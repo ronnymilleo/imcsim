@@ -56,14 +56,14 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   colors on the schematic
 - Poles and zeros from an input source to a node, on an s-plane with their frequency, quality factor and damping, and
   marked on the Bode plot of an AC sweep
-- S-parameters of two or more ports, set on Block pin markers: a Smith chart with the impedance, VSWR and return loss
+- S-parameters of one port (Nodalys) or two or more, set on Block pin markers: a Smith chart with the impedance, VSWR and return loss
   under the pointer, magnitude and phase plots, and the whole matrix saved as a Touchstone `.sNp` file
 - A truth table of a digital circuit: every combination of the chosen logic inputs and the 0, 1 or X it gives at the
   measured outputs
 - Two simulation engines, picked in Edit > Preferences > Simulation: ngspice, the default, and Nodalys, a solver written
   for imcsim from published circuit theory and tested against closed-form results and against ngspice on every
-  example. Nodalys runs every analysis of ngspice, with temperature, fuses, behavioral sources and seedable noise and
-  random sources, and what it does not cover is refused with the reason (see the
+  example. Nodalys runs every analysis of ngspice, with temperature, fuses, behavioral sources, blocks imported from
+  SPICE libraries and seedable noise and random sources, and what it does not cover is refused with the reason (see the
   [user guide](docs/user_guide.md#choosing-the-simulation-engine)). It also comes as `nodalys`, a command line that
   reads SPICE netlists
 - A harmonic balance, on Nodalys: the periodic steady state of a circuit driven at one frequency, with the amplitude
@@ -151,7 +151,7 @@ roughly in the order they are likely to come.
 - **Sources, parts and models**: XSPICE analog blocks (transfer functions, limiters, integrators), transmission lines,
   a circuit driven from a WAV or CSV file, PWL points read from a CSV file, and a MOSFET body diode and higher-level
   MOSFET models
-- **Nodalys**: blocks kept as SPICE text, and initial voltages of nodes set in the editor
+- **Nodalys**: initial voltages of nodes set in the editor
 
 ## Install
 

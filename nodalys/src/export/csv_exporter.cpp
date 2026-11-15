@@ -6,11 +6,40 @@
 #include "nodalys/exporters.h"
 
 #include <algorithm>
+#include <complex>
 #include <format>
 #include <numbers>
+#include <optional>
 #include <sstream>
 
 namespace Nodalys {
+
+namespace {
+
+/// The header of the columns of a matrix of ports, such as Z11_re,Z11_im for the impedance.
+void WritePortMatrixHeader(std::ostringstream &ss, const char letter, const int ports) {
+    for (int i = 1; i <= ports; ++i) {
+        for (int j = 1; j <= ports; ++j) {
+            ss << std::format(",{0}{1}{2}_re,{0}{1}{2}_im", letter, i, j);
+        }
+    }
+}
+
+/// The columns of a matrix of ports at one frequency, empty where the circuit has no finite matrix.
+void WritePortMatrixRow(std::ostringstream &ss, const std::optional<PortMatrix> &matrix, const int ports) {
+    for (int i = 0; i < ports; ++i) {
+        for (int j = 0; j < ports; ++j) {
+            if (matrix) {
+                const std::complex<double> value = (*matrix)[static_cast<std::size_t>(i * ports + j)];
+                ss << std::format(",{:.8g},{:.8g}", value.real(), value.imag());
+            } else {
+                ss << ",,";
+            }
+        }
+    }
+}
+
+} // namespace
 
 std::string ExportCsv(const OperatingPointResult &result) {
     std::ostringstream ss;
@@ -162,6 +191,12 @@ std::string ExportCsv(const SParameterResult &result) {
             ss << std::format(",S{0}{1}_dB,S{0}{1}_deg,S{0}{1}_re,S{0}{1}_im", i, j);
         }
     }
+    const bool has_matrices = result.ImpedanceMatrices.size() == result.Frequencies.size() &&
+                              result.AdmittanceMatrices.size() == result.Frequencies.size();
+    if (has_matrices) {
+        WritePortMatrixHeader(ss, 'Z', ports);
+        WritePortMatrixHeader(ss, 'Y', ports);
+    }
     ss << "\n";
 
     constexpr double RAD_TO_DEG = 180.0 / std::numbers::pi;
@@ -175,6 +210,10 @@ std::string ExportCsv(const SParameterResult &result) {
                 const double phase_deg = std::arg(s) * RAD_TO_DEG;
                 ss << std::format(",{:.8g},{:.8g},{:.8g},{:.8g}", mag_db, phase_deg, s.real(), s.imag());
             }
+        }
+        if (has_matrices) {
+            WritePortMatrixRow(ss, result.ImpedanceMatrices[pt], ports);
+            WritePortMatrixRow(ss, result.AdmittanceMatrices[pt], ports);
         }
         ss << "\n";
     }

@@ -217,7 +217,8 @@ ExportFigure SParameterTab::BuildFigure(const bool is_table) const {
  *          Touchstone file.
  */
 void SParameterTab::DrawControls(const Core::SParameters &result, PlotExporter &exporter) {
-    ImGui::TextUnformatted(std::format("S-parameters of {} ports, {}Hz to {}Hz, {} points", result.GetPortCount(),
+    ImGui::TextUnformatted(std::format("S-parameters of {} {}, {}Hz to {}Hz, {} points", result.GetPortCount(),
+                                       result.GetPortCount() == 1 ? "port" : "ports",
                                        Core::FormatValue(result.Frequencies.front()),
                                        Core::FormatValue(result.Frequencies.back()), result.Frequencies.size())
                                .c_str());

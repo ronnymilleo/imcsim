@@ -82,6 +82,7 @@ add_executable(imcsim-tests
             ready_blocks_tests.cpp
             result_store_tests.cpp
             run_status_tests.cpp
+            s_parameter_ports_tests.cpp
             s_parameter_view_tests.cpp
             s_parameters_tests.cpp
             schematic_canvas_tests.cpp

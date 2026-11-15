@@ -713,6 +713,9 @@ The panel gives the RMS noise over the whole range at the output and at the inpu
 the output noise, largest first, as RMS and as a percentage of the noise power (the percentages add up to 100).
 Check a part to plot its share; parts whose noise does not reach the output are left out.
 
+The Noise example (Examples > Basics) is a 10k and 10n low-pass with the analysis saved: its output noise totals the
+sqrt(kT/C) of the capacitor, whatever the resistor.
+
 When the input source hardly reaches the output (a gain under -120 dB, as through a logic gate), its input-referred
 noise would only grow without meaning, so it is left out and the tab says why. When no noise reaches the output at
 all, as on a node an ideal source holds, the tab says so instead of an empty plot. [Simulation models](models.md) lists which parts add noise.
@@ -737,6 +740,9 @@ The Transfer function tab of the Output window is a table of three values:
 
 An output an ideal voltage source holds has an output impedance of 0 Ohm, and an input path held open reads as
 `open` rather than a giant number. The table is a readout like the operating point, so it is not exported.
+
+The Transfer function example (Examples > Basics) is a resistive attenuator whose gain of 0.5 and impedances of
+20 kOhm and 5 kOhm can be checked by hand.
 
 ## Sensitivity
 
@@ -825,22 +831,24 @@ of 0 is a perfect match and an S21 of 0 dB passes everything.
 
 **Ports**: the ports are Block pin markers of the top-level schematic. Select a marker, turn on **S-parameter port**
 in its properties, and set its **Number** and **Z0**. A new port takes the lowest number no other marker uses; the
-numbers must run from 1 to N with no gap and no repeat, and the symbol reads `P1`, `P2 (OUT)`. A marker that is not a
-port does nothing here, and a port is invisible to every other analysis: only in an S-parameter run does imcsim put a
-source and the reference impedance at its node. Inside a block, port settings are kept and ignored. The analysis needs two
-or more ports in all, a Ground in the circuit, a node of its own for each port (not ground, not shared) and a Z0 above
-zero; imcsim says which is wrong before it runs.
+numbers must run from 1 to N with no gap and no repeat, in whatever order the markers sit, and the symbol reads `P1`,
+`P2 (OUT)`. A marker that is not a port does nothing here, and a port is invisible to every other analysis: only in an
+S-parameter run does imcsim put a source and the reference impedance at its node. Inside a block, port settings are
+kept and ignored. The analysis needs a Ground in the circuit, at least one port with Nodalys (two with ngspice), a node
+of its own for each port (not ground, not shared) and a Z0 above zero; imcsim says which is wrong before it runs.
 
-**Measuring a one-port**: the analysis needs two ports, as ngspice refuses a single one. Add a second port on an
-isolated node, with nothing connected to it: S11 is then the reflection of the first port, and S22 reads 1.
+**Measuring a one-port**: with Nodalys, a single port is enough: S11 is the reflection of the circuit, and the readings
+under the pointer and the Touchstone file (`.s1p`) work as with more ports. ngspice refuses a single port, and the
+message says so and that Nodalys takes one; to measure a one-port on ngspice, add a second port on an isolated node,
+with nothing connected to it: S11 is then the reflection of the first port, and S22 reads 1.
 
 **Bias**: a port holds its node at 0 V in DC and loads the circuit with its reference impedance, so a node that has a
 bias belongs behind a capacitor (or an inductor, for a port on a supply line), as the bias tee of a network analyzer
 does. The circuit's own sources keep their DC value and are AC ground for the measurement.
 
 **Settings**: pick S-parameters beside Run, then the **Start** and **Stop** frequencies (1 MHz to 1 GHz by default),
-the **Sweep** type and the points: log with points per decade (100 by default), or linear with the number of points in all (at least 3,
-since ngspice gives a single point for two). The settings are saved with the schematic. Circuits with logic gates or
+the **Sweep** type and the points: log with points per decade (100 by default), or linear with the number of points in all (at least 2
+with Nodalys, and at least 3 with ngspice, which gives a single point for two; the field follows the engine in use). The settings are saved with the schematic. Circuits with logic gates or
 flip-flops cannot run it, and the analysis is disabled with that reason as its tooltip.
 
 The **S-parameters** tab of the Output window has:
@@ -858,6 +866,11 @@ The **S-parameters** tab of the Output window has:
   the impedance the port sees, absolute and normalized, computed from S as Z0 (1 + S) / (1 - S), the VSWR,
   (1 + |S|) / (1 - |S|), and the return loss, -20 log |S| (positive when the port absorbs power); an open circuit or a
   perfect match reads infinite.
+
+Nodalys also works out the impedance (Z) and admittance (Y) matrices of the ports at every frequency, exact where
+they exist and absent where the circuit has no finite one (Z of two ports joined only by a series element, Y of a port
+shorted to ground), and ngspice does not, as its Z matrix is unusable then. They are not shown in the tab yet: the
+impedance a reflection reads is still computed from S.
 
 **Exports**: Export... saves the plot shown as an SVG image (the Smith chart or the magnitude and phase panels, redrawn
 from the data, in the light or dark theme) or as a CSV table with the frequency and the real and imaginary parts of each
@@ -906,8 +919,8 @@ imcsim solves circuits with one of two engines, picked in Edit > Preferences > S
   step of the inputs, with no X states), so an AC sweep or a noise analysis sees through them, and a run is repeatable
   from its seed even for white and 1/f noise.
 
-Pick ngspice when you want the established reference, an X state in a latch or a library model that is only SPICE
-text. Pick Nodalys for the harmonic balance, for an AC sweep or a noise analysis of a circuit with logic gates, or to
+Pick ngspice when you want the established reference, an X state in a latch, or a library model that holds more than
+Nodalys reads (see below). Pick Nodalys for the harmonic balance, for an AC sweep or a noise analysis of a circuit with logic gates, or to
 compare the two engines on a circuit: a difference between them is worth a second look at the circuit. Both use the
 same part models (see the models page, which lists where Nodalys differs). For poles and zeros, prefer Nodalys: ngspice
 can return nothing, drop roots or return right-half-plane roots that are not real on some circuits.
@@ -919,10 +932,18 @@ What an engine cannot run is said, not guessed at:
   voltage-controlled switch or a relay in the harmonic balance, and logic gates and flip-flops in the sensitivity,
   pole-zero and S-parameters analyses with either engine (and with ngspice also in any analysis when its digital
   models, `digital.cm`, are missing).
+- The S-parameters analysis asks for different things of the ports and the sweep: ngspice needs at least two ports and
+  three points of a linear sweep, and Nodalys takes one port and two points. The refusal says which, and that the other
+  engine takes it.
 - Other limits depend on what a part holds, so they show when you run, as an error with the reason: on Nodalys, a
   behavioral source whose expression uses something it does not read (`limit()`, the random functions, `hertz`, or
   `time` in the harmonic balance), a MOSFET model that is not level 1, and a block imported from a library, which is
-  kept as SPICE text.
+  kept as SPICE text, when its text holds something Nodalys cannot simulate. Nodalys reads the resistors, capacitors,
+  inductors, DC and AC sources, controlled and behavioral sources, diodes, bipolar and level 1 MOSFET transistors,
+  switches and nested subcircuits of such a text, with its `.param` lines, `{expressions}` and `.model` cards; it
+  refuses the rest by name, such as a JFET, a source waveform, a `.func` or a transmission line, and says so before
+  the run. A model parameter its devices do not read, such as a junction capacitance of a substrate, is named in a
+  message of the run.
 
 A run keeps the engine it started on, a paused live run too. If you change the engine in Preferences meanwhile, the
 change takes effect once no run is using it, that is, once the run ends, or its paused live run is ended or
@@ -950,6 +971,8 @@ Amplitudes are peak values or RMS ones, as Preferences > Results > Harmonic ampl
 switch); DC is never scaled. The tables list DC and THD per trace and each harmonic with its phase. The Stop button
 ends a long run between its iterations. Export saves the plot as SVG or CSV, and Export CSV... the spectra and the
 waveforms together.
+
+The Harmonic balance example (Examples > Diodes) is a half-wave rectifier on a 1 kHz sine, with the analysis saved.
 
 ## Exports
 

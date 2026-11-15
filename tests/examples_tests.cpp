@@ -11,6 +11,7 @@
 #include "circuit/components/source.h"
 #include "circuit/components/switch.h"
 #include "digital_models.h"
+#include "nodalys_in_use.h"
 #include "plots/spectrum.h"
 #include "results/circuit_snapshot.h"
 #include "results/fuse_readings.h"
@@ -131,14 +132,6 @@ TEST_CASE("Every example either runs on Nodalys or is flagged unsupported", "[ex
         const auto unsupported = Core::FindUnsupported(nodalys, circuit, Core::AnalysisKind::OPERATING_POINT);
         if (unsupported.has_value()) {
             CHECK(unsupported->find("Nodalys") != std::string::npos);
-            continue;
-        }
-
-        // The precision rectifier example uses a vendor op-amp subcircuit kept as raw SPICE text
-        if (std::string_view(example.FileName) == "precision_rectifier.imcsim") {
-            const Core::OperatingPointRun op = nodalys.RunOperatingPoint(circuit, std::nullopt);
-            REQUIRE_FALSE(op.Result.has_value());
-            CHECK(op.Result.error().find("SPICE text") != std::string::npos);
             continue;
         }
 
@@ -1449,4 +1442,76 @@ TEST_CASE("The Monte Carlo bias example spreads the collector voltage around its
     INFO(std::format("Collector {} V nominal, {} to {} V", nominal, lowest, highest));
     CHECK(lowest < nominal - 0.2);
     CHECK(highest > nominal + 0.2);
+}
+
+TEST_CASE("The noise example opens on its noise analysis and totals the kT/C noise of the capacitor", "[examples]") {
+    GUI::Schematic schematic;
+    OpenExample("noise_analysis_rc_low_pass.imcsim", schematic);
+    const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
+    REQUIRE(settings.Selected == GUI::Analysis::NOISE);
+    REQUIRE(settings.NoiseOutput.has_value());
+
+    const Core::NoiseRun run = Core::RunNoise(schematic.BuildCircuit(),
+                                              {.OutputNode = static_cast<int>(NodeAt(schematic, *settings.NoiseOutput)),
+                                               .InputSource = settings.NoiseSource,
+                                               .StartFrequency = settings.NoiseRange.StartFrequency,
+                                               .StopFrequency = settings.NoiseRange.StopFrequency,
+                                               .PointsPerDecade = settings.NoiseRange.PointsPerDecade});
+    REQUIRE(run.Result.has_value());
+    const Core::Noise &noise = *run.Result;
+    // R1 is the only source of noise, and the noise it puts on C1 integrates to sqrt(kT/C), whatever its value:
+    // for 10 nF at 27 degrees Celsius is 0.64 uV
+    constexpr double BOLTZMANN = 1.380649e-23;
+    constexpr double TEMPERATURE_KELVIN = 300.15;
+    const double expected_total = std::sqrt(BOLTZMANN * TEMPERATURE_KELVIN / 10e-9);
+    INFO(noise.OutputTotal);
+    CHECK_THAT(noise.OutputTotal, Catch::Matchers::WithinRel(expected_total, 0.05));
+    // Flat at the 4kTR density of 10k, 12.9 nV/sqrt(Hz), far below the 1.6 kHz corner
+    CHECK_THAT(noise.OutputDensities.front(),
+               Catch::Matchers::WithinRel(std::sqrt(4.0 * BOLTZMANN * 300.15 * 10e3), 0.02));
+    REQUIRE(noise.Contributions.size() == 1);
+    CHECK(noise.Contributions.front().Name == "R1");
+}
+
+TEST_CASE("The transfer function example reads a gain of 0.5 and impedances of 20 kOhm and 5 kOhm", "[examples]") {
+    GUI::Schematic schematic;
+    OpenExample("transfer_function_attenuator.imcsim", schematic);
+    const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
+    REQUIRE(settings.Selected == GUI::Analysis::TRANSFER_FUNCTION);
+    REQUIRE(settings.TransferFunctionOutput.has_value());
+
+    const Core::TransferFunctionRun run = Core::RunTransferFunction(
+        schematic.BuildCircuit(), {.OutputNode = static_cast<int>(NodeAt(schematic, *settings.TransferFunctionOutput)),
+                                   .InputSource = settings.TransferFunctionSource});
+    REQUIRE(run.Result.has_value());
+    // R2 and R3 in parallel make 10k, so R1 and they halve the input; the source sees 10k + 10k and the output node
+    // looks back into R1, R2 and R3 in parallel
+    CHECK_THAT(run.Result->Gain, Catch::Matchers::WithinRel(0.5, 1e-3));
+    CHECK_THAT(run.Result->InputImpedance, Catch::Matchers::WithinRel(20e3, 1e-3));
+    CHECK_THAT(run.Result->OutputImpedance, Catch::Matchers::WithinRel(5e3, 1e-3));
+}
+
+TEST_CASE("The harmonic balance example finds a rectified DC level with harmonics of the line frequency",
+          "[examples]") {
+    GUI::Schematic schematic;
+    OpenExample("harmonic_balance_rectifier.imcsim", schematic);
+    const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
+    REQUIRE(settings.Selected == GUI::Analysis::HARMONIC_BALANCE);
+
+    const TestSupport::NodalysInUse nodalys;
+    const Core::HarmonicBalanceRun run = Core::RunHarmonicBalance(schematic.BuildCircuit(), settings.HarmonicBalance);
+    REQUIRE(run.Result.has_value());
+    const Core::HarmonicBalance &balance = *run.Result;
+    CHECK_THAT(balance.FundamentalFrequency, Catch::Matchers::WithinRel(1e3, 1e-9));
+    CHECK(balance.Frequencies.size() == static_cast<std::size_t>(settings.HarmonicBalance.Harmonics) + 1);
+    const std::size_t output = NodeAt(schematic, {11, 4});
+    const std::vector<std::complex<double>> &phasors = balance.NodePhasors[output];
+    // The 5 V peak sine leaves a DC level well under it, as the 1 ms time constant lets the capacitor droop a lot, and
+    // that ripple puts its energy in the harmonics, falling with their order
+    INFO(std::abs(phasors[0]));
+    CHECK(phasors[0].real() > 2.5);
+    CHECK(phasors[0].real() < 4.0);
+    CHECK(std::abs(phasors[1]) > 0.1);
+    CHECK(std::abs(phasors[1]) > std::abs(phasors[3]));
+    CHECK(balance.Warnings.empty());
 }

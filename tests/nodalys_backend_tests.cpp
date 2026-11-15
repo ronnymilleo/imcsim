@@ -107,6 +107,42 @@ struct BehavioralStage {
     }
 };
 
+/**
+ * @struct  SpiceBlockCircuit
+ * @brief   A 10 V supply on node 1 feeding two instances of a block kept as SPICE text in series to node 3, loaded by
+ *          4k to ground; the nodes between and inside the instances are the block's own.
+ * @details The block is a divider written as text: a series resistor RTOP, a parameter with the default 1k, and a
+ *          shunt of 3 times that. Each instance is X1 and X2, with the ports IN and OUT on nodes 1 and 2, then 2 and 3.
+ */
+struct SpiceBlockCircuit {
+    Core::VCC Supply;
+    Core::Resistor Load;
+    Core::Ground Reference;
+    Core::SubcircuitInstance First{"SERIES", {"IN", "OUT"}};
+    Core::SubcircuitInstance Second{"SERIES", {"IN", "OUT"}};
+    Core::Circuit Circuit;
+
+    explicit SpiceBlockCircuit(const std::string &text) {
+        Supply.SetName("V1");
+        Supply.SetValue(10.0);
+        Load.SetName("RL");
+        Load.SetValue(4e3);
+        First.SetName("X1");
+        Second.SetName("X2");
+        auto definition = std::make_shared<Core::SubcircuitDefinition>();
+        definition->Name = "SERIES";
+        definition->Pins = {{"IN", 0}, {"OUT", 0}};
+        definition->Parameters = {{"RTOP", 1e3}};
+        definition->Spice = Core::SubcircuitText{.Ports = {"IN", "OUT"}, .Text = text};
+        Circuit.AddSubcircuit(definition);
+        Circuit.Add(Supply, {1});
+        Circuit.Add(First, {1, 2});
+        Circuit.Add(Second, {2, 3});
+        Circuit.Add(Load, {3, 0});
+        Circuit.Add(Reference, {0});
+    }
+};
+
 Core::Transient RunTransient(Core::SimulationBackend &backend, const Core::Circuit &circuit, double stop, double step) {
     Core::TransientRun run = backend.RunTransient(circuit, {.StopTime = stop, .TimeStep = step}, std::nullopt, {});
     REQUIRE(run.Result.has_value());
@@ -1090,4 +1126,71 @@ TEST_CASE("Nodalys sensitivity includes block instances by their dominant inner 
     REQUIRE(found != run.Result->Parts.end());
     CHECK(found->Unit == "Ohm");
     CHECK_THAT(std::abs(found->Normalized), WithinRel(0.75, 1e-4));
+}
+
+TEST_CASE("Nodalys simulates a block kept as SPICE text, each instance with its own nodes and parameters",
+          "[nodalys][spice_text]") {
+    // A series resistor from a parameter, and a node MID of the block's own that two instances must not share
+    const SpiceBlockCircuit blocks("R1 IN MID {RTOP}\nR2 MID OUT {RTOP}\n");
+    Core::NodalysBackend backend;
+    const Core::OperatingPointRun run = backend.RunOperatingPoint(blocks.Circuit, std::nullopt);
+    REQUIRE(run.Result.has_value());
+    // Each instance is 2k with the default; 10 V over 2k + 2k + 4k puts node 2 at 7.5 V and node 3 at 5 V
+    CHECK_THAT(run.Result->NodeVoltages[2], WithinRel(7.5, 1e-6));
+    CHECK_THAT(run.Result->NodeVoltages[3], WithinRel(5.0, 1e-6));
+    // The results hold the nodes of the circuit only, not the two MID nodes
+    CHECK(run.Result->NodeVoltages.size() == 4);
+    CHECK_THAT(CurrentOf(*run.Result, "X1.R1"), WithinRel(CurrentOf(*run.Result, "X1.R2"), 1e-6));
+    CHECK_THAT(CurrentOf(*run.Result, "X1.R1"), WithinRel(10.0 / 8e3, 1e-6));
+
+    // An instance value replaces the default of its own instance only
+    SpiceBlockCircuit overridden("R1 IN MID {RTOP}\nR2 MID OUT {RTOP}\n");
+    overridden.Second.SetParameter("RTOP", 3e3);
+    const Core::OperatingPointRun changed = backend.RunOperatingPoint(overridden.Circuit, std::nullopt);
+    REQUIRE(changed.Result.has_value());
+    // 2k, then 6k, then 4k: node 3 is 10 V * 4k / 12k
+    CHECK_THAT(changed.Result->NodeVoltages[3], WithinRel(10.0 * 4e3 / 12e3, 1e-6));
+}
+
+TEST_CASE("A block kept as SPICE text runs a transient and an AC sweep on Nodalys", "[nodalys][spice_text]") {
+    // Each instance is a 1k resistor and a 100 nF capacitor from an expression, so the circuit is two RC sections
+    SpiceBlockCircuit blocks("R1 IN OUT {RTOP}\nC1 OUT 0 {100n}\n");
+    Core::NodalysBackend backend;
+    const Core::Transient transient = RunTransient(backend, blocks.Circuit, 2e-3, 1e-6);
+    CHECK(transient.NodeVoltages[2].back() > 0.0);
+    const Core::ACSweepRun sweep = backend.RunACSweep(
+        blocks.Circuit, {.StartFrequency = 10.0, .StopFrequency = 1e5, .PointsPerDecade = 5}, std::nullopt);
+    CHECK(sweep.Result.has_value());
+}
+
+TEST_CASE("Nodalys tells before the run that a block kept as SPICE text holds what it cannot simulate",
+          "[nodalys][spice_text]") {
+    const Core::NodalysBackend backend;
+    const SpiceBlockCircuit fine("R1 IN OUT {RTOP}\n");
+    CHECK_FALSE(Core::FindUnsupported(backend, fine.Circuit, Core::AnalysisKind::OPERATING_POINT).has_value());
+
+    const SpiceBlockCircuit jfet("J1 OUT IN 0 JMOD\nR1 IN OUT 1k\n");
+    const std::optional<std::string> reason =
+        Core::FindUnsupported(backend, jfet.Circuit, Core::AnalysisKind::TRANSIENT);
+    REQUIRE(reason.has_value());
+    CHECK(reason->contains("SERIES"));
+    CHECK(reason->contains("J1 OUT IN 0 JMOD"));
+    CHECK(reason->contains("JFET"));
+
+    // The run says the same, since the editor disabled it before
+    const TestSupport::NodalysInUse in_use;
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(jfet.Circuit);
+    REQUIRE_FALSE(run.Result.has_value());
+    CHECK(run.Result.error() == *reason);
+}
+
+TEST_CASE("A model parameter of a block kept as SPICE text that Nodalys does not read comes back as a message",
+          "[nodalys][spice_text]") {
+    const SpiceBlockCircuit blocks("D1 IN OUT DMOD\n.model DMOD D(IS=1e-14 CJS=2p)\n");
+    Core::NodalysBackend backend;
+    const Core::OperatingPointRun run = backend.RunOperatingPoint(blocks.Circuit, std::nullopt);
+    REQUIRE(run.Result.has_value());
+    REQUIRE_FALSE(run.Messages.empty());
+    CHECK(run.Messages.front().Text.contains("CJS"));
+    CHECK_FALSE(run.Messages.front().FromErrorStream);
 }

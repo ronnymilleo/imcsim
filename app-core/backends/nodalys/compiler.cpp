@@ -171,6 +171,25 @@ Nodalys::BoyleOpAmpParameters MakeBoyleParams(const OpAmpParameters &params) {
     };
 }
 
+Nodalys::SubcircuitText MakeSpiceText(const std::string &name, const SubcircuitText &spice) {
+    return {.Name = name, .Ports = spice.Ports, .Body = spice.Text};
+}
+
+/**
+ * @brief   The value of each parameter an instance of a block is used with: the defaults of the definition, then what
+ *          the instance sets.
+ */
+Parameters InstanceParameters(const SubcircuitInstance &instance, const SubcircuitDefinition &definition) {
+    Parameters values;
+    for (const SubcircuitParameter &parameter : definition.Parameters) {
+        values[parameter.Name] = parameter.DefaultValue;
+    }
+    for (const auto &[name, value] : instance.GetParameters()) {
+        values[name] = value;
+    }
+    return values;
+}
+
 class CircuitCompiler {
 public:
     explicit CircuitCompiler(const Circuit &circuit) : m_Circuit(circuit) {}
@@ -195,19 +214,27 @@ public:
         return m_Builder->Build();
     }
 
+    std::vector<std::string> TakeWarnings() { return std::move(m_Warnings); }
+
 private:
     const Circuit &m_Circuit;
     std::unique_ptr<Nodalys::CircuitBuilder> m_Builder;
+    std::vector<std::string> m_Warnings;
 
-    Parameters InstanceParameters(const SubcircuitInstance &instance, const SubcircuitDefinition &definition) {
-        Parameters values;
-        for (const SubcircuitParameter &parameter : definition.Parameters) {
-            values[parameter.Name] = parameter.DefaultValue;
+    /**
+     * @brief   Hands a block kept as SPICE text to the engine, which reads it as an instance of its own.
+     */
+    std::expected<void, std::string> AddSpiceBlock(const SubcircuitDefinition &definition, const SubcircuitText &spice,
+                                                   const SubcircuitInstance &instance, const std::vector<int> &nodes,
+                                                   const std::string &instance_prefix) {
+        const auto added = Nodalys::AddSubcircuitText(
+            *m_Builder, MakeSpiceText(definition.Name, spice),
+            {.Prefix = instance_prefix, .PortNodes = nodes, .Parameters = InstanceParameters(instance, definition)});
+        if (!added) {
+            return std::unexpected(added.error());
         }
-        for (const auto &[name, value] : instance.GetParameters()) {
-            values[name] = value;
-        }
-        return values;
+        m_Warnings.insert(m_Warnings.end(), added->begin(), added->end());
+        return {};
     }
 
     std::expected<void, std::string> AddCircuit(const Circuit &circuit, const std::vector<int> &node_map,
@@ -412,9 +439,10 @@ private:
             if (!definition) {
                 return std::unexpected(std::format("The subcircuit {} is not defined", instance.GetDefinitionName()));
             }
+            const std::string sub_prefix =
+                prefix.empty() ? instance.GetName() : std::format("{}.{}", prefix, instance.GetName());
             if (definition->Spice) {
-                return std::unexpected(std::format(
-                    "Nodalys cannot simulate the subcircuit {}, which is kept as SPICE text", definition->Name));
+                return AddSpiceBlock(*definition, *definition->Spice, instance, nodes, sub_prefix);
             }
             const std::set<int> used = UsedNodes(definition->Body);
             std::vector<int> body_map(static_cast<std::size_t>(definition->Body.GetNodeCount()), 0);
@@ -428,8 +456,6 @@ private:
                     body_map[static_cast<std::size_t>(body_node)] = m_Builder->AddNode();
                 }
             }
-            const std::string sub_prefix =
-                prefix.empty() ? instance.GetName() : std::format("{}.{}", prefix, instance.GetName());
             return AddCircuit(definition->Body, body_map, InstanceParameters(instance, *definition), sub_prefix);
         }
 
@@ -685,8 +711,36 @@ private:
 
 } // namespace
 
-std::expected<Nodalys::Circuit, std::string> CompileCircuit(const Circuit &circuit) {
-    return CircuitCompiler(circuit).Compile();
+/**
+ * @brief   Compiles a circuit for Nodalys.
+ * @param[in]  circuit    Circuit to compile.
+ * @param[out] warnings   Receives what the engine says about the blocks kept as SPICE text it read, or null to
+ *                        ignore it.
+ * @return  The compiled circuit, or why the circuit cannot be simulated by Nodalys.
+ */
+std::expected<Nodalys::Circuit, std::string> CompileCircuit(const Circuit &circuit,
+                                                            std::vector<std::string> *warnings) {
+    CircuitCompiler compiler(circuit);
+    auto compiled = compiler.Compile();
+    if (warnings != nullptr) {
+        *warnings = compiler.TakeWarnings();
+    }
+    return compiled;
+}
+
+/**
+ * @brief   Tells why Nodalys cannot simulate a block of SPICE text, before a run asks it to.
+ * @param[in] circuit   Circuit that holds the definition of the block.
+ * @param[in] instance  The use of the block.
+ * @return  The reason, written for the user, or none when the block can be simulated or is drawn.
+ */
+std::optional<std::string> FindSpiceBlockProblem(const Circuit &circuit, const SubcircuitInstance &instance) {
+    const std::shared_ptr<const SubcircuitDefinition> definition = circuit.FindSubcircuit(instance.GetDefinitionName());
+    if (!definition || !definition->Spice) {
+        return std::nullopt;
+    }
+    return Nodalys::CheckSubcircuitText(MakeSpiceText(definition->Name, *definition->Spice),
+                                        InstanceParameters(instance, *definition));
 }
 
 } // namespace Core

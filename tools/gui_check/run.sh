@@ -25,20 +25,21 @@
 # named by engine and numbered in order, such as nodalys_03_transient.png, and those are to be looked at before a
 # change is called good.
 #
-# The circuit of each analysis (examples/ unless noted; fixtures/ are examples with the settings of that analysis
-# saved, for the analyses that no example has):
+# The circuit of each analysis (examples/ unless noted; fixtures/ holds the stepped parameter and the live
+# potentiometer, which no example saves):
 #
 #   Operating point        voltage_divider
 #   Transient              led_driver, decade_counter (logic parts), noise_through_rc_low_pass (random source)
 #   AC sweep               rc_low_pass_filter
 #   DC sweep               zener_regulator
-#   Noise                  fixtures/noise_rc_low_pass (the RC low-pass of the AC example, no example has .noise)
-#   Transfer function      fixtures/transfer_function_divider (the voltage divider, no example has .tf)
+#   Noise                  noise_analysis_rc_low_pass
+#   Transfer function      transfer_function_attenuator
 #   Sensitivity            bias_sensitivity
 #   Poles and zeros        rlc_low_pass_poles_and_zeros
-#   S-parameters           s_parameters_lc_low_pass
+#   S-parameters           s_parameters_lc_low_pass; fixtures/s_parameters_one_port (the same filter with its second
+#                          port turned off): Nodalys gives S11, ngspice refuses it, since it needs two ports
 #   Truth table            logic_truth_table
-#   Harmonic balance       fixtures/harmonic_balance_rectifier (a diode rectifier on a sine, no example has it);
+#   Harmonic balance       harmonic_balance_rectifier
 #                          Nodalys only: with ngspice the step expects it disabled and refused with its reason
 #   Stepped parameter      fixtures/parameter_step_rc_low_pass (R1 of the RC low-pass over a list)
 #   Stepped source         bjt_output_characteristics (DC sweep of V1, stepping I1)
@@ -247,16 +248,28 @@ check_analyses() {
     check_circuit_run transient led_driver Spectrum
     check_circuit_run ac_sweep rc_low_pass_filter Magnitude
     check_circuit_run dc_sweep zener_regulator Cursors
-    check_circuit_run noise noise_rc_low_pass Share
-    check_circuit_run transfer_function transfer_function_divider impedance
+    check_circuit_run noise noise_analysis_rc_low_pass Share
+    check_circuit_run transfer_function transfer_function_attenuator impedance
     check_circuit_run sensitivity bias_sensitivity Share
     check_circuit_run poles_and_zeros rlc_low_pass_poles_and_zeros Poles
     check_circuit_run s_parameters s_parameters_lc_low_pass Smith
+    check_s_parameters_one_port
     check_circuit_run truth_table logic_truth_table 'combinations;?'
     check_harmonic_balance
     # Logic parts and a random source in a transient, the two things the engines treat differently
     check_circuit_run transient_logic decade_counter Spectrum
     check_circuit_run transient_noise_source noise_through_rc_low_pass Spectrum
+}
+
+# Nodalys measures a single port; ngspice needs two, so the run is refused with the reason
+check_s_parameters_one_port() {
+    open_circuit s_parameters_one_port
+    run_and_wait
+    if [[ "$ENGINE" == ngspice ]]; then
+        check_step s_parameters_one_port_refused 'S-parameters' failed 'two'
+    else
+        check_step s_parameters_one_port Smith "done"
+    fi
 }
 
 # Nodalys runs it and plots the spectra; ngspice cannot, so the run is refused with the reason

@@ -314,11 +314,18 @@ std::string_view NgspiceBackend::GetName() const {
  */
 const BackendCapabilities &NgspiceBackend::GetCapabilities() const {
     std::call_once(m_CapabilitiesReady, [this] {
-        m_Capabilities = {.Analyses = {AnalysisKind::OPERATING_POINT, AnalysisKind::TRANSIENT, AnalysisKind::AC_SWEEP,
-                                       AnalysisKind::DC_SWEEP, AnalysisKind::NOISE, AnalysisKind::TRANSFER_FUNCTION,
-                                       AnalysisKind::SENSITIVITY, AnalysisKind::POLE_ZERO, AnalysisKind::S_PARAMETERS},
-                          .UnsupportedParts = {},
-                          .UnsupportedPartsByAnalysis = {}};
+        m_Capabilities = {
+            .Analyses = {AnalysisKind::OPERATING_POINT, AnalysisKind::TRANSIENT, AnalysisKind::AC_SWEEP,
+                         AnalysisKind::DC_SWEEP, AnalysisKind::NOISE, AnalysisKind::TRANSFER_FUNCTION,
+                         AnalysisKind::SENSITIVITY, AnalysisKind::POLE_ZERO, AnalysisKind::S_PARAMETERS},
+            .UnsupportedParts = {},
+            .UnsupportedPartsByAnalysis = {},
+            .TemperatureUnsupported = std::nullopt,
+            .SParameters = {.MinPorts = 2,
+                            .MinPortsReason = "ngspice needs at least two S-parameter ports, and Nodalys takes one",
+                            .MinLinearPoints = 3,
+                            .MinLinearPointsReason = "ngspice gives only the first point for a linear "
+                                                     "sweep of two points, and Nodalys gives both"}};
         // The digital models allocate nodes while ngspice sets up the sensitivity analysis, which it cannot recover
         // from, and they leave the pole-zero solver nothing to follow; the parts are told apart by type, from the
         // first to the last of the enumeration

@@ -31,6 +31,10 @@ constexpr auto AC_SWEEP_KEYS = std::to_array<ParameterKey<Core::ACSweepSettings>
     {"stop", &Core::ACSweepSettings::StopFrequency},
 });
 
+/// Fewest points of a linear S-parameter sweep a file may hold: Nodalys gives two, and a run on ngspice, which needs
+/// more, says so when it starts.
+constexpr int MIN_FILE_LINEAR_S_POINTS = 2;
+
 /// The sweep type and the points are written and read apart.
 constexpr auto S_PARAMETER_KEYS = std::to_array<ParameterKey<Core::SParameterSettings>>({
     {"start", &Core::SParameterSettings::StartFrequency},
@@ -297,7 +301,7 @@ std::expected<void, std::string> ReadSParameterSettings(const nlohmann::json &ob
     }
     if (object.contains("linear_points")) {
         const std::optional<int> points = ReadInt(object, "linear_points");
-        if (!points || *points < 3) {
+        if (!points || *points < MIN_FILE_LINEAR_S_POINTS) {
             return std::unexpected("have no valid linear_points");
         }
         range.LinearPoints = *points;

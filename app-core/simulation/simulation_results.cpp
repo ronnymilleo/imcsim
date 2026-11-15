@@ -6,8 +6,28 @@
 #include "simulation/simulation_results.h"
 
 #include <cmath>
+#include <complex>
+#include <optional>
+#include <vector>
 
 namespace Core {
+
+namespace {
+
+std::optional<std::complex<double>>
+ReadPortMatrix(const std::vector<std::optional<std::vector<std::complex<double>>>> &matrices,
+               const std::size_t frequency, const int ports, const int row, const int column) {
+    if (frequency >= matrices.size()) {
+        return std::nullopt;
+    }
+    const std::optional<std::vector<std::complex<double>>> &matrix = matrices[frequency];
+    if (!matrix) {
+        return std::nullopt;
+    }
+    return (*matrix)[static_cast<std::size_t>((row - 1) * ports + (column - 1))];
+}
+
+} // namespace
 
 /**
  * @brief   Tells how many ports the matrix has.
@@ -29,6 +49,41 @@ std::complex<double> SParameters::Get(const std::size_t frequency, const int row
     const auto ports = static_cast<std::size_t>(GetPortCount());
     return Values[(frequency * ports + static_cast<std::size_t>(row - 1)) * ports +
                   static_cast<std::size_t>(column - 1)];
+}
+
+/**
+ * @brief   Tells whether the backend gave the impedance and admittance matrices.
+ * @return  True when there is one entry per frequency of each, absent or not; false for a result without them.
+ */
+bool SParameters::HasPortMatrices() const {
+    return !Frequencies.empty() && ImpedanceMatrices.size() == Frequencies.size() &&
+           AdmittanceMatrices.size() == Frequencies.size();
+}
+
+/**
+ * @brief   Reads one entry of the impedance matrix.
+ * @param[in] frequency  Index of the frequency in Frequencies.
+ * @param[in] row        Port the voltage is read at, from 1.
+ * @param[in] column    Port the current enters, from 1.
+ * @return  Z(row, column) in ohms; no value when the backend gave no impedance matrices, or the circuit has no finite
+ *          one at this frequency.
+ */
+std::optional<std::complex<double>> SParameters::GetImpedance(const std::size_t frequency, const int row,
+                                                              const int column) const {
+    return ReadPortMatrix(ImpedanceMatrices, frequency, GetPortCount(), row, column);
+}
+
+/**
+ * @brief   Reads one entry of the admittance matrix.
+ * @param[in] frequency  Index of the frequency in Frequencies.
+ * @param[in] row        Port the current is read at, from 1.
+ * @param[in] column     Port the voltage is applied to, from 1.
+ * @return  Y(row, column) in siemens; no value when the backend gave no admittance matrices, or the circuit has no
+ *          finite one at this frequency.
+ */
+std::optional<std::complex<double>> SParameters::GetAdmittance(const std::size_t frequency, const int row,
+                                                               const int column) const {
+    return ReadPortMatrix(AdmittanceMatrices, frequency, GetPortCount(), row, column);
 }
 
 /**

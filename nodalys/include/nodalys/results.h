@@ -140,9 +140,16 @@ struct NoiseResult {
     std::vector<NoiseContribution> Contributions;
 };
 
+/// A square complex matrix of the ports at one frequency, row by row.
+using PortMatrix = std::vector<std::complex<double>>;
+
 /**
  * @struct  SParameterResult
  * @brief   Multiport Scattering Parameters (S-matrix) and derived RF figures of merit across frequency.
+ * @details The impedance and admittance matrices are worked out from the S matrix at every frequency. A matrix is
+ *          absent at a frequency where the circuit has no finite one: Z of two ports joined by a series element and
+ *          nothing else (the ports float), Y of a port shorted to ground. The vectors are empty when a result is built
+ *          without them.
  */
 struct SParameterResult {
     std::vector<double> Frequencies;
@@ -150,6 +157,10 @@ struct SParameterResult {
     std::vector<double> ReferenceOhms;
     /// Flattened complex S-matrix values stored as: [freq_idx][row - 1][col - 1].
     std::vector<std::complex<double>> Values;
+    /// Impedance matrix Z in ohms of each frequency, or none where no finite one exists.
+    std::vector<std::optional<PortMatrix>> ImpedanceMatrices;
+    /// Admittance matrix Y in siemens of each frequency, or none where no finite one exists.
+    std::vector<std::optional<PortMatrix>> AdmittanceMatrices;
     /// Diagnostic warnings.
     std::vector<std::string> Warnings;
 
@@ -159,6 +170,18 @@ struct SParameterResult {
         const auto ports = static_cast<std::size_t>(GetPortCount());
         return Values[(frequency_idx * ports + static_cast<std::size_t>(row - 1)) * ports +
                       static_cast<std::size_t>(column - 1)];
+    }
+
+    /// Z(row, column) at a frequency; none when the result has no impedance matrices or the circuit has no finite Z.
+    std::optional<std::complex<double>> Impedance(const std::size_t frequency_idx, const int row,
+                                                  const int column) const {
+        return ReadMatrix(ImpedanceMatrices, frequency_idx, row, column);
+    }
+
+    /// Y(row, column) at a frequency; none when the result has no admittance matrices or the circuit has no finite Y.
+    std::optional<std::complex<double>> Admittance(const std::size_t frequency_idx, const int row,
+                                                   const int column) const {
+        return ReadMatrix(AdmittanceMatrices, frequency_idx, row, column);
     }
 
     std::optional<double> ReturnLossDb(const std::size_t frequency_idx, const int port) const {
@@ -203,6 +226,21 @@ struct SParameterResult {
             return std::nullopt;
         }
         return z0 * (1.0 + s) / denom;
+    }
+
+private:
+    std::optional<std::complex<double>> ReadMatrix(const std::vector<std::optional<PortMatrix>> &matrices,
+                                                   const std::size_t frequency_idx, const int row,
+                                                   const int column) const {
+        if (frequency_idx >= matrices.size()) {
+            return std::nullopt;
+        }
+        const std::optional<PortMatrix> &matrix = matrices[frequency_idx];
+        if (!matrix) {
+            return std::nullopt;
+        }
+        const auto ports = static_cast<std::size_t>(GetPortCount());
+        return (*matrix)[static_cast<std::size_t>(row - 1) * ports + static_cast<std::size_t>(column - 1)];
     }
 };
 

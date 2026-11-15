@@ -147,6 +147,34 @@ VoltageSourceDevice *FindVoltageSource(const std::map<std::string, Device *> &so
     return nullptr;
 }
 
+/**
+ * @brief   Scales the parameters of a diode by its area, as SPICE does: the currents and the capacitance grow with
+ *          it and the series resistance shrinks.
+ */
+DiodeParameters ScaleByArea(DiodeParameters parameters, const double area) {
+    parameters.SaturationCurrent *= area;
+    parameters.BreakdownCurrent *= area;
+    parameters.JunctionCapacitance *= area;
+    parameters.SeriesResistance /= area;
+    return parameters;
+}
+
+/**
+ * @brief   Scales the parameters of a bipolar transistor by its area, as SPICE does: the currents and the
+ *          capacitances grow with it and the resistances shrink.
+ */
+BjtParameters ScaleByArea(BjtParameters parameters, const double area) {
+    parameters.SaturationCurrent *= area;
+    parameters.LeakageSaturationCurrent *= area;
+    parameters.ForwardKneeCurrent *= area;
+    parameters.EmitterCapacitance *= area;
+    parameters.CollectorCapacitance *= area;
+    parameters.BaseResistance /= area;
+    parameters.CollectorResistance /= area;
+    parameters.EmitterResistance /= area;
+    return parameters;
+}
+
 } // namespace
 
 class CircuitBuilderImpl {
@@ -440,11 +468,10 @@ public:
         });
     }
 
-    void AddDiode(std::string name, NodeId anode, NodeId cathode, const DiodeParameters &params, double area) {
-        (void)area;
+    void AddDiode(std::string name, NodeId anode, NodeId cathode, const DiodeParameters &unit_params, double area) {
         Track(anode);
         Track(cathode);
-        Defer([this, name = std::move(name), anode, cathode, params]() mutable {
+        Defer([this, name = std::move(name), anode, cathode, params = ScaleByArea(unit_params, area)]() mutable {
             const int ua = MapNode(anode);
             const int uc = MapNode(cathode);
             const int internal = (params.SeriesResistance > 0.0) ? AllocateInternalNode() : -1;
@@ -459,12 +486,12 @@ public:
         });
     }
 
-    void AddBjt(std::string name, NodeId c, NodeId b, NodeId e, bool is_npn, const BjtParameters &params, double area) {
-        (void)area;
+    void AddBjt(std::string name, NodeId c, NodeId b, NodeId e, bool is_npn, const BjtParameters &unit_params,
+                double area) {
         Track(c);
         Track(b);
         Track(e);
-        Defer([this, name = std::move(name), c, b, e, is_npn, params]() mutable {
+        Defer([this, name = std::move(name), c, b, e, is_npn, params = ScaleByArea(unit_params, area)]() mutable {
             const int uc = MapNode(c);
             const int ub = MapNode(b);
             const int ue = MapNode(e);

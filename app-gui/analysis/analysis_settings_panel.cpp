@@ -467,13 +467,14 @@ void AnalysisSettingsPanel::DrawSParameterSettings(SimulationSettings &settings)
         range.IsLogarithmic = false;
     }
     DrawFieldLabel("Points");
-    // Files reject too few points, so the fields never produce a value that would not load back
+    // Files reject too few points for any backend, so the fields never produce a value that would not load back
     if (range.IsLogarithmic) {
         if (ImGui::InputInt("per decade", &range.PointsPerDecade)) {
             range.PointsPerDecade = std::max(range.PointsPerDecade, 1);
         }
     } else if (ImGui::InputInt("in all", &range.LinearPoints)) {
-        range.LinearPoints = std::max(range.LinearPoints, 3);
+        range.LinearPoints =
+            std::max(range.LinearPoints, Core::GetBackend().GetCapabilities().SParameters.MinLinearPoints);
     }
     DrawPortSummary();
 }
@@ -484,10 +485,10 @@ void AnalysisSettingsPanel::DrawSParameterSettings(SimulationSettings &settings)
 void AnalysisSettingsPanel::DrawPortSummary() {
     std::vector<Core::CircuitPort> ports = m_Schematic.BuildCircuit().GetPorts();
     std::ranges::sort(ports, {}, &Core::CircuitPort::Number);
-    if (ports.size() < Core::MIN_S_PARAMETER_PORTS) {
+    if (const std::optional<std::string> missing =
+            Core::CheckSParameterPortCount(ports.size(), Core::GetBackend().GetCapabilities().SParameters)) {
         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetFontSize() * 20.0f);
-        ImGui::TextColored(GetErrorTextColor(), "%s",
-                           "Needs two or more ports: turn on S-parameter port in the properties of Block pin markers");
+        ImGui::TextColored(GetErrorTextColor(), "%s", missing->c_str());
         ImGui::PopTextWrapPos();
         return;
     }

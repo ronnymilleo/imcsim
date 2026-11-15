@@ -78,6 +78,12 @@ Core::SParameterSettings SinglePoint(const double frequency) {
             .LinearPoints = 3};
 }
 
+/// The checks as the default backend, ngspice, asks for them.
+std::optional<std::string> CheckOnNgspice(const Core::Circuit &circuit, const Core::SParameterSettings &settings) {
+    Core::SetBackend(nullptr);
+    return Core::CheckSParameterSettings(circuit, settings, Core::GetBackend().GetCapabilities().SParameters);
+}
+
 void RequireClose(const Complex actual, const Complex expected, const double tolerance = 1e-6) {
     CHECK_THAT(actual.real(), WithinAbs(expected.real(), tolerance));
     CHECK_THAT(actual.imag(), WithinAbs(expected.imag(), tolerance));
@@ -173,22 +179,24 @@ TEST_CASE("The ports reach the circuit, its copies and its node count, but never
     CHECK(copy.GetCircuit().GetPorts()[1].ReferenceOhms == 75.0);
 }
 
-TEST_CASE("The analysis is refused with fewer than two ports before ngspice sees it", "[s_parameters][simulator]") {
+TEST_CASE("On ngspice the analysis is refused with fewer than two ports before ngspice sees it",
+          "[s_parameters][simulator]") {
     Core::SetBackend(nullptr);
     SeriesResistor line(100.0);
     const Core::SParameterSettings settings;
-    const std::optional<std::string> none = Core::CheckSParameterSettings(line.Circuit, settings);
+    const std::optional<std::string> none = CheckOnNgspice(line.Circuit, settings);
     REQUIRE(none.has_value());
-    CHECK(none->contains("ngspice needs at least two S-parameter ports"));
+    CHECK(none->contains("no S-parameter port"));
     line.Circuit.AddPort({.Number = 1, .Node = 1, .ReferenceOhms = 50.0});
-    const std::optional<std::string> one = Core::CheckSParameterSettings(line.Circuit, settings);
+    const std::optional<std::string> one = CheckOnNgspice(line.Circuit, settings);
     REQUIRE(one.has_value());
-    CHECK(one->contains("ngspice needs at least two S-parameter ports"));
+    CHECK(one->contains("ngspice needs at least two S-parameter ports, and Nodalys takes one"));
 
     // ngspice stops for good when it finds a single port, so a run that reached it would end every later one
     const Core::SParametersRun run = Core::RunSParameters(line.Circuit, settings);
     REQUIRE_FALSE(run.Result.has_value());
     CHECK(run.Result.error().contains("at least two"));
+    CHECK(run.Result.error().contains("Nodalys takes one"));
     CHECK(run.Messages.empty());
     Core::VoltageSource source;
     Core::Resistor load;
@@ -209,33 +217,33 @@ TEST_CASE("Ports must be numbered 1 to N, have a reference above zero and sit on
     SeriesResistor line(100.0);
     line.Circuit.AddPort({.Number = 1, .Node = 1, .ReferenceOhms = 50.0});
     line.Circuit.AddPort({.Number = 2, .Node = 2, .ReferenceOhms = 50.0});
-    CHECK_FALSE(Core::CheckSParameterSettings(line.Circuit, settings).has_value());
+    CHECK_FALSE(CheckOnNgspice(line.Circuit, settings).has_value());
 
     SeriesResistor gap(100.0);
     gap.Circuit.AddPort({.Number = 1, .Node = 1, .ReferenceOhms = 50.0});
     gap.Circuit.AddPort({.Number = 3, .Node = 2, .ReferenceOhms = 50.0});
-    const std::optional<std::string> gap_reason = Core::CheckSParameterSettings(gap.Circuit, settings);
+    const std::optional<std::string> gap_reason = CheckOnNgspice(gap.Circuit, settings);
     REQUIRE(gap_reason.has_value());
     CHECK(gap_reason->contains("port 2 is missing"));
 
     SeriesResistor repeat(100.0);
     repeat.Circuit.AddPort({.Number = 1, .Node = 1, .ReferenceOhms = 50.0});
     repeat.Circuit.AddPort({.Number = 1, .Node = 2, .ReferenceOhms = 50.0});
-    const std::optional<std::string> repeat_reason = Core::CheckSParameterSettings(repeat.Circuit, settings);
+    const std::optional<std::string> repeat_reason = CheckOnNgspice(repeat.Circuit, settings);
     REQUIRE(repeat_reason.has_value());
     CHECK(repeat_reason->contains("numbered 1"));
 
     SeriesResistor impedance(100.0);
     impedance.Circuit.AddPort({.Number = 1, .Node = 1, .ReferenceOhms = 0.0});
     impedance.Circuit.AddPort({.Number = 2, .Node = 2, .ReferenceOhms = 50.0});
-    const std::optional<std::string> impedance_reason = Core::CheckSParameterSettings(impedance.Circuit, settings);
+    const std::optional<std::string> impedance_reason = CheckOnNgspice(impedance.Circuit, settings);
     REQUIRE(impedance_reason.has_value());
     CHECK(impedance_reason->contains("reference impedance of port 1"));
 
     SeriesResistor ground(100.0);
     ground.Circuit.AddPort({.Number = 1, .Node = 0, .ReferenceOhms = 50.0});
     ground.Circuit.AddPort({.Number = 2, .Node = 2, .ReferenceOhms = 50.0});
-    const std::optional<std::string> ground_reason = Core::CheckSParameterSettings(ground.Circuit, settings);
+    const std::optional<std::string> ground_reason = CheckOnNgspice(ground.Circuit, settings);
     REQUIRE(ground_reason.has_value());
     CHECK(ground_reason->contains("on ground"));
 
@@ -243,7 +251,7 @@ TEST_CASE("Ports must be numbered 1 to N, have a reference above zero and sit on
     SeriesResistor shared(100.0);
     shared.Circuit.AddPort({.Number = 1, .Node = 2, .ReferenceOhms = 50.0});
     shared.Circuit.AddPort({.Number = 2, .Node = 2, .ReferenceOhms = 50.0});
-    const std::optional<std::string> shared_reason = Core::CheckSParameterSettings(shared.Circuit, settings);
+    const std::optional<std::string> shared_reason = CheckOnNgspice(shared.Circuit, settings);
     REQUIRE(shared_reason.has_value());
     CHECK(shared_reason->contains("same node"));
 }
@@ -253,13 +261,13 @@ TEST_CASE("The frequency range of the analysis is checked, as ngspice says nothi
     SeriesResistor line(100.0);
     line.Circuit.AddPort({.Number = 1, .Node = 1, .ReferenceOhms = 50.0});
     line.Circuit.AddPort({.Number = 2, .Node = 2, .ReferenceOhms = 50.0});
-    CHECK_FALSE(Core::CheckSParameterSettings(line.Circuit, {}).has_value());
-    CHECK(Core::CheckSParameterSettings(line.Circuit, {.StartFrequency = 0.0}).has_value());
-    CHECK(Core::CheckSParameterSettings(line.Circuit, {.StartFrequency = 1e9, .StopFrequency = 1e6}).has_value());
-    CHECK(Core::CheckSParameterSettings(line.Circuit, {.StartFrequency = 1e6, .StopFrequency = 1e6}).has_value());
-    CHECK(Core::CheckSParameterSettings(line.Circuit, {.PointsPerDecade = 0}).has_value());
-    CHECK(Core::CheckSParameterSettings(line.Circuit, {.IsLogarithmic = false, .LinearPoints = 2}).has_value());
-    CHECK_FALSE(Core::CheckSParameterSettings(line.Circuit, {.IsLogarithmic = false, .LinearPoints = 3}).has_value());
+    CHECK_FALSE(CheckOnNgspice(line.Circuit, {}).has_value());
+    CHECK(CheckOnNgspice(line.Circuit, {.StartFrequency = 0.0}).has_value());
+    CHECK(CheckOnNgspice(line.Circuit, {.StartFrequency = 1e9, .StopFrequency = 1e6}).has_value());
+    CHECK(CheckOnNgspice(line.Circuit, {.StartFrequency = 1e6, .StopFrequency = 1e6}).has_value());
+    CHECK(CheckOnNgspice(line.Circuit, {.PointsPerDecade = 0}).has_value());
+    CHECK(CheckOnNgspice(line.Circuit, {.IsLogarithmic = false, .LinearPoints = 2}).has_value());
+    CHECK_FALSE(CheckOnNgspice(line.Circuit, {.IsLogarithmic = false, .LinearPoints = 3}).has_value());
 }
 
 TEST_CASE("ngspice does not simulate logic parts in an S-parameter analysis, and the analysis is refused",
