@@ -13,10 +13,12 @@
 #include "circuit/components/subcircuit.h"
 #include "circuit/components/vcc.h"
 #include "circuit/subcircuit.h"
+#include "nodalys_in_use.h"
 #include "simulation/circuit_checks.h"
 #include "simulation/simulator.h"
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <cmath>
 #include <memory>
 #include <optional>
 #include <string>
@@ -300,4 +302,81 @@ TEST_CASE("A MOSFET with a library model takes its channel size from the model",
     Core::Resistor resistor;
     resistor.SetLibraryModel("IRF540");
     CHECK_FALSE(resistor.HasLibraryModel());
+}
+
+TEST_CASE("The subcircuits of a library give the same operating point on Nodalys as on ngspice", "[spice_library]") {
+    const Core::SpiceLibrary library = Core::ReadSpiceLibrary(LIBRARY);
+    Core::VCC supply;
+    supply.SetName("V1");
+    supply.SetValue(5.0);
+    const Core::Ground ground;
+
+    // The divider reads a file parameter through an expression, and the clamp a model that shares its name with its
+    // element and a subcircuit it places
+    Core::SubcircuitInstance divider("DIVIDER", {"IN", "OUT"});
+    divider.SetName("X1");
+    Core::Circuit divided;
+    divided.Add(supply, {1});
+    divided.Add(divider, {1, 2});
+    divided.Add(ground, {0});
+    divided.AddSubcircuit(MakeDefinition(Find(library, "DIVIDER")));
+    Core::SubcircuitInstance clamp("CLAMP", {"A", "K"});
+    clamp.SetName("X2");
+    Core::Circuit clamped;
+    clamped.Add(supply, {1});
+    clamped.Add(clamp, {1, 2});
+    clamped.Add(ground, {0});
+    clamped.AddSubcircuit(MakeDefinition(Find(library, "CLAMP")));
+
+    for (const Core::Circuit *circuit : {&divided, &clamped}) {
+        const Core::OperatingPointRun on_ngspice = Core::RunOperatingPoint(*circuit);
+        REQUIRE(on_ngspice.Result);
+        const TestSupport::NodalysInUse nodalys;
+        const Core::OperatingPointRun on_nodalys = Core::RunOperatingPoint(*circuit);
+        INFO((on_nodalys.Result ? std::string{} : on_nodalys.Result.error()));
+        REQUIRE(on_nodalys.Result);
+        // Both stop their Newton iteration at a relative change of 1e-3
+        CHECK(on_nodalys.Result->NodeVoltages[2] == Catch::Approx(on_ngspice.Result->NodeVoltages[2]).epsilon(2e-3));
+    }
+    const Core::OperatingPointRun by_default = [&] {
+        const TestSupport::NodalysInUse nodalys;
+        return Core::RunOperatingPoint(divided);
+    }();
+    REQUIRE(by_default.Result);
+    // 1k over the 10k the file parameter gives
+    CHECK(by_default.Result->NodeVoltages[2] == Catch::Approx(5.0 * 10.0 / 11.0).margin(1e-6));
+}
+
+TEST_CASE("A vendor subcircuit with numbered ports and nodes runs on Nodalys", "[spice_library]") {
+    // The ports and the internal node are numbers, as op-amp libraries write them
+    const Core::SpiceLibrary library =
+        Core::ReadSpiceLibrary(".SUBCKT OPA-1 1 2 3 4 5\nE1 6 0 1 2 100k\nR1 6 5 10\n.ENDS\n");
+    REQUIRE(library.Subcircuits.size() == 1);
+    Core::SubcircuitInstance amplifier("OPA-1", {"1", "2", "3", "4", "5"});
+    amplifier.SetName("X1");
+    Core::VCC input;
+    input.SetName("V1");
+    input.SetValue(0.001);
+    Core::Resistor feedback;
+    feedback.SetName("R1");
+    feedback.SetValue(1e3);
+    Core::Resistor load;
+    load.SetName("R2");
+    load.SetValue(1e3);
+    const Core::Ground ground;
+    // A follower: the output on node 2 returns to the inverting input
+    Core::Circuit circuit;
+    circuit.Add(input, {1});
+    circuit.Add(amplifier, {1, 2, 3, 4, 2});
+    circuit.Add(load, {2, 0});
+    circuit.Add(ground, {0});
+    circuit.AddSubcircuit(MakeDefinition(library.Subcircuits.front()));
+    const TestSupport::NodalysInUse nodalys;
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(circuit);
+    INFO((run.Result ? std::string{} : run.Result.error()));
+    REQUIRE(run.Result);
+    // The gain of 100k loses a little in the 10 ohm in front of the 1k load, and the follower sits at A / (1 + A) of
+    // the input
+    const double gain = 1e5 * 1e3 / (1e3 + 10.0);
+    CHECK(run.Result->NodeVoltages[2] == Catch::Approx(0.001 * gain / (1.0 + gain)).epsilon(1e-6));
 }

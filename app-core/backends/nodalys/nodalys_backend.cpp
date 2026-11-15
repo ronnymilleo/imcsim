@@ -9,6 +9,7 @@
 #include "circuit/components/behavioral_source.h"
 #include "circuit/components/logic_part.h"
 #include "circuit/components/source.h"
+#include "circuit/components/subcircuit.h"
 #include "circuit/components/switch.h"
 #include "simulation/live_pace.h"
 #include "simulation/pole_zero.h"
@@ -141,6 +142,17 @@ std::optional<std::string> FindBehavioralProblem(const Component &part, const An
 }
 
 /**
+ * @brief   Tells why Nodalys cannot run a part whose limit depends on what it holds: the expression of a behavioral
+ *          source, or the text of a block kept as SPICE text.
+ */
+std::optional<std::string> FindPartProblem(const Circuit &circuit, const Component &part, const AnalysisKind kind) {
+    if (part.GetType() == ComponentType::SUBCIRCUIT) {
+        return FindSpiceBlockProblem(circuit, static_cast<const SubcircuitInstance &>(part));
+    }
+    return FindBehavioralProblem(part, kind);
+}
+
+/**
  * @brief   Compiles a circuit, runs one Nodalys analysis on it and turns the result into the one of imcsim.
  * @details Every analysis goes the same way, so a compile failure, the messages of the engine and its failures read
  *          alike whatever the analysis.
@@ -154,10 +166,14 @@ template <typename Run, typename Compute, typename Convert>
 Run RunOnNodalys(const Circuit &circuit, Compute compute, Convert convert,
                  const std::optional<double> &temperature_celsius = std::nullopt) {
     Run run;
-    std::expected<Nodalys::Circuit, std::string> compiled = CompileCircuit(circuit);
+    std::vector<std::string> compile_warnings;
+    std::expected<Nodalys::Circuit, std::string> compiled = CompileCircuit(circuit, &compile_warnings);
     if (!compiled) {
         run.Result = std::unexpected(std::format("Nodalys cannot simulate this circuit: {}", compiled.error()));
         return run;
+    }
+    for (std::string &warning : compile_warnings) {
+        run.Messages.push_back({std::move(warning), false});
     }
     if (temperature_celsius) {
         compiled->SetTemperature(*temperature_celsius);
@@ -182,7 +198,7 @@ Run RunOnNodalys(const Circuit &circuit, Compute compute, Convert convert,
  */
 NodalysBackend::NodalysBackend() {
     m_Capabilities.Analyses = NODALYS_ANALYSES;
-    m_Capabilities.FindPartProblem = FindBehavioralProblem;
+    m_Capabilities.FindPartProblem = FindPartProblem;
     for (int index = 0; index <= static_cast<int>(ComponentType::SEVEN_SEGMENT); ++index) {
         const auto type = static_cast<ComponentType>(index);
         if (IsLogicPart(type)) {

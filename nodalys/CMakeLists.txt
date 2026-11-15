@@ -40,8 +40,15 @@ add_library(nodalys STATIC
     src/linear/qz.cpp
     src/mna/mna_system.cpp
     src/newton/newton.cpp
+    src/parser/model_cards.cpp
     src/parser/netlist_parser.cpp
     src/parser/spice_number.cpp
+    src/parser/spice_text.cpp
+    src/parser/spice_values.cpp
+    src/parser/subcircuit_elements.cpp
+    src/parser/subcircuit_models.cpp
+    src/parser/subcircuit_scope.cpp
+    src/parser/subcircuit_text.cpp
 )
 
 target_include_directories(nodalys

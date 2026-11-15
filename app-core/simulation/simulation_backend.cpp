@@ -220,7 +220,7 @@ std::optional<std::string> FindUnsupported(const SimulationBackend &backend, con
         return std::nullopt;
     }
     for (const Component *part : all_parts) {
-        if (const std::optional<std::string> reason = find_problem(*part, kind)) {
+        if (const std::optional<std::string> reason = find_problem(circuit, *part, kind)) {
             return reason;
         }
     }

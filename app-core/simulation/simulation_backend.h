@@ -55,9 +55,11 @@ struct BackendCapabilities {
     /// Why the backend cannot simulate at a temperature other than the default one, or none when it can.
     std::optional<std::string> TemperatureUnsupported;
     /// Finds why the backend cannot simulate one part in one analysis when that depends on what the part holds, such
-    /// as the expression of a behavioral source, which names functions the backend may not have; empty when the
-    /// backend has no such limit. It returns the reason, written for the user, or no value when the part is fine.
-    std::function<std::optional<std::string>(const Component &part, AnalysisKind kind)> FindPartProblem;
+    /// as the expression of a behavioral source, which names functions the backend may not have, or the text of a
+    /// block kept as SPICE text, which the circuit holds the definition of; empty when the backend has no such limit.
+    /// It returns the reason, written for the user, or no value when the part is fine.
+    std::function<std::optional<std::string>(const Circuit &circuit, const Component &part, AnalysisKind kind)>
+        FindPartProblem;
 };
 
 /**

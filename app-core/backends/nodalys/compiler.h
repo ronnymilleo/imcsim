@@ -9,16 +9,18 @@
 #include "circuit/circuit.h"
 #include <expected>
 #include <nodalys/nodalys.h>
+#include <optional>
 #include <string>
+#include <vector>
 
 namespace Core {
 
-/**
- * @brief   Compiles a `Core::Circuit` for the Nodalys solver using `Nodalys::CircuitBuilder`.
- * @param[in] circuit  Circuit to compile.
- * @return  The compiled Nodalys circuit, or a descriptive error if a component or expression is unsupported.
- */
-std::expected<Nodalys::Circuit, std::string> CompileCircuit(const Circuit &circuit);
+class SubcircuitInstance;
+
+// Compiling
+std::expected<Nodalys::Circuit, std::string> CompileCircuit(const Circuit &circuit,
+                                                            std::vector<std::string> *warnings = nullptr);
+std::optional<std::string> FindSpiceBlockProblem(const Circuit &circuit, const SubcircuitInstance &instance);
 
 } // namespace Core
 

@@ -6,6 +6,7 @@
 #include "nodalys/netlist_parser.h"
 #include "nodalys/circuit_builder.h"
 #include "nodalys/expression.h"
+#include "parser/model_cards.h"
 #include "parser/spice_number.h"
 
 #include <algorithm>
@@ -117,108 +118,6 @@ std::vector<std::string> TokenizeLine(std::string_view line) {
         tokens.emplace_back(line.substr(start, i - start));
     }
     return tokens;
-}
-
-struct ParsedModel {
-    enum class ModelKind {
-        DIODE,
-        BJT_NPN,
-        BJT_PNP,
-        MOSFET_NMOS,
-        MOSFET_PMOS,
-        SWITCH
-    };
-    ModelKind Kind = ModelKind::DIODE;
-    std::map<std::string, double> Params;
-};
-
-DiodeParameters BuildDiodeParameters(const ParsedModel &m) {
-    DiodeParameters p;
-    auto get = [&](std::string_view k, double def) {
-        auto it = m.Params.find(std::string(k));
-        return it != m.Params.end() ? it->second : def;
-    };
-    p.SaturationCurrent = get("IS", p.SaturationCurrent);
-    p.SeriesResistance = get("RS", p.SeriesResistance);
-    p.EmissionCoefficient = get("N", p.EmissionCoefficient);
-    p.BreakdownVoltage = get("BV", p.BreakdownVoltage);
-    p.BreakdownCurrent = get("IBV", p.BreakdownCurrent);
-    p.JunctionCapacitance = get("CJO", p.JunctionCapacitance);
-    p.JunctionPotential = get("VJ", p.JunctionPotential);
-    p.GradingCoefficient = get("M", p.GradingCoefficient);
-    p.TransitTime = get("TT", p.TransitTime);
-    p.EnergyGap = get("EG", p.EnergyGap);
-    p.SaturationCurrentExponent = get("XTI", p.SaturationCurrentExponent);
-    return p;
-}
-
-BjtParameters BuildBjtParameters(const ParsedModel &m) {
-    BjtParameters p;
-    auto get = [&](std::string_view k, double def) {
-        auto it = m.Params.find(std::string(k));
-        return it != m.Params.end() ? it->second : def;
-    };
-    p.SaturationCurrent = get("IS", p.SaturationCurrent);
-    p.ForwardBeta = get("BF", p.ForwardBeta);
-    p.ReverseBeta = get("BR", p.ReverseBeta);
-    p.EarlyVoltage = get("VAF", p.EarlyVoltage);
-    p.ForwardKneeCurrent = get("IKF", p.ForwardKneeCurrent);
-    p.LeakageSaturationCurrent = get("ISE", p.LeakageSaturationCurrent);
-    p.LeakageEmissionCoefficient = get("NE", p.LeakageEmissionCoefficient);
-    p.BaseResistance = get("RB", p.BaseResistance);
-    p.CollectorResistance = get("RC", p.CollectorResistance);
-    p.EmitterResistance = get("RE", p.EmitterResistance);
-    p.EmitterCapacitance = get("CJE", p.EmitterCapacitance);
-    p.CollectorCapacitance = get("CJC", p.CollectorCapacitance);
-    p.TransitTime = get("TF", p.TransitTime);
-    p.EnergyGap = get("EG", p.EnergyGap);
-    p.SaturationCurrentExponent = get("XTI", p.SaturationCurrentExponent);
-    p.BetaExponent = get("XTB", p.BetaExponent);
-    return p;
-}
-
-MosfetParameters BuildMosfetParameters(const ParsedModel &m) {
-    MosfetParameters p;
-    auto get = [&](std::string_view k, double def) {
-        auto it = m.Params.find(std::string(k));
-        return it != m.Params.end() ? it->second : def;
-    };
-    p.ThresholdVoltage = get("VTO", p.ThresholdVoltage);
-    p.Transconductance = get("KP", p.Transconductance);
-    p.ChannelModulation = get("LAMBDA", p.ChannelModulation);
-    p.DrainResistance = get("RD", p.DrainResistance);
-    p.SourceResistance = get("RS", p.SourceResistance);
-    p.GateSourceOverlap = get("CGSO", p.GateSourceOverlap);
-    p.GateDrainOverlap = get("CGDO", p.GateDrainOverlap);
-    p.Length = get("L", p.Length);
-    p.Width = get("W", p.Width);
-    p.SurfacePotential = get("PHI", p.SurfacePotential);
-    return p;
-}
-
-SwitchParameters BuildSwitchParameters(const ParsedModel &m) {
-    SwitchParameters p;
-    auto get = [&](std::string_view k, double def) {
-        auto it = m.Params.find(std::string(k));
-        return it != m.Params.end() ? it->second : def;
-    };
-    if (m.Params.contains("VT")) {
-        p.Threshold = m.Params.at("VT");
-    } else if (m.Params.contains("VTHRESHOLD")) {
-        p.Threshold = m.Params.at("VTHRESHOLD");
-    }
-    if (m.Params.contains("VH")) {
-        p.Hysteresis = m.Params.at("VH");
-    } else if (m.Params.contains("VHYSTERESIS")) {
-        p.Hysteresis = m.Params.at("VHYSTERESIS");
-    }
-    if (m.Params.contains("RON")) {
-        p.OnResistance = m.Params.at("RON");
-    }
-    if (m.Params.contains("ROFF")) {
-        p.OffResistance = m.Params.at("ROFF");
-    }
-    return p;
 }
 
 struct SubcircuitDef {

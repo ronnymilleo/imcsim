@@ -95,8 +95,13 @@ in these points:
   the sweeps and the small-signal analyses, as in ngspice. A transient draws it, from a generator Nodalys seeds, so
   the seed of the transient settings repeats the whole run, white and 1/f noise included; the values differ from those
   of ngspice, which draws its own.
-- A block imported from a library, which imcsim keeps as SPICE text, and a MOSFET model of a level other than 1 are
-  refused with the reason; the harmonic balance also refuses voltage-controlled switches and relays.
+- A block imported from a library, which imcsim keeps as SPICE text, runs on Nodalys as on ngspice: the engine reads
+  its elements (R, C, L, V, I, E, G, H, F, B, D, Q, M, S and nested blocks), `.param` lines, `{expressions}`, `.model`
+  cards and nested `.subckt` definitions (see [`nodalys/subcircuit_text.md`](nodalys/subcircuit_text.md)). What it holds
+  that Nodalys cannot simulate (a JFET, a source waveform, a `.func`, a model of a type or level it lacks) is refused
+  with the line, before the run, and a model parameter its devices do not read is named in a message of the run.
+  A MOSFET model of a level other than 1 is refused with the reason, and the harmonic balance also refuses
+  voltage-controlled switches and relays.
 - The transient lands a time point on every corner of a source waveform (each edge of a pulse or clock, each point of
   a piecewise linear source, the delays of the exponential and AM sources) and keeps it in the results, so a pulse
   narrower than the time step still shows; ngspice does the same with its breakpoints.
@@ -628,7 +633,8 @@ die, with 0.13 mA of supply current and picoamperes of bias current, which is no
 - The `.model` lines inside a block are renamed after it (`imcsim_RC_LOWPASS_...`), since ngspice keeps model names
   global and two blocks with a custom part of the same name would otherwise share one model.
 - A block kept as SPICE text is written as it came from its library, between a `.subckt` line with its own ports and
-  `.ends`; imcsim reads none of it, so it simulates whatever the vendor modeled, and only what ngspice understands.
+  `.ends`; imcsim reads none of it for ngspice, which simulates whatever the vendor modeled, and Nodalys reads it with
+  its own subcircuit reader, which refuses what its devices cannot simulate.
 - The ready logic blocks are ordinary blocks of the gates and flip-flops above, at a 5 V logic level and a 10 ns
   propagation delay per part. They inherit the timing of their parts: the 4-bit counter is a ripple counter, so its
   outputs change one after another and pass through other values for a few tens of nanoseconds, which a bus lane shows
