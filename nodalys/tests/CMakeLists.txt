@@ -16,6 +16,7 @@ add_executable(nodalys-tests
     random_draws_tests.cpp
     sens_analysis_tests.cpp
     smooth_logic_tests.cpp
+    sp_analysis_tests.cpp
     thermal_tests.cpp
     transient_analysis_tests.cpp
     transient_noise_tests.cpp

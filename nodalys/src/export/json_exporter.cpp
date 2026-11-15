@@ -5,8 +5,10 @@
 
 #include "nodalys/exporters.h"
 
+#include <complex>
 #include <format>
 #include <numbers>
+#include <optional>
 #include <sstream>
 
 namespace Nodalys {
@@ -22,6 +24,28 @@ void WriteDoubleArray(std::ostringstream &ss, const std::vector<double> &arr) {
         ss << std::format("{:.8g}", arr[i]);
     }
     ss << "]";
+}
+
+/// Writes the matrices of ports of every frequency as an array, with null where the circuit has no finite one.
+void WritePortMatrices(std::ostringstream &ss, const std::vector<std::optional<PortMatrix>> &matrices) {
+    ss << "[\n";
+    for (std::size_t pt = 0; pt < matrices.size(); ++pt) {
+        ss << "    ";
+        const std::optional<PortMatrix> &matrix = matrices[pt];
+        if (matrix) {
+            ss << "[";
+            for (std::size_t index = 0; index < matrix->size(); ++index) {
+                const std::complex<double> value = (*matrix)[index];
+                ss << (index > 0 ? ", " : "") << "{\"re\": " << std::format("{:.8g}", value.real())
+                   << ", \"im\": " << std::format("{:.8g}", value.imag()) << "}";
+            }
+            ss << "]";
+        } else {
+            ss << "null";
+        }
+        ss << (pt + 1 < matrices.size() ? ",\n" : "\n");
+    }
+    ss << "  ]";
 }
 
 } // namespace
@@ -179,7 +203,15 @@ std::string ExportJson(const SParameterResult &result) {
         }
         ss << (pt + 1 < result.Frequencies.size() ? "],\n" : "]\n");
     }
-    ss << "  ]\n}\n";
+    ss << "  ]";
+    if (result.ImpedanceMatrices.size() == result.Frequencies.size() &&
+        result.AdmittanceMatrices.size() == result.Frequencies.size()) {
+        ss << ",\n  \"impedance\": ";
+        WritePortMatrices(ss, result.ImpedanceMatrices);
+        ss << ",\n  \"admittance\": ";
+        WritePortMatrices(ss, result.AdmittanceMatrices);
+    }
+    ss << "\n}\n";
     return ss.str();
 }
 
