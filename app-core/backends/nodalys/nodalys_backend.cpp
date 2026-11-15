@@ -175,6 +175,24 @@ Run RunOnNodalys(const Circuit &circuit, Compute compute, Convert convert,
     return run;
 }
 
+/**
+ * @brief   Says why a transfer function has no pole or zero to show.
+ * @param[in] settings         Output node and input source of the run.
+ * @param[in] cancelled_pairs  Poles that a zero at the same place left out.
+ * @return  The text of the error, which tells the user what to look at in the circuit.
+ */
+std::string DescribeConstantTransfer(const PoleZeroSettings &settings, const int cancelled_pairs) {
+    std::string text = std::format("The transfer from {} to node {} has no poles or zeros: it is a constant gain at "
+                                   "every frequency. Either no capacitor or inductor lies between them, or the output "
+                                   "is the node the source holds",
+                                   settings.InputSource, settings.OutputNode);
+    if (cancelled_pairs > 0) {
+        text += std::format(", or what does lie between them cancels out ({} pole-zero {} at the same place)",
+                            cancelled_pairs, cancelled_pairs == 1 ? "pair" : "pairs");
+    }
+    return text;
+}
+
 } // namespace
 
 /**
@@ -448,10 +466,12 @@ PoleZeroRun NodalysBackend::RunPoleZero(const Circuit &circuit, const PoleZeroSe
             return Nodalys::ComputePoleZero(compiled, config, {}, messages);
         },
         [&circuit, &settings](const Nodalys::PoleZeroResult &result) -> std::expected<PoleZero, std::string> {
-            if (result.Poles.empty() && result.Zeros.empty()) {
-                return std::unexpected(std::string(NO_POLE_ZERO_RESULT));
+            PoleZero poles_and_zeros = BuildPoleZero(circuit, settings, result.Poles, result.Zeros);
+            if (poles_and_zeros.Roots.empty()) {
+                return std::unexpected(DescribeConstantTransfer(settings, poles_and_zeros.CancelledPairs));
             }
-            return BuildPoleZero(circuit, settings, result.Poles, result.Zeros);
+            poles_and_zeros.Warnings = result.Warnings;
+            return poles_and_zeros;
         });
 }
 
