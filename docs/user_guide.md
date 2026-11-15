@@ -713,6 +713,9 @@ The panel gives the RMS noise over the whole range at the output and at the inpu
 the output noise, largest first, as RMS and as a percentage of the noise power (the percentages add up to 100).
 Check a part to plot its share; parts whose noise does not reach the output are left out.
 
+The Noise example (Examples > Basics) is a 10k and 10n low-pass with the analysis saved: its output noise totals the
+sqrt(kT/C) of the capacitor, whatever the resistor.
+
 When the input source hardly reaches the output (a gain under -120 dB, as through a logic gate), its input-referred
 noise would only grow without meaning, so it is left out and the tab says why. When no noise reaches the output at
 all, as on a node an ideal source holds, the tab says so instead of an empty plot. [Simulation models](models.md) lists which parts add noise.
@@ -737,6 +740,9 @@ The Transfer function tab of the Output window is a table of three values:
 
 An output an ideal voltage source holds has an output impedance of 0 Ohm, and an input path held open reads as
 `open` rather than a giant number. The table is a readout like the operating point, so it is not exported.
+
+The Transfer function example (Examples > Basics) is a resistive attenuator whose gain of 0.5 and impedances of
+20 kOhm and 5 kOhm can be checked by hand.
 
 ## Sensitivity
 
@@ -946,6 +952,8 @@ Amplitudes are peak values or RMS ones, as Preferences > Results > Harmonic ampl
 switch); DC is never scaled. The tables list DC and THD per trace and each harmonic with its phase. The Stop button
 ends a long run between its iterations. Export saves the plot as SVG or CSV, and Export CSV... the spectra and the
 waveforms together.
+
+The Harmonic balance example (Examples > Diodes) is a half-wave rectifier on a 1 kHz sine, with the analysis saved.
 
 ## Exports
 

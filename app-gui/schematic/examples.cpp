@@ -95,6 +95,27 @@ constexpr auto EXAMPLES = std::to_array<Example>({
         .FileName = "rlc_low_pass_poles_and_zeros.imcsim",
     },
     {
+        .Title = "Noise of an RC low-pass filter",
+        .Group = "Basics",
+        .Description = "A 10k resistor and a 10n capacitor, with the corner at 1.6 kHz, and the Noise analysis "
+                       "selected: it measures the thermal noise of R1 at the capacitor, from 1 Hz to 1 MHz. Run it "
+                       "and read the Noise tab of the Output window: the density is flat at 12.9 nV per root hertz "
+                       "up to the corner and falls beyond it, the output totals 0.64 uV rms, which is the sqrt(kT/C) "
+                       "of a 10n capacitor whatever the resistor, and R1 is the whole of it. The dashed input-referred "
+                       "noise climbs where the filter attenuates.",
+        .FileName = "noise_analysis_rc_low_pass.imcsim",
+    },
+    {
+        .Title = "Gain and impedances of a resistive attenuator",
+        .Group = "Basics",
+        .Description = "Three resistors, 10k, 15k and 30k, split a 10 V supply, with the Transfer function analysis "
+                       "selected from V1 to the node of R1, R2 and R3. Run it and read the Transfer function tab: "
+                       "the gain is 0.5, since R2 and R3 in parallel make 10k, the source sees 20 kOhm, and the "
+                       "output looks back into 5 kOhm, R1, R2 and R3 in parallel. No frequency sweep is needed: "
+                       "it is the small-signal DC gain and its two resistances.",
+        .FileName = "transfer_function_attenuator.imcsim",
+    },
+    {
         .Title = "S-parameters of an LC low-pass",
         .Group = "Basics",
         .Description =
@@ -141,6 +162,18 @@ constexpr auto EXAMPLES = std::to_array<Example>({
                        "Run the transient to see the ripple on the load and the short pulses that recharge it "
                        "through D1.",
         .FileName = "full_bridge_rectifier.imcsim",
+    },
+    {
+        .Title = "Harmonic balance of a half-wave rectifier",
+        .Group = "Diodes",
+        .Description = "A 5 V, 1 kHz sine charges a 1u capacitor through a 1N4148 and a 1k load drains it, so the "
+                       "capacitor holds a little over 3 V and droops a lot between peaks. The Harmonic balance "
+                       "analysis, at 1 kHz with 24 harmonics, finds that periodic state without waiting out a "
+                       "startup. It runs on the Nodalys engine only (Edit > Preferences > Simulation): with ngspice "
+                       "it is disabled. Run it and read the Harmonic balance tab: the DC level, a 0.93 V "
+                       "fundamental of ripple and the harmonics beyond it, falling with their order, and the "
+                       "diode current as narrow pulses.",
+        .FileName = "harmonic_balance_rectifier.imcsim",
     },
     {
         .Title = "LED driver",
