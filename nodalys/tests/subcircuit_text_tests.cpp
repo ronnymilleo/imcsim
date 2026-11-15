@@ -13,6 +13,7 @@
 #include "parser/spice_text.h"
 #include "parser/spice_values.h"
 
+#include <cmath>
 #include <cstddef>
 #include <map>
 #include <optional>
@@ -291,6 +292,94 @@ TEST_CASE("A text with an element, a directive or a model the engine cannot simu
     CHECK_THAT(refusal(".subckt ONE A\nR1 A 0 1\n.ends\nX1 IN OUT ONE\n"), ContainsSubstring("2 nodes to ONE"));
     CHECK_THAT(refusal(".subckt ONE A params: K=1\nR1 A 0 1\n.ends\nX1 IN ONE Q=2\n"),
                ContainsSubstring("parameter Q"));
+}
+
+TEST_CASE("Passive parts, sources and controlled sources of the text take their values in every form it allows",
+          "[subcircuit_text]") {
+    // A divider of two resistors, with a capacitor and an inductor that the operating point reads as open and short
+    const Bench divider = Solve("R1 IN MID 1k\nL1 MID OUT 1m IC=0\nC1 OUT 0 1u\nR2 OUT 0 1k\n");
+    REQUIRE_FALSE(divider.Failure);
+    CHECK_THAT(divider.Voltages[2], WithinAbs(5.0, VOLTAGE_TOLERANCE));
+
+    // A source written with DC=, one with DC and an AC magnitude and phase, and a current source into a resistor
+    const Bench sources = Solve("V1 MID IN DC=2\nV2 TOP MID DC 1 AC 1 90\nR1 TOP OUT 1k\nI1 0 OUT 1m\nR2 OUT 0 1k\n");
+    REQUIRE_FALSE(sources.Failure);
+    // 13 V through 1k and 1 mA into the 1k to ground: (13 / 1k + 1 mA) * 500
+    CHECK_THAT(sources.Voltages[2], WithinAbs(7.0, VOLTAGE_TOLERANCE));
+
+    // A transconductance of 1 mS into 1k is a gain of 1, and a transresistance of 1k on a sensed 1 mA gives 1 V more
+    const Bench controlled = Solve("VS IN SENSED 0\nRS SENSED 0 10k\nG1 0 MID IN 0 1m\nRG MID 0 1k\n"
+                                   "H1 OUT MID VS 1k\nRO OUT 0 1meg\n");
+    REQUIRE_FALSE(controlled.Failure);
+    // The 1meg on the output loads the 1k of the middle node: OUT = 11 / (1 + 1k / 1meg)
+    CHECK_THAT(controlled.Voltages[2], WithinAbs(11.0 / 1.001, 1e-4));
+}
+
+TEST_CASE("A diode and a transistor of the text take an area, and a transistor a substrate node", "[subcircuit_text]") {
+    const std::string models = ".model DMOD D(IS=1e-14)\n.model QMOD NPN(BF=100 IS=1e-14)\n";
+    const Bench single = Solve("D1 IN OUT DMOD\n" + models, {"IN", "OUT"}, {}, 1e3);
+    const Bench doubled = Solve("D1 IN OUT DMOD 2\n" + models, {"IN", "OUT"}, {}, 1e3);
+    REQUIRE_FALSE(single.Failure);
+    REQUIRE_FALSE(doubled.Failure);
+    // Twice the area drops Vt ln 2 less at nearly the same current
+    CHECK(doubled.Voltages[2] > single.Voltages[2]);
+    CHECK_THAT(doubled.Voltages[2] - single.Voltages[2], WithinAbs(0.025852 * std::log(2.0), 1e-3));
+
+    const Bench plain = Solve("Q1 OUT B 0 QMOD\nRB IN B 1meg\n" + models, {"IN", "OUT"}, {}, 1e3);
+    const Bench substrate = Solve("Q1 OUT B 0 0 QMOD 1\nRB IN B 1meg\n" + models, {"IN", "OUT"}, {}, 1e3);
+    REQUIRE_FALSE(plain.Failure);
+    REQUIRE_FALSE(substrate.Failure);
+    CHECK_THAT(substrate.Voltages[2], WithinAbs(plain.Voltages[2], VOLTAGE_TOLERANCE));
+
+    // In the forward region the collector current is beta times the base current whatever the area, which only
+    // lowers the base-emitter voltage, so the collector barely moves while the base drops Vt ln 2
+    const Bench wide = Solve("Q1 OUT B 0 QMOD 2\nRB IN B 1meg\n" + models, {"IN", "OUT"}, {}, 1e3);
+    REQUIRE_FALSE(wide.Failure);
+    CHECK_THAT(wide.Voltages[2], WithinAbs(plain.Voltages[2], 1e-2));
+    CHECK(wide.Voltages[2] != plain.Voltages[2]);
+}
+
+TEST_CASE("A line with a value, a node, a model or an option that cannot be read is refused, whatever its element",
+          "[subcircuit_text]") {
+    const std::string models = ".model DMOD D(IS=1e-14)\n.model QMOD NPN(BF=100)\n"
+                               ".model NM NMOS(VTO=1 KP=2e-5 LEVEL=1)\n.model SMOD SW(VT=5 RON=1 ROFF=1e9)\n";
+    const std::vector<std::string> lines = {
+        "R1 IN OUT {MISSING}",
+        "R1 IN",
+        "R1 IN OUT 1k TC1=0.1",
+        "C1 IN OUT {MISSING}",
+        "L1 IN OUT 1m IC={MISSING}",
+        "V1 IN OUT DC {MISSING}",
+        "V1 IN OUT DC=1 AC {MISSING}",
+        "V1 IN",
+        "I1 IN OUT {MISSING}",
+        "E1 OUT 0 IN 0 {MISSING}",
+        "E1 OUT 0 IN",
+        "G1 OUT 0 IN 0 {MISSING}",
+        "H1 OUT 0 VNONE 2",
+        "F1 OUT 0",
+        "B1 OUT 0 V=v(NOWHERE",
+        "D1 IN OUT NOMODEL",
+        "D1 IN OUT DMOD {MISSING}",
+        "D1 IN",
+        "Q1 IN OUT 0 QMOD {MISSING}",
+        "Q1 IN OUT 0 NOMODEL",
+        "Q1 IN OUT",
+        "M1 IN IN OUT 0 NM L={MISSING}",
+        "M1 IN IN OUT 0 NM AD=1p",
+        "M1 IN IN OUT 0 DMOD",
+        "M1 IN IN OUT",
+        "S1 IN OUT IN 0 NOMODEL",
+        "S1 IN OUT IN 0 SMOD ON",
+        "S1 IN OUT IN",
+    };
+    for (const std::string &line : lines) {
+        CAPTURE(line);
+        const Bench bench = Solve(line + "\nRKEEP IN OUT 1k\n" + models);
+        REQUIRE(bench.Failure);
+        CHECK_THAT(*bench.Failure, ContainsSubstring("BLOCK"));
+        CHECK_THAT(*bench.Failure, ContainsSubstring(line.substr(0, 2)));
+    }
 }
 
 TEST_CASE("A text that does not fit its ports is refused", "[subcircuit_text]") {
