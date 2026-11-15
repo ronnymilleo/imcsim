@@ -189,6 +189,14 @@ TEST_CASE("The transformer power supply has no right-half-plane root and all sev
     CHECK(report.Poles.size() == 7);
     CHECK_FALSE(Testing::HasRightHalfPlaneRoot(report.Poles, 0.0));
     CHECK_FALSE(Testing::HasRightHalfPlaneRoot(report.Zeros, 0.0));
+    // The roots near 1 to 1e4 rad/s sit a million times closer to the origin than the 3e12 rad/s junction poles. QZ
+    // alone put the zero beside the pole at -15005.77 anywhere from -14868 to -15114 depending on the rounding of the
+    // platform (a macOS arm64 build did); refined to its own size it is at -15005.746 to 1e-6 on every one
+    CHECK(Testing::HasRootNear(report.Zeros, {-15005.7457, 0.0}, 1e-5));
+    CHECK(Testing::HasRootNear(report.Poles, {-15005.7709, 0.0}, 1e-5));
+    CHECK(Testing::HasRootNear(report.Poles, {-9.67149943, 0.0}, 1e-6));
+    CHECK(Testing::HasRootNear(report.Poles, {-1.0, 0.0}, 1e-6));
+    CHECK(std::ranges::any_of(report.Zeros, [](const auto &zero) { return zero == std::complex<double>(0.0, 0.0); }));
     CHECK(Testing::IsMatch(report));
 }
 

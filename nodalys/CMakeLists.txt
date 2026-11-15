@@ -41,6 +41,7 @@ add_library(nodalys STATIC
     src/linear/fft.cpp
     src/linear/pencil_reduction.cpp
     src/linear/qz.cpp
+    src/linear/root_refinement.cpp
     src/mna/mna_system.cpp
     src/newton/newton.cpp
     src/parser/model_cards.cpp

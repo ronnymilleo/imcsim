@@ -12,6 +12,7 @@
 #include <cmath>
 #include <complex>
 #include <nodalys/nodalys.h>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -270,6 +271,63 @@ TEST_CASE("Rows with no dynamics are removed without moving the roots of the res
     REQUIRE(roots.size() == 1);
     CHECK_THAT(roots[0].real(), WithinRel(-3000.0, 1e-9));
     CHECK_THAT(roots[0].imag(), WithinAbs(0.0, 1e-9));
+}
+
+TEST_CASE("Roots of a stiff pencil stay put when its entries change by a few roundings", "[linear][qz][refine]") {
+    // The zero pencil of a transistor amplifier (bias network, coupling and bypass capacitors, junctions), 6 states
+    // after the algebraic ones are gone, with roots from 1e-21 to 1e10 rad/s. Another platform rounds the stamps and
+    // the Newton steps differently, which moves each entry by a few units in the last place; the roots must not move.
+    constexpr std::size_t SIZE = 6;
+    constexpr std::array<std::array<double, SIZE>, SIZE> A_ENTRIES = {
+        {{{0, 0, 0, 0, -0.80000000000000004, 0}},
+         {{0.5001063829792235, 0, 0, -0.5, 0, 0}},
+         {{0, 1.5231465995293683, 0, -0.00024858189082107966, -0.37266235892893151, 0}},
+         {{0, 0, 1.638400016384, 0, 0, 0}},
+         {{-0.5, -0.046314636545804581, 0, 0.50000776818458825, 0.011574775044407066, 0}},
+         {{0, -0.0090782300316215991, 0, -1.7496909849396222e-85, 0.80226955751590545, 0}}}};
+    constexpr std::array<std::array<double, SIZE>, SIZE> B_ENTRIES = {
+        {{{-0, -0, -0, -0, -0, 0.16384000000000001}},
+         {{-5.0000000000000004e-06, -0, 5.0000000000000004e-06, -0, -0, 0}},
+         {{-0, -0.0032000006739468685, -0, 7.487286551487825e-14, 1.6844928065084274e-10, 0}},
+         {{0.16384000000000001, -0, -0.16384000000000001, -0, -0, 0}},
+         {{-0, -0, -0, -9.6455181164520113e-13, 4.8227590582260056e-13, 0}},
+         {{-0, 6.7394686833440075e-10, -0, 3.0790785107131559e-11, -1.8388210963716594e-10, 0}}}};
+    constexpr double ROUNDING = 2.220446049250313e-16;
+    const auto build = [&](const double ulps, const unsigned seed) {
+        std::pair<Nodalys::DenseMatrix, Nodalys::DenseMatrix> pencil{Nodalys::DenseMatrix(SIZE, SIZE),
+                                                                     Nodalys::DenseMatrix(SIZE, SIZE)};
+        unsigned state = seed * 2654435761u + 1u;
+        for (std::size_t row = 0; row < SIZE; ++row) {
+            for (std::size_t column = 0; column < SIZE; ++column) {
+                state = state * 1664525u + 1013904223u;
+                const double unit = static_cast<double>(state >> 8) / 8388608.0 - 1.0;
+                pencil.first.At(row, column) = A_ENTRIES[row][column] * (1.0 + unit * ulps * ROUNDING);
+                pencil.second.At(row, column) = B_ENTRIES[row][column] * (1.0 + unit * ulps * ROUNDING);
+            }
+        }
+        return pencil;
+    };
+    const auto sorted = [](std::vector<std::complex<double>> roots) {
+        std::ranges::sort(roots, {}, [](const auto &root) { return root.real(); });
+        return roots;
+    };
+    const auto [base_a, base_b] = build(0.0, 0);
+    const std::vector<std::complex<double>> expected = sorted(Nodalys::ComputeGeneralizedEigenvalues(base_a, base_b));
+    REQUIRE(expected.size() >= 4);
+    const double largest = std::abs(expected.front());
+    for (const double ulps : {4.0, 32.0}) {
+        for (unsigned seed = 1; seed <= 12; ++seed) {
+            const auto [a, b] = build(ulps, seed);
+            const std::vector<std::complex<double>> roots = sorted(Nodalys::ComputeGeneralizedEigenvalues(a, b));
+            INFO("ulps " << ulps << " seed " << seed);
+            REQUIRE(roots.size() == expected.size());
+            for (std::size_t index = 0; index < roots.size(); ++index) {
+                // A root at the origin has no size to be relative to, so it is held to a share of the largest root
+                const double allowed = 1e-6 * std::max(std::abs(expected[index]), 1e-9 * largest);
+                CHECK(std::abs(roots[index] - expected[index]) <= allowed);
+            }
+        }
+    }
 }
 
 } // namespace

@@ -10,6 +10,7 @@
 #include "linear/qz.h"
 
 #include "linear/pencil_reduction.h"
+#include "linear/root_refinement.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -794,6 +795,9 @@ std::vector<std::complex<double>> ComputeGeneralizedEigenvalues(const DenseMatri
         return {};
     }
 
+    // QZ works on copies: refinement goes back to the pencil as it was before the reduction
+    const DenseMatrix deflated_a = a;
+    const DenseMatrix deflated_b = b;
     std::vector<std::complex<double>> roots;
     if (n == 1) {
         if (std::abs(b.At(0, 0)) > infinite_beta) {
@@ -805,6 +809,7 @@ std::vector<std::complex<double>> ComputeGeneralizedEigenvalues(const DenseMatri
         IterateQz(a, b, epsb);
         roots = ExtractEigenvalues(a, b, epsb, infinite_beta);
     }
+    roots = RefineRoots(deflated_a, deflated_b, roots);
     for (std::complex<double> &root : roots) {
         root *= frequency_scale;
     }

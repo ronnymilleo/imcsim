@@ -12,7 +12,6 @@
 #include <cmath>
 #include <complex>
 #include <format>
-#include <limits>
 #include <utility>
 #include <vector>
 
@@ -98,32 +97,6 @@ std::vector<std::complex<double>> FindZeros(const SmallSignalSystem &system) {
     return ComputeGeneralizedEigenvalues(constant_part, dynamic_part);
 }
 
-/// Roots closer to the origin than this many roundings of the largest root cannot be told from 0.
-constexpr double ORIGIN_NOISE_FACTOR = 10.0;
-
-/**
- * @brief   Sets to exactly 0 the roots that are only rounding noise around the origin.
- * @details QZ finds each eigenvalue to about a rounding of the largest one, so beside a junction capacitance with a
- *          pole at 3e12 rad/s, a zero that is really at the origin comes out at 1e-6, and in the right half-plane half
- *          of the time, which would read as an instability that the circuit does not have.
- */
-void SnapNoiseToOrigin(PoleZeroResult &roots) {
-    double largest = 0.0;
-    for (const auto &list : {roots.Poles, roots.Zeros}) {
-        for (const std::complex<double> &root : list) {
-            largest = std::max(largest, std::abs(root));
-        }
-    }
-    const double noise = ORIGIN_NOISE_FACTOR * std::numeric_limits<double>::epsilon() * largest;
-    for (auto *list : {&roots.Poles, &roots.Zeros}) {
-        for (std::complex<double> &root : *list) {
-            if (std::abs(root) <= noise) {
-                root = {0.0, 0.0};
-            }
-        }
-    }
-}
-
 } // namespace
 
 /**
@@ -175,8 +148,6 @@ std::expected<PoleZeroResult, std::string> ComputePoleZero(CompiledCircuit &comp
     if (settings.FindZeros) {
         result.Zeros = FindZeros(system);
     }
-
-    SnapNoiseToOrigin(result);
 
     if (const std::optional<std::string> reason = FindUndrivenOutput(system, result)) {
         return std::unexpected(*reason);
