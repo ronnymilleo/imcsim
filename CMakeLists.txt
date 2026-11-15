@@ -13,7 +13,7 @@ cmake_minimum_required(VERSION 4.3)
 set(CMAKE_OSX_DEPLOYMENT_TARGET 26.0 CACHE STRING "Oldest macOS the program runs on")
 
 project(imcsim
-    VERSION 0.14.0
+    VERSION 0.15.0
 )
 
 add_compile_definitions(IMCSIM_VERSION="${PROJECT_VERSION}")
@@ -47,12 +47,19 @@ if(CLANG_FORMAT)
             ${CMAKE_CURRENT_SOURCE_DIR}/app-core/*.h
             ${CMAKE_CURRENT_SOURCE_DIR}/app-gui/*.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/app-gui/*.h
+            ${CMAKE_CURRENT_SOURCE_DIR}/nodalys/*.cpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/nodalys/*.h
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/*.h
     )
 
+    # The list goes in a file: on the command line it grew past what Windows accepts for one process
+    set(FORMAT_FILE_LIST "${CMAKE_CURRENT_BINARY_DIR}/format_files.txt")
+    list(JOIN ALL_SOURCE_FILES "\n" FORMAT_FILE_LINES)
+    file(WRITE "${FORMAT_FILE_LIST}" "${FORMAT_FILE_LINES}\n${CMAKE_CURRENT_SOURCE_DIR}/main.cpp\n")
+
     add_custom_target(format
-            COMMAND ${CLANG_FORMAT} -i ${ALL_SOURCE_FILES} main.cpp
+            COMMAND ${CLANG_FORMAT} -i --files=${FORMAT_FILE_LIST}
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
             COMMENT "Formatting source code with clang-format"
             VERBATIM
@@ -83,7 +90,14 @@ function(imcsim_target_coverage target)
     endif()
 endfunction()
 
+option(BUILD_TESTS "Build tests" OFF)
+if(BUILD_TESTS)
+    enable_testing()
+    list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/vendor/Catch2/extras)
+endif()
+
 add_subdirectory(vendor)
+add_subdirectory(nodalys)
 add_subdirectory(app-core)
 add_subdirectory(app-gui)
 
@@ -123,9 +137,7 @@ add_dependencies(imcsim format)
 # Testing
 # =============================================================================
 
-option(BUILD_TESTS "Build tests" OFF)
 if(BUILD_TESTS)
-    enable_testing()
     add_subdirectory(tests)
 endif()
 
@@ -151,10 +163,11 @@ add_dependencies(imcsim copy_compile_commands)
 
 # Windows gets a folder to unzip anywhere, with ngspice next to the program; macOS the application bundle, with
 # ngspice in its Frameworks folder; Linux the standard layout, with the desktop entry and icon. All carry the licenses
-# of what the program includes
+# of what the program includes. The nodalys command line ships in the Windows zip and the Linux layout, next to imcsim;
+# the macOS bundle carries the app only, since the disk image has no place for a loose executable
 if(WIN32)
     set(IMCSIM_DOC_DIR .)
-    install(TARGETS imcsim RUNTIME DESTINATION .)
+    install(TARGETS imcsim nodalys-cli RUNTIME DESTINATION .)
     install(FILES vendor/ngspice-windows/bin/ngspice.dll vendor/ngspice-windows/bin/digital.cm DESTINATION .)
     install(FILES vendor/ngspice-windows/licenses/ngspice-COPYING.txt RENAME ngspice-LICENSE.txt
             DESTINATION licenses)
@@ -169,7 +182,7 @@ elseif(APPLE)
 else()
     include(GNUInstallDirs)
     set(IMCSIM_DOC_DIR ${CMAKE_INSTALL_DOCDIR})
-    install(TARGETS imcsim RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    install(TARGETS imcsim nodalys-cli RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
     install(FILES packaging/imcsim.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
     install(FILES packaging/imcsim.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps)
 endif()
@@ -178,6 +191,9 @@ install(FILES vendor/imgui/LICENSE.txt RENAME imgui-LICENSE.txt DESTINATION ${IM
 install(FILES vendor/implot/LICENSE RENAME implot-LICENSE.txt DESTINATION ${IMCSIM_DOC_DIR}/licenses)
 install(FILES vendor/json/LICENSE.MIT RENAME json-LICENSE.txt DESTINATION ${IMCSIM_DOC_DIR}/licenses)
 install(FILES vendor/SDL/LICENSE.txt RENAME SDL-LICENSE.txt DESTINATION ${IMCSIM_DOC_DIR}/licenses)
+if(NOT APPLE)
+    install(FILES vendor/CLI11/LICENSE RENAME CLI11-LICENSE.txt DESTINATION ${IMCSIM_DOC_DIR}/licenses)
+endif()
 install(FILES assets/fonts/Inter-LICENSE.txt assets/fonts/JetBrainsMono-LICENSE.txt
         DESTINATION ${IMCSIM_DOC_DIR}/licenses)
 # Last, since the signature seals every file of the bundle

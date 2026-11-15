@@ -5,7 +5,7 @@
 
 #include "analysis/auto_rerun.h"
 
-#include "document/simulation_settings.h"
+#include "schematic/simulation_settings.h"
 #include <catch2/catch_test_macros.hpp>
 #include <cstddef>
 

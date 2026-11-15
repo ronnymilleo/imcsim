@@ -3,14 +3,14 @@
  * @brief   Tests for the logic blocks that come with imcsim, read and run through ngspice.
  */
 
-#include "components/clock.h"
-#include "components/logic_input.h"
-#include "components/net_label.h"
-#include "components/subcircuit.h"
+#include "circuit/components/clock.h"
+#include "circuit/components/logic_input.h"
+#include "circuit/components/net_label.h"
+#include "circuit/components/subcircuit.h"
 #include "digital_models.h"
-#include "document/ready_blocks.h"
-#include "document/schematic.h"
-#include "editing/element_factory.h"
+#include "schematic/element_factory.h"
+#include "schematic/ready_blocks.h"
+#include "schematic/schematic.h"
 #include "simulation/circuit_checks.h"
 #include "simulation/simulator.h"
 #include <catch2/catch_test_macros.hpp>

@@ -5,9 +5,9 @@
 
 #include "simulation/stepped_circuit.h"
 
-#include "components/capacitor.h"
-#include "components/ground.h"
-#include "components/resistor.h"
+#include "circuit/components/capacitor.h"
+#include "circuit/components/ground.h"
+#include "circuit/components/resistor.h"
 #include <catch2/catch_test_macros.hpp>
 #include <string>
 #include <vector>

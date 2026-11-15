@@ -5,7 +5,7 @@
 
 #include "windows/netlist_window.h"
 
-#include "drawing/theme.h"
+#include "base/theme.h"
 #include <string>
 
 namespace GUI {

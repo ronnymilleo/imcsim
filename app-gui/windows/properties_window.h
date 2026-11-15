@@ -6,8 +6,8 @@
 #ifndef IMCSIM_PROPERTIES_WINDOW_H
 #define IMCSIM_PROPERTIES_WINDOW_H
 
-#include "part_editor.h"
 #include "windows/app_window.h"
+#include "windows/part_editor.h"
 
 namespace GUI {
 

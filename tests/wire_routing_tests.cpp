@@ -3,7 +3,7 @@
  * @brief   Tests for routing new wires on the grid around parts, terminals and other wires.
  */
 
-#include "editing/wire_routing.h"
+#include "schematic/wire_routing.h"
 #include "test_printers.h"
 #include <catch2/catch_test_macros.hpp>
 #include <cstddef>

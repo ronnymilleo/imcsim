@@ -45,6 +45,8 @@ const char *GetTabLabel(const PlotTab tab) {
         return "S-parameters";
     case PlotTab::TRUTH_TABLE:
         return "Truth table";
+    case PlotTab::HARMONIC_BALANCE:
+        return "Harmonic balance";
     case PlotTab::MONTE_CARLO:
         return "Monte Carlo";
     default:
@@ -99,6 +101,8 @@ std::optional<Analysis> GetTabAnalysis(const PlotTab tab) {
         return Analysis::S_PARAMETERS;
     case PlotTab::TRUTH_TABLE:
         return Analysis::TRUTH_TABLE;
+    case PlotTab::HARMONIC_BALANCE:
+        return Analysis::HARMONIC_BALANCE;
     case PlotTab::SPECTRUM:
     case PlotTab::MONTE_CARLO:
     default:
@@ -133,6 +137,8 @@ PlotTab GetAnalysisTab(const Analysis analysis) {
         return PlotTab::S_PARAMETERS;
     case Analysis::TRUTH_TABLE:
         return PlotTab::TRUTH_TABLE;
+    case Analysis::HARMONIC_BALANCE:
+        return PlotTab::HARMONIC_BALANCE;
     default:
         return PlotTab::OPERATING_POINT;
     }

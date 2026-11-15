@@ -5,7 +5,7 @@
 
 #include "simulation/circuit_copy.h"
 
-#include "model/subcircuit.h"
+#include "circuit/subcircuit.h"
 #include <map>
 
 namespace Core {

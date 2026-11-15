@@ -8,7 +8,7 @@
 #ifndef IMCSIM_SENSITIVITY_H
 #define IMCSIM_SENSITIVITY_H
 
-#include "model/circuit.h"
+#include "circuit/circuit.h"
 #include "simulation/simulation_results.h"
 #include <map>
 #include <string>

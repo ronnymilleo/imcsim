@@ -5,8 +5,8 @@
 
 #include "plots/math_channels.h"
 
-#include "drawing/theme.h"
-#include "drawing/trace_swatch.h"
+#include "base/theme.h"
+#include "base/trace_swatch.h"
 #include "misc/cpp/imgui_stdlib.h"
 #include <algorithm>
 #include <array>

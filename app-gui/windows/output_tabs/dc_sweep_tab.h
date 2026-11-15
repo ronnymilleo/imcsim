@@ -6,11 +6,12 @@
 #ifndef IMCSIM_DC_SWEEP_TAB_H
 #define IMCSIM_DC_SWEEP_TAB_H
 
-#include "document/schematic.h"
 #include "plots/math_channels.h"
 #include "plots/plot_export.h"
 #include "plots/plot_types.h"
 #include "plots/trace_fit_state.h"
+#include "results/result_store.h"
+#include "schematic/schematic.h"
 #include "simulation/simulation_results.h"
 #include "windows/output_tabs/frame_results.h"
 #include <vector>
@@ -24,7 +25,7 @@ namespace GUI {
  */
 class DCSweepTab {
 public:
-    explicit DCSweepTab(Schematic &schematic);
+    DCSweepTab(Schematic &schematic, const ResultStore &results);
 
     void Draw(const FrameResults &frame);
 
@@ -34,6 +35,7 @@ public:
 
 private:
     Schematic &m_Schematic;
+    const ResultStore &m_Results;
     /// What the plot showed last frame, so its axes fit for a new result and when its traces change.
     TraceFitState m_Fit;
     PlotCursors m_Cursors;

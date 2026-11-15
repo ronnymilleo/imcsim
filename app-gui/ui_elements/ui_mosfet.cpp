@@ -5,7 +5,7 @@
 
 #include "ui_elements/ui_mosfet.h"
 
-#include "components/mosfet.h"
+#include "circuit/components/mosfet.h"
 #include <array>
 #include <memory>
 

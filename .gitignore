@@ -10,3 +10,5 @@ imgui.ini
 !tools/docs_images/fixtures/*.imcsim
 /graphify-out/
 .vs
+.venv/
+__pycache__/

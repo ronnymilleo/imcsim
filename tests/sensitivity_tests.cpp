@@ -6,20 +6,20 @@
 
 #include "simulation/sensitivity.h"
 
-#include "components/capacitor.h"
-#include "components/controlled_source.h"
-#include "components/diode.h"
-#include "components/ground.h"
-#include "components/logic_part.h"
-#include "components/potentiometer.h"
-#include "components/resistor.h"
-#include "components/subcircuit.h"
-#include "components/vcc.h"
-#include "components/voltage_source.h"
-#include "model/circuit.h"
-#include "model/subcircuit.h"
-#include "ngspice/ngspice_library.h"
-#include "simulation/circuit_checks.h"
+#include "backends/ngspice/ngspice_library.h"
+#include "circuit/circuit.h"
+#include "circuit/components/capacitor.h"
+#include "circuit/components/controlled_source.h"
+#include "circuit/components/diode.h"
+#include "circuit/components/ground.h"
+#include "circuit/components/logic_part.h"
+#include "circuit/components/potentiometer.h"
+#include "circuit/components/resistor.h"
+#include "circuit/components/subcircuit.h"
+#include "circuit/components/vcc.h"
+#include "circuit/components/voltage_source.h"
+#include "circuit/subcircuit.h"
+#include "simulation/check_sensitivity.h"
 #include "simulation/simulation_backend.h"
 #include "simulation/simulator.h"
 #include <algorithm>
@@ -306,4 +306,29 @@ TEST_CASE("The sensitivity of a controlled source is that of its gain", "[sensit
     CHECK_THAT(FindPart(*run.Result, "E1").Absolute, Catch::Matchers::WithinRel(2.0, 1e-4));
     CHECK_THAT(FindPart(*run.Result, "E1").Normalized, Catch::Matchers::WithinRel(8.0, 1e-4));
     CHECK_THAT(FindPart(*run.Result, "V1").Normalized, Catch::Matchers::WithinRel(8.0, 1e-4));
+}
+
+TEST_CASE("The normalized sensitivity of an AC source scales by its DC offset rather than its AC magnitude",
+          "[sensitivity][simulator]") {
+    Core::VoltageSource source;
+    source.SetName("V1");
+    source.SetSourceType(Core::Source::SourceType::AC);
+    source.SetValue(5.0);
+    source.SetAC({.Magnitude = 5.0});
+    Core::Resistor load;
+    load.SetName("R1");
+    const Core::Ground reference;
+
+    Core::Circuit circuit;
+    circuit.Add(source, {1, 0});
+    circuit.Add(load, {1, 0});
+    circuit.Add(reference, {0});
+
+    const Core::SensitivityRun run = Core::RunSensitivity(circuit, {.OutputNode = 1});
+    REQUIRE(run.Result.has_value());
+    const Core::PartSensitivity &part = FindPart(*run.Result, "V1");
+    CHECK_THAT(part.Absolute, Catch::Matchers::WithinRel(1.0, 1e-4));
+    CHECK_THAT(part.Normalized, Catch::Matchers::WithinAbs(0.0, 1e-12));
+    REQUIRE(part.Value.has_value());
+    CHECK_THAT(*part.Value, Catch::Matchers::WithinAbs(0.0, 1e-12));
 }

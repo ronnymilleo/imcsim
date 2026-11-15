@@ -5,7 +5,7 @@
 
 #include "ui_elements/ui_capacitor.h"
 
-#include "components/capacitor.h"
+#include "circuit/components/capacitor.h"
 #include <memory>
 
 namespace GUI {

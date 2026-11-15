@@ -4,7 +4,7 @@
  *          cursor and the figures of the plots.
  */
 
-#include "analysis/s_parameter_view.h"
+#include "plots/s_parameter_view.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>

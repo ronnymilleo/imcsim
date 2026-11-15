@@ -3,7 +3,7 @@
  * @brief   Tests for reading the outputs of a truth table as logic states and writing it as text.
  */
 
-#include "analysis/truth_table.h"
+#include "results/truth_table.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <string>

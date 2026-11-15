@@ -5,7 +5,7 @@
 
 #include "ui_elements/ui_inductor.h"
 
-#include "components/inductor.h"
+#include "circuit/components/inductor.h"
 #include <array>
 #include <cmath>
 #include <memory>

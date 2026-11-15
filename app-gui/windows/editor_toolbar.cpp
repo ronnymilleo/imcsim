@@ -5,10 +5,10 @@
 
 #include "windows/editor_toolbar.h"
 
-#include "drawing/theme.h"
-#include "drawing/tool_icons.h"
-#include "editing/shortcuts.h"
+#include "base/theme.h"
+#include "schematic/shortcuts.h"
 #include "spice/spice_value.h"
+#include "windows/tool_icons.h"
 #include <algorithm>
 #include <array>
 #include <format>
@@ -70,7 +70,7 @@ float AnalysisButtonWidth() {
     for (const Analysis analysis :
          {Analysis::OPERATING_POINT, Analysis::TRANSIENT, Analysis::AC_SWEEP, Analysis::DC_SWEEP, Analysis::NOISE,
           Analysis::TRANSFER_FUNCTION, Analysis::SENSITIVITY, Analysis::POLE_ZERO, Analysis::S_PARAMETERS,
-          Analysis::TRUTH_TABLE}) {
+          Analysis::TRUTH_TABLE, Analysis::HARMONIC_BALANCE}) {
         widest = std::max(widest, ImGui::CalcTextSize(GetAnalysisName(analysis)).x);
     }
     return widest + ImGui::GetStyle().FramePadding.x * 2.0f + ImGui::GetFontSize();

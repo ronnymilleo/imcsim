@@ -5,7 +5,7 @@
 
 #include "ui_elements/ui_subcircuit_pin.h"
 
-#include "components/subcircuit_pin.h"
+#include "circuit/components/subcircuit_pin.h"
 #include <array>
 #include <format>
 #include <memory>

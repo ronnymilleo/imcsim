@@ -1,0 +1,148 @@
+/**
+ * @file    preferences.h
+ * @brief   The user's own choices, apart from any schematic, and the file that keeps them.
+ */
+
+#ifndef IMCSIM_PREFERENCES_H
+#define IMCSIM_PREFERENCES_H
+
+#include "base/theme.h"
+#include "spice/standard_values.h"
+#include "ui_elements/ui_element.h"
+#include <array>
+#include <cstddef>
+#include <string>
+#include <string_view>
+#include <vector>
+
+namespace GUI {
+
+/**
+ * @enum    WireColoring
+ * @brief   What the colors of wires (and, by current, power and sensitivity, of parts) show.
+ * @details Voltage, Current and Power color by the state on display, on a heat scale with a legend. Sensitivity colors
+ *          the parts by their influence on the output of the last sensitivity analysis, and leaves the wires plain.
+ */
+enum class WireColoring {
+    PLAIN,
+    NODES,
+    VOLTAGE,
+    CURRENT,
+    POWER,
+    SENSITIVITY,
+    COUNT
+};
+
+/**
+ * @enum    LiveEffect
+ * @brief   An animated effect that reads the state on display and draws on top of the schematic.
+ * @details Each effect is turned on by itself, over any wire coloring.
+ */
+enum class LiveEffect {
+    CURRENT_FLOW,
+    LED_GLOW,
+    HEAT_GLOW,
+    /// Lights the box of a logic input that is high and of a logic output that reads 1.
+    LOGIC_LIGHTS,
+    /// A short burst of rays at the instant a fuse blows.
+    FUSE,
+    COUNT
+};
+
+constexpr std::size_t NUMBER_OF_LIVE_EFFECTS = static_cast<std::size_t>(LiveEffect::COUNT);
+
+/// The effects a new user gets: all off but the fuse flash, which marks an event that is easy to miss otherwise.
+constexpr std::array<bool, NUMBER_OF_LIVE_EFFECTS> DEFAULT_LIVE_EFFECTS = [] {
+    std::array<bool, NUMBER_OF_LIVE_EFFECTS> effects = {};
+    effects[static_cast<std::size_t>(LiveEffect::FUSE)] = true;
+    return effects;
+}();
+
+/// How long an edit must settle before the analysis runs again by itself: long enough for a burst of edits to run once,
+/// short enough to feel like it follows them.
+constexpr double DEFAULT_RERUN_DELAY_SECONDS = 0.5;
+/// Shortest delay the user may set.
+constexpr double MIN_RERUN_DELAY_SECONDS = 0.1;
+/// Longest delay the user may set.
+constexpr double MAX_RERUN_DELAY_SECONDS = 5.0;
+
+/**
+ * @enum    SimulationEngine
+ * @brief   The engine that solves the circuits.
+ */
+enum class SimulationEngine {
+    NGSPICE,
+    NODALYS
+};
+
+/**
+ * @enum    HarmonicAmplitudeUnit
+ * @brief   Convention used to display AC harmonic magnitudes in harmonic balance plots and tables.
+ */
+enum class HarmonicAmplitudeUnit {
+    PEAK,
+    RMS
+};
+
+/**
+ * @struct  Preferences
+ * @brief   How the program looks and behaves for this user, whatever schematic is open.
+ * @details What belongs to a circuit, such as the simulation settings, is saved in its file instead. Every field
+ *          starts at the choice a new user gets.
+ */
+struct Preferences {
+    // Appearance
+    /// By name, so the choice survives themes being added or reordered.
+    std::string Theme = GetThemes().front().Name;
+    SymbolStyle Symbols = SymbolStyle::IEC;
+    /// Numbers each terminal; terminal 1 is where a positive current enters.
+    bool ShowTerminalNumbers = false;
+
+    /// Schematic while showing results.
+    WireColoring WireColors = WireColoring::PLAIN;
+    /// By enum value, each on its own; all off until asked for but the fuse flash.
+    std::array<bool, NUMBER_OF_LIVE_EFFECTS> LiveEffects = DEFAULT_LIVE_EFFECTS;
+
+    /// Parts: resistors, capacitors and inductors take the nearest value of the series.
+    Core::ValueSeries ValueSeries = Core::ValueSeries::FREE;
+
+    /// Results: a new result brings the Output window to the front, or only marks it.
+    bool BringOutputToFront = true;
+    /// Which engine solves the circuits.
+    SimulationEngine Engine = SimulationEngine::NGSPICE;
+    /// The selected analysis runs again by itself once an edit of the circuit settles, if it was already run.
+    bool RerunOnEdit = false;
+    /// Quiet time after the last edit before it runs, from MIN_RERUN_DELAY_SECONDS to MAX_RERUN_DELAY_SECONDS.
+    double RerunDelaySeconds = DEFAULT_RERUN_DELAY_SECONDS;
+    /// Convention for displaying AC harmonic magnitudes in harmonic balance results (DC is unchanged).
+    HarmonicAmplitudeUnit HarmonicAmplitudes = HarmonicAmplitudeUnit::PEAK;
+
+    bool IsEffectOn(LiveEffect effect) const;
+    void SetEffectOn(LiveEffect effect, bool on);
+
+    bool operator==(const Preferences &) const = default;
+};
+
+/**
+ * @struct  LoadedPreferences
+ * @brief   Preferences read from their file, plus a message for each choice that could not be read.
+ */
+struct LoadedPreferences {
+    Preferences Choices;
+    std::vector<std::string> Warnings;
+};
+
+// Names as menus and the file show them
+const char *GetWireColoringName(WireColoring coloring);
+const char *GetLiveEffectName(LiveEffect effect);
+const char *GetSimulationEngineName(SimulationEngine engine);
+const char *GetHarmonicAmplitudeUnitName(HarmonicAmplitudeUnit unit);
+
+// File
+inline constexpr std::string_view PREFERENCES_FILE_NAME = "preferences.json";
+std::string SavePreferences(const Preferences &preferences);
+LoadedPreferences LoadPreferences(std::string_view text);
+
+} // namespace GUI
+
+#endif // IMCSIM_PREFERENCES_H

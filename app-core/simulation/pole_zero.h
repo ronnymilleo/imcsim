@@ -10,7 +10,7 @@
 #ifndef IMCSIM_POLE_ZERO_H
 #define IMCSIM_POLE_ZERO_H
 
-#include "model/circuit.h"
+#include "circuit/circuit.h"
 #include "simulation/analysis_settings.h"
 #include "simulation/simulation_results.h"
 #include <complex>

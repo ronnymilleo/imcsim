@@ -3,8 +3,8 @@
  * @brief   Tests for the brightness and color of lit LEDs.
  */
 
-#include "drawing/led_glow.h"
-#include "editing/element_factory.h"
+#include "overlays/led_glow.h"
+#include "schematic/element_factory.h"
 #include "test_printers.h"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>

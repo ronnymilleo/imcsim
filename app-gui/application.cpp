@@ -5,19 +5,20 @@
 
 #include "application.h"
 
-#include "document/examples.h"
-#include "document/schematic_file.h"
-#include "drawing/theme.h"
-#include "drawing/tool_icons.h"
-#include "editing/shortcuts.h"
+#include "backends/ngspice/ngspice_library.h"
+#include "backends/nodalys/nodalys_backend.h"
+#include "base/theme.h"
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_sdlgpu3.h"
 #include "imgui_internal.h"
 #include "implot.h"
-#include "ngspice/ngspice_library.h"
+#include "schematic/examples.h"
+#include "schematic/schematic_file.h"
+#include "schematic/shortcuts.h"
 #include "simulation/simulator.h"
 #include "windows/dock_layout.h"
+#include "windows/tool_icons.h"
 #include <SDL3/SDL.h>
 #include <array>
 #include <cstdio>
@@ -68,6 +69,14 @@ std::filesystem::path GetCodeModelDirectory(const std::filesystem::path &base_pa
 }
 
 } // namespace
+
+/**
+ * @brief   Makes the results hear of every change of the schematic that drops them, from the start, so no frame shows a
+ *          result that no longer matches.
+ */
+Application::Application() {
+    m_Schematic.SetListener(&m_Results);
+}
 
 /**
  * @brief   Initializes SDL, the GPU device and Dear ImGui, in that order.
@@ -267,13 +276,18 @@ void Application::LoadPreferencesFile() {
 
 /**
  * @brief   The theme is global to ImGui, so it follows the preferences here; the windows read the other choices
- *          themselves.
+ *          themselves; the simulation backend follows here too, switched once no run holds it.
  * @details Writing only when something changed keeps the file untouched frame after frame, and a failed write is logged
  *          once.
  */
 void Application::ApplyPreferences() {
     if (const std::optional<std::size_t> theme = FindTheme(m_Preferences.Theme); theme && *theme != GetThemeIndex()) {
         SetTheme(*theme);
+    }
+    const SimulationEngine engine = m_Preferences.Engine;
+    // The worker of a run, a paused live one too, uses the backend it started on, so the switch waits for its end
+    if (GetSimulationEngineName(engine) != Core::GetBackend().GetName() && !m_AnalysisControls.IsBackendInUse()) {
+        Core::SetBackend(engine == SimulationEngine::NODALYS ? std::make_unique<Core::NodalysBackend>() : nullptr);
     }
     if (m_Preferences == m_SavedPreferences) {
         return;
@@ -322,11 +336,11 @@ void Application::Render() {
     m_AnalysisControls.Update();
     // The window of points that the plot shows and the schematic plays follows a run whichever window is in front. A
     // live run is seen a stop time at a time, however many points that is
-    const std::optional<Core::Transient> &transient = m_Schematic.GetTransient();
+    const std::optional<Core::Transient> &transient = m_Results.GetTransient();
     m_Playback.Window.SetSpan(m_AnalysisControls.IsLiveResult()
                                   ? std::optional(m_Schematic.GetSimulationSettings().Transient.StopTime)
                                   : std::nullopt);
-    m_Playback.Window.Update(transient ? &*transient : nullptr, m_Schematic.GetTransientVersion(),
+    m_Playback.Window.Update(transient ? &*transient : nullptr, m_Results.GetTransientVersion(),
                              m_AnalysisControls.IsRunning());
     ShowNewResults();
 
@@ -479,7 +493,7 @@ void Application::UpdateWindowTitle() {
  * @details Versions also change when results are dropped, which opens nothing.
  */
 void Application::ShowNewResults() {
-    if (m_Schematic.GetTransientVersion() != m_ShownTransientVersion) {
+    if (m_Results.GetTransientVersion() != m_ShownTransientVersion) {
         m_Playback.Reset();
     }
     // A live run is played on the schematic, so its results never take the front from it
@@ -489,27 +503,29 @@ void Application::ShowNewResults() {
             m_OutputWindow.ShowTab(tab, !m_AnalysisControls.IsLive());
         }
     };
-    show_if_new(m_ShownOperatingPointVersion, m_Schematic.GetOperatingPointVersion(),
-                m_Schematic.GetOperatingPoint().has_value(), PlotTab::OPERATING_POINT);
-    show_if_new(m_ShownTransientVersion, m_Schematic.GetTransientVersion(), m_Schematic.GetTransient().has_value(),
+    show_if_new(m_ShownOperatingPointVersion, m_Results.GetOperatingPointVersion(),
+                m_Results.GetOperatingPoint().has_value(), PlotTab::OPERATING_POINT);
+    show_if_new(m_ShownTransientVersion, m_Results.GetTransientVersion(), m_Results.GetTransient().has_value(),
                 PlotTab::TRANSIENT);
-    show_if_new(m_ShownACSweepVersion, m_Schematic.GetACSweepVersion(), m_Schematic.GetACSweep().has_value(),
+    show_if_new(m_ShownACSweepVersion, m_Results.GetACSweepVersion(), m_Results.GetACSweep().has_value(),
                 PlotTab::AC_SWEEP);
-    show_if_new(m_ShownDCSweepVersion, m_Schematic.GetDCSweepVersion(), m_Schematic.GetDCSweep().has_value(),
+    show_if_new(m_ShownDCSweepVersion, m_Results.GetDCSweepVersion(), m_Results.GetDCSweep().has_value(),
                 PlotTab::DC_SWEEP);
-    show_if_new(m_ShownNoiseVersion, m_Schematic.GetNoiseVersion(), m_Schematic.GetNoise().has_value(), PlotTab::NOISE);
-    show_if_new(m_ShownTransferFunctionVersion, m_Schematic.GetTransferFunctionVersion(),
-                m_Schematic.GetTransferFunction().has_value(), PlotTab::TRANSFER_FUNCTION);
-    show_if_new(m_ShownSensitivityVersion, m_Schematic.GetSensitivityVersion(),
-                m_Schematic.GetSensitivity().has_value(), PlotTab::SENSITIVITY);
-    show_if_new(m_ShownPoleZeroVersion, m_Schematic.GetPoleZeroVersion(), m_Schematic.GetPoleZero().has_value(),
+    show_if_new(m_ShownNoiseVersion, m_Results.GetNoiseVersion(), m_Results.GetNoise().has_value(), PlotTab::NOISE);
+    show_if_new(m_ShownTransferFunctionVersion, m_Results.GetTransferFunctionVersion(),
+                m_Results.GetTransferFunction().has_value(), PlotTab::TRANSFER_FUNCTION);
+    show_if_new(m_ShownSensitivityVersion, m_Results.GetSensitivityVersion(), m_Results.GetSensitivity().has_value(),
+                PlotTab::SENSITIVITY);
+    show_if_new(m_ShownPoleZeroVersion, m_Results.GetPoleZeroVersion(), m_Results.GetPoleZero().has_value(),
                 PlotTab::POLE_ZERO);
-    show_if_new(m_ShownSParametersVersion, m_Schematic.GetSParametersVersion(),
-                m_Schematic.GetSParameters().has_value(), PlotTab::S_PARAMETERS);
-    show_if_new(m_ShownTruthTableVersion, m_Schematic.GetTruthTableVersion(), m_Schematic.GetTruthTable().has_value(),
+    show_if_new(m_ShownSParametersVersion, m_Results.GetSParametersVersion(), m_Results.GetSParameters().has_value(),
+                PlotTab::S_PARAMETERS);
+    show_if_new(m_ShownTruthTableVersion, m_Results.GetTruthTableVersion(), m_Results.GetTruthTable().has_value(),
                 PlotTab::TRUTH_TABLE);
+    show_if_new(m_ShownHarmonicBalanceVersion, m_Results.GetHarmonicBalanceVersion(),
+                m_Results.GetHarmonicBalance().has_value(), PlotTab::HARMONIC_BALANCE);
     // After the analyses, so the table of a Monte Carlo run is what shows in front of the traces it came with
-    show_if_new(m_ShownMonteCarloVersion, m_Schematic.GetMonteCarloVersion(), m_Schematic.GetMonteCarlo().has_value(),
+    show_if_new(m_ShownMonteCarloVersion, m_Results.GetMonteCarloVersion(), m_Results.GetMonteCarlo().has_value(),
                 PlotTab::MONTE_CARLO);
     const std::optional<Analysis> last_run = m_AnalysisControls.GetLastRun();
     if (std::exchange(m_ShownRunCount, m_AnalysisControls.GetFinishedRunCount()) !=

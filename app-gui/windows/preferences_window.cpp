@@ -5,7 +5,7 @@
 
 #include "windows/preferences_window.h"
 
-#include "drawing/theme.h"
+#include "base/theme.h"
 #include "spice/standard_values.h"
 #include <array>
 #include <cstddef>
@@ -118,6 +118,7 @@ void PreferencesWindow::Draw() {
     DrawAppearance();
     DrawSchematic();
     DrawParts();
+    DrawSimulation();
     DrawResults();
     ImGui::Spacing();
     ImGui::Separator();
@@ -189,6 +190,26 @@ void PreferencesWindow::DrawParts() {
     ImGui::EndTable();
 }
 
+void PreferencesWindow::DrawSimulation() {
+    if (!BeginSection("Simulation")) {
+        return;
+    }
+    BeginChoice("Backend");
+    if (ImGui::BeginCombo("##simulation_backend", GetSimulationEngineName(m_Preferences.Engine))) {
+        if (ImGui::Selectable("ngspice", m_Preferences.Engine == SimulationEngine::NGSPICE)) {
+            m_Preferences.Engine = SimulationEngine::NGSPICE;
+        }
+        ImGui::SetItemTooltip("The reference simulator, ngspice, as a shared library");
+        if (ImGui::Selectable("Nodalys", m_Preferences.Engine == SimulationEngine::NODALYS)) {
+            m_Preferences.Engine = SimulationEngine::NODALYS;
+        }
+        ImGui::SetItemTooltip("Nodalys, the built-in solver of imcsim; it runs analog and digital simulations");
+        ImGui::EndCombo();
+    }
+    ImGui::SetItemTooltip("The engine that solves the circuits; a run in progress ends on the one it started on");
+    ImGui::EndTable();
+}
+
 void PreferencesWindow::DrawResults() {
     if (!BeginSection("Results")) {
         return;
@@ -207,6 +228,19 @@ void PreferencesWindow::DrawResults() {
     ImGui::EndDisabled();
     ImGui::SetItemTooltip("How long the circuit must stay unchanged before the analysis runs again: shorter follows "
                           "edits sooner, longer waits for a series of edits to end");
+    BeginChoice("Harmonic amplitudes");
+    if (ImGui::BeginCombo("##harmonic_amplitudes", GetHarmonicAmplitudeUnitName(m_Preferences.HarmonicAmplitudes))) {
+        if (ImGui::Selectable("Peak", m_Preferences.HarmonicAmplitudes == HarmonicAmplitudeUnit::PEAK)) {
+            m_Preferences.HarmonicAmplitudes = HarmonicAmplitudeUnit::PEAK;
+        }
+        ImGui::SetItemTooltip("Show AC harmonic magnitudes as peak values (DC stays unscaled)");
+        if (ImGui::Selectable("RMS", m_Preferences.HarmonicAmplitudes == HarmonicAmplitudeUnit::RMS)) {
+            m_Preferences.HarmonicAmplitudes = HarmonicAmplitudeUnit::RMS;
+        }
+        ImGui::SetItemTooltip("Show AC harmonic magnitudes as RMS values, scaled by 1/sqrt(2) (DC stays unscaled)");
+        ImGui::EndCombo();
+    }
+    ImGui::SetItemTooltip("How harmonic balance plots and tables show AC harmonic magnitudes");
     ImGui::EndTable();
 }
 

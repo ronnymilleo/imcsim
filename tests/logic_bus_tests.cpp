@@ -3,12 +3,12 @@
  * @brief   Tests for logic buses: reading several logic signals as one number and writing its value.
  */
 
-#include "document/schematic.h"
-#include "document/schematic_file.h"
-#include "plots/logic_bus.h"
 #include "plots/logic_buses.h"
 #include "plots/plot_export.h"
 #include "plots/plot_figures.h"
+#include "results/logic_bus.h"
+#include "schematic/schematic.h"
+#include "schematic/schematic_file.h"
 #include <catch2/catch_test_macros.hpp>
 #include <cmath>
 #include <cstdint>
@@ -82,9 +82,7 @@ TEST_CASE("A bus keeps a value while all its bits do, and is unknown while any i
     CHECK(GUI::FindBusSegments({}, bits).empty());
 }
 
-TEST_CASE("A new bus gets a name no other bus has", "[logic_bus]") {
-    CHECK(GUI::GetNextBusName({}) == "BUS1");
-    CHECK(GUI::GetNextBusName({{.Name = "BUS1"}, {.Name = "BUS3"}}) == "BUS2");
+TEST_CASE("A bus is described by its bits and format", "[logic_bus]") {
     CHECK(GUI::DescribeBus({.Name = "B", .Bits = {"V(Q1)", "V(Q0)"}, .Format = GUI::BusFormat::BINARY}) ==
           "V(Q1) V(Q0), bin");
     CHECK(GUI::DescribeBus({.Name = "E"}) == "no bits, hex");

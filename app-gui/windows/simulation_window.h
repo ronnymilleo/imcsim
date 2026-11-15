@@ -8,7 +8,7 @@
 
 #include "analysis/analysis_controls.h"
 #include "analysis/analysis_settings_panel.h"
-#include "document/schematic.h"
+#include "schematic/schematic.h"
 #include "windows/app_window.h"
 
 namespace GUI {

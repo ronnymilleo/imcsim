@@ -6,8 +6,8 @@
 #ifndef IMCSIM_LOGIC_BUSES_H
 #define IMCSIM_LOGIC_BUSES_H
 
-#include "document/schematic.h"
-#include "plots/logic_bus.h"
+#include "results/logic_bus.h"
+#include "schematic/schematic.h"
 #include <string>
 #include <vector>
 

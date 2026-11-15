@@ -6,10 +6,10 @@
 #ifndef IMCSIM_PART_PICKER_H
 #define IMCSIM_PART_PICKER_H
 
-#include "document/ready_blocks.h"
-#include "document/schematic_file.h"
-#include "editing/editor_mode.h"
-#include "preferences.h"
+#include "schematic/editor_mode.h"
+#include "schematic/preferences.h"
+#include "schematic/ready_blocks.h"
+#include "schematic/schematic_file.h"
 #include <cstddef>
 #include <optional>
 #include <string>

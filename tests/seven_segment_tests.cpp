@@ -4,12 +4,12 @@
  *          simulation.
  */
 
-#include "analysis/logic_outputs.h"
-#include "components/logic_input.h"
-#include "components/seven_segment.h"
-#include "document/schematic.h"
-#include "document/schematic_file.h"
-#include "editing/element_factory.h"
+#include "circuit/components/logic_input.h"
+#include "circuit/components/seven_segment.h"
+#include "results/logic_outputs.h"
+#include "schematic/element_factory.h"
+#include "schematic/schematic.h"
+#include "schematic/schematic_file.h"
 #include "simulation/circuit_checks.h"
 #include "simulation/simulator.h"
 #include <algorithm>

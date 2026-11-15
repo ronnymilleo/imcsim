@@ -3,9 +3,9 @@
  * @brief   Tests for where the voltage readout of a node sits beside its wire.
  */
 
-#include "drawing/readout_placement.h"
+#include "overlays/readout_placement.h"
 
-#include "helpers.h"
+#include "base/helpers.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <optional>

@@ -5,13 +5,13 @@
 
 #include "analysis/analysis_inputs.h"
 
-#include "components/current_source.h"
-#include "components/ground.h"
-#include "components/logic_input.h"
-#include "components/resistor.h"
-#include "components/voltage_source.h"
-#include "document/examples.h"
-#include "document/schematic.h"
+#include "circuit/components/current_source.h"
+#include "circuit/components/ground.h"
+#include "circuit/components/logic_input.h"
+#include "circuit/components/resistor.h"
+#include "circuit/components/voltage_source.h"
+#include "schematic/examples.h"
+#include "schematic/schematic.h"
 #include "test_printers.h"
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>

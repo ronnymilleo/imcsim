@@ -7,12 +7,13 @@
 #include "analysis/analysis_settings_panel.h"
 
 #include "analysis/analysis_inputs.h"
-#include "drawing/theme.h"
-#include "editing/probing.h"
+#include "base/theme.h"
 #include "imgui.h"
 #include "misc/cpp/imgui_stdlib.h"
+#include "schematic/probing.h"
+#include "simulation/analysis_sources.h"
 #include "simulation/analysis_suggestions.h"
-#include "simulation/circuit_checks.h"
+#include "simulation/check_s_parameters.h"
 #include "simulation/simulation_backend.h"
 #include "spice/spice_value.h"
 #include <algorithm>
@@ -92,6 +93,8 @@ Core::AnalysisKind ToKind(const Analysis analysis) {
         return Core::AnalysisKind::S_PARAMETERS;
     case Analysis::TRUTH_TABLE:
         return Core::AnalysisKind::TRUTH_TABLE;
+    case Analysis::HARMONIC_BALANCE:
+        return Core::AnalysisKind::HARMONIC_BALANCE;
     default:
         return Core::AnalysisKind::OPERATING_POINT;
     }
@@ -271,6 +274,9 @@ void AnalysisSettingsPanel::DrawSelectedSettings(SimulationSettings &settings) {
     case Analysis::TRUTH_TABLE:
         DrawTruthTableSettings(settings);
         break;
+    case Analysis::HARMONIC_BALANCE:
+        DrawHarmonicBalanceSettings(settings);
+        break;
     }
 }
 
@@ -287,6 +293,7 @@ void AnalysisSettingsPanel::LoadSettingsFields() {
     m_NoiseStopFrequency.Load(settings.NoiseRange.StopFrequency);
     m_SStartFrequency.Load(settings.SParameters.StartFrequency);
     m_SStopFrequency.Load(settings.SParameters.StopFrequency);
+    m_HBFundamental.Load(settings.HarmonicBalance.FundamentalFrequency);
     LoadParameterStepFields(settings.ParameterStep);
     m_LoadedSettingsVersion = m_Schematic.GetSimulationSettingsVersion();
 }
@@ -619,6 +626,66 @@ void AnalysisSettingsPanel::DrawTruthTableSettings(SimulationSettings &settings)
 }
 
 /**
+ * @brief   The fundamental, the number of harmonics and the time samples per period, and a button that takes the
+ *          fundamental and the harmonics from the periodic sources of the circuit.
+ * @details An explicit sample count stays above twice the harmonics, so a harmonic never aliases onto another one.
+ */
+void AnalysisSettingsPanel::DrawHarmonicBalanceSettings(SimulationSettings &settings) {
+    constexpr int MIN_EXPLICIT_SAMPLES = 32;
+    constexpr int MAX_EXPLICIT_SAMPLES = Core::MAX_HARMONIC_BALANCE_SAMPLES;
+    if (const std::optional<double> fundamental = m_HBFundamental.Draw("Fundamental", "Hz", IsPositive)) {
+        settings.HarmonicBalance.FundamentalFrequency = *fundamental;
+    }
+    DrawFieldLabel("Harmonics");
+    if (ImGui::InputInt("##hb_harmonics", &settings.HarmonicBalance.Harmonics)) {
+        settings.HarmonicBalance.Harmonics =
+            std::clamp(settings.HarmonicBalance.Harmonics, 1, Core::MAX_HARMONIC_BALANCE_HARMONICS);
+    }
+    ImGui::SetItemTooltip("Number of harmonics above DC (1 to %d)", Core::MAX_HARMONIC_BALANCE_HARMONICS);
+    // An explicit sample count stays above twice the harmonics, the Nyquist limit
+    if (settings.HarmonicBalance.Samples != 0 &&
+        settings.HarmonicBalance.Samples <= 2 * settings.HarmonicBalance.Harmonics) {
+        int next_power = MIN_EXPLICIT_SAMPLES;
+        while (next_power <= 2 * settings.HarmonicBalance.Harmonics && next_power < MAX_EXPLICIT_SAMPLES) {
+            next_power *= 2;
+        }
+        settings.HarmonicBalance.Samples = next_power;
+    }
+    DrawFieldLabel("Samples");
+    const std::string samples_label =
+        settings.HarmonicBalance.Samples == 0 ? "Auto" : std::format("{}", settings.HarmonicBalance.Samples);
+    if (ImGui::BeginCombo("##hb_samples", samples_label.c_str())) {
+        if (ImGui::Selectable("Auto", settings.HarmonicBalance.Samples == 0)) {
+            settings.HarmonicBalance.Samples = 0;
+        }
+        ImGui::SetItemTooltip("The smallest power of two of at least 16 and 4 times the harmonics");
+        for (int candidate = MIN_EXPLICIT_SAMPLES; candidate <= MAX_EXPLICIT_SAMPLES; candidate *= 2) {
+            if (candidate <= 2 * settings.HarmonicBalance.Harmonics) {
+                continue;
+            }
+            const std::string label = std::format("{}", candidate);
+            if (ImGui::Selectable(label.c_str(), settings.HarmonicBalance.Samples == candidate)) {
+                settings.HarmonicBalance.Samples = candidate;
+            }
+        }
+        ImGui::EndCombo();
+    }
+    const Core::Circuit circuit = m_Schematic.BuildCircuit();
+    const auto suggested = Core::SuggestHarmonicBalanceSettings(circuit);
+    ImGui::BeginDisabled(!suggested.has_value());
+    if (ImGui::Button("From sources") && suggested) {
+        settings.HarmonicBalance.FundamentalFrequency = suggested->FundamentalFrequency;
+        settings.HarmonicBalance.Harmonics = suggested->Harmonics;
+        settings.HarmonicBalance.Samples = suggested->Samples;
+        m_HBFundamental.Load(suggested->FundamentalFrequency);
+    }
+    ImGui::EndDisabled();
+    ImGui::SetItemTooltip(
+        "%s", suggested ? "Set the fundamental frequency and harmonic count from the circuit's periodic sources"
+                        : "Needs a sine, AC, pulse or clock source with commensurable frequencies");
+}
+
+/**
  * @brief   Below the settings of the operating point, the transient, the AC sweep and the DC sweep: how they repeat,
  * which is not at all, once per value of a parameter or once per draw of the parts within their tolerances.
  * @details The fields share their labels with those of the analysis above, so they get an ID of their own.
@@ -766,12 +833,18 @@ void AnalysisSettingsPanel::DrawParameterPicker(ParameterStepSettings &step, con
     if (!ImGui::BeginCombo("##step_parameter", shown.c_str())) {
         return;
     }
+    const std::optional<std::string> &no_temperature = Core::GetBackend().GetCapabilities().TemperatureUnsupported;
+    ImGui::BeginDisabled(no_temperature.has_value());
     if (ImGui::Selectable("Temperature", step.Part.empty()) && !step.Part.empty()) {
         step.Part.clear();
         step.Start = 0.0;
         step.Stop = 100.0;
         step.Step = 25.0;
         LoadParameterStepFields(step);
+    }
+    ImGui::EndDisabled();
+    if (no_temperature) {
+        ImGui::SetItemTooltip("%s", no_temperature->c_str());
     }
     const std::vector<std::string> steppable = Core::GetSteppableParts(circuit);
     for (const Core::CircuitEntry &entry : circuit.GetEntries()) {

@@ -6,10 +6,11 @@
 #ifndef IMCSIM_AC_SWEEP_TAB_H
 #define IMCSIM_AC_SWEEP_TAB_H
 
-#include "document/schematic.h"
 #include "plots/plot_export.h"
 #include "plots/plot_types.h"
 #include "plots/trace_fit_state.h"
+#include "results/result_store.h"
+#include "schematic/schematic.h"
 #include "simulation/simulation_results.h"
 #include "windows/output_tabs/frame_results.h"
 #include <string>
@@ -27,7 +28,7 @@ namespace GUI {
  */
 class ACSweepTab {
 public:
-    explicit ACSweepTab(Schematic &schematic);
+    ACSweepTab(Schematic &schematic, ResultStore &results);
 
     void Draw(const FrameResults &frame);
 
@@ -70,6 +71,7 @@ private:
     };
 
     Schematic &m_Schematic;
+    ResultStore &m_Results;
     /// What the plots showed last frame, so their axes fit for a new result and when their traces change.
     TraceFitState m_Fit;
     /// Shared by both plots.

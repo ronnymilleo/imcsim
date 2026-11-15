@@ -5,7 +5,7 @@
 
 #include "ui_elements/ui_op_amp.h"
 
-#include "components/op_amp.h"
+#include "circuit/components/op_amp.h"
 #include "spice/spice_value.h"
 #include <format>
 #include <memory>

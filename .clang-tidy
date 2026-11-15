@@ -10,7 +10,7 @@ Checks: >-
   bugprone-suspicious-stringview-data-usage,
   bugprone-unchecked-optional-access,
   readability-identifier-naming
-HeaderFilterRegex: '.*/(app-core|app-gui)/.*'
+HeaderFilterRegex: '.*/(app-core|app-gui|nodalys)/.*'
 CheckOptions:
   readability-identifier-naming.NamespaceCase: CamelCase
   readability-identifier-naming.ClassCase: CamelCase

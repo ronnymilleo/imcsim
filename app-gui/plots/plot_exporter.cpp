@@ -5,10 +5,10 @@
 
 #include "plots/plot_exporter.h"
 
-#include "document/schematic_file.h"
-#include "drawing/theme.h"
+#include "base/theme.h"
 #include "imgui.h"
 #include "plots/touchstone.h"
+#include "schematic/schematic_file.h"
 #include <algorithm>
 #include <array>
 #include <expected>

@@ -7,7 +7,7 @@
 #ifndef IMCSIM_LIVE_CHANGE_H
 #define IMCSIM_LIVE_CHANGE_H
 
-#include "components/component.h"
+#include "circuit/components/component.h"
 #include <string>
 #include <vector>
 

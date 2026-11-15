@@ -3,7 +3,7 @@
  * @brief   Tests for the instant of a transient the schematic shows.
  */
 
-#include "analysis/playback.h"
+#include "results/playback.h"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 

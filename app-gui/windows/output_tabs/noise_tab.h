@@ -7,10 +7,11 @@
 #ifndef IMCSIM_NOISE_TAB_H
 #define IMCSIM_NOISE_TAB_H
 
-#include "document/schematic.h"
 #include "plots/plot_export.h"
 #include "plots/plot_types.h"
 #include "plots/trace_fit_state.h"
+#include "results/result_store.h"
+#include "schematic/schematic.h"
 #include "simulation/simulation_results.h"
 #include <set>
 #include <string>
@@ -25,7 +26,7 @@ namespace GUI {
  */
 class NoiseTab {
 public:
-    explicit NoiseTab(Schematic &schematic);
+    NoiseTab(Schematic &schematic, const ResultStore &results);
 
     void Draw();
 
@@ -35,6 +36,7 @@ public:
 
 private:
     Schematic &m_Schematic;
+    const ResultStore &m_Results;
     /// The noise result the axes of its plot were fitted to.
     TraceFitState m_Fit;
     /// Visible range of the noise plot.

@@ -7,11 +7,12 @@
 #ifndef IMCSIM_SPECTRUM_TAB_H
 #define IMCSIM_SPECTRUM_TAB_H
 
-#include "document/schematic.h"
 #include "plots/math_channels.h"
 #include "plots/plot_export.h"
 #include "plots/plot_types.h"
 #include "plots/spectrum.h"
+#include "results/result_store.h"
+#include "schematic/schematic.h"
 #include "windows/output_tabs/frame_results.h"
 #include <optional>
 #include <vector>
@@ -27,7 +28,7 @@ namespace GUI {
  */
 class SpectrumTab {
 public:
-    explicit SpectrumTab(Schematic &schematic);
+    SpectrumTab(Schematic &schematic, const ResultStore &results);
 
     void Draw(const FrameResults &frame, PlotSpan span);
 
@@ -37,6 +38,7 @@ public:
 
 private:
     Schematic &m_Schematic;
+    const ResultStore &m_Results;
     /// Window the transform of the spectrum applies.
     SpectrumWindow m_Window = SpectrumWindow::HANN;
     /// Whether the frequency scale of the spectrum is logarithmic.

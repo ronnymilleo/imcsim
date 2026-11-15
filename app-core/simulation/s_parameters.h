@@ -9,7 +9,7 @@
 #ifndef IMCSIM_S_PARAMETERS_H
 #define IMCSIM_S_PARAMETERS_H
 
-#include "model/circuit.h"
+#include "circuit/circuit.h"
 #include "simulation/analysis_settings.h"
 #include "simulation/simulation_results.h"
 #include <complex>

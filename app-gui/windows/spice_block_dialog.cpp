@@ -5,11 +5,11 @@
 
 #include "windows/spice_block_dialog.h"
 
-#include "document/spice_import.h"
-#include "document/subcircuit_pins.h"
-#include "drawing/theme.h"
+#include "base/theme.h"
 #include "imgui.h"
 #include "misc/cpp/imgui_stdlib.h"
+#include "schematic/spice_import.h"
+#include "schematic/subcircuit_pins.h"
 #include "spice/spice_value.h"
 #include <algorithm>
 #include <array>

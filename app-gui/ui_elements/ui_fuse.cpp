@@ -5,8 +5,8 @@
 
 #include "ui_elements/ui_fuse.h"
 
-#include "components/fuse.h"
-#include "drawing/theme.h"
+#include "base/theme.h"
+#include "circuit/components/fuse.h"
 #include "spice/spice_value.h"
 #include <cmath>
 #include <memory>

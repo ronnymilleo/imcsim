@@ -6,7 +6,7 @@
 #ifndef IMCSIM_CIRCUIT_COPY_H
 #define IMCSIM_CIRCUIT_COPY_H
 
-#include "model/circuit.h"
+#include "circuit/circuit.h"
 #include <memory>
 #include <vector>
 

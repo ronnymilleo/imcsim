@@ -5,10 +5,10 @@
 
 #include "windows/part_picker.h"
 
-#include "drawing/tool_icons.h"
-#include "editing/element_factory.h"
 #include "imgui_internal.h"
 #include "misc/cpp/imgui_stdlib.h"
+#include "schematic/element_factory.h"
+#include "windows/tool_icons.h"
 #include <algorithm>
 #include <format>
 #include <utility>

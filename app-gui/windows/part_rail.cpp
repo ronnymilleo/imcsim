@@ -5,11 +5,11 @@
 
 #include "windows/part_rail.h"
 
-#include "document/ready_blocks.h"
-#include "drawing/schematic_canvas.h"
-#include "drawing/theme.h"
-#include "drawing/tool_icons.h"
-#include "editing/element_factory.h"
+#include "base/theme.h"
+#include "canvas/schematic_canvas.h"
+#include "schematic/element_factory.h"
+#include "schematic/ready_blocks.h"
+#include "windows/tool_icons.h"
 #include <algorithm>
 #include <format>
 #include <span>

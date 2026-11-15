@@ -3,9 +3,9 @@
  * @brief   Tests for the grouping of the parts on the part rail.
  */
 
-#include "editing/part_catalog.h"
+#include "schematic/part_catalog.h"
 
-#include "editing/element_factory.h"
+#include "schematic/element_factory.h"
 #include "test_printers.h"
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>

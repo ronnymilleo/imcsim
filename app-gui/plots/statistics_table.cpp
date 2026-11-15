@@ -5,7 +5,7 @@
 
 #include "plots/statistics_table.h"
 
-#include "plots/trace_statistics.h"
+#include "results/trace_statistics.h"
 #include "spice/spice_value.h"
 #include <algorithm>
 #include <array>

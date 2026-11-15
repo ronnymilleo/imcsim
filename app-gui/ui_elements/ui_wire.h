@@ -6,8 +6,8 @@
 #ifndef IMCSIM_UI_WIRE_H
 #define IMCSIM_UI_WIRE_H
 
-#include "drawing/schematic_canvas.h"
-#include "helpers.h"
+#include "base/helpers.h"
+#include "canvas/schematic_canvas.h"
 #include "imgui.h"
 
 namespace GUI {

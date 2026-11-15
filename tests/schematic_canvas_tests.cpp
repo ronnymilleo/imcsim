@@ -3,8 +3,8 @@
  * @brief   Tests for the SVG canvas that exported schematics are drawn on.
  */
 
-#include "drawing/schematic_canvas.h"
-#include "drawing/svg_writer.h"
+#include "base/svg_writer.h"
+#include "canvas/schematic_canvas.h"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 #include <string>

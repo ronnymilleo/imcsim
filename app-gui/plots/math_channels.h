@@ -6,10 +6,11 @@
 #ifndef IMCSIM_MATH_CHANNELS_H
 #define IMCSIM_MATH_CHANNELS_H
 
-#include "document/schematic.h"
 #include "implot.h"
-#include "plots/math_channel.h"
-#include "plots/trace_math.h"
+#include "results/math_channel.h"
+#include "results/math_trace.h"
+#include "results/trace_math.h"
+#include "schematic/schematic.h"
 #include "simulation/simulator.h"
 #include <expected>
 #include <optional>
@@ -18,29 +19,6 @@
 #include <vector>
 
 namespace GUI {
-
-/**
- * @struct  MathTrace
- * @brief   A math channel evaluated over one result, ready to plot and measure.
- */
-struct MathTrace {
-    std::string Label;
-    std::vector<double> Values;
-    std::string Unit;
-    ImAxis Axis = ImAxis_Y1;
-    ImU32 Color = 0;
-};
-
-/**
- * @struct  ACMathTraces
- * @brief   The math channels evaluated over an AC sweep, one magnitude and one phase trace per channel, in the same
- *          order.
- * @details Each trace keeps the unit of the channel, such as "Ohm", while its values are decibels or degrees.
- */
-struct ACMathTraces {
-    std::vector<MathTrace> Magnitudes;
-    std::vector<MathTrace> Phases;
-};
 
 /**
  * @class   MathChannels

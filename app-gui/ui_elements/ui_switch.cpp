@@ -5,7 +5,7 @@
 
 #include "ui_elements/ui_switch.h"
 
-#include "components/switch.h"
+#include "circuit/components/switch.h"
 #include <cmath>
 #include <memory>
 

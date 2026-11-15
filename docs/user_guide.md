@@ -454,8 +454,10 @@ or a current through itself from + to -. Type it in Properties, such as `V(IN)*V
 `1m*tanh(V(IN)/26m)` for a soft limiter or `10m*V(TEMP)` for a sensor. It names voltages by net label, `V(OUT)` or
 `V(IN, OUT)`, so put a label on every net it reads (`0` and `GND` are ground), and currents as the plots name them,
 `I(R1)` or `I(Q1.C)`. Numbers take SPICE suffixes, and the functions and operators are those of ngspice: `tanh()`,
-`exp()`, `abs()`, `min()`, `max()`, comparisons with `a ? b : c`, `time` and `temper`. Properties says at once what is
-wrong, a net no label names, a current the circuit lacks or a parenthesis that does not close, and keeps the last
+`exp()`, `abs()`, `min()`, `max()`, comparisons with `a ? b : c`, `time` and `temper`. With the Nodalys engine, an
+expression that uses what ngspice reads and Nodalys does not (`limit()`, which is a random function in ngspice, the
+random functions, `hertz`) is refused before the run with its name; `min(max(x, low), high)` clamps on both.
+Properties says at once what is wrong, a net no label names, a current the circuit lacks or a parenthesis that does not close, and keeps the last
 expression that read until the new one does; ngspice reports the rest when it runs. The schematic labels it as
 `V=...` or `I=...`, cut after 24 characters. Renaming a part it reads renames it in the expression too. In an AC
 sweep it is linearized at the operating point (see the models page).
@@ -679,7 +681,8 @@ A voltage or current source set to **Noise** adds noise to a transient on top of
 - The noise changes on each run. The **Seed** of the transient settings (0 draws new ones) makes the Random sources and
   the telegraph part repeat, but never the white and 1/f noise, which ngspice does not seed. A seeded Gaussian
   Random source repeats only every other run in one session, since ngspice keeps half of its last pair of Gaussian
-  values for the next run; the other distributions repeat every run.
+  values for the next run; the other distributions repeat every run. With the Nodalys engine, a seed repeats the whole
+  run, white and 1/f noise included, though the values drawn differ from those of ngspice.
 - **Random** holds a new value every **Sample step**, after the **Delay**, from a distribution whose two parameters
   are called after it: uniform (range around the offset), Gaussian (standard deviation, mean), exponential (mean,
   offset) or Poisson (lambda, offset).
@@ -887,6 +890,62 @@ the table on the clipboard.
 Each row is an independent operating point, so the table describes combinational circuits. A latch or flip-flop whose
 outputs depend on its history has no operating point for the combinations that hold its state; those rows read X and
 the Run report says how many. The table is not exported as a figure, like the operating point.
+
+## Choosing the simulation engine
+
+imcsim solves circuits with one of two engines, picked in Edit > Preferences > Simulation (the **Backend** choice):
+
+- **ngspice** is the reference simulator, the open-source successor of Berkeley SPICE, used as a shared library. It is
+  the default. Logic gates and flip-flops run as its digital models, with X states, and its results are the ones the
+  rest of this guide describes.
+- **Nodalys** is the solver built into imcsim. It reads the circuit directly, with no netlist, and runs every analysis
+  of ngspice plus the harmonic balance, which ngspice cannot. Its logic gates and flip-flops are continuous (a smooth
+  step of the inputs, with no X states), so an AC sweep or a noise analysis sees through them, and a run is repeatable
+  from its seed even for white and 1/f noise.
+
+Pick ngspice when you want the established reference, an X state in a latch or a library model that is only SPICE
+text. Pick Nodalys for the harmonic balance, for an AC sweep or a noise analysis of a circuit with logic gates, or to
+compare the two engines on a circuit: a difference between them is worth a second look at the circuit. Both use the
+same part models (see the models page, which lists where Nodalys differs).
+
+What an engine cannot run is said, not guessed at:
+
+- An analysis the engine cannot run on the circuit is grayed out in the analysis list, and its tooltip gives the
+  reason. This covers analyses and the kinds of parts on the schematic: the harmonic balance with ngspice, a
+  voltage-controlled switch or a relay in the harmonic balance, and logic gates and flip-flops in the sensitivity,
+  pole-zero and S-parameters analyses with either engine (and with ngspice also in any analysis when its digital
+  models, `digital.cm`, are missing).
+- Other limits depend on what a part holds, so they show when you run, as an error with the reason: on Nodalys, a
+  behavioral source whose expression uses something it does not read (`limit()`, the random functions, `hertz`, or
+  `time` in the harmonic balance), a MOSFET model that is not level 1, and a block imported from a library, which is
+  kept as SPICE text.
+
+A run keeps the engine it started on, a paused live run too. If you change the engine in Preferences meanwhile, the
+change takes effect once no run is using it, that is, once the run ends, or its paused live run is ended or
+discarded.
+Results already in the Output window stay as they are until you run again.
+
+## Harmonic balance
+
+The Harmonic balance analysis finds the periodic steady state of a circuit driven at one fundamental frequency and its
+harmonics, without waiting out the startup a transient goes through: a rectifier with a large filter capacitor, for
+one, settles in seconds of simulated time, which harmonic balance skips. It runs on Nodalys only (Edit > Preferences >
+Simulation); with ngspice it is disabled, with the reason as its tooltip. Pick it beside Run, then set:
+
+- **Fundamental**: every sine, AC, pulse and clock source must run at a whole multiple of it, up to the number of
+  harmonics; other waveforms are refused. **From sources** takes the fundamental and the harmonics from the periodic
+  sources of the circuit.
+- **Harmonics**: how many above DC, from 1 to 64. More harmonics follow sharper edges but grow the system with them.
+- **Samples**: points per period where the nonlinear parts are evaluated. Auto takes the smallest power of two of at
+  least 16 and 4 times the harmonics; a chosen count stays above twice the harmonics, so no harmonic folds onto
+  another.
+
+The Harmonic balance tab of the Output window plots the spectrum of each measured voltage and current as stems, in a
+linear scale, in dB or in dBc (relative to the fundamental), and the waveform rebuilt from them over 1 to 3 periods.
+Amplitudes are peak values or RMS ones, as Preferences > Results > Harmonic amplitudes says (the tab has the same
+switch); DC is never scaled. The tables list DC and THD per trace and each harmonic with its phase. The Stop button
+ends a long run between its iterations. Export saves the plot as SVG or CSV, and Export CSV... the spectra and the
+waveforms together.
 
 ## Exports
 

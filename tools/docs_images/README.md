@@ -77,7 +77,10 @@ shows one of them at full size.
   the others are the Examples of `app-gui/examples/`. A file keeps the analysis, its settings, the probes and the math
   channels, so a shot needs few clicks.
 - Menu items, analysis names, tab names and labels are found on screen with tesseract (`docs_find_text`,
-  `ui_click_text`, `docs_menu`) instead of fixed coordinates.
+  `ui_click_text`, `docs_menu`) instead of fixed coordinates; `docs_read_words` gives the text itself of a box
+  (a status line, a number), for a check that needs more than a position.
+- `docs_launch --engine ngspice|Nodalys` writes the simulation engine into the `preferences.json` of the instance
+  (ngspice by default), which the interface check (`tools/gui_check/run.sh`) uses to run once on each engine.
 - Parts are clicked through the grid coordinates of their file: `docs_calibrate_on_wire` finds the longest
   horizontal wire on the canvas, whose grid ends the script gives, and works out the zoom and where grid point
   (0, 0) is; `docs_grid_point` turns grid points into window points.

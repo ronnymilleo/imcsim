@@ -6,7 +6,7 @@
 #ifndef IMCSIM_UI_SEVEN_SEGMENT_H
 #define IMCSIM_UI_SEVEN_SEGMENT_H
 
-#include "plots/logic_trace.h"
+#include "base/logic_state.h"
 #include "ui_elements/ui_element.h"
 #include <array>
 #include <optional>

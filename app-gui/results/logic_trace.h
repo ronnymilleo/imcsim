@@ -1,0 +1,65 @@
+/**
+ * @file    logic_trace.h
+ * @brief   Reads logic levels from voltages, and lays logic signals out as lanes for the Output window.
+ * @details Pure functions, so the plot only draws what they give.
+ */
+
+#ifndef IMCSIM_LOGIC_TRACE_H
+#define IMCSIM_LOGIC_TRACE_H
+
+#include "base/logic_state.h"
+#include "circuit/circuit.h"
+#include <span>
+#include <vector>
+
+namespace GUI {
+
+/**
+ * @struct  LogicNode
+ * @brief   A node that a logic part is connected to, with the logic level its signal swings between.
+ */
+struct LogicNode {
+    int Node = 0;
+    double LogicLevel = 5.0;
+};
+
+/**
+ * @struct  LogicSegment
+ * @brief   A stretch of a signal that keeps one logic state.
+ */
+struct LogicSegment {
+    double From = 0.0;
+    double To = 0.0;
+    LogicState State = LogicState::LOW;
+};
+
+/**
+ * @struct  LogicSignal
+ * @brief   The voltages of one logic signal and the logic level it swings to.
+ */
+struct LogicSignal {
+    std::span<const double> Voltages;
+    double LogicLevel = 5.0;
+};
+
+/// Height of one lane; lanes are stacked from the bottom.
+inline constexpr double LANE_STRIDE = 1.5;
+/// Height of the low state inside a lane.
+inline constexpr double LANE_LOW_OFFSET = 0.0;
+/// Height of the unknown state inside a lane.
+inline constexpr double LANE_UNKNOWN_OFFSET = 0.5;
+/// Height of the high state inside a lane.
+inline constexpr double LANE_HIGH_OFFSET = 1.0;
+/// Room above and below the stack of lanes, in lane units.
+inline constexpr double LANE_MARGIN = 0.3;
+
+std::vector<double> BuildLane(const std::vector<double> &voltages, double logic_level, std::size_t lane);
+std::vector<LogicNode> FindLogicNodes(const Core::Circuit &circuit);
+std::vector<LogicSegment> FindLogicSegments(std::span<const double> times, std::span<const double> voltages,
+                                            double logic_level);
+std::vector<std::vector<LogicSegment>> FindBitCells(std::span<const double> times, std::span<const LogicSignal> signals,
+                                                    double from, double to);
+
+} // namespace GUI
+
+#endif // IMCSIM_LOGIC_TRACE_H

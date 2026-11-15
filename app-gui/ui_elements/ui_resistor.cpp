@@ -5,7 +5,7 @@
 
 #include "ui_elements/ui_resistor.h"
 
-#include "components/resistor.h"
+#include "circuit/components/resistor.h"
 #include <array>
 #include <memory>
 #include <utility>

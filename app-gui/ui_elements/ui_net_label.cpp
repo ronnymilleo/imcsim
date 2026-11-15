@@ -5,7 +5,7 @@
 
 #include "ui_elements/ui_net_label.h"
 
-#include "components/net_label.h"
+#include "circuit/components/net_label.h"
 #include <cmath>
 #include <memory>
 #include <string>

@@ -3,7 +3,7 @@
  * @brief   Tests for the expressions of behavioral sources: what they read, what is refused and how ngspice gets them.
  */
 
-#include "spice/behavioral_expression.h"
+#include "circuit/behavioral_expression.h"
 #include <catch2/catch_test_macros.hpp>
 #include <optional>
 #include <string>

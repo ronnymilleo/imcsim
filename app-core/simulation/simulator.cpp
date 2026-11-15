@@ -5,8 +5,19 @@
 
 #include "simulation/simulator.h"
 
-#include "components/logic_input.h"
-#include "model/subcircuit.h"
+#include "circuit/components/logic_input.h"
+#include "circuit/subcircuit.h"
+#include "simulation/analysis_sources.h"
+#include "simulation/check_ac_sweep.h"
+#include "simulation/check_dc_sweep.h"
+#include "simulation/check_harmonic_balance.h"
+#include "simulation/check_noise.h"
+#include "simulation/check_pole_zero.h"
+#include "simulation/check_s_parameters.h"
+#include "simulation/check_sensitivity.h"
+#include "simulation/check_transfer_function.h"
+#include "simulation/check_transient.h"
+#include "simulation/check_truth_table.h"
 #include "simulation/circuit_checks.h"
 #include "simulation/simulation_backend.h"
 #include "simulation/stepped_circuit.h"
@@ -31,6 +42,22 @@ std::optional<std::string> FindProblem(const Circuit &circuit, const std::option
         return settings_error;
     }
     return FindUnsupported(GetBackend(), circuit, kind);
+}
+
+/**
+ * @brief   The circuit of one run at its stepped value, refused when the value is a temperature the backend in use
+ *          cannot simulate, which it would otherwise ignore.
+ */
+std::expected<ParameterCircuit, std::string> ApplyRunParameter(const Circuit &circuit,
+                                                               const std::optional<ParameterValue> &parameter) {
+    auto applied = ApplyParameter(circuit, parameter);
+    if (!applied || !applied->Temperature) {
+        return applied;
+    }
+    if (const std::optional<std::string> &reason = GetBackend().GetCapabilities().TemperatureUnsupported) {
+        return std::unexpected(*reason);
+    }
+    return applied;
 }
 
 /// The chosen logic inputs as copies that each row of a truth table sets, and the circuit that uses them in place of
@@ -143,7 +170,7 @@ OperatingPointRun RunOperatingPoint(const Circuit &circuit, const std::optional<
     if (const std::optional<std::string> error = FindProblem(circuit, std::nullopt, AnalysisKind::OPERATING_POINT)) {
         return {std::unexpected(*error), {}};
     }
-    const auto applied = ApplyParameter(circuit, parameter);
+    const auto applied = ApplyRunParameter(circuit, parameter);
     if (!applied) {
         return {std::unexpected(applied.error()), {}};
     }
@@ -177,7 +204,7 @@ TransientRun RunTransient(const Circuit &circuit, const TransientSettings &setti
     if (const std::optional<std::string> error = FindProblem(circuit, settings_error, AnalysisKind::TRANSIENT)) {
         return {std::unexpected(*error), {}};
     }
-    const auto applied = ApplyParameter(circuit, parameter);
+    const auto applied = ApplyRunParameter(circuit, parameter);
     if (!applied) {
         return {std::unexpected(applied.error()), {}};
     }
@@ -201,7 +228,7 @@ ACSweepRun RunACSweep(const Circuit &circuit, const ACSweepSettings &settings,
             FindProblem(circuit, CheckACSweepSettings(circuit, settings), AnalysisKind::AC_SWEEP)) {
         return {std::unexpected(*error), {}};
     }
-    const auto applied = ApplyParameter(circuit, parameter);
+    const auto applied = ApplyRunParameter(circuit, parameter);
     if (!applied) {
         return {std::unexpected(applied.error()), {}};
     }
@@ -226,7 +253,7 @@ DCSweepRun RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings,
             FindProblem(circuit, CheckDCSweepSettings(circuit, settings), AnalysisKind::DC_SWEEP)) {
         return {std::unexpected(*error), {}};
     }
-    const auto applied = ApplyParameter(circuit, parameter);
+    const auto applied = ApplyRunParameter(circuit, parameter);
     if (!applied) {
         return {std::unexpected(applied.error()), {}};
     }
@@ -371,6 +398,25 @@ TruthTableRun RunTruthTable(const Circuit &circuit, const TruthTableSettings &se
         table.Rows.push_back(std::move(row));
     }
     return ConcludeTable(std::move(table), std::move(run), std::move(failure));
+}
+
+/**
+ * @brief   Finds periodic steady-state node voltages and component currents at a fundamental and its harmonics.
+ * @param[in]     circuit   Circuit to simulate; it needs a ground component, unless it holds only logic parts, logic
+ *                          inputs, clocks and supply rails.
+ * @param[in]     settings  Fundamental frequency, harmonic count, and optional sample count per period.
+ * @param[in,out] control   Where the run looks for a request to stop between its iterations, or null.
+ * @return  The harmonic spectra, one-cycle reconstructed waveforms, and solver diagnostics, or an error, plus any
+ *          messages from the backend. Invalid settings and backends that do not support harmonic balance are rejected
+ *          before calling the backend.
+ */
+HarmonicBalanceRun RunHarmonicBalance(const Circuit &circuit, const HarmonicBalanceSettings &settings,
+                                      RunControl *control) {
+    if (const std::optional<std::string> error =
+            FindProblem(circuit, CheckHarmonicBalanceSettings(circuit, settings), AnalysisKind::HARMONIC_BALANCE)) {
+        return {std::unexpected(*error), {}};
+    }
+    return GetBackend().RunHarmonicBalance(circuit, settings, control);
 }
 
 } // namespace Core
