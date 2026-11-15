@@ -9,6 +9,8 @@
 
 #include "linear/qz.h"
 
+#include "linear/pencil_reduction.h"
+#include "linear/root_refinement.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -17,6 +19,9 @@
 namespace Nodalys {
 
 namespace {
+
+/// Size of B, relative to its largest entry, at or below which an eigenvalue counts as infinite.
+constexpr double INFINITE_EIGENVALUE_FRACTION = 1e-13;
 
 /**
  * @brief   Reduces matrix pair (A, B) to upper Hessenberg-triangular form in place.
@@ -463,10 +468,12 @@ void IterateQz(DenseMatrix &a, DenseMatrix &b, double &epsb_out) {
  * @brief   Extracts finite eigenvalues from quasi-triangular A and triangular B.
  * @param[in,out] a     Quasi-triangular matrix.
  * @param[in,out] b     Upper triangular matrix.
- * @param[in]     epsb  Singularity floor for B diagonal.
+ * @param[in]     epsb           Singularity floor for B diagonal.
+ * @param[in]     infinite_beta  Largest beta that still counts as an infinite eigenvalue.
  * @return  Vector of finite complex eigenvalues.
  */
-std::vector<std::complex<double>> ExtractEigenvalues(DenseMatrix &a, DenseMatrix &b, const double epsb) {
+std::vector<std::complex<double>> ExtractEigenvalues(DenseMatrix &a, DenseMatrix &b, const double epsb,
+                                                     const double infinite_beta) {
     const std::size_t n = a.Rows();
     std::vector<double> alfr(n, 0.0);
     std::vector<double> alfi(n, 0.0);
@@ -752,173 +759,12 @@ std::vector<std::complex<double>> ExtractEigenvalues(DenseMatrix &a, DenseMatrix
     }
 
     std::vector<std::complex<double>> eigenvalues;
-    double b_norm = 0.0;
     for (std::size_t i = 0; i < n; ++i) {
-        for (std::size_t j = 0; j < n; ++j) {
-            b_norm = std::max(b_norm, std::abs(b.At(i, j)));
-        }
-    }
-    const double tol = 1e-12 * b_norm;
-
-    for (std::size_t i = 0; i < n; ++i) {
-        if (beta[i] > tol) {
+        if (beta[i] > infinite_beta) {
             eigenvalues.emplace_back(alfr[i] / beta[i], alfi[i] / beta[i]);
         }
     }
     return eigenvalues;
-}
-
-DenseMatrix RemoveRowAndColumn(const DenseMatrix &matrix, const std::size_t drop_row, const std::size_t drop_col) {
-    const std::size_t n = matrix.Rows();
-    DenseMatrix reduced(n - 1, n - 1);
-    std::size_t dst_r = 0;
-    for (std::size_t r = 0; r < n; ++r) {
-        if (r == drop_row) {
-            continue;
-        }
-        std::size_t dst_c = 0;
-        for (std::size_t c = 0; c < n; ++c) {
-            if (c == drop_col) {
-                continue;
-            }
-            reduced.At(dst_r, dst_c) = matrix.At(r, c);
-            ++dst_c;
-        }
-        ++dst_r;
-    }
-    return reduced;
-}
-
-double MaxAbsEntry(const DenseMatrix &matrix) {
-    double max_val = 0.0;
-    for (std::size_t r = 0; r < matrix.Rows(); ++r) {
-        for (std::size_t c = 0; c < matrix.Cols(); ++c) {
-            max_val = std::max(max_val, std::abs(matrix.At(r, c)));
-        }
-    }
-    return max_val;
-}
-
-struct AlgebraicPivot {
-    bool IsRow = false;
-    std::size_t Row = 0;
-    std::size_t Col = 0;
-    double Magnitude = 0.0;
-};
-
-void UpdateBestZeroBRowPivot(const DenseMatrix &a, const DenseMatrix &b, const double b_tol, AlgebraicPivot &best) {
-    const std::size_t n = a.Rows();
-    for (std::size_t r = 0; r < n; ++r) {
-        double row_b = 0.0;
-        for (std::size_t c = 0; c < n; ++c) {
-            row_b = std::max(row_b, std::abs(b.At(r, c)));
-        }
-        if (row_b > b_tol) {
-            continue;
-        }
-        for (std::size_t c = 0; c < n; ++c) {
-            const double val = std::abs(a.At(r, c));
-            if (val > best.Magnitude) {
-                best = {.IsRow = true, .Row = r, .Col = c, .Magnitude = val};
-            }
-        }
-    }
-}
-
-void UpdateBestZeroBColPivot(const DenseMatrix &a, const DenseMatrix &b, const double b_tol, AlgebraicPivot &best) {
-    const std::size_t n = a.Rows();
-    for (std::size_t c = 0; c < n; ++c) {
-        double col_b = 0.0;
-        for (std::size_t r = 0; r < n; ++r) {
-            col_b = std::max(col_b, std::abs(b.At(r, c)));
-        }
-        if (col_b > b_tol) {
-            continue;
-        }
-        for (std::size_t r = 0; r < n; ++r) {
-            const double val = std::abs(a.At(r, c));
-            if (val > best.Magnitude) {
-                best = {.IsRow = false, .Row = r, .Col = c, .Magnitude = val};
-            }
-        }
-    }
-}
-
-void EliminateRowPivot(DenseMatrix &a, DenseMatrix &b, const std::size_t pivot_row, const std::size_t pivot_col) {
-    const std::size_t n = a.Rows();
-    const double pivot = a.At(pivot_row, pivot_col);
-    for (std::size_t j = 0; j < n; ++j) {
-        if (j == pivot_col) {
-            continue;
-        }
-        const double factor = a.At(pivot_row, j) / pivot;
-        if (factor == 0.0) {
-            continue;
-        }
-        for (std::size_t i = 0; i < n; ++i) {
-            a.At(i, j) -= factor * a.At(i, pivot_col);
-            b.At(i, j) -= factor * b.At(i, pivot_col);
-        }
-    }
-}
-
-void EliminateColPivot(DenseMatrix &a, DenseMatrix &b, const std::size_t pivot_row, const std::size_t pivot_col) {
-    const std::size_t n = a.Rows();
-    const double pivot = a.At(pivot_row, pivot_col);
-    for (std::size_t i = 0; i < n; ++i) {
-        if (i == pivot_row) {
-            continue;
-        }
-        const double factor = a.At(i, pivot_col) / pivot;
-        if (factor == 0.0) {
-            continue;
-        }
-        for (std::size_t j = 0; j < n; ++j) {
-            a.At(i, j) -= factor * a.At(pivot_row, j);
-            b.At(i, j) -= factor * b.At(pivot_row, j);
-        }
-    }
-}
-
-/**
- * @brief   Deflates algebraic rows and columns (zero rows/columns in B) before running QZ, eliminating spurious
- *          infinite-eigenvalue leaks in singular MNA pencils.
- */
-void DeflateZeroRowsAndColumns(DenseMatrix &a, DenseMatrix &b) {
-    const double a_norm_ref = MaxAbsEntry(a);
-    const double b_norm_ref = MaxAbsEntry(b);
-    if (b_norm_ref == 0.0) {
-        a = DenseMatrix(0, 0);
-        b = DenseMatrix(0, 0);
-        return;
-    }
-    const double b_tol = 1e-12 * b_norm_ref;
-    const double a_tol = 1e-12 * a_norm_ref;
-
-    while (a.Rows() > 0) {
-        if (MaxAbsEntry(b) <= b_tol) {
-            a = DenseMatrix(0, 0);
-            b = DenseMatrix(0, 0);
-            return;
-        }
-
-        AlgebraicPivot best;
-        UpdateBestZeroBRowPivot(a, b, b_tol, best);
-        UpdateBestZeroBColPivot(a, b, b_tol, best);
-
-        if (best.Magnitude <= a_tol) {
-            break;
-        }
-
-        if (best.IsRow) {
-            EliminateRowPivot(a, b, best.Row, best.Col);
-        } else {
-            EliminateColPivot(a, b, best.Row, best.Col);
-        }
-
-        a = RemoveRowAndColumn(a, best.Row, best.Col);
-        b = RemoveRowAndColumn(b, best.Row, best.Col);
-    }
 }
 
 } // namespace
@@ -937,26 +783,37 @@ std::vector<std::complex<double>> ComputeGeneralizedEigenvalues(const DenseMatri
 
     DenseMatrix a = mat_a;
     DenseMatrix b = mat_b;
-    DeflateZeroRowsAndColumns(a, b);
+    const double frequency_scale = ScaleFrequency(a, b);
+    BalancePencil(a, b);
+    // Measured before the algebraic part is eliminated and after the scaling, so what counts as small is the same for
+    // every pencil, and a 1 pF capacitor beside a 1 S conductance is not taken for the zero of an infinite eigenvalue
+    const double infinite_beta = INFINITE_EIGENVALUE_FRACTION * MaxAbsEntry(b);
+    DeflateAlgebraicRowsAndColumns(a, b);
 
     const std::size_t n = a.Rows();
     if (n == 0) {
         return {};
     }
 
+    // QZ works on copies: refinement goes back to the pencil as it was before the reduction
+    const DenseMatrix deflated_a = a;
+    const DenseMatrix deflated_b = b;
+    std::vector<std::complex<double>> roots;
     if (n == 1) {
-        const double b00 = b.At(0, 0);
-        const double b_norm = std::abs(b00);
-        if (std::abs(b00) <= 1e-12 * std::max(b_norm, 1.0)) {
-            return {};
+        if (std::abs(b.At(0, 0)) > infinite_beta) {
+            roots.emplace_back(a.At(0, 0) / b.At(0, 0), 0.0);
         }
-        return {std::complex<double>(a.At(0, 0) / b00, 0.0)};
+    } else {
+        ReduceToHessenbergTriangular(a, b);
+        double epsb = 0.0;
+        IterateQz(a, b, epsb);
+        roots = ExtractEigenvalues(a, b, epsb, infinite_beta);
     }
-
-    ReduceToHessenbergTriangular(a, b);
-    double epsb = 0.0;
-    IterateQz(a, b, epsb);
-    return ExtractEigenvalues(a, b, epsb);
+    roots = RefineRoots(deflated_a, deflated_b, roots);
+    for (std::complex<double> &root : roots) {
+        root *= frequency_scale;
+    }
+    return roots;
 }
 
 } // namespace Nodalys

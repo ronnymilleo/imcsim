@@ -73,6 +73,7 @@ add_executable(imcsim-tests
             plot_tab_tests.cpp
             plot_ticks_tests.cpp
             point_window_tests.cpp
+            pole_zero_robustness_tests.cpp
             pole_zero_tests.cpp
             pole_zero_view_tests.cpp
             preferences_tests.cpp
@@ -124,9 +125,16 @@ add_executable(imcsim-tests
             wire_routing_tests.cpp
 )
 
+# The oracle that rebuilds a response from its poles and zeros is shared with the Nodalys tests
+target_sources(imcsim-tests
+        PRIVATE
+            ${PROJECT_SOURCE_DIR}/nodalys/tests/pole_zero_oracle.cpp
+)
+
 target_include_directories(imcsim-tests
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}
+            ${PROJECT_SOURCE_DIR}/nodalys/tests
 )
 
 target_link_libraries(imcsim-tests

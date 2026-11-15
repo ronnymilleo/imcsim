@@ -807,7 +807,7 @@ The table has one row per real root and per complex pair:
 
 A pole and a zero at the same place cancel, so they are left out and the note under the plot counts them: ngspice
 reports such pairs for parts the signal never reaches. A warning above the plot says when ngspice gave up searching for
-some roots, so some may be missing.
+some roots, so some may be missing; Nodalys gives one when its roots do not rebuild the circuit's own response.
 
 To compare with the Bode plot, run the AC sweep too and tick **Show poles and zeros** on its tab: each pole and zero is
 a dashed vertical line at its natural frequency on both plots, colored as in the s-plane, and labelled on the magnitude
@@ -816,7 +816,10 @@ its -3 dB point near its natural frequency, a little above it when Q is over 0.7
 
 ngspice's pole-zero solver is not reliable on every circuit. It can find nothing without saying why, as with some ideal
 op-amp circuits at certain gain-bandwidth products (try another product or a real op-amp model), and it may leave out
-roots or return wrong ones; treat the result as a check on the AC sweep rather than as the last word. The table is a
+roots or return wrong ones; treat the result as a check on the AC sweep rather than as the last word. The Nodalys
+engine does not have these limits: it finds every root of those circuits, and it says so when an output does not respond
+to the input (a diode that is off), when the transfer is a constant gain, or when its roots fail its own check against the
+AC response. Pick it in Edit > Preferences to run the analysis there; imcsim never switches engine for you. The table is a
 readout like the operating point, so it is not exported.
 
 ## S-parameters
@@ -919,7 +922,8 @@ imcsim solves circuits with one of two engines, picked in Edit > Preferences > S
 Pick ngspice when you want the established reference, an X state in a latch, or a library model that holds more than
 Nodalys reads (see below). Pick Nodalys for the harmonic balance, for an AC sweep or a noise analysis of a circuit with logic gates, or to
 compare the two engines on a circuit: a difference between them is worth a second look at the circuit. Both use the
-same part models (see the models page, which lists where Nodalys differs).
+same part models (see the models page, which lists where Nodalys differs). For poles and zeros, prefer Nodalys: ngspice
+can return nothing, drop roots or return right-half-plane roots that are not real on some circuits.
 
 What an engine cannot run is said, not guessed at:
 

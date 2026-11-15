@@ -251,6 +251,8 @@ private:
 struct PoleZeroResult {
     std::vector<std::complex<double>> Poles;
     std::vector<std::complex<double>> Zeros;
+    /// What makes the roots doubtful, such as roots that do not rebuild the AC response of the circuit.
+    std::vector<std::string> Warnings;
 };
 
 /**
