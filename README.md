@@ -56,7 +56,7 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   colors on the schematic
 - Poles and zeros from an input source to a node, on an s-plane with their frequency, quality factor and damping, and
   marked on the Bode plot of an AC sweep
-- S-parameters of two or more ports, set on Block pin markers: a Smith chart with the impedance, VSWR and return loss
+- S-parameters of one port (Nodalys) or two or more, set on Block pin markers: a Smith chart with the impedance, VSWR and return loss
   under the pointer, magnitude and phase plots, and the whole matrix saved as a Touchstone `.sNp` file
 - A truth table of a digital circuit: every combination of the chosen logic inputs and the 0, 1 or X it gives at the
   measured outputs

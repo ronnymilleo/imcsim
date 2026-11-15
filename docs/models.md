@@ -58,7 +58,11 @@ elements, so the results are those of ngspice with the models below. Some things
   the stop frequency is below the start. The impedance, VSWR and return loss are computed from S, not read from the Z
   matrix of ngspice, which is meaningless (around 1e17 ohm) when the circuit has no finite impedance matrix, as for a
   series resistor. Logic parts are refused, since the digital models of ngspice are fixed levels in a small-signal
-  analysis.
+  analysis. Nodalys has none of these limits: it takes a single port and a linear sweep of two points, reports a wrong
+  port or frequency range in words, and also works out the impedance (Z) and admittance (Y) matrices of the ports from
+  S, each absent at a frequency where the circuit has no finite one (the Z of two floating ports joined by a series
+  element, the Y of a port shorted to ground). Ports numbered with a gap or a repeat are refused on both engines, since
+  the matrix and the Touchstone file index the ports by number.
 - A truth table runs one operating point per combination of the chosen logic inputs, each on a copy of the circuit
   with the inputs set, so a row never depends on the one before it. That describes combinational logic; a latch or
   flip-flop that holds its state has no operating point for those combinations, and the row reads X.

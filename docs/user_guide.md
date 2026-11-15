@@ -822,22 +822,24 @@ of 0 is a perfect match and an S21 of 0 dB passes everything.
 
 **Ports**: the ports are Block pin markers of the top-level schematic. Select a marker, turn on **S-parameter port**
 in its properties, and set its **Number** and **Z0**. A new port takes the lowest number no other marker uses; the
-numbers must run from 1 to N with no gap and no repeat, and the symbol reads `P1`, `P2 (OUT)`. A marker that is not a
-port does nothing here, and a port is invisible to every other analysis: only in an S-parameter run does imcsim put a
-source and the reference impedance at its node. Inside a block, port settings are kept and ignored. The analysis needs two
-or more ports in all, a Ground in the circuit, a node of its own for each port (not ground, not shared) and a Z0 above
-zero; imcsim says which is wrong before it runs.
+numbers must run from 1 to N with no gap and no repeat, in whatever order the markers sit, and the symbol reads `P1`,
+`P2 (OUT)`. A marker that is not a port does nothing here, and a port is invisible to every other analysis: only in an
+S-parameter run does imcsim put a source and the reference impedance at its node. Inside a block, port settings are
+kept and ignored. The analysis needs a Ground in the circuit, at least one port with Nodalys (two with ngspice), a node
+of its own for each port (not ground, not shared) and a Z0 above zero; imcsim says which is wrong before it runs.
 
-**Measuring a one-port**: the analysis needs two ports, as ngspice refuses a single one. Add a second port on an
-isolated node, with nothing connected to it: S11 is then the reflection of the first port, and S22 reads 1.
+**Measuring a one-port**: with Nodalys, a single port is enough: S11 is the reflection of the circuit, and the readings
+under the pointer and the Touchstone file (`.s1p`) work as with more ports. ngspice refuses a single port, and the
+message says so and that Nodalys takes one; to measure a one-port on ngspice, add a second port on an isolated node,
+with nothing connected to it: S11 is then the reflection of the first port, and S22 reads 1.
 
 **Bias**: a port holds its node at 0 V in DC and loads the circuit with its reference impedance, so a node that has a
 bias belongs behind a capacitor (or an inductor, for a port on a supply line), as the bias tee of a network analyzer
 does. The circuit's own sources keep their DC value and are AC ground for the measurement.
 
 **Settings**: pick S-parameters beside Run, then the **Start** and **Stop** frequencies (1 MHz to 1 GHz by default),
-the **Sweep** type and the points: log with points per decade (100 by default), or linear with the number of points in all (at least 3,
-since ngspice gives a single point for two). The settings are saved with the schematic. Circuits with logic gates or
+the **Sweep** type and the points: log with points per decade (100 by default), or linear with the number of points in all (at least 2
+with Nodalys, and at least 3 with ngspice, which gives a single point for two; the field follows the engine in use). The settings are saved with the schematic. Circuits with logic gates or
 flip-flops cannot run it, and the analysis is disabled with that reason as its tooltip.
 
 The **S-parameters** tab of the Output window has:
@@ -855,6 +857,11 @@ The **S-parameters** tab of the Output window has:
   the impedance the port sees, absolute and normalized, computed from S as Z0 (1 + S) / (1 - S), the VSWR,
   (1 + |S|) / (1 - |S|), and the return loss, -20 log |S| (positive when the port absorbs power); an open circuit or a
   perfect match reads infinite.
+
+Nodalys also works out the impedance (Z) and admittance (Y) matrices of the ports at every frequency, exact where
+they exist and absent where the circuit has no finite one (Z of two ports joined only by a series element, Y of a port
+shorted to ground), and ngspice does not, as its Z matrix is unusable then. They are not shown in the tab yet: the
+impedance a reflection reads is still computed from S.
 
 **Exports**: Export... saves the plot shown as an SVG image (the Smith chart or the magnitude and phase panels, redrawn
 from the data, in the light or dark theme) or as a CSV table with the frequency and the real and imaginary parts of each
@@ -915,6 +922,9 @@ What an engine cannot run is said, not guessed at:
   voltage-controlled switch or a relay in the harmonic balance, and logic gates and flip-flops in the sensitivity,
   pole-zero and S-parameters analyses with either engine (and with ngspice also in any analysis when its digital
   models, `digital.cm`, are missing).
+- The S-parameters analysis asks for different things of the ports and the sweep: ngspice needs at least two ports and
+  three points of a linear sweep, and Nodalys takes one port and two points. The refusal says which, and that the other
+  engine takes it.
 - Other limits depend on what a part holds, so they show when you run, as an error with the reason: on Nodalys, a
   behavioral source whose expression uses something it does not read (`limit()`, the random functions, `hertz`, or
   `time` in the harmonic balance), a MOSFET model that is not level 1, and a block imported from a library, which is
