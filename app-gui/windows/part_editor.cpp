@@ -192,6 +192,9 @@ void PartEditor::DrawFields(Core::Component &component) {
     } else if (type == Core::ComponentType::TRANSFORMER) {
         DrawValue(component, m_Value, m_BlockParameters, m_Preferences, *m_Schematic);
         DrawTransformer(static_cast<Core::Transformer &>(component), m_Electromechanical, *m_Schematic);
+    } else if (type == Core::ComponentType::INITIAL_VOLTAGE) {
+        DrawValue(component, m_Value, m_BlockParameters, m_Preferences, *m_Schematic);
+        ImGui::TextDisabled("The node starts a transient at this voltage; other analyses ignore it");
     } else {
         DrawValue(component, m_Value, m_BlockParameters, m_Preferences, *m_Schematic);
         if (type == Core::ComponentType::POTENTIOMETER) {

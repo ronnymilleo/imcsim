@@ -15,9 +15,11 @@
 #include "circuit/components/source.h"
 #include "circuit/components/subcircuit.h"
 #include "circuit/subcircuit.h"
+#include "spice/spice_value.h"
 #include <algorithm>
 #include <format>
 #include <functional>
+#include <map>
 #include <optional>
 #include <set>
 #include <string>
@@ -214,6 +216,64 @@ std::optional<std::string> CheckBehavioralSources(const Circuit &circuit) {
     return std::nullopt;
 }
 
+/**
+ * @brief   Names a node as the user sees it: V(OUT) when a label names its net, "node 3" otherwise.
+ */
+std::string DescribeNode(const Circuit &circuit, const int node) {
+    for (const auto &[net, net_node] : circuit.GetNets()) {
+        if (net_node == node) {
+            return std::format("V({})", net);
+        }
+    }
+    return std::format("node {}", node);
+}
+
+/**
+ * @brief   An initial voltage needs a node of its own to start: not ground, which is 0 V by definition, a node some
+ *          part is connected to, since a loose one has no equations to start from, and one voltage per node.
+ */
+std::optional<std::string> CheckInitialVoltages(const Circuit &circuit) {
+    std::set<int> used_nodes;
+    for (const CircuitEntry &entry : circuit.GetEntries()) {
+        used_nodes.insert(entry.Nodes.begin(), entry.Nodes.end());
+    }
+    std::map<int, double> volts_by_node;
+    for (const CircuitInitialVoltage &initial_voltage : circuit.GetInitialVoltages()) {
+        const std::string node = DescribeNode(circuit, initial_voltage.Node);
+        if (initial_voltage.Node == 0) {
+            return "An initial voltage is on ground, which is always 0 V; place it on another node";
+        }
+        if (!used_nodes.contains(initial_voltage.Node)) {
+            return std::format("An initial voltage of {} V is on {}, which no part is connected to",
+                               FormatValue(initial_voltage.Volts), node);
+        }
+        const auto [known, is_new] = volts_by_node.try_emplace(initial_voltage.Node, initial_voltage.Volts);
+        if (!is_new && known->second != initial_voltage.Volts) {
+            return std::format("{} has two initial voltages, {} V and {} V; keep one", node, FormatValue(known->second),
+                               FormatValue(initial_voltage.Volts));
+        }
+    }
+    return std::nullopt;
+}
+
+/**
+ * @brief   The first problem with the initial voltages of the circuit; those inside blocks are refused, since a block
+ *          has no node of its own to start from that is the same for each instance.
+ */
+std::optional<std::string> CheckAllInitialVoltages(const Circuit &circuit) {
+    if (std::optional<std::string> problem = CheckInitialVoltages(circuit)) {
+        return problem;
+    }
+    for (const auto &definition : circuit.GetSubcircuits()) {
+        if (!definition->Body.GetInitialVoltages().empty()) {
+            return std::format("Block {} holds an initial voltage, which only the circuit outside blocks can have; "
+                               "place it on the node of a pin of the block instead",
+                               definition->Name);
+        }
+    }
+    return std::nullopt;
+}
+
 } // namespace
 
 /**
@@ -222,7 +282,9 @@ std::optional<std::string> CheckBehavioralSources(const Circuit &circuit) {
  * @return  The reason it cannot, in words for the user: it is empty, it has no ground (a circuit of only clocks, logic
  *          inputs, supply rails and logic parts, in blocks or not, needs none), a subcircuit instance or definition
  * cannot be written (an unknown definition, a pin on ground, a parameter it lacks), a part uses a library model the
- * circuit lacks or of another kind, or a current-controlled source follows no valid current; no value when it can.
+ * circuit lacks or of another kind, an initial voltage is on ground, on a node nothing is connected to, inside a block
+ * or twice with different voltages on one node, or a current-controlled source follows no valid current; no value when
+ * it can.
  */
 std::optional<std::string> CheckCircuit(const Circuit &circuit) {
     if (circuit.GetEntries().empty()) {
@@ -238,6 +300,9 @@ std::optional<std::string> CheckCircuit(const Circuit &circuit) {
         return problem;
     }
     if (std::optional<std::string> problem = CheckSourceWaveforms(circuit)) {
+        return problem;
+    }
+    if (std::optional<std::string> problem = CheckAllInitialVoltages(circuit)) {
         return problem;
     }
     // A current-controlled source needs a current that some other part reports
