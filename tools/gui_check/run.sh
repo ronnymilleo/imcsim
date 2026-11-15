@@ -29,7 +29,8 @@
 # potentiometer, which no example saves):
 #
 #   Operating point        voltage_divider
-#   Transient              led_driver, decade_counter (logic parts), noise_through_rc_low_pass (random source)
+#   Transient              led_driver, decade_counter (logic parts), noise_through_rc_low_pass (random source),
+#                          astable_multivibrator (an Initial voltage part starts it)
 #   AC sweep               rc_low_pass_filter
 #   DC sweep               zener_regulator
 #   Noise                  noise_analysis_rc_low_pass
@@ -256,9 +257,10 @@ check_analyses() {
     check_s_parameters_one_port
     check_circuit_run truth_table logic_truth_table 'combinations;?'
     check_harmonic_balance
-    # Logic parts and a random source in a transient, the two things the engines treat differently
+    # Logic parts, a random source and a node started at a voltage in a transient, which the engines treat differently
     check_circuit_run transient_logic decade_counter Spectrum
     check_circuit_run transient_noise_source noise_through_rc_low_pass Spectrum
+    check_circuit_run transient_initial_voltage astable_multivibrator Spectrum
 }
 
 # Nodalys measures a single port; ngspice needs two, so the run is refused with the reason
