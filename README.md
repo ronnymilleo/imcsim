@@ -62,8 +62,8 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   measured outputs
 - Two simulation engines, picked in Edit > Preferences > Simulation: ngspice, the default, and Nodalys, a solver written
   for imcsim from published circuit theory and tested against closed-form results and against ngspice on every
-  example. Nodalys runs every analysis of ngspice, with temperature, fuses, behavioral sources and seedable noise and
-  random sources, and what it does not cover is refused with the reason (see the
+  example. Nodalys runs every analysis of ngspice, with temperature, fuses, behavioral sources, blocks imported from
+  SPICE libraries and seedable noise and random sources, and what it does not cover is refused with the reason (see the
   [user guide](docs/user_guide.md#choosing-the-simulation-engine)). It also comes as `nodalys`, a command line that
   reads SPICE netlists
 - A harmonic balance, on Nodalys: the periodic steady state of a circuit driven at one frequency, with the amplitude
@@ -151,7 +151,7 @@ roughly in the order they are likely to come.
 - **Sources, parts and models**: XSPICE analog blocks (transfer functions, limiters, integrators), transmission lines,
   a circuit driven from a WAV or CSV file, PWL points read from a CSV file, and a MOSFET body diode and higher-level
   MOSFET models
-- **Nodalys**: blocks kept as SPICE text, and initial voltages of nodes set in the editor
+- **Nodalys**: initial voltages of nodes set in the editor
 
 ## Install
 

@@ -903,8 +903,8 @@ imcsim solves circuits with one of two engines, picked in Edit > Preferences > S
   step of the inputs, with no X states), so an AC sweep or a noise analysis sees through them, and a run is repeatable
   from its seed even for white and 1/f noise.
 
-Pick ngspice when you want the established reference, an X state in a latch or a library model that is only SPICE
-text. Pick Nodalys for the harmonic balance, for an AC sweep or a noise analysis of a circuit with logic gates, or to
+Pick ngspice when you want the established reference, an X state in a latch, or a library model that holds more than
+Nodalys reads (see below). Pick Nodalys for the harmonic balance, for an AC sweep or a noise analysis of a circuit with logic gates, or to
 compare the two engines on a circuit: a difference between them is worth a second look at the circuit. Both use the
 same part models (see the models page, which lists where Nodalys differs).
 
@@ -918,7 +918,12 @@ What an engine cannot run is said, not guessed at:
 - Other limits depend on what a part holds, so they show when you run, as an error with the reason: on Nodalys, a
   behavioral source whose expression uses something it does not read (`limit()`, the random functions, `hertz`, or
   `time` in the harmonic balance), a MOSFET model that is not level 1, and a block imported from a library, which is
-  kept as SPICE text.
+  kept as SPICE text, when its text holds something Nodalys cannot simulate. Nodalys reads the resistors, capacitors,
+  inductors, DC and AC sources, controlled and behavioral sources, diodes, bipolar and level 1 MOSFET transistors,
+  switches and nested subcircuits of such a text, with its `.param` lines, `{expressions}` and `.model` cards; it
+  refuses the rest by name, such as a JFET, a source waveform, a `.func` or a transmission line, and says so before
+  the run. A model parameter its devices do not read, such as a junction capacitance of a substrate, is named in a
+  message of the run.
 
 A run keeps the engine it started on, a paused live run too. If you change the engine in Preferences meanwhile, the
 change takes effect once no run is using it, that is, once the run ends, or its paused live run is ended or
