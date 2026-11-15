@@ -115,6 +115,23 @@ TEST_CASE("A matrix of five ports breaks its rows at four pairs", "[touchstone]"
     CHECK(lines[4] == "  1 0 1 0 1 0 1 0");
 }
 
+TEST_CASE("A one-port is a .s1p file with a pair of numbers after each frequency", "[touchstone]") {
+    Core::SParameters result;
+    result.Frequencies = {1e9, 2e9};
+    result.ReferenceOhms = {50.0};
+    result.Values = {{0.1, 0.2}, {0.3, -0.4}};
+    const auto text = GUI::FormatTouchstone(
+        result, {.Unit = GUI::TouchstoneFrequencyUnit::GHZ, .Format = GUI::TouchstoneFormat::REAL_IMAGINARY});
+    REQUIRE(text.has_value());
+    const std::vector<std::string> lines = SplitLines(*text);
+    REQUIRE(lines.size() == 4);
+    CHECK(lines[0] == "! S-parameters from imcsim, 1 port");
+    CHECK(lines[1] == "# GHz S RI R 50");
+    CHECK(lines[2] == "1 0.1 0.2");
+    CHECK(lines[3] == "2 0.3 -0.4");
+    CHECK(GUI::GetTouchstoneExtension(1) == ".s1p");
+}
+
 TEST_CASE("The extension counts the ports", "[touchstone]") {
     CHECK(GUI::GetTouchstoneExtension(2) == ".s2p");
     CHECK(GUI::GetTouchstoneExtension(3) == ".s3p");

@@ -337,18 +337,21 @@ PoleZeroRun RunPoleZero(const Circuit &circuit, const PoleZeroSettings &settings
 
 /**
  * @brief   Measures the scattering matrix of the ports of a circuit across frequency.
- * @param[in] circuit   Circuit to simulate; it needs a ground component and at least two ports, which are the pin
- *                      markers set as ports in the top-level schematic.
+ * @param[in] circuit   Circuit to simulate; it needs a ground component and as many ports as the backend asks for
+ *                      (one for Nodalys, two for ngspice), which are the pin markers set as ports in the top-level
+ *                      schematic.
  * @param[in] settings  Frequency range and points.
- * @return  The S matrix at every frequency or an error, plus every line ngspice printed. Invalid settings, and fewer
- *          than two ports, are rejected before reaching the backend, since ngspice stops for good on them.
+ * @return  The S matrix at every frequency or an error, plus every line the backend printed. Invalid settings, and
+ *          fewer ports than the backend asks for, are rejected before reaching it, since ngspice stops for good on
+ * them.
  * @note    The ports load the circuit through their reference impedance and hold their nodes at 0 V in DC, so a port
  *          belongs behind a capacitor where the node has a bias. Not thread-safe: the backend in use may be a single
  *          global instance, as ngspice is.
  */
 SParametersRun RunSParameters(const Circuit &circuit, const SParameterSettings &settings) {
     if (const std::optional<std::string> error =
-            FindProblem(circuit, CheckSParameterSettings(circuit, settings), AnalysisKind::S_PARAMETERS)) {
+            FindProblem(circuit, CheckSParameterSettings(circuit, settings, GetBackend().GetCapabilities().SParameters),
+                        AnalysisKind::S_PARAMETERS)) {
         return {std::unexpected(*error), {}};
     }
     return GetBackend().RunSParameters(circuit, settings);

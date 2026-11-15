@@ -215,16 +215,30 @@ struct PoleZero {
  *          matrices one after the other, frequency by frequency and row by row, so S(i, j) at a frequency is the wave
  *          leaving port i for a wave entering port j. The waves are power waves, normalized to the reference impedance
  *          of each port.
+ *
+ *          A backend that works out the impedance and admittance matrices of the ports gives them too, one per
+ *          frequency in the same row by row layout; a frequency whose circuit has no finite matrix, such as the
+ *          impedance of two ports joined by a series element and nothing else, has none there. They are empty when the
+ *          backend does not give them, as ngspice, whose Z matrix is unusable when the circuit has no finite one.
  */
 struct SParameters {
     std::vector<double> Frequencies;
     /// One reference impedance in ohms per port, in the order of the port numbers.
     std::vector<double> ReferenceOhms;
     std::vector<std::complex<double>> Values;
+    /// Impedance matrix Z in ohms at each frequency, or none where the circuit has no finite one; empty for a backend
+    /// that does not give it.
+    std::vector<std::optional<std::vector<std::complex<double>>>> ImpedanceMatrices;
+    /// Admittance matrix Y in siemens at each frequency, or none where the circuit has no finite one; empty for a
+    /// backend that does not give it.
+    std::vector<std::optional<std::vector<std::complex<double>>>> AdmittanceMatrices;
     std::vector<std::string> Warnings;
 
     int GetPortCount() const;
     std::complex<double> Get(std::size_t frequency, int row, int column) const;
+    bool HasPortMatrices() const;
+    std::optional<std::complex<double>> GetImpedance(std::size_t frequency, int row, int column) const;
+    std::optional<std::complex<double>> GetAdmittance(std::size_t frequency, int row, int column) const;
 };
 
 /**
