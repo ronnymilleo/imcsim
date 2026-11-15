@@ -76,7 +76,11 @@ An MNA pencil mixes siemens with farads and henries, and its roots span 12 decad
 2. **Balancing:** rows and columns are scaled by powers of two (exact) until each has $|\mathbf{A}| + |\mathbf{B}|$ of about 1. On a BJT amplifier a pole at -5.7 rad/s came out at -5.74 without it and -5.75498 after, with the AC response off by 0.0175 dB instead of 7.5e-8 dB.
 3. **Algebraic rows:** a row (or column) whose $\mathbf{B}$ entries are *exactly* zero is eliminated with the largest $\mathbf{A}$ pivot in it. Differences that cancel to rounding noise are set to exactly 0 where they are made, so a 1 pF capacitor beside 10 uF is never mistaken for noise (the old test, 1e-12 of the largest $\mathbf{B}$ entry, dropped real fast roots, and its 1x1 case compared against an absolute 1, which lost the right-half-plane zero gm/Cgd = 2e9 rad/s of a common-source stage).
 
-A root counts as infinite when its $\beta$ is under 1e-13 of the largest $\mathbf{B}$ entry of the scaled pencil. Roots within 10 roundings of the largest root of the origin are set to 0 (a zero at the origin beside a 3e12 rad/s junction pole came out at +6.5e-7 and read as a right-half-plane root).
+A root counts as infinite when its $\beta$ is under 1e-13 of the largest $\mathbf{B}$ entry of the scaled pencil. 
+### 1.4.1.1 Refinement of Each Root (`root_refinement.cpp`)
+QZ finds every eigenvalue to about a rounding of the *largest* one, times a condition factor. Beside a junction pole at 3e12 rad/s that leaves a root near 1e4 rad/s good to a few parts in a thousand at best, and the way it falls depends on the rounding of the platform: on the transformer supply of the examples, a macOS arm64 build put the zero next to the pole at -15005.77 at -14867.8, and perturbing the entries of the pencil by 4 units in the last place reproduced it on Linux (-14867.75, -15114.44 or -15005.746 depending on the seed, a warning of 0.08 dB). So each root is refined on the deflated pencil, in complex arithmetic, by shifted inverse iteration: solve $(\mathbf{A} - \mu\mathbf{B})\mathbf{z} = \mathbf{B}\mathbf{x}$, read $\lambda = \mu + \mathbf{x}^H\mathbf{x} / \mathbf{x}^H\mathbf{z}$ (since $(\mathbf{A} - \mu\mathbf{B})^{-1}\mathbf{B}\mathbf{x} = \mathbf{x}/(\lambda - \mu)$ for an eigenvector), and shift to it, up to 40 times. Inverse iteration is used because it needs only $\mathbf{A} - \mu\mathbf{B}$ to be regular, which it is for any shift that is not a root, so a singular $\mathbf{B}$ (infinite eigenvalues left in the pencil) does no harm; a Newton step on $\det$ or a Rayleigh quotient with $\mathbf{B}^{-1}$ would not survive it.
+
+A refined root replaces the QZ one only if it converged, its relative residual $\|(\mathbf{A} - \lambda\mathbf{B})\mathbf{x}\| / (\|\mathbf{x}\|(\|\mathbf{A}\| + |\lambda|\|\mathbf{B}\|))$ is under $10^3 n$ roundings and under that of the QZ root, and it moved by no more than its own size or $10^7$ roundings of the largest root. Two roots that were apart and now coincide are both put back to the QZ values, so refinement never merges two roots. Real roots stay real and conjugate pairs stay conjugate. A refined root whose eigenvector leaves $\mathbf{A}$ singular to 50 $n$ roundings is exactly 0, which is how a zero at the origin is told from a small root: by a residual, not by the size of the largest root. Only a root that could not be refined (a pencil of more than 150 states, or no convergence) falls back to the old rule, 0 under 10 roundings of the largest root.
 
 ### 1.4.2 Checks on the Result (`pz_checks.cpp`)
 Both solve $(\mathbf{G} + j\omega\mathbf{C})\mathbf{x} = \mathbf{B}$ at 3 points per decade from a decade below the lowest root (not below 1e-3 rad/s) to a decade above the highest:
@@ -112,11 +116,13 @@ The oracle (`pole_zero_oracle.h`) rebuilds $H(j\omega)$ from the roots and compa
 | Every example with a Vin source | match, or refused as undriven (full bridge rectifier, buck converter) | under 1e-3 dB |
 
 ### 1.8 Limits That Remain
-- A root exactly at the origin shows at about -Gmin/C (1e-6 rad/s for 1 uF), since every node has Gmin to ground.
+- A root exactly at the origin shows at about -Gmin/C (1e-6 rad/s for 1 uF), since every node has Gmin to ground. A zero at the origin comes out exactly 0.
 - A pole and a zero almost on top of each other (a mode the input barely excites) are ill-conditioned: a BJT amplifier shows them 1e-3 apart relative, within 1.5e-5 dB of the AC response. Core cancels pairs within 1e-3.
 - A root above about 1e13 times the scale $\|\mathbf{A}\| / \|\mathbf{B}\|$ counts as infinite.
+- Roots are accurate to their own size after refinement, but not beyond the conditioning of the circuit: entries of the stiff transistor pencil of `linear_tests.cpp` moved by up to 32 units in the last place keep every root within 1e-6, and the examples and stress circuits pass the AC check under the same perturbation. Moved by 256 units (which no platform difference produces) the check starts to warn on some circuits, as it should.
+- A pencil of more than 150 states keeps the QZ roots, which are good to the rounding of the largest root only.
 - The rebuild check is as accurate as the roots near the origin allow, so it starts at 1e-3 rad/s.
-- A repeated root splits by the square root of the rounding (1e-8 relative).
+- A repeated root splits by the square root of the rounding (1e-8 relative); refinement leaves a root alone when it would land on another one.
 
 ## 2. Benchmark Tables: Analytical Golden vs. `ngspice` vs. `Nodalys`
 
