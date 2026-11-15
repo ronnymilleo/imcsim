@@ -43,7 +43,8 @@ struct TimeContext {
     bool IsTransient = false;
     /// True at t = 0 when starting a transient from user-specified initial conditions (`uic`).
     bool UseInitialConditions = false;
-    /// True at t = 0 of a transient solve (both with and without `uic`), so `.ic` node voltages clamp only the start.
+    /// True at t = 0 of a transient solve (both with and without `uic`); `.ic` node voltages clamp only the solve that
+    /// is not `uic`, the operating point that starts the transient.
     bool IsTransientStart = false;
     /// True on the first integration step of a transient and on the step that leaves a source corner: uses Backward
     /// Euler (1st-order, needs no past derivatives) whatever `Method` says.

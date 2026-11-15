@@ -517,7 +517,6 @@ TEST_CASE("Autonomous 3-inverter ring oscillator generates continuous periodic o
     Nodalys::TransientConfig tran;
     tran.StopTime = 40e-9;
     tran.TimeStep = 0.1e-9;
-    tran.UseInitialConditions = true;
 
     const auto res = Nodalys::ComputeTransient(*circuit, tran);
     REQUIRE(res.has_value());
