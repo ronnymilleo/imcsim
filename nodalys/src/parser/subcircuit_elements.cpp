@@ -182,6 +182,58 @@ struct SourceValues {
     double AcPhaseDegrees = 0.0;
 };
 
+Result ReadInto(const TextScope &scope, const std::string &text, double &target) {
+    const auto value = scope.Evaluate(text);
+    if (!value) {
+        return std::unexpected(value.error());
+    }
+    target = *value;
+    return {};
+}
+
+/**
+ * @brief   Reads the magnitude after the word AC, at index, and the phase when a value follows it.
+ */
+Result ReadAcValues(const TextScope &scope, const std::vector<std::string> &tokens, std::size_t &index,
+                    SourceValues &values) {
+    Result done = ReadInto(scope, tokens[index + 1], values.AcMagnitude);
+    index += 2;
+    if (done && index < tokens.size() && scope.Evaluate(tokens[index])) {
+        done = ReadInto(scope, tokens[index], values.AcPhaseDegrees);
+        ++index;
+    }
+    return done;
+}
+
+/**
+ * @brief   Reads the word of a source line at index, with the value that belongs to it, and moves index past them.
+ * @return  Nothing, or why the word cannot be simulated: anything but a DC or an AC value, such as a waveform.
+ */
+Result ReadSourceWord(const TextScope &scope, const std::vector<std::string> &tokens, std::size_t &index,
+                      SourceValues &values) {
+    const std::string upper = ToUpperCase(tokens[index]);
+    const bool has_next = index + 1 < tokens.size();
+    if (upper == "DC" && has_next) {
+        index += 2;
+        return ReadInto(scope, tokens[index - 1], values.Dc);
+    }
+    if (upper.starts_with("DC=")) {
+        ++index;
+        return ReadInto(scope, tokens[index - 1].substr(3), values.Dc);
+    }
+    if (upper == "AC" && has_next) {
+        return ReadAcValues(scope, tokens, index, values);
+    }
+    if (index == TWO_TERMINAL_VALUE_INDEX && tokens[index].find('(') == std::string::npos) {
+        ++index;
+        return ReadInto(scope, tokens[index - 1], values.Dc);
+    }
+    const std::string word = tokens[index].substr(0, tokens[index].find('('));
+    return std::unexpected(std::format("the source waveform or option '{}' is not simulated inside a "
+                                       "subcircuit kept as text; only DC and AC values are",
+                                       word));
+}
+
 /**
  * @brief   Reads "[DC] value [AC magnitude [phase]]" of a source; a waveform such as PULSE or SIN is refused.
  */
@@ -189,43 +241,10 @@ std::expected<SourceValues, std::string> ReadSource(const TextScope &scope, cons
     if (const Result nodes = CheckNodeCount(element, 2); !nodes) {
         return std::unexpected(nodes.error());
     }
-    const std::vector<std::string> &tokens = element.Tokens;
     SourceValues values;
     std::size_t index = TWO_TERMINAL_VALUE_INDEX;
-    const auto read = [&scope](const std::string &text, double &target) -> Result {
-        const auto value = scope.Evaluate(text);
-        if (!value) {
-            return std::unexpected(value.error());
-        }
-        target = *value;
-        return {};
-    };
-    while (index < tokens.size()) {
-        const std::string upper = ToUpperCase(tokens[index]);
-        Result done;
-        if (upper == "DC" && index + 1 < tokens.size()) {
-            done = read(tokens[index + 1], values.Dc);
-            index += 2;
-        } else if (upper.starts_with("DC=")) {
-            done = read(tokens[index].substr(3), values.Dc);
-            ++index;
-        } else if (upper == "AC" && index + 1 < tokens.size()) {
-            done = read(tokens[index + 1], values.AcMagnitude);
-            index += 2;
-            if (done && index < tokens.size() && scope.Evaluate(tokens[index])) {
-                done = read(tokens[index], values.AcPhaseDegrees);
-                ++index;
-            }
-        } else if (index == TWO_TERMINAL_VALUE_INDEX && tokens[index].find('(') == std::string::npos) {
-            done = read(tokens[index], values.Dc);
-            ++index;
-        } else {
-            const std::string word = tokens[index].substr(0, tokens[index].find('('));
-            return std::unexpected(std::format("the source waveform or option '{}' is not simulated inside a "
-                                               "subcircuit kept as text; only DC and AC values are",
-                                               word));
-        }
-        if (!done) {
+    while (index < element.Tokens.size()) {
+        if (const Result done = ReadSourceWord(scope, element.Tokens, index, values); !done) {
             return std::unexpected(done.error());
         }
     }

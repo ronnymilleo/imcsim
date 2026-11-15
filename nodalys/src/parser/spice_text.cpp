@@ -38,6 +38,48 @@ std::string_view StripInlineComment(const std::string_view line) {
     return line;
 }
 
+bool IsSeparator(const char character) {
+    return IsSpace(character) || character == ',';
+}
+
+/**
+ * @brief   Follows the parentheses, braces and single quotes of a line, inside which a separator splits nothing.
+ */
+class Grouping {
+public:
+    void Follow(const char character) {
+        if (character == '\'') {
+            m_IsQuoted = !m_IsQuoted;
+        } else if (m_IsQuoted) {
+            return;
+        } else if (character == '(' || character == '{') {
+            ++m_Depth;
+        } else if (character == ')' || character == '}') {
+            --m_Depth;
+        }
+    }
+
+    bool IsOpen() const { return m_IsQuoted || m_Depth > 0; }
+
+private:
+    int m_Depth = 0;
+    bool m_IsQuoted = false;
+};
+
+std::size_t SkipSeparators(const std::string_view line, std::size_t index) {
+    while (index < line.size() && IsSeparator(line[index])) {
+        ++index;
+    }
+    return index;
+}
+
+void FlushToken(std::string &token, std::vector<std::string> &tokens) {
+    if (!token.empty()) {
+        tokens.push_back(std::move(token));
+        token.clear();
+    }
+}
+
 } // namespace
 
 /**
@@ -102,42 +144,25 @@ std::vector<std::string> SplitLogicalLines(const std::string_view text) {
 std::vector<std::string> SplitTokens(const std::string_view line) {
     std::vector<std::string> tokens;
     std::string token;
-    int depth = 0;
-    bool is_quoted = false;
-    const auto flush = [&] {
-        if (!token.empty()) {
-            tokens.push_back(std::move(token));
-            token.clear();
-        }
-    };
+    Grouping grouping;
     for (std::size_t index = 0; index < line.size(); ++index) {
         const char character = line[index];
-        if (character == '\'') {
-            is_quoted = !is_quoted;
-        } else if (!is_quoted && (character == '(' || character == '{')) {
-            ++depth;
-        } else if (!is_quoted && (character == ')' || character == '}')) {
-            --depth;
-        }
-        const bool is_separator = (IsSpace(character) || character == ',') && depth <= 0 && !is_quoted;
-        if (!is_separator) {
+        grouping.Follow(character);
+        if (!IsSeparator(character) || grouping.IsOpen()) {
             token.push_back(character);
             continue;
         }
         // Spaces around an equals sign belong to the assignment
-        std::size_t next = index;
-        while (next < line.size() && (IsSpace(line[next]) || line[next] == ',')) {
-            ++next;
-        }
-        const bool is_before_equals = next < line.size() && line[next] == '=' && !token.empty();
-        const bool is_after_equals = !token.empty() && token.back() == '=';
-        if (is_before_equals || is_after_equals) {
+        const std::size_t next = SkipSeparators(line, index);
+        const bool is_before_equals = next < line.size() && line[next] == '=';
+        const bool is_after_equals = token.ends_with('=');
+        if (!token.empty() && (is_before_equals || is_after_equals)) {
             index = next - 1;
         } else {
-            flush();
+            FlushToken(token, tokens);
         }
     }
-    flush();
+    FlushToken(token, tokens);
     return tokens;
 }
 
