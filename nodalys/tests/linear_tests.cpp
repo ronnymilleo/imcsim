@@ -6,6 +6,7 @@
 #include "linear/dense_matrix.h"
 #include "linear/qz.h"
 #include <algorithm>
+#include <array>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <cmath>
@@ -192,6 +193,83 @@ TEST_CASE("RLC low-pass pole-zero analysis returns the two poles and no spurious
     REQUIRE(pz.has_value());
     CHECK(pz->Poles.size() == 2);
     CHECK(pz->Zeros.empty());
+}
+
+TEST_CASE("A small B entry beside a large conductance is a finite eigenvalue", "[linear][qz]") {
+    // The Rosenbrock pencil of a common-source stage: x = (v1, v2, v3, iV, u) with Rs = 1k, RL = 10k, Cgs = 10 pF,
+    // Cgd = 1 pF and gm = 2 mS. Its transfer function (Cgd s - gm) has one zero, at gm / Cgd = 2e9 rad/s, in the
+    // right half-plane; its only B entry that reaches the algebraic part is 1e-12 beside entries of order 1.
+    constexpr double SOURCE_RESISTANCE = 1e3;
+    constexpr double LOAD_RESISTANCE = 1e4;
+    constexpr double GATE_SOURCE_CAPACITANCE = 10e-12;
+    constexpr double GATE_DRAIN_CAPACITANCE = 1e-12;
+    constexpr double TRANSCONDUCTANCE = 2e-3;
+    Nodalys::DenseMatrix a(5, 5);
+    Nodalys::DenseMatrix b(5, 5);
+    a.At(0, 0) = 1.0 / SOURCE_RESISTANCE;
+    a.At(0, 1) = -1.0 / SOURCE_RESISTANCE;
+    a.At(0, 3) = 1.0;
+    a.At(1, 0) = -1.0 / SOURCE_RESISTANCE;
+    a.At(1, 1) = 1.0 / SOURCE_RESISTANCE;
+    b.At(1, 1) = -(GATE_SOURCE_CAPACITANCE + GATE_DRAIN_CAPACITANCE);
+    b.At(1, 2) = GATE_DRAIN_CAPACITANCE;
+    a.At(2, 1) = TRANSCONDUCTANCE;
+    a.At(2, 2) = 1.0 / LOAD_RESISTANCE;
+    b.At(2, 1) = GATE_DRAIN_CAPACITANCE;
+    b.At(2, 2) = -GATE_DRAIN_CAPACITANCE;
+    a.At(3, 0) = 1.0;
+    a.At(3, 4) = -1.0;
+    a.At(4, 2) = 1.0;
+
+    const auto zeros = Nodalys::ComputeGeneralizedEigenvalues(a, b);
+    REQUIRE(zeros.size() == 1);
+    CHECK_THAT(zeros[0].real(), WithinRel(TRANSCONDUCTANCE / GATE_DRAIN_CAPACITANCE, 1e-9));
+    CHECK_THAT(zeros[0].imag(), WithinAbs(0.0, 1.0));
+}
+
+TEST_CASE("Eigenvalues twelve decades apart are all found, whichever way the pencil is ordered", "[linear][qz]") {
+    // Four decoupled first-order modes, as in a circuit with a slow RC and a fast junction, each with a different
+    // size of its equations, coupled by a triangular term so the pencil is not diagonal
+    constexpr std::array<double, 4> ROOTS{3.0, 4.5e3, 2.0e7, 6.0e12};
+    for (const std::array<std::size_t, 4> order :
+         {std::array<std::size_t, 4>{0, 1, 2, 3}, std::array<std::size_t, 4>{3, 2, 1, 0},
+          std::array<std::size_t, 4>{1, 3, 0, 2}}) {
+        Nodalys::DenseMatrix a(4, 4);
+        Nodalys::DenseMatrix b(4, 4);
+        for (std::size_t row = 0; row < 4; ++row) {
+            const double root = ROOTS[order[row]];
+            a.At(row, row) = root * 1e-9;
+            b.At(row, row) = 1e-9;
+            for (std::size_t column = row + 1; column < 4; ++column) {
+                a.At(row, column) = 0.25e-9;
+                b.At(row, column) = 0.1e-9;
+            }
+        }
+        auto roots = Nodalys::ComputeGeneralizedEigenvalues(a, b);
+        REQUIRE(roots.size() == 4);
+        std::ranges::sort(roots, {}, [](const auto &root) { return root.real(); });
+        for (std::size_t index = 0; index < 4; ++index) {
+            CHECK_THAT(roots[index].real(), WithinRel(ROOTS[index], 1e-9));
+        }
+    }
+}
+
+TEST_CASE("Rows with no dynamics are removed without moving the roots of the rest", "[linear][qz]") {
+    // Node 1 has 1 uF and 2 mS to ground and 1 mS to node 2, which a voltage source holds at 0 V for the small signal:
+    // two algebraic equations (the source branch and its node) around one state, whose pole is -3 mS / 1 uF
+    Nodalys::DenseMatrix a(3, 3);
+    Nodalys::DenseMatrix b(3, 3);
+    a.At(0, 0) = 3e-3;
+    a.At(0, 1) = -1e-3;
+    b.At(0, 0) = -1e-6;
+    a.At(1, 0) = -1e-3;
+    a.At(1, 1) = 1e-3;
+    a.At(1, 2) = 1.0;
+    a.At(2, 1) = 1.0;
+    const auto roots = Nodalys::ComputeGeneralizedEigenvalues(a, b);
+    REQUIRE(roots.size() == 1);
+    CHECK_THAT(roots[0].real(), WithinRel(-3000.0, 1e-9));
+    CHECK_THAT(roots[0].imag(), WithinAbs(0.0, 1e-9));
 }
 
 } // namespace

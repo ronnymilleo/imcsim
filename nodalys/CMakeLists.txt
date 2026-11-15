@@ -8,6 +8,7 @@ add_library(nodalys STATIC
     src/analyses/hb_analysis.cpp
     src/analyses/noise_analysis.cpp
     src/analyses/pz_analysis.cpp
+    src/analyses/pz_checks.cpp
     src/analyses/sens_analysis.cpp
     src/analyses/sp_analysis.cpp
     src/analyses/tf_analysis.cpp
@@ -37,6 +38,7 @@ add_library(nodalys STATIC
     src/expression/expression_parser.cpp
     src/linear/dense_matrix.cpp
     src/linear/fft.cpp
+    src/linear/pencil_reduction.cpp
     src/linear/qz.cpp
     src/mna/mna_system.cpp
     src/newton/newton.cpp
