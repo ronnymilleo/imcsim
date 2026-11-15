@@ -41,7 +41,7 @@ flowchart TD
     app_core_backends -->|2| app_core_spice
     app_core_circuit -->|8| app_core_spice
     app_core_simulation -->|78| app_core_circuit
-    app_core_simulation -->|2| app_core_spice
+    app_core_simulation -->|3| app_core_spice
 ```
 
 Layers, lowest first:
