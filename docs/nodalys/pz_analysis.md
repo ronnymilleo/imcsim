@@ -70,6 +70,19 @@ The transmission zeros are the **finite generalized eigenvalues** of the matrix 
 
 ---
 
+### 1.4.1 Conditioning Before QZ (`pencil_reduction.cpp`)
+An MNA pencil mixes siemens with farads and henries, and its roots span 12 decades. Three steps keep QZ accurate:
+1. **Frequency scaling:** $\mathbf{B}$ is multiplied by a power of two so that $\mathbf{A}$ and $\mathbf{B}$ have the same largest entry; the roots are multiplied back afterwards.
+2. **Balancing:** rows and columns are scaled by powers of two (exact) until each has $|\mathbf{A}| + |\mathbf{B}|$ of about 1. On a BJT amplifier a pole at -5.7 rad/s came out at -5.74 without it and -5.75498 after, with the AC response off by 0.0175 dB instead of 7.5e-8 dB.
+3. **Algebraic rows:** a row (or column) whose $\mathbf{B}$ entries are *exactly* zero is eliminated with the largest $\mathbf{A}$ pivot in it. Differences that cancel to rounding noise are set to exactly 0 where they are made, so a 1 pF capacitor beside 10 uF is never mistaken for noise (the old test, 1e-12 of the largest $\mathbf{B}$ entry, dropped real fast roots, and its 1x1 case compared against an absolute 1, which lost the right-half-plane zero gm/Cgd = 2e9 rad/s of a common-source stage).
+
+A root counts as infinite when its $\beta$ is under 1e-13 of the largest $\mathbf{B}$ entry of the scaled pencil. Roots within 10 roundings of the largest root of the origin are set to 0 (a zero at the origin beside a 3e12 rad/s junction pole came out at +6.5e-7 and read as a right-half-plane root).
+
+### 1.4.2 Checks on the Result (`pz_checks.cpp`)
+Both solve $(\mathbf{G} + j\omega\mathbf{C})\mathbf{x} = \mathbf{B}$ at 3 points per decade from a decade below the lowest root (not below 1e-3 rad/s) to a decade above the highest:
+- **Undriven output:** if $|y / u_{port}|$ is under 1e-9 everywhere, the run fails with "The output does not respond to the input" (a diode that is off, a separate network). Gmin leaks 1e-12 through it, which would otherwise yield a list of meaningless roots.
+- **Rebuild check:** the gain $K$ in $H = K \prod(s - z) / \prod(s - p)$ read at each point must be the same real number within 1e-3. If not, `PoleZeroResult::Warnings` says by how many dB and degrees and around which frequency, so a short or wrong list is never silent. It would see a missing root up to four decades above the highest found.
+
 ### 1.5 Post-Processing & Robustness
 The raw poles and zeros are post-processed through `Core::BuildPoleZero`:
 - **Conjugate Pairing:** Roots with non-zero imaginary parts are paired into complex conjugate pairs $s = \sigma \pm j\omega$.
@@ -82,6 +95,28 @@ In `ngspice`, `.pz` relies on a heuristic numerical root-finding algorithm (Mull
 In contrast, **Nodalys** solves the generalized eigenvalue problem globally via the QZ algorithm on the exact linearized MNA pencil. It requires no initial frequency guesses, exhibits no divergence, and finds all theoretical poles and zeros deterministically.
 
 ---
+
+### 1.7 What Was Verified (`nodalys/tests/pz_analysis_tests.cpp`, `tests/pole_zero_robustness_tests.cpp`)
+The oracle (`pole_zero_oracle.h`) rebuilds $H(j\omega)$ from the roots and compares it with the AC sweep; it holds for any circuit.
+
+| Circuit | Result | Worst AC mismatch |
+| :--- | :--- | :--- |
+| Sallen-Key, ideal op-amp, GBW 1e4, 3e5, 5e5, 1e6, 2e6 Hz | 3 poles, equal to the roots of the nodal cubic to 1e-4 (ngspice: nothing at 1e4, 5e5, 1e6) | 1e-12 dB |
+| Transformer power supply | 7 poles, none in the right half-plane (ngspice: a ladder of 11 poles, most in the right half-plane) | 5e-5 dB |
+| 20-section RC ladder | 20 poles equal to $-(2/RC)(1-\cos((2k-1)\pi/(2N+1)))$ to 1e-6 | 7e-13 dB |
+| 5 buffered RC sections, 1 Hz to 100 MHz | all 5 at $-1/RC$ to 1e-5 | 3e-14 dB |
+| LC tank, integrator, repeated pole | on the axis, at -Gmin/C = -1e-6, double at -1000 | 1e-14 dB |
+| Common-source stage | zero at gm/Cgd = 2e9 and the two poles of its quadratic, to 1e-6 | 1e-13 dB |
+| Negative conductance, each controlled source | pole at +2000; 4 poles at -1000 | 1e-14 dB |
+| BJT amplifier (5 poles, 4 zeros, 12 decades), 2N3904 example | complete, same under reordering | 1.5e-5 dB |
+| Every example with a Vin source | match, or refused as undriven (full bridge rectifier, buck converter) | under 1e-3 dB |
+
+### 1.8 Limits That Remain
+- A root exactly at the origin shows at about -Gmin/C (1e-6 rad/s for 1 uF), since every node has Gmin to ground.
+- A pole and a zero almost on top of each other (a mode the input barely excites) are ill-conditioned: a BJT amplifier shows them 1e-3 apart relative, within 1.5e-5 dB of the AC response. Core cancels pairs within 1e-3.
+- A root above about 1e13 times the scale $\|\mathbf{A}\| / \|\mathbf{B}\|$ counts as infinite.
+- The rebuild check is as accurate as the roots near the origin allow, so it starts at 1e-3 rad/s.
+- A repeated root splits by the square root of the rounding (1e-8 relative).
 
 ## 2. Benchmark Tables: Analytical Golden vs. `ngspice` vs. `Nodalys`
 
