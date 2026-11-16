@@ -219,7 +219,13 @@ std::optional<std::string> RunInChunks(const Circuit &circuit, const TransientSe
                                        const RunMonitor &monitor, const std::vector<SimulatorMessage> &messages) {
     const bool is_live = monitor.LivePace > 0.0;
     const double pace = monitor.LivePace;
-    double duration = is_live ? pace * LIVE_CHUNK_SECONDS : settings.StopTime * FIRST_CHUNK_SHARE;
+    const bool is_fixed = !is_live && monitor.FixedChunkSeconds > 0.0;
+    double duration = settings.StopTime * FIRST_CHUNK_SHARE;
+    if (is_live) {
+        duration = pace * LIVE_CHUNK_SECONDS;
+    } else if (is_fixed) {
+        duration = monitor.FixedChunkSeconds;
+    }
     double reached = 0.0;
     std::size_t sent = 0;
     bool is_started = false;
@@ -250,10 +256,12 @@ std::optional<std::string> RunInChunks(const Circuit &circuit, const TransientSe
         if (is_complete || IsCancelled(monitor.Control)) {
             return std::nullopt;
         }
-        if (!is_live) {
+        if (is_live) {
+            if (!KeepLivePace(start, reached, pace, monitor.Control)) {
+                return std::nullopt;
+            }
+        } else if (!is_fixed) {
             duration = GetNextChunkDuration(duration, wall.count(), settings.TimeStep);
-        } else if (!KeepLivePace(start, reached, pace, monitor.Control)) {
-            return std::nullopt;
         }
     }
 }
