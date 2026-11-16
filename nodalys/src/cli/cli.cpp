@@ -17,6 +17,7 @@
 #include <format>
 #include <fstream>
 #include <istream>
+#include <iterator>
 #include <optional>
 #include <ostream>
 #include <sstream>
@@ -35,6 +36,42 @@ std::string ToLower(std::string_view sv) {
         s.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
     }
     return s;
+}
+
+/// Whether an analysis of the netlist is the one that `--analysis` names.
+bool IsOverrideMatch(const std::string &name, const AnalysisKind kind) {
+    if (name == "op") {
+        return kind == AnalysisKind::OPERATING_POINT;
+    }
+    if (name == "tran") {
+        return kind == AnalysisKind::TRANSIENT;
+    }
+    if (name == "dc") {
+        return kind == AnalysisKind::DC_SWEEP;
+    }
+    if (name == "ac") {
+        return kind == AnalysisKind::AC_SWEEP;
+    }
+    if (name == "tf") {
+        return kind == AnalysisKind::TRANSFER_FUNCTION;
+    }
+    if (name == "noise") {
+        return kind == AnalysisKind::NOISE;
+    }
+    if (name == "sp") {
+        return kind == AnalysisKind::S_PARAMETERS;
+    }
+    if (name == "pz") {
+        return kind == AnalysisKind::POLE_ZERO;
+    }
+    if (name == "sens") {
+        // Both forms of .sens
+        return kind == AnalysisKind::SENSITIVITY || kind == AnalysisKind::AC_SENSITIVITY;
+    }
+    if (name == "hb") {
+        return kind == AnalysisKind::HARMONIC_BALANCE;
+    }
+    return false;
 }
 
 std::optional<std::string> ReadFileContent(const std::string &path, std::istream &input) {
@@ -90,7 +127,7 @@ int RunCli(const int argc, const char *const *argv, std::istream &input, std::os
     app.add_option("-f,--format", format_str, "Output format: raw (Nutmeg ASCII), csv, json, touchstone (default: raw)")
         ->check(CLI::IsMember({"raw", "raw-ascii", "csv", "json", "touchstone", "s2p"}, CLI::ignore_case));
     app.add_option("-a,--analysis", analysis_override,
-                   "Override analysis: op, tran, dc, ac, tf, noise, sp, pz, sens, hb")
+                   "Override analysis: op, tran, dc, ac, tf, noise, sp, pz, sens (DC and AC), hb")
         ->check(CLI::IsMember({"op", "tran", "dc", "ac", "tf", "noise", "sp", "pz", "sens", "hb"}, CLI::ignore_case));
     app.add_option("-s,--step", step_override, "Override transient step time / sweep step");
     app.add_option("-t,--stop", stop_override, "Override transient stop time");
@@ -166,44 +203,18 @@ int RunCli(const int argc, const char *const *argv, std::istream &input, std::os
     // Apply analysis overrides
     if (!analysis_override.empty()) {
         const std::string a_lower = ToLower(analysis_override);
-        auto it = std::ranges::find_if(parsed.Analyses, [&](const auto &an) {
-            if (a_lower == "op") {
-                return an.Kind == Nodalys::AnalysisKind::OPERATING_POINT;
-            }
-            if (a_lower == "tran") {
-                return an.Kind == Nodalys::AnalysisKind::TRANSIENT;
-            }
-            if (a_lower == "dc") {
-                return an.Kind == Nodalys::AnalysisKind::DC_SWEEP;
-            }
-            if (a_lower == "ac") {
-                return an.Kind == Nodalys::AnalysisKind::AC_SWEEP;
-            }
-            if (a_lower == "tf") {
-                return an.Kind == Nodalys::AnalysisKind::TRANSFER_FUNCTION;
-            }
-            if (a_lower == "noise") {
-                return an.Kind == Nodalys::AnalysisKind::NOISE;
-            }
-            if (a_lower == "sp") {
-                return an.Kind == Nodalys::AnalysisKind::S_PARAMETERS;
-            }
-            if (a_lower == "pz") {
-                return an.Kind == Nodalys::AnalysisKind::POLE_ZERO;
-            }
-            if (a_lower == "sens") {
-                return an.Kind == Nodalys::AnalysisKind::SENSITIVITY;
-            }
-            if (a_lower == "hb") {
-                return an.Kind == Nodalys::AnalysisKind::HARMONIC_BALANCE;
-            }
-            return false;
-        });
+        const auto it =
+            std::ranges::find_if(parsed.Analyses, [&](const auto &an) { return IsOverrideMatch(a_lower, an.Kind); });
 
         if (it != parsed.Analyses.end()) {
-            Nodalys::ParsedAnalysis match = *it;
-            parsed.Analyses.clear();
-            parsed.Analyses.push_back(std::move(match));
+            std::vector<Nodalys::ParsedAnalysis> matches;
+            std::ranges::copy_if(parsed.Analyses, std::back_inserter(matches),
+                                 [&](const auto &an) { return IsOverrideMatch(a_lower, an.Kind); });
+            // Only a sensitivity keeps every match, since a netlist may ask for both of its forms
+            if (a_lower != "sens") {
+                matches.resize(1);
+            }
+            parsed.Analyses = std::move(matches);
         } else {
             parsed.Analyses.clear();
             if (a_lower == "op") {
@@ -383,6 +394,22 @@ int RunCli(const int argc, const char *const *argv, std::istream &input, std::os
             }
             auto res = Nodalys::ComputeSensitivity(parsed.CircuitInstance, cfg, parsed.Options,
                                                    verbose ? &diagnostics : nullptr);
+            if (!res) {
+                errors << std::format("Simulation Error: {}\n", res.error());
+                return EXIT_FAILURE;
+            }
+            sim_result = std::move(*res);
+            break;
+        }
+
+        case Nodalys::AnalysisKind::AC_SENSITIVITY: {
+            const auto &cfg = std::get<Nodalys::AcSensitivityConfig>(analysis.Config);
+            if (verbose && !batch_mode) {
+                output << std::format("Running AC Sensitivity (.sens ... ac) analysis: pos={}, neg={}, input={}\n",
+                                      cfg.OutputPositiveNode, cfg.OutputNegativeNode, cfg.InputSource);
+            }
+            auto res = Nodalys::ComputeAcSensitivity(parsed.CircuitInstance, cfg, parsed.Options,
+                                                     verbose ? &diagnostics : nullptr);
             if (!res) {
                 errors << std::format("Simulation Error: {}\n", res.error());
                 return EXIT_FAILURE;

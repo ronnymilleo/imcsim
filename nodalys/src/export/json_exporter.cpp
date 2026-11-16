@@ -48,6 +48,60 @@ void WritePortMatrices(std::ostringstream &ss, const std::vector<std::optional<P
     ss << "  ]";
 }
 
+/// Writes a text as a JSON string, escaping what JSON does not allow bare.
+void WriteQuoted(std::ostringstream &ss, std::string_view text) {
+    ss << '"';
+    for (const char ch : text) {
+        if (ch == '"' || ch == '\\') {
+            ss << '\\';
+        }
+        ss << ch;
+    }
+    ss << '"';
+}
+
+/// Writes numbers that may be missing, null where the figure is none.
+void WriteOptionalArray(std::ostringstream &ss, const std::vector<std::optional<double>> &values) {
+    ss << "[";
+    for (std::size_t i = 0; i < values.size(); ++i) {
+        ss << (i > 0 ? ", " : "");
+        if (const std::optional<double> &value = values[i]; value.has_value()) {
+            ss << std::format("{:.8g}", *value);
+        } else {
+            ss << "null";
+        }
+    }
+    ss << "]";
+}
+
+/// Writes the real or the imaginary parts of complex values as an array.
+void WriteComplexPart(std::ostringstream &ss, const std::vector<std::complex<double>> &values, const bool is_real) {
+    ss << "[";
+    for (std::size_t i = 0; i < values.size(); ++i) {
+        ss << (i > 0 ? ", " : "") << std::format("{:.8g}", is_real ? values[i].real() : values[i].imag());
+    }
+    ss << "]";
+}
+
+const char *DescribeParameter(const SensitivityParameter parameter) {
+    switch (parameter) {
+    case SensitivityParameter::RESISTANCE:
+        return "resistance";
+    case SensitivityParameter::CAPACITANCE:
+        return "capacitance";
+    case SensitivityParameter::INDUCTANCE:
+        return "inductance";
+    case SensitivityParameter::VOLTAGE:
+        return "voltage";
+    case SensitivityParameter::CURRENT:
+        return "current";
+    case SensitivityParameter::GAIN:
+        return "gain";
+    default:
+        return "unknown";
+    }
+}
+
 } // namespace
 
 std::string ExportJson(const OperatingPointResult &result) {
@@ -258,6 +312,44 @@ std::string ExportJson(const SensitivityResult &result) {
         ss << "    \"" << name << "\": " << std::format("{:.8g}", val);
     }
     ss << "\n  }\n}\n";
+    return ss.str();
+}
+
+std::string ExportJson(const AcSensitivityResult &result) {
+    std::ostringstream ss;
+    ss << "{\n  \"analysis\": \"ac_sensitivity\",\n";
+    ss << "  \"output_positive_node\": " << result.OutputPositiveNode << ",\n";
+    ss << "  \"output_negative_node\": " << result.OutputNegativeNode << ",\n";
+    ss << "  \"input_source\": ";
+    WriteQuoted(ss, result.InputSource);
+    ss << ",\n  \"frequencies\": ";
+    WriteDoubleArray(ss, result.Frequencies);
+    ss << ",\n  \"output_re\": ";
+    WriteComplexPart(ss, result.Output, true);
+    ss << ",\n  \"output_im\": ";
+    WriteComplexPart(ss, result.Output, false);
+    ss << ",\n  \"warnings\": [";
+    for (std::size_t i = 0; i < result.Warnings.size(); ++i) {
+        ss << (i > 0 ? ", " : "");
+        WriteQuoted(ss, result.Warnings[i]);
+    }
+    ss << "],\n  \"elements\": [\n";
+    for (std::size_t index = 0; index < result.Elements.size(); ++index) {
+        const AcElementSensitivity &element = result.Elements[index];
+        ss << "    {\"name\": ";
+        WriteQuoted(ss, element.Name);
+        ss << ", \"parameter\": \"" << DescribeParameter(element.Parameter)
+           << "\", \"value\": " << std::format("{:.8g}", element.Value) << ",\n     \"derivative_re\": ";
+        WriteComplexPart(ss, element.Derivatives, true);
+        ss << ",\n     \"derivative_im\": ";
+        WriteComplexPart(ss, element.Derivatives, false);
+        ss << ",\n     \"magnitude_db_per_percent\": ";
+        WriteOptionalArray(ss, element.MagnitudeDecibelsPerPercent);
+        ss << ",\n     \"phase_deg_per_percent\": ";
+        WriteOptionalArray(ss, element.PhaseDegreesPerPercent);
+        ss << "}" << (index + 1 < result.Elements.size() ? ",\n" : "\n");
+    }
+    ss << "  ]\n}\n";
     return ss.str();
 }
 

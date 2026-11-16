@@ -57,13 +57,27 @@ std::optional<std::string> CheckConfig(const CompiledCircuit &compiled, const Ac
     return std::nullopt;
 }
 
-/// The frequencies of a logarithmic sweep, from the start to the stop with the stop included.
+/// The frequencies of a sweep, from the start to the stop with the stop included.
 std::vector<double> MakeFrequencies(const AcSensitivityConfig &settings) {
     std::vector<double> frequencies;
+    if (settings.SweepType == FrequencySweepType::LINEAR) {
+        if (settings.PointsPerDecade == 1 || settings.StartFrequency == settings.StopFrequency) {
+            frequencies.push_back(settings.StartFrequency);
+            return frequencies;
+        }
+        const double step =
+            (settings.StopFrequency - settings.StartFrequency) / static_cast<double>(settings.PointsPerDecade - 1);
+        for (int index = 0; index < settings.PointsPerDecade; ++index) {
+            frequencies.push_back(
+                std::min(settings.StartFrequency + static_cast<double>(index) * step, settings.StopFrequency));
+        }
+        return frequencies;
+    }
+    const double base = settings.SweepType == FrequencySweepType::OCTAVE ? 2.0 : 10.0;
     for (int index = 0;; ++index) {
         const double frequency =
             settings.StartFrequency *
-            std::pow(10.0, static_cast<double>(index) / static_cast<double>(settings.PointsPerDecade));
+            std::pow(base, static_cast<double>(index) / static_cast<double>(settings.PointsPerDecade));
         if (frequency > settings.StopFrequency * (1.0 + 1e-9)) {
             break;
         }

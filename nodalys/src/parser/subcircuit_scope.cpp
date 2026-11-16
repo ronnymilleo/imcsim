@@ -116,6 +116,9 @@ NodeId TextScope::ResolveNode(ExpansionContext &context, const std::string_view 
     }
     const NodeId node = context.Builder.AddNode();
     m_Nodes[upper] = node;
+    if (context.OnInternalNode) {
+        context.OnInternalNode(ToUpperCase(MakeName(upper)), node);
+    }
     return node;
 }
 

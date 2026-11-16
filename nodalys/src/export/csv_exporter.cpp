@@ -246,6 +246,32 @@ std::string ExportCsv(const SensitivityResult &result) {
     return ss.str();
 }
 
+std::string ExportCsv(const AcSensitivityResult &result) {
+    std::ostringstream ss;
+    ss << "Frequency,Output_re,Output_im";
+    for (const AcElementSensitivity &element : result.Elements) {
+        ss << std::format(",{0}_dB_per_percent,{0}_deg_per_percent", element.Name);
+    }
+    ss << "\n";
+    for (std::size_t pt = 0; pt < result.Frequencies.size(); ++pt) {
+        ss << std::format("{:.8g},{:.8g},{:.8g}", result.Frequencies[pt], result.Output[pt].real(),
+                          result.Output[pt].imag());
+        for (const AcElementSensitivity &element : result.Elements) {
+            // Empty where the output is too small for a relative change to mean anything
+            for (const std::optional<double> &figure :
+                 {element.MagnitudeDecibelsPerPercent[pt], element.PhaseDegreesPerPercent[pt]}) {
+                ss << ",";
+                if (figure) {
+                    // Adding zero turns the negative zero of a part with no effect into "0", not "-0"
+                    ss << std::format("{:.8g}", *figure + 0.0);
+                }
+            }
+        }
+        ss << "\n";
+    }
+    return ss.str();
+}
+
 std::string ExportCsv(const HarmonicBalanceResult &result) {
     std::ostringstream ss;
     constexpr double RAD_TO_DEG = 180.0 / std::numbers::pi;

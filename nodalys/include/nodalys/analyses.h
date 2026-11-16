@@ -142,7 +142,7 @@ struct SensitivityConfig {
 /**
  * @struct  AcSensitivityConfig
  * @brief   Configuration for small-signal AC sensitivity analysis: the output voltage, the source that drives the
- *          circuit and the logarithmic frequency range.
+ *          circuit and the frequency range.
  */
 struct AcSensitivityConfig {
     int OutputPositiveNode = 0;
@@ -151,7 +151,9 @@ struct AcSensitivityConfig {
     std::string InputSource;
     double StartFrequency = 1.0;
     double StopFrequency = 1e6;
+    /// Points per decade or per octave of a logarithmic sweep, or the points in all of a linear one.
     int PointsPerDecade = 10;
+    FrequencySweepType SweepType = FrequencySweepType::DECADE;
 };
 
 /**

@@ -33,6 +33,7 @@ enum class AnalysisKind {
     S_PARAMETERS,      ///< .sp
     POLE_ZERO,         ///< .pz
     SENSITIVITY,       ///< .sens
+    AC_SENSITIVITY,    ///< .sens ... ac
     HARMONIC_BALANCE   ///< .hb
 };
 
@@ -51,6 +52,7 @@ struct ParsedAnalysis {
                  SParameterConfig,       // SParameters (.sp)
                  PoleZeroConfig,         // PoleZero (.pz)
                  SensitivityConfig,      // Sensitivity (.sens)
+                 AcSensitivityConfig,    // AcSensitivity (.sens ... ac)
                  HarmonicBalanceConfig   // HarmonicBalance (.hb)
                  >
         Config;

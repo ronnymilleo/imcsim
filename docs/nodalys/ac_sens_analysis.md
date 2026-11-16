@@ -8,7 +8,8 @@
 - [`nodalys/src/analyses/ac_sens_bias.cpp`](../../nodalys/src/analyses/ac_sens_bias.cpp) (the bias term of the nonlinear devices)
 - [`nodalys/src/mna/mna_system.cpp`](../../nodalys/src/mna/mna_system.cpp) (`MnaSystem::SolveAcTransposeFor`, `MnaSystem::SolveTransposeComplex`)
 - [`app-core/backends/nodalys/nodalys_backend.cpp`](../../app-core/backends/nodalys/nodalys_backend.cpp) (`NodalysBackend::RunACSensitivity`)
-- [`nodalys/tests/ac_sens_analysis_tests.cpp`](../../nodalys/tests/ac_sens_analysis_tests.cpp)
+- [`nodalys/src/parser/netlist_parser.cpp`](../../nodalys/src/parser/netlist_parser.cpp) (`.sens ... ac`), [`nodalys/src/cli/cli.cpp`](../../nodalys/src/cli/cli.cpp) and the exporters of [`nodalys/src/export/`](../../nodalys/src/export/)
+- [`nodalys/tests/ac_sens_analysis_tests.cpp`](../../nodalys/tests/ac_sens_analysis_tests.cpp), [`nodalys/tests/ac_sens_netlist_tests.cpp`](../../nodalys/tests/ac_sens_netlist_tests.cpp)
 
 ---
 
@@ -66,8 +67,35 @@ For an RC low-pass at its corner, with $x = \omega R C = 1$, $\partial \ln H / \
 
 The Sallen-Key example of `imcsim` also checks that the four changes of $\ln H$ for 1 % of $R_1$, $R_2$, $C_1$ and $C_2$ add up to twice $d\ln H / d\ln f$, since scaling every $R$ and $C$ by one factor scales $\omega R C$ by its square.
 
+The netlist parser and the command line check the same: `ac_sens_netlist_tests.cpp` reads a netlist through `ParseNetlist()` and `RunCli()` and compares every number with `ComputeAcSensitivity()` on the same circuit, with the RC corner above as the reference.
+
 ---
 
-## 3. Use in `imcsim`
+## 3. Netlist and Command Line
+
+```
+.sens <out_var> ac dec|oct|lin <np> <fstart> <fstop>
+```
+
+- `<out_var>` is `V(node)` or the differential `V(node1,node2)`, as in the DC `.sens`. The positive node cannot be ground (`V(0,out)` is refused; write `V(out,0)` or swap the nodes and read the sign), and the two nodes must differ.
+- `dec` and `oct` give `<np>` points per decade or per octave, from `<fstart>` to `<fstop>` with the stop included; `lin` gives `<np>` points in all, spaced evenly. `0 < fstart <= fstop` and `<np>` is a whole number of at least 1. The three sweep types are an extension of `AcSensitivityConfig` (`SweepType`, with the decade as default, which is what `imcsim` uses).
+- The ngspice syntax has no input source, so it is the one independent source of the netlist with an AC magnitude (`V1 in 0 DC 0 AC 1`, or a current source). If none or more than one has an AC magnitude the netlist is refused with a message that says so and names the sources found; leave `AC` on one source only. An AC magnitude of 0 does not count, and sources inside a block are not looked at. The magnitude only sets the scale of the output phasor: the figures per 1 % do not depend on it.
+- The directive may stand before or after the sources, and a netlist may carry both this and the DC `.sens`.
+
+On the command line, `--analysis sens` runs every `.sens` of the netlist, the DC and the AC form. There is no separate `acsens` choice: without a `.sens ... ac` line `--analysis sens` runs the DC one, since the AC form needs an input source and a range that no default can stand in for.
+
+The output of `--format`:
+
+| Format | Content |
+| :--- | :--- |
+| `csv` | One row per frequency: `Frequency`, `Output_re`, `Output_im` (the output phasor), then for each element `<name>_dB_per_percent` and `<name>_deg_per_percent`. The cell is empty at a frequency with no figure. |
+| `json` | `analysis` (`ac_sensitivity`), the output nodes, `input_source`, `frequencies`, `output_re`, `output_im`, `warnings` and `elements`: each with `name`, `parameter`, `value`, `derivative_re`, `derivative_im` and the two figures, `null` where there is none. |
+| `raw` | Nutmeg ASCII, `Flags: complex`: the vectors `frequency`, the output (`v(n)` or `v(n1,n2)`, numbers of nodes) and one per element named as the netlist writes it, holding the derivative $\partial V / \partial p$ in volts per unit of the value, as ngspice writes the sensitivity of `.sens ... ac`. |
+
+The raw file differs from ngspice's in that the figures per 1 % are not in it (they follow from the derivative and the output, and are in the CSV and the JSON), and in the order of the vectors (elements by name). A source with a DC value only (`V1` above) appears with a derivative of zero, as it does not move the small-signal output of a linear circuit.
+
+---
+
+## 4. Use in `imcsim`
 
 The Sensitivity analysis has a kind, DC or AC. The AC kind is disabled with the reason as its tooltip when the engine in use is ngspice. [`ac_sensitivity.cpp`](../../app-core/simulation/ac_sensitivity.cpp) turns the figures by element name into those of each part (a potentiometer as the sum of its halves, a block by its element with the largest peak effect), and the Output tab ranks the parts at a chosen frequency, by default the -3 dB point of the response.
