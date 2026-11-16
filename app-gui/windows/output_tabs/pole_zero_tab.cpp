@@ -241,7 +241,8 @@ void PoleZeroTab::DrawTable(const Core::PoleZero &result) {
     if (std::ranges::any_of(rows, &PoleZeroRow::IsRightHalfPlane)) {
         ImGui::TextColored(GetWarningTextColor(), "%s",
                            "A root in the right half-plane means the circuit is unstable at its operating point, or "
-                           "that ngspice's solver got it wrong; compare it with an AC sweep");
+                           "that the solver got it wrong (ngspice's can; Nodalys checks its roots against the AC "
+                           "response and warns); compare it with an AC sweep");
     }
     ImGui::PopTextWrapPos();
 }
