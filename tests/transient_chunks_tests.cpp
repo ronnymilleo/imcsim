@@ -91,9 +91,11 @@ double ValueAt(const std::vector<double> &times, const std::vector<double> &valu
     return values[index - 1] + fraction * (values[index] - values[index - 1]);
 }
 
-/// Circuits that switch when a slow input barely passes a threshold, so the instant of the switching depends on the
-/// step sequence by a hundred microseconds or so; they are compared by what they reach, not point by point.
-constexpr auto THRESHOLD_SENSITIVE_EXAMPLES = std::to_array<std::string_view>({"Schmitt trigger"});
+/// Circuits whose switching instants depend on the step sequence: one that switches when a slow input barely passes
+/// a threshold, by a hundred microseconds or so, and a free-running oscillator, where each edge sets the time of the
+/// next, so a shift of one adds to all that follow. They are compared by what they reach, not point by point.
+constexpr auto THRESHOLD_SENSITIVE_EXAMPLES =
+    std::to_array<std::string_view>({"Schmitt trigger", "Astable multivibrator started by an initial voltage"});
 
 /**
  * @brief   Lowest and highest value of a trace within a window of time around an instant.

@@ -397,6 +397,24 @@ either: it only joins the nodes of every point with the same name, compared with
 has no line for it and the nodes are numbered as if those points were wired together. A net named `0` or `GND` is ground, and one named `VCC` joins every VCC supply, so two supplies of different
 voltages must not share that name.
 
+An **initial voltage** is no element either: it sets the voltage its node starts a transient at, and the netlist has
+one line for it, `.ic V(node)=value`, with no element. Its value is that voltage, in volts and of either sign. Only
+the transient reads it:
+
+- Without a capacitor or inductor that has an initial condition, the transient starts from an operating point, and the
+  node is held at the voltage in that solve, as ngspice does with `.ic` and Nodalys does with a stiff source that it
+  removes afterwards. The rest of the circuit starts at the point that is consistent with the held node, the
+  capacitors charged to it, and the node is released when the transient begins at t = 0. A divider whose middle node is
+  held at 4 V, over two equal resistors, starts its lower node at 2 V.
+- With such a part, the transient runs with `uic` and has no operating point to hold the node in. The voltage then only
+  sets the starting voltage of the capacitors that have no initial condition of their own and sit across the node, as
+  in SPICE (a capacitor to ground starts at the node voltage, one between two nodes at their difference); a node with
+  no capacitor on it has nothing to start from and is solved as usual. Nodalys follows the same rule, so the two
+  engines agree.
+- The operating point, the DC sweep, the AC sweep and the other small-signal analyses leave it out of the circuit.
+- Two parts on one node need the same voltage. A part on ground, on a node nothing is connected to or inside a block is
+  refused with a message. A circuit of only an initial voltage and parts that tie themselves to ground needs no Ground.
+
 ## Controlled sources
 
 | Part | SPICE element | Output | Gain unit |

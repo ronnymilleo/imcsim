@@ -563,10 +563,11 @@ ImU32 SchematicOverlays::GetElementColor(const Schematic &schematic, const std::
     }
     const UIElement &element = *schematic.GetElements()[index];
     const Core::Component &component = element.GetComponent();
-    // Ground, net labels, logic displays and subcircuit pin markers carry no current or power of their own
+    // Ground, net labels, initial voltages, logic displays and subcircuit pin markers carry no current or power of
+    // their own
     const Core::ComponentType type = component.GetType();
-    if (type == Core::ComponentType::GROUND || type == Core::ComponentType::NET_LABEL || Core::IsLogicDisplay(type) ||
-        Core::IsSubcircuitPin(type)) {
+    if (type == Core::ComponentType::GROUND || type == Core::ComponentType::NET_LABEL ||
+        type == Core::ComponentType::INITIAL_VOLTAGE || Core::IsLogicDisplay(type) || Core::IsSubcircuitPin(type)) {
         return GetPalette().Element;
     }
     if (!by_current) {

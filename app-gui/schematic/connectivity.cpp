@@ -297,11 +297,17 @@ const std::vector<GridPoint> &Connectivity::GetJunctions() const {
 Core::Circuit BuildCircuit(const std::vector<std::unique_ptr<UIElement>> &elements, const Connectivity &connectivity) {
     Core::Circuit circuit;
     for (const auto &element : elements) {
-        // Labels join points, subcircuit pins mark ports and logic displays only read their nodes; the simulator sees
-        // none of them in its netlist, and takes the pins set as S-parameter ports apart
+        // Labels join points, subcircuit pins mark ports, initial voltages set the start of their node and logic
+        // displays only read their nodes; the simulator sees none of them in its netlist, and takes the pins set as
+        // S-parameter ports and the initial voltages apart
         const Core::ComponentType type = element->GetComponent().GetType();
         if (Core::IsSubcircuitPin(type)) {
             AddPort(circuit, element->GetComponent(), connectivity.GetNode(element->GetTerminals().front()));
+            continue;
+        }
+        if (type == Core::ComponentType::INITIAL_VOLTAGE) {
+            circuit.AddInitialVoltage({.Node = connectivity.GetNode(element->GetTerminals().front()).value_or(0),
+                                       .Volts = element->GetComponent().GetValue()});
             continue;
         }
         if (type == Core::ComponentType::NET_LABEL || Core::IsLogicDisplay(type)) {
