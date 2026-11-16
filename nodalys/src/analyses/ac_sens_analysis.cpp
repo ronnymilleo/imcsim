@@ -12,6 +12,7 @@
 
 #include "analyses/ac_sens_bias.h"
 #include "analyses/ac_sens_elements.h"
+#include "analyses/frequency_sweep.h"
 #include "devices/devices.h"
 #include <algorithm>
 #include <cmath>
@@ -55,38 +56,6 @@ std::optional<std::string> CheckConfig(const CompiledCircuit &compiled, const Ac
         return "The AC sensitivity analysis has invalid frequency settings; check start, stop and points per decade";
     }
     return std::nullopt;
-}
-
-/// The frequencies of a sweep, from the start to the stop with the stop included.
-std::vector<double> MakeFrequencies(const AcSensitivityConfig &settings) {
-    std::vector<double> frequencies;
-    if (settings.SweepType == FrequencySweepType::LINEAR) {
-        if (settings.PointsPerDecade == 1 || settings.StartFrequency == settings.StopFrequency) {
-            frequencies.push_back(settings.StartFrequency);
-            return frequencies;
-        }
-        const double step =
-            (settings.StopFrequency - settings.StartFrequency) / static_cast<double>(settings.PointsPerDecade - 1);
-        for (int index = 0; index < settings.PointsPerDecade; ++index) {
-            frequencies.push_back(
-                std::min(settings.StartFrequency + static_cast<double>(index) * step, settings.StopFrequency));
-        }
-        return frequencies;
-    }
-    const double base = settings.SweepType == FrequencySweepType::OCTAVE ? 2.0 : 10.0;
-    for (int index = 0;; ++index) {
-        const double frequency =
-            settings.StartFrequency *
-            std::pow(base, static_cast<double>(index) / static_cast<double>(settings.PointsPerDecade));
-        if (frequency > settings.StopFrequency * (1.0 + 1e-9)) {
-            break;
-        }
-        frequencies.push_back(std::min(frequency, settings.StopFrequency));
-        if (frequency >= settings.StopFrequency * (1.0 - 1e-9)) {
-            break;
-        }
-    }
-    return frequencies;
 }
 
 /// The AC magnitude of the input source, or none when it is not an independent source that can drive the analysis.
@@ -255,7 +224,8 @@ std::expected<AcSensitivityResult, std::string> ComputeAcSensitivity(CompiledCir
     result.OutputPositiveNode = settings.OutputPositiveNode;
     result.OutputNegativeNode = settings.OutputNegativeNode;
     result.InputSource = settings.InputSource;
-    result.Frequencies = MakeFrequencies(settings);
+    result.Frequencies = MakeFrequencySweep(settings.SweepType, settings.StartFrequency, settings.StopFrequency,
+                                            settings.PointsPerDecade);
     for (const AcSensitivityElement &element : elements) {
         result.Elements.push_back({.Name = element.Name, .Parameter = element.Parameter, .Value = element.Value});
     }

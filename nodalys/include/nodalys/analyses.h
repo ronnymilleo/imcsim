@@ -65,13 +65,25 @@ struct TransientConfig {
 };
 
 /**
+ * @enum    FrequencySweepType
+ * @brief   Frequency spacing mode for AC, noise, AC sensitivity and S-parameter frequency sweeps.
+ */
+enum class FrequencySweepType {
+    LINEAR,
+    DECADE,
+    OCTAVE
+};
+
+/**
  * @struct  AcSweepConfig
  * @brief   Configuration for small-signal AC frequency sweep (.ac).
  */
 struct AcSweepConfig {
     double StartFrequency = 1.0;
     double StopFrequency = 1e6;
+    /// Points per decade or per octave of a logarithmic sweep, or the points in all of a linear one.
     int PointsPerDecade = 10;
+    FrequencySweepType SweepType = FrequencySweepType::DECADE;
 };
 
 /**
@@ -94,17 +106,9 @@ struct NoiseConfig {
     std::string InputSource;
     double StartFrequency = 1.0;
     double StopFrequency = 1e6;
+    /// Points per decade or per octave of a logarithmic sweep, or the points in all of a linear one.
     int PointsPerDecade = 10;
-};
-
-/**
- * @enum    FrequencySweepType
- * @brief   Frequency spacing mode for AC and S-parameter frequency sweeps.
- */
-enum class FrequencySweepType {
-    LINEAR,
-    DECADE,
-    OCTAVE
+    FrequencySweepType SweepType = FrequencySweepType::DECADE;
 };
 
 /**
