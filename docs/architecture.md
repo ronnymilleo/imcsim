@@ -40,7 +40,7 @@ flowchart TD
     app_core_backends -->|47| app_core_simulation
     app_core_backends -->|2| app_core_spice
     app_core_circuit -->|8| app_core_spice
-    app_core_simulation -->|79| app_core_circuit
+    app_core_simulation -->|80| app_core_circuit
     app_core_simulation -->|3| app_core_spice
 ```
 
