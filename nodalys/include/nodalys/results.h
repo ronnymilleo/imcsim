@@ -351,9 +351,9 @@ struct HarmonicBalanceResult {
 
 [[nodiscard]] double ComputeThd(std::span<const std::complex<double>> phasors);
 
-using SimulationResult =
-    std::variant<OperatingPointResult, TransientResult, DcSweepResult, AcSweepResult, TransferFunctionResult,
-                 NoiseResult, SParameterResult, PoleZeroResult, SensitivityResult, HarmonicBalanceResult>;
+using SimulationResult = std::variant<OperatingPointResult, TransientResult, DcSweepResult, AcSweepResult,
+                                      TransferFunctionResult, NoiseResult, SParameterResult, PoleZeroResult,
+                                      SensitivityResult, AcSensitivityResult, HarmonicBalanceResult>;
 
 } // namespace Nodalys
 

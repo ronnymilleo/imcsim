@@ -303,6 +303,39 @@ std::string ExportRaw(const SensitivityResult &result, std::string_view title) {
     return ss.str();
 }
 
+std::string ExportRaw(const AcSensitivityResult &result, std::string_view title) {
+    std::ostringstream ss;
+    ss << "Title: " << title << "\n";
+    ss << "Date: " << CurrentDateString() << "\n";
+    ss << "Plotname: AC Sensitivity Analysis\n";
+    ss << "Flags: complex\n";
+    ss << "No. Variables: " << 2 + result.Elements.size() << "\n";
+    ss << "No. Points: " << result.Frequencies.size() << "\n";
+    ss << "Variables:\n";
+
+    // The output is named as the user writes it in the directive, v(out) or v(out,ref)
+    const std::string output_name = result.OutputNegativeNode == 0
+                                        ? std::format("v({})", result.OutputPositiveNode)
+                                        : std::format("v({},{})", result.OutputPositiveNode, result.OutputNegativeNode);
+    std::size_t var_idx = 0;
+    ss << "\t" << var_idx++ << "\tfrequency\tfrequency\n";
+    ss << "\t" << var_idx++ << "\t" << output_name << "\tvoltage\n";
+    for (const AcElementSensitivity &element : result.Elements) {
+        ss << "\t" << var_idx++ << "\t" << element.Name << "\tvoltage\n";
+    }
+
+    ss << "Values:\n";
+    for (std::size_t pt = 0; pt < result.Frequencies.size(); ++pt) {
+        ss << pt << "\t" << std::format("{:.15e},{:.15e}\n", result.Frequencies[pt], 0.0);
+        ss << "\t" << std::format("{:.15e},{:.15e}\n", result.Output[pt].real(), result.Output[pt].imag());
+        for (const AcElementSensitivity &element : result.Elements) {
+            ss << "\t"
+               << std::format("{:.15e},{:.15e}\n", element.Derivatives[pt].real(), element.Derivatives[pt].imag());
+        }
+    }
+    return ss.str();
+}
+
 std::string ExportRaw(const HarmonicBalanceResult &result, std::string_view title) {
     std::ostringstream ss;
     const std::string date_str = CurrentDateString();
