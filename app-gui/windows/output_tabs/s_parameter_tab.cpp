@@ -602,6 +602,9 @@ void SParameterTab::DrawSmith(const Core::SParameters &result, const SParameterV
         PlotStabilityCircles(result);
     }
     PlotSmithCurves(result, entries);
+    if (m_AreCirclesShown && IsTwoPort(result)) {
+        ShowCircleFrequency();
+    }
     ShowSmithReading(result, entries);
     ImPlot::EndPlot();
 }
@@ -672,6 +675,17 @@ void SParameterTab::PlotStabilityCircles(const Core::SParameters &result) {
             ImPlot::PlotLine(name, xs.data(), ys.data(), static_cast<int>(xs.size()), spec);
         }
     }
+}
+
+/**
+ * @brief   Writes in the corner of the Smith chart the frequency the stability circles are drawn at and mu there.
+ */
+void SParameterTab::ShowCircleFrequency() {
+    const std::size_t frequency = std::min(m_CircleFrequency, m_Sweep.Frequencies.size() - 1);
+    const std::string text = DescribeCircleFrequency(m_Sweep.Metrics[frequency], m_Sweep.Frequencies[frequency]);
+    const ImVec2 corner = ImPlot::GetPlotPos();
+    ImPlot::GetPlotDrawList()->AddText(ImVec2(corner.x + LABEL_OFFSET, corner.y + LABEL_OFFSET),
+                                       ImGui::GetColorU32(ImGuiCol_Text), text.c_str());
 }
 
 /**
@@ -815,6 +829,7 @@ void SParameterTab::DrawFactorPlot(const float height) {
     limit_spec.LineWeight = HATCH_WEIGHT * 1.5f;
     limit_spec.Flags = ImPlotInfLinesFlags_Horizontal;
     ImPlot::PlotInfLines("1, stable above", &STABILITY_LIMIT, 1, limit_spec);
+    MarkCircleFrequency();
     if (ImPlot::IsPlotHovered()) {
         const std::size_t frequency = FindNearestFrequency(m_Curves.Frequencies, ImPlot::GetPlotMousePos().x);
         std::string text;
@@ -859,6 +874,7 @@ void SParameterTab::DrawGainPlot(const float height) {
         ImPlot::PlotLine(m_Curves.MaximumStableGainLabel.c_str(), m_Curves.Frequencies.data(),
                          m_Curves.MaximumStableGainDecibels.data(), static_cast<int>(count), spec);
     }
+    MarkCircleFrequency();
     if (ImPlot::IsPlotHovered()) {
         const std::size_t frequency = FindNearestFrequency(m_Curves.Frequencies, ImPlot::GetPlotMousePos().x);
         std::string text;
@@ -868,6 +884,33 @@ void SParameterTab::DrawGainPlot(const float height) {
         ImGui::SetTooltip("%s", text.c_str());
     }
     ImPlot::EndPlot();
+}
+
+/**
+ * @brief   Draws a vertical line at the frequency of the stability circles on the plot being built, and lets a click on
+ *          the plot move it to the swept frequency nearest to the pointer.
+ * @details The factor and gain plots share this, so the Smith chart circles follow whichever one is clicked. The click
+ *          moves the circles even while they are hidden, so they are already there when the checkbox is turned on.
+ * @note    Call it between BeginPlot and EndPlot.
+ */
+void SParameterTab::MarkCircleFrequency() {
+    if (m_Curves.Frequencies.empty()) {
+        return;
+    }
+    m_CircleFrequency = std::min(m_CircleFrequency, m_Curves.Frequencies.size() - 1);
+    // A press also starts a pan, so only a release that did not drag counts as a click
+    const ImGuiIO &io = ImGui::GetIO();
+    const bool is_click =
+        ImGui::IsMouseReleased(ImGuiMouseButton_Left) &&
+        io.MouseDragMaxDistanceSqr[ImGuiMouseButton_Left] <= io.MouseDragThreshold * io.MouseDragThreshold;
+    if (ImPlot::IsPlotHovered() && is_click) {
+        m_CircleFrequency = FindNearestFrequency(m_Curves.Frequencies, ImPlot::GetPlotMousePos().x);
+    }
+    const double circle_frequency = m_Curves.Frequencies[m_CircleFrequency];
+    ImPlotSpec spec;
+    spec.LineColor = ToImVec4(SOURCE_CIRCLE_COLOR);
+    spec.LineWeight = HATCH_WEIGHT * 1.5f;
+    ImPlot::PlotInfLines("Circles at", &circle_frequency, 1, spec);
 }
 
 } // namespace GUI

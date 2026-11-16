@@ -172,3 +172,11 @@ TEST_CASE("The metrics of a point read as lines for a tooltip", "[stability_summ
     metrics.IsValid = false;
     CHECK(GUI::DescribeMetrics(metrics, 180e6).size() == 2);
 }
+
+TEST_CASE("The Smith chart labels its circles with their frequency and the mu found there", "[stability_summary]") {
+    GUI::TwoPortMetrics metrics;
+    metrics.Mu = 0.942;
+    CHECK(GUI::DescribeCircleFrequency(metrics, 180e6) == "Circles at 180MHz, mu = 0.942");
+    metrics.IsValid = false;
+    CHECK(GUI::DescribeCircleFrequency(metrics, 180e6) == "Circles at 180MHz, no finite S matrix");
+}
