@@ -39,6 +39,8 @@
 #   Poles and zeros        rlc_low_pass_poles_and_zeros
 #   S-parameters           s_parameters_lc_low_pass; fixtures/s_parameters_one_port (the same filter with its second
 #                          port turned off): Nodalys gives S11, ngspice refuses it, since it needs two ports
+#   Stability              stability_common_emitter (a two-port amplifier): the stability circles on the Smith
+#                          chart, the Stability view and, on Nodalys, the Z quantity
 #   Truth table            logic_truth_table
 #   Harmonic balance       harmonic_balance_rectifier
 #                          Nodalys only: with ngspice the step expects it disabled and refused with its reason
@@ -255,12 +257,30 @@ check_analyses() {
     check_circuit_run poles_and_zeros rlc_low_pass_poles_and_zeros Poles
     check_circuit_run s_parameters s_parameters_lc_low_pass Smith
     check_s_parameters_one_port
+    check_s_parameter_views
     check_circuit_run truth_table logic_truth_table 'combinations;?'
     check_harmonic_balance
     # Logic parts, a random source and a node started at a voltage in a transient, which the engines treat differently
     check_circuit_run transient_logic decade_counter Spectrum
     check_circuit_run transient_noise_source noise_through_rc_low_pass Spectrum
     check_circuit_run transient_initial_voltage astable_multivibrator Spectrum
+}
+
+# The views of a two-port result: the stability circles on the Smith chart, the stability against frequency and, on
+# Nodalys, which gives the matrix, the Z quantity. Each is reached by the word of its control in the Output window
+check_s_parameter_views() {
+    check_circuit_run s_parameters_two_port stability_common_emitter Smith
+    ui_click_text circles "$DOCS_OUTPUT_X" "$COMMAND_BAR_BOTTOM" "$DOCS_SIDE_X" "$DOCS_HEIGHT"
+    sleep "$MEDIUM_PAUSE"
+    check_step s_parameters_stability_circles 'Worst'
+    ui_click_text Stability "$DOCS_OUTPUT_X" "$COMMAND_BAR_BOTTOM" "$DOCS_SIDE_X" "$DOCS_HEIGHT"
+    sleep "$MEDIUM_PAUSE"
+    check_step s_parameters_stability 'unstable'
+    if [[ "$ENGINE" == nodalys ]]; then
+        ui_click_text Z "$DOCS_OUTPUT_X" "$COMMAND_BAR_BOTTOM" "$DOCS_SIDE_X" "$DOCS_HEIGHT"
+        sleep "$MEDIUM_PAUSE"
+        check_step s_parameters_impedance 'Magnitude'
+    fi
 }
 
 # Nodalys measures a single port; ngspice needs two, so the run is refused with the reason

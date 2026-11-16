@@ -520,7 +520,7 @@ std::expected<std::string, std::string> RenderSvg(const ExportFigure &figure, co
             std::format("Width and height must be between {} and {} pixels", MIN_EXPORT_SIZE, MAX_EXPORT_SIZE));
     }
     if (figure.Smith) {
-        if (figure.Smith->Traces.empty()) {
+        if (figure.Smith->Traces.empty() && figure.Smith->Circles.empty()) {
             return std::unexpected("There is nothing to export");
         }
         return RenderSmith(*figure.Smith, style);

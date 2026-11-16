@@ -50,9 +50,11 @@ add_library(imcsim-gui-lib
             plots/plot_figures.cpp
             plots/plot_helpers.cpp
             plots/plot_ticks.cpp
+            plots/port_matrix_view.cpp
             plots/s_parameter_view.cpp
             plots/smith_chart.cpp
             plots/spectrum.cpp
+            plots/stability_view.cpp
             plots/statistics_table.cpp
             plots/touchstone.cpp
             plots/trace_fit_state.cpp
@@ -70,10 +72,13 @@ add_library(imcsim-gui-lib
             results/pole_zero_view.cpp
             results/result_store.cpp
             results/sensitivity_view.cpp
+            results/stability_circles.cpp
+            results/stability_summary.cpp
             results/trace_math.cpp
             results/trace_statistics.cpp
             results/transient_window.cpp
             results/truth_table.cpp
+            results/two_port_metrics.cpp
             schematic/block_definitions.cpp
             schematic/block_nesting.cpp
             schematic/block_session.cpp
