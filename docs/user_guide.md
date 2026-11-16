@@ -883,13 +883,24 @@ had. Touchstone files are S only.
 oscillate when connected to passive terminations. Under the controls, a sentence says it in words, such as
 "Potentially unstable up to 292.9MHz (K < 1); lowest K is 0.0666 at 10MHz. Unconditionally stable elsewhere in the
 sweep." The plots are K and mu against frequency, with a dashed line at 1 above which the circuit is unconditionally
-stable, and the gain bound in decibels, one curve in two kinds. The definitions, from the S matrix and with
-Delta = S11 S22 - S12 S21:
+stable, and the gain bound in decibels, one curve in two kinds.
+
+Why a circuit that runs can still be called unstable: an amplifier passes some of its output back to its input
+(S12 is not 0), so what the input looks like depends on what is connected to the output. For some loads the input
+reflects more than it receives, more power coming back than went in. That is a negative resistance, and a negative
+resistance beside any resonance is an oscillator. "Potentially unstable" means that such a load, or such a source for
+the output, exists among the passive ones; with the 50 Ohm ports of the analysis the circuit may be perfectly quiet.
+The risk comes with a filter, an antenna or a mismatched cable, whose impedance wanders over the chart with frequency.
+"Unconditionally stable" means that no passive termination can do it.
+
+The definitions, from the S matrix and with Delta = S11 S22 - S12 S21:
 
 - **K** (Rollett) = (1 - |S11|^2 - |S22|^2 + |Delta|^2) / (2 |S12 S21|).
-- **mu** (Edwards and Sinsky) = (1 - |S11|^2) / (|S22 - Delta S11*| + |S12 S21|), the distance from the load circle to
-  the edge of the chart; mu above 1 is the one test of unconditional stability (K above 1 with |Delta| below 1 says the
-  same), and mu' is the same from the source side. A lossless filter has mu = 1 exactly and counts as stable.
+- **mu** (Edwards and Sinsky) = (1 - |S11|^2) / (|S22 - Delta S11*| + |S12 S21|), the distance from the center of the
+  chart to the nearest unstable load. Above 1, that load lies outside the chart, where no passive load is, so mu above
+  1 is the one test of unconditional stability (K above 1 with |Delta| below 1 says the same), and the smaller mu is,
+  the closer the trouble comes to a matched load. mu' is the same from the source side. A lossless filter has mu = 1
+  exactly and counts as stable.
 - **MAG**, the maximum available gain, |S21/S12| (K - sqrt(K^2 - 1)), where the circuit is unconditionally stable: the
   most power gain a conjugate match of both ports gives.
 - **MSG**, the maximum stable gain, |S21/S12|, where it is not: the gain bound with the amplifier made stable by
@@ -902,10 +913,20 @@ reflection plane of its own port.
 
 On the Smith chart, with two ports, the **Stability circles** checkbox draws the source and the load stability circle at
 one frequency, set with **Circles at** (it starts where mu is lowest, the worst case, each time a new result arrives;
-**Worst case** goes back there). A circle is the edge between the terminations that are stable and those that make the
-port reflect more than it receives: the hatched side is the unstable one. Read the chart as a map of loads (or sources)
-to avoid: a termination inside the hatching can make the circuit oscillate. A circle that lies wholly outside the chart
-draws nothing, and a note says that the whole chart is stable (or unstable) there for that source or load.
+**Worst case** goes back there). They answer one question: which terminations may be connected without the circuit
+oscillating?
+
+Every point of the chart is an impedance: the center is the reference impedance, the upper half is inductive, the lower
+half capacitive, and the rim holds the purely reactive ones. The **load stability circle** is the edge, among the loads,
+where the reflection seen at the input is exactly 1: loads on one side of it leave the input well behaved, and loads on
+the other make it a negative resistance. The **source stability circle** is the same the other way round, the sources
+that make the output reflect more than it receives. The hatched side is the unstable one, so the chart reads as a map of
+loads (or sources) to avoid: a termination inside the hatching can make the circuit oscillate. Hatching over the upper
+half, for example, says that an inductive, strongly reflecting termination is the dangerous one at that frequency.
+
+A circle that lies wholly outside the chart draws nothing, and a note says that the whole chart is stable (or unstable)
+there for that source or load. The circles show one frequency at a time; K and mu in the Stability view sum up the
+same for every frequency, and the frequency where mu is lowest is where the hatching comes closest to the center.
 
 **Readings** in the Stability view: hover for K, |Delta|, mu, mu' and the gain bound at the nearest frequency.
 
