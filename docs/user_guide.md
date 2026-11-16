@@ -864,14 +864,53 @@ The **S-parameters** tab of the Output window has:
   (1 + |S|) / (1 - |S|), and the return loss, -20 log |S| (positive when the port absorbs power); an open circuit or a
   perfect match reads infinite.
 
-Nodalys also works out the impedance (Z) and admittance (Y) matrices of the ports at every frequency, exact where
-they exist and absent where the circuit has no finite one (Z of two ports joined only by a series element, Y of a port
-shorted to ground), and ngspice does not, as its Z matrix is unusable then. They are not shown in the tab yet: the
-impedance a reflection reads is still computed from S.
+**Quantity: S, Z or Y.** The **Quantity** choice at the top of the tab switches the matrix shown. S is the default.
+Z, the impedance matrix (the voltage at a port per current into another, the other ports left open), and Y, the
+admittance matrix (the current at a port per voltage on another, the others shorted), come from the Nodalys engine
+only; with ngspice the two choices are grayed out and their tooltip says so. They exist where the circuit has a finite
+matrix: Z is absent for two ports joined only by a series element with nothing to ground, Y for ports that are one wire
+with only elements to ground. At a frequency where it is absent the curve has a gap, and the line under the controls
+counts them; when it is absent at every frequency the plot area says why instead of drawing. With Z or Y the entries
+read Z11, Z12... (or Y...), the plot is magnitude and phase only, the magnitude in ohms or siemens on a logarithmic
+axis (an entry that is exactly 0 cannot be drawn there and leaves a gap), and the Smith chart choice is grayed out,
+since a Smith chart plots reflections. Each quantity keeps its own checked entries, and S comes back with the view you
+had. Touchstone files are S only.
 
-**Exports**: Export... saves the plot shown as an SVG image (the Smith chart or the magnitude and phase panels, redrawn
-from the data, in the light or dark theme) or as a CSV table with the frequency and the real and imaginary parts of each
-checked entry. **Save Touchstone...** opens a small popup for the frequency unit and format, then writes the whole
+**Stability of a two-port.** With exactly two ports and S chosen, the **Stability** view tells whether the circuit can
+oscillate when connected to passive terminations. Under the controls, a sentence says it in words, such as
+"Potentially unstable up to 292.9MHz (K < 1); lowest K is 0.0666 at 10MHz. Unconditionally stable elsewhere in the
+sweep." The plots are K and mu against frequency, with a dashed line at 1 above which the circuit is unconditionally
+stable, and the gain bound in decibels, one curve in two kinds. The definitions, from the S matrix and with
+Delta = S11 S22 - S12 S21:
+
+- **K** (Rollett) = (1 - |S11|^2 - |S22|^2 + |Delta|^2) / (2 |S12 S21|).
+- **mu** (Edwards and Sinsky) = (1 - |S11|^2) / (|S22 - Delta S11*| + |S12 S21|), the distance from the load circle to
+  the edge of the chart; mu above 1 is the one test of unconditional stability (K above 1 with |Delta| below 1 says the
+  same), and mu' is the same from the source side. A lossless filter has mu = 1 exactly and counts as stable.
+- **MAG**, the maximum available gain, |S21/S12| (K - sqrt(K^2 - 1)), where the circuit is unconditionally stable: the
+  most power gain a conjugate match of both ports gives.
+- **MSG**, the maximum stable gain, |S21/S12|, where it is not: the gain bound with the amplifier made stable by
+  resistive loading. Both gains are power ratios, so 10 log of them in decibels.
+
+A circuit with S12 = 0 is unilateral: K is infinite, stability needs only |S11| and |S22| below 1, and the gain shown is
+the unilateral power gain, which the sentence says. A circuit with S21 = 0 transmits nothing and has no gain to bound.
+The formulas read power waves, so ports of different reference impedances need no conversion; each circle lives in the
+reflection plane of its own port.
+
+On the Smith chart, with two ports, the **Stability circles** checkbox draws the source and the load stability circle at
+one frequency, set with **Circles at** (it starts where mu is lowest, the worst case, each time a new result arrives;
+**Worst case** goes back there). A circle is the edge between the terminations that are stable and those that make the
+port reflect more than it receives: the hatched side is the unstable one. Read the chart as a map of loads (or sources)
+to avoid: a termination inside the hatching can make the circuit oscillate. A circle that lies wholly outside the chart
+draws nothing, and a note says that the whole chart is stable (or unstable) there for that source or load.
+
+**Readings** in the Stability view: hover for K, |Delta|, mu, mu' and the gain bound at the nearest frequency.
+
+**Exports**: Export... saves the plot shown as an SVG image (the Smith chart, with the stability circles when shown, the
+magnitude and phase panels or the stability panels, redrawn from the data, in the light or dark theme) or as a CSV table
+with the frequency and the real and imaginary parts of each checked entry of S, Z or Y (empty cells where Z or Y is
+absent; the Stability view lists K, mu, mu', |Delta| and the gain instead, and a Smith chart with circles adds a table of
+them below). **Save Touchstone...** opens a small popup for the frequency unit and format, then writes the whole
 matrix as a Touchstone version 1 file, `.sNp` for N ports, in the frequency unit (Hz, kHz, MHz or GHz) and format you
 pick there: RI (real and imaginary parts), MA (magnitude and angle in
 degrees) or DB (decibels and angle in degrees). The default, the one most tools write, is `# GHz S MA R 50`. A two-port
@@ -881,7 +920,9 @@ and the message names them.
 
 The S-parameters example (Examples > Basics) is a T low-pass of two 8 uH inductors and a 3.18 nF capacitor between two
 50 ohm ports: S11 starts at the center of the chart, matched, and sweeps out to the rim as the inductors block the
-signal, while S21 stays near 0 dB up to about 1 MHz.
+signal, while S21 stays near 0 dB up to about 1 MHz. A filter like it is unconditionally stable; the example with an
+active two-port is "Stability of a common-emitter amplifier" (Examples > Transistors): a 2N3904 stage that can oscillate
+below about 290 MHz, for the Stability view and the circles.
 
 ## Truth table
 
@@ -930,7 +971,8 @@ What an engine cannot run is said, not guessed at:
   models, `digital.cm`, are missing).
 - The S-parameters analysis asks for different things of the ports and the sweep: ngspice needs at least two ports and
   three points of a linear sweep, and Nodalys takes one port and two points. The refusal says which, and that the other
-  engine takes it.
+  engine takes it. Only Nodalys gives the impedance (Z) and admittance (Y) matrices in the S-parameters tab; with ngspice
+  those choices are grayed out, and the stability factors and circles, worked out from S, work on both.
 - Other limits depend on what a part holds, so they show when you run, as an error with the reason: on Nodalys, a
   behavioral source whose expression uses something it does not read (`limit()`, the random functions, `hertz`, or
   `time` in the harmonic balance), a MOSFET model that is not level 1, and a block imported from a library, which is

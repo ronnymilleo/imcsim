@@ -57,7 +57,8 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
 - Poles and zeros from an input source to a node, on an s-plane with their frequency, quality factor and damping, and
   marked on the Bode plot of an AC sweep
 - S-parameters of one port (Nodalys) or two or more, set on Block pin markers: a Smith chart with the impedance, VSWR and return loss
-  under the pointer, magnitude and phase plots, and the whole matrix saved as a Touchstone `.sNp` file
+  under the pointer, magnitude and phase plots, the impedance and admittance matrices (Nodalys), the whole matrix saved as
+  a Touchstone `.sNp` file, and for a two-port its stability (K, mu, MAG and MSG, source and load stability circles)
 - A truth table of a digital circuit: every combination of the chosen logic inputs and the 0, 1 or X it gives at the
   measured outputs
 - Two simulation engines, picked in Edit > Preferences > Simulation: ngspice, the default, and Nodalys, a solver written
