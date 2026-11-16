@@ -1,0 +1,148 @@
+{
+  "elements": [
+    {
+      "net": "IN",
+      "port": {
+        "number": 1,
+        "z0": 50
+      },
+      "rotation": 0,
+      "type": "Pin",
+      "x": 4,
+      "y": 4
+    },
+    {
+      "name": "L1",
+      "rotation": 0,
+      "type": "Inductor",
+      "value": 8e-06,
+      "x": 9,
+      "y": 4
+    },
+    {
+      "name": "L2",
+      "rotation": 0,
+      "type": "Inductor",
+      "value": 8e-06,
+      "x": 15,
+      "y": 4
+    },
+    {
+      "net": "OUT",
+      "rotation": 180,
+      "type": "Pin",
+      "x": 20,
+      "y": 4
+    },
+    {
+      "name": "C1",
+      "rotation": 90,
+      "type": "Capacitor",
+      "value": 3.18e-09,
+      "x": 12,
+      "y": 7
+    },
+    {
+      "rotation": 0,
+      "type": "Ground",
+      "x": 12,
+      "y": 11
+    }
+  ],
+  "format": "imcsim-schematic",
+  "measurements": {
+    "currents": [],
+    "voltages": [
+      [
+        4,
+        4
+      ],
+      [
+        17,
+        4
+      ]
+    ]
+  },
+  "simulation": {
+    "ac_sweep": {
+      "points_per_decade": 50,
+      "start": 100,
+      "stop": 100000
+    },
+    "analysis": "s_parameters",
+    "s_parameters": {
+      "linear_points": 101,
+      "logarithmic": true,
+      "points_per_decade": 200,
+      "start": 100000.0,
+      "stop": 10000000.0
+    },
+    "transient": {
+      "step": 2e-06,
+      "stop": 0.002
+    }
+  },
+  "version": 1,
+  "wires": [
+    {
+      "end": [
+        7,
+        4
+      ],
+      "start": [
+        4,
+        4
+      ]
+    },
+    {
+      "end": [
+        12,
+        4
+      ],
+      "start": [
+        11,
+        4
+      ]
+    },
+    {
+      "end": [
+        13,
+        4
+      ],
+      "start": [
+        12,
+        4
+      ]
+    },
+    {
+      "end": [
+        20,
+        4
+      ],
+      "start": [
+        17,
+        4
+      ]
+    },
+    {
+      "end": [
+        12,
+        5
+      ],
+      "start": [
+        12,
+        4
+      ]
+    },
+    {
+      "end": [
+        12,
+        11
+      ],
+      "start": [
+        12,
+        9
+      ]
+    }
+  ]
+}
