@@ -72,6 +72,7 @@ add_executable(imcsim-tests
             plot_helpers_tests.cpp
             plot_tab_tests.cpp
             plot_ticks_tests.cpp
+            port_matrix_view_tests.cpp
             point_window_tests.cpp
             pole_zero_tests.cpp
             pole_zero_view_tests.cpp
@@ -101,6 +102,9 @@ add_executable(imcsim-tests
             spice_inclusions_tests.cpp
             spice_library_tests.cpp
             spice_value_tests.cpp
+            stability_circles_tests.cpp
+            stability_summary_tests.cpp
+            stability_view_tests.cpp
             standard_values_tests.cpp
             statistics_table_tests.cpp
             stepped_circuit_tests.cpp
@@ -113,6 +117,7 @@ add_executable(imcsim-tests
             trace_fit_state_tests.cpp
             trace_math_tests.cpp
             trace_statistics_tests.cpp
+            two_port_metrics_tests.cpp
             transient_chunks_tests.cpp
             transient_window_tests.cpp
             truth_table_tests.cpp

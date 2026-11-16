@@ -118,13 +118,47 @@ struct ExportSmithTrace {
 };
 
 /**
+ * @struct  ExportSmithStroke
+ * @brief   A straight stroke of the hatching of a region of the Smith chart, between two points of the plane.
+ */
+struct ExportSmithStroke {
+    std::complex<double> From;
+    std::complex<double> To;
+};
+
+/**
+ * @struct  ExportSmithCircle
+ * @brief   A stability circle of a two-port on a Smith chart, with the hatching of the side that is unstable.
+ * @details One that does not cross the chart has no boundary and no hatching and is not drawn, but its row stays in the
+ *          CSV table, saying that the whole chart is stable or unstable.
+ */
+struct ExportSmithCircle {
+    /// Names it in the legend and in the CSV table, such as "Source stability circle".
+    std::string Name;
+    ExportColor Color;
+    double FrequencyHertz = 0.0;
+    /// "circle", "line" or "none".
+    std::string Shape;
+    /// The center of a circle, or the point of a line nearest to the origin.
+    std::complex<double> Center;
+    /// Not a number for a line and for none.
+    double Radius = 0.0;
+    /// Which terminations are stable, in words, for the CSV table.
+    std::string StableRegion;
+    /// The part of the boundary inside the chart and a margin: a run of points per piece.
+    std::vector<std::vector<std::complex<double>>> Boundary;
+    std::vector<ExportSmithStroke> Hatch;
+};
+
+/**
  * @struct  ExportSmith
  * @brief   A Smith chart: its curves on the plane of the reflection coefficient, with the grid of normalized
- *          resistance and reactance.
+ *          resistance and reactance, and the stability circles of a two-port when it has them.
  */
 struct ExportSmith {
     std::string Title;
     std::vector<ExportSmithTrace> Traces;
+    std::vector<ExportSmithCircle> Circles;
 };
 
 /**
@@ -139,7 +173,7 @@ struct ExportFigure {
     std::optional<ExportRange> XRange;
     std::vector<ExportPanel> Panels;
     /// A Smith chart in place of the panels: when set, only it is drawn, and its CSV lists the real and imaginary
-    /// parts.
+    /// parts, then the stability circles.
     std::optional<ExportSmith> Smith;
 };
 

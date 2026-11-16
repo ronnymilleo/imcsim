@@ -18,8 +18,11 @@
 #include "results/logic_outputs.h"
 #include "results/logic_trace.h"
 #include "results/monte_carlo_results.h"
+#include "results/stability_circles.h"
+#include "results/stability_summary.h"
 #include "results/trace_math.h"
 #include "results/trace_statistics.h"
+#include "results/two_port_metrics.h"
 #include "schematic/examples.h"
 #include "schematic/schematic.h"
 #include "simulation/analysis_sources.h"
@@ -31,6 +34,7 @@
 #include <array>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 #include <cmath>
 #include <complex>
 #include <format>
@@ -1514,4 +1518,56 @@ TEST_CASE("The harmonic balance example finds a rectified DC level with harmonic
     CHECK(std::abs(phasors[1]) > 0.1);
     CHECK(std::abs(phasors[1]) > std::abs(phasors[3]));
     CHECK(balance.Warnings.empty());
+}
+
+TEST_CASE("The stability example is potentially unstable up to about 290 MHz, with K and MSG as worked by hand",
+          "[examples][s_parameters]") {
+    GUI::Schematic schematic;
+    OpenExample("stability_common_emitter.imcsim", schematic);
+    const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
+    CHECK(settings.Selected == GUI::Analysis::S_PARAMETERS);
+    const Core::SParametersRun run = Core::RunSParameters(schematic.BuildCircuit(), settings.SParameters);
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    REQUIRE(run.Result->GetPortCount() == 2);
+    REQUIRE(run.Result->Frequencies.size() == 91);
+    // 30 points per decade from 1 MHz: index 60 is 100 MHz
+    REQUIRE_THAT(run.Result->Frequencies[60], Catch::Matchers::WithinRel(1e8, 1e-6));
+    const std::complex<double> s11(0.13653, -0.802204);
+    const std::complex<double> s12(0.0608979, 0.053971);
+    const std::complex<double> s21(-2.00554, 2.38591);
+    const std::complex<double> s22(0.790769, -0.251073);
+    CHECK(std::abs(run.Result->Get(60, 1, 1) - s11) < 2e-3);
+    CHECK(std::abs(run.Result->Get(60, 1, 2) - s12) < 2e-3);
+    CHECK(std::abs(run.Result->Get(60, 2, 1) - s21) < 2e-3);
+    CHECK(std::abs(run.Result->Get(60, 2, 2) - s22) < 2e-3);
+    // By hand from that matrix: Delta = S11 S22 - S12 S21, K = (1 - |S11|^2 - |S22|^2 + |Delta|^2) / (2 |S12 S21|),
+    // MSG = 10 log10 |S21 / S12|; the figures were worked out with an independent script
+    const GUI::TwoPortSweep sweep = GUI::ComputeTwoPortSweep(*run.Result);
+    const GUI::TwoPortMetrics &at_100_mhz = sweep.Metrics[60];
+    CHECK_THAT(at_100_mhz.K, Catch::Matchers::WithinAbs(0.33962, 5e-3));
+    CHECK_THAT(at_100_mhz.Mu, Catch::Matchers::WithinAbs(0.56267, 5e-3));
+    CHECK(at_100_mhz.Gain == GUI::GainKind::MSG);
+    REQUIRE(at_100_mhz.GainDecibels);
+    CHECK_THAT(*at_100_mhz.GainDecibels, Catch::Matchers::WithinAbs(15.832, 0.05));
+    // Unstable below 250 MHz, stable above 400 MHz
+    const std::vector<GUI::UnstableRegion> regions = GUI::FindUnstableRegions(sweep);
+    REQUIRE(regions.size() == 1);
+    CHECK(regions.front().First == 0);
+    CHECK(sweep.Frequencies[regions.front().Last] > 250e6);
+    CHECK(sweep.Frequencies[regions.front().Last] < 400e6);
+    CHECK(sweep.Frequencies[GUI::FindLowestMu(sweep).value()] > 30e6);
+    CHECK(sweep.Frequencies[GUI::FindLowestMu(sweep).value()] < 40e6);
+    CHECK_THAT(GUI::DescribeStability(sweep),
+               Catch::Matchers::StartsWith("Potentially unstable up to 292.9MHz (K < 1)"));
+    // Both circles cross the chart at the worst case, and leave it at 1 GHz
+    const std::size_t worst = GUI::FindLowestMu(sweep).value();
+    CHECK(GUI::DescribeCircles(GUI::ComputeStabilityCircles(GUI::ReadTwoPortMatrix(*run.Result, worst)),
+                               sweep.Frequencies[worst])
+              .empty());
+    // At 464 MHz the source circle has left the chart, which is wholly stable there, and the note says so
+    CHECK_THAT(GUI::DescribeCircles(GUI::ComputeStabilityCircles(GUI::ReadTwoPortMatrix(*run.Result, 80)),
+                                    sweep.Frequencies[80]),
+               Catch::Matchers::StartsWith("Source circle: the whole chart is stable at"));
 }

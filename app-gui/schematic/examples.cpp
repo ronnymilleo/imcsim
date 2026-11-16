@@ -226,6 +226,25 @@ constexpr auto EXAMPLES = std::to_array<Example>({
         .FileName = "common_emitter_amplifier.imcsim",
     },
     {
+        .Title = "Stability of a common-emitter amplifier",
+        .Group = "Transistors",
+        .Description =
+            "The biased 2N3904 stage of the common-emitter example with a port at its input and one at its output, the "
+            "Block pin markers IN and OUT set as 50 Ohm ports, and the S-parameters analysis selected from 1 MHz to 1 "
+            "GHz. Run it and open the Stability view of its tab: the sentence above the plots says the amplifier is "
+            "potentially unstable up to about 290 MHz, where K stays below 1 (lowest, 0.07, at 10 MHz), and "
+            "unconditionally stable above. The gain below is one curve in two kinds: the maximum stable gain MSG "
+            "(dashed, 36 dB at 1 MHz) where it can oscillate, and the maximum available gain MAG (solid) where it "
+            "cannot. Then pick the Smith chart, check Stability circles: they open at 34 MHz, where mu is lowest, "
+            "and the hatching marks the source and load terminations that make the amplifier unstable. Move Circles at "
+            "up to about 460 MHz and the source circle leaves the chart, which the note says. Z and Y are in the "
+            "Quantity choice "
+            "with the Nodalys engine. The two 10 MOhm resistors at the ports only give those nodes a DC path, so the "
+            "operating "
+            "point is defined.",
+        .FileName = "stability_common_emitter.imcsim",
+    },
+    {
         .Title = "Bias sensitivity of a common-emitter stage",
         .Group = "Transistors",
         .Description =
