@@ -298,6 +298,25 @@ constexpr auto EXAMPLES = std::to_array<Example>({
         .FileName = "class_ab_amplifier.imcsim",
     },
     {
+        .Title = "Astable multivibrator started by an initial voltage",
+        .Group = "Transistors",
+        .Description =
+            "Two 2N3904 stages, each driving the base of the other through a 10n capacitor, with 47k base "
+            "resistors: an astable multivibrator with a period of about 0.68 ms. Built exactly symmetric, it has a "
+            "balance point where both transistors conduct equally, and it would stay there until rounding noise "
+            "pushed it away, at a moment nobody chooses. The Initial voltage part, IC 5V, on the first collector "
+            "breaks the symmetry on purpose: that node is held at 5 V while the starting point is found, so the "
+            "capacitor between it and the second base starts charged to about 4.3 V, and when the node is released "
+            "the first collector falls, drags the second base below zero and turns the second transistor off. From "
+            "there the circuit oscillates by itself. Run the transient, which lasts 2 ms, about three periods, "
+            "and look at both collectors, which swing between about 0.1 V and the 5 V supply. Its 0.2 us step is "
+            "short on purpose: the edges are steep, and with a longer one ngspice misplaces them. The plot opens "
+            "on the first 2000 points, up to the first edge: drag its scroll bar, or raise Plot points to 10000 "
+            "to see the whole run. Only the transient uses the part: the operating point shows the balance "
+            "point.",
+        .FileName = "astable_multivibrator.imcsim",
+    },
+    {
         .Title = "Op-amp inverting amplifier",
         .Group = "Op-amps",
         .Description = "An ideal op-amp amplifies a 0.5 V, 1 kHz sine by -10, set by its 1k input and 10k feedback "

@@ -43,6 +43,7 @@ add_executable(imcsim-tests
             harmonic_balance_view_tests.cpp
             heat_glow_tests.cpp
             helpers_tests.cpp
+            initial_voltages_tests.cpp
             led_glow_tests.cpp
             live_change_tests.cpp
             live_input_tests.cpp

@@ -35,6 +35,7 @@ add_library(imcsim-core-lib
             circuit/components/fuse.cpp
             circuit/components/ground.cpp
             circuit/components/inductor.cpp
+            circuit/components/initial_voltage.cpp
             circuit/components/logic_input.cpp
             circuit/components/logic_output.cpp
             circuit/components/logic_part.cpp

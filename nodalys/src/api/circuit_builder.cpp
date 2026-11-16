@@ -930,6 +930,13 @@ public:
         for (const auto &[node, voltage] : m_InitialNodeVoltages) {
             m_Compiled.Devices.push_back(std::make_unique<NodeInitialConditionDevice>(node, voltage));
         }
+        if (!m_InitialNodeVoltages.empty()) {
+            for (const auto &device : m_Compiled.Devices) {
+                if (auto *capacitor = dynamic_cast<CapacitorDevice *>(device.get())) {
+                    capacitor->TakeInitialVoltageFrom(m_InitialNodeVoltages);
+                }
+            }
+        }
         m_InitialNodeVoltages.clear();
         BindBehavioralCurrents();
         if (!m_Errors.empty()) {
@@ -1340,6 +1347,9 @@ void CircuitBuilder::AddDFlipFlop(std::string name, const NodeId q, const NodeId
  * @brief   Sets the initial voltage of a node at $t = 0$ in a transient analysis (SPICE `.ic`).
  * @param[in] node     Node to clamp at the start of the transient; ground (0) is ignored.
  * @param[in] voltage  Initial voltage in volts.
+ * @note    The node is held at the voltage while the operating point that starts the transient is found, and then
+ *          released. A transient that starts from initial conditions (`uic`) has no operating point: there the
+ *          capacitors with no `IC` of their own that touch the node start at its voltage, as in SPICE.
  */
 void CircuitBuilder::SetInitialVoltage(const NodeId node, const double voltage) {
     m_Impl->SetInitialVoltage(node, voltage);

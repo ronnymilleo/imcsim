@@ -36,6 +36,7 @@
 #include <cstddef>
 #include <format>
 #include <iterator>
+#include <map>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -194,6 +195,22 @@ std::string FormatReactivePart(const Component &component, const std::vector<int
         line += std::format(" IC={}", FormatSpiceValue(*initial));
     }
     return line + "\n";
+}
+
+/**
+ * @brief   One ".ic" line per node with an initial voltage; a node two markers set to the same voltage is written once,
+ *          and CheckCircuit() refuses two different ones.
+ */
+std::string FormatInitialVoltages(const Circuit &circuit) {
+    std::map<int, double> volts_by_node;
+    for (const CircuitInitialVoltage &initial_voltage : circuit.GetInitialVoltages()) {
+        volts_by_node.try_emplace(initial_voltage.Node, initial_voltage.Volts);
+    }
+    std::string text;
+    for (const auto &[node, volts] : volts_by_node) {
+        text += std::format(".ic V({})={}\n", node, FormatSpiceValue(volts));
+    }
+    return text;
 }
 
 /**
@@ -401,12 +418,19 @@ std::string FormatPart(const Circuit &circuit, const Component &component, const
         return FormatTransformer(static_cast<const Transformer &>(component), nodes, extras);
     case ComponentType::GROUND:
     case ComponentType::NET_LABEL:
+    case ComponentType::INITIAL_VOLTAGE:
     case ComponentType::PIN:
     case ComponentType::LOGIC_OUTPUT:
     case ComponentType::SEVEN_SEGMENT:
     default:
         return {};
     }
+}
+
+/// Whether a part only marks or reads its node, so the netlist has no element for it.
+bool WritesNoElement(const ComponentType type) {
+    return type == ComponentType::GROUND || type == ComponentType::NET_LABEL ||
+           type == ComponentType::INITIAL_VOLTAGE || IsLogicDisplay(type) || IsSubcircuitPin(type);
 }
 
 } // namespace
@@ -428,9 +452,11 @@ std::string FormatPart(const Circuit &circuit, const Component &component, const
  *          starting value and its shape, so the same netlist works for .op, .ac and .tran. A clock writes a pulse whose
  *          rise and fall times are a fixed share of its period, and a logic input a DC level, both from their terminal
  *          to ground. A capacitor or inductor with an initial condition writes it as IC=, which only a transient with
- *          uic uses. Probes and the gain stage of each ideal op-amp use nodes numbered after GetNodeCount(), so the
- *          circuit nodes keep their numbers. Op-amp macromodels are subcircuits, written after the models. A fuse is an
- *          instance of a subcircuit written once with the models, and a circuit with a fuse, in a block or not, writes
+ *          uic uses. The initial voltage of a node is one ".ic V(node)=value" line, which ngspice holds the node at
+ * while it finds the operating point a transient starts from, and which every other analysis ignores. Probes and the
+ * gain stage of each ideal op-amp use nodes numbered after GetNodeCount(), so the circuit nodes keep their numbers.
+ * Op-amp macromodels are subcircuits, written after the models. A fuse is an instance of a subcircuit written once with
+ * the models, and a circuit with a fuse, in a block or not, writes
  *          ".options method=gear" once.
  */
 std::string WriteSpiceNetlist(const Circuit &circuit, const std::string_view analysis, const bool add_current_probes) {
@@ -451,6 +477,7 @@ std::string WriteSpiceNetlist(const Circuit &circuit, const std::string_view ana
     if (circuit.HasFuse()) {
         netlist += FUSE_INTEGRATION_OPTION;
     }
+    netlist += FormatInitialVoltages(circuit);
     netlist += FormatLibraryModels(circuit.GetLibraryModels());
     for (const SubcircuitDefinition *definition : OrderByUse(circuit.GetSubcircuits())) {
         netlist += FormatSubcircuit(*definition);
@@ -468,13 +495,13 @@ std::string WriteSpiceNetlist(const Circuit &circuit, const std::string_view ana
  * @return  The component name for a part that is one element, such as "R1" or "Q1"; the elements of a part written
  *          as several, such as "R-RV1a" and "R-RV1b" for a potentiometer or "X-U1" for an op-amp macromodel, whose
  *          own elements ngspice names after it ("q.x-u1.q1"), "X-FU1" for a fuse subcircuit, and the model, bridges and
- * resistors of a logic part; nothing for ground, net labels, logic displays and subcircuit pin markers.
+ * resistors of a logic part; nothing for ground, net labels, initial voltages, logic displays and subcircuit pin
+ * markers.
  */
 std::vector<std::string> GetElementNames(const Component &component) {
     const std::string &name = component.GetName();
     const ComponentType type = component.GetType();
-    if (type == ComponentType::GROUND || type == ComponentType::NET_LABEL || IsLogicDisplay(type) ||
-        IsSubcircuitPin(type)) {
+    if (WritesNoElement(type)) {
         return {};
     }
     if (IsLogicGate(type) || IsFlipFlop(type)) {

@@ -19,6 +19,7 @@
 #include <cstdint>
 #include <functional>
 #include <limits>
+#include <map>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -225,6 +226,9 @@ public:
     int GetNodeA() const { return m_NodeA; }
     int GetNodeB() const { return m_NodeB; }
     double GetCapacitance() const { return m_Capacitance; }
+
+    /// A capacitor with no IC= of its own starts at the difference of the initial voltages of its nodes, as in SPICE.
+    void TakeInitialVoltageFrom(const std::map<int, double> &node_voltages);
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     void StampAc(MnaSystem &reactive, const std::vector<double> &x_dc) const override;
@@ -582,9 +586,13 @@ private:
 
 /**
  * @class   NodeInitialConditionDevice
- * @brief   Clamps a node to a fixed initial voltage at the start of a transient (SPICE `.ic`), then disconnects.
- * @details Stamps a stiff Norton companion to ground only while `IsTransientStart` is true, leaving operating point
- *          and small-signal analyses unaffected and letting the node evolve freely for $t > 0$.
+ * @brief   Clamps a node to a fixed initial voltage while the operating point that starts a transient is found (SPICE
+ *          `.ic`), then disconnects.
+ * @details Stamps a stiff Norton companion to ground only in that solve, so the rest of the circuit starts from the
+ *          point that is consistent with the node, and the node evolves freely for $t > 0$. A transient that starts
+ *          from initial conditions (`uic`) has no operating point: there the voltage reaches the circuit only through
+ *          the capacitors on the node, which `CapacitorDevice::TakeInitialVoltageFrom()` sets up, as in SPICE.
+ *          Operating point and small-signal analyses are unaffected.
  */
 class NodeInitialConditionDevice : public Device {
 public:

@@ -150,7 +150,7 @@
 | **Fourier / Spectrum Analysis** | ✅ **Ready** | High-resolution FFT post-processed over `ComputeTransient` waveforms. |
 | **Live Simulation Mode** | ✅ **Ready** | Live transient paced against the clock (`simulation/live_pace.h`, shared with ngspice), paused and resumed, with changes applied between chunks. |
 | **Temperature Sweep ($T$)** | ✅ **Ready** | `Circuit::SetTemperature()` applies the SPICE temperature laws of the diode, BJT and MOSFET relative to the nominal $T_{\text{nom}} = 27\,^\circ\text{C}$, and `temper` in an expression reads it. |
-| **Initial Conditions (`.ic`, `.nodeset`)** | 🟡 **Partial** | Element-level `uic` on capacitors ($V_0$) and inductors ($I_0$) supported; arbitrary node `.ic` pending. |
+| **Initial Conditions (`.ic`, `.nodeset`)** | 🟡 **Partial** | Element-level `uic` on capacitors ($V_0$) and inductors ($I_0$) and node `.ic` (held in the operating point, or the start of the capacitors on the node with `uic`; see [`transient_analysis.md`](./transient_analysis.md)) supported; `.nodeset` pending. |
 | **Gear-2 / BDF-2 Integration** | 🟡 **Partial** | 3rd divided-difference LTE step control with Trapezoidal/Euler supported; Gear-2 for stiff switching circuits pending. |
 | **Vendor SPICE `.subckt` Parsing** | ✅ **Ready** | `AddSubcircuitText()` reads a subcircuit kept as text with its parameters, `{expressions}`, `.model` cards and nested subcircuits; what it cannot simulate is refused with the line ([`subcircuit_text.md`](./subcircuit_text.md)). |
 
@@ -215,7 +215,7 @@ starts once the one before it is done.
 | **Temperature** | The SPICE temperature laws of the diode, BJT and MOSFET (`IS`, `VJ`, `EG`, `BF`...), so a stepped temperature runs. | Done |
 | **Noise and Random Sources in a Transient** | White, $1/f$ and telegraph noise, and the random distributions, drawn from a seeded generator written out in `random_draws.cpp`, so a seed repeats on every platform. | Done |
 | **SPICE-Text Subcircuits** | Vendor `.subckt` models kept as SPICE text, such as the op-amp of the precision rectifier example. | Done ([`subcircuit_text.md`](./subcircuit_text.md)) |
-| **Node Initial Conditions** (`.ic`, `.nodeset`) | Starting a transient or guiding an operating point from node voltages, not only from parts. | Parts only (`uic`) |
+| **Node Initial Conditions** (`.ic`, `.nodeset`) | Starting a transient or guiding an operating point from node voltages, not only from parts. | `.ic` done ([`transient_analysis.md`](./transient_analysis.md)); `.nodeset` pending |
 
 **Done when** every example runs every analysis it offers on `Nodalys` and matches `ngspice` in the parity tests, and
 the transient and AC benchmarks are no slower than `ngspice`.

@@ -32,6 +32,19 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   as a warning. Capacitors and inductors left empty then start at zero, not at their operating point values, so set
   every part that should start charged. The operating point, the AC sweep and the DC sweep ignore the initial
   conditions.
+- **Initial voltage of a node**: the small square on a lead, in the same button as net labels and VCC (search "initial"),
+  placed on a wire or a terminal, sets the voltage that node starts a transient at, and reads `IC 2.5V` beside it, the
+  voltage being the part's Value. Use it when a circuit has no source to start it, such as an RC network that should
+  discharge from a chosen voltage, or when it has a balance point that it would never leave by itself, such as an
+  astable multivibrator or a ring oscillator (see the astable multivibrator example). Without initial conditions of
+  capacitors or inductors, the node is held at its voltage while the starting point of the transient is found, so every
+  other node starts where that is consistent with it (a node of a divider held at 4 V pulls the rest with it), and then
+  the node is released and the circuit evolves on its own. With the Initial field of a capacitor or inductor in use,
+  the transient has no operating point (`uic`) and a node voltage only reaches the capacitors across that node, which
+  start at it; a node with no capacitor on it does not start anywhere in particular. Both engines mean the same. Two
+  parts on one node must agree, ground cannot take one, a node needs a part connected to it, and a part inside a block is
+  refused: put it outside, on the node of a pin. Only the transient reads it; the operating point, the AC and DC
+  sweeps and the other small-signal analyses ignore it, so it never changes their results.
 - **Switches**: a switch and a push button have a Closed (or Pressed) box in their properties, and the symbol and a
   label under it show the state. Both start open. Outside a live run, the state holds for the whole simulation. During
   a live run, click a switch to flip it or hold a push button to press it (see Live runs).
