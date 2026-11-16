@@ -423,6 +423,46 @@ the transient reads it:
   instance. A part on a pin of the block sets the outer node that instance connects the pin to, so it must agree with a
   part on that net outside, and is refused when the instance connects the pin to ground.
 
+A **nodeset** is no element either, and writes one line, `.nodeset V(node)=value`. Its value is a voltage, in volts and of
+either sign, and it is a starting guess and not a held value, unlike an initial voltage:
+
+- Every solve of an operating point starts with the node pulled to the voltage by a stiff conductance, and then lets it
+  go and converges again from the point it found, as SPICE does. A circuit with one operating point ends there
+  whatever the guess; a circuit with several ends in the one nearest it. ngspice does this natively, and Nodalys does
+  it in `SolveNewton`: a first pass with the `NodesetDevice` stamped, a second without it, and a plain solve if the
+  first finds nothing.
+- Every analysis that starts from an operating point reads it: the operating point, the DC sweep (for its first point;
+  the next points start from the one before, so a sweep through a hysteresis loop keeps its branch), the AC sweep, the
+  transfer function, the noise, sensitivity, pole-zero and S-parameter analyses, and the transient that starts from an
+  operating point. A transient with `uic` has no operating point to guess, so it ignores it. The harmonic balance
+  solves its own periodic steady state and ignores it.
+- It adds nothing to the circuit once released, so it never changes the result of a circuit that has one operating
+  point, and a nodeset and an initial voltage on one node may differ.
+- The checks are those of the initial voltage: two different voltages on one node, ground and a node no part touches
+  are refused with a message, and a part in a block body acts on the node of each instance (`.nodeset V(X1.X2.5)=value`
+  at the top of the netlist, since ngspice does not read it inside a `.subckt`).
+
+## Solver options
+
+The tolerances, the integration method and the nominal temperature of a run are options of the schematic, in the Solver
+section of the analysis settings. Both engines read them:
+
+| Option | ngspice | Nodalys | Default |
+|---|---|---|---|
+| Relative tolerance | `.options reltol=` | `ConvergenceOptions::RelTol` | 1e-3 |
+| Current tolerance | `.options abstol=` | `ConvergenceOptions::CurrentAbsTol` | 1e-12 A |
+| Voltage tolerance | `.options vntol=` | `ConvergenceOptions::VoltageAbsTol` | 1e-6 V |
+| Integration method | `.options method=trap\|gear` | `TransientConfig::Method` (trapezoidal or Gear-2) | trapezoidal |
+| Nominal temperature | `.options tnom=` | the nominal temperature of `Circuit::SetTemperature()` | 27 C |
+
+The netlist writes one `.options` line with the options that are not the default, so a circuit that leaves them alone has
+no line. A circuit with a fuse that leaves the method to the program writes `.options method=gear` on a line of its own,
+once (a fuse in a block too), and an explicit method replaces it, so the method is never written twice; Nodalys follows
+the same rule. The ranges are checked before a run: reltol 1e-9 to 0.1, abstol 1e-18 to 1e-6 A, vntol 1e-12 to
+1e-2 V, tnom -200 to 500 C. The nominal temperature is where the parameters of the diode, BJT and MOSFET models are
+given; the run itself is at 27 C unless the temperature is stepped, so a model that says it was extracted at 77 C and
+is simulated at 27 C has a lower saturation current than its parameters say.
+
 ## Controlled sources
 
 | Part | SPICE element | Output | Gain unit |

@@ -112,6 +112,16 @@ std::optional<ComponentPower> FindPower(const std::vector<ComponentPower> &power
     return found != powers.end() ? std::optional(*found) : std::nullopt;
 }
 
+/**
+ * @brief   Whether a part has a current or power of its own to color it by: ground, net labels, initial voltages,
+ *          nodesets, logic displays and subcircuit pin markers have none.
+ */
+bool CarriesHeat(const Core::ComponentType type) {
+    return type != Core::ComponentType::GROUND && type != Core::ComponentType::NET_LABEL &&
+           type != Core::ComponentType::INITIAL_VOLTAGE && type != Core::ComponentType::NODESET &&
+           !Core::IsLogicDisplay(type) && !Core::IsSubcircuitPin(type);
+}
+
 } // namespace
 
 /**
@@ -564,11 +574,7 @@ ImU32 SchematicOverlays::GetElementColor(const Schematic &schematic, const std::
     }
     const UIElement &element = *schematic.GetElements()[index];
     const Core::Component &component = element.GetComponent();
-    // Ground, net labels, initial voltages, logic displays and subcircuit pin markers carry no current or power of
-    // their own
-    const Core::ComponentType type = component.GetType();
-    if (type == Core::ComponentType::GROUND || type == Core::ComponentType::NET_LABEL ||
-        type == Core::ComponentType::INITIAL_VOLTAGE || Core::IsLogicDisplay(type) || Core::IsSubcircuitPin(type)) {
+    if (!CarriesHeat(component.GetType())) {
         return GetPalette().Element;
     }
     if (!by_current) {

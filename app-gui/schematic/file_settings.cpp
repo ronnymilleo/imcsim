@@ -8,8 +8,10 @@
 #include "nlohmann/json.hpp"
 #include "schematic/file_json.h"
 #include "simulation/check_harmonic_balance.h"
+#include "simulation/check_solver_options.h"
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <cmath>
 #include <format>
 #include <limits>
@@ -81,6 +83,41 @@ std::optional<Core::ToleranceDistribution> ParseDistributionName(const std::stri
         return Core::ToleranceDistribution::UNIFORM;
     }
     return std::nullopt;
+}
+
+constexpr auto SOLVER_KEYS = std::to_array<ParameterKey<Core::SolverOptions>>({
+    {"reltol", &Core::SolverOptions::RelativeTolerance},
+    {"abstol", &Core::SolverOptions::CurrentToleranceAmperes},
+    {"vntol", &Core::SolverOptions::VoltageToleranceVolts},
+    {"tnom", &Core::SolverOptions::NominalTemperatureCelsius},
+});
+
+const char *ToFileName(const Core::IntegrationMethod method) {
+    switch (method) {
+    case Core::IntegrationMethod::TRAPEZOIDAL:
+        return "trapezoidal";
+    case Core::IntegrationMethod::GEAR:
+        return "gear";
+    case Core::IntegrationMethod::DEFAULT:
+    default:
+        return "default";
+    }
+}
+
+std::optional<Core::IntegrationMethod> ParseMethodName(const std::string_view name) {
+    for (const Core::IntegrationMethod method :
+         {Core::IntegrationMethod::DEFAULT, Core::IntegrationMethod::TRAPEZOIDAL, Core::IntegrationMethod::GEAR}) {
+        if (name == ToFileName(method)) {
+            return method;
+        }
+    }
+    return std::nullopt;
+}
+
+nlohmann::json WriteSolverOptions(const Core::SolverOptions &options) {
+    nlohmann::json object = {{"method", ToFileName(options.Method)}};
+    WriteParameters(SOLVER_KEYS, options, object);
+    return object;
 }
 
 nlohmann::json WriteHarmonicBalanceSettings(const Core::HarmonicBalanceSettings &settings) {
@@ -421,6 +458,27 @@ std::expected<void, std::string> ReadMonteCarloSettings(const nlohmann::json &ob
     return {};
 }
 
+std::expected<void, std::string> ReadSolverSettings(const nlohmann::json &object, SimulationSettings &settings) {
+    Core::SolverOptions options = settings.Solver;
+    if (const auto read = ReadParameters(SOLVER_KEYS, object, options); !read) {
+        return read;
+    }
+    if (object.contains("method")) {
+        const std::optional<std::string> name = ReadString(object, "method");
+        const std::optional<Core::IntegrationMethod> method = name ? ParseMethodName(*name) : std::nullopt;
+        if (!method) {
+            return std::unexpected("have an unknown integration method");
+        }
+        options.Method = *method;
+    }
+    if (std::optional<std::string> error = Core::CheckSolverOptions(options)) {
+        error->front() = static_cast<char>(std::tolower(static_cast<unsigned char>(error->front())));
+        return std::unexpected(std::format("are out of range ({})", *error));
+    }
+    settings.Solver = options;
+    return {};
+}
+
 /**
  * @struct  AnalysisReader
  * @brief   JSON key of the settings of one analysis, its name in warnings and the function that reads them.
@@ -444,6 +502,7 @@ constexpr auto ANALYSIS_READERS = std::to_array<AnalysisReader>({
     {"harmonic_balance", "harmonic balance", &ReadHarmonicBalanceSettings},
     {"parameter_step", "parameter step", &ReadParameterStepSettings},
     {"monte_carlo", "Monte Carlo", &ReadMonteCarloSettings},
+    {"solver", "solver", &ReadSolverSettings},
 });
 
 } // namespace
@@ -514,6 +573,7 @@ nlohmann::json WriteSettings(const SimulationSettings &settings) {
         {"harmonic_balance", WriteHarmonicBalanceSettings(settings.HarmonicBalance)},
         {"parameter_step", parameter_step},
         {"monte_carlo", monte_carlo_object},
+        {"solver", WriteSolverOptions(settings.Solver)},
     };
 }
 

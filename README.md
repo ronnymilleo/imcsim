@@ -95,7 +95,9 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   are no rise or fall times to set) and a Logic input that drives a net high or low, and simulated with the digital
   code models of ngspice behind analog bridges, so their outputs are voltages that plot and probe like any other
 - Initial voltage markers that set the voltage a node starts a transient at, for circuits that need a push to start,
-  the same on ngspice and Nodalys
+  and nodesets that guess where the operating point of a bistable circuit starts, the same on ngspice and Nodalys
+- Solver options saved with the schematic (tolerances, integration method, nominal temperature), honoured by both
+  engines
 - Logic outputs and 7-segment displays that show the levels of their nets on the schematic, lit by the Logic Lights
   effect, and eight ready logic blocks built from the gates: a 4-bit counter and shift register, a multiplexer, a
   demultiplexer, a 2-to-4 decoder, a 4-bit adder and comparator, and a BCD to 7-segment decoder

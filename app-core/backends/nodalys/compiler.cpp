@@ -211,9 +211,7 @@ public:
         for (const auto &port : m_Circuit.GetPorts()) {
             m_Builder->AddPort(port.Number, port.Node, port.ReferenceOhms);
         }
-        for (const CircuitInitialVoltage &initial_voltage : m_Circuit.GetInitialVoltages()) {
-            m_Builder->SetInitialVoltage(initial_voltage.Node, initial_voltage.Volts);
-        }
+        AddNodeVoltages(m_Circuit, top_node_map);
 
         return m_Builder->Build();
     }
@@ -221,6 +219,17 @@ public:
     std::vector<std::string> TakeWarnings() { return std::move(m_Warnings); }
 
 private:
+    /// Hands the engine the initial voltages and the nodesets of a circuit, at the nodes its node map gives.
+    void AddNodeVoltages(const Circuit &circuit, const std::vector<int> &node_map) {
+        for (const CircuitNodeVoltage &initial_voltage : circuit.GetInitialVoltages()) {
+            m_Builder->SetInitialVoltage(node_map[static_cast<std::size_t>(initial_voltage.Node)],
+                                         initial_voltage.Volts);
+        }
+        for (const CircuitNodeVoltage &nodeset : circuit.GetNodesets()) {
+            m_Builder->SetNodeset(node_map[static_cast<std::size_t>(nodeset.Node)], nodeset.Volts);
+        }
+    }
+
     const Circuit &m_Circuit;
     std::unique_ptr<Nodalys::CircuitBuilder> m_Builder;
     std::vector<std::string> m_Warnings;
@@ -293,6 +302,7 @@ private:
         case ComponentType::GROUND:
         case ComponentType::NET_LABEL:
         case ComponentType::INITIAL_VOLTAGE:
+        case ComponentType::NODESET:
         case ComponentType::PIN:
             return {};
 
@@ -461,11 +471,8 @@ private:
                     body_map[static_cast<std::size_t>(body_node)] = m_Builder->AddNode();
                 }
             }
-            // A marker in the body starts this instance's own node, or the outer node when it sits on a pin
-            for (const CircuitInitialVoltage &initial_voltage : definition->Body.GetInitialVoltages()) {
-                m_Builder->SetInitialVoltage(body_map[static_cast<std::size_t>(initial_voltage.Node)],
-                                             initial_voltage.Volts);
-            }
+            // A marker in the body acts on this instance's own node, or on the outer node when it sits on a pin
+            AddNodeVoltages(definition->Body, body_map);
             return AddCircuit(definition->Body, body_map, InstanceParameters(instance, *definition), sub_prefix);
         }
 

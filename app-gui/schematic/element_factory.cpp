@@ -22,6 +22,7 @@
 #include "ui_elements/ui_logic_part.h"
 #include "ui_elements/ui_mosfet.h"
 #include "ui_elements/ui_net_label.h"
+#include "ui_elements/ui_nodeset.h"
 #include "ui_elements/ui_op_amp.h"
 #include "ui_elements/ui_potentiometer.h"
 #include "ui_elements/ui_resistor.h"
@@ -74,6 +75,7 @@ constexpr auto PARTS = std::to_array<PartInfo>({
     {Core::ComponentType::OP_AMP, "Op-amp"},
     {Core::ComponentType::NET_LABEL, "Net label"},
     {Core::ComponentType::INITIAL_VOLTAGE, "Initial voltage"},
+    {Core::ComponentType::NODESET, "Nodeset"},
     {Core::ComponentType::PIN, "Block pin"},
     {Core::ComponentType::POTENTIOMETER, "Potentiometer"},
     {Core::ComponentType::SWITCH, "Switch"},
@@ -152,6 +154,8 @@ std::unique_ptr<UIElement> CreateElement(const Core::ComponentType type, const G
         return std::make_unique<UINetLabel>(position, rotation);
     case Core::ComponentType::INITIAL_VOLTAGE:
         return std::make_unique<UIInitialVoltage>(position, rotation);
+    case Core::ComponentType::NODESET:
+        return std::make_unique<UINodeset>(position, rotation);
     case Core::ComponentType::PIN:
         return std::make_unique<UISubcircuitPin>(position, rotation);
     case Core::ComponentType::POTENTIOMETER:

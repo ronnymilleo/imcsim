@@ -30,6 +30,9 @@ struct NewtonOutcome {
 
 /**
  * @brief   Finds the DC solution of a compiled circuit with Newton-Raphson.
+ * @details A solve that finds an operating point and has nodesets runs twice, as SPICE does: first with every nodeset
+ *          pulling its node to its voltage, then released, from the point the first pass found. If the pulled pass
+ * finds nothing the solve goes on without the nodesets.
  * @param[in,out] sys      The compiled system; devices stamp into it.
  * @param[in,out] devices  The device list of the circuit; holds and limit states.
  * @param[in,out] x        Initial guess in, converged solution out.

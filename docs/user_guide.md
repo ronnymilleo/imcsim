@@ -46,6 +46,17 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   body starts that node in every instance of the block; on a pin of the block it starts the net each instance connects
   the pin to, and must agree with a part on that net outside. Only the transient reads it; the operating point, the AC and DC
   sweeps and the other small-signal analyses ignore it, so it never changes their results.
+- **Nodeset**: the small diamond on a lead beside the initial voltage in the same button (search "nodeset"), placed on a
+  wire or a terminal, reads `NS 2.5V` beside it, the voltage being the part's Value. It is a starting guess for the
+  operating point and not a held voltage: the solver first finds the point with the node pulled to the guess, then lets
+  go and converges again from there. A circuit with one operating point ends where it always does, whatever the guess;
+  a circuit with several, such as a latch, a flip-flop made of transistors or a Schmitt trigger, ends in the stable
+  state nearest the guess, so a nodeset on each of two cross-coupled nodes picks which transistor conducts. Every
+  analysis that starts from an operating point reads it, the transient included (when it starts from one, that is,
+  without the Initial field of a capacitor or inductor in use, which has none to guess), and a DC sweep reads it for its
+  first point only, the others continuing from the point before. The harmonic balance leaves it out. The same rules as
+  the initial voltage apply: two on one node must agree, ground cannot take one, a node needs a part connected to it,
+  and one inside a block acts on the node of each instance. Both engines mean the same.
 - **Switches**: a switch and a push button have a Closed (or Pressed) box in their properties, and the symbol and a
   label under it show the state. Both start open. Outside a live run, the state holds for the whole simulation. During
   a live run, click a switch to flip it or hold a push button to press it (see Live runs).
@@ -1066,6 +1077,31 @@ A run keeps the engine it started on, a paused live run too. If you change the e
 change takes effect once no run is using it, that is, once the run ends, or its paused live run is ended or
 discarded.
 Results already in the Output window stay as they are until you run again.
+
+## Solver options
+
+Every analysis shares a few numerical options, at the end of the analysis settings, in the **Solver** section (closed
+until opened, since the defaults suit most circuits). They are saved with the schematic and honoured by both engines:
+
+- **Rel. tolerance** (`reltol`, default 1m, 1n to 0.1): how close two iterations of the solver must be, relative to the
+  value, and how fast a transient may change its step. A smaller value gives more exact results, and a transient on
+  ngspice more points; a larger one is faster and less exact.
+- **Current tolerance** (`abstol`, default 1p, 1a to 1u) and **Voltage tolerance** (`vntol`, default 1u, 1p to 10m):
+  the smallest current and voltage that count next to the relative tolerance. They matter for circuits with tiny
+  signals, where the default can be coarse.
+- **Integration** (`method`): how a transient steps capacitors and inductors in time. Default keeps what imcsim always
+  did: the trapezoidal rule, or Gear when the circuit has a fuse, whose cut inductor makes the trapezoidal rule ring.
+  Trapezoidal and Gear fix it for every circuit; picking Trapezoidal on a circuit with a fuse is allowed, and may ring.
+  Gear damps the ringing that the trapezoidal rule leaves after a sudden change, at a little more error.
+- **Nominal temp.** (`tnom`, default 27 C, -200 to 500 C): the temperature the model parameters of diodes and
+  transistors are given at. A run is at 27 C unless you step the temperature, so a model given at another temperature
+  behaves as that model scaled from there: a diode of a datasheet measured at 77 C drops more at 27 C. It does not
+  change the temperature of the run.
+
+A value outside its range is not applied while you type it, the field turns red, and a file that holds one is read with
+the defaults and a warning. Reset to defaults puts all of them back. ngspice reads them as one `.options` line of the
+netlist, which the Netlist window shows when any is changed, and Nodalys takes them as its convergence options, its
+integration method and its nominal temperature.
 
 ## Harmonic balance
 

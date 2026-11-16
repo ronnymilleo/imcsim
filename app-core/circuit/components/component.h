@@ -43,6 +43,7 @@ enum class ComponentType {
     SUBCIRCUIT,
     NET_LABEL,
     INITIAL_VOLTAGE,
+    NODESET,
     PIN,
     POTENTIOMETER,
     SWITCH,

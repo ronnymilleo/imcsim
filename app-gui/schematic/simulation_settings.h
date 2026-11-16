@@ -7,6 +7,7 @@
 #define IMCSIM_SIMULATION_SETTINGS_H
 
 #include "base/helpers.h"
+#include "circuit/solver_options.h"
 #include "schematic/parameter_step_settings.h"
 #include "simulation/monte_carlo.h"
 #include "simulation/simulator.h"
@@ -63,7 +64,7 @@ constexpr double LIVE_RUN_LIMIT_SECONDS = 3600.0;
  * @brief   Which analysis Run starts, and how each one runs: transient times, AC range, DC sweep sources and
  *          ranges, the input source and output node of the noise, transfer function and pole-zero analyses, the output
  *          node of the sensitivity analysis and its AC input and range, the logic inputs of the truth table, and how
- *          long a live transient lasts.
+ *          long a live transient lasts, and the options of the solver.
  * @details The operating point has no settings. A sweep, noise or transfer function source that is empty, or that
  *          left the circuit, is replaced by a default when the analysis runs, so the stored name is never rewritten
  *          behind the user. The noise, transfer function, pole-zero and sensitivity outputs are kept as points of their
@@ -105,6 +106,8 @@ struct SimulationSettings {
     /// Runs the transient, AC sweep or DC sweep once with the nominal values and then with values drawn within the
     /// tolerances of the parts; the step and Monte Carlo are never both on.
     Core::MonteCarloSettings MonteCarlo;
+    /// Tolerances, integration method and nominal temperature of every analysis, on both engines.
+    Core::SolverOptions Solver;
 
     bool operator==(const SimulationSettings &) const = default;
 };

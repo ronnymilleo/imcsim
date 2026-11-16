@@ -679,6 +679,28 @@ std::complex<double> NodeInitialConditionDevice::AcTerminalCurrent(const int /*t
     return {};
 }
 
+NodesetDevice::NodesetDevice(const int node, const double voltage) : m_Node(node), m_Voltage(voltage) {
+}
+
+void NodesetDevice::Stamp(MnaSystem &sys, const std::vector<double> & /*x*/, const TimeContext &time) {
+    if (!time.IsNodesetPass) {
+        return;
+    }
+    constexpr double NODESET_CONDUCTANCE = 1e9;
+    StampConductance(sys, m_Node, -1, NODESET_CONDUCTANCE);
+    StampCurrentSource(sys, m_Node, -1, -NODESET_CONDUCTANCE * m_Voltage);
+}
+
+double NodesetDevice::TerminalCurrent(const int /*terminal*/, const std::vector<double> & /*x*/) const {
+    return 0.0;
+}
+
+std::complex<double> NodesetDevice::AcTerminalCurrent(const int /*terminal*/, const std::vector<double> & /*x_dc*/,
+                                                      const std::vector<std::complex<double>> & /*x_ac*/,
+                                                      const double /*omega*/) const {
+    return {};
+}
+
 NodeSeedDevice::NodeSeedDevice(std::vector<NodeSeed> seeds) : m_Seeds(std::move(seeds)) {
 }
 

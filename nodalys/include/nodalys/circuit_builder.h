@@ -140,6 +140,7 @@ public:
 
     // Initial Conditions
     void SetInitialVoltage(NodeId node, double voltage);
+    void SetNodeset(NodeId node, double voltage);
 
     // Build finalized Circuit
     std::expected<Circuit, std::string> Build();

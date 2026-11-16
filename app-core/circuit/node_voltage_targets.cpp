@@ -1,9 +1,10 @@
 /**
- * @file    initial_voltage_targets.cpp
- * @brief   Finds the node each initial voltage marker sets in the circuit as every instance of a block expands it.
+ * @file    node_voltage_targets.cpp
+ * @brief   Finds the node each initial voltage or nodeset marker sets in the circuit as every instance of a block
+ * expands it.
  */
 
-#include "circuit/initial_voltage_targets.h"
+#include "circuit/node_voltage_targets.h"
 
 #include "circuit/circuit.h"
 #include "circuit/components/component.h"
@@ -52,13 +53,14 @@ std::vector<NodeAddress> AddressBody(const Circuit &root, const SubcircuitDefini
     return addresses;
 }
 
-void Collect(const Circuit &root, const Circuit &level, const std::vector<std::string> &path,
-             const std::vector<NodeAddress> &addresses, std::vector<InitialVoltageTarget> &targets) {
-    for (const CircuitInitialVoltage &initial_voltage : level.GetInitialVoltages()) {
-        const NodeAddress &address = addresses[static_cast<std::size_t>(initial_voltage.Node)];
+void Collect(const Circuit &root, const Circuit &level, const NodeVoltageKind kind,
+             const std::vector<std::string> &path, const std::vector<NodeAddress> &addresses,
+             std::vector<NodeVoltageTarget> &targets) {
+    for (const CircuitNodeVoltage &marker : level.GetNodeVoltages(kind)) {
+        const NodeAddress &address = addresses[static_cast<std::size_t>(marker.Node)];
         targets.push_back({.Path = address.Path,
                            .Node = address.Node,
-                           .Volts = initial_voltage.Volts,
+                           .Volts = marker.Volts,
                            .MarkerPath = path,
                            .Owner = address.Owner});
     }
@@ -77,7 +79,7 @@ void Collect(const Circuit &root, const Circuit &level, const std::vector<std::s
         }
         std::vector<std::string> inner_path = path;
         inner_path.push_back(instance.GetName());
-        Collect(root, definition->Body, inner_path, AddressBody(root, *definition, entry, addresses, inner_path),
+        Collect(root, definition->Body, kind, inner_path, AddressBody(root, *definition, entry, addresses, inner_path),
                 targets);
     }
 }
@@ -85,18 +87,19 @@ void Collect(const Circuit &root, const Circuit &level, const std::vector<std::s
 } // namespace
 
 /**
- * @brief   Lists every initial voltage of the circuit with the node it sets once the blocks are expanded.
+ * @brief   Lists every initial voltage or nodeset of the circuit with the node it sets once the blocks are expanded.
  * @param[in] circuit  Top circuit, whose definitions are looked up by the name each instance gives.
+ * @param[in] kind     Which markers to list.
  * @return  The markers of the top circuit, then those of each block instance in order, nested ones included. A block
  *          body that no instance places has no entry.
  */
-std::vector<InitialVoltageTarget> ResolveInitialVoltages(const Circuit &circuit) {
+std::vector<NodeVoltageTarget> ResolveNodeVoltages(const Circuit &circuit, const NodeVoltageKind kind) {
     std::vector<NodeAddress> addresses;
     for (int node = 0; node < circuit.GetNodeCount(); ++node) {
         addresses.push_back({.Path = {}, .Node = node, .Owner = &circuit});
     }
-    std::vector<InitialVoltageTarget> targets;
-    Collect(circuit, circuit, {}, addresses, targets);
+    std::vector<NodeVoltageTarget> targets;
+    Collect(circuit, circuit, kind, {}, addresses, targets);
     return targets;
 }
 

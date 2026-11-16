@@ -14,6 +14,7 @@
 #include "simulation/analysis_sources.h"
 #include "simulation/analysis_suggestions.h"
 #include "simulation/check_s_parameters.h"
+#include "simulation/check_solver_options.h"
 #include "simulation/simulation_backend.h"
 #include "spice/spice_value.h"
 #include <algorithm>
@@ -48,6 +49,8 @@ enum class RunMode {
     STEP,
     MONTE_CARLO,
 };
+
+constexpr std::array<const char *, 3> INTEGRATION_METHOD_NAMES = {"Default", "Trapezoidal", "Gear"};
 
 constexpr std::array<const char *, 3> RUN_MODE_NAMES = {"Single run", "Step a parameter", "Monte Carlo"};
 
@@ -234,6 +237,7 @@ void AnalysisSettingsPanel::DrawSettings() {
     if (IsRepeatable(settings.Selected)) {
         DrawRunModeSettings(settings);
     }
+    DrawSolverSettings(settings.Solver);
     m_Schematic.SetSimulationSettings(settings);
 }
 
@@ -297,6 +301,7 @@ void AnalysisSettingsPanel::LoadSettingsFields() {
     m_SStopFrequency.Load(settings.SParameters.StopFrequency);
     m_HBFundamental.Load(settings.HarmonicBalance.FundamentalFrequency);
     LoadParameterStepFields(settings.ParameterStep);
+    LoadSolverFields(settings.Solver);
     m_LoadedSettingsVersion = m_Schematic.GetSimulationSettingsVersion();
 }
 
@@ -788,6 +793,82 @@ void AnalysisSettingsPanel::DrawRunModeSettings(SimulationSettings &settings) {
 }
 
 /**
+ * @brief   The numerical options every analysis shares, which both engines honour: the tolerances, the integration
+ *          method of a transient and the temperature the models are given at.
+ * @details The section starts closed, since the defaults suit most circuits; each field says its default in its
+ *          tooltip, and Reset puts them all back.
+ */
+void AnalysisSettingsPanel::DrawSolverSettings(Core::SolverOptions &options) {
+    ImGui::Separator();
+    ImGui::PushID("solver");
+    if (ImGui::CollapsingHeader("Solver")) {
+        const auto is_between = [](const double minimum, const double maximum) {
+            return [minimum, maximum](const double value) { return value >= minimum && value <= maximum; };
+        };
+        if (const std::optional<double> value = m_RelativeTolerance.Draw(
+                "Rel. tolerance", "", is_between(Core::MIN_RELATIVE_TOLERANCE, Core::MAX_RELATIVE_TOLERANCE))) {
+            options.RelativeTolerance = *value;
+        }
+        ImGui::SetItemTooltip("%s", std::format("reltol: how close two Newton iterations must be, relative to the "
+                                                "value, and how fast a transient may change its step; default {}, "
+                                                "{} to {}",
+                                                Core::FormatValue(Core::DEFAULT_RELATIVE_TOLERANCE),
+                                                Core::FormatValue(Core::MIN_RELATIVE_TOLERANCE),
+                                                Core::FormatValue(Core::MAX_RELATIVE_TOLERANCE))
+                                        .c_str());
+        if (const std::optional<double> value = m_CurrentTolerance.Draw(
+                "Current tolerance", "A",
+                is_between(Core::MIN_CURRENT_TOLERANCE_AMPERES, Core::MAX_CURRENT_TOLERANCE_AMPERES))) {
+            options.CurrentToleranceAmperes = *value;
+        }
+        ImGui::SetItemTooltip("%s", std::format("abstol: the smallest current that counts; default {}A, {}A to {}A",
+                                                Core::FormatValue(Core::DEFAULT_CURRENT_TOLERANCE_AMPERES),
+                                                Core::FormatValue(Core::MIN_CURRENT_TOLERANCE_AMPERES),
+                                                Core::FormatValue(Core::MAX_CURRENT_TOLERANCE_AMPERES))
+                                        .c_str());
+        if (const std::optional<double> value = m_VoltageTolerance.Draw(
+                "Voltage tolerance", "V",
+                is_between(Core::MIN_VOLTAGE_TOLERANCE_VOLTS, Core::MAX_VOLTAGE_TOLERANCE_VOLTS))) {
+            options.VoltageToleranceVolts = *value;
+        }
+        ImGui::SetItemTooltip("%s", std::format("vntol: the smallest voltage that counts; default {}V, {}V to {}V",
+                                                Core::FormatValue(Core::DEFAULT_VOLTAGE_TOLERANCE_VOLTS),
+                                                Core::FormatValue(Core::MIN_VOLTAGE_TOLERANCE_VOLTS),
+                                                Core::FormatValue(Core::MAX_VOLTAGE_TOLERANCE_VOLTS))
+                                        .c_str());
+        DrawFieldLabel("Integration");
+        if (ImGui::BeginCombo("##method", INTEGRATION_METHOD_NAMES[static_cast<std::size_t>(options.Method)])) {
+            for (std::size_t index = 0; index < INTEGRATION_METHOD_NAMES.size(); ++index) {
+                const auto candidate = static_cast<Core::IntegrationMethod>(index);
+                if (ImGui::Selectable(INTEGRATION_METHOD_NAMES[index], candidate == options.Method)) {
+                    options.Method = candidate;
+                }
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::SetItemTooltip("How a transient steps capacitors and inductors in time. Default: trapezoidal, or Gear "
+                              "when the circuit has a fuse. Gear damps the ringing the trapezoidal rule leaves after "
+                              "a sudden change, at a little more error");
+        if (const std::optional<double> value = m_NominalTemperature.Draw(
+                "Nominal temp.", "C",
+                is_between(Core::MIN_NOMINAL_TEMPERATURE_CELSIUS, Core::MAX_NOMINAL_TEMPERATURE_CELSIUS))) {
+            options.NominalTemperatureCelsius = *value;
+        }
+        ImGui::SetItemTooltip("%s", std::format("tnom: the temperature the model parameters are given at; a run at "
+                                                "another temperature scales them from it; default {} C",
+                                                Core::FormatValue(Core::DEFAULT_NOMINAL_TEMPERATURE_CELSIUS))
+                                        .c_str());
+        ImGui::BeginDisabled(options == Core::SolverOptions{});
+        if (ImGui::Button("Reset to defaults")) {
+            options = {};
+            LoadSolverFields(options);
+        }
+        ImGui::EndDisabled();
+    }
+    ImGui::PopID();
+}
+
+/**
  * @brief   The part or the temperature, and its values as a range or a typed list.
  */
 void AnalysisSettingsPanel::DrawParameterStepSettings(ParameterStepSettings &step) {
@@ -966,6 +1047,13 @@ void AnalysisSettingsPanel::LoadParameterStepFields(const ParameterStepSettings 
     m_ParameterFields[0].Load(step.Start);
     m_ParameterFields[1].Load(step.Stop);
     m_ParameterFields[2].Load(step.Step);
+}
+
+void AnalysisSettingsPanel::LoadSolverFields(const Core::SolverOptions &options) {
+    m_RelativeTolerance.Load(options.RelativeTolerance);
+    m_CurrentTolerance.Load(options.CurrentToleranceAmperes);
+    m_VoltageTolerance.Load(options.VoltageToleranceVolts);
+    m_NominalTemperature.Load(options.NominalTemperatureCelsius);
 }
 
 } // namespace GUI

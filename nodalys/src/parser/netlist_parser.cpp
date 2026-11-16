@@ -224,10 +224,11 @@ std::expected<IcAssignment, std::string> NextIcAssignment(const std::vector<std:
     return std::unexpected(std::format("Malformed entry '{}' in .ic: '{}'", tokens[index], line));
 }
 
-/// Parses a `.ic` directive such as `.ic v(1)=5 v(out) = 0` and records each node initial voltage.
-std::expected<void, std::string> ParseInitialConditionDirective(const std::vector<std::string> &tokens,
-                                                                std::string_view line, const NodeManager &nodes,
-                                                                CircuitBuilder &builder) {
+/// Parses a `.ic` or `.nodeset` directive such as `.ic v(1)=5 v(out) = 0` and records each node voltage, as the
+/// initial voltage of the node or as its nodeset.
+std::expected<void, std::string> ParseNodeVoltageDirective(const std::vector<std::string> &tokens,
+                                                           std::string_view line, const NodeManager &nodes,
+                                                           CircuitBuilder &builder, const bool is_nodeset) {
     for (std::size_t i = 1; i < tokens.size(); ++i) {
         const auto assignment = NextIcAssignment(tokens, i, line);
         if (!assignment) {
@@ -242,7 +243,11 @@ std::expected<void, std::string> ParseInitialConditionDirective(const std::vecto
         if (!voltage) {
             return std::unexpected(std::format("Invalid voltage '{}' in .ic: '{}'", assignment->Rhs, line));
         }
-        builder.SetInitialVoltage(nodes.Resolve(node_name), *voltage);
+        if (is_nodeset) {
+            builder.SetNodeset(nodes.Resolve(node_name), *voltage);
+        } else {
+            builder.SetInitialVoltage(nodes.Resolve(node_name), *voltage);
+        }
     }
     return {};
 }
@@ -1060,8 +1065,9 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                         return std::unexpected(std::format("Invalid temperature '{}' in .temp: '{}'", tokens[1], line));
                     }
                 }
-            } else if (dir == ".IC") {
-                if (const auto ic_res = ParseInitialConditionDirective(tokens, line, nodes, builder); !ic_res) {
+            } else if (dir == ".IC" || dir == ".NODESET") {
+                if (const auto ic_res = ParseNodeVoltageDirective(tokens, line, nodes, builder, dir == ".NODESET");
+                    !ic_res) {
                     return std::unexpected(ic_res.error());
                 }
             }

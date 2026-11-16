@@ -8,6 +8,7 @@
 
 #include "circuit/components/component.h"
 #include "circuit/library_model.h"
+#include "circuit/solver_options.h"
 #include <functional>
 #include <map>
 #include <memory>
@@ -43,12 +44,24 @@ struct CircuitPort {
 };
 
 /**
- * @struct  CircuitInitialVoltage
- * @brief   The voltage a node starts a transient at, from an initial voltage marker.
+ * @struct  CircuitNodeVoltage
+ * @brief   A voltage given to a node by a marker: where a transient starts it or where an operating point starts to
+ * look for it.
  */
-struct CircuitInitialVoltage {
+struct CircuitNodeVoltage {
     int Node = 0;
     double Volts = 0.0;
+};
+
+/**
+ * @enum    NodeVoltageKind
+ * @brief   What a marker does with the voltage it gives a node.
+ */
+enum class NodeVoltageKind {
+    /// The node starts a transient at the voltage (SPICE `.ic`).
+    INITIAL,
+    /// The voltage is the guess the solver starts the operating point from (SPICE `.nodeset`).
+    NODESET
 };
 
 /**
@@ -62,8 +75,10 @@ public:
     void AddSubcircuit(std::shared_ptr<SubcircuitDefinition> definition);
     void AddLibraryModel(LibraryModel model);
     void AddPort(const CircuitPort &port);
-    void AddInitialVoltage(const CircuitInitialVoltage &initial_voltage);
+    void AddInitialVoltage(const CircuitNodeVoltage &initial_voltage);
+    void AddNodeset(const CircuitNodeVoltage &nodeset);
     void NameNet(std::string_view net, int node);
+    void SetSolverOptions(const SolverOptions &options);
     void AddDefinitionsOf(const Circuit &other);
 
     const std::vector<CircuitEntry> &GetEntries() const;
@@ -71,7 +86,10 @@ public:
     std::shared_ptr<const SubcircuitDefinition> FindSubcircuit(std::string_view name) const;
     const std::vector<LibraryModel> &GetLibraryModels() const;
     const std::vector<CircuitPort> &GetPorts() const;
-    const std::vector<CircuitInitialVoltage> &GetInitialVoltages() const;
+    const std::vector<CircuitNodeVoltage> &GetInitialVoltages() const;
+    const std::vector<CircuitNodeVoltage> &GetNodesets() const;
+    const std::vector<CircuitNodeVoltage> &GetNodeVoltages(NodeVoltageKind kind) const;
+    const SolverOptions &GetSolverOptions() const;
     const LibraryModel *FindLibraryModel(std::string_view name) const;
     std::optional<int> FindNodeOfNet(std::string_view net) const;
     const std::map<std::string, int, std::less<>> &GetNets() const;
@@ -88,7 +106,10 @@ private:
     std::vector<LibraryModel> m_LibraryModels;
     std::vector<CircuitPort> m_Ports;
     /// One entry per marker, so two markers on one node stay visible to the checks.
-    std::vector<CircuitInitialVoltage> m_InitialVoltages;
+    std::vector<CircuitNodeVoltage> m_InitialVoltages;
+    /// One entry per marker, for the same reason.
+    std::vector<CircuitNodeVoltage> m_Nodesets;
+    SolverOptions m_SolverOptions;
     /// Node of each net a label names, by the name in the form nets are compared in, so a behavioral source can read
     /// V(OUT).
     std::map<std::string, int, std::less<>> m_NodeOfNet;

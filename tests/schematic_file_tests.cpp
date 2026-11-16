@@ -470,6 +470,11 @@ TEST_CASE("Simulation settings load back unchanged", "[schematic_file]") {
         .Enabled = true, .Part = "R2", .UsesList = true, .Start = 1e3, .Stop = 4e3, .Step = 1e3, .List = "1k, 2.2k"};
     settings.MonteCarlo = {
         .Enabled = true, .Runs = 250, .Distribution = Core::ToleranceDistribution::UNIFORM, .Seed = 4000000000U};
+    settings.Solver = {.RelativeTolerance = 1e-4,
+                       .CurrentToleranceAmperes = 1e-13,
+                       .VoltageToleranceVolts = 1e-7,
+                       .Method = Core::IntegrationMethod::GEAR,
+                       .NominalTemperatureCelsius = 50.0};
 
     const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic({}, {}, settings, {}));
     CHECK(loaded.Warnings.empty());
