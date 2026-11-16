@@ -726,8 +726,14 @@ void SParameterTab::DrawMagnitudePhase(const Core::SParameters &result, const SP
 void SParameterTab::DrawBodePlot(const Core::SParameters &result, const std::vector<SParameterEntry> &entries,
                                  const bool is_phase, const float height) {
     const bool is_s = m_Quantity == SParameterQuantity::S;
+    const bool is_decade_axis = !is_s && !is_phase;
     if (m_IsFitting) {
-        ImPlot::SetNextAxesToFit();
+        // The logarithmic axis is fitted in decades below, since the padding of the fit is linear and crosses zero
+        if (is_decade_axis) {
+            ImPlot::SetNextAxisToFit(ImAxis_X1);
+        } else {
+            ImPlot::SetNextAxesToFit();
+        }
     }
     if (!BeginTracePlot(is_phase ? "Phase##s" : "Magnitude##s", ImVec2(-1.0f, height), true)) {
         return;
@@ -740,8 +746,14 @@ void SParameterTab::DrawBodePlot(const Core::SParameters &result, const std::vec
     ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
     ImPlot::SetupAxisLinks(ImAxis_X1, &m_View.From, &m_View.To);
     ImPlot::SetupAxisFormat(ImAxis_X1, FormatAxisValue, const_cast<char *>("Hz"));
-    if (!is_s && !is_phase) {
+    if (is_decade_axis) {
         ImPlot::SetupAxisScale(ImAxis_Y1, ImPlotScale_Log10);
+        std::vector<std::vector<double>> magnitudes;
+        for (const SParameterEntry &entry : entries) {
+            magnitudes.push_back(ListMatrixMagnitudes(result, entry, m_Quantity));
+        }
+        const ExportRange range = FindDecadeRange(magnitudes);
+        ImPlot::SetupAxisLimits(ImAxis_Y1, range.From, range.To, m_IsFitting ? ImPlotCond_Always : ImPlotCond_Once);
         ImPlot::SetupAxisFormat(ImAxis_Y1, FormatAxisValue,
                                 const_cast<char *>(m_Quantity == SParameterQuantity::Z ? "Ohm" : "S"));
     }

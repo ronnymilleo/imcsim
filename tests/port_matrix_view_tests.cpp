@@ -6,11 +6,14 @@
 
 #include "plots/port_matrix_view.h"
 
+#include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 #include <cmath>
 #include <complex>
+#include <limits>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -168,4 +171,54 @@ TEST_CASE("The table of Z lists the real and imaginary parts and leaves the abse
     const std::string admittance =
         GUI::RenderCsv(GUI::BuildMatrixTableFigure(result, {{2, 1}}, GUI::SParameterQuantity::Y));
     CHECK_THAT(admittance, ContainsSubstring("Y21 real (S),Y21 imaginary (S)"));
+}
+
+TEST_CASE("The decade range of a logarithmic axis pads the positive values in decades", "[port_matrix_view]") {
+    // Four decades, from 10 to 100k: a tenth of them is 0.4, below the half decade, so half a decade each side
+    const GUI::ExportRange spanning = GUI::FindDecadeRange({{10.0, 1e3}, {1e5}});
+    CHECK_THAT(spanning.From, WithinAbs(10.0 / std::sqrt(10.0), 1e-9));
+    CHECK_THAT(spanning.To, WithinAbs(1e5 * std::sqrt(10.0), 1e-3));
+    // Twelve decades pad by 1.2 decades
+    const GUI::ExportRange wide = GUI::FindDecadeRange({{1.0, 1e12}});
+    CHECK_THAT(std::log10(wide.From), WithinAbs(-1.2, 1e-9));
+    CHECK_THAT(std::log10(wide.To), WithinAbs(13.2, 1e-9));
+    // The range never reaches zero or crosses it
+    CHECK(wide.From > 0.0);
+}
+
+TEST_CASE("The decade range of one constant value is half a decade each side of it", "[port_matrix_view]") {
+    const GUI::ExportRange range = GUI::FindDecadeRange({{4700.0, 4700.0, 4700.0}});
+    CHECK_THAT(range.From, WithinAbs(4700.0 / std::sqrt(10.0), 1e-6));
+    CHECK_THAT(range.To, WithinAbs(4700.0 * std::sqrt(10.0), 1e-6));
+}
+
+TEST_CASE("The decade range leaves out gaps, zeros and infinities", "[port_matrix_view]") {
+    const double gap = std::nan("");
+    const GUI::ExportRange range =
+        GUI::FindDecadeRange({{gap, 100.0, 0.0, 1e4, std::numeric_limits<double>::infinity()}});
+    CHECK_THAT(std::log10(range.From), WithinAbs(1.5, 1e-9));
+    CHECK_THAT(std::log10(range.To), WithinAbs(4.5, 1e-9));
+}
+
+TEST_CASE("The decade range with nothing to draw is 1 to 10", "[port_matrix_view]") {
+    const double gap = std::nan("");
+    for (const std::vector<std::vector<double>> &traces : {std::vector<std::vector<double>>{}, {{gap, gap}}, {{0.0}}}) {
+        const GUI::ExportRange range = GUI::FindDecadeRange(traces);
+        CHECK(range.From == 1.0);
+        CHECK(range.To == 10.0);
+    }
+}
+
+TEST_CASE("The figure of Z has an axis fitted to its magnitudes, and so has Y", "[port_matrix_view]") {
+    const Core::SParameters result = MakeResult(true);
+    for (const GUI::SParameterQuantity quantity : {GUI::SParameterQuantity::Z, GUI::SParameterQuantity::Y}) {
+        const GUI::ExportFigure figure = GUI::BuildMatrixMagnitudePhaseFigure(result, {{1, 1}}, std::nullopt, quantity);
+        const std::optional<GUI::ExportRange> &range = figure.Panels[0].YAxes[0].Range;
+        REQUIRE(range.has_value());
+        const std::vector<double> &values = figure.Panels[0].Series[0].Values;
+        CHECK(range->From > 0.0);
+        CHECK(range->From < std::min(values[0], values[2]));
+        CHECK(range->To > std::max(values[0], values[2]));
+        CHECK(range->To / range->From < 1e3);
+    }
 }

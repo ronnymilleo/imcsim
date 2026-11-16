@@ -20,6 +20,10 @@ namespace {
 /// Digits of a reading, enough to tell 50 ohm from 51.
 constexpr int READING_DIGITS = 4;
 
+/// Share of the decades a logarithmic axis spans that it leaves free above and below, and the least it leaves.
+constexpr double DECADE_PADDING_SHARE = 0.1;
+constexpr double MIN_PADDING_DECADES = 0.5;
+
 constexpr double MISSING = std::numeric_limits<double>::quiet_NaN();
 
 /**
@@ -219,6 +223,32 @@ std::vector<double> ListMatrixAngles(const Core::SParameters &result, const SPar
 }
 
 /**
+ * @brief   Works out the range a logarithmic axis fits to.
+ * @param[in] traces  The magnitudes drawn; zeros and not-a-number gaps are left out.
+ * @return  From a tenth of the decades the finite positive values span, and at least half a decade, below the lowest to
+ *          as much above the highest. One constant value, or the range when no value is left, gets half a decade each
+ *          side of it, or 1 to 10. The padding is in decades, since the linear one of ImPlot would cross zero, which a
+ *          logarithmic axis cannot show.
+ */
+ExportRange FindDecadeRange(const std::vector<std::vector<double>> &traces) {
+    double lowest = std::numeric_limits<double>::infinity();
+    double highest = 0.0;
+    for (const std::vector<double> &trace : traces) {
+        for (const double value : trace) {
+            if (value > 0.0 && std::isfinite(value)) {
+                lowest = std::min(lowest, value);
+                highest = std::max(highest, value);
+            }
+        }
+    }
+    if (highest <= 0.0) {
+        return {.From = 1.0, .To = 10.0};
+    }
+    const double padding_decades = std::max(std::log10(highest / lowest) * DECADE_PADDING_SHARE, MIN_PADDING_DECADES);
+    return {.From = lowest / std::pow(10.0, padding_decades), .To = highest * std::pow(10.0, padding_decades)};
+}
+
+/**
  * @brief   Words the reading of an entry of Z or Y under the cursor, one line each.
  * @param[in] result     Result of the sweep.
  * @param[in] frequency  Index of the frequency.
@@ -269,9 +299,15 @@ ExportFigure BuildMatrixMagnitudePhaseFigure(const Core::SParameters &result,
     figure.XRange = view;
     const std::string unit = GetQuantityUnit(quantity);
     const std::string_view what = quantity == SParameterQuantity::Z ? "Impedance" : "Admittance";
-    ExportPanel magnitude{
-        .Title = "Magnitude",
-        .YAxes = {{.Name = std::format("{} magnitude ({})", what, unit), .Unit = unit, .Logarithmic = true}}};
+    std::vector<std::vector<double>> magnitudes;
+    for (const SParameterEntry &entry : entries) {
+        magnitudes.push_back(ListMatrixMagnitudes(result, entry, quantity));
+    }
+    ExportPanel magnitude{.Title = "Magnitude",
+                          .YAxes = {{.Name = std::format("{} magnitude ({})", what, unit),
+                                     .Unit = unit,
+                                     .Logarithmic = true,
+                                     .Range = FindDecadeRange(magnitudes)}}};
     ExportPanel phase{.Title = "Phase", .YAxes = {{.Name = "Phase (deg)", .Unit = "deg", .UsesPrefixes = false}}};
     for (std::size_t index = 0; index < entries.size(); ++index) {
         const std::string name = GetMatrixEntryName(entries[index], quantity);

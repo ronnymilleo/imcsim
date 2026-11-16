@@ -51,6 +51,9 @@ std::vector<double> ListMatrixMagnitudes(const Core::SParameters &result, const 
 std::vector<double> ListMatrixAngles(const Core::SParameters &result, const SParameterEntry &entry,
                                      SParameterQuantity quantity);
 
+// Axis
+ExportRange FindDecadeRange(const std::vector<std::vector<double>> &traces);
+
 // Readings
 std::vector<std::string> DescribeMatrixReading(const Core::SParameters &result, std::size_t frequency,
                                                const SParameterEntry &entry, SParameterQuantity quantity);
