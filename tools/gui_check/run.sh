@@ -35,7 +35,8 @@
 #   DC sweep               zener_regulator
 #   Noise                  noise_analysis_rc_low_pass
 #   Transfer function      transfer_function_attenuator
-#   Sensitivity            bias_sensitivity
+#   Sensitivity            bias_sensitivity; ac_sensitivity_sallen_key (the AC kind):
+#                          Nodalys only: with ngspice the step expects it refused with its reason
 #   Poles and zeros        rlc_low_pass_poles_and_zeros
 #   S-parameters           s_parameters_lc_low_pass; fixtures/s_parameters_one_port (the same filter with its second
 #                          port turned off): Nodalys gives S11, ngspice refuses it, since it needs two ports
@@ -254,6 +255,7 @@ check_analyses() {
     check_circuit_run noise noise_analysis_rc_low_pass Share
     check_circuit_run transfer_function transfer_function_attenuator impedance
     check_circuit_run sensitivity bias_sensitivity Share
+    check_ac_sensitivity
     check_circuit_run poles_and_zeros rlc_low_pass_poles_and_zeros Poles
     check_circuit_run s_parameters s_parameters_lc_low_pass Smith
     check_s_parameters_one_port
@@ -302,6 +304,17 @@ check_harmonic_balance() {
         check_step harmonic_balance_refused 'Harmonic' failed 'does not run'
     else
         check_step harmonic_balance 'Amplitudes:?' "done"
+    fi
+}
+
+# The AC kind of the sensitivity analysis runs on Nodalys only, and ngspice refuses it with the reason
+check_ac_sensitivity() {
+    open_circuit ac_sensitivity_sallen_key
+    run_and_wait
+    if [[ "$ENGINE" == ngspice ]]; then
+        check_step ac_sensitivity_refused 'Sensitivity' failed 'does not run'
+    else
+        check_step ac_sensitivity 'Share' "done"
     fi
 }
 
