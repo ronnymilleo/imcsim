@@ -25,8 +25,6 @@ using Result = std::expected<void, std::string>;
 /// How many subcircuits may sit inside one another, which stops a block that places itself.
 constexpr int MAX_NESTING_DEPTH = 16;
 
-constexpr std::string_view PARAMETER_LIST_MARK = "PARAMS:";
-
 /**
  * @struct  ClassifiedLines
  * @brief   The lines of a text sorted by what they do, since the parameters and models come before the elements that
@@ -44,14 +42,6 @@ struct ClassifiedLines {
 std::string Refuse(const ExpansionContext &context, const std::string_view line, const std::string_view reason) {
     return std::format("Nodalys cannot simulate the subcircuit {}: the line '{}' {}", context.SubcircuitName, line,
                        reason);
-}
-
-/**
- * @brief   Tells whether a token starts the parameters of a .subckt or an X line: the PARAMS: word or a NAME=VALUE.
- */
-bool IsParameterStart(const std::string &token) {
-    return ToUpperCase(token).starts_with(PARAMETER_LIST_MARK) ||
-           (token.find('=') != std::string::npos && token.front() != '{' && token.front() != '\'');
 }
 
 /**
@@ -311,7 +301,12 @@ AddSubcircuitText(CircuitBuilder &builder, const SubcircuitText &text, const Sub
                                            "instance connects {}",
                                            text.Name, text.Ports.size(), instance.PortNodes.size()));
     }
-    ExpansionContext context{.Builder = builder, .SubcircuitName = text.Name, .Warnings = {}, .ReportedModels = {}};
+    ExpansionContext context{.Builder = builder,
+                             .SubcircuitName = text.Name,
+                             .Warnings = {},
+                             .ReportedModels = {},
+                             .OnInternalNode = instance.OnInternalNode,
+                             .OnSource = instance.OnSource};
     TextScope scope(nullptr, instance.Prefix);
     for (const auto &[name, value] : instance.Parameters) {
         scope.SetParameter(ToUpperCase(name), value);

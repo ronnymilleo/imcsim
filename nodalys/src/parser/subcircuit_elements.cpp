@@ -284,8 +284,13 @@ Result AddSourceLine(ExpansionContext &context, TextScope &scope, const ElementL
     if (!values) {
         return std::unexpected(values.error());
     }
-    AddWaveformSource(context.Builder, element.Name, is_voltage, Node(context, scope, element, 0),
-                      Node(context, scope, element, 1), values->Waveform, values->WaveformValues, values->Levels);
+    const NodeId positive = Node(context, scope, element, 0);
+    const NodeId negative = Node(context, scope, element, 1);
+    AddWaveformSource(context.Builder, element.Name, is_voltage, positive, negative, values->Waveform,
+                      values->WaveformValues, values->Levels);
+    if (context.OnSource) {
+        context.OnSource(element.Name, positive, negative);
+    }
     return {};
 }
 

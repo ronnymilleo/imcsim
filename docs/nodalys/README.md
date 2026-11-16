@@ -92,7 +92,7 @@
 | `src/expression/` | The language of the behavioral source: a recursive-descent parser to a flat program, forward-mode automatic differentiation, and the value and partial derivatives of every operator and function ([`behavioral_source.md`](./behavioral_source.md)). |
 | `src/analyses/` | Complete numerical solvers for DC Operating Point, DC Sweep (1D/2D), Time-Domain Transient, AC Small-Signal Sweep, DC Transfer Function, AC Adjoint Noise, Multiport S-Parameters, Pole-Zero, DC Sensitivity, and Harmonic Balance. |
 | `src/bridge/` | `LogicBridge` translating discrete event-driven logic levels (`0`, `1`, `X`, `Z`) into continuous analog waveforms with realistic slew rates and configurable supply rails. |
-| `src/parser/` & `src/export/` | SPICE netlist syntax parser supporting engineering scales (`1k`, `100n`, `4.7u`), the expansion of a subcircuit kept as SPICE text (`subcircuit_*.cpp`, [`subcircuit_text.md`](./subcircuit_text.md)) and multi-format simulation result export (CSV, JSON, SPICE Raw, Touchstone). |
+| `src/parser/` & `src/export/` | SPICE netlist syntax parser supporting engineering scales (`1k`, `100n`, `4.7u`), the expansion of a subcircuit kept as SPICE text, which the `X` lines of a netlist use too (`subcircuit_*.cpp`, `netlist_subcircuits.cpp`, [`subcircuit_text.md`](./subcircuit_text.md)) and multi-format simulation result export (CSV, JSON, SPICE Raw, Touchstone). |
 | `src/cli/` | Standalone CLI tool (`nodalys`) processing netlists from files or `stdin` with command-line options (`--analysis`, `--format`, `--output`). |
 
 ### 2. imcsim GUI & Model Bridge (`app-core/backends/nodalys/`)
@@ -155,7 +155,7 @@
 | **Temperature Sweep ($T$)** | ✅ **Ready** | `Circuit::SetTemperature()` applies the SPICE temperature laws of the diode, BJT and MOSFET relative to the nominal $T_{\text{nom}} = 27\,^\circ\text{C}$, and `temper` in an expression reads it. |
 | **Initial Conditions (`.ic`, `.nodeset`)** | 🟡 **Partial** | Element-level `uic` on capacitors ($V_0$) and inductors ($I_0$) and node `.ic` (held in the operating point, or the start of the capacitors on the node with `uic`; see [`transient_analysis.md`](./transient_analysis.md)) supported; `.nodeset` pending. |
 | **Gear-2 / BDF-2 Integration** | 🟡 **Partial** | 3rd divided-difference LTE step control with Trapezoidal/Euler supported; Gear-2 for stiff switching circuits pending. |
-| **Vendor SPICE `.subckt` Parsing** | ✅ **Ready** | `AddSubcircuitText()` reads a subcircuit kept as text with its parameters, `{expressions}`, `.model` cards and nested subcircuits; what it cannot simulate is refused with the line ([`subcircuit_text.md`](./subcircuit_text.md)). |
+| **Vendor SPICE `.subckt` Parsing** | ✅ **Ready** | `AddSubcircuitText()` reads a subcircuit kept as text, and `ParseNetlist()` and the CLI place the `X` lines of a netlist through it, with its parameters, `{expressions}`, `.model` cards and nested subcircuits; what it cannot simulate is refused with the line ([`subcircuit_text.md`](./subcircuit_text.md)). |
 
 ---
 

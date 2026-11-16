@@ -7,8 +7,10 @@
 #include "nodalys/circuit_builder.h"
 #include "nodalys/expression.h"
 #include "parser/model_cards.h"
+#include "parser/netlist_subcircuits.h"
 #include "parser/source_waveforms.h"
 #include "parser/spice_number.h"
+#include "parser/spice_text.h"
 
 #include <algorithm>
 #include <cctype>
@@ -121,12 +123,6 @@ std::vector<std::string> TokenizeLine(std::string_view line) {
     return tokens;
 }
 
-struct SubcircuitDef {
-    std::string Name;
-    std::vector<std::string> Pins;
-    std::vector<std::string> Lines;
-};
-
 // Map node string (e.g. "0", "GND", "IN", "1") to NodeId
 class NodeManager {
 public:
@@ -165,6 +161,9 @@ public:
         const int total_nodes = std::max(next_id, 1);
         builder.SetCircuitNodeCount(total_nodes);
     }
+
+    /// Gives a name to a node that something else made, such as an internal node of a subcircuit instance.
+    void Bind(const std::string &upper_name, const NodeId node) { m_NodeMap[upper_name] = node; }
 
     NodeId Resolve(std::string_view name) const {
         const std::string upper = ToUpper(Trim(name));
@@ -364,13 +363,14 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
     // SPICE standard: first line is circuit title
     result.Title = logical_lines.front();
 
-    // 2. First pass: Collect .model and .subckt definitions
+    // 2. First pass: Collect .model definitions and the lines the subcircuits are placed from
     std::map<std::string, ParsedModel> models;
-    std::map<std::string, SubcircuitDef> subcircuits;
     std::vector<std::string> circuit_lines;
+    // The .subckt blocks, .model cards and .param lines, which every X line is placed over
+    std::vector<std::string> definition_lines;
 
-    bool in_subcircuit = false;
-    SubcircuitDef current_subckt;
+    int subcircuit_depth = 0;
+    std::string open_subcircuit_name;
 
     for (std::size_t line_idx = 1; line_idx < logical_lines.size(); ++line_idx) {
         const std::string &line = logical_lines[line_idx];
@@ -390,25 +390,29 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
             if (tokens.size() < 2) {
                 return std::unexpected(std::format("Malformed .subckt directive on line {}", line_idx + 1));
             }
-            in_subcircuit = true;
-            current_subckt.Name = ToUpper(tokens[1]);
-            current_subckt.Pins.clear();
-            for (std::size_t p = 2; p < tokens.size(); ++p) {
-                current_subckt.Pins.push_back(ToUpper(tokens[p]));
+            if (subcircuit_depth == 0) {
+                open_subcircuit_name = tokens[1];
             }
-            current_subckt.Lines.clear();
+            ++subcircuit_depth;
+            definition_lines.push_back(line);
             continue;
         }
 
         if (directive == ".ENDS") {
-            in_subcircuit = false;
-            subcircuits[current_subckt.Name] = std::move(current_subckt);
-            current_subckt = SubcircuitDef{};
+            if (subcircuit_depth > 0) {
+                --subcircuit_depth;
+                definition_lines.push_back(line);
+            }
             continue;
         }
 
-        if (in_subcircuit) {
-            current_subckt.Lines.push_back(line);
+        if (subcircuit_depth > 0) {
+            definition_lines.push_back(line);
+            continue;
+        }
+
+        if (directive == ".PARAM") {
+            definition_lines.push_back(line);
             continue;
         }
 
@@ -489,6 +493,7 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
             }
 
             models[model_name] = std::move(model);
+            definition_lines.push_back(line);
             continue;
         }
 
@@ -499,105 +504,15 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
         circuit_lines.push_back(line);
     }
 
-    // 3. Expand Subcircuits ('X' devices) into flat circuit lines
-    std::vector<std::string> flat_lines;
-    std::function<std::expected<void, std::string>(const std::string &line, const std::string &prefix,
-                                                   const std::map<std::string, std::string> &pin_map)>
-        expand_line;
-
-    expand_line = [&](const std::string &line, const std::string &prefix,
-                      const std::map<std::string, std::string> &pin_map) -> std::expected<void, std::string> {
-        const auto tokens = TokenizeLine(line);
-        if (tokens.empty()) {
-            return {};
-        }
-
-        if (ToUpper(tokens[0]).starts_with('X')) {
-            // Subcircuit instantiation: X<name> <pins...> <subckt_name>
-            if (tokens.size() < 3) {
-                return std::unexpected(std::format("Malformed subcircuit call: '{}'", line));
-            }
-            const std::string inst_name = prefix.empty() ? tokens[0] : prefix + "." + tokens[0];
-            const std::string subckt_name = ToUpper(tokens.back());
-
-            auto it = subcircuits.find(subckt_name);
-            if (it == subcircuits.end()) {
-                return std::unexpected(std::format("Subcircuit '{}' not found", subckt_name));
-            }
-
-            const auto &sub = it->second;
-            const std::size_t formal_pin_count = sub.Pins.size();
-            const std::size_t actual_pin_count = tokens.size() - 2;
-            if (actual_pin_count != formal_pin_count) {
-                return std::unexpected(std::format("Subcircuit '{}' expects {} pins, got {}", subckt_name,
-                                                   formal_pin_count, actual_pin_count));
-            }
-
-            std::map<std::string, std::string> child_pin_map;
-            for (std::size_t p = 0; p < formal_pin_count; ++p) {
-                std::string actual_pin = ToUpper(tokens[1 + p]);
-                auto p_it = pin_map.find(actual_pin);
-                if (p_it != pin_map.end()) {
-                    actual_pin = p_it->second;
-                } else if (!prefix.empty() && actual_pin != "0" && actual_pin != "GND") {
-                    actual_pin = prefix + "." + actual_pin;
-                }
-                child_pin_map[sub.Pins[p]] = actual_pin;
-            }
-
-            for (const auto &sub_line : sub.Lines) {
-                auto exp_res = expand_line(sub_line, inst_name, child_pin_map);
-                if (!exp_res) {
-                    return exp_res;
-                }
-            }
-            return {};
-        }
-
-        // Normal element inside subcircuit: map its nodes and prepend instance prefix
-        if (!prefix.empty() && std::toupper(static_cast<unsigned char>(tokens[0].front())) == 'B') {
-            // The nodes and sources an expression names are not renamed for the instance, which would read the nodes of
-            // the circuit around it instead
-            return std::unexpected(
-                std::format("A behavioral source inside a subcircuit is not supported, since its expression cannot be "
-                            "renamed for each instance: '{}'",
-                            line));
-        }
-        if (!prefix.empty()) {
-            std::string rewritten = prefix + "." + tokens[0];
-            for (std::size_t i = 1; i < tokens.size(); ++i) {
-                rewritten.push_back(' ');
-                const std::string upper_tok = ToUpper(tokens[i]);
-                auto it = pin_map.find(upper_tok);
-                if (it != pin_map.end()) {
-                    rewritten.append(it->second);
-                } else if (i <= 4 && !upper_tok.starts_with('.') && !ParseSpiceNumber(tokens[i]) && upper_tok != "0" &&
-                           upper_tok != "GND") {
-                    rewritten.append(prefix + "." + tokens[i]);
-                } else {
-                    rewritten.append(tokens[i]);
-                }
-            }
-            flat_lines.push_back(std::move(rewritten));
-        } else {
-            flat_lines.push_back(line);
-        }
-        return {};
-    };
-
-    for (const auto &line : circuit_lines) {
-        auto res = expand_line(line, "", {});
-        if (!res) {
-            return std::unexpected(res.error());
-        }
+    if (subcircuit_depth > 0) {
+        return std::unexpected(std::format("The subcircuit '{}' has no .ends", open_subcircuit_name));
     }
-
     // 4. Parse components and analyses using CircuitBuilder
     CircuitBuilder builder;
     NodeManager nodes;
 
-    // Pre-scan all flat_lines to discover and register all circuit nodes
-    for (const auto &line : flat_lines) {
+    // Pre-scan all circuit_lines to discover and register all circuit nodes
+    for (const auto &line : circuit_lines) {
         const auto tokens = TokenizeLine(line);
         if (tokens.empty()) {
             continue;
@@ -694,6 +609,14 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
             break;
         }
 
+        case 'X':
+            if (const std::optional<InstanceLine> instance = SplitInstanceLine(SplitTokens(line))) {
+                for (const std::string &node_name : instance->NodeNames) {
+                    nodes.Register(node_name);
+                }
+            }
+            break;
+
         case 'U': {
             for (std::size_t i = 1; i < tokens.size(); ++i) {
                 if (tokens[i].find('=') != std::string::npos) {
@@ -717,7 +640,39 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
 
     nodes.Finalize(builder);
 
-    for (const auto &line : flat_lines) {
+    // Subcircuits come first, since their internal nodes (X1.MID) are named by the directives that follow, wherever
+    // those stand in the netlist
+    struct BlockSource {
+        std::string Name;
+        NodeId Positive;
+        NodeId Negative;
+    };
+    std::vector<BlockSource> block_sources;
+    const InstanceObservers observers{
+        .OnInternalNode = [&nodes](const std::string &name, const NodeId node) { nodes.Bind(name, node); },
+        .OnSource = [&block_sources](const std::string &name, const NodeId positive,
+                                     const NodeId negative) { block_sources.push_back({name, positive, negative}); }};
+    for (const auto &line : circuit_lines) {
+        const auto tokens = TokenizeLine(line);
+        if (tokens.empty() || std::toupper(static_cast<unsigned char>(tokens[0].front())) != 'X') {
+            continue;
+        }
+        const auto added = AddNetlistInstance(
+            builder, definition_lines, line, [&nodes](const std::string_view name) { return nodes.Resolve(name); },
+            observers);
+        if (!added) {
+            return std::unexpected(added.error());
+        }
+        for (const std::string &warning : *added) {
+            const bool is_reported = std::ranges::any_of(
+                result.Diagnostics, [&warning](const DiagnosticMessage &message) { return message.Text == warning; });
+            if (!is_reported) {
+                result.Diagnostics.push_back({warning});
+            }
+        }
+    }
+
+    for (const auto &line : circuit_lines) {
         const auto tokens = TokenizeLine(line);
         if (tokens.empty()) {
             continue;
@@ -849,8 +804,8 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                     const std::string in_neg = tokens[2];
                     const std::string out_pos = tokens[3];
                     cfg.OutputNode = nodes.Resolve(out_pos);
-                    // Search flat_lines for a source connected between in_pos and in_neg
-                    for (const auto &cand_line : flat_lines) {
+                    // Search circuit_lines for a source connected between in_pos and in_neg
+                    for (const auto &cand_line : circuit_lines) {
                         const auto cand_toks = TokenizeLine(cand_line);
                         if (cand_toks.size() >= 3) {
                             const char fc =
@@ -862,6 +817,17 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                                     break;
                                 }
                             }
+                        }
+                    }
+                    for (const BlockSource &source : block_sources) {
+                        if (!cfg.InputSource.empty()) {
+                            break;
+                        }
+                        const NodeId in_positive = nodes.Resolve(in_pos);
+                        const NodeId in_negative = nodes.Resolve(in_neg);
+                        if ((source.Positive == in_positive && source.Negative == in_negative) ||
+                            (source.Positive == in_negative && source.Negative == in_positive)) {
+                            cfg.InputSource = source.Name;
                         }
                     }
                     if (cfg.InputSource.empty()) {
@@ -1469,6 +1435,9 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
             builder.AddLogicGate(name, gate_type, out, std::move(inputs), params);
             break;
         }
+
+        case 'X': // placed before the loop
+            break;
 
         default:
             result.Diagnostics.push_back({std::format("Ignored unrecognized device line: '{}'", line)});
