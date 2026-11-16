@@ -77,6 +77,17 @@ void Circuit::AddPort(const CircuitPort &port) {
 }
 
 /**
+ * @brief   Adds the voltage a node starts a transient at.
+ * @param[in] initial_voltage  Node and voltage; the node counts toward GetNodeCount().
+ * @note    Only a transient reads it. The netlist writes it as ".ic"; CheckCircuit() refuses two different voltages on
+ *          one node, ground, and a node no part is connected to.
+ */
+void Circuit::AddInitialVoltage(const CircuitInitialVoltage &initial_voltage) {
+    m_NodeCount = std::max(m_NodeCount, initial_voltage.Node + 1);
+    m_InitialVoltages.push_back(initial_voltage);
+}
+
+/**
  * @brief   Gives a node the name a net label gave it, so expressions can name it.
  * @param[in] net   Name of the net, compared without regard to case.
  * @param[in] node  Its node.
@@ -86,9 +97,9 @@ void Circuit::NameNet(const std::string_view net, const int node) {
 }
 
 /**
- * @brief   Adds the subcircuit definitions, library models and net names of another circuit, as a circuit derived from
- *          it needs.
- * @param[in] other  Circuit whose definitions are shared and whose models and net names are copied.
+ * @brief   Adds the subcircuit definitions, library models, net names and initial voltages of another circuit, as a
+ *          circuit derived from it needs.
+ * @param[in] other  Circuit whose definitions are shared and whose models, net names and initial voltages are copied.
  */
 void Circuit::AddDefinitionsOf(const Circuit &other) {
     for (const auto &definition : other.m_Subcircuits) {
@@ -99,6 +110,9 @@ void Circuit::AddDefinitionsOf(const Circuit &other) {
     }
     for (const auto &[net, node] : other.m_NodeOfNet) {
         m_NodeOfNet[net] = node;
+    }
+    for (const CircuitInitialVoltage &initial_voltage : other.m_InitialVoltages) {
+        AddInitialVoltage(initial_voltage);
     }
 }
 
@@ -142,6 +156,14 @@ const std::vector<LibraryModel> &Circuit::GetLibraryModels() const {
  */
 const std::vector<CircuitPort> &Circuit::GetPorts() const {
     return m_Ports;
+}
+
+/**
+ * @brief   Returns the initial voltages of the nodes.
+ * @return  One entry per marker, in the order they were added.
+ */
+const std::vector<CircuitInitialVoltage> &Circuit::GetInitialVoltages() const {
+    return m_InitialVoltages;
 }
 
 /**

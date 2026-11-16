@@ -168,6 +168,35 @@ TEST_CASE("Initial conditions and ports in a netlist reach the circuit", "[nodal
         CHECK_THAT(VoltageAt(*tran, 1, 1e-3), WithinAbs(3.0 * std::exp(-1.0), WAVEFORM_TOLERANCE));
     }
 
+    SECTION(".ic holds a node in the operating point that starts the transient and the rest follows it") {
+        const auto parsed = Nodalys::ParseNetlist(
+            "* held\nV1 1 0 5\nR1 1 2 1k\nR2 2 3 1k\nR3 3 0 1k\nC1 3 0 1u\n.ic v(2)=4\n.tran 10u 5m\n.end\n");
+        REQUIRE(parsed.has_value());
+        const auto tran = Nodalys::ComputeTransient(parsed->CircuitInstance,
+                                                    std::get<Nodalys::TransientConfig>(parsed->Analyses[0].Config));
+        REQUIRE(tran.has_value());
+        // Held at 4 V the two lower resistors split it in half; released, both nodes settle at the operating point
+        CHECK_THAT(tran->NodeVoltages[2].front(), WithinAbs(4.0, 1e-6));
+        CHECK_THAT(tran->NodeVoltages[3].front(), WithinAbs(2.0, 1e-6));
+        CHECK_THAT(tran->NodeVoltages[2].back(), WithinAbs(10.0 / 3.0, 1e-2));
+        CHECK_THAT(tran->NodeVoltages[3].back(), WithinAbs(5.0 / 3.0, 1e-2));
+    }
+
+    SECTION("With uic .ic gives the capacitors on a node their start, as SPICE does, and holds nothing") {
+        const auto parsed = Nodalys::ParseNetlist("* uic\nC1 out 0 1u\nR1 out 0 1k\nV1 1 0 5\nR2 1 2 1k\nR3 2 0 "
+                                                  "1k\n.ic v(out)=3 v(2)=4\n.tran 10u 5m uic\n.end\n");
+        REQUIRE(parsed.has_value());
+        const auto tran = Nodalys::ComputeTransient(parsed->CircuitInstance,
+                                                    std::get<Nodalys::TransientConfig>(parsed->Analyses[0].Config));
+        REQUIRE(tran.has_value());
+        // The numbered nodes keep their numbers and "out" is the next one, node 3. Its capacitor starts at 3 V and
+        // discharges with a time constant of 1 ms
+        CHECK_THAT(tran->NodeVoltages[3].front(), WithinAbs(3.0, 1e-6));
+        CHECK_THAT(VoltageAt(*tran, 3, 1e-3), WithinAbs(3.0 * std::exp(-1.0), WAVEFORM_TOLERANCE));
+        // Node 2 has no capacitor, so nothing carries its 4 V: it sits where the divider puts it
+        CHECK_THAT(tran->NodeVoltages[2].front(), WithinAbs(2.5, 1e-6));
+    }
+
     SECTION("Malformed .ic directives are rejected") {
         CHECK_FALSE(Nodalys::ParseNetlist("* bad ic\nR1 1 0 1k\n.ic 1=5\n.op\n.end\n").has_value());
         CHECK_FALSE(Nodalys::ParseNetlist("* bad ic\nR1 1 0 1k\n.ic v(1)=abc\n.op\n.end\n").has_value());

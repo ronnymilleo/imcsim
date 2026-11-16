@@ -43,6 +43,15 @@ struct CircuitPort {
 };
 
 /**
+ * @struct  CircuitInitialVoltage
+ * @brief   The voltage a node starts a transient at, from an initial voltage marker.
+ */
+struct CircuitInitialVoltage {
+    int Node = 0;
+    double Volts = 0.0;
+};
+
+/**
  * @class   Circuit
  * @brief   Topology of a circuit, without geometry: which nodes each component connects.
  */
@@ -53,6 +62,7 @@ public:
     void AddSubcircuit(std::shared_ptr<SubcircuitDefinition> definition);
     void AddLibraryModel(LibraryModel model);
     void AddPort(const CircuitPort &port);
+    void AddInitialVoltage(const CircuitInitialVoltage &initial_voltage);
     void NameNet(std::string_view net, int node);
     void AddDefinitionsOf(const Circuit &other);
 
@@ -61,6 +71,7 @@ public:
     std::shared_ptr<const SubcircuitDefinition> FindSubcircuit(std::string_view name) const;
     const std::vector<LibraryModel> &GetLibraryModels() const;
     const std::vector<CircuitPort> &GetPorts() const;
+    const std::vector<CircuitInitialVoltage> &GetInitialVoltages() const;
     const LibraryModel *FindLibraryModel(std::string_view name) const;
     std::optional<int> FindNodeOfNet(std::string_view net) const;
     const std::map<std::string, int, std::less<>> &GetNets() const;
@@ -76,6 +87,8 @@ private:
     std::vector<std::shared_ptr<SubcircuitDefinition>> m_Subcircuits;
     std::vector<LibraryModel> m_LibraryModels;
     std::vector<CircuitPort> m_Ports;
+    /// One entry per marker, so two markers on one node stay visible to the checks.
+    std::vector<CircuitInitialVoltage> m_InitialVoltages;
     /// Node of each net a label names, by the name in the form nets are compared in, so a behavioral source can read
     /// V(OUT).
     std::map<std::string, int, std::less<>> m_NodeOfNet;

@@ -57,7 +57,8 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
 - Poles and zeros from an input source to a node, on an s-plane with their frequency, quality factor and damping, and
   marked on the Bode plot of an AC sweep
 - S-parameters of one port (Nodalys) or two or more, set on Block pin markers: a Smith chart with the impedance, VSWR and return loss
-  under the pointer, magnitude and phase plots, and the whole matrix saved as a Touchstone `.sNp` file
+  under the pointer, magnitude and phase plots, the impedance and admittance matrices (Nodalys), the whole matrix saved as
+  a Touchstone `.sNp` file, and for a two-port its stability (K, mu, MAG and MSG, source and load stability circles)
 - A truth table of a digital circuit: every combination of the chosen logic inputs and the 0, 1 or X it gives at the
   measured outputs
 - Two simulation engines, picked in Edit > Preferences > Simulation: ngspice, the default, and Nodalys, a solver written
@@ -92,6 +93,8 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   flip-flops, driven by a Clock source (frequency, duty cycle, logic level and start delay, written as a pulse so there
   are no rise or fall times to set) and a Logic input that drives a net high or low, and simulated with the digital
   code models of ngspice behind analog bridges, so their outputs are voltages that plot and probe like any other
+- Initial voltage markers that set the voltage a node starts a transient at, for circuits that need a push to start,
+  the same on ngspice and Nodalys
 - Logic outputs and 7-segment displays that show the levels of their nets on the schematic, lit by the Logic Lights
   effect, and eight ready logic blocks built from the gates: a 4-bit counter and shift register, a multiplexer, a
   demultiplexer, a 2-to-4 decoder, a 4-bit adder and comparator, and a BCD to 7-segment decoder
@@ -151,7 +154,6 @@ roughly in the order they are likely to come.
 - **Sources, parts and models**: XSPICE analog blocks (transfer functions, limiters, integrators), transmission lines,
   a circuit driven from a WAV or CSV file, PWL points read from a CSV file, and a MOSFET body diode and higher-level
   MOSFET models
-- **Nodalys**: initial voltages of nodes set in the editor
 
 ## Install
 

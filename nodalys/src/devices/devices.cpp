@@ -143,6 +143,22 @@ CapacitorDevice::CapacitorDevice(const int node_a, const int node_b, const doubl
     }
 }
 
+void CapacitorDevice::TakeInitialVoltageFrom(const std::map<int, double> &node_voltages) {
+    if (m_HasInitial) {
+        return;
+    }
+    const auto voltage_of = [&node_voltages](const int node) {
+        const auto found = node_voltages.find(node);
+        return found != node_voltages.end() ? found->second : 0.0;
+    };
+    const double difference = voltage_of(m_NodeA) - voltage_of(m_NodeB);
+    if (difference != 0.0) {
+        m_InitialVoltage = difference;
+        m_HasInitial = true;
+        m_History.Charge = m_Capacitance * m_InitialVoltage;
+    }
+}
+
 void CapacitorDevice::Stamp(MnaSystem &sys, const std::vector<double> &, const TimeContext &time) {
     if (!time.IsTransient) {
         m_LastConductance = 0.0;
@@ -643,7 +659,8 @@ NodeInitialConditionDevice::NodeInitialConditionDevice(const int node, const dou
 }
 
 void NodeInitialConditionDevice::Stamp(MnaSystem &sys, const std::vector<double> & /*x*/, const TimeContext &time) {
-    if (!time.IsTransientStart) {
+    // With uic there is no operating point to hold the node in; the capacitors on it start from its voltage instead
+    if (!time.IsTransientStart || time.UseInitialConditions) {
         return;
     }
     constexpr double IC_CONDUCTANCE = 1e9;

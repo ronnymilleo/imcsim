@@ -12,7 +12,11 @@
 
 #include "analysis/analysis_inputs.h"
 #include "backends/nodalys/nodalys_backend.h"
+#include "circuit/components/capacitor.h"
+#include "circuit/components/ground.h"
+#include "circuit/components/resistor.h"
 #include "circuit/components/source.h"
+#include "circuit/components/vcc.h"
 #include "nodalys_in_use.h"
 #include "schematic/examples.h"
 #include "schematic/schematic.h"
@@ -869,6 +873,65 @@ TEST_CASE("The precision rectifier, whose op-amp is SPICE text, gives the same w
     const auto [fine_expected, fine_actual] = run_both(fine);
     INFO(std::format("at a tenth of the step {} V", largest_output_difference(fine_expected, fine_actual)));
     CHECK(largest_output_difference(fine_expected, fine_actual) < FINE_VOLTS);
+}
+
+TEST_CASE("The initial voltage of a node starts a transient the same way on both engines",
+          "[cross_validation][initial_voltage]") {
+    // 5 V over three 1k resistors with a capacitor on the last node, and a second RC whose capacitor has an initial
+    // condition of its own, which makes the whole transient start from initial conditions (uic)
+    Core::VCC supply;
+    supply.SetName("V1");
+    supply.SetValue(5.0);
+    std::array<Core::Resistor, 4> resistors;
+    for (std::size_t index = 0; index < resistors.size(); ++index) {
+        resistors[index].SetName(std::format("R{}", index + 1));
+        resistors[index].SetValue(1e3);
+    }
+    std::array<Core::Capacitor, 2> capacitors;
+    capacitors[0].SetName("C1");
+    capacitors[0].SetValue(1e-6);
+    capacitors[1].SetName("C2");
+    capacitors[1].SetValue(1e-6);
+    Core::Ground ground;
+    Core::Circuit circuit;
+    circuit.Add(supply, {1});
+    circuit.Add(resistors[0], {1, 2});
+    circuit.Add(resistors[1], {2, 3});
+    circuit.Add(resistors[2], {3, 0});
+    circuit.Add(capacitors[0], {3, 0});
+    circuit.Add(ground, {0});
+    // The second pair, with the capacitor on node 4 and the resistor from it to ground
+    circuit.Add(resistors[3], {4, 0});
+    circuit.Add(capacitors[1], {4, 0});
+    circuit.AddInitialVoltage({.Node = 2, .Volts = 4.0});
+    circuit.AddInitialVoltage({.Node = 4, .Volts = 3.0});
+
+    const Core::TransientSettings settings{.StopTime = 5e-3, .TimeStep = 5e-6};
+    const auto compare = [&](const Core::Circuit &asked) {
+        const Core::TransientRun on_ngspice = Core::RunTransient(asked, settings);
+        REQUIRE(on_ngspice.Result.has_value());
+        const TestSupport::NodalysInUse nodalys;
+        const Core::TransientRun on_nodalys = Core::RunTransient(asked, settings);
+        REQUIRE(on_nodalys.Result.has_value());
+        DifferenceLog log;
+        for (int node = 1; node < asked.GetNodeCount(); ++node) {
+            const auto index = static_cast<std::size_t>(node);
+            CompareWaveforms(log, std::format("V({})", node), on_ngspice.Result->Times,
+                             on_ngspice.Result->NodeVoltages[index], on_nodalys.Result->Times,
+                             on_nodalys.Result->NodeVoltages[index], settings.StopTime, settings.TimeStep,
+                             VOLTAGE_FLOOR_VOLTS);
+        }
+        const Differences found = log.Take();
+        INFO(Indented(found));
+        CHECK(found.empty());
+    };
+
+    // Node 2 is held at 4 V in the operating point and node 4 at 3 V, then both are released
+    compare(circuit);
+
+    // With a capacitor that has an initial condition, node 4 starts the capacitors across it from 3 V instead
+    capacitors[0].SetInitialCondition(1.0);
+    compare(circuit);
 }
 
 TEST_CASE("Every example gives the same results on ngspice and on Nodalys", "[cross_validation]") {

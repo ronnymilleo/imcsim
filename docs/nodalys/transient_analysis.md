@@ -52,6 +52,14 @@ which is $\tfrac{2}{9} h^3 |y^{(3)}|$ at a constant step, the error constant of 
 - **Hysteretic Switching Events:** a voltage-controlled switch or relay contact takes its state from the iterate of each Newton iteration, so it can flip inside a step. A flip turns the slope of every stiff mode around it (a switch of 10 mΩ closing onto a diode capacitance of 110 pF has a time constant of a few picoseconds against steps of a microsecond), and the trapezoidal rule would carry the error as a ringing of the capacitor current for ever. The step that flips a switch (`Device::HasSwitched()`) is therefore treated as a corner: the next step restarts with Backward Euler and a fresh LTE history. The buck converter example showed it, with 1.26 A through the switch where ngspice shows 0.57 A.
 - **Output Grid Interpolation (`TransientCollector`):** internal adaptive steps are linearly interpolated onto the user-requested uniform output grid (`TimeStep`).
 
+### 1.5 Initial Conditions: the Start of the Transient
+The transient starts from one of two solves at $t = 0$, as in SPICE:
+
+- **Operating point (default):** the DC solution with the capacitors open and the inductors shorted. A node with an initial voltage (`CircuitBuilder::SetInitialVoltage()`, SPICE `.ic V(node)=value`) is held at it in this solve by a stiff Norton source ($10^9$ S), so every other node settles at the point that is consistent with it; the source is stamped in this solve only, and the node evolves freely for $t > 0$. A divider of three $1\,\mathrm{k\Omega}$ resistors over 5 V with its first inner node held at 4 V starts the second at 2 V, not at the 1.67 V of the unconstrained operating point.
+- **Initial conditions (`uic`):** no operating point. A capacitor with an `IC` of its own is forced to it at $t = 0$ by a stiff companion, an inductor starts from its `IC` current, and every other capacitor and inductor starts at zero. A node initial voltage holds nothing here: it gives each capacitor that has no `IC` of its own the voltage difference of its two nodes, which is how SPICE takes it (`CapacitorDevice::TakeInitialVoltageFrom()`), so a node with no capacitor on it has nothing to start from.
+
+The operating point, the DC sweep and the small-signal analyses never stamp the node source, so an initial voltage does not change their results. `imcsim` writes the same `.ic` line for `ngspice`, which holds the node in the operating point and, with `uic`, applies the voltage to the capacitors on it in the same way (the two engines are compared in `engine_cross_validation_tests.cpp`).
+
 ---
 
 ## 2. Benchmark Tables: Analytical Golden vs. `ngspice` vs. `Nodalys`

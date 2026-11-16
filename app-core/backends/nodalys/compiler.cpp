@@ -210,6 +210,9 @@ public:
         for (const auto &port : m_Circuit.GetPorts()) {
             m_Builder->AddPort(port.Number, port.Node, port.ReferenceOhms);
         }
+        for (const CircuitInitialVoltage &initial_voltage : m_Circuit.GetInitialVoltages()) {
+            m_Builder->SetInitialVoltage(initial_voltage.Node, initial_voltage.Volts);
+        }
 
         return m_Builder->Build();
     }
@@ -288,6 +291,7 @@ private:
         switch (type) {
         case ComponentType::GROUND:
         case ComponentType::NET_LABEL:
+        case ComponentType::INITIAL_VOLTAGE:
         case ComponentType::PIN:
             return {};
 
