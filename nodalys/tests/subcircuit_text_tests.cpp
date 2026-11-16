@@ -13,11 +13,14 @@
 #include "parser/spice_text.h"
 #include "parser/spice_values.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <format>
 #include <map>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 using Catch::Matchers::ContainsSubstring;
@@ -273,7 +276,8 @@ TEST_CASE("A text with an element, a directive or a model the engine cannot simu
     CHECK_THAT(jfet, ContainsSubstring("J1 OUT IN 0 JMOD"));
     CHECK_THAT(jfet, ContainsSubstring("JFET"));
     CHECK_THAT(refusal("K1 L1 L2 0.9\n"), ContainsSubstring("coupled inductors"));
-    CHECK_THAT(refusal("V2 OUT 0 PULSE(0 1 0 1n 1n 1u 2u)\n"), ContainsSubstring("PULSE"));
+    CHECK_THAT(refusal("V2 OUT 0 WOBBLE(0 1 0)\n"), ContainsSubstring("WOBBLE"));
+    CHECK_THAT(refusal("V2 OUT 0 PULSE(0 {NOPE} 0 1n 1n 1u 2u)\n"), ContainsSubstring("NOPE"));
     CHECK_THAT(refusal(".func twice(x) {2*x}\nR1 IN OUT 1\n"), ContainsSubstring(".func"));
     CHECK_THAT(refusal("R1 IN OUT 1k TC1=0.001\n"), ContainsSubstring("TC1"));
     CHECK_THAT(refusal("R1 IN OUT {NOPE}\n"), ContainsSubstring("NOPE"));
@@ -400,4 +404,87 @@ TEST_CASE("A text is checked before a run without a circuit to put it in", "[sub
     const auto reason = Nodalys::CheckSubcircuitText(bad, {});
     REQUIRE(reason.has_value());
     CHECK_THAT(*reason, ContainsSubstring("MESFET"));
+}
+
+TEST_CASE("A source of the text with any waveform gives the signal of the same source in a netlist",
+          "[subcircuit_text]") {
+    constexpr double STOP_TIME = 20e-6;
+    constexpr double TIME_STEP = 0.1e-6;
+    constexpr unsigned int SEED = 7;
+    constexpr double LOAD_OHMS = 1e3;
+    constexpr double SAME_SIGNAL_TOLERANCE = 1e-12;
+    const Nodalys::TransientConfig config{.StopTime = STOP_TIME, .TimeStep = TIME_STEP, .Seed = SEED};
+    // The kind of source (V or I) and what follows its two nodes, as written in a netlist
+    const std::vector<std::pair<char, std::string>> sources = {
+        {'V', "PULSE(0 5 2u 1u 1u 4u 10u)"},
+        {'V', "SIN(1 2 100k 0 0)"},
+        {'V', "EXP(0 3 1u 2u 8u 3u)"},
+        {'V', "PWL(0 0 5u 2 10u -1 20u 4)"},
+        {'V', "SFFM(0 2 500k 3 50k)"},
+        {'V', "AM(2 0 50k 500k 1u)"},
+        {'V', "DC 0.5 TRNOISE(1m 1u 0 0 0 0 0)"},
+        {'V', "TRRANDOM(1 1u 0 1 0)"},
+        {'I', "PULSE(0 2m 2u 1u 1u 4u 10u)"},
+        {'I', "SIN(0 1m 100k) AC 1"},
+    };
+    for (const auto &[kind, waveform] : sources) {
+        CAPTURE(kind, waveform);
+        const std::string netlist = std::format("waveform check\n{}1 1 0 {}\nRLOAD 1 0 1k\n.end\n", kind, waveform);
+        const auto parsed = Nodalys::ParseNetlist(netlist);
+        REQUIRE(parsed.has_value());
+        const auto expected = Nodalys::ComputeTransient(parsed->CircuitInstance, config);
+        REQUIRE(expected.has_value());
+
+        Nodalys::CircuitBuilder builder{2};
+        // Added before the load, as in the netlist: the draws of a noise source follow the index of its device
+        const Nodalys::SubcircuitText text{
+            .Name = "BLOCK", .Ports = {"IN"}, .Body = std::format("{}1 IN 0 {}\n", kind, waveform)};
+        REQUIRE(Nodalys::AddSubcircuitText(builder, text, {.Prefix = "X1", .PortNodes = {1}}).has_value());
+        builder.AddResistor("RLOAD", 1, 0, LOAD_OHMS);
+        auto circuit = builder.Build();
+        REQUIRE(circuit.has_value());
+        const auto actual = Nodalys::ComputeTransient(*circuit, config);
+        REQUIRE(actual.has_value());
+
+        REQUIRE(actual->Times.size() == expected->Times.size());
+        double largest = 0.0;
+        double largest_difference = 0.0;
+        for (std::size_t point = 0; point < actual->Times.size(); ++point) {
+            largest = std::max(largest, std::abs(expected->NodeVoltages[1][point]));
+            largest_difference = std::max(largest_difference,
+                                          std::abs(actual->NodeVoltages[1][point] - expected->NodeVoltages[1][point]));
+        }
+        // A waveform that stayed at zero would match anything, so the signal must be there
+        CHECK(largest > 0.0);
+        CHECK(largest_difference < SAME_SIGNAL_TOLERANCE);
+    }
+}
+
+TEST_CASE("The numbers of a waveform in the text may be expressions of the parameters of the block",
+          "[subcircuit_text]") {
+    constexpr double STOP_TIME = 10e-6;
+    constexpr double TIME_STEP = 0.1e-6;
+    constexpr double HIGH_VOLTS = 3.0;
+    const Nodalys::TransientConfig config{.StopTime = STOP_TIME, .TimeStep = TIME_STEP};
+    Nodalys::CircuitBuilder builder{2};
+    builder.AddResistor("RLOAD", 1, 0, 1e3);
+    const Nodalys::SubcircuitText text{
+        .Name = "BLOCK", .Ports = {"IN"}, .Body = "V1 IN 0 PULSE(0 {VHIGH} 0 1n 1n {2 * TON} 100u)\n"};
+    REQUIRE(Nodalys::AddSubcircuitText(
+                builder, text, {.Prefix = "X1", .PortNodes = {1}, .Parameters = {{"VHIGH", HIGH_VOLTS}, {"TON", 4e-6}}})
+                .has_value());
+    auto circuit = builder.Build();
+    REQUIRE(circuit.has_value());
+    const auto result = Nodalys::ComputeTransient(*circuit, config);
+    REQUIRE(result.has_value());
+    // The pulse is high from 1 ns to 8 us, so the node holds the high level at 5 us and is back to zero at 9 us
+    const auto at = [&result](const double time) {
+        std::size_t point = 0;
+        while (point + 1 < result->Times.size() && result->Times[point] < time) {
+            ++point;
+        }
+        return result->NodeVoltages[1][point];
+    };
+    CHECK_THAT(at(5e-6), WithinAbs(HIGH_VOLTS, VOLTAGE_TOLERANCE));
+    CHECK_THAT(at(9e-6), WithinAbs(0.0, VOLTAGE_TOLERANCE));
 }

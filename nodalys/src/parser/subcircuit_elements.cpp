@@ -6,6 +6,7 @@
 #include "parser/subcircuit_elements.h"
 
 #include "nodalys/expression.h"
+#include "parser/source_waveforms.h"
 #include "parser/spice_text.h"
 #include "parser/spice_values.h"
 #include "parser/subcircuit_models.h"
@@ -174,12 +175,13 @@ Result AddInductorLine(ExpansionContext &context, TextScope &scope, const Elemen
 
 /**
  * @struct  SourceValues
- * @brief   What an independent source line gives: its DC value and its small-signal magnitude and phase.
+ * @brief   What an independent source line gives: its DC value, its small-signal magnitude and phase, and its
+ *          waveform with the numbers in the parentheses.
  */
 struct SourceValues {
-    double Dc = 0.0;
-    double AcMagnitude = 0.0;
-    double AcPhaseDegrees = 0.0;
+    SourceLevels Levels;
+    SourceWaveform Waveform = SourceWaveform::NONE;
+    std::vector<double> WaveformValues;
 };
 
 Result ReadInto(const TextScope &scope, const std::string &text, double &target) {
@@ -196,18 +198,38 @@ Result ReadInto(const TextScope &scope, const std::string &text, double &target)
  */
 Result ReadAcValues(const TextScope &scope, const std::vector<std::string> &tokens, std::size_t &index,
                     SourceValues &values) {
-    Result done = ReadInto(scope, tokens[index + 1], values.AcMagnitude);
+    Result done = ReadInto(scope, tokens[index + 1], values.Levels.AcMagnitude);
     index += 2;
     if (done && index < tokens.size() && scope.Evaluate(tokens[index])) {
-        done = ReadInto(scope, tokens[index], values.AcPhaseDegrees);
+        done = ReadInto(scope, tokens[index], values.Levels.AcPhaseDegrees);
         ++index;
     }
     return done;
 }
 
 /**
+ * @brief   Reads the numbers inside the parentheses of a waveform, each one a literal or an expression of the
+ *          parameters the scope sees.
+ */
+Result ReadWaveformValues(const TextScope &scope, const std::string &token, std::vector<double> &values) {
+    const std::size_t open = token.find('(');
+    const std::size_t close = token.rfind(')');
+    if (close == std::string::npos || close < open) {
+        return std::unexpected(std::format("the waveform '{}' has no closing parenthesis", token));
+    }
+    for (const std::string &text : SplitTokens(std::string_view(token).substr(open + 1, close - open - 1))) {
+        const auto value = scope.Evaluate(text);
+        if (!value) {
+            return std::unexpected(value.error());
+        }
+        values.push_back(*value);
+    }
+    return {};
+}
+
+/**
  * @brief   Reads the word of a source line at index, with the value that belongs to it, and moves index past them.
- * @return  Nothing, or why the word cannot be simulated: anything but a DC or an AC value, such as a waveform.
+ * @return  Nothing, or why the word cannot be simulated: anything but a DC value, an AC value or a waveform.
  */
 Result ReadSourceWord(const TextScope &scope, const std::vector<std::string> &tokens, std::size_t &index,
                       SourceValues &values) {
@@ -215,27 +237,33 @@ Result ReadSourceWord(const TextScope &scope, const std::vector<std::string> &to
     const bool has_next = index + 1 < tokens.size();
     if (upper == "DC" && has_next) {
         index += 2;
-        return ReadInto(scope, tokens[index - 1], values.Dc);
+        return ReadInto(scope, tokens[index - 1], values.Levels.Dc);
     }
     if (upper.starts_with("DC=")) {
         ++index;
-        return ReadInto(scope, tokens[index - 1].substr(3), values.Dc);
+        return ReadInto(scope, tokens[index - 1].substr(3), values.Levels.Dc);
     }
     if (upper == "AC" && has_next) {
         return ReadAcValues(scope, tokens, index, values);
     }
+    if (const SourceWaveform waveform = FindSourceWaveform(tokens[index]); waveform != SourceWaveform::NONE) {
+        values.Waveform = waveform;
+        values.WaveformValues.clear();
+        ++index;
+        return ReadWaveformValues(scope, tokens[index - 1], values.WaveformValues);
+    }
     if (index == TWO_TERMINAL_VALUE_INDEX && tokens[index].find('(') == std::string::npos) {
         ++index;
-        return ReadInto(scope, tokens[index - 1], values.Dc);
+        return ReadInto(scope, tokens[index - 1], values.Levels.Dc);
     }
     const std::string word = tokens[index].substr(0, tokens[index].find('('));
-    return std::unexpected(std::format("the source waveform or option '{}' is not simulated inside a "
-                                       "subcircuit kept as text; only DC and AC values are",
+    return std::unexpected(std::format("the source word or option '{}' is not simulated inside a "
+                                       "subcircuit kept as text; only DC and AC values and the waveforms are",
                                        word));
 }
 
 /**
- * @brief   Reads "[DC] value [AC magnitude [phase]]" of a source; a waveform such as PULSE or SIN is refused.
+ * @brief   Reads "[DC] value [AC magnitude [phase]]" and a waveform such as PULSE or SIN of a source line.
  */
 std::expected<SourceValues, std::string> ReadSource(const TextScope &scope, const ElementLine &element) {
     if (const Result nodes = CheckNodeCount(element, 2); !nodes) {
@@ -251,24 +279,22 @@ std::expected<SourceValues, std::string> ReadSource(const TextScope &scope, cons
     return values;
 }
 
-Result AddVoltageSourceLine(ExpansionContext &context, TextScope &scope, const ElementLine &element) {
+Result AddSourceLine(ExpansionContext &context, TextScope &scope, const ElementLine &element, const bool is_voltage) {
     const auto values = ReadSource(scope, element);
     if (!values) {
         return std::unexpected(values.error());
     }
-    context.Builder.AddVdc(element.Name, Node(context, scope, element, 0), Node(context, scope, element, 1), values->Dc,
-                           values->AcMagnitude, values->AcPhaseDegrees);
+    AddWaveformSource(context.Builder, element.Name, is_voltage, Node(context, scope, element, 0),
+                      Node(context, scope, element, 1), values->Waveform, values->WaveformValues, values->Levels);
     return {};
 }
 
+Result AddVoltageSourceLine(ExpansionContext &context, TextScope &scope, const ElementLine &element) {
+    return AddSourceLine(context, scope, element, true);
+}
+
 Result AddCurrentSourceLine(ExpansionContext &context, TextScope &scope, const ElementLine &element) {
-    const auto values = ReadSource(scope, element);
-    if (!values) {
-        return std::unexpected(values.error());
-    }
-    context.Builder.AddIdc(element.Name, Node(context, scope, element, 0), Node(context, scope, element, 1), values->Dc,
-                           values->AcMagnitude, values->AcPhaseDegrees);
-    return {};
+    return AddSourceLine(context, scope, element, false);
 }
 
 /**
