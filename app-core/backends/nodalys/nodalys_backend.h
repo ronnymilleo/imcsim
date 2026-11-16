@@ -35,6 +35,7 @@ public:
     NoiseRun RunNoise(const Circuit &circuit, const NoiseSettings &settings) override;
     TransferFunctionRun RunTransferFunction(const Circuit &circuit, const TransferFunctionSettings &settings) override;
     SensitivityRun RunSensitivity(const Circuit &circuit, const SensitivitySettings &settings) override;
+    ACSensitivityRun RunACSensitivity(const Circuit &circuit, const ACSensitivitySettings &settings) override;
     PoleZeroRun RunPoleZero(const Circuit &circuit, const PoleZeroSettings &settings) override;
     SParametersRun RunSParameters(const Circuit &circuit, const SParameterSettings &settings) override;
     HarmonicBalanceRun RunHarmonicBalance(const Circuit &circuit, const HarmonicBalanceSettings &settings,

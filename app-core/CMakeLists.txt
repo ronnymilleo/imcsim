@@ -59,6 +59,7 @@ add_library(imcsim-core-lib
             circuit/netlist_sources.cpp
             circuit/netlist_subcircuits.cpp
             circuit/spice_library.cpp
+            simulation/ac_sensitivity.cpp
             simulation/analysis_sources.cpp
             simulation/analysis_suggestions.cpp
             simulation/check_ac_sweep.cpp
