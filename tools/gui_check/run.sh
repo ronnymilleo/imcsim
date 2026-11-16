@@ -277,7 +277,7 @@ check_s_parameter_views() {
     if [[ "$ENGINE" == nodalys ]]; then
         ui_click_text Z "$DOCS_OUTPUT_X" "$COMMAND_BAR_BOTTOM" "$DOCS_SIDE_X" "$DOCS_HEIGHT"
         sleep "$MEDIUM_PAUSE"
-        check_step s_parameters_impedance 'Impedance'
+        check_step s_parameters_impedance 'Magnitude'
     fi
 }
 
