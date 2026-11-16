@@ -305,19 +305,12 @@ std::vector<std::string> FindAcSources(const std::vector<std::string> &circuit_l
     return names;
 }
 
-/// Reads the rest of `.sens <out_var> AC [DEC|OCT|LIN] <np> <fstart> <fstop>` after the output nodes, and picks the
-/// input source: the ngspice syntax names none, so it is the one source with an AC magnitude.
-std::expected<AcSensitivityConfig, std::string> ParseAcSensitivity(const std::vector<std::string> &tokens,
-                                                                   const NodeId positive, const NodeId negative,
-                                                                   const std::vector<std::string> &circuit_lines) {
-    constexpr std::size_t TOKENS_WITH_SWEEP_TYPE = 7;
-    constexpr std::size_t FIRST_SWEEP_TOKEN = 3;
-    if (tokens.size() != TOKENS_WITH_SWEEP_TYPE) {
-        return std::unexpected("Malformed .sens ac directive, expected '.sens <out_var> ac dec|oct|lin <np> <fstart> "
-                               "<fstop>'");
-    }
-    AcSensitivityConfig cfg;
-    const std::string sweep_type = ToUpper(tokens[FIRST_SWEEP_TOKEN]);
+/// Where the sweep of `.sens <out_var> AC <type> <np> <fstart> <fstop>` starts among the tokens.
+constexpr std::size_t FIRST_AC_SENSITIVITY_SWEEP_TOKEN = 3;
+
+/// Reads the sweep type, the points and the frequency range of a `.sens ... AC` directive into the configuration.
+std::optional<std::string> ReadAcSensitivitySweep(const std::vector<std::string> &tokens, AcSensitivityConfig &cfg) {
+    const std::string sweep_type = ToUpper(tokens[FIRST_AC_SENSITIVITY_SWEEP_TOKEN]);
     if (sweep_type == "DEC") {
         cfg.SweepType = FrequencySweepType::DECADE;
     } else if (sweep_type == "OCT") {
@@ -325,30 +318,26 @@ std::expected<AcSensitivityConfig, std::string> ParseAcSensitivity(const std::ve
     } else if (sweep_type == "LIN") {
         cfg.SweepType = FrequencySweepType::LINEAR;
     } else {
-        return std::unexpected(
-            std::format("Unknown sweep type '{}' in .sens ac, use dec, oct or lin", tokens[FIRST_SWEEP_TOKEN]));
+        return std::format("Unknown sweep type '{}' in .sens ac, use dec, oct or lin",
+                           tokens[FIRST_AC_SENSITIVITY_SWEEP_TOKEN]);
     }
-    const std::optional<double> points = ParseSpiceNumber(tokens[FIRST_SWEEP_TOKEN + 1]);
+    const std::optional<double> points = ParseSpiceNumber(tokens[FIRST_AC_SENSITIVITY_SWEEP_TOKEN + 1]);
     if (!points || *points < 1.0 || std::floor(*points) != *points) {
-        return std::unexpected("Invalid number of points in .sens ac, it must be a whole number of at least 1");
+        return "Invalid number of points in .sens ac, it must be a whole number of at least 1";
     }
     cfg.PointsPerDecade = static_cast<int>(*points);
-    const std::optional<double> start = ParseSpiceNumber(tokens[FIRST_SWEEP_TOKEN + 2]);
-    const std::optional<double> stop = ParseSpiceNumber(tokens[FIRST_SWEEP_TOKEN + 3]);
+    const std::optional<double> start = ParseSpiceNumber(tokens[FIRST_AC_SENSITIVITY_SWEEP_TOKEN + 2]);
+    const std::optional<double> stop = ParseSpiceNumber(tokens[FIRST_AC_SENSITIVITY_SWEEP_TOKEN + 3]);
     if (!start || !stop || *start <= 0.0 || *stop < *start) {
-        return std::unexpected("Invalid frequency range in .sens ac, it needs 0 < fstart <= fstop");
+        return "Invalid frequency range in .sens ac, it needs 0 < fstart <= fstop";
     }
     cfg.StartFrequency = *start;
     cfg.StopFrequency = *stop;
-    if (positive == GROUND_NODE) {
-        return std::unexpected("The output of .sens ac must have a node other than ground as its positive one");
-    }
-    if (positive == negative) {
-        return std::unexpected("The two output nodes of .sens ac are the same node");
-    }
-    cfg.OutputPositiveNode = positive;
-    cfg.OutputNegativeNode = negative;
+    return std::nullopt;
+}
 
+/// The input of an AC sensitivity: the ngspice syntax names none, so it is the one source with an AC magnitude.
+std::expected<std::string, std::string> FindAcSensitivityInput(const std::vector<std::string> &circuit_lines) {
     const std::vector<std::string> sources = FindAcSources(circuit_lines);
     if (sources.empty()) {
         return std::unexpected("No source has an AC magnitude, so .sens ac has no input; give one source 'AC 1'");
@@ -362,7 +351,36 @@ std::expected<AcSensitivityConfig, std::string> ParseAcSensitivity(const std::ve
                                            "its input; leave AC on one source only",
                                            names));
     }
-    cfg.InputSource = sources.front();
+    return sources.front();
+}
+
+/// Reads the rest of `.sens <out_var> AC [DEC|OCT|LIN] <np> <fstart> <fstop>` after the output nodes, and picks the
+/// input source.
+std::expected<AcSensitivityConfig, std::string> ParseAcSensitivity(const std::vector<std::string> &tokens,
+                                                                   const NodeId positive, const NodeId negative,
+                                                                   const std::vector<std::string> &circuit_lines) {
+    constexpr std::size_t TOKENS_WITH_SWEEP_TYPE = 7;
+    if (tokens.size() != TOKENS_WITH_SWEEP_TYPE) {
+        return std::unexpected("Malformed .sens ac directive, expected '.sens <out_var> ac dec|oct|lin <np> <fstart> "
+                               "<fstop>'");
+    }
+    AcSensitivityConfig cfg;
+    if (const std::optional<std::string> error = ReadAcSensitivitySweep(tokens, cfg)) {
+        return std::unexpected(*error);
+    }
+    if (positive == GROUND_NODE) {
+        return std::unexpected("The output of .sens ac must have a node other than ground as its positive one");
+    }
+    if (positive == negative) {
+        return std::unexpected("The two output nodes of .sens ac are the same node");
+    }
+    cfg.OutputPositiveNode = positive;
+    cfg.OutputNegativeNode = negative;
+    const std::expected<std::string, std::string> input = FindAcSensitivityInput(circuit_lines);
+    if (!input) {
+        return std::unexpected(input.error());
+    }
+    cfg.InputSource = *input;
     return cfg;
 }
 
