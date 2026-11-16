@@ -143,6 +143,7 @@ add_library(imcsim-gui-lib
             ui_elements/ui_logic_part.cpp
             ui_elements/ui_mosfet.cpp
             ui_elements/ui_net_label.cpp
+            ui_elements/ui_nodeset.cpp
             ui_elements/ui_op_amp.cpp
             ui_elements/ui_potentiometer.cpp
             ui_elements/ui_resistor.cpp

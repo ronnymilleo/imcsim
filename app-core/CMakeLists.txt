@@ -41,6 +41,7 @@ add_library(imcsim-core-lib
             circuit/components/logic_part.cpp
             circuit/components/mosfet.cpp
             circuit/components/net_label.cpp
+            circuit/components/nodeset.cpp
             circuit/components/op_amp.cpp
             circuit/components/potentiometer.cpp
             circuit/components/relay.cpp
@@ -54,11 +55,11 @@ add_library(imcsim-core-lib
             circuit/components/vcc.cpp
             circuit/components/voltage_controlled_switch.cpp
             circuit/components/voltage_source.cpp
-            circuit/initial_voltage_targets.cpp
             circuit/library_model.cpp
             circuit/netlist_logic.cpp
             circuit/netlist_sources.cpp
             circuit/netlist_subcircuits.cpp
+            circuit/node_voltage_targets.cpp
             circuit/spice_library.cpp
             simulation/ac_sensitivity.cpp
             simulation/analysis_sources.cpp
@@ -71,6 +72,7 @@ add_library(imcsim-core-lib
             simulation/check_pole_zero.cpp
             simulation/check_s_parameters.cpp
             simulation/check_sensitivity.cpp
+            simulation/check_solver_options.cpp
             simulation/check_transfer_function.cpp
             simulation/check_transient.cpp
             simulation/check_truth_table.cpp

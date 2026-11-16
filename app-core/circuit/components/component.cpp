@@ -42,6 +42,7 @@ constexpr auto ALL_TYPES = std::to_array<ComponentType>({
     ComponentType::SUBCIRCUIT,
     ComponentType::NET_LABEL,
     ComponentType::INITIAL_VOLTAGE,
+    ComponentType::NODESET,
     ComponentType::PIN,
     ComponentType::POTENTIOMETER,
     ComponentType::SWITCH,
@@ -170,6 +171,7 @@ const char *Component::GetNamePrefix() const {
     case ComponentType::GROUND:
     case ComponentType::NET_LABEL:
     case ComponentType::INITIAL_VOLTAGE:
+    case ComponentType::NODESET:
     case ComponentType::PIN:
     case ComponentType::LOGIC_OUTPUT:
     case ComponentType::SEVEN_SEGMENT:
@@ -198,6 +200,7 @@ const char *Component::GetUnit() const {
     case ComponentType::CLOCK:
     case ComponentType::LOGIC_INPUT:
     case ComponentType::INITIAL_VOLTAGE:
+    case ComponentType::NODESET:
         return "V";
     case ComponentType::CURRENT_SOURCE:
     case ComponentType::BEHAVIORAL_CURRENT:
@@ -304,6 +307,7 @@ bool Component::HasValue() const {
     case ComponentType::CCCS:
     case ComponentType::CCVS:
     case ComponentType::INITIAL_VOLTAGE:
+    case ComponentType::NODESET:
         return true;
     }
     return false;
@@ -332,6 +336,7 @@ bool Component::IsValidValue(const double value) const {
     case ComponentType::CCVS:
         return true;
     case ComponentType::INITIAL_VOLTAGE:
+    case ComponentType::NODESET:
         return std::isfinite(value);
     case ComponentType::BEHAVIORAL_VOLTAGE:
     case ComponentType::BEHAVIORAL_CURRENT:
@@ -648,6 +653,8 @@ const char *GetTypeName(const ComponentType type) {
         return "NetLabel";
     case ComponentType::INITIAL_VOLTAGE:
         return "InitialVoltage";
+    case ComponentType::NODESET:
+        return "Nodeset";
     case ComponentType::PIN:
         return "Pin";
     case ComponentType::POTENTIOMETER:

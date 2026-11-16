@@ -60,6 +60,7 @@ add_executable(imcsim-tests
             nodalys_backend_tests.cpp
             nodalys_benchmark_tests.cpp
             nodalys_in_use.cpp
+            nodeset_tests.cpp
             nonlinear_tests.cpp
             op_amp_tests.cpp
             parameter_conversion_tests.cpp
@@ -101,6 +102,7 @@ add_executable(imcsim-tests
             simulation_service_tests.cpp
             simulator_tests.cpp
             smith_chart_tests.cpp
+            solver_options_tests.cpp
             spectrum_tests.cpp
             spice_import_tests.cpp
             spice_inclusions_tests.cpp

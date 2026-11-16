@@ -1,10 +1,11 @@
 /**
- * @file    initial_voltage_targets.h
- * @brief   Finds the node each initial voltage marker sets in the circuit as every instance of a block expands it.
+ * @file    node_voltage_targets.h
+ * @brief   Finds the node each initial voltage or nodeset marker sets in the circuit as every instance of a block
+ * expands it.
  */
 
-#ifndef IMCSIM_INITIAL_VOLTAGE_TARGETS_H
-#define IMCSIM_INITIAL_VOLTAGE_TARGETS_H
+#ifndef IMCSIM_NODE_VOLTAGE_TARGETS_H
+#define IMCSIM_NODE_VOLTAGE_TARGETS_H
 
 #include "circuit/circuit.h"
 #include <string>
@@ -13,12 +14,13 @@
 namespace Core {
 
 /**
- * @struct  InitialVoltageTarget
- * @brief   One initial voltage as one instance of the circuit expands it: the node it sets and where the marker sits.
+ * @struct  NodeVoltageTarget
+ * @brief   One initial voltage or nodeset as one instance of the circuit expands it: the node it sets and where the
+ *          marker sits.
  * @details A marker inside a block gives one target per instance, nested instances included. A marker on a pin of the
  *          block sets the outer node that instance connects the pin to, so its Path is that of the outer circuit.
  */
-struct InitialVoltageTarget {
+struct NodeVoltageTarget {
     /// Names of the instances from the top circuit down to the block whose numbering Node uses; empty at the top.
     std::vector<std::string> Path;
     int Node = 0;
@@ -30,11 +32,11 @@ struct InitialVoltageTarget {
 };
 
 // Expanding
-std::vector<InitialVoltageTarget> ResolveInitialVoltages(const Circuit &circuit);
+std::vector<NodeVoltageTarget> ResolveNodeVoltages(const Circuit &circuit, NodeVoltageKind kind);
 
 // Naming
 std::string FormatInstancePath(const std::vector<std::string> &path);
 
 } // namespace Core
 
-#endif // IMCSIM_INITIAL_VOLTAGE_TARGETS_H
+#endif // IMCSIM_NODE_VOLTAGE_TARGETS_H

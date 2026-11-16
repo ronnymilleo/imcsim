@@ -81,11 +81,24 @@ void Circuit::AddPort(const CircuitPort &port) {
  * @param[in] initial_voltage  Node and voltage; the node counts toward GetNodeCount().
  * @note    Only a transient reads it. The netlist writes it as ".ic"; CheckCircuit() refuses two different voltages on
  *          one node, ground, and a node no part is connected to. In a block body it sets the node of each instance;
- *          see ResolveInitialVoltages().
+ *          see ResolveNodeVoltages().
  */
-void Circuit::AddInitialVoltage(const CircuitInitialVoltage &initial_voltage) {
+void Circuit::AddInitialVoltage(const CircuitNodeVoltage &initial_voltage) {
     m_NodeCount = std::max(m_NodeCount, initial_voltage.Node + 1);
     m_InitialVoltages.push_back(initial_voltage);
+}
+
+/**
+ * @brief   Adds the voltage the solver starts a node at when it looks for the operating point.
+ * @param[in] nodeset  Node and voltage; the node counts toward GetNodeCount().
+ * @note    Every analysis that starts from an operating point reads it, and the solution is free to end elsewhere,
+ *          which is how it picks one of the stable states of a circuit that has several. The netlist writes it as
+ *          ".nodeset"; CheckCircuit() refuses what it refuses for an initial voltage. In a block body it sets the
+ *          node of each instance; see ResolveNodeVoltages().
+ */
+void Circuit::AddNodeset(const CircuitNodeVoltage &nodeset) {
+    m_NodeCount = std::max(m_NodeCount, nodeset.Node + 1);
+    m_Nodesets.push_back(nodeset);
 }
 
 /**
@@ -98,9 +111,18 @@ void Circuit::NameNet(const std::string_view net, const int node) {
 }
 
 /**
- * @brief   Adds the subcircuit definitions, library models, net names and initial voltages of another circuit, as a
- *          circuit derived from it needs.
- * @param[in] other  Circuit whose definitions are shared and whose models, net names and initial voltages are copied.
+ * @brief   Sets the options of the solver, which the netlist writes and the backends read.
+ * @param[in] options  Tolerances, integration method and nominal temperature.
+ */
+void Circuit::SetSolverOptions(const SolverOptions &options) {
+    m_SolverOptions = options;
+}
+
+/**
+ * @brief   Adds the subcircuit definitions, library models, net names, initial voltages, nodesets and solver options of
+ *          another circuit, as a circuit derived from it needs.
+ * @param[in] other  Circuit whose definitions are shared and whose models, net names, initial voltages, nodesets and
+ *                   solver options are copied.
  */
 void Circuit::AddDefinitionsOf(const Circuit &other) {
     for (const auto &definition : other.m_Subcircuits) {
@@ -112,9 +134,13 @@ void Circuit::AddDefinitionsOf(const Circuit &other) {
     for (const auto &[net, node] : other.m_NodeOfNet) {
         m_NodeOfNet[net] = node;
     }
-    for (const CircuitInitialVoltage &initial_voltage : other.m_InitialVoltages) {
+    for (const CircuitNodeVoltage &initial_voltage : other.m_InitialVoltages) {
         AddInitialVoltage(initial_voltage);
     }
+    for (const CircuitNodeVoltage &nodeset : other.m_Nodesets) {
+        AddNodeset(nodeset);
+    }
+    m_SolverOptions = other.m_SolverOptions;
 }
 
 /**
@@ -163,8 +189,33 @@ const std::vector<CircuitPort> &Circuit::GetPorts() const {
  * @brief   Returns the initial voltages of the nodes.
  * @return  One entry per marker, in the order they were added.
  */
-const std::vector<CircuitInitialVoltage> &Circuit::GetInitialVoltages() const {
+const std::vector<CircuitNodeVoltage> &Circuit::GetInitialVoltages() const {
     return m_InitialVoltages;
+}
+
+/**
+ * @brief   Returns the nodesets of the nodes.
+ * @return  One entry per marker, in the order they were added.
+ */
+const std::vector<CircuitNodeVoltage> &Circuit::GetNodesets() const {
+    return m_Nodesets;
+}
+
+/**
+ * @brief   Returns the markers of one kind.
+ * @param[in] kind  Initial voltages or nodesets.
+ * @return  One entry per marker, in the order they were added.
+ */
+const std::vector<CircuitNodeVoltage> &Circuit::GetNodeVoltages(const NodeVoltageKind kind) const {
+    return kind == NodeVoltageKind::INITIAL ? m_InitialVoltages : m_Nodesets;
+}
+
+/**
+ * @brief   Returns the options of the solver.
+ * @return  The defaults unless SetSolverOptions() changed them.
+ */
+const SolverOptions &Circuit::GetSolverOptions() const {
+    return m_SolverOptions;
 }
 
 /**

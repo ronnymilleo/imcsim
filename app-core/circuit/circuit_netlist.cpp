@@ -26,11 +26,12 @@
 #include "circuit/components/switch.h"
 #include "circuit/components/transformer.h"
 #include "circuit/components/voltage_controlled_switch.h"
-#include "circuit/initial_voltage_targets.h"
 #include "circuit/library_model.h"
 #include "circuit/netlist_logic.h"
 #include "circuit/netlist_sources.h"
 #include "circuit/netlist_subcircuits.h"
+#include "circuit/node_voltage_targets.h"
+#include "circuit/solver_options.h"
 #include "circuit/subcircuit.h"
 #include "spice/spice_value.h"
 #include <algorithm>
@@ -199,14 +200,15 @@ std::string FormatReactivePart(const Component &component, const std::vector<int
 }
 
 /**
- * @brief   One ".ic" line per node with an initial voltage; a node two markers set to the same voltage is written once,
- *          and CheckCircuit() refuses two different ones.
+ * @brief   One ".ic" or ".nodeset" line per node with a marker of the kind; a node two markers give the same voltage is
+ *          written once, and CheckCircuit() refuses two different ones.
  * @details A node inside a block is written at the top, named by the instances down to it ("X1.X2.5"), as ngspice
- *          does not take ".ic" inside a ".subckt": one line per instance.
+ *          does not take either card inside a ".subckt": one line per instance.
  */
-std::string FormatInitialVoltages(const Circuit &circuit) {
+std::string FormatNodeVoltages(const Circuit &circuit, const NodeVoltageKind kind) {
+    const std::string_view directive = kind == NodeVoltageKind::INITIAL ? ".ic" : ".nodeset";
     std::map<std::pair<std::vector<std::string>, int>, double> volts_by_node;
-    for (const InitialVoltageTarget &target : ResolveInitialVoltages(circuit)) {
+    for (const NodeVoltageTarget &target : ResolveNodeVoltages(circuit, kind)) {
         volts_by_node.try_emplace({target.Path, target.Node}, target.Volts);
     }
     std::string text;
@@ -214,9 +216,34 @@ std::string FormatInitialVoltages(const Circuit &circuit) {
         const auto &[path, node] = address;
         const std::string name =
             path.empty() ? std::format("{}", node) : std::format("{}.{}", FormatInstancePath(path), node);
-        text += std::format(".ic V({})={}\n", name, FormatSpiceValue(volts));
+        text += std::format("{} V({})={}\n", directive, name, FormatSpiceValue(volts));
     }
     return text;
+}
+
+/**
+ * @brief   The ".options" line of what the user changed in the solver, or nothing when every option is the default.
+ * @details A circuit with a fuse that leaves the method to the program asks for Gear on a line of its own, so an option
+ *          line never says the method twice.
+ */
+std::string FormatSolverOptions(const Circuit &circuit) {
+    const SolverOptions &options = circuit.GetSolverOptions();
+    std::string line;
+    const auto add = [&line](const std::string_view name, const double value, const double default_value) {
+        if (value != default_value) {
+            line += std::format(" {}={}", name, FormatSpiceValue(value));
+        }
+    };
+    add("reltol", options.RelativeTolerance, DEFAULT_RELATIVE_TOLERANCE);
+    add("abstol", options.CurrentToleranceAmperes, DEFAULT_CURRENT_TOLERANCE_AMPERES);
+    add("vntol", options.VoltageToleranceVolts, DEFAULT_VOLTAGE_TOLERANCE_VOLTS);
+    add("tnom", options.NominalTemperatureCelsius, DEFAULT_NOMINAL_TEMPERATURE_CELSIUS);
+    if (options.Method != IntegrationMethod::DEFAULT) {
+        line += options.Method == IntegrationMethod::GEAR ? " method=gear" : " method=trap";
+    } else if (circuit.HasFuse()) {
+        return std::string(FUSE_INTEGRATION_OPTION) + (line.empty() ? "" : ".options" + line + "\n");
+    }
+    return line.empty() ? std::string() : ".options" + line + "\n";
 }
 
 /**
@@ -425,6 +452,7 @@ std::string FormatPart(const Circuit &circuit, const Component &component, const
     case ComponentType::GROUND:
     case ComponentType::NET_LABEL:
     case ComponentType::INITIAL_VOLTAGE:
+    case ComponentType::NODESET:
     case ComponentType::PIN:
     case ComponentType::LOGIC_OUTPUT:
     case ComponentType::SEVEN_SEGMENT:
@@ -436,7 +464,8 @@ std::string FormatPart(const Circuit &circuit, const Component &component, const
 /// Whether a part only marks or reads its node, so the netlist has no element for it.
 bool WritesNoElement(const ComponentType type) {
     return type == ComponentType::GROUND || type == ComponentType::NET_LABEL ||
-           type == ComponentType::INITIAL_VOLTAGE || IsLogicDisplay(type) || IsSubcircuitPin(type);
+           type == ComponentType::INITIAL_VOLTAGE || type == ComponentType::NODESET || IsLogicDisplay(type) ||
+           IsSubcircuitPin(type);
 }
 
 } // namespace
@@ -459,7 +488,9 @@ bool WritesNoElement(const ComponentType type) {
  *          rise and fall times are a fixed share of its period, and a logic input a DC level, both from their terminal
  *          to ground. A capacitor or inductor with an initial condition writes it as IC=, which only a transient with
  *          uic uses. The initial voltage of a node is one ".ic V(node)=value" line, which ngspice holds the node at
- * while it finds the operating point a transient starts from, and which every other analysis ignores. Probes and the
+ * while it finds the operating point a transient starts from, and which every other analysis ignores. A nodeset is one
+ * ".nodeset V(node)=value" line, the guess ngspice starts every operating point from. The solver options the user
+ * changed are one ".options" line with reltol, abstol, vntol, tnom and method. Probes and the
  * gain stage of each ideal op-amp use nodes numbered after GetNodeCount(), so the circuit nodes keep their numbers.
  * Op-amp macromodels are subcircuits, written after the models. A fuse is an instance of a subcircuit written once with
  * the models, and a circuit with a fuse, in a block or not, writes
@@ -480,10 +511,9 @@ std::string WriteSpiceNetlist(const Circuit &circuit, const std::string_view ana
         netlist += probes;
     }
     netlist += extras.Models;
-    if (circuit.HasFuse()) {
-        netlist += FUSE_INTEGRATION_OPTION;
-    }
-    netlist += FormatInitialVoltages(circuit);
+    netlist += FormatSolverOptions(circuit);
+    netlist += FormatNodeVoltages(circuit, NodeVoltageKind::INITIAL);
+    netlist += FormatNodeVoltages(circuit, NodeVoltageKind::NODESET);
     netlist += FormatLibraryModels(circuit.GetLibraryModels());
     for (const SubcircuitDefinition *definition : OrderByUse(circuit.GetSubcircuits())) {
         netlist += FormatSubcircuit(*definition);
