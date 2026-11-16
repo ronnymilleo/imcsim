@@ -105,7 +105,7 @@ in these points:
 - A block imported from a library, which imcsim keeps as SPICE text, runs on Nodalys as on ngspice: the engine reads
   its elements (R, C, L, V, I, E, G, H, F, B, D, Q, M, S and nested blocks), `.param` lines, `{expressions}`, `.model`
   cards and nested `.subckt` definitions (see [`nodalys/subcircuit_text.md`](nodalys/subcircuit_text.md)). What it holds
-  that Nodalys cannot simulate (a JFET, a source waveform, a `.func`, a model of a type or level it lacks) is refused
+  that Nodalys cannot simulate (a JFET, a `.func`, a model of a type or level it lacks) is refused
   with the line, before the run, and a model parameter its devices do not read is named in a message of the run.
   A MOSFET model of a level other than 1 is refused with the reason, and the harmonic balance also refuses
   voltage-controlled switches and relays.

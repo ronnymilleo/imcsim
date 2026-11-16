@@ -1051,7 +1051,7 @@ What an engine cannot run is said, not guessed at:
   kept as SPICE text, when its text holds something Nodalys cannot simulate. Nodalys reads the resistors, capacitors,
   inductors, DC and AC sources, controlled and behavioral sources, diodes, bipolar and level 1 MOSFET transistors,
   switches and nested subcircuits of such a text, with its `.param` lines, `{expressions}` and `.model` cards; it
-  refuses the rest by name, such as a JFET, a source waveform, a `.func` or a transmission line, and says so before
+  refuses the rest by name, such as a JFET, a `.func` or a transmission line, and says so before
   the run. A model parameter its devices do not read, such as a junction capacitance of a substrate, is named in a
   message of the run.
 
