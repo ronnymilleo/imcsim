@@ -51,6 +51,8 @@ private:
     std::array<ValueField, 3> m_SteppedFields;
     ValueField m_NoiseStartFrequency;
     ValueField m_NoiseStopFrequency;
+    ValueField m_ACSensitivityStartFrequency;
+    ValueField m_ACSensitivityStopFrequency;
     ValueField m_SStartFrequency;
     ValueField m_SStopFrequency;
     ValueField m_HBFundamental;
@@ -69,6 +71,7 @@ private:
     void DrawNoiseSettings(SimulationSettings &settings);
     void DrawTransferFunctionSettings(SimulationSettings &settings);
     void DrawSensitivitySettings(SimulationSettings &settings);
+    void DrawACSensitivityInputs(SimulationSettings &settings);
     void DrawPoleZeroSettings(SimulationSettings &settings);
     void DrawSParameterSettings(SimulationSettings &settings);
     void DrawPortSummary();

@@ -13,6 +13,7 @@
 #include "digital_models.h"
 #include "nodalys_in_use.h"
 #include "plots/spectrum.h"
+#include "results/ac_sensitivity_view.h"
 #include "results/circuit_snapshot.h"
 #include "results/fuse_readings.h"
 #include "results/logic_outputs.h"
@@ -40,6 +41,7 @@
 #include <format>
 #include <numbers>
 #include <optional>
+#include <set>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -1570,4 +1572,59 @@ TEST_CASE("The stability example is potentially unstable up to about 290 MHz, wi
     CHECK_THAT(GUI::DescribeCircles(GUI::ComputeStabilityCircles(GUI::ReadTwoPortMatrix(*run.Result, 80)),
                                     sweep.Frequencies[80]),
                Catch::Matchers::StartsWith("Source circle: the whole chart is stable at"));
+}
+
+TEST_CASE("The Sallen-Key sensitivity example ranks the four filter parts at the corner and obeys frequency scaling",
+          "[examples]") {
+    const TestSupport::NodalysInUse nodalys;
+    GUI::Schematic schematic;
+    OpenExample("ac_sensitivity_sallen_key.imcsim", schematic);
+    const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
+    CHECK(settings.Selected == GUI::Analysis::SENSITIVITY);
+    CHECK(settings.SensitivityType == GUI::SensitivityKind::AC);
+    REQUIRE(settings.SensitivityOutput.has_value());
+    const Core::ACSensitivitySettings run_settings{.OutputNode =
+                                                       static_cast<int>(NodeAt(schematic, *settings.SensitivityOutput)),
+                                                   .InputSource = settings.ACSensitivitySource,
+                                                   .StartFrequency = settings.ACSensitivityRange.StartFrequency,
+                                                   .StopFrequency = settings.ACSensitivityRange.StopFrequency,
+                                                   .PointsPerDecade = settings.ACSensitivityRange.PointsPerDecade};
+
+    const Core::ACSensitivityRun run = Core::RunACSensitivity(schematic.BuildCircuit(), run_settings);
+
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const Core::ACSensitivity &sensitivity = *run.Result;
+    CHECK(sensitivity.Warnings.empty());
+    // The marker starts at the -3 dB point, near 1.1 kHz
+    const std::size_t corner = GUI::FindCornerFrequencyIndex(sensitivity);
+    CHECK_THAT(sensitivity.Frequencies[corner], Catch::Matchers::WithinRel(1.1e3, 0.05));
+    // The four filter parts lead the table, and the supplies and the source, which a linear stage does not feel, are
+    // last with no influence
+    const std::vector<GUI::ACSensitivityRow> rows = GUI::MakeACSensitivityRows(sensitivity, corner);
+    REQUIRE(rows.size() == 7);
+    const std::set<std::string> leaders = {rows[0].PartName, rows[1].PartName, rows[2].PartName, rows[3].PartName};
+    CHECK(leaders == std::set<std::string>{"R1", "R2", "C1", "C2"});
+    CHECK(rows[0].PartName == "C2");
+    CHECK(rows[4].Share == 0.0);
+
+    // The response depends on the frequency through the products R C only, so scaling every resistor and capacitor by
+    // a factor scales those products by its square, and the four changes of ln H for 1 % of each add up to twice
+    // d(ln H)/d(ln f), which the neighbouring points of the sweep give
+    std::complex<double> total;
+    for (const Core::ACPartSensitivity &part : sensitivity.Parts) {
+        if (part.Name == "R1" || part.Name == "R2" || part.Name == "C1" || part.Name == "C2") {
+            const double decibels = part.MagnitudeDecibelsPerPercent[corner].value();
+            const double degrees = part.PhaseDegreesPerPercent[corner].value();
+            total +=
+                std::complex<double>(decibels / (20.0 / std::numbers::ln10), degrees / (180.0 / std::numbers::pi)) /
+                0.01;
+        }
+    }
+    const std::complex<double> slope =
+        (std::log(sensitivity.Output[corner + 1]) - std::log(sensitivity.Output[corner - 1])) /
+        std::log(sensitivity.Frequencies[corner + 1] / sensitivity.Frequencies[corner - 1]);
+    CHECK_THAT(total.real(), Catch::Matchers::WithinRel(2.0 * slope.real(), 0.02));
+    CHECK_THAT(total.imag(), Catch::Matchers::WithinRel(2.0 * slope.imag(), 0.02));
 }

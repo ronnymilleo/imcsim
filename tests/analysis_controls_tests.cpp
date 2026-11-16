@@ -1161,3 +1161,45 @@ TEST_CASE("Harmonic balance runs on Nodalys through AnalysisControls and fails c
     const double expected_current = AMP / std::hypot(resistor->GetValue(), reactance);
     CHECK(std::abs(std::abs(r_trace->Phasors[1]) - expected_current) < 1e-6);
 }
+
+TEST_CASE(
+    "The AC sensitivity runs on Nodalys through AnalysisControls, replaces the DC one and fails cleanly on ngspice",
+    "[analysis_controls][ac_sensitivity]") {
+    struct BackendRestorer {
+        ~BackendRestorer() { Core::SetBackend(nullptr); }
+    } restore;
+
+    GUI::Schematic schematic;
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
+    OpenRCFilter(schematic);
+    GUI::SimulationSettings settings = schematic.GetSimulationSettings();
+    settings.Selected = GUI::Analysis::SENSITIVITY;
+    settings.SensitivityType = GUI::SensitivityKind::AC;
+    settings.ACSensitivityRange = {.StartFrequency = 10.0, .StopFrequency = 10e3, .PointsPerDecade = 5};
+    schematic.SetSimulationSettings(settings);
+    GUI::AnalysisControls controls(schematic, results);
+
+    // The default ngspice backend refuses it with the reason, and keeps no result
+    RunAndWait(controls);
+    CHECK(controls.GetOutcome(GUI::Analysis::SENSITIVITY) == GUI::RunOutcome::FAILED);
+    CHECK_FALSE(results.GetACSensitivity().has_value());
+    REQUIRE(controls.GetError(GUI::Analysis::SENSITIVITY).has_value());
+    CHECK(controls.GetError(GUI::Analysis::SENSITIVITY)->contains("does not run"));
+
+    Core::SetBackend(std::make_unique<Core::NodalysBackend>());
+    RunAndWait(controls);
+    CHECK(controls.GetOutcome(GUI::Analysis::SENSITIVITY) == GUI::RunOutcome::SUCCEEDED);
+    REQUIRE(results.GetACSensitivity().has_value());
+    CHECK_FALSE(results.GetSensitivity().has_value());
+    CHECK(results.GetACSensitivity()->Frequencies.size() == 16);
+    CHECK_FALSE(results.GetACSensitivity()->Parts.empty());
+    CHECK(controls.GetLastRun() == GUI::Analysis::SENSITIVITY);
+
+    // Going back to the DC kind replaces the AC result
+    settings.SensitivityType = GUI::SensitivityKind::DC;
+    schematic.SetSimulationSettings(settings);
+    RunAndWait(controls);
+    CHECK(results.GetSensitivity().has_value());
+    CHECK_FALSE(results.GetACSensitivity().has_value());
+}

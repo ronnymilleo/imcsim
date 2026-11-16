@@ -81,6 +81,10 @@ public:
     void SetSensitivity(std::optional<Core::Sensitivity> sensitivity);
     const std::optional<Core::Sensitivity> &GetSensitivity() const;
     std::size_t GetSensitivityVersion() const;
+    void SetACSensitivity(std::optional<Core::ACSensitivity> sensitivity);
+    const std::optional<Core::ACSensitivity> &GetACSensitivity() const;
+    void SetACSensitivityFrequency(std::size_t frequency_index);
+    std::size_t GetACSensitivityFrequency() const;
 
     // Poles and zeros
     void SetPoleZero(std::optional<Core::PoleZero> pole_zero);
@@ -122,6 +126,9 @@ private:
     std::optional<Core::Noise> m_Noise;
     std::optional<Core::TransferFunction> m_TransferFunction;
     std::optional<Core::Sensitivity> m_Sensitivity;
+    std::optional<Core::ACSensitivity> m_ACSensitivity;
+    /// Index of the frequency the AC sensitivity table and the schematic read.
+    std::size_t m_ACSensitivityFrequency = 0;
     std::optional<Core::PoleZero> m_PoleZero;
     std::optional<Core::SParameters> m_SParameters;
     std::optional<Core::TruthTable> m_TruthTable;

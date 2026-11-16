@@ -19,18 +19,24 @@ std::string FormatUnit(const std::string &unit, const std::string &prefix) {
     return unit.empty() ? prefix : std::format("{}/{}", prefix, unit);
 }
 
+} // namespace
+
 /**
  * @brief   Names a part as the schematic labels it: a supply rail shows its voltage, "VCC 12V", and has no name there;
  *          the others show their own, and a block shows the element inside it that the row stands for.
+ * @param[in] type     Kind of the part.
+ * @param[in] name     Name of the part in the circuit.
+ * @param[in] element  The element inside a block that the row stands for; empty for other parts.
+ * @param[in] value    Value of the part, or none when the results do not carry it.
+ * @return  Such as "R1", "VCC 12V" or "X2.R1".
  */
-std::string FormatPartLabel(const Core::PartSensitivity &part) {
-    if (part.Type == Core::ComponentType::VCC && part.Value) {
-        return std::format("VCC {}V", Core::FormatValue(*part.Value));
+std::string FormatSensitivityPartLabel(const Core::ComponentType type, const std::string &name,
+                                       const std::string &element, const std::optional<double> value) {
+    if (type == Core::ComponentType::VCC && value) {
+        return std::format("VCC {}V", Core::FormatValue(*value));
     }
-    return part.Element.empty() ? part.Name : std::format("{}.{}", part.Name, part.Element);
+    return element.empty() ? name : std::format("{}.{}", name, element);
 }
-
-} // namespace
 
 /**
  * @brief   Finds the size of the largest normalized sensitivity, which the heat scale and the shares are relative to.
@@ -76,7 +82,7 @@ std::vector<SensitivityRow> MakeSensitivityRows(const Core::Sensitivity &sensiti
     std::vector<SensitivityRow> rows;
     for (const Core::PartSensitivity &part : sensitivity.Parts) {
         SensitivityRow row;
-        row.Part = FormatPartLabel(part);
+        row.Part = FormatSensitivityPartLabel(part.Type, part.Name, part.Element, part.Value);
         row.PartName = part.Name;
         if (part.Value) {
             row.Value = std::format("{}{}", Core::FormatValue(*part.Value), part.Unit);

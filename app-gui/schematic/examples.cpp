@@ -376,6 +376,23 @@ constexpr auto EXAMPLES = std::to_array<Example>({
         .FileName = "sallen_key_low_pass.imcsim",
     },
     {
+        .Title = "Which part sets the corner of a Sallen-Key filter",
+        .Group = "Op-amps",
+        .Description =
+            "The Sallen-Key filter above with the Sensitivity analysis selected, its kind set to AC and its output at "
+            "the filter output, driven by Vin1 from 10 Hz to 100 kHz. Run it (it needs the Nodalys engine, chosen in "
+            "Preferences) and open the Sensitivity tab of the Output window: the plots show, for each part, how many "
+            "dB and degrees the response changes for a 1 % higher value, against frequency, with the five most "
+            "influential parts checked. The marker starts at the -3 dB point, 1.1 kHz, where the table ranks the "
+            "parts by their influence on the corner: the 10 nF capacitor C2 leads, at -0.089 dB and -0.42 degrees per "
+            "1 %, then the two 10k resistors at -0.046 dB, then C1 at about -0.002 dB, since it moves the quality "
+            "factor and the phase more than the gain. The four changes add up to twice the slope of the "
+            "response, since scaling every R and C by one factor scales the frequency axis by its square. Drag "
+            "the marker to read another frequency, and tick Color the schematic to color the parts at that "
+            "frequency.",
+        .FileName = "ac_sensitivity_sallen_key.imcsim",
+    },
+    {
         .Title = "Buck converter",
         .Group = "Switching",
         .Description =

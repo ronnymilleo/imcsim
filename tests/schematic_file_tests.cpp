@@ -460,6 +460,9 @@ TEST_CASE("Simulation settings load back unchanged", "[schematic_file]") {
     settings.TransferFunctionSource = "V2";
     settings.TransferFunctionOutput = GUI::GridPoint{6, 3};
     settings.SensitivityOutput = GUI::GridPoint{10, 14};
+    settings.SensitivityType = GUI::SensitivityKind::AC;
+    settings.ACSensitivitySource = "Vin1";
+    settings.ACSensitivityRange = {.StartFrequency = 5.0, .StopFrequency = 2e6, .PointsPerDecade = 33};
     settings.PoleZeroSource = "Vin1";
     settings.PoleZeroOutput = GUI::GridPoint{8, 2};
     settings.TruthTableInputs = {"V1", "V3"};
@@ -508,6 +511,33 @@ TEST_CASE("Invalid sensitivity settings fall back to their defaults with a warni
     const GUI::LoadedSchematic loaded = LoadOrFail(text);
     CHECK(loaded.Warnings.size() == 1);
     CHECK_FALSE(loaded.Settings.SensitivityOutput);
+}
+
+TEST_CASE("Invalid AC sensitivity settings fall back to their defaults with a warning", "[schematic_file]") {
+    const std::string text = R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
+                             R"("sensitivity": {"kind": "ac", "ac": {"start": -1.0, "stop": 1e3, "source": "V1"}}}})";
+    const GUI::LoadedSchematic loaded = LoadOrFail(text);
+    CHECK(loaded.Warnings.size() == 1);
+    CHECK(loaded.Settings.SensitivityType == GUI::SensitivityKind::DC);
+    CHECK(loaded.Settings.ACSensitivitySource.empty());
+    CHECK(loaded.Settings.ACSensitivityRange == GUI::SimulationSettings{}.ACSensitivityRange);
+}
+
+TEST_CASE("An unknown sensitivity kind falls back to the DC one with a warning", "[schematic_file]") {
+    const std::string text = R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
+                             R"("sensitivity": {"kind": "sideways"}}})";
+    const GUI::LoadedSchematic loaded = LoadOrFail(text);
+    CHECK(loaded.Warnings.size() == 1);
+    CHECK(loaded.Settings.SensitivityType == GUI::SensitivityKind::DC);
+}
+
+TEST_CASE("A file saved before the AC sensitivity loads the sensitivity as the DC one", "[schematic_file]") {
+    const std::string text = R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
+                             R"("analysis": "sensitivity", "sensitivity": {"output": [3, 4]}}})";
+    const GUI::LoadedSchematic loaded = LoadOrFail(text);
+    CHECK(loaded.Warnings.empty());
+    CHECK(loaded.Settings.SensitivityType == GUI::SensitivityKind::DC);
+    CHECK(loaded.Settings.ACSensitivityRange == GUI::SimulationSettings{}.ACSensitivityRange);
 }
 
 TEST_CASE("Invalid pole-zero settings fall back to their defaults with a warning", "[schematic_file]") {

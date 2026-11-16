@@ -41,6 +41,10 @@ struct SensitivityRow {
     double Share = 0.0;
 };
 
+// Labels
+std::string FormatSensitivityPartLabel(Core::ComponentType type, const std::string &name, const std::string &element,
+                                       std::optional<double> value);
+
 // Heat colors
 double GetLargestSensitivity(const Core::Sensitivity &sensitivity);
 std::optional<float> FindSensitivityLevel(const Core::Sensitivity &sensitivity, std::string_view part_name);
