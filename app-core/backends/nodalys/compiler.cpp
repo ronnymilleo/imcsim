@@ -460,6 +460,11 @@ private:
                     body_map[static_cast<std::size_t>(body_node)] = m_Builder->AddNode();
                 }
             }
+            // A marker in the body starts this instance's own node, or the outer node when it sits on a pin
+            for (const CircuitInitialVoltage &initial_voltage : definition->Body.GetInitialVoltages()) {
+                m_Builder->SetInitialVoltage(body_map[static_cast<std::size_t>(initial_voltage.Node)],
+                                             initial_voltage.Volts);
+            }
             return AddCircuit(definition->Body, body_map, InstanceParameters(instance, *definition), sub_prefix);
         }
 

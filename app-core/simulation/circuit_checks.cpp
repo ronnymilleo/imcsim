@@ -14,6 +14,7 @@
 #include "circuit/components/logic_part.h"
 #include "circuit/components/source.h"
 #include "circuit/components/subcircuit.h"
+#include "circuit/initial_voltage_targets.h"
 #include "circuit/subcircuit.h"
 #include "spice/spice_value.h"
 #include <algorithm>
@@ -24,6 +25,8 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <utility>
+#include <vector>
 
 namespace Core {
 
@@ -229,49 +232,77 @@ std::string DescribeNode(const Circuit &circuit, const int node) {
 }
 
 /**
- * @brief   An initial voltage needs a node of its own to start: not ground, which is 0 V by definition, a node some
- *          part is connected to, since a loose one has no equations to start from, and one voltage per node.
+ * @brief   An initial voltage needs a node of its own to start: not ground, which is 0 V by definition, and a node some
+ *          part of its circuit is connected to, since a loose one has no equations to start from.
+ * @param[in] where  Where the circuit is, for the message: empty at the top, " in block NAME" inside a definition.
  */
-std::optional<std::string> CheckInitialVoltages(const Circuit &circuit) {
+std::optional<std::string> CheckInitialVoltagePlaces(const Circuit &circuit, const std::string_view where) {
     std::set<int> used_nodes;
     for (const CircuitEntry &entry : circuit.GetEntries()) {
         used_nodes.insert(entry.Nodes.begin(), entry.Nodes.end());
     }
-    std::map<int, double> volts_by_node;
     for (const CircuitInitialVoltage &initial_voltage : circuit.GetInitialVoltages()) {
-        const std::string node = DescribeNode(circuit, initial_voltage.Node);
         if (initial_voltage.Node == 0) {
-            return "An initial voltage is on ground, which is always 0 V; place it on another node";
+            return std::format("An initial voltage{} is on ground, which is always 0 V; place it on another node",
+                               where);
         }
         if (!used_nodes.contains(initial_voltage.Node)) {
-            return std::format("An initial voltage of {} V is on {}, which no part is connected to",
-                               FormatValue(initial_voltage.Volts), node);
-        }
-        const auto [known, is_new] = volts_by_node.try_emplace(initial_voltage.Node, initial_voltage.Volts);
-        if (!is_new && known->second != initial_voltage.Volts) {
-            return std::format("{} has two initial voltages, {} V and {} V; keep one", node, FormatValue(known->second),
-                               FormatValue(initial_voltage.Volts));
+            return std::format("An initial voltage of {} V{} is on {}, which no part is connected to",
+                               FormatValue(initial_voltage.Volts), where, DescribeNode(circuit, initial_voltage.Node));
         }
     }
     return std::nullopt;
 }
 
 /**
- * @brief   The first problem with the initial voltages of the circuit; those inside blocks are refused, since a block
- *          has no node of its own to start from that is the same for each instance.
+ * @brief   Names the node a target sets as the user sees it, with the instance it belongs to inside a block.
  */
-std::optional<std::string> CheckAllInitialVoltages(const Circuit &circuit) {
-    if (std::optional<std::string> problem = CheckInitialVoltages(circuit)) {
-        return problem;
-    }
-    for (const auto &definition : circuit.GetSubcircuits()) {
-        if (!definition->Body.GetInitialVoltages().empty()) {
-            return std::format("Block {} holds an initial voltage, which only the circuit outside blocks can have; "
-                               "place it on the node of a pin of the block instead",
-                               definition->Name);
+std::string DescribeTarget(const InitialVoltageTarget &target) {
+    const std::string node = DescribeNode(*target.Owner, target.Node);
+    return target.Path.empty() ? node : std::format("{} of {}", node, FormatInstancePath(target.Path));
+}
+
+/**
+ * @brief   One voltage per node once the blocks are expanded, which a marker on a pin of a block and another on the net
+ *          it joins can break, and none on ground, which a pin tied to ground would reach.
+ */
+std::optional<std::string> CheckInitialVoltageTargets(const Circuit &circuit) {
+    std::map<std::pair<std::vector<std::string>, int>, const InitialVoltageTarget *> known_by_node;
+    const std::vector<InitialVoltageTarget> targets = ResolveInitialVoltages(circuit);
+    for (const InitialVoltageTarget &target : targets) {
+        const std::string where =
+            target.MarkerPath.empty() ? "" : std::format(" in {}", FormatInstancePath(target.MarkerPath));
+        if (target.Node == 0) {
+            return std::format("An initial voltage of {} V{} reaches ground, which is always 0 V, through a pin that "
+                               "its instance connects to ground",
+                               FormatValue(target.Volts), where);
+        }
+        const auto [known, is_new] = known_by_node.try_emplace({target.Path, target.Node}, &target);
+        if (!is_new && known->second->Volts != target.Volts) {
+            const std::string known_where = known->second->MarkerPath.empty()
+                                                ? ""
+                                                : std::format(" in {}", FormatInstancePath(known->second->MarkerPath));
+            return std::format("{} has two initial voltages, {} V{} and {} V{}; keep one", DescribeTarget(target),
+                               FormatValue(known->second->Volts), known_where, FormatValue(target.Volts), where);
         }
     }
     return std::nullopt;
+}
+
+/**
+ * @brief   The first problem with the initial voltages of the circuit and of the blocks it places.
+ */
+std::optional<std::string> CheckAllInitialVoltages(const Circuit &circuit) {
+    if (std::optional<std::string> problem = CheckInitialVoltagePlaces(circuit, "")) {
+        return problem;
+    }
+    for (const auto &definition : circuit.GetSubcircuits()) {
+        if (std::optional<std::string> problem =
+                CheckInitialVoltagePlaces(definition->Body, std::format(" in block {}", definition->Name))) {
+            return problem;
+        }
+    }
+    return CheckInitialVoltageTargets(circuit);
 }
 
 /**
