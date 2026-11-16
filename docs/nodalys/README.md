@@ -119,7 +119,7 @@
 | **S-Parameters** | `.sp` | ✅ | ✅ **Ready** | [`sp_analysis.cpp`](../../nodalys/src/analyses/sp_analysis.cpp) — Multiport scattering matrix $\mathbf{S}(j\omega)$ from one port up, single-LU multi-RHS solve, exact $\mathbf{Z}$ and $\mathbf{Y}$ matrices (absent where the circuit has none), Return Loss, Insertion Loss, VSWR, Input Impedance, and Touchstone export. |
 | **Pole-Zero** | `.pz` | ✅ | ✅ **Ready** | [`pz_analysis.cpp`](../../nodalys/src/analyses/pz_analysis.cpp) — Generalized eigenvalue solver $(\mathbf{G}, -\mathbf{C})$ and Rosenbrock pencil $(\mathbf{A}_z, -\mathbf{B}_z)$ via pure C++23 QZ algorithm, after balancing and exact removal of algebraic rows ([`pencil_reduction.cpp`](../../nodalys/src/linear/pencil_reduction.cpp)), with the checks of [`pz_checks.cpp`](../../nodalys/src/analyses/pz_checks.cpp). |
 | **Sensitivity** | `.sens` | ✅ | ✅ **Ready** | [`sens_analysis.cpp`](../../nodalys/src/analyses/sens_analysis.cpp) — Transposed adjoint solve $\mathbf{J}^T \boldsymbol{\lambda} = \mathbf{d}$, analytical device derivatives, 100% normalized scale, and subcircuit/potentiometer aggregation. |
-| **AC Sensitivity** | `.sens ... ac` | ❌ (wrong with forward-biased devices) | ✅ **Ready** | [`ac_sens_analysis.cpp`](../../nodalys/src/analyses/ac_sens_analysis.cpp) — Transposed complex adjoint solve per frequency, the bias term of the nonlinear devices through the DC adjoint, and the change of gain and phase for 1 % of each part ([`ac_sens_analysis.md`](./ac_sens_analysis.md)). |
+| **AC Sensitivity** | `.sens ... ac` | ❌ (wrong with forward-biased devices) | ✅ **Ready** | [`ac_sens_analysis.cpp`](../../nodalys/src/analyses/ac_sens_analysis.cpp) — Transposed complex adjoint solve per frequency, the bias term of the nonlinear devices through the DC adjoint, and the change of gain and phase for 1 % of each part, read from `.sens <out> ac dec|oct|lin <np> <fstart> <fstop>` by the netlist parser and the CLI ([`ac_sens_analysis.md`](./ac_sens_analysis.md)). |
 | **Harmonic Balance** | `.hb` | ❌ | ✅ **Ready** | [`hb_analysis.cpp`](../../nodalys/src/analyses/hb_analysis.cpp) — Exclusive AFT Newton-Raphson solver with pure C++23 radix-2 FFT, Toeplitz/circulant conversion Jacobian, and source/gmin stepping continuation. |
 | **Truth Table** | Multiple `.op` | ✅ | ✅ **Ready** | Fully supported natively in imcsim UI without ngspice via smooth continuous logic macromodels ($C^\infty$). |
 
@@ -147,8 +147,8 @@
 
 | Feature / Tool | Status in `Nodalys` | Description |
 | :--- | :---: | :--- |
-| **Standalone CLI (`nodalys`)** | ✅ **Ready** | Command-line tool accepting standard SPICE netlists from arguments or standard input (`stdin`). |
-| **Multi-Format Export** | ✅ **Ready** | Standalone exporter formatting results into CSV, JSON, SPICE Raw, and Touchstone (.sNp) formats (`--format`). |
+| **Standalone CLI (`nodalys`)** | ✅ **Ready** | Command-line tool accepting standard SPICE netlists from arguments or standard input (`stdin`); `--analysis sens` runs both the DC and the AC `.sens` of a netlist ([`ac_sens_analysis.md`](./ac_sens_analysis.md)). |
+| **Multi-Format Export** | ✅ **Ready** | Standalone exporter formatting results into CSV, JSON, SPICE Raw, and Touchstone (.sNp) formats (`--format`), the AC sensitivity included. |
 | **Component Parameter Stepping** | ✅ **Ready** | Steps $R, C, L$ across `.tran`, `.ac`, and `.dc` runs directly through `imcsim` controls. |
 | **Fourier / Spectrum Analysis** | ✅ **Ready** | High-resolution FFT post-processed over `ComputeTransient` waveforms. |
 | **Live Simulation Mode** | ✅ **Ready** | Live transient paced against the clock (`simulation/live_pace.h`, shared with ngspice), paused and resumed, with changes applied between chunks. |

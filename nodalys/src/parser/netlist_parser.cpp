@@ -280,6 +280,110 @@ std::pair<std::string, std::string> ParseVoltageNodes(std::string_view s) {
     return {std::string(s), "0"};
 }
 
+/// The names of the independent sources of the circuit lines that have an AC magnitude, which is what drives an AC
+/// sensitivity. Sources inside a block are not seen: a block's own sources have no AC to name from outside.
+std::vector<std::string> FindAcSources(const std::vector<std::string> &circuit_lines) {
+    std::vector<std::string> names;
+    for (const std::string &line : circuit_lines) {
+        const std::vector<std::string> tokens = TokenizeLine(line);
+        if (tokens.size() < 3) {
+            continue;
+        }
+        const char kind = static_cast<char>(std::toupper(static_cast<unsigned char>(tokens[0].front())));
+        if (kind != 'V' && kind != 'I') {
+            continue;
+        }
+        for (std::size_t index = 3; index + 1 < tokens.size(); ++index) {
+            if (ToUpper(tokens[index]) == "AC") {
+                if (ParseSpiceNumber(tokens[index + 1]).value_or(1.0) != 0.0) {
+                    names.push_back(tokens[0]);
+                }
+                break;
+            }
+        }
+    }
+    return names;
+}
+
+/// Where the sweep of `.sens <out_var> AC <type> <np> <fstart> <fstop>` starts among the tokens.
+constexpr std::size_t FIRST_AC_SENSITIVITY_SWEEP_TOKEN = 3;
+
+/// Reads the sweep type, the points and the frequency range of a `.sens ... AC` directive into the configuration.
+std::optional<std::string> ReadAcSensitivitySweep(const std::vector<std::string> &tokens, AcSensitivityConfig &cfg) {
+    const std::string sweep_type = ToUpper(tokens[FIRST_AC_SENSITIVITY_SWEEP_TOKEN]);
+    if (sweep_type == "DEC") {
+        cfg.SweepType = FrequencySweepType::DECADE;
+    } else if (sweep_type == "OCT") {
+        cfg.SweepType = FrequencySweepType::OCTAVE;
+    } else if (sweep_type == "LIN") {
+        cfg.SweepType = FrequencySweepType::LINEAR;
+    } else {
+        return std::format("Unknown sweep type '{}' in .sens ac, use dec, oct or lin",
+                           tokens[FIRST_AC_SENSITIVITY_SWEEP_TOKEN]);
+    }
+    const std::optional<double> points = ParseSpiceNumber(tokens[FIRST_AC_SENSITIVITY_SWEEP_TOKEN + 1]);
+    if (!points || *points < 1.0 || std::floor(*points) != *points) {
+        return "Invalid number of points in .sens ac, it must be a whole number of at least 1";
+    }
+    cfg.PointsPerDecade = static_cast<int>(*points);
+    const std::optional<double> start = ParseSpiceNumber(tokens[FIRST_AC_SENSITIVITY_SWEEP_TOKEN + 2]);
+    const std::optional<double> stop = ParseSpiceNumber(tokens[FIRST_AC_SENSITIVITY_SWEEP_TOKEN + 3]);
+    if (!start || !stop || *start <= 0.0 || *stop < *start) {
+        return "Invalid frequency range in .sens ac, it needs 0 < fstart <= fstop";
+    }
+    cfg.StartFrequency = *start;
+    cfg.StopFrequency = *stop;
+    return std::nullopt;
+}
+
+/// The input of an AC sensitivity: the ngspice syntax names none, so it is the one source with an AC magnitude.
+std::expected<std::string, std::string> FindAcSensitivityInput(const std::vector<std::string> &circuit_lines) {
+    const std::vector<std::string> sources = FindAcSources(circuit_lines);
+    if (sources.empty()) {
+        return std::unexpected("No source has an AC magnitude, so .sens ac has no input; give one source 'AC 1'");
+    }
+    if (sources.size() > 1) {
+        std::string names;
+        for (const std::string &name : sources) {
+            names += (names.empty() ? "" : ", ") + name;
+        }
+        return std::unexpected(std::format("More than one source has an AC magnitude ({}), so .sens ac cannot tell "
+                                           "its input; leave AC on one source only",
+                                           names));
+    }
+    return sources.front();
+}
+
+/// Reads the rest of `.sens <out_var> AC [DEC|OCT|LIN] <np> <fstart> <fstop>` after the output nodes, and picks the
+/// input source.
+std::expected<AcSensitivityConfig, std::string> ParseAcSensitivity(const std::vector<std::string> &tokens,
+                                                                   const NodeId positive, const NodeId negative,
+                                                                   const std::vector<std::string> &circuit_lines) {
+    constexpr std::size_t TOKENS_WITH_SWEEP_TYPE = 7;
+    if (tokens.size() != TOKENS_WITH_SWEEP_TYPE) {
+        return std::unexpected("Malformed .sens ac directive, expected '.sens <out_var> ac dec|oct|lin <np> <fstart> "
+                               "<fstop>'");
+    }
+    AcSensitivityConfig cfg;
+    if (const std::optional<std::string> error = ReadAcSensitivitySweep(tokens, cfg)) {
+        return std::unexpected(*error);
+    }
+    if (positive == GROUND_NODE) {
+        return std::unexpected("The output of .sens ac must have a node other than ground as its positive one");
+    }
+    if (positive == negative) {
+        return std::unexpected("The two output nodes of .sens ac are the same node");
+    }
+    cfg.OutputPositiveNode = positive;
+    cfg.OutputNegativeNode = negative;
+    const std::expected<std::string, std::string> input = FindAcSensitivityInput(circuit_lines);
+    if (!input) {
+        return std::unexpected(input.error());
+    }
+    cfg.InputSource = *input;
+    return cfg;
+}
+
 /// The kind and the text of the expression of a B element line, `B1 n+ n- V=<expression>`; the text is taken from
 /// the line itself, since the tokens break an expression at its spaces and parentheses.
 struct BehavioralLine {
@@ -858,14 +962,26 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                 result.Analyses.push_back({AnalysisKind::POLE_ZERO, cfg});
             } else if (dir == ".SENS") {
                 // .SENS <out_var> (e.g. .sens v(out) or .sens v(out, ref))
+                // .SENS <out_var> AC [DEC|OCT|LIN] <np> <fstart> <fstop>
                 if (tokens.size() < 2) {
                     return std::unexpected(std::format("Malformed .sens directive: '{}'", line));
                 }
-                SensitivityConfig cfg;
                 const auto [pos_str, neg_str] = ParseVoltageNodes(tokens[1]);
-                cfg.OutputPositiveNode = nodes.Resolve(pos_str);
-                cfg.OutputNegativeNode = nodes.Resolve(neg_str);
-                result.Analyses.push_back({AnalysisKind::SENSITIVITY, cfg});
+                const NodeId positive = nodes.Resolve(pos_str);
+                const NodeId negative = nodes.Resolve(neg_str);
+                if (tokens.size() >= 3 && ToUpper(tokens[2]) == "AC") {
+                    const std::expected<AcSensitivityConfig, std::string> cfg =
+                        ParseAcSensitivity(tokens, positive, negative, circuit_lines);
+                    if (!cfg) {
+                        return std::unexpected(std::format("{}: '{}'", cfg.error(), line));
+                    }
+                    result.Analyses.push_back({AnalysisKind::AC_SENSITIVITY, *cfg});
+                } else {
+                    SensitivityConfig cfg;
+                    cfg.OutputPositiveNode = positive;
+                    cfg.OutputNegativeNode = negative;
+                    result.Analyses.push_back({AnalysisKind::SENSITIVITY, cfg});
+                }
             } else if (dir == ".HB") {
                 // .HB <f0> <harmonics> [samples=<M>]
                 if (tokens.size() < 3) {
