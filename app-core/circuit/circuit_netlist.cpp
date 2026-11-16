@@ -427,6 +427,12 @@ std::string FormatPart(const Circuit &circuit, const Component &component, const
     }
 }
 
+/// Whether a part only marks or reads its node, so the netlist has no element for it.
+bool WritesNoElement(const ComponentType type) {
+    return type == ComponentType::GROUND || type == ComponentType::NET_LABEL ||
+           type == ComponentType::INITIAL_VOLTAGE || IsLogicDisplay(type) || IsSubcircuitPin(type);
+}
+
 } // namespace
 
 /**
@@ -495,8 +501,7 @@ std::string WriteSpiceNetlist(const Circuit &circuit, const std::string_view ana
 std::vector<std::string> GetElementNames(const Component &component) {
     const std::string &name = component.GetName();
     const ComponentType type = component.GetType();
-    if (type == ComponentType::GROUND || type == ComponentType::NET_LABEL || type == ComponentType::INITIAL_VOLTAGE ||
-        IsLogicDisplay(type) || IsSubcircuitPin(type)) {
+    if (WritesNoElement(type)) {
         return {};
     }
     if (IsLogicGate(type) || IsFlipFlop(type)) {

@@ -274,6 +274,44 @@ std::optional<std::string> CheckAllInitialVoltages(const Circuit &circuit) {
     return std::nullopt;
 }
 
+/**
+ * @brief   Checks that every current-controlled source follows a current that some other part reports.
+ */
+std::optional<std::string> CheckControllingCurrents(const Circuit &circuit) {
+    for (const CircuitEntry &entry : circuit.GetEntries()) {
+        if (!IsCurrentControlled(entry.Part->GetType())) {
+            continue;
+        }
+        const std::string &name = entry.Part->GetName();
+        const std::string &current = static_cast<const ControlledSource &>(*entry.Part).GetControllingCurrent();
+        if (current.empty()) {
+            return std::format("{} follows no current; pick its controlling current in Properties", name);
+        }
+        if (current == name) {
+            return std::format("{} cannot follow its own current", name);
+        }
+        if (!FindControllingSource(circuit, current)) {
+            return std::format("{} follows I({}), which is not in the circuit", name, current);
+        }
+    }
+    return std::nullopt;
+}
+
+/**
+ * @brief   Checks the behavioral sources of a circuit and of the bodies of its blocks, naming the block of a problem.
+ */
+std::optional<std::string> CheckAllBehavioralSources(const Circuit &circuit) {
+    if (std::optional<std::string> problem = CheckBehavioralSources(circuit)) {
+        return problem;
+    }
+    for (const auto &definition : circuit.GetSubcircuits()) {
+        if (std::optional<std::string> problem = CheckBehavioralSources(definition->Body)) {
+            return std::format("In block {}: {}", definition->Name, *problem);
+        }
+    }
+    return std::nullopt;
+}
+
 } // namespace
 
 /**
@@ -305,32 +343,10 @@ std::optional<std::string> CheckCircuit(const Circuit &circuit) {
     if (std::optional<std::string> problem = CheckAllInitialVoltages(circuit)) {
         return problem;
     }
-    // A current-controlled source needs a current that some other part reports
-    for (const CircuitEntry &entry : circuit.GetEntries()) {
-        if (!IsCurrentControlled(entry.Part->GetType())) {
-            continue;
-        }
-        const std::string &name = entry.Part->GetName();
-        const std::string &current = static_cast<const ControlledSource &>(*entry.Part).GetControllingCurrent();
-        if (current.empty()) {
-            return std::format("{} follows no current; pick its controlling current in Properties", name);
-        }
-        if (current == name) {
-            return std::format("{} cannot follow its own current", name);
-        }
-        if (!FindControllingSource(circuit, current)) {
-            return std::format("{} follows I({}), which is not in the circuit", name, current);
-        }
-    }
-    if (std::optional<std::string> problem = CheckBehavioralSources(circuit)) {
+    if (std::optional<std::string> problem = CheckControllingCurrents(circuit)) {
         return problem;
     }
-    for (const auto &definition : circuit.GetSubcircuits()) {
-        if (std::optional<std::string> problem = CheckBehavioralSources(definition->Body)) {
-            return std::format("In block {}: {}", definition->Name, *problem);
-        }
-    }
-    return std::nullopt;
+    return CheckAllBehavioralSources(circuit);
 }
 
 /**
