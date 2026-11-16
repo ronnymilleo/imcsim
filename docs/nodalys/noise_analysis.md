@@ -11,11 +11,13 @@
 
 ## 1. Algorithms and Mathematical Formulation
 
-Small-signal noise analysis (`.noise V(out) Vin dec N fstart fstop`) computes:
+Small-signal noise analysis (`.noise V(out) Vin dec|oct|lin N fstart fstop`) computes:
 1. **Output Noise Spectral Density** $e_{n,\text{out}}(f) = \sqrt{S_{v,\text{out}}(f)}$ in $\text{V}/\sqrt{\text{Hz}}$ at output node $n_{\text{out}}$.
 2. **Input-Referred Noise Spectral Density** $e_{n,\text{in}}(f) = \sqrt{S_{\text{in}}(f)}$ in $\text{V}/\sqrt{\text{Hz}}$ (voltage input source) or $\text{A}/\sqrt{\text{Hz}}$ (current input source).
 3. **Total Integrated RMS Noise** ($V_{\text{out,rms}}$ and $V_{\text{in,rms}}$ or $I_{\text{in,rms}}$) integrated across $[f_{\text{start}}, f_{\text{stop}}]$.
 4. **Per-Component Noise Breakdown** (`NoiseContribution`), grouping internal macromodel/subcircuit primitives under each top-level schematic part and sorting descending by total output RMS noise.
+
+The sweep type is read into `NoiseConfig::SweepType` (the decade by default, also when the word is left out), with the same grid, point count and range rules as the AC sweep ([`ac_analysis.md`](./ac_analysis.md), section 1.2b); the integration below follows whatever grid the sweep gives.
 
 ### 1.1 Transposed Complex Adjoint Method (`SolveAcTranspose`)
 A circuit may contain hundreds of noisy resistors, diodes, and transistors. Solving a forward AC system $\mathbf{Y}(j\omega)\mathbf{x} = \mathbf{b}_m$ for each individual noise source $m$ would require $O(N_{\text{sources}})$ matrix solves per frequency.

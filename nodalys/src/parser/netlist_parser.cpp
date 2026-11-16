@@ -17,12 +17,14 @@
 #include <charconv>
 #include <cmath>
 #include <format>
+#include <limits>
 #include <map>
 #include <optional>
 #include <ranges>
 #include <set>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace Nodalys {
@@ -310,35 +312,83 @@ std::vector<std::string> FindAcSources(const std::vector<std::string> &circuit_l
     return names;
 }
 
+/// The sweep of an `.ac`, `.noise` or `.sens ... ac` directive as it is written.
+struct FrequencySweepWords {
+    FrequencySweepType Type = FrequencySweepType::DECADE;
+    int Points = 0;
+    double StartFrequency = 0.0;
+    double StopFrequency = 0.0;
+};
+
 /// Where the sweep of `.sens <out_var> AC <type> <np> <fstart> <fstop>` starts among the tokens.
 constexpr std::size_t FIRST_AC_SENSITIVITY_SWEEP_TOKEN = 3;
 
-/// Reads the sweep type, the points and the frequency range of a `.sens ... AC` directive into the configuration.
-std::optional<std::string> ReadAcSensitivitySweep(const std::vector<std::string> &tokens, AcSensitivityConfig &cfg) {
-    const std::string sweep_type = ToUpper(tokens[FIRST_AC_SENSITIVITY_SWEEP_TOKEN]);
-    if (sweep_type == "DEC") {
-        cfg.SweepType = FrequencySweepType::DECADE;
-    } else if (sweep_type == "OCT") {
-        cfg.SweepType = FrequencySweepType::OCTAVE;
-    } else if (sweep_type == "LIN") {
-        cfg.SweepType = FrequencySweepType::LINEAR;
-    } else {
-        return std::format("Unknown sweep type '{}' in .sens ac, use dec, oct or lin",
-                           tokens[FIRST_AC_SENSITIVITY_SWEEP_TOKEN]);
+/// The words that follow the sweep type, which are the points, the start and the stop.
+constexpr std::size_t SWEEP_NUMBER_COUNT = 3;
+
+std::optional<FrequencySweepType> FindSweepType(const std::string &word) {
+    const std::string upper = ToUpper(word);
+    if (upper == "DEC") {
+        return FrequencySweepType::DECADE;
     }
-    const std::optional<double> points = ParseSpiceNumber(tokens[FIRST_AC_SENSITIVITY_SWEEP_TOKEN + 1]);
-    if (!points || *points < 1.0 || std::floor(*points) != *points) {
-        return "Invalid number of points in .sens ac, it must be a whole number of at least 1";
+    if (upper == "OCT") {
+        return FrequencySweepType::OCTAVE;
     }
-    cfg.PointsPerDecade = static_cast<int>(*points);
-    const std::optional<double> start = ParseSpiceNumber(tokens[FIRST_AC_SENSITIVITY_SWEEP_TOKEN + 2]);
-    const std::optional<double> stop = ParseSpiceNumber(tokens[FIRST_AC_SENSITIVITY_SWEEP_TOKEN + 3]);
-    if (!start || !stop || *start <= 0.0 || *stop < *start) {
-        return "Invalid frequency range in .sens ac, it needs 0 < fstart <= fstop";
+    if (upper == "LIN") {
+        return FrequencySweepType::LINEAR;
     }
-    cfg.StartFrequency = *start;
-    cfg.StopFrequency = *stop;
     return std::nullopt;
+}
+
+/**
+ * @brief   Reads `[DEC|OCT|LIN] <np> <fstart> <fstop>` from the tokens of a directive.
+ * @details The point count is a whole number of at least 1 and the range needs 0 < fstart <= fstop, for a linear
+ *          sweep too: the engine solves at each frequency as it is asked, and a zero start has no meaning for the
+ *          noise of a part that falls with frequency. ngspice accepts a start of 0 in a linear sweep; this reader
+ *          does not.
+ * @param[in] tokens             Tokens of the directive.
+ * @param[in] first_token        Index of the sweep type, or of the point count when the type is optional and absent.
+ * @param[in] is_type_required   True when the type word must be there, as in `.sens ac`; otherwise a missing one is a
+ *                               sweep by decade.
+ * @param[in] directive          Name used in the messages, such as ".ac".
+ * @param[in] line               Text of the directive, quoted in the messages.
+ * @return  The sweep, or the message that tells what is wrong with it.
+ */
+std::expected<FrequencySweepWords, std::string>
+ReadFrequencySweep(const std::vector<std::string> &tokens, const std::size_t first_token, const bool is_type_required,
+                   const std::string_view directive, const std::string_view line) {
+    FrequencySweepWords sweep;
+    std::size_t number_token = first_token;
+    if (first_token >= tokens.size()) {
+        return std::unexpected(std::format("Malformed {} directive: '{}'", directive, line));
+    }
+    const std::optional<FrequencySweepType> type = FindSweepType(tokens[first_token]);
+    if (type) {
+        sweep.Type = *type;
+        ++number_token;
+    } else if (is_type_required) {
+        return std::unexpected(std::format("Unknown sweep type '{}' in {}, use dec, oct or lin: '{}'",
+                                           tokens[first_token], directive, line));
+    }
+    if (tokens.size() < number_token + SWEEP_NUMBER_COUNT) {
+        return std::unexpected(std::format("Malformed {} directive: '{}'", directive, line));
+    }
+    const std::optional<double> points = ParseSpiceNumber(tokens[number_token]);
+    if (!points || *points < 1.0 || std::floor(*points) != *points ||
+        *points > static_cast<double>(std::numeric_limits<int>::max())) {
+        return std::unexpected(std::format(
+            "Invalid number of points in {}, it must be a whole number of at least 1: '{}'", directive, line));
+    }
+    sweep.Points = static_cast<int>(*points);
+    const std::optional<double> start = ParseSpiceNumber(tokens[number_token + 1]);
+    const std::optional<double> stop = ParseSpiceNumber(tokens[number_token + 2]);
+    if (!start || !stop || *start <= 0.0 || *stop < *start) {
+        return std::unexpected(
+            std::format("Invalid frequency range in {}, it needs 0 < fstart <= fstop: '{}'", directive, line));
+    }
+    sweep.StartFrequency = *start;
+    sweep.StopFrequency = *stop;
+    return sweep;
 }
 
 /// The input of an AC sensitivity: the ngspice syntax names none, so it is the one source with an AC magnitude.
@@ -363,16 +413,23 @@ std::expected<std::string, std::string> FindAcSensitivityInput(const std::vector
 /// input source.
 std::expected<AcSensitivityConfig, std::string> ParseAcSensitivity(const std::vector<std::string> &tokens,
                                                                    const NodeId positive, const NodeId negative,
-                                                                   const std::vector<std::string> &circuit_lines) {
+                                                                   const std::vector<std::string> &circuit_lines,
+                                                                   const std::string_view line) {
     constexpr std::size_t TOKENS_WITH_SWEEP_TYPE = 7;
     if (tokens.size() != TOKENS_WITH_SWEEP_TYPE) {
         return std::unexpected("Malformed .sens ac directive, expected '.sens <out_var> ac dec|oct|lin <np> <fstart> "
                                "<fstop>'");
     }
-    AcSensitivityConfig cfg;
-    if (const std::optional<std::string> error = ReadAcSensitivitySweep(tokens, cfg)) {
-        return std::unexpected(*error);
+    const std::expected<FrequencySweepWords, std::string> sweep =
+        ReadFrequencySweep(tokens, FIRST_AC_SENSITIVITY_SWEEP_TOKEN, true, ".sens ac", line);
+    if (!sweep) {
+        return std::unexpected(sweep.error());
     }
+    AcSensitivityConfig cfg;
+    cfg.SweepType = sweep->Type;
+    cfg.PointsPerDecade = sweep->Points;
+    cfg.StartFrequency = sweep->StartFrequency;
+    cfg.StopFrequency = sweep->StopFrequency;
     if (positive == GROUND_NODE) {
         return std::unexpected("The output of .sens ac must have a node other than ground as its positive one");
     }
@@ -839,15 +896,16 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                 if (tokens.size() < 4) {
                     return std::unexpected(std::format("Malformed .ac directive: '{}'", line));
                 }
-                AcSweepConfig cfg;
-                int start_idx = 1;
-                const std::string scale_type = ToUpper(tokens[1]);
-                if (scale_type == "DEC" || scale_type == "OCT" || scale_type == "LIN") {
-                    start_idx = 2;
+                const std::expected<FrequencySweepWords, std::string> sweep =
+                    ReadFrequencySweep(tokens, 1, false, ".ac", line);
+                if (!sweep) {
+                    return std::unexpected(sweep.error());
                 }
-                cfg.PointsPerDecade = static_cast<int>(ParseSpiceNumber(tokens[start_idx]).value_or(10));
-                cfg.StartFrequency = ParseSpiceNumber(tokens[start_idx + 1]).value_or(1.0);
-                cfg.StopFrequency = ParseSpiceNumber(tokens[start_idx + 2]).value_or(1e6);
+                AcSweepConfig cfg;
+                cfg.SweepType = sweep->Type;
+                cfg.PointsPerDecade = sweep->Points;
+                cfg.StartFrequency = sweep->StartFrequency;
+                cfg.StopFrequency = sweep->StopFrequency;
                 result.Analyses.push_back({AnalysisKind::AC_SWEEP, cfg});
             } else if (dir == ".TF") {
                 // .TF <out_var> <in_src>
@@ -870,14 +928,15 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                 cfg.OutputPositiveNode = nodes.Resolve(pos_str);
                 cfg.OutputNegativeNode = nodes.Resolve(neg_str);
                 cfg.InputSource = tokens[2];
-                int sidx = 3;
-                const std::string stype = ToUpper(tokens[3]);
-                if (stype == "DEC" || stype == "OCT" || stype == "LIN") {
-                    sidx = 4;
+                const std::expected<FrequencySweepWords, std::string> sweep =
+                    ReadFrequencySweep(tokens, 3, false, ".noise", line);
+                if (!sweep) {
+                    return std::unexpected(sweep.error());
                 }
-                cfg.PointsPerDecade = static_cast<int>(ParseSpiceNumber(tokens[sidx]).value_or(10));
-                cfg.StartFrequency = ParseSpiceNumber(tokens[sidx + 1]).value_or(1.0);
-                cfg.StopFrequency = ParseSpiceNumber(tokens[sidx + 2]).value_or(1e6);
+                cfg.SweepType = sweep->Type;
+                cfg.PointsPerDecade = sweep->Points;
+                cfg.StartFrequency = sweep->StartFrequency;
+                cfg.StopFrequency = sweep->StopFrequency;
                 result.Analyses.push_back({AnalysisKind::NOISE, cfg});
             } else if (dir == ".SP") {
                 // .SP [DEC|OCT|LIN] <np> <fstart> <fstop>
@@ -976,7 +1035,7 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                 const NodeId negative = nodes.Resolve(neg_str);
                 if (tokens.size() >= 3 && ToUpper(tokens[2]) == "AC") {
                     const std::expected<AcSensitivityConfig, std::string> cfg =
-                        ParseAcSensitivity(tokens, positive, negative, circuit_lines);
+                        ParseAcSensitivity(tokens, positive, negative, circuit_lines, line);
                     if (!cfg) {
                         return std::unexpected(std::format("{}: '{}'", cfg.error(), line));
                     }

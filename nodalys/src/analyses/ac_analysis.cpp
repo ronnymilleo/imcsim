@@ -5,6 +5,7 @@
 
 #include "analyses/analyses.h"
 
+#include "analyses/frequency_sweep.h"
 #include "devices/devices.h"
 #include <algorithm>
 #include <cmath>
@@ -42,18 +43,8 @@ std::expected<AcSweepResult, std::string> ComputeACSweep(CompiledCircuit &compil
     }
 
     AcSweepResult result;
-    for (int index = 0;; ++index) {
-        const double frequency =
-            settings.StartFrequency *
-            std::pow(10.0, static_cast<double>(index) / static_cast<double>(settings.PointsPerDecade));
-        if (frequency > settings.StopFrequency * (1.0 + 1e-9)) {
-            break;
-        }
-        result.Frequencies.push_back(std::min(frequency, settings.StopFrequency));
-        if (frequency >= settings.StopFrequency * (1.0 - 1e-9)) {
-            break;
-        }
-    }
+    result.Frequencies = MakeFrequencySweep(settings.SweepType, settings.StartFrequency, settings.StopFrequency,
+                                            settings.PointsPerDecade);
 
     const std::size_t point_count = result.Frequencies.size();
     result.NodeMagnitudesDecibels.resize(static_cast<std::size_t>(compiled.CircuitNodeCount));

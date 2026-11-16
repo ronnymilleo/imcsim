@@ -5,6 +5,7 @@
 
 #include "analyses/analyses.h"
 
+#include "analyses/frequency_sweep.h"
 #include "analyses/port_matrices.h"
 #include "devices/devices.h"
 #include <algorithm>
@@ -48,63 +49,7 @@ std::expected<std::vector<double>, std::string> GenerateFrequencyPoints(const SP
                                    : "The points per decade or octave must be at least 1");
     }
 
-    std::vector<double> frequencies;
-    switch (settings.SweepType) {
-    case FrequencySweepType::LINEAR: {
-        if (settings.Points == 1 || settings.StartFrequency == settings.StopFrequency) {
-            frequencies.push_back(settings.StartFrequency);
-        } else {
-            const double step =
-                (settings.StopFrequency - settings.StartFrequency) / static_cast<double>(settings.Points - 1);
-            for (int i = 0; i < settings.Points; ++i) {
-                const double f = settings.StartFrequency + static_cast<double>(i) * step;
-                frequencies.push_back(std::min(f, settings.StopFrequency));
-            }
-        }
-        break;
-    }
-    case FrequencySweepType::DECADE: {
-        if (settings.StartFrequency == settings.StopFrequency) {
-            frequencies.push_back(settings.StartFrequency);
-        } else {
-            for (int index = 0;; ++index) {
-                const double frequency =
-                    settings.StartFrequency *
-                    std::pow(10.0, static_cast<double>(index) / static_cast<double>(settings.Points));
-                if (frequency > settings.StopFrequency * (1.0 + 1e-9)) {
-                    break;
-                }
-                frequencies.push_back(std::min(frequency, settings.StopFrequency));
-                if (frequency >= settings.StopFrequency * (1.0 - 1e-9)) {
-                    break;
-                }
-            }
-        }
-        break;
-    }
-    case FrequencySweepType::OCTAVE: {
-        if (settings.StartFrequency == settings.StopFrequency) {
-            frequencies.push_back(settings.StartFrequency);
-        } else {
-            for (int index = 0;; ++index) {
-                const double frequency =
-                    settings.StartFrequency *
-                    std::pow(2.0, static_cast<double>(index) / static_cast<double>(settings.Points));
-                if (frequency > settings.StopFrequency * (1.0 + 1e-9)) {
-                    break;
-                }
-                frequencies.push_back(std::min(frequency, settings.StopFrequency));
-                if (frequency >= settings.StopFrequency * (1.0 - 1e-9)) {
-                    break;
-                }
-            }
-        }
-        break;
-    }
-    default:
-        return std::unexpected("Unknown frequency sweep type for S-parameter analysis");
-    }
-    return frequencies;
+    return MakeFrequencySweep(settings.SweepType, settings.StartFrequency, settings.StopFrequency, settings.Points);
 }
 
 std::optional<std::string> CheckPortNumbers(const std::vector<CircuitPort> &sorted_ports) {
