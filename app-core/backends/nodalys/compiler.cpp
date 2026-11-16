@@ -7,6 +7,7 @@
 
 #include "backends/nodalys/model_parser.h"
 #include "backends/nodalys/parameter_conversion.h"
+#include "backends/nodalys/spice_block_check.h"
 #include "circuit/behavioral_expression.h"
 #include "circuit/circuit_currents.h"
 #include "circuit/components/behavioral_source.h"
@@ -743,8 +744,8 @@ std::optional<std::string> FindSpiceBlockProblem(const Circuit &circuit, const S
     if (!definition || !definition->Spice) {
         return std::nullopt;
     }
-    return Nodalys::CheckSubcircuitText(MakeSpiceText(definition->Name, *definition->Spice),
-                                        InstanceParameters(instance, *definition));
+    return GetNodalysSpiceBlockCheck().Find(MakeSpiceText(definition->Name, *definition->Spice),
+                                            InstanceParameters(instance, *definition));
 }
 
 } // namespace Core
