@@ -415,8 +415,13 @@ the transient reads it:
   no capacitor on it has nothing to start from and is solved as usual. Nodalys follows the same rule, so the two
   engines agree.
 - The operating point, the DC sweep, the AC sweep and the other small-signal analyses leave it out of the circuit.
-- Two parts on one node need the same voltage. A part on ground, on a node nothing is connected to or inside a block is
-  refused with a message. A circuit of only an initial voltage and parts that tie themselves to ground needs no Ground.
+- Two parts on one node need the same voltage. A part on ground or on a node nothing is connected to is refused with a
+  message. A circuit of only an initial voltage and parts that tie themselves to ground needs no Ground.
+- A part inside a block body starts the node of each instance of the block, and the instances of blocks inside it too.
+  ngspice does not read `.ic` inside a `.subckt`, so the netlist writes one line per instance at the top, named by the
+  instances down to the node (`.ic V(X1.X2.5)=value`); Nodalys gives the initial condition to the node it makes for each
+  instance. A part on a pin of the block sets the outer node that instance connects the pin to, so it must agree with a
+  part on that net outside, and is refused when the instance connects the pin to ground.
 
 ## Controlled sources
 
