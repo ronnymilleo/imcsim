@@ -112,6 +112,67 @@ bool HasNodesets(const std::vector<std::unique_ptr<Device>> &devices) {
 }
 
 /**
+ * @brief   Gives the devices their starting guesses of an operating point, which a step inside a transient already has.
+ */
+void SeedOperatingPoint(const std::vector<std::unique_ptr<Device>> &devices, std::vector<double> &x,
+                        const TimeContext &time) {
+    if (!time.IsTransient || time.IsTransientStart) {
+        for (const std::unique_ptr<Device> &device : devices) {
+            device->SeedOperatingPoint(x);
+        }
+    }
+}
+
+/**
+ * @brief   Gmin stepping: a large conductance (1 mS) from every node to ground makes the network nearly linear, then it
+ *          is reduced by 10x per step down to options.Gmin, warm-starting each step from the last.
+ */
+bool TryGminStepping(MnaSystem &sys, const std::vector<std::unique_ptr<Device>> &devices, std::vector<double> &x,
+                     const TimeContext &time, const ConvergenceOptions &options, NewtonOutcome &outcome) {
+    constexpr double GMIN_STEP_START = 1e-3;
+    constexpr double GMIN_STEP_FACTOR = 0.1;
+    constexpr int GMIN_STEPS = 10;
+    x.assign(static_cast<std::size_t>(sys.GetSize()), 0.0);
+    SeedOperatingPoint(devices, x, time);
+    for (int step = 0; step <= GMIN_STEPS; ++step) {
+        const double gmin = GMIN_STEP_START * std::pow(GMIN_STEP_FACTOR, static_cast<double>(step));
+        if (!RunNewton(sys, devices, x, options, std::max(gmin, options.Gmin), time, outcome.Fault)) {
+            return false;
+        }
+    }
+    outcome.Converged = true;
+    outcome.Strategy = "gmin stepping";
+    return true;
+}
+
+/**
+ * @brief   Source stepping: all independent sources are scaled from 0 up to 100% in 20 linear steps, tracking the
+ *          operating point continuously from the trivial zero solution.
+ */
+bool TrySourceStepping(MnaSystem &sys, const std::vector<std::unique_ptr<Device>> &devices, std::vector<double> &x,
+                       const TimeContext &time, const ConvergenceOptions &options, NewtonOutcome &outcome) {
+    constexpr int SOURCE_STEPS = 20;
+    x.assign(static_cast<std::size_t>(sys.GetSize()), 0.0);
+    SeedOperatingPoint(devices, x, time);
+    bool has_converged = true;
+    for (int step = 1; step <= SOURCE_STEPS && has_converged; ++step) {
+        const double scale = static_cast<double>(step) / static_cast<double>(SOURCE_STEPS);
+        for (const std::unique_ptr<Device> &device : devices) {
+            device->SetSourceScale(scale);
+        }
+        has_converged = RunNewton(sys, devices, x, options, options.Gmin, time, outcome.Fault) != 0;
+    }
+    for (const std::unique_ptr<Device> &device : devices) {
+        device->SetSourceScale(1.0);
+    }
+    if (has_converged) {
+        outcome.Converged = true;
+        outcome.Strategy = "source stepping";
+    }
+    return has_converged;
+}
+
+/**
  * @brief   The three strategies that find a solution: plain Newton, gmin stepping and source stepping.
  * @param[in] is_warm_start  Starts the plain attempt from the iterate it is given and not from the seeds of the
  * devices, for the pass that continues from a point already found.
@@ -119,73 +180,19 @@ bool HasNodesets(const std::vector<std::unique_ptr<Device>> &devices) {
 NewtonOutcome SolveWithStrategies(MnaSystem &sys, const std::vector<std::unique_ptr<Device>> &devices,
                                   std::vector<double> &x, const TimeContext &time, const ConvergenceOptions &options,
                                   const bool is_warm_start) {
-    if (!is_warm_start && (!time.IsTransient || time.IsTransientStart)) {
-        for (const std::unique_ptr<Device> &device : devices) {
-            device->SeedOperatingPoint(x);
-        }
+    if (!is_warm_start) {
+        SeedOperatingPoint(devices, x, time);
     }
-
-    // Attempt 1: Direct Newton-Raphson
     NewtonOutcome outcome;
     if (const int iterations = RunNewton(sys, devices, x, options, options.Gmin, time, outcome.Fault)) {
         outcome.Converged = true;
         outcome.Iterations = iterations;
         return outcome;
     }
-
-    // Attempt 2: Gmin stepping — place a large conductance (1 mS) from every node to ground to make the network
-    // nearly linear, then reduce it by 10x per step down to options.Gmin, warm-starting each step from the last.
-    constexpr double GMIN_STEP_START = 1e-3;
-    constexpr double GMIN_STEP_FACTOR = 0.1;
-    constexpr int GMIN_STEPS = 10;
-    x.assign(static_cast<std::size_t>(sys.GetSize()), 0.0);
-    if (!time.IsTransient || time.IsTransientStart) {
-        for (const std::unique_ptr<Device> &device : devices) {
-            device->SeedOperatingPoint(x);
-        }
-    }
-    for (int step = 0; step <= GMIN_STEPS; ++step) {
-        const double gmin = GMIN_STEP_START * std::pow(GMIN_STEP_FACTOR, static_cast<double>(step));
-        if (!RunNewton(sys, devices, x, options, std::max(gmin, options.Gmin), time, outcome.Fault)) {
-            break;
-        }
-        if (step == GMIN_STEPS) {
-            outcome.Converged = true;
-            outcome.Strategy = "gmin stepping";
-        }
-    }
-    if (outcome.Converged) {
+    if (TryGminStepping(sys, devices, x, time, options, outcome)) {
         return outcome;
     }
-
-    // Attempt 3: Source stepping — scale all independent sources from 0 up to 100% in 20 linear steps, tracking
-    // the operating point continuously from the trivial zero solution.
-    constexpr int SOURCE_STEPS = 20;
-    x.assign(static_cast<std::size_t>(sys.GetSize()), 0.0);
-    if (!time.IsTransient || time.IsTransientStart) {
-        for (const std::unique_ptr<Device> &device : devices) {
-            device->SeedOperatingPoint(x);
-        }
-    }
-    for (const std::unique_ptr<Device> &device : devices) {
-        device->SetSourceScale(0.0);
-    }
-    for (int step = 1; step <= SOURCE_STEPS; ++step) {
-        const double scale = static_cast<double>(step) / static_cast<double>(SOURCE_STEPS);
-        for (const std::unique_ptr<Device> &device : devices) {
-            device->SetSourceScale(scale);
-        }
-        if (!RunNewton(sys, devices, x, options, options.Gmin, time, outcome.Fault)) {
-            break;
-        }
-        if (step == SOURCE_STEPS) {
-            outcome.Converged = true;
-            outcome.Strategy = "source stepping";
-        }
-    }
-    for (const std::unique_ptr<Device> &device : devices) {
-        device->SetSourceScale(1.0);
-    }
+    TrySourceStepping(sys, devices, x, time, options, outcome);
     return outcome;
 }
 
