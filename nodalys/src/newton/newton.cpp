@@ -99,11 +99,27 @@ int RunNewton(MnaSystem &sys, const std::vector<std::unique_ptr<Device>> &device
     return 0;
 }
 
-} // namespace
+/// Whether the solve finds an operating point, which is what nodesets guide: a DC solve, or the one that starts a
+/// transient from its operating point.
+bool IsOperatingPointSolve(const TimeContext &time) {
+    return !time.IsTransient || (time.IsTransientStart && !time.UseInitialConditions);
+}
 
-NewtonOutcome SolveNewton(MnaSystem &sys, const std::vector<std::unique_ptr<Device>> &devices, std::vector<double> &x,
-                          const TimeContext &time, const ConvergenceOptions &options) {
-    if (!time.IsTransient || time.IsTransientStart) {
+bool HasNodesets(const std::vector<std::unique_ptr<Device>> &devices) {
+    return std::ranges::any_of(devices, [](const std::unique_ptr<Device> &device) {
+        return dynamic_cast<NodesetDevice *>(device.get()) != nullptr;
+    });
+}
+
+/**
+ * @brief   The three strategies that find a solution: plain Newton, gmin stepping and source stepping.
+ * @param[in] is_warm_start  Starts the plain attempt from the iterate it is given and not from the seeds of the
+ * devices, for the pass that continues from a point already found.
+ */
+NewtonOutcome SolveWithStrategies(MnaSystem &sys, const std::vector<std::unique_ptr<Device>> &devices,
+                                  std::vector<double> &x, const TimeContext &time, const ConvergenceOptions &options,
+                                  const bool is_warm_start) {
+    if (!is_warm_start && (!time.IsTransient || time.IsTransientStart)) {
         for (const std::unique_ptr<Device> &device : devices) {
             device->SeedOperatingPoint(x);
         }
@@ -171,6 +187,26 @@ NewtonOutcome SolveNewton(MnaSystem &sys, const std::vector<std::unique_ptr<Devi
         device->SetSourceScale(1.0);
     }
     return outcome;
+}
+
+} // namespace
+
+NewtonOutcome SolveNewton(MnaSystem &sys, const std::vector<std::unique_ptr<Device>> &devices, std::vector<double> &x,
+                          const TimeContext &time, const ConvergenceOptions &options) {
+    if (time.AppliesNodesets && IsOperatingPointSolve(time) && HasNodesets(devices)) {
+        // As SPICE does: find the point with the nodes pulled to their guesses, then let go and converge again from it
+        const std::vector<double> start = x;
+        TimeContext held = time;
+        held.IsNodesetPass = true;
+        if (SolveWithStrategies(sys, devices, x, held, options, false).Converged) {
+            if (const NewtonOutcome released = SolveWithStrategies(sys, devices, x, time, options, true);
+                released.Converged) {
+                return released;
+            }
+        }
+        x = start;
+    }
+    return SolveWithStrategies(sys, devices, x, time, options, false);
 }
 
 std::string DescribeFailure(std::string message, const NewtonOutcome &outcome) {

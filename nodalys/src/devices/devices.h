@@ -611,6 +611,31 @@ private:
 };
 
 /**
+ * @class   NodesetDevice
+ * @brief   Pulls a node to a voltage in the first pass of the solve of an operating point (SPICE `.nodeset`), which
+ *          then lets go and converges again.
+ * @details A stiff Norton companion to ground, stamped only while `TimeContext::IsNodesetPass` is true. The solver
+ *          finds the point with every nodeset held, releases them and converges again from there, so a circuit with
+ *          several stable states, such as a latch, ends in the one nearest the voltages, and a circuit with one ends
+ *          where it always does. A nodeset is a guess where `NodeInitialConditionDevice` is a held value, which the
+ *          transient keeps in the operating point that starts it. Every solve that starts from an operating point reads
+ *          it, the transient's without `uic` included; the solves that continue a DC sweep do not.
+ */
+class NodesetDevice : public Device {
+public:
+    NodesetDevice(int node, double voltage);
+
+    void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
+    double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
+    std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
+                                           const std::vector<std::complex<double>> &x_ac, double omega) const override;
+
+private:
+    int m_Node;
+    double m_Voltage;
+};
+
+/**
  * @struct  NodeSeed
  * @brief   One node index and its initial Newton guess for `NodeSeedDevice`.
  */

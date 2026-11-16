@@ -133,6 +133,8 @@ std::expected<DcSweepResult, std::string> ComputeDCSweep(CompiledCircuit &compil
 
     std::vector<double> x(static_cast<std::size_t>(compiled.System->GetSize()), 0.0);
     NewtonOutcome outcome;
+    // Only the first point starts from the nodesets; the others continue from the point before them
+    TimeContext context;
     for (const double step_value : step_values) {
         if (stepped_device && !SetSourceValue(stepped_device, step_value)) {
             return std::unexpected(std::format("Nodalys cannot step the source {}", sweep.SteppedSource));
@@ -144,7 +146,8 @@ std::expected<DcSweepResult, std::string> ComputeDCSweep(CompiledCircuit &compil
             if (!SetSourceValue(swept->second, swept_value)) {
                 return std::unexpected(std::format("Nodalys cannot sweep the source {}", sweep.SweptSource));
             }
-            outcome = SolveNewton(*compiled.System, compiled.Devices, x, TimeContext{}, options);
+            outcome = SolveNewton(*compiled.System, compiled.Devices, x, context, options);
+            context.AppliesNodesets = false;
             if (!outcome.Converged) {
                 return std::unexpected(DescribeFailure(
                     std::format("Nodalys found no operating point at {} = {}", sweep.SweptSource, swept_value),

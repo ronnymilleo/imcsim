@@ -919,6 +919,16 @@ public:
         });
     }
 
+    void SetNodeset(const NodeId node, const double voltage) {
+        Track(node);
+        Defer([this, node, voltage]() {
+            const int mapped = MapNode(node);
+            if (mapped >= 0) {
+                m_NodesetVoltages[mapped] = voltage;
+            }
+        });
+    }
+
     std::expected<Circuit, std::string> Build() {
         const int total_top_nodes = std::max(m_CircuitNodeCount, m_MaxNode + 1);
         SetCircuitNodeCount(total_top_nodes);
@@ -938,6 +948,10 @@ public:
             }
         }
         m_InitialNodeVoltages.clear();
+        for (const auto &[node, voltage] : m_NodesetVoltages) {
+            m_Compiled.Devices.push_back(std::make_unique<NodesetDevice>(node, voltage));
+        }
+        m_NodesetVoltages.clear();
         BindBehavioralCurrents();
         if (!m_Errors.empty()) {
             return std::unexpected(m_Errors.front());
@@ -983,6 +997,7 @@ private:
     std::vector<bool> m_IsNodeUnknown;
     std::vector<bool> m_DynamicUnknown;
     std::map<int, double> m_InitialNodeVoltages;
+    std::map<int, double> m_NodesetVoltages;
     CompiledCircuit m_Compiled;
 };
 
@@ -1353,6 +1368,19 @@ void CircuitBuilder::AddDFlipFlop(std::string name, const NodeId q, const NodeId
  */
 void CircuitBuilder::SetInitialVoltage(const NodeId node, const double voltage) {
     m_Impl->SetInitialVoltage(node, voltage);
+}
+
+/**
+ * @brief   Sets the voltage the solver starts the operating point of a node from (SPICE `.nodeset`).
+ * @param[in] node     Node to pull toward the voltage; ground (0) is ignored.
+ * @param[in] voltage  Voltage in volts.
+ * @note    A guess and not a held value: the solver first finds the point with the node pulled to the voltage, then
+ * lets go and converges again, so where a circuit has several stable states it ends in the one nearest the guess. Every
+ * analysis that starts from an operating point reads it, except the harmonic balance; the transient that starts from
+ * initial conditions (`uic`) has no operating point, and a DC sweep reads it for its first point only.
+ */
+void CircuitBuilder::SetNodeset(const NodeId node, const double voltage) {
+    m_Impl->SetNodeset(node, voltage);
 }
 
 std::expected<Circuit, std::string> CircuitBuilder::Build() {
