@@ -55,6 +55,7 @@ add_library(imcsim-core-lib
             circuit/components/vcc.cpp
             circuit/components/voltage_controlled_switch.cpp
             circuit/components/voltage_source.cpp
+            circuit/initial_voltage_targets.cpp
             circuit/library_model.cpp
             circuit/netlist_logic.cpp
             circuit/netlist_sources.cpp

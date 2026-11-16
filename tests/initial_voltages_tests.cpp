@@ -10,6 +10,7 @@
 #include "circuit/components/capacitor.h"
 #include "circuit/components/ground.h"
 #include "circuit/components/resistor.h"
+#include "circuit/components/subcircuit.h"
 #include "circuit/components/vcc.h"
 #include "circuit/components/voltage_source.h"
 #include "circuit/subcircuit.h"
@@ -133,6 +134,85 @@ std::vector<Core::Transient> RunOnBothEngines(const Core::Circuit &circuit, cons
     return results;
 }
 
+/**
+ * @brief   A block of an RC of 1k and 1u (time constant 1 ms) to ground, with an initial voltage on its node, reached
+ *          from the pin through a 1 ohm link or, when asked, on the pin itself.
+ * @details The link carries no current in an open circuit, so the pin reads the voltage of the RC: the engines give
+ *          the results of the circuit nodes only, and this is how a test sees inside a block.
+ */
+std::shared_ptr<Core::SubcircuitDefinition> MakeTank(const std::string &name, const double volts,
+                                                     const bool is_marker_on_pin) {
+    static Core::Resistor link;
+    static Core::Resistor resistor;
+    static Core::Capacitor capacitor;
+    link.SetName("RL");
+    link.SetValue(1.0);
+    resistor.SetName("R1");
+    resistor.SetValue(1e3);
+    capacitor.SetName("C1");
+    capacitor.SetValue(1e-6);
+    auto definition = std::make_shared<Core::SubcircuitDefinition>();
+    definition->Name = name;
+    definition->Pins = {{.Name = "A", .Node = 1}};
+    // The capacitor sits on the node of the marker, which a transient from initial conditions needs to charge it
+    const int rc_node = is_marker_on_pin ? 1 : 2;
+    if (!is_marker_on_pin) {
+        definition->Body.Add(link, {1, 2});
+    }
+    definition->Body.Add(resistor, {rc_node, 0});
+    definition->Body.Add(capacitor, {rc_node, 0});
+    definition->Body.AddInitialVoltage({.Node = rc_node, .Volts = volts});
+    return definition;
+}
+
+/// An instance of a block with one pin.
+Core::SubcircuitInstance MakeInstance(const std::string &name, const std::string &definition) {
+    Core::SubcircuitInstance instance(definition, {"A"});
+    instance.SetName(name);
+    return instance;
+}
+
+/**
+ * @struct  TwoTanks
+ * @brief   Two instances of the block TANK on the nodes 1 and 2, and a Ground; when asked, node 3 has a 1k resistor
+ *          and a capacitor with an initial condition, which makes the transient start from initial conditions (uic).
+ */
+struct TwoTanks {
+    Core::SubcircuitInstance First = MakeInstance("X1", "TANK");
+    Core::SubcircuitInstance Second = MakeInstance("X2", "TANK");
+    Core::Resistor OtherResistor;
+    Core::Capacitor OtherCapacitor;
+    Core::Ground Reference;
+    Core::Circuit Circuit;
+
+    TwoTanks(const std::shared_ptr<Core::SubcircuitDefinition> &definition, const bool has_other_condition) {
+        Circuit.AddSubcircuit(definition);
+        Circuit.Add(First, {1});
+        Circuit.Add(Second, {2});
+        Circuit.Add(Reference, {0});
+        if (has_other_condition) {
+            OtherResistor.SetName("R2");
+            OtherResistor.SetValue(1e3);
+            OtherCapacitor.SetName("C2");
+            OtherCapacitor.SetValue(1e-6);
+            OtherCapacitor.SetInitialCondition(2.0);
+            Circuit.Add(OtherResistor, {3, 0});
+            Circuit.Add(OtherCapacitor, {3, 0});
+        }
+    }
+};
+
+/// Both pins of the two instances start at the voltage and discharge with the time constant of 1 ms.
+void CheckBothTanksDischarge(const Core::Circuit &circuit, const double volts) {
+    for (const Core::Transient &transient : RunOnBothEngines(circuit, FIVE_MILLISECONDS)) {
+        for (const std::size_t node : {std::size_t{1}, std::size_t{2}}) {
+            CHECK_THAT(transient.NodeVoltages[node].front(), WithinAbs(volts, 1e-3));
+            CHECK_THAT(VoltageAt(transient, node, 1e-3), WithinAbs(volts * std::exp(-1.0), 0.02));
+            CHECK_THAT(VoltageAt(transient, node, 3e-3), WithinAbs(volts * std::exp(-3.0), 0.02));
+        }
+    }
+}
+
 /// A schematic of a resistor to ground on a wire that an initial voltage marker of the given value also touches.
 struct MarkedResistor {
     GUI::Schematic Schematic;
@@ -234,21 +314,121 @@ TEST_CASE("A marker on ground or on a node nothing is connected to is refused", 
     }
 }
 
-TEST_CASE("A marker inside a block is refused with the way out", "[initial_voltage]") {
-    auto definition = std::make_shared<Core::SubcircuitDefinition>();
-    definition->Name = "TANK";
-    definition->Body.AddInitialVoltage({.Node = 1, .Volts = 2.0});
-    Core::Resistor resistor;
-    resistor.SetName("R1");
-    Core::Ground ground;
+TEST_CASE("A marker inside a block is checked where it sits", "[initial_voltage]") {
+    SECTION("A marker on a node of the body is accepted") {
+        TwoTanks setup(MakeTank("TANK", 3.0, false), false);
+        CHECK_FALSE(Core::CheckCircuit(setup.Circuit).has_value());
+    }
+    SECTION("A marker on the ground of the body is refused, naming the block") {
+        auto definition = MakeTank("TANK", 3.0, false);
+        definition->Body.AddInitialVoltage({.Node = 0, .Volts = 1.0});
+        TwoTanks setup(definition, false);
+        const std::optional<std::string> problem = Core::CheckCircuit(setup.Circuit);
+        REQUIRE(problem.has_value());
+        CHECK_THAT(*problem, ContainsSubstring("ground"));
+        CHECK_THAT(*problem, ContainsSubstring("block TANK"));
+    }
+    SECTION("A marker on a node nothing in the body touches is refused, naming the block") {
+        auto definition = MakeTank("TANK", 3.0, false);
+        definition->Body.AddInitialVoltage({.Node = 5, .Volts = 1.0});
+        TwoTanks setup(definition, false);
+        const std::optional<std::string> problem = Core::CheckCircuit(setup.Circuit);
+        REQUIRE(problem.has_value());
+        CHECK_THAT(*problem, ContainsSubstring("no part is connected"));
+        CHECK_THAT(*problem, ContainsSubstring("block TANK"));
+    }
+    SECTION("A marker on a pin that an instance ties to ground is refused") {
+        TwoTanks setup(MakeTank("TANK", 3.0, true), false);
+        Core::Circuit circuit;
+        circuit.AddSubcircuit(setup.Circuit.GetSubcircuits()[0]);
+        circuit.Add(setup.First, {0});
+        circuit.Add(setup.Reference, {0});
+        const std::optional<std::string> problem = Core::CheckCircuit(circuit);
+        REQUIRE(problem.has_value());
+        CHECK_THAT(*problem, ContainsSubstring("reaches ground"));
+        CHECK_THAT(*problem, ContainsSubstring("X1"));
+    }
+}
+
+TEST_CASE("A marker on a pin of a block and another on the net it joins must agree, naming both", "[initial_voltage]") {
+    TwoTanks setup(MakeTank("TANK", 3.0, true), false);
+    SECTION("The same voltage is fine and is written once for the node") {
+        setup.Circuit.AddInitialVoltage({.Node = 1, .Volts = 3.0});
+        CHECK_FALSE(Core::CheckCircuit(setup.Circuit).has_value());
+        const std::string netlist = setup.Circuit.ToSpiceNetlist();
+        CHECK_THAT(netlist, ContainsSubstring(".ic V(1)=3\n"));
+        const std::size_t first = netlist.find(".ic V(1)=");
+        CHECK(netlist.find(".ic V(1)=", first + 1) == std::string::npos);
+    }
+    SECTION("Different voltages are refused with both values and where each marker is") {
+        setup.Circuit.AddInitialVoltage({.Node = 1, .Volts = 2.0});
+        const std::optional<std::string> problem = Core::CheckCircuit(setup.Circuit);
+        REQUIRE(problem.has_value());
+        CHECK_THAT(*problem, ContainsSubstring("two initial voltages"));
+        CHECK_THAT(*problem, ContainsSubstring("3 V in X1"));
+        CHECK_THAT(*problem, ContainsSubstring("2 V"));
+    }
+}
+
+TEST_CASE("The netlist writes the initial voltage of each instance of a block at the top, and none inside it",
+          "[initial_voltage]") {
+    TwoTanks setup(MakeTank("TANK", 3.0, false), false);
+    const std::string netlist = setup.Circuit.ToSpiceNetlist();
+    CHECK_THAT(netlist, ContainsSubstring(".ic V(X1.2)=3\n"));
+    CHECK_THAT(netlist, ContainsSubstring(".ic V(X2.2)=3\n"));
+    // Two lines at the top and none between ".subckt" and ".ends"
+    CHECK(std::ranges::count(netlist, 'V') >= 2);
+    const std::size_t subcircuit = netlist.find(".subckt");
+    REQUIRE(subcircuit != std::string::npos);
+    CHECK(netlist.find(".ic", subcircuit) == std::string::npos);
+}
+
+TEST_CASE("A marker inside a block starts the node of each instance on both engines", "[initial_voltage]") {
+    SECTION("Without initial conditions the node is held in the operating point") {
+        TwoTanks setup(MakeTank("TANK", 3.0, false), false);
+        REQUIRE_FALSE(Core::CheckCircuit(setup.Circuit).has_value());
+        CheckBothTanksDischarge(setup.Circuit, 3.0);
+    }
+    SECTION("With the initial condition of a part it starts the capacitors across the node") {
+        TwoTanks setup(MakeTank("TANK", 3.0, false), true);
+        REQUIRE_FALSE(Core::CheckCircuit(setup.Circuit).has_value());
+        CheckBothTanksDischarge(setup.Circuit, 3.0);
+    }
+    SECTION("A marker on a pin sets the outer node of each instance") {
+        TwoTanks setup(MakeTank("TANK", 3.0, true), false);
+        REQUIRE_FALSE(Core::CheckCircuit(setup.Circuit).has_value());
+        CheckBothTanksDischarge(setup.Circuit, 3.0);
+    }
+    SECTION("A marker on a pin sets the outer node with initial conditions too") {
+        TwoTanks setup(MakeTank("TANK", 3.0, true), true);
+        REQUIRE_FALSE(Core::CheckCircuit(setup.Circuit).has_value());
+        CheckBothTanksDischarge(setup.Circuit, 3.0);
+    }
+}
+
+TEST_CASE("A marker in a block placed inside another block starts every instance on both engines",
+          "[initial_voltage]") {
+    // OUTER places a TANK on its pin, which a first instance of OUTER reaches through its own pin
+    auto outer = std::make_shared<Core::SubcircuitDefinition>();
+    outer->Name = "OUTER";
+    outer->Pins = {{.Name = "A", .Node = 1}};
+    Core::SubcircuitInstance inner = MakeInstance("XI", "TANK");
+    outer->Body.Add(inner, {1});
+    Core::SubcircuitInstance first = MakeInstance("X1", "OUTER");
+    Core::SubcircuitInstance second = MakeInstance("X2", "OUTER");
+    Core::Ground reference;
     Core::Circuit circuit;
-    circuit.Add(resistor, {1, 0});
-    circuit.Add(ground, {0});
-    circuit.AddSubcircuit(definition);
-    const std::optional<std::string> problem = Core::CheckCircuit(circuit);
-    REQUIRE(problem.has_value());
-    CHECK_THAT(*problem, ContainsSubstring("Block TANK holds an initial voltage"));
-    CHECK_THAT(*problem, ContainsSubstring("pin"));
+    circuit.AddSubcircuit(MakeTank("TANK", 3.0, false));
+    circuit.AddSubcircuit(outer);
+    circuit.Add(first, {1});
+    circuit.Add(second, {2});
+    circuit.Add(reference, {0});
+    REQUIRE_FALSE(Core::CheckCircuit(circuit).has_value());
+
+    const std::string netlist = circuit.ToSpiceNetlist();
+    CHECK_THAT(netlist, ContainsSubstring(".ic V(X1.XI.2)=3\n"));
+    CHECK_THAT(netlist, ContainsSubstring(".ic V(X2.XI.2)=3\n"));
+    CheckBothTanksDischarge(circuit, 3.0);
 }
 
 TEST_CASE("The circuit copies carry the initial voltages", "[initial_voltage]") {

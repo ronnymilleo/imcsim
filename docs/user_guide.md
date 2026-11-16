@@ -42,8 +42,9 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   the node is released and the circuit evolves on its own. With the Initial field of a capacitor or inductor in use,
   the transient has no operating point (`uic`) and a node voltage only reaches the capacitors across that node, which
   start at it; a node with no capacitor on it does not start anywhere in particular. Both engines mean the same. Two
-  parts on one node must agree, ground cannot take one, a node needs a part connected to it, and a part inside a block is
-  refused: put it outside, on the node of a pin. Only the transient reads it; the operating point, the AC and DC
+  parts on one node must agree, ground cannot take one, and a node needs a part connected to it. A part inside a block
+  body starts that node in every instance of the block; on a pin of the block it starts the net each instance connects
+  the pin to, and must agree with a part on that net outside. Only the transient reads it; the operating point, the AC and DC
   sweeps and the other small-signal analyses ignore it, so it never changes their results.
 - **Switches**: a switch and a push button have a Closed (or Pressed) box in their properties, and the symbol and a
   label under it show the state. Both start open. Outside a live run, the state holds for the whole simulation. During

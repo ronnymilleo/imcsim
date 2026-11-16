@@ -26,6 +26,7 @@
 #include "circuit/components/switch.h"
 #include "circuit/components/transformer.h"
 #include "circuit/components/voltage_controlled_switch.h"
+#include "circuit/initial_voltage_targets.h"
 #include "circuit/library_model.h"
 #include "circuit/netlist_logic.h"
 #include "circuit/netlist_sources.h"
@@ -200,15 +201,20 @@ std::string FormatReactivePart(const Component &component, const std::vector<int
 /**
  * @brief   One ".ic" line per node with an initial voltage; a node two markers set to the same voltage is written once,
  *          and CheckCircuit() refuses two different ones.
+ * @details A node inside a block is written at the top, named by the instances down to it ("X1.X2.5"), as ngspice
+ *          does not take ".ic" inside a ".subckt": one line per instance.
  */
 std::string FormatInitialVoltages(const Circuit &circuit) {
-    std::map<int, double> volts_by_node;
-    for (const CircuitInitialVoltage &initial_voltage : circuit.GetInitialVoltages()) {
-        volts_by_node.try_emplace(initial_voltage.Node, initial_voltage.Volts);
+    std::map<std::pair<std::vector<std::string>, int>, double> volts_by_node;
+    for (const InitialVoltageTarget &target : ResolveInitialVoltages(circuit)) {
+        volts_by_node.try_emplace({target.Path, target.Node}, target.Volts);
     }
     std::string text;
-    for (const auto &[node, volts] : volts_by_node) {
-        text += std::format(".ic V({})={}\n", node, FormatSpiceValue(volts));
+    for (const auto &[address, volts] : volts_by_node) {
+        const auto &[path, node] = address;
+        const std::string name =
+            path.empty() ? std::format("{}", node) : std::format("{}.{}", FormatInstancePath(path), node);
+        text += std::format(".ic V({})={}\n", name, FormatSpiceValue(volts));
     }
     return text;
 }

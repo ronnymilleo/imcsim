@@ -80,7 +80,8 @@ void Circuit::AddPort(const CircuitPort &port) {
  * @brief   Adds the voltage a node starts a transient at.
  * @param[in] initial_voltage  Node and voltage; the node counts toward GetNodeCount().
  * @note    Only a transient reads it. The netlist writes it as ".ic"; CheckCircuit() refuses two different voltages on
- *          one node, ground, and a node no part is connected to.
+ *          one node, ground, and a node no part is connected to. In a block body it sets the node of each instance;
+ *          see ResolveInitialVoltages().
  */
 void Circuit::AddInitialVoltage(const CircuitInitialVoltage &initial_voltage) {
     m_NodeCount = std::max(m_NodeCount, initial_voltage.Node + 1);
