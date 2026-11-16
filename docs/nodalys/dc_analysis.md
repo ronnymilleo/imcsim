@@ -47,6 +47,19 @@ When direct Newton-Raphson fails to converge from $\mathbf{x}^{(0)} = \mathbf{0}
 ### 1.6 DC Sweep (`.dc`) with Homotopic Continuation
 In [`ComputeDCSweep`](../../nodalys/src/analyses/dc_analysis.cpp), only the first point of each sweep curve requires a cold start ([`ComputeOperatingPoint`](../../nodalys/src/analyses/dc_analysis.cpp)). Every subsequent point $k = 1, 2, \dots, M$ seeds `SolveNewton` directly with the converged vector $\mathbf{x}_{k-1}$ from the preceding source value, typically converging in 2–4 iterations.
 
+### 1.7 Nodesets (`.nodeset`)
+A circuit with several stable operating points (a latch, a flip-flop of transistors, a Schmitt trigger) has no single answer for Newton-Raphson to find: it lands on the one nearest where it starts. `CircuitBuilder::SetNodeset(node, voltage)` (SPICE `.nodeset V(node)=value`) is the guess that picks it, and it is a guess, not a held value, as in SPICE:
+
+1. **Pulled pass.** `SolveNewton` solves with `TimeContext::IsNodesetPass` true, so every `NodesetDevice` stamps a stiff Norton source to ground ($10^9$ S) that pulls its node to the voltage, and the rest of the circuit settles consistently with it. The three strategies of 1.5 apply to this pass too.
+2. **Released pass.** It solves again with the pass flag off, **starting from the point the first pass found** (no device seed is applied, since that would throw the point away), so the solution is free to move where the circuit puts it: the nearest stable state, or, in a circuit with one operating point, the one it always had.
+
+If the pulled pass converges nowhere, the solve goes on without the nodesets. Only a solve that finds an operating point has the passes: the operating point, the first point of a DC sweep (`TimeContext::AppliesNodesets` is false for the others, which continue from the point before, so a sweep through a hysteresis loop keeps its branch), the operating points that start the AC, noise, transfer-function, sensitivity, pole-zero and S-parameter analyses, and the one that starts a transient without `uic`. A transient with `uic` has no operating point and ignores nodesets, and the transient steps never read them. The harmonic balance solves its own periodic steady state and ignores them. This differs from `NodeInitialConditionDevice` (`.ic`), which holds its node in the operating point that starts a transient and keeps that point. A nodeset and an initial voltage on one node may differ.
+
+`ParseNetlist` reads `.nodeset v(1)=5 v(out)=0`, with the same syntax as `.ic`. The tests (`nodalys/tests/nodeset_tests.cpp`) run a two-transistor bistable whose collectors are `.nodeset` either way, and check that a divider is unchanged by any guess.
+
+### 1.8 Options That Reach the Solver
+`ConvergenceOptions` (`RelTol`, `VoltageAbsTol`, `CurrentAbsTol`) is the tolerance of the Newton step and of the residual check, and of the LTE step control of the transient; the netlist parser fills it from `.options reltol= vntol= abstol=`, and the `imcsim` backend from the solver options of the schematic. The nominal temperature is `Circuit::SetTemperature(temperature, nominal)`, the temperature that the diode, BJT and MOSFET model parameters are given at (`.options tnom=`); a run at another temperature scales them from it.
+
 ---
 
 ## 2. Benchmark Tables: Analytical Golden vs. `ngspice` vs. `Nodalys`

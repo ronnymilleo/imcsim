@@ -219,7 +219,7 @@ starts once the one before it is done.
 | **Temperature** | The SPICE temperature laws of the diode, BJT and MOSFET (`IS`, `VJ`, `EG`, `BF`...), so a stepped temperature runs. | Done |
 | **Noise and Random Sources in a Transient** | White, $1/f$ and telegraph noise, and the random distributions, drawn from a seeded generator written out in `random_draws.cpp`, so a seed repeats on every platform. | Done |
 | **SPICE-Text Subcircuits** | Vendor `.subckt` models kept as SPICE text, such as the op-amp of the precision rectifier example. | Done ([`subcircuit_text.md`](./subcircuit_text.md)) |
-| **Node Initial Conditions** (`.ic`, `.nodeset`) | Starting a transient or guiding an operating point from node voltages, not only from parts. | `.ic` done ([`transient_analysis.md`](./transient_analysis.md)); `.nodeset` pending |
+| **Node Initial Conditions** (`.ic`, `.nodeset`) | Starting a transient or guiding an operating point from node voltages, not only from parts. | Done: `.ic` ([`transient_analysis.md`](./transient_analysis.md)) and `.nodeset` ([`dc_analysis.md`](./dc_analysis.md), 1.7) |
 
 **Done when** every example runs every analysis it offers on `Nodalys` and matches `ngspice` in the parity tests, and
 the transient and AC benchmarks are no slower than `ngspice`.
