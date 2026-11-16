@@ -243,6 +243,20 @@ std::string DescribeCircles(const StabilityCircles &circles, const double freque
 }
 
 /**
+ * @brief   Labels the Smith chart with the frequency its stability circles are drawn at and the mu found there.
+ * @param[in] metrics          Metrics at that frequency.
+ * @param[in] frequency_hertz  The frequency.
+ * @return  Text such as "Circles at 1.2GHz, mu = 0.83", or one that says the S matrix has no finite value there.
+ */
+std::string DescribeCircleFrequency(const TwoPortMetrics &metrics, const double frequency_hertz) {
+    const std::string frequency = FormatFrequency(frequency_hertz);
+    if (!metrics.IsValid) {
+        return std::format("Circles at {}, no finite S matrix", frequency);
+    }
+    return std::format("Circles at {}, mu = {}", frequency, FormatFactor(metrics.Mu));
+}
+
+/**
  * @brief   Words the metrics at one frequency for a tooltip, one line each.
  * @param[in] metrics          Metrics at the frequency.
  * @param[in] frequency_hertz  The frequency.

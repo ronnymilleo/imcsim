@@ -111,6 +111,7 @@ private:
     void DrawSmith(const Core::SParameters &result, SParameterView view);
     void PlotSmithCurves(const Core::SParameters &result, const std::vector<SParameterEntry> &entries);
     void PlotStabilityCircles(const Core::SParameters &result);
+    void ShowCircleFrequency();
     void ShowSmithReading(const Core::SParameters &result, const std::vector<SParameterEntry> &entries);
 
     // Magnitude and phase
@@ -122,6 +123,7 @@ private:
     void DrawStability();
     void DrawFactorPlot(float height);
     void DrawGainPlot(float height);
+    void MarkCircleFrequency();
 };
 
 } // namespace GUI

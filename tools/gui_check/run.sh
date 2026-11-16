@@ -41,7 +41,8 @@
 #   S-parameters           s_parameters_lc_low_pass; fixtures/s_parameters_one_port (the same filter with its second
 #                          port turned off): Nodalys gives S11, ngspice refuses it, since it needs two ports
 #   Stability              stability_common_emitter (a two-port amplifier): the stability circles on the Smith
-#                          chart, the Stability view and, on Nodalys, the Z quantity
+#                          chart, the Stability view, a click on it that moves the circles, and, on Nodalys, the Z
+#                          quantity
 #   Truth table            logic_truth_table
 #   Harmonic balance       harmonic_balance_rectifier
 #                          Nodalys only: with ngspice the step expects it disabled and refused with its reason
@@ -278,6 +279,19 @@ check_s_parameter_views() {
     ui_click_text Stability "$DOCS_OUTPUT_X" "$COMMAND_BAR_BOTTOM" "$DOCS_SIDE_X" "$DOCS_HEIGHT"
     sleep "$MEDIUM_PAUSE"
     check_step s_parameters_stability 'unstable'
+    # A click on the stability plot, at its 100MHz tick, moves the circles there, which the Smith chart then names
+    local tick
+    if tick=$(docs_find_text 100MHz "$DOCS_OUTPUT_X" "$COMMAND_BAR_BOTTOM" "$DOCS_SIDE_X" "$DOCS_HEIGHT" | head -n 1) &&
+        [[ -n "$tick" ]]; then
+        ui_click "${tick% *}" "$((${tick#* } - 150))"
+        sleep "$MEDIUM_PAUSE"
+    fi
+    check_step s_parameters_stability_marker 'Circles'
+    ui_click_text Smith "$DOCS_OUTPUT_X" "$COMMAND_BAR_BOTTOM" "$DOCS_SIDE_X" "$DOCS_HEIGHT"
+    sleep "$MEDIUM_PAUSE"
+    check_step s_parameters_circle_frequency '100MHz,|10[0-9]MHz,|9[0-9]MHz,'
+    ui_click_text Stability "$DOCS_OUTPUT_X" "$COMMAND_BAR_BOTTOM" "$DOCS_SIDE_X" "$DOCS_HEIGHT"
+    sleep "$MEDIUM_PAUSE"
     if [[ "$ENGINE" == nodalys ]]; then
         ui_click_text Z "$DOCS_OUTPUT_X" "$COMMAND_BAR_BOTTOM" "$DOCS_SIDE_X" "$DOCS_HEIGHT"
         sleep "$MEDIUM_PAUSE"

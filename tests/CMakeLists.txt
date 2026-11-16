@@ -104,6 +104,7 @@ add_executable(imcsim-tests
             smith_chart_tests.cpp
             solver_options_tests.cpp
             spectrum_tests.cpp
+            spice_block_check_tests.cpp
             spice_import_tests.cpp
             spice_inclusions_tests.cpp
             spice_library_tests.cpp

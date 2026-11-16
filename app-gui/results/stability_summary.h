@@ -34,6 +34,7 @@ std::optional<std::size_t> FindLowestMu(const TwoPortSweep &sweep);
 // Sentences
 std::string DescribeStability(const TwoPortSweep &sweep);
 std::string DescribeCircles(const StabilityCircles &circles, double frequency_hertz);
+std::string DescribeCircleFrequency(const TwoPortMetrics &metrics, double frequency_hertz);
 std::vector<std::string> DescribeMetrics(const TwoPortMetrics &metrics, double frequency_hertz);
 
 } // namespace GUI

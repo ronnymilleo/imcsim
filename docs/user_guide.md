@@ -971,7 +971,8 @@ reflection plane of its own port.
 
 On the Smith chart, with two ports, the **Stability circles** checkbox draws the source and the load stability circle at
 one frequency, set with **Circles at** (it starts where mu is lowest, the worst case, each time a new result arrives;
-**Worst case** goes back there). They answer one question: which terminations may be connected without the circuit
+**Worst case** goes back there). The chart's top-left corner says which frequency the circles are drawn at and the mu
+found there. They answer one question: which terminations may be connected without the circuit
 oscillating?
 
 Every point of the chart is an impedance: the center is the reference impedance, the upper half is inductive, the lower
@@ -985,6 +986,11 @@ half, for example, says that an inductive, strongly reflecting termination is th
 A circle that lies wholly outside the chart draws nothing, and a note says that the whole chart is stable (or unstable)
 there for that source or load. The circles show one frequency at a time; K and mu in the Stability view sum up the
 same for every frequency, and the frequency where mu is lowest is where the hatching comes closest to the center.
+
+The Stability view links to the circles: a vertical line on the K and mu plot and on the gain plot marks the frequency
+of the circles, and a click on either plot (not a drag, which pans it) moves it and the circles to the swept frequency
+nearest to the pointer, so you can pick a frequency by looking at where K or mu dips and then read the circles there on
+the Smith chart.
 
 **Readings** in the Stability view: hover for K, |Delta|, mu, mu' and the gain bound at the nearest frequency.
 
@@ -1063,7 +1069,7 @@ What an engine cannot run is said, not guessed at:
   kept as SPICE text, when its text holds something Nodalys cannot simulate. Nodalys reads the resistors, capacitors,
   inductors, DC and AC sources, controlled and behavioral sources, diodes, bipolar and level 1 MOSFET transistors,
   switches and nested subcircuits of such a text, with its `.param` lines, `{expressions}` and `.model` cards; it
-  refuses the rest by name, such as a JFET, a source waveform, a `.func` or a transmission line, and says so before
+  refuses the rest by name, such as a JFET, a `.func` or a transmission line, and says so before
   the run. A model parameter its devices do not read, such as a junction capacitance of a substrate, is named in a
   message of the run.
 
