@@ -5,7 +5,7 @@
  *          F, B, D, Q, M, S and X), .param lines, .model cards and nested .subckt definitions, with numbers written as
  *          literals or as {expressions} of parameters. Each instance gets private internal nodes and element names
  *          that start with its own prefix, so two instances of one text never meet. What the engine cannot simulate,
- *          such as a JFET, a waveform source, a .func or a MOSFET of a level other than 1, is refused with a message
+ *          such as a JFET, a .func or a MOSFET of a level other than 1, is refused with a message
  *          that names the subcircuit and the line, never skipped.
  */
 

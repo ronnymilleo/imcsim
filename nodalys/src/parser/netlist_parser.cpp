@@ -7,6 +7,7 @@
 #include "nodalys/circuit_builder.h"
 #include "nodalys/expression.h"
 #include "parser/model_cards.h"
+#include "parser/source_waveforms.h"
 #include "parser/spice_number.h"
 
 #include <algorithm>
@@ -1070,18 +1071,7 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
             int port_num = 0;
             double z0 = 50.0;
 
-            enum class WaveformType {
-                NONE,
-                PULSE,
-                SINE,
-                EXP,
-                PWL,
-                SFFM,
-                AM,
-                TRNOISE,
-                TRRANDOM
-            };
-            WaveformType wtype = WaveformType::NONE;
+            SourceWaveform wtype = SourceWaveform::NONE;
             std::string waveform_token;
 
             std::size_t idx = 3;
@@ -1127,29 +1117,9 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                         }
                         continue;
                     }
-                } else if (u.starts_with("PULSE(")) {
-                    wtype = WaveformType::PULSE;
-                    waveform_token = tokens[idx];
-                } else if (u.starts_with("SIN(") || u.starts_with("SINE(")) {
-                    wtype = WaveformType::SINE;
-                    waveform_token = tokens[idx];
-                } else if (u.starts_with("EXP(")) {
-                    wtype = WaveformType::EXP;
-                    waveform_token = tokens[idx];
-                } else if (u.starts_with("PWL(")) {
-                    wtype = WaveformType::PWL;
-                    waveform_token = tokens[idx];
-                } else if (u.starts_with("SFFM(")) {
-                    wtype = WaveformType::SFFM;
-                    waveform_token = tokens[idx];
-                } else if (u.starts_with("AM(")) {
-                    wtype = WaveformType::AM;
-                    waveform_token = tokens[idx];
-                } else if (u.starts_with("TRNOISE(")) {
-                    wtype = WaveformType::TRNOISE;
-                    waveform_token = tokens[idx];
-                } else if (u.starts_with("TRRANDOM(")) {
-                    wtype = WaveformType::TRRANDOM;
+                } else if (const SourceWaveform found = FindSourceWaveform(tokens[idx]);
+                           found != SourceWaveform::NONE) {
+                    wtype = found;
                     waveform_token = tokens[idx];
                 } else if (const auto num = ParseSpiceNumber(tokens[idx])) {
                     dc_val = *num;
@@ -1172,201 +1142,9 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
 
             const bool is_voltage = (first_char == 'V');
 
-            switch (wtype) {
-            case WaveformType::PULSE: {
-                const auto vals = ExtractParenthesizedValues(waveform_token);
-                PulseParameters p;
-                if (vals.size() >= 1) {
-                    p.Low = vals[0];
-                }
-                if (vals.size() >= 2) {
-                    p.High = vals[1];
-                }
-                if (vals.size() >= 3) {
-                    p.Delay = vals[2];
-                }
-                if (vals.size() >= 4) {
-                    p.RiseTime = vals[3];
-                }
-                if (vals.size() >= 5) {
-                    p.FallTime = vals[4];
-                }
-                if (vals.size() >= 6) {
-                    p.Width = vals[5];
-                }
-                if (vals.size() >= 7) {
-                    p.Period = vals[6];
-                }
-                if (is_voltage) {
-                    builder.AddVpulse(name, n_pos, n_neg, p, ac_mag, ac_phase);
-                } else {
-                    builder.AddIpulse(name, n_pos, n_neg, p, ac_mag, ac_phase);
-                }
-                break;
-            }
-            case WaveformType::SINE: {
-                const auto vals = ExtractParenthesizedValues(waveform_token);
-                SineParameters p;
-                if (vals.size() >= 1) {
-                    p.Offset = vals[0];
-                }
-                if (vals.size() >= 2) {
-                    p.Amplitude = vals[1];
-                }
-                if (vals.size() >= 3) {
-                    p.Frequency = vals[2];
-                }
-                if (vals.size() >= 4) {
-                    p.Phase = vals[3];
-                }
-                p.Magnitude = ac_mag > 0.0 ? ac_mag : p.Amplitude;
-                const bool damped = vals.size() >= 5 && vals[4] != 0.0;
-                if (is_voltage) {
-                    builder.AddVsine(name, n_pos, n_neg, p, ac_mag, ac_phase, damped);
-                } else {
-                    builder.AddIsine(name, n_pos, n_neg, p, ac_mag, ac_phase, damped);
-                }
-                break;
-            }
-            case WaveformType::EXP: {
-                const auto vals = ExtractParenthesizedValues(waveform_token);
-                ExpParameters p;
-                if (vals.size() >= 1) {
-                    p.InitialValue = vals[0];
-                }
-                if (vals.size() >= 2) {
-                    p.PeakValue = vals[1];
-                }
-                if (vals.size() >= 3) {
-                    p.RiseDelay = vals[2];
-                }
-                if (vals.size() >= 4) {
-                    p.RiseTimeConstant = vals[3];
-                }
-                if (vals.size() >= 5) {
-                    p.FallDelay = vals[4];
-                }
-                if (vals.size() >= 6) {
-                    p.FallTimeConstant = vals[5];
-                }
-                if (is_voltage) {
-                    builder.AddVexp(name, n_pos, n_neg, p, ac_mag, ac_phase);
-                } else {
-                    builder.AddIexp(name, n_pos, n_neg, p, ac_mag, ac_phase);
-                }
-                break;
-            }
-            case WaveformType::PWL: {
-                const auto vals = ExtractParenthesizedValues(waveform_token);
-                PwlParameters p;
-                p.Points.clear();
-                for (std::size_t i = 0; i + 1 < vals.size(); i += 2) {
-                    p.Points.push_back({vals[i], vals[i + 1]});
-                }
-                if (is_voltage) {
-                    builder.AddVpwl(name, n_pos, n_neg, p, ac_mag, ac_phase);
-                } else {
-                    builder.AddIpwl(name, n_pos, n_neg, p, ac_mag, ac_phase);
-                }
-                break;
-            }
-            case WaveformType::SFFM: {
-                const auto vals = ExtractParenthesizedValues(waveform_token);
-                SffmParameters p;
-                if (vals.size() >= 1) {
-                    p.Offset = vals[0];
-                }
-                if (vals.size() >= 2) {
-                    p.Amplitude = vals[1];
-                }
-                if (vals.size() >= 3) {
-                    p.CarrierFrequency = vals[2];
-                }
-                if (vals.size() >= 4) {
-                    p.ModulationIndex = vals[3];
-                }
-                if (vals.size() >= 5) {
-                    p.SignalFrequency = vals[4];
-                }
-                if (is_voltage) {
-                    builder.AddVsffm(name, n_pos, n_neg, p, ac_mag, ac_phase);
-                } else {
-                    builder.AddIsffm(name, n_pos, n_neg, p, ac_mag, ac_phase);
-                }
-                break;
-            }
-            case WaveformType::AM: {
-                const auto vals = ExtractParenthesizedValues(waveform_token);
-                AmParameters p;
-                if (vals.size() >= 1) {
-                    p.Amplitude = vals[0];
-                }
-                if (vals.size() >= 2) {
-                    p.Offset = vals[1];
-                }
-                if (vals.size() >= 3) {
-                    p.ModulatingFrequency = vals[2];
-                }
-                if (vals.size() >= 4) {
-                    p.CarrierFrequency = vals[3];
-                }
-                if (vals.size() >= 5) {
-                    p.Delay = vals[4];
-                }
-                if (is_voltage) {
-                    builder.AddVam(name, n_pos, n_neg, p, ac_mag, ac_phase);
-                } else {
-                    builder.AddIam(name, n_pos, n_neg, p, ac_mag, ac_phase);
-                }
-                break;
-            }
-            case WaveformType::TRNOISE: {
-                const auto vals = ExtractParenthesizedValues(waveform_token);
-                NoiseParameters p;
-                p.Offset = dc_val;
-                p.WhiteAmplitude = vals.size() >= 1 ? vals[0] : 0.0;
-                p.TimeStep = vals.size() >= 2 ? vals[1] : 0.0;
-                p.FlickerExponent = vals.size() >= 3 ? vals[2] : 1.0;
-                p.FlickerAmplitude = vals.size() >= 4 ? vals[3] : 0.0;
-                p.TelegraphAmplitude = vals.size() >= 5 ? vals[4] : 0.0;
-                p.CaptureTime = vals.size() >= 6 ? vals[5] : 0.0;
-                p.EmissionTime = vals.size() >= 7 ? vals[6] : 0.0;
-                if (is_voltage) {
-                    builder.AddVnoise(name, n_pos, n_neg, p, ac_mag);
-                } else {
-                    builder.AddInoise(name, n_pos, n_neg, p, ac_mag);
-                }
-                break;
-            }
-            case WaveformType::TRRANDOM: {
-                const auto vals = ExtractParenthesizedValues(waveform_token);
-                RandomParameters p;
-                if (vals.size() >= 1) {
-                    const int dist = static_cast<int>(vals[0]);
-                    if (dist >= 1 && dist <= 4) {
-                        p.Distribution = static_cast<RandomDistribution>(dist);
-                    }
-                }
-                p.TimeStep = vals.size() >= 2 ? vals[1] : 10e-6;
-                p.Delay = vals.size() >= 3 ? vals[2] : 0.0;
-                p.First = vals.size() >= 4 ? vals[3] : 0.1;
-                p.Second = dc_val + (vals.size() >= 5 ? vals[4] : 0.0);
-                if (is_voltage) {
-                    builder.AddVrandom(name, n_pos, n_neg, p, ac_mag);
-                } else {
-                    builder.AddIrandom(name, n_pos, n_neg, p, ac_mag);
-                }
-                break;
-            }
-            case WaveformType::NONE:
-            default:
-                if (is_voltage) {
-                    builder.AddVdc(name, n_pos, n_neg, dc_val, ac_mag, ac_phase);
-                } else {
-                    builder.AddIdc(name, n_pos, n_neg, dc_val, ac_mag, ac_phase);
-                }
-                break;
-            }
+            AddWaveformSource(builder, name, is_voltage, n_pos, n_neg, wtype,
+                              ExtractParenthesizedValues(waveform_token),
+                              {.Dc = dc_val, .AcMagnitude = ac_mag, .AcPhaseDegrees = ac_phase});
             break;
         }
 

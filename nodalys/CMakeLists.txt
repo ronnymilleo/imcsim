@@ -49,6 +49,7 @@ add_library(nodalys STATIC
     src/newton/newton.cpp
     src/parser/model_cards.cpp
     src/parser/netlist_parser.cpp
+    src/parser/source_waveforms.cpp
     src/parser/spice_number.cpp
     src/parser/spice_text.cpp
     src/parser/spice_values.cpp
