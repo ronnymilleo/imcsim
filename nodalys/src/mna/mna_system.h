@@ -143,6 +143,22 @@ public:
     bool SolveAcTranspose(const MnaSystem &reactive, double omega, int output_unknown,
                           std::vector<std::complex<double>> &adjoint) const;
 
+    /**
+     * @brief   Solves the transposed small-signal system $Y(j\omega)^T \cdot \lambda = \text{rhs}$ for any
+     *          complex right-hand side, which the AC sensitivity uses for an output that is a node difference.
+     * @return  False if the matrix is singular or the sizes differ.
+     */
+    bool SolveAcTransposeFor(const MnaSystem &reactive, double omega, const std::vector<std::complex<double>> &rhs,
+                             std::vector<std::complex<double>> &adjoint) const;
+
+    /**
+     * @brief   Solves $A^T \cdot x = \text{rhs}$ for a complex right-hand side, where $A$ is the real matrix of the
+     *          system, as the DC adjoint of a small-signal quantity needs.
+     * @return  False if the matrix is singular or the sizes differ.
+     */
+    bool SolveTransposeComplex(const std::vector<std::complex<double>> &rhs,
+                               std::vector<std::complex<double>> &x) const;
+
     /// Verifies that the equation residual $|A \cdot x - \text{rhs}|$ satisfies KCL and branch tolerances.
     bool CheckResidual(const std::vector<double> &x, double voltage_abstol, double current_abstol, double reltol) const;
 

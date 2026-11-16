@@ -9,8 +9,12 @@
 #include "results/result_store.h"
 #include "schematic/preferences.h"
 #include "schematic/schematic.h"
+#include <string>
 
 namespace GUI {
+
+// Selection
+void SelectPart(Schematic &schematic, const std::string &name);
 
 // Tables
 void DrawTransferFunctionTab(const ResultStore &results, Schematic &schematic);

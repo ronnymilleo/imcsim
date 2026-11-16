@@ -5,6 +5,8 @@
 include(Catch)
 
 add_executable(imcsim-tests
+            ac_sensitivity_tests.cpp
+            ac_sensitivity_view_tests.cpp
             analysis_controls_tests.cpp
             analysis_inputs_tests.cpp
             analysis_sources_tests.cpp

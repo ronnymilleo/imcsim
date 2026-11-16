@@ -10,6 +10,7 @@
 #include "plots/math_channels.h"
 #include "plots/plot_export.h"
 #include "plots/plot_types.h"
+#include "results/ac_sensitivity_view.h"
 #include "results/logic_bus.h"
 #include "results/logic_trace.h"
 #include "results/result_store.h"
@@ -64,6 +65,10 @@ ExportFigure BuildDCSweepFigure(const Core::DCSweep &sweep, const std::vector<st
                                 Schematic &schematic, const PlotSpan &view);
 ExportFigure BuildNoiseFigure(const Core::Noise &noise, Schematic &schematic, const std::set<std::string> &shown,
                               const PlotSpan &view);
+ExportFigure BuildACSensitivityFigure(const Core::ACSensitivity &sensitivity,
+                                      const std::vector<ACSensitivityCurve> &curves,
+                                      const std::vector<ImU32> &part_colors, const std::set<std::string> &shown,
+                                      const std::string &output_label, const PlotSpan &view);
 
 } // namespace GUI
 

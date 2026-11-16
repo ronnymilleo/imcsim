@@ -36,6 +36,7 @@ enum class AnalysisKind {
     NOISE,
     TRANSFER_FUNCTION,
     SENSITIVITY,
+    AC_SENSITIVITY,
     POLE_ZERO,
     S_PARAMETERS,
     TRUTH_TABLE,
@@ -202,6 +203,8 @@ public:
      * @return  The matrix at every frequency or an error, plus the messages of the backend.
      */
     virtual SParametersRun RunSParameters(const Circuit &circuit, const SParameterSettings &settings) = 0;
+
+    virtual ACSensitivityRun RunACSensitivity(const Circuit &circuit, const ACSensitivitySettings &settings);
 
     virtual HarmonicBalanceRun RunHarmonicBalance(const Circuit &circuit, const HarmonicBalanceSettings &settings,
                                                   RunControl *control);

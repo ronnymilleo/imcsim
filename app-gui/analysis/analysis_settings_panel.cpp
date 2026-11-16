@@ -291,6 +291,8 @@ void AnalysisSettingsPanel::LoadSettingsFields() {
     LoadSweepFields(settings.SteppedRange, m_SteppedFields);
     m_NoiseStartFrequency.Load(settings.NoiseRange.StartFrequency);
     m_NoiseStopFrequency.Load(settings.NoiseRange.StopFrequency);
+    m_ACSensitivityStartFrequency.Load(settings.ACSensitivityRange.StartFrequency);
+    m_ACSensitivityStopFrequency.Load(settings.ACSensitivityRange.StopFrequency);
     m_SStartFrequency.Load(settings.SParameters.StartFrequency);
     m_SStopFrequency.Load(settings.SParameters.StopFrequency);
     m_HBFundamental.Load(settings.HarmonicBalance.FundamentalFrequency);
@@ -553,7 +555,9 @@ void AnalysisSettingsPanel::DrawSourceAndOutputPickers(std::string &source, std:
 }
 
 /**
- * @brief   The output picker lists every node by the label the plots give it, as the transfer function one does.
+ * @brief   The kind, DC or AC, and the output picker, which lists every node by the label the plots give it, as the
+ *          transfer function one does; the AC kind adds its input and its frequency range.
+ * @note    The AC kind is disabled, with the reason as its tooltip, when the backend in use cannot run it.
  */
 void AnalysisSettingsPanel::DrawSensitivitySettings(SimulationSettings &settings) {
     const Core::Circuit circuit = m_Schematic.BuildCircuit();
@@ -562,6 +566,22 @@ void AnalysisSettingsPanel::DrawSensitivitySettings(SimulationSettings &settings
         ImGui::TextDisabled("Connect some parts to measure their sensitivity");
         return;
     }
+    const std::optional<std::string> ac_unsupported =
+        Core::FindUnsupported(Core::GetBackend(), ListPartTypes(m_Schematic), Core::AnalysisKind::AC_SENSITIVITY);
+    DrawFieldLabel("Kind");
+    if (ImGui::RadioButton("DC", settings.SensitivityType == SensitivityKind::DC)) {
+        settings.SensitivityType = SensitivityKind::DC;
+    }
+    ImGui::SetItemTooltip("How much the DC voltage of the output changes with the value of each part");
+    ImGui::SameLine();
+    ImGui::BeginDisabled(ac_unsupported.has_value());
+    if (ImGui::RadioButton("AC", settings.SensitivityType == SensitivityKind::AC)) {
+        settings.SensitivityType = SensitivityKind::AC;
+    }
+    ImGui::EndDisabled();
+    ImGui::SetItemTooltip("%s", ac_unsupported ? ac_unsupported->c_str()
+                                               : "How much the gain and the phase at the output change with the "
+                                                 "value of each part, across frequency");
     const Connectivity &connectivity = m_Schematic.GetConnectivity();
     DrawFieldLabel("Output");
     if (ImGui::BeginCombo("##sensitivity_output", GetVoltageLabel(connectivity, *output).c_str())) {
@@ -572,7 +592,51 @@ void AnalysisSettingsPanel::DrawSensitivitySettings(SimulationSettings &settings
         }
         ImGui::EndCombo();
     }
-    ImGui::SetItemTooltip("How much the DC voltage of this node changes with the value of each part");
+    ImGui::SetItemTooltip("The voltage of this node is the output of the analysis");
+    if (settings.SensitivityType == SensitivityKind::AC) {
+        DrawACSensitivityInputs(settings);
+    }
+}
+
+/**
+ * @brief   The AC source that drives the circuit and the frequency range of the AC kind of the sensitivity analysis.
+ */
+void AnalysisSettingsPanel::DrawACSensitivityInputs(SimulationSettings &settings) {
+    const Core::Circuit circuit = m_Schematic.BuildCircuit();
+    const std::vector<std::string> sources = Core::GetNoiseInputSources(circuit);
+    const std::string input = ResolveOptionalInput(settings.ACSensitivitySource, sources);
+    DrawFieldLabel("Input");
+    if (sources.empty()) {
+        ImGui::TextDisabled("Set a voltage or current source to AC");
+    } else if (ImGui::BeginCombo("##ac_sensitivity_input", input.c_str())) {
+        for (const std::string &source : sources) {
+            if (ImGui::Selectable(source.c_str(), source == input)) {
+                settings.ACSensitivitySource = source;
+            }
+        }
+        ImGui::EndCombo();
+    }
+    ImGui::SetItemTooltip("The response measured is the one to this source");
+    Core::ACSweepSettings &range = settings.ACSensitivityRange;
+    if (const std::optional<double> start = m_ACSensitivityStartFrequency.Draw("Start", "Hz", IsPositive)) {
+        range.StartFrequency = *start;
+    }
+    if (const std::optional<double> stop = m_ACSensitivityStopFrequency.Draw("Stop", "Hz", IsPositive)) {
+        range.StopFrequency = *stop;
+    }
+    DrawFieldLabel("Points");
+    if (ImGui::InputInt("per decade##ac_sensitivity", &range.PointsPerDecade)) {
+        range.PointsPerDecade = std::max(range.PointsPerDecade, 1);
+    }
+    const auto suggested = Core::SuggestACSweepSettings(circuit);
+    if (DrawSuggestButton(suggested.has_value(), "Two decades past the RC, RL and LC corners and the op-amp bandwidths",
+                          "Needs a capacitor, an inductor or an op-amp") &&
+        suggested) {
+        range.StartFrequency = suggested->StartFrequency;
+        range.StopFrequency = suggested->StopFrequency;
+        m_ACSensitivityStartFrequency.Load(suggested->StartFrequency);
+        m_ACSensitivityStopFrequency.Load(suggested->StopFrequency);
+    }
 }
 
 /**

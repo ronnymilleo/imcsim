@@ -275,6 +275,46 @@ struct Sensitivity {
 };
 
 /**
+ * @struct  ACPartSensitivity
+ * @brief   How the response at the output changes with the value of one part, at every frequency of the sweep.
+ * @details The figures are for a 1 % higher value of the part, which compares parts of different kinds. A block
+ *          reports its most influential element inside, named by Element, and a potentiometer the two halves
+ *          together, as its total resistance.
+ */
+struct ACPartSensitivity {
+    std::string Name;
+    /// Kind of the part, which tells how the schematic labels it.
+    ComponentType Type = ComponentType::RESISTOR;
+    /// The element inside the block that has the largest effect, such as "R1"; empty for other parts.
+    std::string Element;
+    /// Unit of the value of the part, as Component::GetUnit() gives it; empty for a gain.
+    std::string Unit;
+    double Value = 0.0;
+    /// Decibels the magnitude of the response changes by, at each frequency; none where the output is too small for a
+    /// relative change to mean anything.
+    std::vector<std::optional<double>> MagnitudeDecibelsPerPercent;
+    /// Degrees the phase of the response changes by, at each frequency; none where the output is too small.
+    std::vector<std::optional<double>> PhaseDegreesPerPercent;
+};
+
+/**
+ * @struct  ACSensitivity
+ * @brief   The AC sensitivity of the voltage of a node to every part with a value, across frequency.
+ * @details Parts are listed in circuit order; the view ranks them at the frequency it shows. Diodes, transistors,
+ *          op-amps, switches and other parts without a value of their own are not listed.
+ */
+struct ACSensitivity {
+    int OutputNode = 0;
+    std::string InputSource;
+    std::vector<double> Frequencies;
+    /// The phasor of the output at each frequency, for the AC magnitude of the input source.
+    std::vector<std::complex<double>> Output;
+    std::vector<ACPartSensitivity> Parts;
+    /// What the user should know about the run, such as the frequencies where the output was too small to measure.
+    std::vector<std::string> Warnings;
+};
+
+/**
  * @struct  TruthTableRow
  * @brief   One combination of the inputs and the voltages it gives at the output nodes.
  * @details The voltages are empty when ngspice found no operating point for the combination, as a latch whose
@@ -353,6 +393,7 @@ using ACSweepRun = SimulationRun<ACSweep>;
 using DCSweepRun = SimulationRun<DCSweep>;
 using NoiseRun = SimulationRun<Noise>;
 using SensitivityRun = SimulationRun<Sensitivity>;
+using ACSensitivityRun = SimulationRun<ACSensitivity>;
 using PoleZeroRun = SimulationRun<PoleZero>;
 using SParametersRun = SimulationRun<SParameters>;
 using TransferFunctionRun = SimulationRun<TransferFunction>;

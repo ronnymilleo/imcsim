@@ -53,7 +53,8 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
 - Noise at one node across frequency, at the output and referred to the input, with the share of each part
 - A transfer function from an input source to an output: the DC gain, the input impedance and the output impedance
 - A sensitivity analysis: how much the DC voltage of a node changes with the value of each part, as a table and as
-  colors on the schematic
+  colors on the schematic; with Nodalys also the AC kind, how many dB and degrees the response changes for 1 % of each
+  part across frequency, ranked at the -3 dB point to tell which part sets a corner
 - Poles and zeros from an input source to a node, on an s-plane with their frequency, quality factor and damping, and
   marked on the Bode plot of an AC sweep
 - S-parameters of one port (Nodalys) or two or more, set on Block pin markers: a Smith chart with the impedance, VSWR and return loss

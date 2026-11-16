@@ -154,6 +154,23 @@ struct SensitivitySettings {
 };
 
 /**
+ * @struct  ACSensitivitySettings
+ * @brief   Where an AC sensitivity analysis measures, which source drives the circuit and its frequency range.
+ * @details The input must be an independent source set to AC, whose response is the one measured; every part with a
+ *          value is varied one at a time around the operating point. Points are spaced logarithmically, as in an AC
+ *          sweep.
+ */
+struct ACSensitivitySettings {
+    int OutputNode = 0;
+    std::string InputSource;
+    double StartFrequency = 10.0;
+    double StopFrequency = 100e3;
+    int PointsPerDecade = 20;
+
+    bool operator==(const ACSensitivitySettings &) const = default;
+};
+
+/**
  * @struct  TruthTableSettings
  * @brief   Which logic inputs a truth table varies and which nodes it reads.
  * @details Inputs are named logic inputs, the first being the most significant bit of the row number.

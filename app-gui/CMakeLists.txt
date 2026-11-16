@@ -58,6 +58,7 @@ add_library(imcsim-gui-lib
             plots/statistics_table.cpp
             plots/touchstone.cpp
             plots/trace_fit_state.cpp
+            results/ac_sensitivity_view.cpp
             results/circuit_snapshot.cpp
             results/current_flow.cpp
             results/fuse_readings.cpp
@@ -167,6 +168,7 @@ add_library(imcsim-gui-lib
             windows/live_input_handler.cpp
             windows/mode_input.cpp
             windows/netlist_window.cpp
+            windows/output_tabs/ac_sensitivity_tab.cpp
             windows/output_tabs/ac_sweep_tab.cpp
             windows/output_tabs/cursor_widgets.cpp
             windows/output_tabs/dc_sweep_tab.cpp

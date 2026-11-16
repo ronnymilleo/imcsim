@@ -271,6 +271,37 @@ bool MnaSystem::SolveAcTranspose(const MnaSystem &reactive, const double omega, 
     return SolveComplexSystem(y_transpose, b_orig, adjoint);
 }
 
+bool MnaSystem::SolveAcTransposeFor(const MnaSystem &reactive, const double omega,
+                                    const std::vector<std::complex<double>> &rhs,
+                                    std::vector<std::complex<double>> &adjoint) const {
+    const std::size_t n = m_A.Rows();
+    if (reactive.m_A.Rows() != n || rhs.size() != n) {
+        return false;
+    }
+    ComplexDenseMatrix y_transpose(n, n);
+    for (std::size_t r = 0; r < n; ++r) {
+        for (std::size_t c = 0; c < n; ++c) {
+            y_transpose.At(r, c) = std::complex<double>(m_A.At(c, r), omega * reactive.m_A.At(c, r));
+        }
+    }
+    return SolveComplexSystem(y_transpose, rhs, adjoint);
+}
+
+bool MnaSystem::SolveTransposeComplex(const std::vector<std::complex<double>> &rhs,
+                                      std::vector<std::complex<double>> &x) const {
+    const std::size_t n = m_A.Rows();
+    if (rhs.size() != n) {
+        return false;
+    }
+    ComplexDenseMatrix a_transpose(n, n);
+    for (std::size_t r = 0; r < n; ++r) {
+        for (std::size_t c = 0; c < n; ++c) {
+            a_transpose.At(r, c) = std::complex<double>(m_A.At(c, r), 0.0);
+        }
+    }
+    return SolveComplexSystem(a_transpose, rhs, x);
+}
+
 bool MnaSystem::CheckResidual(const std::vector<double> &x, const double voltage_abstol, const double current_abstol,
                               const double reltol) const {
     const int size = GetSize();

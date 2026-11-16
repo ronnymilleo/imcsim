@@ -32,6 +32,9 @@ std::vector<std::string> ListWarningsOfResult(const ResultStore &results, const 
     if (analysis == Analysis::TRANSIENT && results.GetTransient()) {
         return results.GetTransient()->Warnings;
     }
+    if (analysis == Analysis::SENSITIVITY && results.GetACSensitivity()) {
+        return results.GetACSensitivity()->Warnings;
+    }
     if (analysis == Analysis::POLE_ZERO && results.GetPoleZero()) {
         return results.GetPoleZero()->Warnings;
     }
@@ -473,6 +476,7 @@ void AnalysisControls::ClearResult(const Analysis analysis) {
         break;
     case Analysis::SENSITIVITY:
         m_Results.SetSensitivity(std::nullopt);
+        m_Results.SetACSensitivity(std::nullopt);
         break;
     case Analysis::POLE_ZERO:
         m_Results.SetPoleZero(std::nullopt);
@@ -535,7 +539,7 @@ bool AnalysisControls::HasResult(const Analysis analysis) const {
     case Analysis::TRANSFER_FUNCTION:
         return m_Results.GetTransferFunction().has_value();
     case Analysis::SENSITIVITY:
-        return m_Results.GetSensitivity().has_value();
+        return m_Results.GetSensitivity().has_value() || m_Results.GetACSensitivity().has_value();
     case Analysis::POLE_ZERO:
         return m_Results.GetPoleZero().has_value();
     case Analysis::S_PARAMETERS:

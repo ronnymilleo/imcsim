@@ -11,6 +11,7 @@
 #include "circuit/components/source.h"
 #include "circuit/components/subcircuit.h"
 #include "circuit/components/switch.h"
+#include "simulation/ac_sensitivity.h"
 #include "simulation/live_pace.h"
 #include "simulation/pole_zero.h"
 #include "simulation/ratings.h"
@@ -26,8 +27,9 @@ namespace Core {
 namespace {
 
 constexpr auto NODALYS_ANALYSES = {
-    AnalysisKind::OPERATING_POINT, AnalysisKind::TRANSIENT,         AnalysisKind::DC_SWEEP,    AnalysisKind::AC_SWEEP,
-    AnalysisKind::NOISE,           AnalysisKind::TRANSFER_FUNCTION, AnalysisKind::SENSITIVITY, AnalysisKind::POLE_ZERO,
+    AnalysisKind::OPERATING_POINT, AnalysisKind::TRANSIENT,       AnalysisKind::DC_SWEEP,
+    AnalysisKind::AC_SWEEP,        AnalysisKind::NOISE,           AnalysisKind::TRANSFER_FUNCTION,
+    AnalysisKind::SENSITIVITY,     AnalysisKind::AC_SENSITIVITY,  AnalysisKind::POLE_ZERO,
     AnalysisKind::S_PARAMETERS,    AnalysisKind::HARMONIC_BALANCE};
 
 /**
@@ -222,6 +224,8 @@ NodalysBackend::NodalysBackend() {
         if (IsLogicPart(type)) {
             m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::SENSITIVITY][type] =
                 "Nodalys cannot run a sensitivity analysis on logic gates and flip-flops";
+            m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::AC_SENSITIVITY][type] =
+                "Nodalys cannot run an AC sensitivity analysis on logic gates and flip-flops";
             m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::POLE_ZERO][type] =
                 "Pole-zero analysis is small-signal, and digital parts have no small-signal model";
             m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::S_PARAMETERS][type] =
@@ -464,6 +468,41 @@ SensitivityRun NodalysBackend::RunSensitivity(const Circuit &circuit, const Sens
         },
         [&circuit, &settings](Nodalys::SensitivityResult result) {
             return BuildSensitivity(circuit, settings.OutputNode, result.Vectors);
+        });
+}
+
+/**
+ * @brief   Finds how much the response of a node to an AC source changes with the value of each part.
+ * @param[in] circuit   Circuit to simulate.
+ * @param[in] settings  Output node, AC input source and frequency range.
+ * @return  The figures of each part at every frequency, or an error.
+ */
+ACSensitivityRun NodalysBackend::RunACSensitivity(const Circuit &circuit, const ACSensitivitySettings &settings) {
+    const Nodalys::AcSensitivityConfig config{.OutputPositiveNode = settings.OutputNode,
+                                              .OutputNegativeNode = 0,
+                                              .InputSource = settings.InputSource,
+                                              .StartFrequency = settings.StartFrequency,
+                                              .StopFrequency = settings.StopFrequency,
+                                              .PointsPerDecade = settings.PointsPerDecade};
+    return RunOnNodalys<ACSensitivityRun>(
+        circuit,
+        [&config](const Nodalys::Circuit &compiled, std::vector<Nodalys::DiagnosticMessage> *messages) {
+            return Nodalys::ComputeAcSensitivity(compiled, config, {}, messages);
+        },
+        [&circuit, &settings](Nodalys::AcSensitivityResult result) {
+            ACElementFiguresByName elements;
+            for (Nodalys::AcElementSensitivity &element : result.Elements) {
+                elements[element.Name] = {.Value = element.Value,
+                                          .MagnitudeDecibelsPerPercent = std::move(element.MagnitudeDecibelsPerPercent),
+                                          .PhaseDegreesPerPercent = std::move(element.PhaseDegreesPerPercent)};
+            }
+            ACSensitivity header{.OutputNode = settings.OutputNode,
+                                 .InputSource = settings.InputSource,
+                                 .Frequencies = std::move(result.Frequencies),
+                                 .Output = std::move(result.Output),
+                                 .Parts = {},
+                                 .Warnings = std::move(result.Warnings)};
+            return BuildACSensitivity(circuit, std::move(header), elements);
         });
 }
 

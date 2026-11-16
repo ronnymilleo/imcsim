@@ -4,6 +4,9 @@
 
 add_library(nodalys STATIC
     src/analyses/ac_analysis.cpp
+    src/analyses/ac_sens_analysis.cpp
+    src/analyses/ac_sens_bias.cpp
+    src/analyses/ac_sens_elements.cpp
     src/analyses/dc_analysis.cpp
     src/analyses/hb_analysis.cpp
     src/analyses/noise_analysis.cpp

@@ -32,6 +32,8 @@
    - Algorithms: Converged DC Jacobian adjoint system $\mathbf{J}^T \boldsymbol{\lambda} = \mathbf{d}$ (`MnaSystem::SolveTranspose`), analytical component derivatives ($\mathcal{O}(1)$ linear solve per analysis), 100% normalized scale, and hierarchical subcircuit/potentiometer aggregation.
    - Benchmark tables: **Analytical Golden vs. `ngspice` vs. `Nodalys`** (accuracy and execution time).
 
+    - AC form: [Small-Signal AC Sensitivity Analysis (`.sens ... ac`)](./ac_sens_analysis.md), *exclusive to Nodalys*. A transposed complex adjoint solve per frequency $\mathbf{Y}(j\omega)^T \boldsymbol{\lambda} = \mathbf{d}$, the bias term of the nonlinear devices through the DC adjoint, and the change of gain and phase for 1 % of each part.
+
 10. **[Harmonic Balance Analysis (`.hb`)](./hb_analysis.md)** *(exclusive to Nodalys)*
     - Algorithms: Alternating Frequency-Time (AFT) Newton-Raphson, internal pure C++23 radix-2 FFT (`FftPlan`), $(2H+1)\times(2H+1)$ Toeplitz/circulant harmonic conversion Jacobian, time-domain PN-junction limiting, and source/gmin stepping continuation.
     - Benchmarks: **`.tran` Steady-State + FFT vs. `Nodalys` HB** (`134.2x` speedup on $Q=200$ RLC diode limiter; `42.4x` speedup on $\tau=100\text{ ms}$ half-wave rectifier) and `imcsim` exclusive UI integration.
@@ -62,7 +64,7 @@
 │   │   └── circuit_builder.h          Fluent CircuitBuilder for components & models
 │   └── src/
 │       ├── api/                       CircuitBuilder implementation and Circuit internals
-│       ├── analyses/                  Solvers: .op, .dc, .tran, .ac, .tf, .noise, .sp, .pz, .sens, .hb
+│       ├── analyses/                  Solvers: .op, .dc, .tran, .ac, .tf, .noise, .sp, .pz, .sens (DC and AC), .hb
 │       ├── bridge/                    LogicBridge: Verilog discrete-to-analog co-simulation
 │       ├── cli/                       Standalone CLI binary entry point (`nodalys`)
 │       ├── compiler/                  CompiledCircuit internal representation
@@ -82,7 +84,7 @@
 
 | Module / Directory | Responsibility |
 | :--- | :--- |
-| `include/nodalys/` | Public C++23 interface exporting `CircuitBuilder`, `Circuit`, and free analysis functions (`ComputeOperatingPoint`, `ComputeTransient`, `ComputeDCSweep`, `ComputeACSweep`, `ComputeTransferFunction`, `ComputeNoise`, `ComputeSParameters`, `ComputePoleZero`, `ComputeSensitivity`, `ComputeHarmonicBalance`). |
+| `include/nodalys/` | Public C++23 interface exporting `CircuitBuilder`, `Circuit`, and free analysis functions (`ComputeOperatingPoint`, `ComputeTransient`, `ComputeDCSweep`, `ComputeACSweep`, `ComputeTransferFunction`, `ComputeNoise`, `ComputeSParameters`, `ComputePoleZero`, `ComputeSensitivity`, `ComputeAcSensitivity`, `ComputeHarmonicBalance`). |
 | `src/mna/` | Real and complex Modified Nodal Analysis (MNA) matrix assembly, transpose solve, dynamic $G_{\min}$ stabilization, and residual verification. |
 | `src/linear/` | `BasicDenseMatrix<Scalar>` (LU decomposition), Moler-Stewart QZ generalized eigenvalue solver (`ComputeGeneralizedEigenvalues`), and internal radix-2 Cooley-Tukey FFT (`FftPlan`, `RealToHarmonics`, `HarmonicsToReal`). |
 | `src/newton/` | Damped nonlinear Newton-Raphson driver with semiconductor junction damping (`pnjlim`, `fetlim`), logic output limiting, and fallback homotopy strategies (*Gmin stepping* and *Source stepping*). |
@@ -117,6 +119,7 @@
 | **S-Parameters** | `.sp` | ✅ | ✅ **Ready** | [`sp_analysis.cpp`](../../nodalys/src/analyses/sp_analysis.cpp) — Multiport scattering matrix $\mathbf{S}(j\omega)$ from one port up, single-LU multi-RHS solve, exact $\mathbf{Z}$ and $\mathbf{Y}$ matrices (absent where the circuit has none), Return Loss, Insertion Loss, VSWR, Input Impedance, and Touchstone export. |
 | **Pole-Zero** | `.pz` | ✅ | ✅ **Ready** | [`pz_analysis.cpp`](../../nodalys/src/analyses/pz_analysis.cpp) — Generalized eigenvalue solver $(\mathbf{G}, -\mathbf{C})$ and Rosenbrock pencil $(\mathbf{A}_z, -\mathbf{B}_z)$ via pure C++23 QZ algorithm, after balancing and exact removal of algebraic rows ([`pencil_reduction.cpp`](../../nodalys/src/linear/pencil_reduction.cpp)), with the checks of [`pz_checks.cpp`](../../nodalys/src/analyses/pz_checks.cpp). |
 | **Sensitivity** | `.sens` | ✅ | ✅ **Ready** | [`sens_analysis.cpp`](../../nodalys/src/analyses/sens_analysis.cpp) — Transposed adjoint solve $\mathbf{J}^T \boldsymbol{\lambda} = \mathbf{d}$, analytical device derivatives, 100% normalized scale, and subcircuit/potentiometer aggregation. |
+| **AC Sensitivity** | `.sens ... ac` | ❌ (wrong with forward-biased devices) | ✅ **Ready** | [`ac_sens_analysis.cpp`](../../nodalys/src/analyses/ac_sens_analysis.cpp) — Transposed complex adjoint solve per frequency, the bias term of the nonlinear devices through the DC adjoint, and the change of gain and phase for 1 % of each part ([`ac_sens_analysis.md`](./ac_sens_analysis.md)). |
 | **Harmonic Balance** | `.hb` | ❌ | ✅ **Ready** | [`hb_analysis.cpp`](../../nodalys/src/analyses/hb_analysis.cpp) — Exclusive AFT Newton-Raphson solver with pure C++23 radix-2 FFT, Toeplitz/circulant conversion Jacobian, and source/gmin stepping continuation. |
 | **Truth Table** | Multiple `.op` | ✅ | ✅ **Ready** | Fully supported natively in imcsim UI without ngspice via smooth continuous logic macromodels ($C^\infty$). |
 
@@ -201,6 +204,7 @@ starts once the one before it is done.
 | :--- | :---: | :--- |
 | **Pole-Zero Analysis** | `.pz` | QZ algorithm over $(\mathbf{G}, -\mathbf{C})$ and the Rosenbrock pencil. |
 | **DC Sensitivity** | `.sens` | One transposed adjoint solve $\mathbf{J}^T \boldsymbol{\lambda} = \mathbf{d}$ for every part. |
+| **AC Sensitivity** | `.sens ... ac` | One transposed complex solve per frequency, plus the bias term of the nonlinear devices; the Sensitivity analysis of `imcsim` has an AC kind for it. |
 | **RF S-Parameters** | `.sp` | One or more ports, power waves, Z and Y matrices, Touchstone export, Smith chart in `imcsim`. |
 | **Harmonic Balance (1-Tone)** | `.hb` | AFT Newton with source and gmin stepping; refused above 4000 dense unknowns. |
 | **Live Transient** | — | Paced against the clock and paused through the pace `imcsim` shares with `ngspice`. |
@@ -234,7 +238,6 @@ the transient and AC benchmarks are no slower than `ngspice`.
 | Item | Why |
 | :--- | :--- |
 | **Power Sweep / P1dB / PAE / Large-Signal $S_{ij}$** | An amplitude loop over `ComputeHarmonicBalance`. |
-| **AC Sensitivity** (`.sens ac`) | Adjoint solves over the complex AC MNA $\mathbf{Y}(j\omega)^T \boldsymbol{\lambda} = \mathbf{d}$. |
 | **Modal Analysis and Participation Factors** | Every natural pole of $(\mathbf{G}, \mathbf{C})$ from the QZ solver, with the $L$ and $C$ that take part in each. |
 
 #### Phase 4 — Long Term, Revisited on Demand
@@ -258,7 +261,8 @@ Comparison against upstream `ngspice 47` (`src/spicelib/analysis/`): upstream sh
 | **Worst-Case (EVA) & RSS Tolerance** | Tolerance / Yield | Not available (manual scripting or Monte Carlo only) | Monte Carlo only | Low | Combines sensitivity vectors with `imcsim` component tolerances for instant RSS bounds and extreme-value corners. |
 | **2-Port RF Stability & Noise (`NF`, `Fmin`, `Rn`, `Sopt`)** | RF / Small-Signal | `.sp` supports `CKTspnoise`, but lacks $K$/$\mu$/circles | `SParameterResult` (no `donoise` or $K$/$\mu$) | Low | Post-processing on `SParameterResult` for Rollett $K$, $\mu$, MAG/MSG, Smith circles, plus multiport RF noise figures. |
 | **Modal / Eigenvalue & Participation Factors** | Linear Dynamics | SISO `.pz` only | SISO `.pz` only | Low / Medium | Computes all natural poles of $(\mathbf{G}, \mathbf{C})$ via QZ and ranks $L$/$C$ participation per mode to pinpoint resonances without choosing an I/O pair. |
-| **AC, HB & Transient Adjoint Sensitivity** | Sensitivity | Has `.sens ac`; legacy `.sens2` transient unmaintained/off | DC `.sens` only | Medium | Adjoint solves over complex AC MNA (`AC Sensitivity` above), periodic HB Jacobian, and time-domain companion matrices. |
+| **AC Sensitivity** | Sensitivity | Has `.sens ac`, wrong with forward-biased devices | ✅ **Ready** | — | Adjoint solves over the complex AC MNA plus the bias term of the nonlinear devices ([`ac_sens_analysis.md`](./ac_sens_analysis.md)). |
+| **HB & Transient Adjoint Sensitivity** | Sensitivity | Legacy `.sens2` transient unmaintained/off | DC and AC `.sens` only | Medium | Periodic HB Jacobian and time-domain companion matrices. |
 | **HB-AC / HB-Noise / HB-XF (`PAC`/`PNoise`/`PXF`)** | Periodic Small-Signal | Upstream has `.pss` shooting only (no HB conversion) | Planned | Medium / High | Linearizes around the converged HB periodic solution via the harmonic conversion matrix for mixers, choppers, and SMPS. |
 | **Automatic Transient Noise (`.trannoise`)** | Time / Noise | Manual `TRNOISE`/`TRRANDOM` voltage/current sources only | Planned | Medium / High | Automatically injects bandwidth-scaled thermal, shot, and $1/f$ noise per device during `.tran` for SNR and oscillator/comparator jitter. |
 | **Autonomous HB (Oscillators + Phase Noise)** | RF / Oscillators | `.pss` shooting only (needs stabilization time) | Planned *(fixed `f0`)* | High | Solves unknown oscillation frequency $f_0$ jointly in HB Newton with a phase constraint; suited to high-$Q$ crystal and LC oscillators. |

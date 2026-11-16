@@ -18,6 +18,7 @@
 #include "schematic/schematic.h"
 #include "simulation/simulation_results.h"
 #include "windows/app_window.h"
+#include "windows/output_tabs/ac_sensitivity_tab.h"
 #include "windows/output_tabs/ac_sweep_tab.h"
 #include "windows/output_tabs/dc_sweep_tab.h"
 #include "windows/output_tabs/frame_results.h"
@@ -93,6 +94,7 @@ private:
     ACSweepTab m_ACSweepTab;
     DCSweepTab m_DCSweepTab;
     NoiseTab m_NoiseTab;
+    ACSensitivityTab m_ACSensitivityTab;
     PoleZeroTab m_PoleZeroTab;
     SParameterTab m_SParameterTab;
     HarmonicBalanceTab m_HarmonicBalanceTab;

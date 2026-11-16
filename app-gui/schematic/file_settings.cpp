@@ -317,6 +317,25 @@ std::expected<void, std::string> ReadSensitivitySettings(const nlohmann::json &o
         }
         settings.SensitivityOutput = *output;
     }
+    if (object.contains("kind")) {
+        const std::optional<std::string> kind = ReadString(object, "kind");
+        if (!kind || (*kind != "dc" && *kind != "ac")) {
+            return std::unexpected("have a kind that is neither dc nor ac");
+        }
+        settings.SensitivityType = *kind == "ac" ? SensitivityKind::AC : SensitivityKind::DC;
+    }
+    if (const auto ac = object.find("ac"); ac != object.end()) {
+        if (const auto read = ReadFrequencyRange(*ac, settings.ACSensitivityRange); !read) {
+            return read;
+        }
+        if (ac->contains("source")) {
+            const std::optional<std::string> source = ReadString(*ac, "source");
+            if (!source) {
+                return std::unexpected("have no valid source");
+            }
+            settings.ACSensitivitySource = *source;
+        }
+    }
     return {};
 }
 
@@ -452,10 +471,14 @@ nlohmann::json WriteSettings(const SimulationSettings &settings) {
     if (settings.TransferFunctionOutput) {
         transfer_function["output"] = {settings.TransferFunctionOutput->X, settings.TransferFunctionOutput->Y};
     }
-    nlohmann::json sensitivity = nlohmann::json::object();
+    nlohmann::json sensitivity = {{"kind", settings.SensitivityType == SensitivityKind::AC ? "ac" : "dc"}};
     if (settings.SensitivityOutput) {
         sensitivity["output"] = {settings.SensitivityOutput->X, settings.SensitivityOutput->Y};
     }
+    nlohmann::json ac_sensitivity = {{"source", settings.ACSensitivitySource}};
+    WriteParameters(AC_SWEEP_KEYS, settings.ACSensitivityRange, ac_sensitivity);
+    ac_sensitivity["points_per_decade"] = settings.ACSensitivityRange.PointsPerDecade;
+    sensitivity["ac"] = std::move(ac_sensitivity);
     nlohmann::json pole_zero = {{"source", settings.PoleZeroSource}};
     if (settings.PoleZeroOutput) {
         pole_zero["output"] = {settings.PoleZeroOutput->X, settings.PoleZeroOutput->Y};
