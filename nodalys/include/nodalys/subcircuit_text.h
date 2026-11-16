@@ -16,6 +16,7 @@
 #include "nodalys/types.h"
 
 #include <expected>
+#include <functional>
 #include <map>
 #include <optional>
 #include <string>
@@ -47,6 +48,11 @@ struct SubcircuitTextInstance {
     /// The value of each parameter of the .subckt line, defaults and overrides settled; they win over a .param line of
     /// the text with the same name.
     std::map<std::string, double> Parameters;
+    /// Called, when set, with the name of each internal node an instance makes and the node it got, such as "X1.MID"
+    /// (upper case, the names of the instances it sits in before it), so the caller can let its own directives name it.
+    std::function<void(const std::string &name, NodeId node)> OnInternalNode;
+    /// Called, when set, with the name and the two nodes of each independent source, such as "X1.V1".
+    std::function<void(const std::string &name, NodeId positive, NodeId negative)> OnSource;
 };
 
 // Building
