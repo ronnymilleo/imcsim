@@ -65,8 +65,8 @@ void WriteOptionalArray(std::ostringstream &ss, const std::vector<std::optional<
     ss << "[";
     for (std::size_t i = 0; i < values.size(); ++i) {
         ss << (i > 0 ? ", " : "");
-        if (values[i]) {
-            ss << std::format("{:.8g}", *values[i]);
+        if (const std::optional<double> &value = values[i]; value.has_value()) {
+            ss << std::format("{:.8g}", *value);
         } else {
             ss << "null";
         }
