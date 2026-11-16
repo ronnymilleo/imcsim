@@ -309,7 +309,8 @@ takes the size of the part names, so it follows the zoom, and is left out when z
   delivers power).
 - **Sensitivity** colors each part the sensitivity analysis lists by the size of its normalized sensitivity, on a
   logarithmic scale of four decades below the largest one; the legend gives the volts for a 1 % change of the value (titled with
-  the output it refers to), and marks the floor with `<`. Parts the analysis does not list, such as diodes, transistors and ground, keep the theme color.
+  the output it refers to), and marks the floor with `<`. After an AC sensitivity the scale is three decades and the
+  legend gives the percent of the response a 1 % change moves, at the frequency of the marker. Parts the analysis does not list, such as diodes, transistors and ground, keep the theme color.
 
 ## Transient on the schematic
 
@@ -789,6 +790,38 @@ operating point, so it is not exported. To see the same values on the schematic,
 1 %", with the volts for a 1 % change at its two ends. A supply rail is named in the table as on the schematic, such
 as `VCC 12V`; clicking its row still selects it.
 
+### The AC kind
+
+**Kind** at the top of the settings is **DC**, as above, or **AC**: how much the gain and the phase at the output change
+with the value of each part, across frequency. It answers questions such as which part sets the corner of a filter, and
+which one to trim to move it. The AC kind runs on the Nodalys engine only (ngspice's own AC sensitivity is wrong for
+circuits with forward-biased diodes and transistors); with ngspice it is disabled, with that reason as its tooltip.
+
+Set **Output** as for the DC kind, **Input** to the source that drives the circuit (a voltage or current source set to
+AC, picked as in the noise analysis), and the frequency range, **Start**, **Stop** and the points per decade, with a
+Suggest button as in the AC sweep. A transistor counts through its operating point: a part that sets the bias, such as
+a divider resistor or the supply, moves the gain through the bias too, and the result includes that. The parts listed
+are the ones of the DC kind, with a potentiometer as its total resistance and a block by the element inside it that
+moves the response most.
+
+The Sensitivity tab then has two plots over a logarithmic frequency axis: the change of the **gain**, in dB, and of the
+**phase**, in degrees, for a value 1 % higher, one curve for each part that is checked. The five most influential parts
+are checked at first; tick or untick the others in the table, or use All and None. A gap in a curve is a
+frequency where the output is almost zero (a notch), whose relative change means nothing; a warning above the plots says
+so.
+
+The table below ranks every part at the frequency of the marker, the vertical line in both plots, which starts at
+the **-3 dB point** of the response, so the table answers which part sets the corner. Drag the marker to read another
+frequency, or use **Go to the -3 dB point**. The columns are the value, the change of the gain and of the phase for 1 %,
+and the **share of largest**: how much of the response a 1 % change of the part moves, gain and phase together, as a
+share of the part that moves it most. A negative gain change means a higher value lowers the gain at that frequency. A
+click on a part selects it in the editor.
+
+**Color the schematic** colors the parts by the same share at the marked frequency, so dragging the marker shows what
+matters at the corner, at the passband or in the stopband; the legend gives the change of the response in percent for 1 %
+of the value. The plots export as SVG or CSV like the other plots (gain and phase panels, with the checked parts); the
+table is a readout. The Sallen-Key sensitivity example (Examples > Op-amps) shows it on a second-order filter.
+
 ## Poles and zeros
 
 The Poles and zeros analysis finds where the transfer function from a source to a node has its poles and zeros, which
@@ -990,7 +1023,7 @@ imcsim solves circuits with one of two engines, picked in Edit > Preferences > S
   the default. Logic gates and flip-flops run as its digital models, with X states, and its results are the ones the
   rest of this guide describes.
 - **Nodalys** is the solver built into imcsim. It reads the circuit directly, with no netlist, and runs every analysis
-  of ngspice plus the harmonic balance, which ngspice cannot. Its logic gates and flip-flops are continuous (a smooth
+  of ngspice plus the harmonic balance and the AC kind of the sensitivity, which ngspice cannot. Its logic gates and flip-flops are continuous (a smooth
   step of the inputs, with no X states), so an AC sweep or a noise analysis sees through them, and a run is repeatable
   from its seed even for white and 1/f noise.
 
@@ -1003,7 +1036,8 @@ can return nothing, drop roots or return right-half-plane roots that are not rea
 What an engine cannot run is said, not guessed at:
 
 - An analysis the engine cannot run on the circuit is grayed out in the analysis list, and its tooltip gives the
-  reason. This covers analyses and the kinds of parts on the schematic: the harmonic balance with ngspice, a
+  reason. This covers analyses and the kinds of parts on the schematic: the harmonic balance with ngspice (the AC kind
+  of the sensitivity is disabled in its settings, with the same kind of reason), a
   voltage-controlled switch or a relay in the harmonic balance, and logic gates and flip-flops in the sensitivity,
   pole-zero and S-parameters analyses with either engine (and with ngspice also in any analysis when its digital
   models, `digital.cm`, are missing).

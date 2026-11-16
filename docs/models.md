@@ -30,8 +30,11 @@ elements, so the results are those of ngspice with the models below. Some things
   Parts that are several elements in the netlist, such as op-amps, fuses, relays and transformers, and parts with no
   value, such as switches, are not listed. ngspice also reports model parameters of diodes and transistors, but most
   read the same meaningless number or nan, so they are left out. Logic parts are refused, since ngspice cannot recover
-  from a sensitivity analysis that holds them. The AC form of `.sens` is not used: ngspice leaves the small-signal
-  conductance of forward-biased diodes and transistors out of it, so it is wrong for nonlinear circuits.
+  from a sensitivity analysis that holds them. The AC form of ngspice's `.sens` is not used: it leaves the small-signal
+  conductance of forward-biased diodes and transistors out of it, and gives a wrong current for a resistor, so it is
+  wrong for nonlinear circuits. The AC kind of the sensitivity analysis runs on Nodalys only, which differentiates the
+  small-signal response with an adjoint solve per frequency and adds the effect of the bias point on the
+  conductances and capacitances of the nonlinear parts; it lists the same parts as the DC kind.
 - A pole-zero analysis is ngspice's `.pz`: it finds the poles and zeros of the small-signal transfer function from an
   independent source to the voltage of a node, with the circuit linearized at its DC operating point, so a diode or
   transistor contributes its bias-point conductance and capacitances. The input port is the source's terminals, and

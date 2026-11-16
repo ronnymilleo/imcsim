@@ -85,4 +85,4 @@ Because the DC Jacobian $\mathbf{J}$ includes the exact linearized conductances 
 | **Diode Ladder (30 diodes, nonlinear)** | 31 | 6.359 ms | **1.013 ms** | **6.28x** |
 
 - Because the adjoint approach requires **only one linear transpose solve** regardless of how many resistors, capacitors, or sources exist in the network, running `.sens` on the 500-node ladder adds only ~2.7 ms over the DC operating point (`4.95 ms` → `7.66 ms`), whereas `ngspice` scales with the number of parameters (`6.17 ms` → `139.78 ms`).
-- **Known scope boundaries:** `Nodalys` does not yet export sensitivities for internal semiconductor model parameters (e.g., `d1_area`, BJT `bf`) or AC frequency-domain `.sens`, neither of which is surfaced in `Core::BuildSensitivity`.
+- **Known scope boundaries:** `Nodalys` does not yet export sensitivities for internal semiconductor model parameters (e.g., `d1_area`, BJT `bf`). The AC form is a separate analysis, [`ac_sens_analysis.md`](./ac_sens_analysis.md).
