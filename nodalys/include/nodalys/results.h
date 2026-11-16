@@ -266,6 +266,56 @@ struct SensitivityResult {
 };
 
 /**
+ * @enum    SensitivityParameter
+ * @brief   Which value of an element a sensitivity is taken with respect to.
+ */
+enum class SensitivityParameter {
+    RESISTANCE,
+    CAPACITANCE,
+    INDUCTANCE,
+    /// DC value of a voltage source.
+    VOLTAGE,
+    /// DC value of a current source.
+    CURRENT,
+    /// Gain of a controlled source.
+    GAIN
+};
+
+/**
+ * @struct  AcElementSensitivity
+ * @brief   How the complex output of an AC analysis changes with the value of one element, at every frequency.
+ * @details Derivatives are $\partial V / \partial p$ in volts per unit of the value. The two figures are what a user
+ *          reads: the change of the magnitude in decibels and of the phase in degrees for a 1 % change of the value,
+ *          none at a frequency where the output is too small for a relative change to mean anything.
+ */
+struct AcElementSensitivity {
+    /// Lower case name of the element, as the netlist writes it ("r1", "x1.r1" inside a block).
+    std::string Name;
+    SensitivityParameter Parameter = SensitivityParameter::RESISTANCE;
+    /// Value of the element: ohms, farads, henries, volts, amperes or the gain.
+    double Value = 0.0;
+    std::vector<std::complex<double>> Derivatives;
+    std::vector<std::optional<double>> MagnitudeDecibelsPerPercent;
+    std::vector<std::optional<double>> PhaseDegreesPerPercent;
+};
+
+/**
+ * @struct  AcSensitivityResult
+ * @brief   Small-signal AC sensitivity of an output voltage to every element value, across frequency.
+ */
+struct AcSensitivityResult {
+    int OutputPositiveNode = 0;
+    int OutputNegativeNode = 0;
+    std::string InputSource;
+    std::vector<double> Frequencies;
+    /// The output phasor at each frequency, for the AC magnitude of the input source.
+    std::vector<std::complex<double>> Output;
+    std::vector<AcElementSensitivity> Elements;
+    /// What the user should know about the run, such as the frequencies where the output is too small to measure.
+    std::vector<std::string> Warnings;
+};
+
+/**
  * @struct  ComponentPhasors
  * @brief   Complex peak harmonic phasors for one monitored component current (indexed 0..H).
  */

@@ -70,6 +70,11 @@ std::expected<SensitivityResult, std::string> ComputeSensitivity(CompiledCircuit
                                                                  const ConvergenceOptions &options,
                                                                  std::vector<DiagnosticMessage> *messages);
 
+std::expected<AcSensitivityResult, std::string> ComputeAcSensitivity(CompiledCircuit &compiled,
+                                                                     const AcSensitivityConfig &settings,
+                                                                     const ConvergenceOptions &options,
+                                                                     std::vector<DiagnosticMessage> *messages);
+
 std::expected<HarmonicBalanceResult, std::string> ComputeHarmonicBalance(CompiledCircuit &compiled,
                                                                          const HarmonicBalanceConfig &settings,
                                                                          const ConvergenceOptions &options,

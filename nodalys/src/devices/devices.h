@@ -329,6 +329,7 @@ public:
 
     double GetDcValue() const;
     void SetDcValue(double value);
+    double GetAcMagnitude() const { return m_AcMagnitude; }
     int GetNodeA() const { return m_NodeA; }
     int GetNodeB() const { return m_NodeB; }
     int GetBranch() const { return m_Branch; }
@@ -370,6 +371,7 @@ public:
 
     double GetDcValue() const;
     void SetDcValue(double value);
+    double GetAcMagnitude() const { return m_AcMagnitude; }
     int GetNodeA() const { return m_NodeA; }
     int GetNodeB() const { return m_NodeB; }
     const SourcePeriodicity &GetPeriodicity() const { return m_Periodicity; }
