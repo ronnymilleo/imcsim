@@ -50,6 +50,10 @@
     - Algorithms: an expansion of the text of a `.subckt` into a `CircuitBuilder` with the scopes of SPICE (parameters, `.model` cards, nested subcircuits), private nodes and element names for each instance, values as expressions of parameters, and a refusal that names the line for everything the engine cannot simulate.
     - Benchmarks: the precision rectifier example, whose op-amp is such a block, against `ngspice`.
 
+14. **[MCP Server (`nodalys mcp`)](./mcp_server.md)**
+    - What it is: the Model Context Protocol over standard input and output, with the tools `check_netlist`, `simulate` and `list_models`, so an AI assistant can validate and simulate netlists and read compact figures instead of vectors of points.
+    - How to register it with an AI host, the arguments of each tool and what each answers.
+
 ---
 
 ## Architecture & Modular Layout
@@ -66,7 +70,8 @@
 │       ├── api/                       CircuitBuilder implementation and Circuit internals
 │       ├── analyses/                  Solvers: .op, .dc, .tran, .ac, .tf, .noise, .sp, .pz, .sens (DC and AC), .hb
 │       ├── bridge/                    LogicBridge: Verilog discrete-to-analog co-simulation
-│       ├── cli/                       Standalone CLI binary entry point (`nodalys`)
+│       ├── cli/                       Standalone CLI binary entry point (`nodalys`) and the runner of one analysis
+│       ├── mcp/                       MCP server of the CLI (`nodalys mcp`): the protocol and its tools
 │       ├── compiler/                  CompiledCircuit internal representation
 │       ├── devices/                   Passive, source, semiconductor, and smooth logic models
 │       ├── export/                    CSV, JSON, SPICE Raw, and Touchstone multi-format exporters
@@ -93,7 +98,8 @@
 | `src/analyses/` | Complete numerical solvers for DC Operating Point, DC Sweep (1D/2D), Time-Domain Transient, AC Small-Signal Sweep, DC Transfer Function, AC Adjoint Noise, Multiport S-Parameters, Pole-Zero, DC Sensitivity, and Harmonic Balance. |
 | `src/bridge/` | `LogicBridge` translating discrete event-driven logic levels (`0`, `1`, `X`, `Z`) into continuous analog waveforms with realistic slew rates and configurable supply rails. |
 | `src/parser/` & `src/export/` | SPICE netlist syntax parser supporting engineering scales (`1k`, `100n`, `4.7u`), the expansion of a subcircuit kept as SPICE text, which the `X` lines of a netlist use too (`subcircuit_*.cpp`, `netlist_subcircuits.cpp`, [`subcircuit_text.md`](./subcircuit_text.md)) and multi-format simulation result export (CSV, JSON, SPICE Raw, Touchstone). |
-| `src/cli/` | Standalone CLI tool (`nodalys`) processing netlists from files or `stdin` with command-line options (`--analysis`, `--format`, `--output`). |
+| `src/cli/` | Standalone CLI tool (`nodalys`) processing netlists from files or `stdin` with command-line options (`--analysis`, `--format`, `--output`), and `analysis_runner.cpp`, which runs one analysis of any kind for the CLI and the MCP server. |
+| `src/mcp/` | The MCP server of `nodalys mcp` (nlohmann/json, linked to the command line only): the JSON-RPC protocol apart from the tools `check_netlist`, `simulate` and `list_models`, and the compact figures of each analysis ([`mcp_server.md`](./mcp_server.md)). |
 
 ### 2. imcsim GUI & Model Bridge (`app-core/backends/nodalys/`)
 
@@ -148,6 +154,7 @@
 | Feature / Tool | Status in `Nodalys` | Description |
 | :--- | :---: | :--- |
 | **Standalone CLI (`nodalys`)** | ✅ **Ready** | Command-line tool accepting standard SPICE netlists from arguments or standard input (`stdin`); `--analysis sens` runs both the DC and the AC `.sens` of a netlist ([`ac_sens_analysis.md`](./ac_sens_analysis.md)). |
+| **MCP Server (`nodalys mcp`)** | ✅ **Ready** | Lets an AI assistant check and simulate netlists over standard input and output, with compact answers ([`mcp_server.md`](./mcp_server.md)). |
 | **Multi-Format Export** | ✅ **Ready** | Standalone exporter formatting results into CSV, JSON, SPICE Raw, and Touchstone (.sNp) formats (`--format`), the AC sensitivity included. |
 | **Component Parameter Stepping** | ✅ **Ready** | Steps $R, C, L$ across `.tran`, `.ac`, and `.dc` runs directly through `imcsim` controls. |
 | **Fourier / Spectrum Analysis** | ✅ **Ready** | High-resolution FFT post-processed over `ComputeTransient` waveforms. |

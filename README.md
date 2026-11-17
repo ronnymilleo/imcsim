@@ -68,6 +68,8 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   SPICE libraries and seedable noise and random sources, and what it does not cover is refused with the reason (see the
   [user guide](docs/user_guide.md#choosing-the-simulation-engine)). It also comes as `nodalys`, a command line that
   reads SPICE netlists
+- An MCP server in that command line (`nodalys mcp`), so an AI assistant such as Claude Code can check netlists and run
+  analyses on Nodalys and read compact answers ([MCP server](docs/nodalys/mcp_server.md))
 - A harmonic balance, on Nodalys: the periodic steady state of a circuit driven at one frequency, with the amplitude
   of each harmonic, the waveform over one period and the THD
 - Math channels on transient, DC sweep and AC sweep plots, as on an oscilloscope: an operation between two traces picked
