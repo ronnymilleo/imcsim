@@ -441,6 +441,10 @@ either sign, and it is a starting guess and not a held value, unlike an initial 
 - The checks are those of the initial voltage: two different voltages on one node, ground and a node no part touches
   are refused with a message, and a part in a block body acts on the node of each instance (`.nodeset V(X1.X2.5)=value`
   at the top of the netlist, since ngspice does not read it inside a `.subckt`).
+- ngspice 47 crashes in a transfer function (`.tf`) when the netlist has a `.nodeset` card, with or without a nonlinear
+  device (an initial voltage, `.ic`, is fine, and so is every other analysis). imcsim does not work around it: the
+  transfer function is refused on ngspice for a circuit with a nodeset, in a block body included, with the reason as
+  the tooltip of the disabled analysis, and Nodalys runs it.
 
 ## Solver options
 
