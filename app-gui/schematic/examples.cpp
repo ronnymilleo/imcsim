@@ -398,7 +398,9 @@ constexpr auto EXAMPLES = std::to_array<Example>({
             "A voltage-controlled switch, driven by a 10 kHz pulse at 50% duty, chops a 12 V supply. A 1N5819 "
             "keeps the inductor current flowing while the switch is open, and L1 (1 mH) with C1 (100u) "
             "average it into about 5.8 V on a 10 Ohm load. Run the transient: the output overshoots to "
-            "about 9 V, rings at the LC resonance near 500 Hz and settles with a ripple of 0.2 V.",
+            "about 9 V, rings at the LC resonance near 500 Hz and settles with a ripple of 0.2 V. The step is 0.1 us "
+            "so that the ring of the switch node after each edge, which peaks near 19 V, is resolved; the plot "
+            "opens on its first millisecond, and its scroll bar reaches the rest.",
         .FileName = "buck_converter.imcsim",
     },
     {

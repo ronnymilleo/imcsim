@@ -181,8 +181,6 @@ constexpr Tolerance SUPPLY_GAIN_BOUND{SOLVER_RELATIVE_TOLERANCE, 1e-5};
 constexpr Tolerance SUPPLY_SENSITIVITY_BOUND{SOLVER_RELATIVE_TOLERANCE, 2e-4};
 /// Input-referred noise of 2.3e7 on Nodalys against 20 on ngspice.
 constexpr Tolerance DIVIDED_BY_NOTHING_BOUND{NOISE_TOTAL.Relative, 1e8};
-/// The ring of the buck converter's diode node, sampled at 1 us, differs by 6.4 V.
-constexpr Tolerance RINGING_BOUND{TRANSIENT_RELATIVE_TOLERANCE, 9.0};
 
 /// Differences found by this test and investigated; each one is a task of its own. Keep the reason to one line, with
 /// the engine that is right.
@@ -231,12 +229,6 @@ constexpr std::array KNOWN_DIFFERENCES{
                     "gain from a supply to the output is 0 on ngspice and 7.7e-6 on Nodalys"},
     KnownDifference{"op_amp_input_offset.imcsim", SENSITIVITY_NAME, "V", SUPPLY_SENSITIVITY_BOUND,
                     "the normalized sensitivity to each supply is 1.2e-4 on Nodalys and under 2e-6 on ngspice"},
-    KnownDifference{"buck_converter.imcsim", TRANSIENT_NAME, "V(", RINGING_BOUND,
-                    "the currents and the waveforms agree, but after the inductor current stops the diode node rings "
-                    "against the diode capacitance at about 600 kHz, which the 1 us step resolves in under two points, "
-                    "so the samples of the ring differ: both engines ring above the 12 V supply, as the inductor "
-                    "pushes the node up to about 19 V when the step shrinks, and at this step ngspice reaches 14.9 V "
-                    "and Nodalys 18.5 V (jay #227)"},
 };
 
 using Differences = std::vector<std::string>;

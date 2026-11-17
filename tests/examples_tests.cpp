@@ -859,6 +859,24 @@ TEST_CASE("The buck converter settles near its duty cycle times the supply, afte
     CHECK(highest > 8.0);
 }
 
+TEST_CASE("The buck converter's switch node peaks near its true 19 V on both engines, since the step resolves the ring",
+          "[examples]") {
+    GUI::Schematic schematic;
+    OpenExample("buck_converter.imcsim", schematic);
+    const Core::Circuit circuit = schematic.BuildCircuit();
+    const Core::TransientSettings &settings = schematic.GetSimulationSettings().Transient;
+    // The diode node rings after each edge at about 17 us, which the step has to resolve in many points
+    const std::size_t switch_node = NodeAt(schematic, {14, 10});
+    Core::NodalysBackend nodalys;
+    for (Core::SimulationBackend *backend : std::array<Core::SimulationBackend *, 2>{&Core::GetBackend(), &nodalys}) {
+        const Core::TransientRun run = backend->RunTransient(circuit, settings, std::nullopt, {});
+        REQUIRE(run.Result.has_value());
+        const double peak = PeakOf(run.Result->NodeVoltages[switch_node]);
+        INFO(std::format("peak {} V", peak));
+        CHECK_THAT(peak, Catch::Matchers::WithinAbs(19.3, 1.0));
+    }
+}
+
 TEST_CASE("The relay contact closes and opens a coil time constant after the transistor does", "[examples]") {
     GUI::Schematic schematic;
     OpenExample("relay_driver.imcsim", schematic);
