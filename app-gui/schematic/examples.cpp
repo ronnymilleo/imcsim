@@ -311,9 +311,8 @@ constexpr auto EXAMPLES = std::to_array<Example>({
             "there the circuit oscillates by itself. Run the transient, which lasts 2 ms, about three periods, "
             "and look at both collectors, which swing between about 0.1 V and the 5 V supply. Its 0.2 us step is "
             "short on purpose: the edges are steep, and with a longer one ngspice misplaces them. The plot opens "
-            "on the first 2000 points, up to the first edge: drag its scroll bar, or raise Plot points to 10000 "
-            "to see the whole run. Only the transient uses the part: the operating point shows the balance "
-            "point.",
+            "on its first 10000 points, nearly the whole run; its scroll bar reaches the rest. Only the transient "
+            "uses the part: the operating point shows the balance point.",
         .FileName = "astable_multivibrator.imcsim",
     },
     {

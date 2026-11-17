@@ -19,6 +19,7 @@
 #include "results/logic_outputs.h"
 #include "results/logic_trace.h"
 #include "results/monte_carlo_results.h"
+#include "results/point_window.h"
 #include "results/stability_circles.h"
 #include "results/stability_summary.h"
 #include "results/trace_math.h"
@@ -203,9 +204,9 @@ TEST_CASE("The noise example shows a flat floor at the input that the low-pass c
     const Core::TransientRun run = Core::RunTransient(schematic.BuildCircuit(), seeded);
     REQUIRE(run.Result.has_value());
     const Core::Transient &transient = *run.Result;
-    // The whole run fits the default window of 2000 points, so the Spectrum tab covers all of it
+    // The whole run fits the default window, so the Spectrum tab covers all of it
     INFO(transient.Times.size());
-    CHECK(transient.Times.size() <= 2000);
+    CHECK(transient.Times.size() <= static_cast<std::size_t>(GUI::DEFAULT_WINDOW_POINTS));
     const std::size_t input = NodeAt(schematic, {4, 4});
     const std::size_t output = NodeAt(schematic, {11, 4});
 
