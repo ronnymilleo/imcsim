@@ -435,7 +435,8 @@ either sign, and it is a starting guess and not a held value, unlike an initial 
   the next points start from the one before, so a sweep through a hysteresis loop keeps its branch), the AC sweep, the
   transfer function, the noise, sensitivity, pole-zero and S-parameter analyses, and the transient that starts from an
   operating point. A transient with `uic` has no operating point to guess, so it ignores it. The harmonic balance
-  solves its own periodic steady state and ignores it.
+  reads it in the DC bias that its Newton starts from, so a circuit with several states runs its balance around the
+  one the nodesets pick.
 - It adds nothing to the circuit once released, so it never changes the result of a circuit that has one operating
   point, and a nodeset and an initial voltage on one node may differ.
 - The checks are those of the initial voltage: two different voltages on one node, ground and a node no part touches
