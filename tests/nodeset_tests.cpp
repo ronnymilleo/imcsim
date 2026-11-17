@@ -24,6 +24,7 @@
 #include "schematic/schematic_file.h"
 #include "simulation/circuit_checks.h"
 #include "simulation/circuit_copy.h"
+#include "simulation/simulation_backend.h"
 #include "simulation/simulator.h"
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
@@ -471,4 +472,65 @@ TEST_CASE("A nodeset on a circuit with one operating point changes nothing on bo
         CHECK_THAT(transient.Result->NodeVoltages[2].back(), WithinAbs(10.0 / 3.0, 1e-3));
     };
     OnBothEngines(compare);
+}
+
+TEST_CASE("A transfer function is refused on ngspice when the circuit has a nodeset, and Nodalys runs it",
+          "[nodeset]") {
+    Bistable setup;
+    const Core::TransferFunctionSettings settings{.OutputNode = 2, .InputSource = "V1"};
+    SetNodesets(setup.Circuit, State::FIRST_ON);
+    REQUIRE_FALSE(Core::CheckCircuit(setup.Circuit).has_value());
+
+    SECTION("ngspice names the nodeset and Nodalys, and never reaches its solver, which would crash") {
+        const std::optional<std::string> reason =
+            Core::FindUnsupported(Core::GetBackend(), setup.Circuit, Core::AnalysisKind::TRANSFER_FUNCTION);
+        REQUIRE(reason.has_value());
+        CHECK_THAT(*reason, ContainsSubstring("nodeset"));
+        CHECK_THAT(*reason, ContainsSubstring("Nodalys runs it"));
+        const Core::TransferFunctionRun run = Core::RunTransferFunction(setup.Circuit, settings);
+        REQUIRE_FALSE(run.Result.has_value());
+        CHECK_THAT(run.Result.error(), ContainsSubstring("nodeset"));
+    }
+
+    SECTION("Nodalys runs it") {
+        const TestSupport::NodalysInUse nodalys_in_use;
+        CHECK_FALSE(Core::FindUnsupported(Core::GetBackend(), setup.Circuit, Core::AnalysisKind::TRANSFER_FUNCTION)
+                        .has_value());
+        const Core::TransferFunctionRun run = Core::RunTransferFunction(setup.Circuit, settings);
+        REQUIRE(run.Result.has_value());
+        CHECK(std::isfinite(run.Result->Gain));
+    }
+
+    SECTION("The other analyses still run on ngspice with the nodeset") {
+        for (const Core::AnalysisKind kind :
+             {Core::AnalysisKind::OPERATING_POINT, Core::AnalysisKind::TRANSIENT, Core::AnalysisKind::AC_SWEEP,
+              Core::AnalysisKind::DC_SWEEP, Core::AnalysisKind::NOISE, Core::AnalysisKind::SENSITIVITY}) {
+            CHECK_FALSE(Core::FindUnsupported(Core::GetBackend(), setup.Circuit, kind).has_value());
+        }
+    }
+}
+
+TEST_CASE("A transfer function is refused on ngspice for a nodeset inside a block, and runs without any nodeset",
+          "[nodeset]") {
+    BistableBlock block(State::FIRST_ON);
+    Core::SubcircuitInstance instance("FLIP", {"VCC", "Q", "QB"});
+    instance.SetName("X1");
+    Core::VCC supply;
+    supply.SetName("V1");
+    supply.SetValue(5.0);
+    Core::Ground ground;
+    Core::Circuit circuit;
+    circuit.AddSubcircuit(block.Definition);
+    circuit.Add(supply, {1});
+    circuit.Add(instance, {1, 2, 3});
+    circuit.Add(ground, {0});
+    CHECK(Core::FindUnsupported(Core::GetBackend(), circuit, Core::AnalysisKind::TRANSFER_FUNCTION).has_value());
+
+    // Without the nodeset the same circuit is fine, so the refusal is no wider than the nodeset
+    Bistable plain;
+    CHECK_FALSE(
+        Core::FindUnsupported(Core::GetBackend(), plain.Circuit, Core::AnalysisKind::TRANSFER_FUNCTION).has_value());
+    const Core::TransferFunctionRun run =
+        Core::RunTransferFunction(plain.Circuit, {.OutputNode = 2, .InputSource = "V1"});
+    CHECK(run.Result.has_value());
 }

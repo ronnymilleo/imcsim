@@ -339,6 +339,9 @@ const BackendCapabilities &NgspiceBackend::GetCapabilities() const {
                          AnalysisKind::SENSITIVITY, AnalysisKind::POLE_ZERO, AnalysisKind::S_PARAMETERS},
             .UnsupportedParts = {},
             .UnsupportedPartsByAnalysis = {},
+            .UnsupportedWithNodesets = {{AnalysisKind::TRANSFER_FUNCTION,
+                                         "ngspice crashes in a transfer function when the circuit has a nodeset, and "
+                                         "Nodalys runs it"}},
             .TemperatureUnsupported = std::nullopt,
             .SParameters = {.MinPorts = 2,
                             .MinPortsReason = "ngspice needs at least two S-parameter ports, and Nodalys takes one",

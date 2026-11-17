@@ -5,6 +5,8 @@
 
 #include "simulation/simulation_backend.h"
 
+#include "circuit/node_voltage_targets.h"
+
 #include <format>
 #include <mutex>
 #include <utility>
@@ -230,6 +232,11 @@ std::optional<std::string> FindUnsupported(const SimulationBackend &backend, con
     }
     if (const std::optional<std::string> reason = FindUnsupported(backend, parts, kind)) {
         return reason;
+    }
+    const auto with_nodesets = backend.GetCapabilities().UnsupportedWithNodesets.find(kind);
+    if (with_nodesets != backend.GetCapabilities().UnsupportedWithNodesets.end() &&
+        !ResolveNodeVoltages(circuit, NodeVoltageKind::NODESET).empty()) {
+        return with_nodesets->second;
     }
     const auto &find_problem = backend.GetCapabilities().FindPartProblem;
     if (!find_problem) {
