@@ -54,9 +54,10 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   state nearest the guess, so a nodeset on each of two cross-coupled nodes picks which transistor conducts. Every
   analysis that starts from an operating point reads it, the transient included (when it starts from one, that is,
   without the Initial field of a capacitor or inductor in use, which has none to guess), and a DC sweep reads it for its
-  first point only, the others continuing from the point before. The harmonic balance leaves it out. The same rules as
-  the initial voltage apply: two on one node must agree, ground cannot take one, a node needs a part connected to it,
-  and one inside a block acts on the node of each instance. Both engines mean the same.
+  first point only, the others continuing from the point before. The harmonic balance reads it in the DC bias it
+  starts from, so it runs around the state the nodesets pick. The same rules as the initial voltage apply: two on one
+  node must agree, ground cannot take one, a node needs a part connected to it, and one inside a block acts on the
+  node of each instance. Both engines mean the same.
 - **Switches**: a switch and a push button have a Closed (or Pressed) box in their properties, and the symbol and a
   label under it show the state. Both start open. Outside a live run, the state holds for the whole simulation. During
   a live run, click a switch to flip it or hold a push button to press it (see Live runs).

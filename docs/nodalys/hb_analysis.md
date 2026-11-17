@@ -65,6 +65,8 @@ For strongly driven nonlinear circuits where direct Newton from the converged DC
 2. **`"source stepping"`:** Adaptive continuation scaling all AC harmonic excitations $\lambda \in (0 \to 1]$ with step halving down to $10^{-4}$ and growth on fast convergence.
 3. **`"gmin stepping"`:** Adds shunt `GMIN_START = 1e-3 S` on all node diagonals during source continuation, then steps `gmin` down by decades (`0.1×`) to `options.Gmin`.
 
+**Nodesets.** The DC bias is the place where a circuit with several stable states gets its state, so `SolveDcBiasForB0` solves it through the same passes as an operating point (`SolveInNodesetPasses()`, shared with `SolveNewton`; see [`dc_analysis.md`](./dc_analysis.md), 1.7): a pulled pass with every `NodesetDevice` stamped into the DC system, a released pass from the point it found, and the plain solve when either finds nothing. The nodesets act on that bias only, not in the harmonic Newton: it starts from the bias and, released, would converge to the state nearest it anyway, whereas a held pull would change the balance itself. A tone small enough to keep the states apart is then solved around the state the nodesets picked (tested on a bistable with each guess), and a tone large enough to merge the states solves to the one periodic response there is. A circuit with no nodeset is solved as before.
+
 Finally, `BuildHarmonicBalanceResult` reconstructs one-cycle waveforms for every circuit node and probes component terminal currents (combining `TerminalCurrent` and $\Omega\,\mathcal{F}\{\text{TerminalCharge}\}$ for nonlinear devices, or DC + `AcTerminalCurrent` for linear elements).
 
 ---
@@ -82,6 +84,7 @@ Finally, `BuildHarmonicBalanceResult` reconstructs one-cycle waveforms for every
 
 ### 4.1 Functional & Cross-Validation Coverage (`hb_analysis_tests.cpp`)
 - **Linear parity:** RC low-pass filter, high-$Q$ series RLC resonant tank, and multi-tone ($f_0 + 3 f_0$) superposition match `.ac` and closed-form phasors.
+- **Nodesets (`nodeset_tests.cpp`):** a cross-coupled bistable with a small tone on its supply, balanced around the state each `.nodeset` picks, the state it always took without one, and a one-state circuit unchanged by a guess.
 - **DC degeneracy (`H = 0`):** Reproduces `.op` DC node voltages and currents on nonlinear diode circuits.
 - **Nonlinear cross-validation vs. steady-state `.tran` + FFT:**
   - Half-wave diode rectifier with capacitive RC load (DC shift, harmonic magnitudes/phases, diode/source currents, THD).
