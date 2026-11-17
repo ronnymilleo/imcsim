@@ -109,10 +109,29 @@ constexpr double FIRST_CHUNK_SHARE = 0.01;
 /// A run has ended when its last point is this close to the stop time, which ngspice lands on exactly.
 constexpr double COMPLETE_SHARE = 1.0 - 1e-9;
 /**
- * @brief   How much simulated time the next chunk covers: twice the last one when it was quick, half when it was slow,
- *          so the chunks settle around the target wall time as the circuit gets easier or harder.
+ * @brief   How much simulated time the first chunk covers: a fixed stretch of the clock for a live run, the length the
+ *          monitor asks for, or else a small share of the stop time.
  */
-double GetNextChunkDuration(const double duration, const double wall_seconds, const double smallest) {
+double GetFirstChunkDuration(const TransientSettings &settings, const RunMonitor &monitor) {
+    if (monitor.LivePace > 0.0) {
+        return monitor.LivePace * LIVE_CHUNK_SECONDS;
+    }
+    if (monitor.FixedChunkSeconds > 0.0) {
+        return monitor.FixedChunkSeconds;
+    }
+    return settings.StopTime * FIRST_CHUNK_SHARE;
+}
+
+/**
+ * @brief   How much simulated time the next chunk of a run that does not keep pace covers: twice the last one when it
+ *          was quick, half when it was slow, so the chunks settle around the target wall time as the circuit gets
+ *          easier or harder. A length the monitor fixed stays as it is.
+ */
+double GetNextChunkDuration(const RunMonitor &monitor, const double duration, const double wall_seconds,
+                            const double smallest) {
+    if (monitor.FixedChunkSeconds > 0.0) {
+        return duration;
+    }
     if (wall_seconds < TARGET_CHUNK_SECONDS / 2.0) {
         return duration * 2.0;
     }
@@ -219,7 +238,7 @@ std::optional<std::string> RunInChunks(const Circuit &circuit, const TransientSe
                                        const RunMonitor &monitor, const std::vector<SimulatorMessage> &messages) {
     const bool is_live = monitor.LivePace > 0.0;
     const double pace = monitor.LivePace;
-    double duration = is_live ? pace * LIVE_CHUNK_SECONDS : settings.StopTime * FIRST_CHUNK_SHARE;
+    double duration = GetFirstChunkDuration(settings, monitor);
     double reached = 0.0;
     std::size_t sent = 0;
     bool is_started = false;
@@ -251,7 +270,7 @@ std::optional<std::string> RunInChunks(const Circuit &circuit, const TransientSe
             return std::nullopt;
         }
         if (!is_live) {
-            duration = GetNextChunkDuration(duration, wall.count(), settings.TimeStep);
+            duration = GetNextChunkDuration(monitor, duration, wall.count(), settings.TimeStep);
         } else if (!KeepLivePace(start, reached, pace, monitor.Control)) {
             return std::nullopt;
         }

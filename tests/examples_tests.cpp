@@ -48,6 +48,9 @@
 
 namespace {
 
+/// Seed of the noise source of the noise example in the tests, so every run draws the same numbers.
+constexpr unsigned int NOISE_EXAMPLE_SEED = 1;
+
 /**
  * @brief   Loads an example into a schematic, as the editor does.
  */
@@ -193,7 +196,11 @@ TEST_CASE("The noise example shows a flat floor at the input that the low-pass c
     const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
     REQUIRE(settings.Selected == GUI::Analysis::TRANSIENT);
 
-    const Core::TransientRun run = Core::RunTransient(schematic.BuildCircuit(), settings.Transient);
+    // The noise is drawn anew on each run, and a band of a few dozen bins scatters by about 15%, so a free draw lands
+    // 30% off now and then; a fixed seed makes every run the same draw
+    Core::TransientSettings seeded = settings.Transient;
+    seeded.Seed = NOISE_EXAMPLE_SEED;
+    const Core::TransientRun run = Core::RunTransient(schematic.BuildCircuit(), seeded);
     REQUIRE(run.Result.has_value());
     const Core::Transient &transient = *run.Result;
     // The whole run fits the default window of 2000 points, so the Spectrum tab covers all of it
@@ -225,7 +232,7 @@ TEST_CASE("The noise example shows a flat floor at the input that the low-pass c
     const double resolution = 1.0 / transient.Times.back();
     const double expected_floor = std::sqrt(2.0 * 1e-6 * 1.5 * resolution);
     CHECK_THAT(band_rms(input, 200.0, 2000.0), Catch::Matchers::WithinRel(expected_floor, 0.3));
-    // A few dozen bins per band scatter by 10% or more, so the limits are wide enough never to fail by chance
+    // A few dozen bins per band scatter by 10% or more, so the limits are wide for any draw, and the seed fixes it
     // The floor stays flat up to the 10 kHz Nyquist band, losing a little to the straight lines between samples
     CHECK_THAT(band_rms(input, 3e3, 4.5e3) / band_rms(input, 200.0, 2000.0), Catch::Matchers::WithinRel(0.93, 0.5));
     // The output follows the floor below the 1.6 kHz corner and is far below it near 10 kHz
@@ -236,8 +243,9 @@ TEST_CASE("The noise example shows a flat floor at the input that the low-pass c
 TEST_CASE("The noise example reads as broadband noise of 1 mV/sqrt(Hz) at its input", "[examples]") {
     GUI::Schematic schematic;
     OpenExample("noise_through_rc_low_pass.imcsim", schematic);
-    const Core::TransientRun run =
-        Core::RunTransient(schematic.BuildCircuit(), schematic.GetSimulationSettings().Transient);
+    Core::TransientSettings seeded = schematic.GetSimulationSettings().Transient;
+    seeded.Seed = NOISE_EXAMPLE_SEED;
+    const Core::TransientRun run = Core::RunTransient(schematic.BuildCircuit(), seeded);
     REQUIRE(run.Result.has_value());
     const Core::Transient &transient = *run.Result;
     const std::size_t input = NodeAt(schematic, {4, 4});

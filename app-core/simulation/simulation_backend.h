@@ -99,6 +99,9 @@ struct RunMonitor {
     std::function<void(Transient)> OnChunk;
     /// Simulated seconds a live run covers per second of the clock, or 0 to run as fast as the backend goes.
     double LivePace = 0.0;
+    /// Simulated seconds of every chunk of a run that is not live, or 0 to size them by the wall time they take. A test
+    /// sets it to cut a run at known instants, which the wall time would otherwise decide.
+    double FixedChunkSeconds = 0.0;
 };
 
 /**
