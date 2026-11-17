@@ -756,6 +756,63 @@ TEST_CASE("The current mirror copies the reference current while Q2 is out of sa
     }
 }
 
+TEST_CASE("The bistable example lands in the state its nodesets pick, on both engines, and in the other when swapped",
+          "[examples]") {
+    // A saturated collector reads below this level, in volts, and a cut-off one above the other
+    constexpr double LOW_LEVEL_VOLTS = 0.5;
+    constexpr double HIGH_LEVEL_VOLTS = 4.0;
+    constexpr double FIRST_ON_VOLTS = 0.2;
+    constexpr double SECOND_ON_VOLTS = 5.0;
+
+    GUI::Schematic schematic;
+    OpenExample("bistable_nodeset.imcsim", schematic);
+    CHECK(schematic.GetSimulationSettings().Selected == GUI::Analysis::OPERATING_POINT);
+    const std::size_t first_collector = NodeAt(schematic, {13, 12});
+    const std::size_t second_collector = NodeAt(schematic, {29, 12});
+
+    // The nodesets are the first on the first collector (left) and the second on the second one (right)
+    std::vector<Core::Component *> nodesets;
+    for (const auto &element : schematic.GetElements()) {
+        if (element->GetComponent().GetType() == Core::ComponentType::NODESET) {
+            nodesets.push_back(&element->GetComponent());
+        }
+    }
+    REQUIRE(nodesets.size() == 2);
+    std::ranges::sort(nodesets, {}, [](const Core::Component *nodeset) { return nodeset->GetValue(); });
+    // Sorted by value, the first is 0.2 V (on the first collector) and the second 5 V
+    REQUIRE(nodesets[0]->GetValue() == FIRST_ON_VOLTS);
+    REQUIRE(nodesets[1]->GetValue() == SECOND_ON_VOLTS);
+
+    const auto check_state = [&](const bool is_first_on) {
+        const Core::OperatingPointRun run = Core::RunOperatingPoint(schematic.BuildCircuit());
+        REQUIRE(run.Result.has_value());
+        const double first = run.Result->NodeVoltages[first_collector];
+        const double second = run.Result->NodeVoltages[second_collector];
+        INFO(std::format("First collector {} V, second collector {} V", first, second));
+        CHECK((is_first_on ? first : second) < LOW_LEVEL_VOLTS);
+        CHECK((is_first_on ? second : first) > HIGH_LEVEL_VOLTS);
+    };
+    const auto check_both_engines = [&](const bool is_first_on) {
+        SECTION("ngspice") {
+            check_state(is_first_on);
+        }
+        SECTION("Nodalys") {
+            const TestSupport::NodalysInUse nodalys_in_use;
+            check_state(is_first_on);
+        }
+    };
+
+    SECTION("As saved, the first transistor conducts") {
+        check_both_engines(true);
+    }
+    SECTION("With the nodesets swapped, the second transistor conducts") {
+        // The 0.2 V nodeset is the one on the first collector, so each takes the other's value
+        nodesets[0]->SetValue(SECOND_ON_VOLTS);
+        nodesets[1]->SetValue(FIRST_ON_VOLTS);
+        check_both_engines(false);
+    }
+}
+
 TEST_CASE("Every example is in a group, and the examples of a group are listed together", "[examples]") {
     const std::vector<const char *> groups = GUI::GetExampleGroups();
     REQUIRE_FALSE(groups.empty());

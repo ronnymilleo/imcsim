@@ -119,16 +119,16 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   a configurable window of points keeps long runs responsive
 - Live transients paced by the clock: flip switches, hold push buttons, change logic inputs and turn potentiometers on
   the schematic while the run continues, then pause, continue or discard the session
-- 51 example circuits sorted by topic, each with its analyses and measurements set up: dividers, RC and RLC
-  filters, the noise of an RC low-pass, the gain and impedances of an attenuator, an amplitude modulator from a
-  behavioral source, diode curves, a Zener regulator and a rectifier with its harmonic balance, BJT and MOSFET
-  switches and characteristics, a current mirror, common-emitter and class AB amplifiers, the stability of a
-  common-emitter stage, the Monte Carlo spread of a bias point, an astable multivibrator started by an initial
-  voltage, op-amp amplifiers and their input offsets, an integrator, a Schmitt trigger and a Sallen-Key filter with
-  the part that sets its corner, an ideal transformer made of controlled sources, switching circuits, digital ones (gates, a truth
-  table of the basic gates, half and full adders, an SR latch, a ripple counter, a decoder with logic outputs and a
-  decade counter on a 7-segment display), and blocks: one RC filter used twice, an 8-bit counter of two 4-bit blocks,
-  and a precision rectifier from a vendor's op-amp and diode models
+- 52 example circuits sorted by topic, each with its analyses and measurements set up: dividers, RC and RLC filters, the
+  noise of an RC low-pass, the gain and impedances of an attenuator, an amplitude modulator from a behavioral source,
+  diode curves, a Zener regulator and a rectifier with its harmonic balance, BJT and MOSFET switches and
+  characteristics, a current mirror, common-emitter and class AB amplifiers, the stability of a common-emitter stage,
+  the Monte Carlo spread of a bias point, an astable multivibrator started by an initial voltage, a bistable whose state
+  a nodeset picks, op-amp amplifiers and their input offsets, an integrator, a Schmitt trigger and a Sallen-Key filter
+  with the part that sets its corner, an ideal transformer made of controlled sources, switching circuits, digital ones
+  (gates, a truth table of the basic gates, half and full adders, an SR latch, a ripple counter, a decoder with logic
+  outputs and a decade counter on a 7-segment display), and blocks: one RC filter used twice, an 8-bit counter of two
+  4-bit blocks, and a precision rectifier from a vendor's op-amp and diode models
 
 ## Screenshots
 

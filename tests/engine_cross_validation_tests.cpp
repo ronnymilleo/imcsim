@@ -1061,7 +1061,11 @@ TEST_CASE("Every example gives the same results on ngspice and on Nodalys", "[cr
             });
     }
     const std::vector<std::string> transfer_sources = Core::GetTransferFunctionInputSources(circuit);
-    if (!transfer_sources.empty()) {
+    // ngspice 47 crashes in .tf when the netlist has a .nodeset card, so the comparison is left out for those circuits
+    if (!circuit.GetNodesets().empty() && !transfer_sources.empty()) {
+        WARN(std::format("Skipped transfer function of {} on ngspice: it crashes in .tf with a nodeset",
+                         example.FileName));
+    } else if (!transfer_sources.empty()) {
         const Core::TransferFunctionSettings transfer{.OutputNode = *output, .InputSource = transfer_sources.front()};
         Examine(
             example, circuit, TRANSFER_FUNCTION_NAME, Core::AnalysisKind::TRANSFER_FUNCTION,
