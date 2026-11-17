@@ -161,6 +161,32 @@ std::expected<void, std::string> AttachFullData(nlohmann::json &answer, const Si
     return {};
 }
 
+/**
+ * @brief   Adds to an answer the error lines of the solver and, when the netlist asks for more than one analysis, the
+ *          names of its directives.
+ */
+void AddRunNotes(nlohmann::json &answer, const ParsedNetlist &parsed,
+                 const std::vector<DiagnosticMessage> &diagnostics) {
+    // The routine progress lines of the solver are left out; only what it flags as an error is worth the AI's context
+    nlohmann::json messages = nlohmann::json::array();
+    for (const DiagnosticMessage &message : diagnostics) {
+        if (message.IsError) {
+            messages.push_back(message.Text);
+        }
+    }
+    if (!messages.empty()) {
+        answer["solver_messages"] = std::move(messages);
+    }
+    // Directives the call did not run are named, so the AI knows the netlist asks for more
+    if (parsed.Analyses.size() > 1) {
+        nlohmann::json directives = nlohmann::json::array();
+        for (const ParsedAnalysis &directive : parsed.Analyses) {
+            directives.push_back(std::string(GetAnalysisName(directive.Kind)));
+        }
+        answer["netlist_analyses"] = std::move(directives);
+    }
+}
+
 ToolResult Simulate(const nlohmann::json &arguments) {
     ArgumentReader reader(arguments);
     const std::optional<std::string> netlist = reader.GetString("netlist");
@@ -203,24 +229,7 @@ ToolResult Simulate(const nlohmann::json &arguments) {
     if (omitted_nodes > 0) {
         answer["nodes_omitted"] = omitted_nodes;
     }
-    // The routine progress lines of the solver are left out; only what it flags as an error is worth the AI's context
-    nlohmann::json messages = nlohmann::json::array();
-    for (const DiagnosticMessage &message : diagnostics) {
-        if (message.IsError) {
-            messages.push_back(message.Text);
-        }
-    }
-    if (!messages.empty()) {
-        answer["solver_messages"] = std::move(messages);
-    }
-    // Directives the call did not run are named, so the AI knows the netlist asks for more
-    if (parsed->Analyses.size() > 1) {
-        nlohmann::json directives = nlohmann::json::array();
-        for (const ParsedAnalysis &directive : parsed->Analyses) {
-            directives.push_back(std::string(GetAnalysisName(directive.Kind)));
-        }
-        answer["netlist_analyses"] = std::move(directives);
-    }
+    AddRunNotes(answer, *parsed, diagnostics);
 
     if (const auto attached = AttachFullData(answer, *result, labels, detail == "full", output_file); !attached) {
         return MakeErrorResult(attached.error());
