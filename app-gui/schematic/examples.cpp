@@ -317,6 +317,23 @@ constexpr auto EXAMPLES = std::to_array<Example>({
         .FileName = "astable_multivibrator.imcsim",
     },
     {
+        .Title = "Bistable started in the state a nodeset picks",
+        .Group = "Transistors",
+        .Description =
+            "Two 2N3904 stages, each driving the base of the other through a 10k resistor: a bistable, the cell of "
+            "a flip-flop. It has two stable states, one with the first transistor on and the second off and the "
+            "other the other way round, and an unstable balance point between them, so the circuit alone does not "
+            "say which one a solver finds. The Nodeset parts, NS 0.2V on the first collector and NS 5V on the "
+            "second, are a starting guess for the operating point: they pick the state with the first transistor "
+            "conducting, and the operating point lands in it on both engines, with the first collector near "
+            "0.1 V and the second near 5 V. A nodeset only guides the search, it does not hold the voltage, so "
+            "the result is a true state of the circuit. Swap the two values, 5 V on the first and 0.2 V on the "
+            "second, and run again to get the other state. Use it for any circuit with more than one operating "
+            "point, such as a latch or a Schmitt trigger. The net labels C1 and C2 join each collector to the "
+            "base resistor of the other stage.",
+        .FileName = "bistable_nodeset.imcsim",
+    },
+    {
         .Title = "Op-amp inverting amplifier",
         .Group = "Op-amps",
         .Description = "An ideal op-amp amplifies a 0.5 V, 1 kHz sine by -10, set by its 1k input and 10k feedback "
