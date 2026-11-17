@@ -20,6 +20,7 @@ add_library(imcsim-core-lib
             backends/nodalys/model_parser.cpp
             backends/nodalys/nodalys_backend.cpp
             backends/nodalys/parameter_conversion.cpp
+            backends/nodalys/spice_block_check.cpp
             circuit/behavioral_expression.cpp
             circuit/circuit.cpp
             circuit/circuit_currents.cpp
@@ -35,11 +36,13 @@ add_library(imcsim-core-lib
             circuit/components/fuse.cpp
             circuit/components/ground.cpp
             circuit/components/inductor.cpp
+            circuit/components/initial_voltage.cpp
             circuit/components/logic_input.cpp
             circuit/components/logic_output.cpp
             circuit/components/logic_part.cpp
             circuit/components/mosfet.cpp
             circuit/components/net_label.cpp
+            circuit/components/nodeset.cpp
             circuit/components/op_amp.cpp
             circuit/components/potentiometer.cpp
             circuit/components/relay.cpp
@@ -57,7 +60,9 @@ add_library(imcsim-core-lib
             circuit/netlist_logic.cpp
             circuit/netlist_sources.cpp
             circuit/netlist_subcircuits.cpp
+            circuit/node_voltage_targets.cpp
             circuit/spice_library.cpp
+            simulation/ac_sensitivity.cpp
             simulation/analysis_sources.cpp
             simulation/analysis_suggestions.cpp
             simulation/check_ac_sweep.cpp
@@ -68,6 +73,7 @@ add_library(imcsim-core-lib
             simulation/check_pole_zero.cpp
             simulation/check_s_parameters.cpp
             simulation/check_sensitivity.cpp
+            simulation/check_solver_options.cpp
             simulation/check_transfer_function.cpp
             simulation/check_transient.cpp
             simulation/check_truth_table.cpp

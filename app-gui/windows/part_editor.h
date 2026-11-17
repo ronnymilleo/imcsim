@@ -79,6 +79,7 @@ private:
     void DrawSelectionSummary();
     void DrawName(Core::Component &component);
     void DrawFields(Core::Component &component);
+    void DrawValuedPart(Core::Component &component);
     bool DrawModeledPart(Core::Component &component);
     bool DrawSettingPart(Core::Component &component);
 };

@@ -6,6 +6,7 @@
 #include "plots/plot_export.h"
 
 #include <cmath>
+#include <complex>
 #include <format>
 
 namespace GUI {
@@ -62,19 +63,43 @@ std::string RenderSmithCsv(const ExportSmith &smith) {
     return text;
 }
 
+/**
+ * @brief   The stability circles under the table of a Smith chart: a row for each, with its place and its stable side.
+ */
+std::string RenderCirclesCsv(const ExportSmith &smith) {
+    if (smith.Circles.empty()) {
+        return "";
+    }
+    std::string text = "\n" + CsvHeader("Stability circle", "") + "," + CsvHeader("Frequency", "Hz") + "," +
+                       CsvHeader("Shape", "") + "," + CsvHeader("Center real", "") + "," +
+                       CsvHeader("Center imaginary", "") + "," + CsvHeader("Radius", "") + "," +
+                       CsvHeader("Stable terminations", "") + "\n";
+    for (const ExportSmithCircle &circle : smith.Circles) {
+        const bool has_center = circle.Shape != "none";
+        // Adding zero turns a negative zero, which a circle around the origin can hold, into a plain 0
+        const std::complex<double> center = circle.Center + std::complex<double>(0.0, 0.0);
+        text += QuoteCsvField(circle.Name) + "," + FormatCsvValue(circle.FrequencyHertz) + "," + circle.Shape + "," +
+                (has_center ? FormatCsvValue(center.real()) : "") + "," +
+                (has_center ? FormatCsvValue(center.imag()) : "") + "," + FormatCsvValue(circle.Radius) + "," +
+                QuoteCsvField(circle.StableRegion) + "\n";
+    }
+    return text;
+}
+
 } // namespace
 
 /**
  * @brief   Writes the samples of a figure as a CSV table.
  * @param[in] figure    Figure whose X samples and series become the columns; its X range is ignored. A Smith chart
- *                      lists the frequency, then the real and imaginary parts of each trace.
+ *                      lists the frequency, then the real and imaginary parts of each trace, and below a blank
+ *                      line the stability circles when it has them.
  * @return  A header row, then one row per X sample: the X value, then each series of each panel in order.
  * @note    Headers carry the unit of their axis, and the panel title when the figure has more than one panel,
  *          since the panels of a Bode plot list the same traces. Missing samples are left empty.
  */
 std::string RenderCsv(const ExportFigure &figure) {
     if (figure.Smith) {
-        return RenderSmithCsv(*figure.Smith);
+        return RenderSmithCsv(*figure.Smith) + RenderCirclesCsv(*figure.Smith);
     }
     std::vector<const ExportSeries *> columns;
     std::string text = CsvHeader(figure.XAxis.Name, figure.XAxis.Unit);

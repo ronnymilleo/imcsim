@@ -81,6 +81,13 @@ std::expected<SensitivityResult, std::string> ComputeSensitivity(const Circuit &
     return ComputeSensitivity(PrepareCircuit(circuit), config, options, messages);
 }
 
+std::expected<AcSensitivityResult, std::string> ComputeAcSensitivity(const Circuit &circuit,
+                                                                     const AcSensitivityConfig &config,
+                                                                     const ConvergenceOptions &options,
+                                                                     std::vector<DiagnosticMessage> *messages) {
+    return ComputeAcSensitivity(PrepareCircuit(circuit), config, options, messages);
+}
+
 std::expected<HarmonicBalanceResult, std::string> ComputeHarmonicBalance(const Circuit &circuit,
                                                                          const HarmonicBalanceConfig &config,
                                                                          const ConvergenceOptions &options,

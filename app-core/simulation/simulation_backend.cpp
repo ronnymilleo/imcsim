@@ -137,6 +137,8 @@ std::string_view GetAnalysisKindName(const AnalysisKind kind) {
         return "transfer function";
     case AnalysisKind::SENSITIVITY:
         return "sensitivity";
+    case AnalysisKind::AC_SENSITIVITY:
+        return "AC sensitivity";
     case AnalysisKind::POLE_ZERO:
         return "pole-zero";
     case AnalysisKind::S_PARAMETERS:
@@ -148,6 +150,20 @@ std::string_view GetAnalysisKindName(const AnalysisKind kind) {
     default:
         return "analysis";
     }
+}
+
+/**
+ * @brief   Finds how much the response of a node to an AC source changes with the value of each part.
+ * @param[in] circuit   Circuit to simulate, already checked.
+ * @param[in] settings  Output node, AC input source and frequency range, already checked.
+ * @return  An error that says the backend does not run it, plus no messages.
+ * @note    A backend that runs the AC sensitivity analysis overrides this.
+ */
+ACSensitivityRun SimulationBackend::RunACSensitivity(const Circuit & /*circuit*/,
+                                                     const ACSensitivitySettings & /*settings*/) {
+    ACSensitivityRun run;
+    run.Result = std::unexpected(std::format("{} does not run the AC sensitivity analysis", GetName()));
+    return run;
 }
 
 /**
@@ -220,7 +236,7 @@ std::optional<std::string> FindUnsupported(const SimulationBackend &backend, con
         return std::nullopt;
     }
     for (const Component *part : all_parts) {
-        if (const std::optional<std::string> reason = find_problem(*part, kind)) {
+        if (const std::optional<std::string> reason = find_problem(circuit, *part, kind)) {
             return reason;
         }
     }

@@ -9,7 +9,9 @@
 #include "circuit/components/behavioral_source.h"
 #include "circuit/components/logic_part.h"
 #include "circuit/components/source.h"
+#include "circuit/components/subcircuit.h"
 #include "circuit/components/switch.h"
+#include "simulation/ac_sensitivity.h"
 #include "simulation/live_pace.h"
 #include "simulation/pole_zero.h"
 #include "simulation/ratings.h"
@@ -25,8 +27,9 @@ namespace Core {
 namespace {
 
 constexpr auto NODALYS_ANALYSES = {
-    AnalysisKind::OPERATING_POINT, AnalysisKind::TRANSIENT,         AnalysisKind::DC_SWEEP,    AnalysisKind::AC_SWEEP,
-    AnalysisKind::NOISE,           AnalysisKind::TRANSFER_FUNCTION, AnalysisKind::SENSITIVITY, AnalysisKind::POLE_ZERO,
+    AnalysisKind::OPERATING_POINT, AnalysisKind::TRANSIENT,       AnalysisKind::DC_SWEEP,
+    AnalysisKind::AC_SWEEP,        AnalysisKind::NOISE,           AnalysisKind::TRANSFER_FUNCTION,
+    AnalysisKind::SENSITIVITY,     AnalysisKind::AC_SENSITIVITY,  AnalysisKind::POLE_ZERO,
     AnalysisKind::S_PARAMETERS,    AnalysisKind::HARMONIC_BALANCE};
 
 /**
@@ -141,6 +144,49 @@ std::optional<std::string> FindBehavioralProblem(const Component &part, const An
 }
 
 /**
+ * @brief   Tells why Nodalys cannot run a part whose limit depends on what it holds: the expression of a behavioral
+ *          source, or the text of a block kept as SPICE text.
+ */
+std::optional<std::string> FindPartProblem(const Circuit &circuit, const Component &part, const AnalysisKind kind) {
+    if (part.GetType() == ComponentType::SUBCIRCUIT) {
+        return FindSpiceBlockProblem(circuit, static_cast<const SubcircuitInstance &>(part));
+    }
+    return FindBehavioralProblem(part, kind);
+}
+
+/// The temperature a run simulates at unless it is stepped, which the models are given at unless tnom says otherwise.
+constexpr double SIMULATION_TEMPERATURE_CELSIUS = 27.0;
+
+/**
+ * @brief   The tolerances of the circuit as Nodalys reads them.
+ */
+Nodalys::ConvergenceOptions ToConvergenceOptions(const Circuit &circuit) {
+    const SolverOptions &solver = circuit.GetSolverOptions();
+    Nodalys::ConvergenceOptions options;
+    options.RelTol = solver.RelativeTolerance;
+    options.CurrentAbsTol = solver.CurrentToleranceAmperes;
+    options.VoltageAbsTol = solver.VoltageToleranceVolts;
+    return options;
+}
+
+/**
+ * @brief   The integration method of a transient of the circuit.
+ * @details A fuse that cuts an inductor makes the trapezoidal rule ring for ever, so the netlist for ngspice asks for
+ *          Gear when the user leaves the method to the program, and Nodalys follows it.
+ */
+Nodalys::IntegrationMethod ToNodalysMethod(const Circuit &circuit) {
+    switch (circuit.GetSolverOptions().Method) {
+    case IntegrationMethod::TRAPEZOIDAL:
+        return Nodalys::IntegrationMethod::TRAPEZOIDAL;
+    case IntegrationMethod::GEAR:
+        return Nodalys::IntegrationMethod::GEAR2;
+    case IntegrationMethod::DEFAULT:
+    default:
+        return circuit.HasFuse() ? Nodalys::IntegrationMethod::GEAR2 : Nodalys::IntegrationMethod::TRAPEZOIDAL;
+    }
+}
+
+/**
  * @brief   Compiles a circuit, runs one Nodalys analysis on it and turns the result into the one of imcsim.
  * @details Every analysis goes the same way, so a compile failure, the messages of the engine and its failures read
  *          alike whatever the analysis.
@@ -154,13 +200,18 @@ template <typename Run, typename Compute, typename Convert>
 Run RunOnNodalys(const Circuit &circuit, Compute compute, Convert convert,
                  const std::optional<double> &temperature_celsius = std::nullopt) {
     Run run;
-    std::expected<Nodalys::Circuit, std::string> compiled = CompileCircuit(circuit);
+    std::vector<std::string> compile_warnings;
+    std::expected<Nodalys::Circuit, std::string> compiled = CompileCircuit(circuit, &compile_warnings);
     if (!compiled) {
         run.Result = std::unexpected(std::format("Nodalys cannot simulate this circuit: {}", compiled.error()));
         return run;
     }
-    if (temperature_celsius) {
-        compiled->SetTemperature(*temperature_celsius);
+    for (std::string &warning : compile_warnings) {
+        run.Messages.push_back({std::move(warning), false});
+    }
+    const double nominal_celsius = circuit.GetSolverOptions().NominalTemperatureCelsius;
+    if (temperature_celsius || nominal_celsius != DEFAULT_NOMINAL_TEMPERATURE_CELSIUS) {
+        compiled->SetTemperature(temperature_celsius.value_or(SIMULATION_TEMPERATURE_CELSIUS), nominal_celsius);
     }
     std::vector<Nodalys::DiagnosticMessage> messages;
     auto result = compute(*compiled, &messages);
@@ -175,6 +226,24 @@ Run RunOnNodalys(const Circuit &circuit, Compute compute, Convert convert,
     return run;
 }
 
+/**
+ * @brief   Says why a transfer function has no pole or zero to show.
+ * @param[in] settings         Output node and input source of the run.
+ * @param[in] cancelled_pairs  Poles that a zero at the same place left out.
+ * @return  The text of the error, which tells the user what to look at in the circuit.
+ */
+std::string DescribeConstantTransfer(const PoleZeroSettings &settings, const int cancelled_pairs) {
+    std::string text = std::format("The transfer from {} to node {} has no poles or zeros: it is a constant gain at "
+                                   "every frequency. Either no capacitor or inductor lies between them, or the output "
+                                   "is the node the source holds",
+                                   settings.InputSource, settings.OutputNode);
+    if (cancelled_pairs > 0) {
+        text += std::format(", or what does lie between them cancels out ({} pole-zero {} at the same place)",
+                            cancelled_pairs, cancelled_pairs == 1 ? "pair" : "pairs");
+    }
+    return text;
+}
+
 } // namespace
 
 /**
@@ -182,12 +251,14 @@ Run RunOnNodalys(const Circuit &circuit, Compute compute, Convert convert,
  */
 NodalysBackend::NodalysBackend() {
     m_Capabilities.Analyses = NODALYS_ANALYSES;
-    m_Capabilities.FindPartProblem = FindBehavioralProblem;
+    m_Capabilities.FindPartProblem = FindPartProblem;
     for (int index = 0; index <= static_cast<int>(ComponentType::SEVEN_SEGMENT); ++index) {
         const auto type = static_cast<ComponentType>(index);
         if (IsLogicPart(type)) {
             m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::SENSITIVITY][type] =
                 "Nodalys cannot run a sensitivity analysis on logic gates and flip-flops";
+            m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::AC_SENSITIVITY][type] =
+                "Nodalys cannot run an AC sensitivity analysis on logic gates and flip-flops";
             m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::POLE_ZERO][type] =
                 "Pole-zero analysis is small-signal, and digital parts have no small-signal model";
             m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::S_PARAMETERS][type] =
@@ -226,8 +297,9 @@ OperatingPointRun NodalysBackend::RunOperatingPoint(const Circuit &circuit,
                                                     const std::optional<double> &temperature_celsius) {
     return RunOnNodalys<OperatingPointRun>(
         circuit,
-        [](const Nodalys::Circuit &compiled, std::vector<Nodalys::DiagnosticMessage> *messages) {
-            return Nodalys::ComputeOperatingPoint(compiled, {}, messages);
+        [options = ToConvergenceOptions(circuit)](const Nodalys::Circuit &compiled,
+                                                  std::vector<Nodalys::DiagnosticMessage> *messages) {
+            return Nodalys::ComputeOperatingPoint(compiled, options, messages);
         },
         [&circuit, node_count = circuit.GetNodeCount()](Nodalys::OperatingPointResult result) {
             KeepCircuitNodes(result.NodeVoltages, node_count);
@@ -252,21 +324,20 @@ OperatingPointRun NodalysBackend::RunOperatingPoint(const Circuit &circuit,
  */
 TransientRun NodalysBackend::RunTransient(const Circuit &circuit, const TransientSettings &settings,
                                           const std::optional<double> &temperature_celsius, const RunMonitor &monitor) {
-    // A fuse that cuts an inductor makes the trapezoidal rule ring for ever, so the netlist for ngspice asks for Gear
-    // and Nodalys follows it
     const Nodalys::TransientConfig config{.StopTime = settings.StopTime,
                                           .TimeStep = settings.TimeStep,
                                           .MaxStep = settings.TimeStep,
-                                          .Method = circuit.HasFuse() ? Nodalys::IntegrationMethod::GEAR2
-                                                                      : Nodalys::IntegrationMethod::TRAPEZOIDAL,
+                                          .Method = ToNodalysMethod(circuit),
                                           .Seed = settings.Seed};
     const bool has_initial_conditions = circuit.HasInitialConditions();
     auto live_start = std::chrono::steady_clock::now();
     const Nodalys::RunMonitor nodalys_monitor = ToNodalysMonitor(monitor, live_start, circuit);
     return RunOnNodalys<TransientRun>(
         circuit,
-        [&](const Nodalys::Circuit &compiled, std::vector<Nodalys::DiagnosticMessage> *messages) {
-            return Nodalys::ComputeTransient(compiled, config, has_initial_conditions, nodalys_monitor, {}, messages);
+        [&, options = ToConvergenceOptions(circuit)](const Nodalys::Circuit &compiled,
+                                                     std::vector<Nodalys::DiagnosticMessage> *messages) {
+            return Nodalys::ComputeTransient(compiled, config, has_initial_conditions, nodalys_monitor, options,
+                                             messages);
         },
         [&circuit, has_initial_conditions, node_count = circuit.GetNodeCount()](Nodalys::TransientResult result) {
             Transient transient = ToTransient(std::move(result), node_count);
@@ -303,8 +374,9 @@ DCSweepRun NodalysBackend::RunDCSweep(const Circuit &circuit, const DCSweepSetti
     }
     return RunOnNodalys<DCSweepRun>(
         circuit,
-        [&config](const Nodalys::Circuit &compiled, std::vector<Nodalys::DiagnosticMessage> *messages) {
-            return Nodalys::ComputeDCSweep(compiled, config, {}, messages);
+        [&config, options = ToConvergenceOptions(circuit)](const Nodalys::Circuit &compiled,
+                                                           std::vector<Nodalys::DiagnosticMessage> *messages) {
+            return Nodalys::ComputeDCSweep(compiled, config, options, messages);
         },
         [node_count = circuit.GetNodeCount()](Nodalys::DcSweepResult result) {
             DCSweep sweep{.SweptSource = std::move(result.SweptSource),
@@ -338,8 +410,9 @@ ACSweepRun NodalysBackend::RunACSweep(const Circuit &circuit, const ACSweepSetti
                                         .PointsPerDecade = settings.PointsPerDecade};
     return RunOnNodalys<ACSweepRun>(
         circuit,
-        [&config](const Nodalys::Circuit &compiled, std::vector<Nodalys::DiagnosticMessage> *messages) {
-            return Nodalys::ComputeACSweep(compiled, config, {}, messages);
+        [&config, options = ToConvergenceOptions(circuit)](const Nodalys::Circuit &compiled,
+                                                           std::vector<Nodalys::DiagnosticMessage> *messages) {
+            return Nodalys::ComputeACSweep(compiled, config, options, messages);
         },
         [node_count = circuit.GetNodeCount()](Nodalys::AcSweepResult result) {
             KeepCircuitNodes(result.NodeMagnitudesDecibels, node_count);
@@ -368,8 +441,9 @@ NoiseRun NodalysBackend::RunNoise(const Circuit &circuit, const NoiseSettings &s
                                       .PointsPerDecade = settings.PointsPerDecade};
     return RunOnNodalys<NoiseRun>(
         circuit,
-        [&config](const Nodalys::Circuit &compiled, std::vector<Nodalys::DiagnosticMessage> *messages) {
-            return Nodalys::ComputeNoise(compiled, config, {}, messages);
+        [&config, options = ToConvergenceOptions(circuit)](const Nodalys::Circuit &compiled,
+                                                           std::vector<Nodalys::DiagnosticMessage> *messages) {
+            return Nodalys::ComputeNoise(compiled, config, options, messages);
         },
         [](Nodalys::NoiseResult result) {
             Noise noise{.OutputNode = result.OutputNode,
@@ -401,8 +475,9 @@ TransferFunctionRun NodalysBackend::RunTransferFunction(const Circuit &circuit,
         .InputSource = settings.InputSource, .OutputPositiveNode = settings.OutputNode, .OutputNegativeNode = 0};
     return RunOnNodalys<TransferFunctionRun>(
         circuit,
-        [&config](const Nodalys::Circuit &compiled, std::vector<Nodalys::DiagnosticMessage> *messages) {
-            return Nodalys::ComputeTransferFunction(compiled, config, {}, messages);
+        [&config, options = ToConvergenceOptions(circuit)](const Nodalys::Circuit &compiled,
+                                                           std::vector<Nodalys::DiagnosticMessage> *messages) {
+            return Nodalys::ComputeTransferFunction(compiled, config, options, messages);
         },
         [](Nodalys::TransferFunctionResult result) {
             // A gain in V/A comes from a current source
@@ -425,11 +500,48 @@ SensitivityRun NodalysBackend::RunSensitivity(const Circuit &circuit, const Sens
     const Nodalys::SensitivityConfig config{.OutputPositiveNode = settings.OutputNode, .OutputNegativeNode = 0};
     return RunOnNodalys<SensitivityRun>(
         circuit,
-        [&config](const Nodalys::Circuit &compiled, std::vector<Nodalys::DiagnosticMessage> *messages) {
-            return Nodalys::ComputeSensitivity(compiled, config, {}, messages);
+        [&config, options = ToConvergenceOptions(circuit)](const Nodalys::Circuit &compiled,
+                                                           std::vector<Nodalys::DiagnosticMessage> *messages) {
+            return Nodalys::ComputeSensitivity(compiled, config, options, messages);
         },
         [&circuit, &settings](Nodalys::SensitivityResult result) {
             return BuildSensitivity(circuit, settings.OutputNode, result.Vectors);
+        });
+}
+
+/**
+ * @brief   Finds how much the response of a node to an AC source changes with the value of each part.
+ * @param[in] circuit   Circuit to simulate.
+ * @param[in] settings  Output node, AC input source and frequency range.
+ * @return  The figures of each part at every frequency, or an error.
+ */
+ACSensitivityRun NodalysBackend::RunACSensitivity(const Circuit &circuit, const ACSensitivitySettings &settings) {
+    const Nodalys::AcSensitivityConfig config{.OutputPositiveNode = settings.OutputNode,
+                                              .OutputNegativeNode = 0,
+                                              .InputSource = settings.InputSource,
+                                              .StartFrequency = settings.StartFrequency,
+                                              .StopFrequency = settings.StopFrequency,
+                                              .PointsPerDecade = settings.PointsPerDecade};
+    return RunOnNodalys<ACSensitivityRun>(
+        circuit,
+        [&config, options = ToConvergenceOptions(circuit)](const Nodalys::Circuit &compiled,
+                                                           std::vector<Nodalys::DiagnosticMessage> *messages) {
+            return Nodalys::ComputeAcSensitivity(compiled, config, options, messages);
+        },
+        [&circuit, &settings](Nodalys::AcSensitivityResult result) {
+            ACElementFiguresByName elements;
+            for (Nodalys::AcElementSensitivity &element : result.Elements) {
+                elements[element.Name] = {.Value = element.Value,
+                                          .MagnitudeDecibelsPerPercent = std::move(element.MagnitudeDecibelsPerPercent),
+                                          .PhaseDegreesPerPercent = std::move(element.PhaseDegreesPerPercent)};
+            }
+            ACSensitivity header{.OutputNode = settings.OutputNode,
+                                 .InputSource = settings.InputSource,
+                                 .Frequencies = std::move(result.Frequencies),
+                                 .Output = std::move(result.Output),
+                                 .Parts = {},
+                                 .Warnings = std::move(result.Warnings)};
+            return BuildACSensitivity(circuit, std::move(header), elements);
         });
 }
 
@@ -444,14 +556,17 @@ PoleZeroRun NodalysBackend::RunPoleZero(const Circuit &circuit, const PoleZeroSe
         .OutputNode = settings.OutputNode, .InputSource = settings.InputSource, .FindPoles = true, .FindZeros = true};
     return RunOnNodalys<PoleZeroRun>(
         circuit,
-        [&config](const Nodalys::Circuit &compiled, std::vector<Nodalys::DiagnosticMessage> *messages) {
-            return Nodalys::ComputePoleZero(compiled, config, {}, messages);
+        [&config, options = ToConvergenceOptions(circuit)](const Nodalys::Circuit &compiled,
+                                                           std::vector<Nodalys::DiagnosticMessage> *messages) {
+            return Nodalys::ComputePoleZero(compiled, config, options, messages);
         },
         [&circuit, &settings](const Nodalys::PoleZeroResult &result) -> std::expected<PoleZero, std::string> {
-            if (result.Poles.empty() && result.Zeros.empty()) {
-                return std::unexpected(std::string(NO_POLE_ZERO_RESULT));
+            PoleZero poles_and_zeros = BuildPoleZero(circuit, settings, result.Poles, result.Zeros);
+            if (poles_and_zeros.Roots.empty()) {
+                return std::unexpected(DescribeConstantTransfer(settings, poles_and_zeros.CancelledPairs));
             }
-            return BuildPoleZero(circuit, settings, result.Poles, result.Zeros);
+            poles_and_zeros.Warnings = result.Warnings;
+            return poles_and_zeros;
         });
 }
 
@@ -473,13 +588,16 @@ SParametersRun NodalysBackend::RunSParameters(const Circuit &circuit, const SPar
     }
     return RunOnNodalys<SParametersRun>(
         circuit,
-        [&config](const Nodalys::Circuit &compiled, std::vector<Nodalys::DiagnosticMessage> *messages) {
-            return Nodalys::ComputeSParameters(compiled, config, {}, messages);
+        [&config, options = ToConvergenceOptions(circuit)](const Nodalys::Circuit &compiled,
+                                                           std::vector<Nodalys::DiagnosticMessage> *messages) {
+            return Nodalys::ComputeSParameters(compiled, config, options, messages);
         },
         [](Nodalys::SParameterResult result) {
             return SParameters{.Frequencies = std::move(result.Frequencies),
                                .ReferenceOhms = std::move(result.ReferenceOhms),
                                .Values = std::move(result.Values),
+                               .ImpedanceMatrices = std::move(result.ImpedanceMatrices),
+                               .AdmittanceMatrices = std::move(result.AdmittanceMatrices),
                                .Warnings = std::move(result.Warnings)};
         });
 }
@@ -501,8 +619,9 @@ HarmonicBalanceRun NodalysBackend::RunHarmonicBalance(const Circuit &circuit, co
     }
     return RunOnNodalys<HarmonicBalanceRun>(
         circuit,
-        [&config](const Nodalys::Circuit &compiled, std::vector<Nodalys::DiagnosticMessage> *messages) {
-            return Nodalys::ComputeHarmonicBalance(compiled, config, {}, messages);
+        [&config, options = ToConvergenceOptions(circuit)](const Nodalys::Circuit &compiled,
+                                                           std::vector<Nodalys::DiagnosticMessage> *messages) {
+            return Nodalys::ComputeHarmonicBalance(compiled, config, options, messages);
         },
         [&settings, node_count = circuit.GetNodeCount()](Nodalys::HarmonicBalanceResult result) {
             KeepCircuitNodes(result.NodePhasors, node_count);

@@ -7,6 +7,7 @@
 #define IMCSIM_SIMULATION_SETTINGS_H
 
 #include "base/helpers.h"
+#include "circuit/solver_options.h"
 #include "schematic/parameter_step_settings.h"
 #include "simulation/monte_carlo.h"
 #include "simulation/simulator.h"
@@ -37,6 +38,16 @@ enum class Analysis {
 
 constexpr std::size_t ANALYSIS_COUNT = 11;
 
+/**
+ * @enum    SensitivityKind
+ * @brief   What the sensitivity analysis measures: the DC voltage of a node, or its response to an AC source across
+ *          frequency.
+ */
+enum class SensitivityKind {
+    DC,
+    AC
+};
+
 /// Wall seconds a live transient takes to cover its stop time, at first.
 constexpr double DEFAULT_LIVE_SECONDS = 10.0;
 /// Fewest wall seconds the user may set.
@@ -52,8 +63,8 @@ constexpr double LIVE_RUN_LIMIT_SECONDS = 3600.0;
  * @struct  SimulationSettings
  * @brief   Which analysis Run starts, and how each one runs: transient times, AC range, DC sweep sources and
  *          ranges, the input source and output node of the noise, transfer function and pole-zero analyses, the output
- *          node of the sensitivity analysis, and the logic inputs of the truth table, and how long a live transient
- *          lasts.
+ *          node of the sensitivity analysis and its AC input and range, the logic inputs of the truth table, and how
+ *          long a live transient lasts, and the options of the solver.
  * @details The operating point has no settings. A sweep, noise or transfer function source that is empty, or that
  *          left the circuit, is replaced by a default when the analysis runs, so the stored name is never rewritten
  *          behind the user. The noise, transfer function, pole-zero and sensitivity outputs are kept as points of their
@@ -77,6 +88,11 @@ struct SimulationSettings {
     std::string TransferFunctionSource;
     std::optional<GridPoint> TransferFunctionOutput;
     std::optional<GridPoint> SensitivityOutput;
+    /// Whether the sensitivity analysis measures the DC voltage or the AC response of its output.
+    SensitivityKind SensitivityType = SensitivityKind::DC;
+    /// Input of the AC kind of the sensitivity analysis; its output is the one of the DC kind.
+    std::string ACSensitivitySource;
+    Core::ACSweepSettings ACSensitivityRange{.StartFrequency = 10.0, .StopFrequency = 100e3, .PointsPerDecade = 20};
     std::string PoleZeroSource;
     std::optional<GridPoint> PoleZeroOutput;
     /// Frequency range of the S-parameter analysis; its ports are pin markers of the schematic, so it has no sources.
@@ -90,6 +106,8 @@ struct SimulationSettings {
     /// Runs the transient, AC sweep or DC sweep once with the nominal values and then with values drawn within the
     /// tolerances of the parts; the step and Monte Carlo are never both on.
     Core::MonteCarloSettings MonteCarlo;
+    /// Tolerances, integration method and nominal temperature of every analysis, on both engines.
+    Core::SolverOptions Solver;
 
     bool operator==(const SimulationSettings &) const = default;
 };

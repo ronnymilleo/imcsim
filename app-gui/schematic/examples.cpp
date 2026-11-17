@@ -95,6 +95,27 @@ constexpr auto EXAMPLES = std::to_array<Example>({
         .FileName = "rlc_low_pass_poles_and_zeros.imcsim",
     },
     {
+        .Title = "Noise of an RC low-pass filter",
+        .Group = "Basics",
+        .Description = "A 10k resistor and a 10n capacitor, with the corner at 1.6 kHz, and the Noise analysis "
+                       "selected: it measures the thermal noise of R1 at the capacitor, from 1 Hz to 1 MHz. Run it "
+                       "and read the Noise tab of the Output window: the density is flat at 12.9 nV per root hertz "
+                       "up to the corner and falls beyond it, the output totals 0.64 uV rms, which is the sqrt(kT/C) "
+                       "of a 10n capacitor whatever the resistor, and R1 is the whole of it. The dashed input-referred "
+                       "noise climbs where the filter attenuates.",
+        .FileName = "noise_analysis_rc_low_pass.imcsim",
+    },
+    {
+        .Title = "Gain and impedances of a resistive attenuator",
+        .Group = "Basics",
+        .Description = "Three resistors, 10k, 15k and 30k, split a 10 V supply, with the Transfer function analysis "
+                       "selected from V1 to the node of R1, R2 and R3. Run it and read the Transfer function tab: "
+                       "the gain is 0.5, since R2 and R3 in parallel make 10k, the source sees 20 kOhm, and the "
+                       "output looks back into 5 kOhm, R1, R2 and R3 in parallel. No frequency sweep is needed: "
+                       "it is the small-signal DC gain and its two resistances.",
+        .FileName = "transfer_function_attenuator.imcsim",
+    },
+    {
         .Title = "S-parameters of an LC low-pass",
         .Group = "Basics",
         .Description =
@@ -141,6 +162,18 @@ constexpr auto EXAMPLES = std::to_array<Example>({
                        "Run the transient to see the ripple on the load and the short pulses that recharge it "
                        "through D1.",
         .FileName = "full_bridge_rectifier.imcsim",
+    },
+    {
+        .Title = "Harmonic balance of a half-wave rectifier",
+        .Group = "Diodes",
+        .Description = "A 5 V, 1 kHz sine charges a 1u capacitor through a 1N4148 and a 1k load drains it, so the "
+                       "capacitor holds a little over 3 V and droops a lot between peaks. The Harmonic balance "
+                       "analysis, at 1 kHz with 24 harmonics, finds that periodic state without waiting out a "
+                       "startup. It runs on the Nodalys engine only (Edit > Preferences > Simulation): with ngspice "
+                       "it is disabled. Run it and read the Harmonic balance tab: the DC level, a 0.93 V "
+                       "fundamental of ripple and the harmonics beyond it, falling with their order, and the "
+                       "diode current as narrow pulses.",
+        .FileName = "harmonic_balance_rectifier.imcsim",
     },
     {
         .Title = "LED driver",
@@ -191,6 +224,25 @@ constexpr auto EXAMPLES = std::to_array<Example>({
                        "and 18 MHz, from the transistor capacitances. The transient turns a 10 mV, 1 kHz sine into "
                        "an inverted 1.4 V one around 6 V of collector bias.",
         .FileName = "common_emitter_amplifier.imcsim",
+    },
+    {
+        .Title = "Stability of a common-emitter amplifier",
+        .Group = "Transistors",
+        .Description =
+            "The biased 2N3904 stage of the common-emitter example with a port at its input and one at its output, the "
+            "Block pin markers IN and OUT set as 50 Ohm ports, and the S-parameters analysis selected from 1 MHz to 1 "
+            "GHz. Run it and open the Stability view of its tab: the sentence above the plots says the amplifier is "
+            "potentially unstable up to about 290 MHz, where K stays below 1 (lowest, 0.07, at 10 MHz), and "
+            "unconditionally stable above. The gain below is one curve in two kinds: the maximum stable gain MSG "
+            "(dashed, 36 dB at 1 MHz) where it can oscillate, and the maximum available gain MAG (solid) where it "
+            "cannot. Then pick the Smith chart, check Stability circles: they open at 34 MHz, where mu is lowest, "
+            "and the hatching marks the source and load terminations that make the amplifier unstable. Move Circles at "
+            "up to about 460 MHz and the source circle leaves the chart, which the note says. Z and Y are in the "
+            "Quantity choice "
+            "with the Nodalys engine. The two 10 MOhm resistors at the ports only give those nodes a DC path, so the "
+            "operating "
+            "point is defined.",
+        .FileName = "stability_common_emitter.imcsim",
     },
     {
         .Title = "Bias sensitivity of a common-emitter stage",
@@ -244,6 +296,25 @@ constexpr auto EXAMPLES = std::to_array<Example>({
                        "the input: the net labels IN, OUT_B and OUT_AB name them in the plots, and the two IN labels "
                        "join the input to the class AB stage with no wire between them.",
         .FileName = "class_ab_amplifier.imcsim",
+    },
+    {
+        .Title = "Astable multivibrator started by an initial voltage",
+        .Group = "Transistors",
+        .Description =
+            "Two 2N3904 stages, each driving the base of the other through a 10n capacitor, with 47k base "
+            "resistors: an astable multivibrator with a period of about 0.68 ms. Built exactly symmetric, it has a "
+            "balance point where both transistors conduct equally, and it would stay there until rounding noise "
+            "pushed it away, at a moment nobody chooses. The Initial voltage part, IC 5V, on the first collector "
+            "breaks the symmetry on purpose: that node is held at 5 V while the starting point is found, so the "
+            "capacitor between it and the second base starts charged to about 4.3 V, and when the node is released "
+            "the first collector falls, drags the second base below zero and turns the second transistor off. From "
+            "there the circuit oscillates by itself. Run the transient, which lasts 2 ms, about three periods, "
+            "and look at both collectors, which swing between about 0.1 V and the 5 V supply. Its 0.2 us step is "
+            "short on purpose: the edges are steep, and with a longer one ngspice misplaces them. The plot opens "
+            "on the first 2000 points, up to the first edge: drag its scroll bar, or raise Plot points to 10000 "
+            "to see the whole run. Only the transient uses the part: the operating point shows the balance "
+            "point.",
+        .FileName = "astable_multivibrator.imcsim",
     },
     {
         .Title = "Op-amp inverting amplifier",
@@ -303,6 +374,23 @@ constexpr auto EXAMPLES = std::to_array<Example>({
                        "response. Run the AC sweep: the gain is flat up to 1 kHz, is 3 dB down at 1.12 kHz and falls "
                        "40 dB per decade beyond it.",
         .FileName = "sallen_key_low_pass.imcsim",
+    },
+    {
+        .Title = "Which part sets the corner of a Sallen-Key filter",
+        .Group = "Op-amps",
+        .Description =
+            "The Sallen-Key filter above with the Sensitivity analysis selected, its kind set to AC and its output at "
+            "the filter output, driven by Vin1 from 10 Hz to 100 kHz. Run it (it needs the Nodalys engine, chosen in "
+            "Preferences) and open the Sensitivity tab of the Output window: the plots show, for each part, how many "
+            "dB and degrees the response changes for a 1 % higher value, against frequency, with the five most "
+            "influential parts checked. The marker starts at the -3 dB point, 1.1 kHz, where the table ranks the "
+            "parts by their influence on the corner: the 10 nF capacitor C2 leads, at -0.089 dB and -0.42 degrees per "
+            "1 %, then the two 10k resistors at -0.046 dB, then C1 at about -0.002 dB, since it moves the quality "
+            "factor and the phase more than the gain. The four changes add up to twice the slope of the "
+            "response, since scaling every R and C by one factor scales the frequency axis by its square. Drag "
+            "the marker to read another frequency, and tick Color the schematic to color the parts at that "
+            "frequency.",
+        .FileName = "ac_sensitivity_sallen_key.imcsim",
     },
     {
         .Title = "Buck converter",

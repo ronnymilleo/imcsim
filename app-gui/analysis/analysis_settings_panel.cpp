@@ -14,6 +14,7 @@
 #include "simulation/analysis_sources.h"
 #include "simulation/analysis_suggestions.h"
 #include "simulation/check_s_parameters.h"
+#include "simulation/check_solver_options.h"
 #include "simulation/simulation_backend.h"
 #include "spice/spice_value.h"
 #include <algorithm>
@@ -48,6 +49,8 @@ enum class RunMode {
     STEP,
     MONTE_CARLO,
 };
+
+constexpr std::array<const char *, 3> INTEGRATION_METHOD_NAMES = {"Default", "Trapezoidal", "Gear"};
 
 constexpr std::array<const char *, 3> RUN_MODE_NAMES = {"Single run", "Step a parameter", "Monte Carlo"};
 
@@ -234,6 +237,7 @@ void AnalysisSettingsPanel::DrawSettings() {
     if (IsRepeatable(settings.Selected)) {
         DrawRunModeSettings(settings);
     }
+    DrawSolverSettings(settings.Solver);
     m_Schematic.SetSimulationSettings(settings);
 }
 
@@ -291,10 +295,13 @@ void AnalysisSettingsPanel::LoadSettingsFields() {
     LoadSweepFields(settings.SteppedRange, m_SteppedFields);
     m_NoiseStartFrequency.Load(settings.NoiseRange.StartFrequency);
     m_NoiseStopFrequency.Load(settings.NoiseRange.StopFrequency);
+    m_ACSensitivityStartFrequency.Load(settings.ACSensitivityRange.StartFrequency);
+    m_ACSensitivityStopFrequency.Load(settings.ACSensitivityRange.StopFrequency);
     m_SStartFrequency.Load(settings.SParameters.StartFrequency);
     m_SStopFrequency.Load(settings.SParameters.StopFrequency);
     m_HBFundamental.Load(settings.HarmonicBalance.FundamentalFrequency);
     LoadParameterStepFields(settings.ParameterStep);
+    LoadSolverFields(settings.Solver);
     m_LoadedSettingsVersion = m_Schematic.GetSimulationSettingsVersion();
 }
 
@@ -467,13 +474,14 @@ void AnalysisSettingsPanel::DrawSParameterSettings(SimulationSettings &settings)
         range.IsLogarithmic = false;
     }
     DrawFieldLabel("Points");
-    // Files reject too few points, so the fields never produce a value that would not load back
+    // Files reject too few points for any backend, so the fields never produce a value that would not load back
     if (range.IsLogarithmic) {
         if (ImGui::InputInt("per decade", &range.PointsPerDecade)) {
             range.PointsPerDecade = std::max(range.PointsPerDecade, 1);
         }
     } else if (ImGui::InputInt("in all", &range.LinearPoints)) {
-        range.LinearPoints = std::max(range.LinearPoints, 3);
+        range.LinearPoints =
+            std::max(range.LinearPoints, Core::GetBackend().GetCapabilities().SParameters.MinLinearPoints);
     }
     DrawPortSummary();
 }
@@ -484,10 +492,10 @@ void AnalysisSettingsPanel::DrawSParameterSettings(SimulationSettings &settings)
 void AnalysisSettingsPanel::DrawPortSummary() {
     std::vector<Core::CircuitPort> ports = m_Schematic.BuildCircuit().GetPorts();
     std::ranges::sort(ports, {}, &Core::CircuitPort::Number);
-    if (ports.size() < Core::MIN_S_PARAMETER_PORTS) {
+    if (const std::optional<std::string> missing =
+            Core::CheckSParameterPortCount(ports.size(), Core::GetBackend().GetCapabilities().SParameters)) {
         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetFontSize() * 20.0f);
-        ImGui::TextColored(GetErrorTextColor(), "%s",
-                           "Needs two or more ports: turn on S-parameter port in the properties of Block pin markers");
+        ImGui::TextColored(GetErrorTextColor(), "%s", missing->c_str());
         ImGui::PopTextWrapPos();
         return;
     }
@@ -552,7 +560,9 @@ void AnalysisSettingsPanel::DrawSourceAndOutputPickers(std::string &source, std:
 }
 
 /**
- * @brief   The output picker lists every node by the label the plots give it, as the transfer function one does.
+ * @brief   The kind, DC or AC, and the output picker, which lists every node by the label the plots give it, as the
+ *          transfer function one does; the AC kind adds its input and its frequency range.
+ * @note    The AC kind is disabled, with the reason as its tooltip, when the backend in use cannot run it.
  */
 void AnalysisSettingsPanel::DrawSensitivitySettings(SimulationSettings &settings) {
     const Core::Circuit circuit = m_Schematic.BuildCircuit();
@@ -561,6 +571,22 @@ void AnalysisSettingsPanel::DrawSensitivitySettings(SimulationSettings &settings
         ImGui::TextDisabled("Connect some parts to measure their sensitivity");
         return;
     }
+    const std::optional<std::string> ac_unsupported =
+        Core::FindUnsupported(Core::GetBackend(), ListPartTypes(m_Schematic), Core::AnalysisKind::AC_SENSITIVITY);
+    DrawFieldLabel("Kind");
+    if (ImGui::RadioButton("DC", settings.SensitivityType == SensitivityKind::DC)) {
+        settings.SensitivityType = SensitivityKind::DC;
+    }
+    ImGui::SetItemTooltip("How much the DC voltage of the output changes with the value of each part");
+    ImGui::SameLine();
+    ImGui::BeginDisabled(ac_unsupported.has_value());
+    if (ImGui::RadioButton("AC", settings.SensitivityType == SensitivityKind::AC)) {
+        settings.SensitivityType = SensitivityKind::AC;
+    }
+    ImGui::EndDisabled();
+    ImGui::SetItemTooltip("%s", ac_unsupported ? ac_unsupported->c_str()
+                                               : "How much the gain and the phase at the output change with the "
+                                                 "value of each part, across frequency");
     const Connectivity &connectivity = m_Schematic.GetConnectivity();
     DrawFieldLabel("Output");
     if (ImGui::BeginCombo("##sensitivity_output", GetVoltageLabel(connectivity, *output).c_str())) {
@@ -571,7 +597,51 @@ void AnalysisSettingsPanel::DrawSensitivitySettings(SimulationSettings &settings
         }
         ImGui::EndCombo();
     }
-    ImGui::SetItemTooltip("How much the DC voltage of this node changes with the value of each part");
+    ImGui::SetItemTooltip("The voltage of this node is the output of the analysis");
+    if (settings.SensitivityType == SensitivityKind::AC) {
+        DrawACSensitivityInputs(settings);
+    }
+}
+
+/**
+ * @brief   The AC source that drives the circuit and the frequency range of the AC kind of the sensitivity analysis.
+ */
+void AnalysisSettingsPanel::DrawACSensitivityInputs(SimulationSettings &settings) {
+    const Core::Circuit circuit = m_Schematic.BuildCircuit();
+    const std::vector<std::string> sources = Core::GetNoiseInputSources(circuit);
+    const std::string input = ResolveOptionalInput(settings.ACSensitivitySource, sources);
+    DrawFieldLabel("Input");
+    if (sources.empty()) {
+        ImGui::TextDisabled("Set a voltage or current source to AC");
+    } else if (ImGui::BeginCombo("##ac_sensitivity_input", input.c_str())) {
+        for (const std::string &source : sources) {
+            if (ImGui::Selectable(source.c_str(), source == input)) {
+                settings.ACSensitivitySource = source;
+            }
+        }
+        ImGui::EndCombo();
+    }
+    ImGui::SetItemTooltip("The response measured is the one to this source");
+    Core::ACSweepSettings &range = settings.ACSensitivityRange;
+    if (const std::optional<double> start = m_ACSensitivityStartFrequency.Draw("Start", "Hz", IsPositive)) {
+        range.StartFrequency = *start;
+    }
+    if (const std::optional<double> stop = m_ACSensitivityStopFrequency.Draw("Stop", "Hz", IsPositive)) {
+        range.StopFrequency = *stop;
+    }
+    DrawFieldLabel("Points");
+    if (ImGui::InputInt("per decade##ac_sensitivity", &range.PointsPerDecade)) {
+        range.PointsPerDecade = std::max(range.PointsPerDecade, 1);
+    }
+    const auto suggested = Core::SuggestACSweepSettings(circuit);
+    if (DrawSuggestButton(suggested.has_value(), "Two decades past the RC, RL and LC corners and the op-amp bandwidths",
+                          "Needs a capacitor, an inductor or an op-amp") &&
+        suggested) {
+        range.StartFrequency = suggested->StartFrequency;
+        range.StopFrequency = suggested->StopFrequency;
+        m_ACSensitivityStartFrequency.Load(suggested->StartFrequency);
+        m_ACSensitivityStopFrequency.Load(suggested->StopFrequency);
+    }
 }
 
 /**
@@ -718,6 +788,82 @@ void AnalysisSettingsPanel::DrawRunModeSettings(SimulationSettings &settings) {
         DrawParameterStepSettings(settings.ParameterStep);
     } else if (settings.MonteCarlo.Enabled) {
         DrawMonteCarloSettings(settings.MonteCarlo);
+    }
+    ImGui::PopID();
+}
+
+/**
+ * @brief   The numerical options every analysis shares, which both engines honour: the tolerances, the integration
+ *          method of a transient and the temperature the models are given at.
+ * @details The section starts closed, since the defaults suit most circuits; each field says its default in its
+ *          tooltip, and Reset puts them all back.
+ */
+void AnalysisSettingsPanel::DrawSolverSettings(Core::SolverOptions &options) {
+    ImGui::Separator();
+    ImGui::PushID("solver");
+    if (ImGui::CollapsingHeader("Solver")) {
+        const auto is_between = [](const double minimum, const double maximum) {
+            return [minimum, maximum](const double value) { return value >= minimum && value <= maximum; };
+        };
+        if (const std::optional<double> value = m_RelativeTolerance.Draw(
+                "Rel. tolerance", "", is_between(Core::MIN_RELATIVE_TOLERANCE, Core::MAX_RELATIVE_TOLERANCE))) {
+            options.RelativeTolerance = *value;
+        }
+        ImGui::SetItemTooltip("%s", std::format("reltol: how close two Newton iterations must be, relative to the "
+                                                "value, and how fast a transient may change its step; default {}, "
+                                                "{} to {}",
+                                                Core::FormatValue(Core::DEFAULT_RELATIVE_TOLERANCE),
+                                                Core::FormatValue(Core::MIN_RELATIVE_TOLERANCE),
+                                                Core::FormatValue(Core::MAX_RELATIVE_TOLERANCE))
+                                        .c_str());
+        if (const std::optional<double> value = m_CurrentTolerance.Draw(
+                "Current tolerance", "A",
+                is_between(Core::MIN_CURRENT_TOLERANCE_AMPERES, Core::MAX_CURRENT_TOLERANCE_AMPERES))) {
+            options.CurrentToleranceAmperes = *value;
+        }
+        ImGui::SetItemTooltip("%s", std::format("abstol: the smallest current that counts; default {}A, {}A to {}A",
+                                                Core::FormatValue(Core::DEFAULT_CURRENT_TOLERANCE_AMPERES),
+                                                Core::FormatValue(Core::MIN_CURRENT_TOLERANCE_AMPERES),
+                                                Core::FormatValue(Core::MAX_CURRENT_TOLERANCE_AMPERES))
+                                        .c_str());
+        if (const std::optional<double> value = m_VoltageTolerance.Draw(
+                "Voltage tolerance", "V",
+                is_between(Core::MIN_VOLTAGE_TOLERANCE_VOLTS, Core::MAX_VOLTAGE_TOLERANCE_VOLTS))) {
+            options.VoltageToleranceVolts = *value;
+        }
+        ImGui::SetItemTooltip("%s", std::format("vntol: the smallest voltage that counts; default {}V, {}V to {}V",
+                                                Core::FormatValue(Core::DEFAULT_VOLTAGE_TOLERANCE_VOLTS),
+                                                Core::FormatValue(Core::MIN_VOLTAGE_TOLERANCE_VOLTS),
+                                                Core::FormatValue(Core::MAX_VOLTAGE_TOLERANCE_VOLTS))
+                                        .c_str());
+        DrawFieldLabel("Integration");
+        if (ImGui::BeginCombo("##method", INTEGRATION_METHOD_NAMES[static_cast<std::size_t>(options.Method)])) {
+            for (std::size_t index = 0; index < INTEGRATION_METHOD_NAMES.size(); ++index) {
+                const auto candidate = static_cast<Core::IntegrationMethod>(index);
+                if (ImGui::Selectable(INTEGRATION_METHOD_NAMES[index], candidate == options.Method)) {
+                    options.Method = candidate;
+                }
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::SetItemTooltip("How a transient steps capacitors and inductors in time. Default: trapezoidal, or Gear "
+                              "when the circuit has a fuse. Gear damps the ringing the trapezoidal rule leaves after "
+                              "a sudden change, at a little more error");
+        if (const std::optional<double> value = m_NominalTemperature.Draw(
+                "Nominal temp.", "C",
+                is_between(Core::MIN_NOMINAL_TEMPERATURE_CELSIUS, Core::MAX_NOMINAL_TEMPERATURE_CELSIUS))) {
+            options.NominalTemperatureCelsius = *value;
+        }
+        ImGui::SetItemTooltip("%s", std::format("tnom: the temperature the model parameters are given at; a run at "
+                                                "another temperature scales them from it; default {} C",
+                                                Core::FormatValue(Core::DEFAULT_NOMINAL_TEMPERATURE_CELSIUS))
+                                        .c_str());
+        ImGui::BeginDisabled(options == Core::SolverOptions{});
+        if (ImGui::Button("Reset to defaults")) {
+            options = {};
+            LoadSolverFields(options);
+        }
+        ImGui::EndDisabled();
     }
     ImGui::PopID();
 }
@@ -901,6 +1047,13 @@ void AnalysisSettingsPanel::LoadParameterStepFields(const ParameterStepSettings 
     m_ParameterFields[0].Load(step.Start);
     m_ParameterFields[1].Load(step.Stop);
     m_ParameterFields[2].Load(step.Step);
+}
+
+void AnalysisSettingsPanel::LoadSolverFields(const Core::SolverOptions &options) {
+    m_RelativeTolerance.Load(options.RelativeTolerance);
+    m_CurrentTolerance.Load(options.CurrentToleranceAmperes);
+    m_VoltageTolerance.Load(options.VoltageToleranceVolts);
+    m_NominalTemperature.Load(options.NominalTemperatureCelsius);
 }
 
 } // namespace GUI

@@ -19,13 +19,10 @@ namespace Core {
 
 namespace {
 
-/// Fewest points a linear S-parameter sweep may take: ngspice gives a single point, at the start, for two.
-constexpr int MIN_LINEAR_S_POINTS = 3;
-
 /// Most points a linear S-parameter sweep may take.
 constexpr int MAX_LINEAR_S_POINTS = 100000;
 
-std::optional<std::string> CheckSParameterRange(const SParameterSettings &settings) {
+std::optional<std::string> CheckSParameterRange(const SParameterSettings &settings, const SParameterLimits &limits) {
     if (!settings.IsLogarithmic) {
         if (settings.StartFrequency <= 0.0) {
             return "The start frequency must be positive";
@@ -33,10 +30,10 @@ std::optional<std::string> CheckSParameterRange(const SParameterSettings &settin
         if (settings.StopFrequency <= settings.StartFrequency) {
             return "The stop frequency must be higher than the start frequency";
         }
-        if (settings.LinearPoints < MIN_LINEAR_S_POINTS || settings.LinearPoints > MAX_LINEAR_S_POINTS) {
-            return std::format("The number of points must be between {} and {}; ngspice gives only the first point "
-                               "for two",
-                               MIN_LINEAR_S_POINTS, MAX_LINEAR_S_POINTS);
+        if (settings.LinearPoints < limits.MinLinearPoints || settings.LinearPoints > MAX_LINEAR_S_POINTS) {
+            const std::string reason = limits.MinLinearPointsReason.empty() ? "" : "; " + limits.MinLinearPointsReason;
+            return std::format("The number of points must be between {} and {}{}", limits.MinLinearPoints,
+                               MAX_LINEAR_S_POINTS, reason);
         }
         return std::nullopt;
     }
@@ -44,8 +41,9 @@ std::optional<std::string> CheckSParameterRange(const SParameterSettings &settin
 }
 
 /**
- * @brief   Ports are numbered from 1 with no gap and no repeat, which ngspice requires and reports as a fatal error,
- *          while ports on one node it takes without a word.
+ * @brief   Ports are numbered from 1 with no gap and no repeat, whatever the order they sit in on the schematic: the
+ *          matrix and the Touchstone file index the ports by number, so a gap would leave a row with no port.
+ * @note    The wording of this check and of the next one is the one the Nodalys engine uses for the same causes.
  */
 std::optional<std::string> CheckSParameterPortNumbers(const std::vector<CircuitPort> &ports) {
     std::set<int> numbers;
@@ -85,22 +83,42 @@ std::optional<std::string> CheckSParameterPortNodes(const std::vector<CircuitPor
 } // namespace
 
 /**
+ * @brief   Checks that a circuit has as many S-parameter ports as the backend asks for.
+ * @param[in] port_count  Ports of the circuit.
+ * @param[in] limits      What the backend asks, from BackendCapabilities::SParameters.
+ * @return  The reason the ports are too few, with how to add one; no value when they are enough.
+ */
+std::optional<std::string> CheckSParameterPortCount(const std::size_t port_count, const SParameterLimits &limits) {
+    if (port_count == 0) {
+        return std::string("The circuit has no S-parameter port; turn on S-parameter port in the properties of a "
+                           "Block pin marker");
+    }
+    if (port_count < limits.MinPorts) {
+        return std::format("{}; turn on S-parameter port in the properties of another Block pin marker",
+                           limits.MinPortsReason.empty()
+                               ? std::format("The analysis needs at least {} S-parameter ports", limits.MinPorts)
+                               : limits.MinPortsReason);
+    }
+    return std::nullopt;
+}
+
+/**
  * @brief   Checks the frequency range of an S-parameter analysis and its ports.
  * @param[in] circuit   Circuit to analyze; its ports are the pin markers set as ports.
  * @param[in] settings  Frequency range and points.
- * @return  The reason the analysis cannot run, such as fewer than two ports or ports numbered with a gap; no value
- *          when it can.
- * @note    ngspice stops for good when it finds fewer than two ports, so this must run before it.
+ * @param[in] limits    What the backend that will run it asks, from BackendCapabilities::SParameters.
+ * @return  The reason the analysis cannot run, such as too few ports for the backend or ports numbered with a gap; no
+ *          value when it can.
+ * @note    ngspice stops for good when it finds fewer than two ports, so this must run before any backend.
  */
-std::optional<std::string> CheckSParameterSettings(const Circuit &circuit, const SParameterSettings &settings) {
-    if (std::optional<std::string> error = CheckSParameterRange(settings)) {
+std::optional<std::string> CheckSParameterSettings(const Circuit &circuit, const SParameterSettings &settings,
+                                                   const SParameterLimits &limits) {
+    if (std::optional<std::string> error = CheckSParameterRange(settings, limits)) {
         return error;
     }
     const std::vector<CircuitPort> &ports = circuit.GetPorts();
-    if (ports.size() < MIN_S_PARAMETER_PORTS) {
-        return "ngspice needs at least two S-parameter ports; turn on S-parameter port in the properties of two or "
-               "more "
-               "Block pin markers";
+    if (std::optional<std::string> error = CheckSParameterPortCount(ports.size(), limits)) {
+        return error;
     }
     if (std::optional<std::string> error = CheckSParameterPortNumbers(ports)) {
         return error;

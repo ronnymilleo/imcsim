@@ -9,6 +9,7 @@
 #include <array>
 #include <cctype>
 #include <charconv>
+#include <cmath>
 #include <format>
 #include <utility>
 
@@ -40,6 +41,8 @@ constexpr auto ALL_TYPES = std::to_array<ComponentType>({
     ComponentType::OP_AMP,
     ComponentType::SUBCIRCUIT,
     ComponentType::NET_LABEL,
+    ComponentType::INITIAL_VOLTAGE,
+    ComponentType::NODESET,
     ComponentType::PIN,
     ComponentType::POTENTIOMETER,
     ComponentType::SWITCH,
@@ -167,6 +170,8 @@ const char *Component::GetNamePrefix() const {
         return "T";
     case ComponentType::GROUND:
     case ComponentType::NET_LABEL:
+    case ComponentType::INITIAL_VOLTAGE:
+    case ComponentType::NODESET:
     case ComponentType::PIN:
     case ComponentType::LOGIC_OUTPUT:
     case ComponentType::SEVEN_SEGMENT:
@@ -194,6 +199,8 @@ const char *Component::GetUnit() const {
     case ComponentType::VOLTAGE_SOURCE:
     case ComponentType::CLOCK:
     case ComponentType::LOGIC_INPUT:
+    case ComponentType::INITIAL_VOLTAGE:
+    case ComponentType::NODESET:
         return "V";
     case ComponentType::CURRENT_SOURCE:
     case ComponentType::BEHAVIORAL_CURRENT:
@@ -299,6 +306,8 @@ bool Component::HasValue() const {
     case ComponentType::VCCS:
     case ComponentType::CCCS:
     case ComponentType::CCVS:
+    case ComponentType::INITIAL_VOLTAGE:
+    case ComponentType::NODESET:
         return true;
     }
     return false;
@@ -307,8 +316,8 @@ bool Component::HasValue() const {
 /**
  * @brief   Checks whether a value makes sense for this kind of component.
  * @param[in] value  Candidate value in the component unit.
- * @return  True when the value can be simulated: positive for R, C and L, any voltage for a supply, and any gain,
- *          negative included, for a controlled source.
+ * @return  True when the value can be simulated: positive for R, C and L, any voltage for a supply or an initial
+ *          voltage, and any gain, negative included, for a controlled source.
  */
 bool Component::IsValidValue(const double value) const {
     switch (m_Type) {
@@ -326,6 +335,9 @@ bool Component::IsValidValue(const double value) const {
     case ComponentType::CCCS:
     case ComponentType::CCVS:
         return true;
+    case ComponentType::INITIAL_VOLTAGE:
+    case ComponentType::NODESET:
+        return std::isfinite(value);
     case ComponentType::BEHAVIORAL_VOLTAGE:
     case ComponentType::BEHAVIORAL_CURRENT:
     case ComponentType::GROUND:
@@ -639,6 +651,10 @@ const char *GetTypeName(const ComponentType type) {
         return "Subcircuit";
     case ComponentType::NET_LABEL:
         return "NetLabel";
+    case ComponentType::INITIAL_VOLTAGE:
+        return "InitialVoltage";
+    case ComponentType::NODESET:
+        return "Nodeset";
     case ComponentType::PIN:
         return "Pin";
     case ComponentType::POTENTIOMETER:

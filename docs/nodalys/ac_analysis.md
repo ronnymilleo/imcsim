@@ -25,6 +25,14 @@ To avoid the singularity of $C(v) = C_{J0}(1 - v/V_J)^{-M}$ as a forward-biased 
 $$C(v) = \frac{C_{J0}}{(1 - \text{FC})^M}\left(1 + \frac{M(v - \text{FC}\cdot V_J)}{V_J(1 - \text{FC})}\right)$$
 guaranteeing both continuous charge $Q(v)$ and continuous capacitance $C(v) = dQ/dv$ across transient and high-frequency Miller-effect AC simulations.
 
+### 1.2b The Frequency Grid
+The directive is `.ac [dec|oct|lin] <np> <fstart> <fstop>`, read into `AcSweepConfig` (`SweepType`, the decade by default, which is what `imcsim` uses; a missing type word is a decade sweep):
+- `dec` and `oct` give `<np>` points per decade or per octave, $f_k = f_{\text{start}}\,b^{k/N}$ with $b = 10$ or $2$, up to the last point not above `fstop`; `fstop` is a point only when the grid reaches it.
+- `lin` gives `<np>` points in all, spaced evenly, with both ends.
+- `<np>` is a whole number of at least 1 and `0 < fstart <= fstop`, for a linear sweep too (ngspice lets a linear sweep start at 0; Nodalys does not). A bad number or range is refused with a message that quotes the line.
+
+The grid comes from one function, `MakeFrequencySweep()` (`src/analyses/frequency_sweep.h`), shared with the noise, AC sensitivity and S-parameter analyses, so they space their points alike.
+
 ### 1.3 Solving the Complex MNA System $\mathbf{Y}(j\omega)\,\tilde{\mathbf{x}} = \tilde{\mathbf{b}}_{\text{AC}}$
 At each frequency $f_k$ on the logarithmic grid ($N_{\text{dec}}$ points per decade, $\omega_k = 2\pi f_k$):
 - The real part of node-voltage diagonals receives `Gmin = 1e-12 S`, while the imaginary part remains free of artificial susceptance.

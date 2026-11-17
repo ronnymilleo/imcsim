@@ -140,9 +140,16 @@ struct NoiseResult {
     std::vector<NoiseContribution> Contributions;
 };
 
+/// A square complex matrix of the ports at one frequency, row by row.
+using PortMatrix = std::vector<std::complex<double>>;
+
 /**
  * @struct  SParameterResult
  * @brief   Multiport Scattering Parameters (S-matrix) and derived RF figures of merit across frequency.
+ * @details The impedance and admittance matrices are worked out from the S matrix at every frequency. A matrix is
+ *          absent at a frequency where the circuit has no finite one: Z of two ports joined by a series element and
+ *          nothing else (the ports float), Y of a port shorted to ground. The vectors are empty when a result is built
+ *          without them.
  */
 struct SParameterResult {
     std::vector<double> Frequencies;
@@ -150,6 +157,10 @@ struct SParameterResult {
     std::vector<double> ReferenceOhms;
     /// Flattened complex S-matrix values stored as: [freq_idx][row - 1][col - 1].
     std::vector<std::complex<double>> Values;
+    /// Impedance matrix Z in ohms of each frequency, or none where no finite one exists.
+    std::vector<std::optional<PortMatrix>> ImpedanceMatrices;
+    /// Admittance matrix Y in siemens of each frequency, or none where no finite one exists.
+    std::vector<std::optional<PortMatrix>> AdmittanceMatrices;
     /// Diagnostic warnings.
     std::vector<std::string> Warnings;
 
@@ -159,6 +170,18 @@ struct SParameterResult {
         const auto ports = static_cast<std::size_t>(GetPortCount());
         return Values[(frequency_idx * ports + static_cast<std::size_t>(row - 1)) * ports +
                       static_cast<std::size_t>(column - 1)];
+    }
+
+    /// Z(row, column) at a frequency; none when the result has no impedance matrices or the circuit has no finite Z.
+    std::optional<std::complex<double>> Impedance(const std::size_t frequency_idx, const int row,
+                                                  const int column) const {
+        return ReadMatrix(ImpedanceMatrices, frequency_idx, row, column);
+    }
+
+    /// Y(row, column) at a frequency; none when the result has no admittance matrices or the circuit has no finite Y.
+    std::optional<std::complex<double>> Admittance(const std::size_t frequency_idx, const int row,
+                                                   const int column) const {
+        return ReadMatrix(AdmittanceMatrices, frequency_idx, row, column);
     }
 
     std::optional<double> ReturnLossDb(const std::size_t frequency_idx, const int port) const {
@@ -204,6 +227,21 @@ struct SParameterResult {
         }
         return z0 * (1.0 + s) / denom;
     }
+
+private:
+    std::optional<std::complex<double>> ReadMatrix(const std::vector<std::optional<PortMatrix>> &matrices,
+                                                   const std::size_t frequency_idx, const int row,
+                                                   const int column) const {
+        if (frequency_idx >= matrices.size()) {
+            return std::nullopt;
+        }
+        const std::optional<PortMatrix> &matrix = matrices[frequency_idx];
+        if (!matrix) {
+            return std::nullopt;
+        }
+        const auto ports = static_cast<std::size_t>(GetPortCount());
+        return (*matrix)[static_cast<std::size_t>(row - 1) * ports + static_cast<std::size_t>(column - 1)];
+    }
 };
 
 /**
@@ -213,6 +251,8 @@ struct SParameterResult {
 struct PoleZeroResult {
     std::vector<std::complex<double>> Poles;
     std::vector<std::complex<double>> Zeros;
+    /// What makes the roots doubtful, such as roots that do not rebuild the AC response of the circuit.
+    std::vector<std::string> Warnings;
 };
 
 /**
@@ -223,6 +263,56 @@ struct SensitivityResult {
     int OutputPositiveNode = 0;
     int OutputNegativeNode = 0;
     std::map<std::string, double> Vectors;
+};
+
+/**
+ * @enum    SensitivityParameter
+ * @brief   Which value of an element a sensitivity is taken with respect to.
+ */
+enum class SensitivityParameter {
+    RESISTANCE,
+    CAPACITANCE,
+    INDUCTANCE,
+    /// DC value of a voltage source.
+    VOLTAGE,
+    /// DC value of a current source.
+    CURRENT,
+    /// Gain of a controlled source.
+    GAIN
+};
+
+/**
+ * @struct  AcElementSensitivity
+ * @brief   How the complex output of an AC analysis changes with the value of one element, at every frequency.
+ * @details Derivatives are $\partial V / \partial p$ in volts per unit of the value. The two figures are what a user
+ *          reads: the change of the magnitude in decibels and of the phase in degrees for a 1 % change of the value,
+ *          none at a frequency where the output is too small for a relative change to mean anything.
+ */
+struct AcElementSensitivity {
+    /// Lower case name of the element, as the netlist writes it ("r1", "x1.r1" inside a block).
+    std::string Name;
+    SensitivityParameter Parameter = SensitivityParameter::RESISTANCE;
+    /// Value of the element: ohms, farads, henries, volts, amperes or the gain.
+    double Value = 0.0;
+    std::vector<std::complex<double>> Derivatives;
+    std::vector<std::optional<double>> MagnitudeDecibelsPerPercent;
+    std::vector<std::optional<double>> PhaseDegreesPerPercent;
+};
+
+/**
+ * @struct  AcSensitivityResult
+ * @brief   Small-signal AC sensitivity of an output voltage to every element value, across frequency.
+ */
+struct AcSensitivityResult {
+    int OutputPositiveNode = 0;
+    int OutputNegativeNode = 0;
+    std::string InputSource;
+    std::vector<double> Frequencies;
+    /// The output phasor at each frequency, for the AC magnitude of the input source.
+    std::vector<std::complex<double>> Output;
+    std::vector<AcElementSensitivity> Elements;
+    /// What the user should know about the run, such as the frequencies where the output is too small to measure.
+    std::vector<std::string> Warnings;
 };
 
 /**
@@ -261,9 +351,9 @@ struct HarmonicBalanceResult {
 
 [[nodiscard]] double ComputeThd(std::span<const std::complex<double>> phasors);
 
-using SimulationResult =
-    std::variant<OperatingPointResult, TransientResult, DcSweepResult, AcSweepResult, TransferFunctionResult,
-                 NoiseResult, SParameterResult, PoleZeroResult, SensitivityResult, HarmonicBalanceResult>;
+using SimulationResult = std::variant<OperatingPointResult, TransientResult, DcSweepResult, AcSweepResult,
+                                      TransferFunctionResult, NoiseResult, SParameterResult, PoleZeroResult,
+                                      SensitivityResult, AcSensitivityResult, HarmonicBalanceResult>;
 
 } // namespace Nodalys
 

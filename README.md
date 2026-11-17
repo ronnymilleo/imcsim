@@ -53,17 +53,19 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
 - Noise at one node across frequency, at the output and referred to the input, with the share of each part
 - A transfer function from an input source to an output: the DC gain, the input impedance and the output impedance
 - A sensitivity analysis: how much the DC voltage of a node changes with the value of each part, as a table and as
-  colors on the schematic
+  colors on the schematic; with Nodalys also the AC kind, how many dB and degrees the response changes for 1 % of each
+  part across frequency, ranked at the -3 dB point to tell which part sets a corner
 - Poles and zeros from an input source to a node, on an s-plane with their frequency, quality factor and damping, and
   marked on the Bode plot of an AC sweep
-- S-parameters of two or more ports, set on Block pin markers: a Smith chart with the impedance, VSWR and return loss
-  under the pointer, magnitude and phase plots, and the whole matrix saved as a Touchstone `.sNp` file
+- S-parameters of one port (Nodalys) or two or more, set on Block pin markers: a Smith chart with the impedance, VSWR and return loss
+  under the pointer, magnitude and phase plots, the impedance and admittance matrices (Nodalys), the whole matrix saved as
+  a Touchstone `.sNp` file, and for a two-port its stability (K, mu, MAG and MSG, source and load stability circles)
 - A truth table of a digital circuit: every combination of the chosen logic inputs and the 0, 1 or X it gives at the
   measured outputs
 - Two simulation engines, picked in Edit > Preferences > Simulation: ngspice, the default, and Nodalys, a solver written
   for imcsim from published circuit theory and tested against closed-form results and against ngspice on every
-  example. Nodalys runs every analysis of ngspice, with temperature, fuses, behavioral sources and seedable noise and
-  random sources, and what it does not cover is refused with the reason (see the
+  example. Nodalys runs every analysis of ngspice, with temperature, fuses, behavioral sources, blocks imported from
+  SPICE libraries and seedable noise and random sources, and what it does not cover is refused with the reason (see the
   [user guide](docs/user_guide.md#choosing-the-simulation-engine)). It also comes as `nodalys`, a command line that
   reads SPICE netlists
 - A harmonic balance, on Nodalys: the periodic steady state of a circuit driven at one frequency, with the amplitude
@@ -92,6 +94,10 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   flip-flops, driven by a Clock source (frequency, duty cycle, logic level and start delay, written as a pulse so there
   are no rise or fall times to set) and a Logic input that drives a net high or low, and simulated with the digital
   code models of ngspice behind analog bridges, so their outputs are voltages that plot and probe like any other
+- Initial voltage markers that set the voltage a node starts a transient at, for circuits that need a push to start,
+  and nodesets that guess where the operating point of a bistable circuit starts, the same on ngspice and Nodalys
+- Solver options saved with the schematic (tolerances, integration method, nominal temperature), honoured by both
+  engines
 - Logic outputs and 7-segment displays that show the levels of their nets on the schematic, lit by the Logic Lights
   effect, and eight ready logic blocks built from the gates: a 4-bit counter and shift register, a multiplexer, a
   demultiplexer, a 2-to-4 decoder, a 4-bit adder and comparator, and a BCD to 7-segment decoder
@@ -113,11 +119,13 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   a configurable window of points keeps long runs responsive
 - Live transients paced by the clock: flip switches, hold push buttons, change logic inputs and turn potentiometers on
   the schematic while the run continues, then pause, continue or discard the session
-- 45 example circuits sorted by topic, each with its analyses and measurements set up: dividers, RC and RLC
-  filters, an amplitude modulator from a behavioral source, diode curves, a Zener regulator and a rectifier, BJT and
-  MOSFET switches and characteristics, a current mirror, common-emitter and class AB amplifiers, the Monte Carlo spread
-  of a bias point, op-amp amplifiers and their input offsets, an integrator, a Schmitt trigger and a Sallen-Key
-  filter, an ideal transformer made of controlled sources, switching circuits, digital ones (gates, a truth
+- 51 example circuits sorted by topic, each with its analyses and measurements set up: dividers, RC and RLC
+  filters, the noise of an RC low-pass, the gain and impedances of an attenuator, an amplitude modulator from a
+  behavioral source, diode curves, a Zener regulator and a rectifier with its harmonic balance, BJT and MOSFET
+  switches and characteristics, a current mirror, common-emitter and class AB amplifiers, the stability of a
+  common-emitter stage, the Monte Carlo spread of a bias point, an astable multivibrator started by an initial
+  voltage, op-amp amplifiers and their input offsets, an integrator, a Schmitt trigger and a Sallen-Key filter with
+  the part that sets its corner, an ideal transformer made of controlled sources, switching circuits, digital ones (gates, a truth
   table of the basic gates, half and full adders, an SR latch, a ripple counter, a decoder with logic outputs and a
   decade counter on a 7-segment display), and blocks: one RC filter used twice, an 8-bit counter of two 4-bit blocks,
   and a precision rectifier from a vendor's op-amp and diode models
@@ -151,7 +159,8 @@ roughly in the order they are likely to come.
 - **Sources, parts and models**: XSPICE analog blocks (transfer functions, limiters, integrators), transmission lines,
   a circuit driven from a WAV or CSV file, PWL points read from a CSV file, and a MOSFET body diode and higher-level
   MOSFET models
-- **Nodalys**: blocks kept as SPICE text, and initial voltages of nodes set in the editor
+- **Analyses**: loop gain and stability margins (`.stb`) on Nodalys, measurements (`.meas`) on result traces, and the
+  noise figure of a two-port
 
 ## Install
 

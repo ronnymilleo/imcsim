@@ -207,3 +207,36 @@ TEST_CASE("The Smith figure holds a curve per entry, and its table lists real an
     CHECK_THAT(csv, ContainsSubstring("Frequency (Hz),S11 real,S11 imaginary,S22 real,S22 imaginary\n"));
     CHECK_THAT(csv, ContainsSubstring("\n1e+06,0.3333333333333333,0,0,0.5\n"));
 }
+
+TEST_CASE("A result of one port shows S11 only, on both views, and reads as a reflection", "[s_parameter_view]") {
+    // A load of 100 ohm on 50 at two frequencies
+    Core::SParameters result;
+    result.Frequencies = {1e6, 1e7};
+    result.ReferenceOhms = {50.0};
+    result.Values = {Complex(1.0 / 3.0, 0.0), Complex(1.0 / 3.0, 0.0)};
+
+    GUI::SParameterSelection selection;
+    selection.Reset(result.GetPortCount());
+    CHECK(selection.ListShown() == std::vector<GUI::SParameterEntry>{{1, 1}});
+    selection.ResetToReflections(result.GetPortCount());
+    CHECK(selection.ListShown() == std::vector<GUI::SParameterEntry>{{1, 1}});
+
+    const GUI::SParameterReading reading = GUI::ReadEntry(result, 1, {1, 1});
+    CHECK(reading.IsReflection);
+    REQUIRE(reading.Impedance.has_value());
+    CHECK_THAT(reading.Impedance->real(), WithinAbs(100.0, 1e-9));
+    REQUIRE(reading.Vswr.has_value());
+    CHECK_THAT(*reading.Vswr, WithinAbs(2.0, 1e-9));
+    CHECK_THAT(GUI::DescribeReading(reading)[2], ContainsSubstring("Z = 100 + j0 ohm"));
+
+    // The magnitude and phase figure and the Smith figure each carry the one curve, and the tables list it
+    const GUI::ExportFigure plots = GUI::BuildMagnitudePhaseFigure(result, selection.ListShown(), std::nullopt);
+    REQUIRE(plots.Panels.size() == 2);
+    REQUIRE(plots.Panels[0].Series.size() == 1);
+    CHECK(GUI::RenderCsv(plots).contains("Magnitude S11 (dB)"));
+    const GUI::ExportFigure chart = GUI::BuildSmithFigure(result, selection.ListShown());
+    REQUIRE(chart.Smith.has_value());
+    REQUIRE(chart.Smith->Traces.size() == 1);
+    CHECK_THAT(GUI::RenderCsv(chart), ContainsSubstring("Frequency (Hz),S11 real,S11 imaginary\n"));
+    CHECK_THAT(GUI::RenderCsv(chart), ContainsSubstring("\n1e+07,0.3333333333333333,0\n"));
+}

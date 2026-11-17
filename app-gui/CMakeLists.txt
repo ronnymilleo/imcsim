@@ -50,12 +50,15 @@ add_library(imcsim-gui-lib
             plots/plot_figures.cpp
             plots/plot_helpers.cpp
             plots/plot_ticks.cpp
+            plots/port_matrix_view.cpp
             plots/s_parameter_view.cpp
             plots/smith_chart.cpp
             plots/spectrum.cpp
+            plots/stability_view.cpp
             plots/statistics_table.cpp
             plots/touchstone.cpp
             plots/trace_fit_state.cpp
+            results/ac_sensitivity_view.cpp
             results/circuit_snapshot.cpp
             results/current_flow.cpp
             results/fuse_readings.cpp
@@ -70,10 +73,13 @@ add_library(imcsim-gui-lib
             results/pole_zero_view.cpp
             results/result_store.cpp
             results/sensitivity_view.cpp
+            results/stability_circles.cpp
+            results/stability_summary.cpp
             results/trace_math.cpp
             results/trace_statistics.cpp
             results/transient_window.cpp
             results/truth_table.cpp
+            results/two_port_metrics.cpp
             schematic/block_definitions.cpp
             schematic/block_nesting.cpp
             schematic/block_session.cpp
@@ -130,12 +136,14 @@ add_library(imcsim-gui-lib
             ui_elements/ui_fuse.cpp
             ui_elements/ui_ground.cpp
             ui_elements/ui_inductor.cpp
+            ui_elements/ui_initial_voltage.cpp
             ui_elements/ui_logic_box.cpp
             ui_elements/ui_logic_input.cpp
             ui_elements/ui_logic_output.cpp
             ui_elements/ui_logic_part.cpp
             ui_elements/ui_mosfet.cpp
             ui_elements/ui_net_label.cpp
+            ui_elements/ui_nodeset.cpp
             ui_elements/ui_op_amp.cpp
             ui_elements/ui_potentiometer.cpp
             ui_elements/ui_resistor.cpp
@@ -161,6 +169,7 @@ add_library(imcsim-gui-lib
             windows/live_input_handler.cpp
             windows/mode_input.cpp
             windows/netlist_window.cpp
+            windows/output_tabs/ac_sensitivity_tab.cpp
             windows/output_tabs/ac_sweep_tab.cpp
             windows/output_tabs/cursor_widgets.cpp
             windows/output_tabs/dc_sweep_tab.cpp

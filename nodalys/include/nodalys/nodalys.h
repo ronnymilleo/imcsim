@@ -14,6 +14,7 @@
 #include "nodalys/logic_bridge.h"
 #include "nodalys/netlist_parser.h"
 #include "nodalys/results.h"
+#include "nodalys/subcircuit_text.h"
 #include "nodalys/types.h"
 #include "nodalys/version.h"
 

@@ -12,7 +12,11 @@
 
 #include "analysis/analysis_inputs.h"
 #include "backends/nodalys/nodalys_backend.h"
+#include "circuit/components/capacitor.h"
+#include "circuit/components/ground.h"
+#include "circuit/components/resistor.h"
 #include "circuit/components/source.h"
+#include "circuit/components/vcc.h"
 #include "nodalys_in_use.h"
 #include "schematic/examples.h"
 #include "schematic/schematic.h"
@@ -107,9 +111,6 @@ constexpr Tolerance S_PARAMETER{SOLVER_RELATIVE_TOLERANCE, 1e-5};
 
 /// Differences listed for one quantity before the rest are only counted.
 constexpr std::size_t MAX_LISTED_DIFFERENCES = 3;
-/// Error text from Nodalys that stands for raw SPICE text parts, which it cannot read.
-constexpr std::string_view SPICE_TEXT_ERROR = "SPICE text";
-
 constexpr std::string_view OPERATING_POINT_NAME = "operating point";
 constexpr std::string_view TRANSIENT_NAME = "transient";
 constexpr std::string_view AC_SWEEP_NAME = "AC sweep";
@@ -684,9 +685,6 @@ Outcome RunBoth(Run &&run, Compare &&compare, const std::vector<const KnownDiffe
         return run();
     }();
     if (!actual.Result) {
-        if (actual.Result.error().contains(SPICE_TEXT_ERROR)) {
-            return {.SkipReason = "Nodalys cannot read parts kept as SPICE text", .Found = {}, .Beyond = {}};
-        }
         const Differences failure = {"Nodalys fails where ngspice runs: " + actual.Result.error()};
         return {.SkipReason = {}, .Found = failure, .Beyond = failure};
     }
@@ -808,6 +806,132 @@ TEST_CASE("A known difference allows its quantities to differ by its bound and n
     CHECK(lines[2].starts_with("current V2"));
     CHECK(log.AllowedWindowSteps("V(1)") == 4.0);
     CHECK(log.AllowedWindowSteps("current V1") == TRANSIENT_TIME_WINDOW_STEPS);
+}
+
+TEST_CASE("The precision rectifier, whose op-amp is SPICE text, gives the same waveforms on both engines",
+          "[cross_validation][spice_text]") {
+    const auto example =
+        std::ranges::find(GUI::GetExamples(), std::string_view("precision_rectifier.imcsim"), &GUI::Example::FileName);
+    REQUIRE(example != GUI::GetExamples().end());
+    auto loaded = GUI::LoadExample(*example);
+    REQUIRE(loaded.has_value());
+    GUI::Schematic schematic;
+    schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings),
+                      std::move(loaded->Subcircuits), std::move(loaded->Models));
+    const Core::Circuit circuit = schematic.BuildCircuit();
+    const Core::TransientSettings settings = schematic.GetSimulationSettings().Transient;
+    // The load of the rectifier, where the example reads its output
+    const std::optional<int> output_node = schematic.GetConnectivity().GetNode({20, 0});
+    REQUIRE(output_node.has_value());
+    const auto output = static_cast<std::size_t>(*output_node);
+
+    const auto run_both = [&circuit](const Core::TransientSettings &asked) {
+        const Core::TransientRun on_ngspice = Core::RunTransient(circuit, asked);
+        REQUIRE(on_ngspice.Result.has_value());
+        const TestSupport::NodalysInUse nodalys;
+        Core::TransientRun on_nodalys = Core::RunTransient(circuit, asked);
+        INFO((on_nodalys.Result ? std::string{} : on_nodalys.Result.error()));
+        REQUIRE(on_nodalys.Result.has_value());
+        return std::pair{*on_ngspice.Result, std::move(*on_nodalys.Result)};
+    };
+    // Largest distance between the output of the engines, at the instants ngspice solved
+    const auto largest_output_difference = [output](const Core::Transient &expected, const Core::Transient &actual) {
+        double largest = 0.0;
+        for (std::size_t point = 0; point < expected.Times.size(); ++point) {
+            const double other = ValueAt(actual.Times, actual.NodeVoltages[output], expected.Times[point]);
+            largest = std::max(largest, std::fabs(expected.NodeVoltages[output][point] - other));
+        }
+        return largest;
+    };
+
+    const auto [expected, actual] = run_both(settings);
+    // Every node agrees in waveform, at the instants where the engines can be compared and with a window around each
+    // edge, since the steps of the two engines do not land on the same instants
+    DifferenceLog log;
+    for (int node = 1; node < circuit.GetNodeCount(); ++node) {
+        const auto index = static_cast<std::size_t>(node);
+        CompareWaveforms(log, std::format("V({})", node), expected.Times, expected.NodeVoltages[index], actual.Times,
+                         actual.NodeVoltages[index], settings.StopTime, settings.TimeStep, VOLTAGE_FLOOR_VOLTS);
+    }
+    const Differences found = log.Take();
+    INFO(Indented(found));
+    CHECK(found.empty());
+    CHECK(std::fabs(std::ranges::max(expected.NodeVoltages[output]) - std::ranges::max(actual.NodeVoltages[output])) <
+          1e-3);
+
+    // After each negative edge of the input the output of ngspice rings, with alternating signs from one step to the
+    // next, 0.027 V at the largest at the step of the example (24 mV from Nodalys, which decays smoothly); the
+    // trapezoidal rule does it. A step ten times shorter brings the engines to 5.4 mV, so the difference is the
+    // integration of ngspice, not the model
+    constexpr double RINGING_VOLTS = 0.03;
+    constexpr double FINE_STEP_FRACTION = 0.1;
+    constexpr double FINE_VOLTS = 0.01;
+    INFO(std::format("at the step of the example {} V", largest_output_difference(expected, actual)));
+    CHECK(largest_output_difference(expected, actual) < RINGING_VOLTS);
+    Core::TransientSettings fine = settings;
+    fine.TimeStep = settings.TimeStep * FINE_STEP_FRACTION;
+    const auto [fine_expected, fine_actual] = run_both(fine);
+    INFO(std::format("at a tenth of the step {} V", largest_output_difference(fine_expected, fine_actual)));
+    CHECK(largest_output_difference(fine_expected, fine_actual) < FINE_VOLTS);
+}
+
+TEST_CASE("The initial voltage of a node starts a transient the same way on both engines",
+          "[cross_validation][initial_voltage]") {
+    // 5 V over three 1k resistors with a capacitor on the last node, and a second RC whose capacitor has an initial
+    // condition of its own, which makes the whole transient start from initial conditions (uic)
+    Core::VCC supply;
+    supply.SetName("V1");
+    supply.SetValue(5.0);
+    std::array<Core::Resistor, 4> resistors;
+    for (std::size_t index = 0; index < resistors.size(); ++index) {
+        resistors[index].SetName(std::format("R{}", index + 1));
+        resistors[index].SetValue(1e3);
+    }
+    std::array<Core::Capacitor, 2> capacitors;
+    capacitors[0].SetName("C1");
+    capacitors[0].SetValue(1e-6);
+    capacitors[1].SetName("C2");
+    capacitors[1].SetValue(1e-6);
+    Core::Ground ground;
+    Core::Circuit circuit;
+    circuit.Add(supply, {1});
+    circuit.Add(resistors[0], {1, 2});
+    circuit.Add(resistors[1], {2, 3});
+    circuit.Add(resistors[2], {3, 0});
+    circuit.Add(capacitors[0], {3, 0});
+    circuit.Add(ground, {0});
+    // The second pair, with the capacitor on node 4 and the resistor from it to ground
+    circuit.Add(resistors[3], {4, 0});
+    circuit.Add(capacitors[1], {4, 0});
+    circuit.AddInitialVoltage({.Node = 2, .Volts = 4.0});
+    circuit.AddInitialVoltage({.Node = 4, .Volts = 3.0});
+
+    const Core::TransientSettings settings{.StopTime = 5e-3, .TimeStep = 5e-6};
+    const auto compare = [&](const Core::Circuit &asked) {
+        const Core::TransientRun on_ngspice = Core::RunTransient(asked, settings);
+        REQUIRE(on_ngspice.Result.has_value());
+        const TestSupport::NodalysInUse nodalys;
+        const Core::TransientRun on_nodalys = Core::RunTransient(asked, settings);
+        REQUIRE(on_nodalys.Result.has_value());
+        DifferenceLog log;
+        for (int node = 1; node < asked.GetNodeCount(); ++node) {
+            const auto index = static_cast<std::size_t>(node);
+            CompareWaveforms(log, std::format("V({})", node), on_ngspice.Result->Times,
+                             on_ngspice.Result->NodeVoltages[index], on_nodalys.Result->Times,
+                             on_nodalys.Result->NodeVoltages[index], settings.StopTime, settings.TimeStep,
+                             VOLTAGE_FLOOR_VOLTS);
+        }
+        const Differences found = log.Take();
+        INFO(Indented(found));
+        CHECK(found.empty());
+    };
+
+    // Node 2 is held at 4 V in the operating point and node 4 at 3 V, then both are released
+    compare(circuit);
+
+    // With a capacitor that has an initial condition, node 4 starts the capacitors across it from 3 V instead
+    capacitors[0].SetInitialCondition(1.0);
+    compare(circuit);
 }
 
 TEST_CASE("Every example gives the same results on ngspice and on Nodalys", "[cross_validation]") {

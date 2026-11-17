@@ -88,19 +88,6 @@ void DrawTransferFunction(const Core::TransferFunction &transfer, Schematic &sch
 }
 
 /**
- * @brief   Selects the part with this name in the editor, which a click on its row asks for.
- */
-void SelectPart(Schematic &schematic, const std::string &name) {
-    const auto &elements = schematic.GetElements();
-    for (std::size_t index = 0; index < elements.size(); ++index) {
-        if (elements[index]->GetComponent().GetName() == name) {
-            schematic.SelectElement(index);
-            return;
-        }
-    }
-}
-
-/**
  * @brief   Draws the sensitivity as a table of parts, the most influential first; a click on a row selects the part.
  * @param[in] sensitivity  The result.
  * @param[in] schematic    The names of nets, for the output node, and the parts a click selects.
@@ -217,6 +204,19 @@ void DrawTruthTable(const Core::TruthTable &table, Schematic &schematic) {
 }
 
 } // namespace
+
+/**
+ * @brief   Selects the part with this name in the editor, which a click on its row asks for.
+ */
+void SelectPart(Schematic &schematic, const std::string &name) {
+    const auto &elements = schematic.GetElements();
+    for (std::size_t index = 0; index < elements.size(); ++index) {
+        if (elements[index]->GetComponent().GetName() == name) {
+            schematic.SelectElement(index);
+            return;
+        }
+    }
+}
 
 /**
  * @brief   Draws the Transfer function tab: the table of the last transfer function, or how to get one.

@@ -1021,7 +1021,7 @@ const Connectivity &Schematic::GetConnectivity() {
 }
 
 /**
- * @brief   Builds the circuit topology of the schematic, for the simulator.
+ * @brief   Builds the circuit topology of the schematic, for the simulator, with the solver options of its settings.
  * @return  The circuit; it points at the components of this schematic, so use it before the next change.
  */
 Core::Circuit Schematic::BuildCircuit() {
@@ -1048,6 +1048,7 @@ Core::Circuit Schematic::BuildCircuit() {
     for (const Core::LibraryModel &model : m_LibraryModels) {
         circuit.AddLibraryModel(model);
     }
+    circuit.SetSolverOptions(m_SimulationSettings.Solver);
     return circuit;
 }
 

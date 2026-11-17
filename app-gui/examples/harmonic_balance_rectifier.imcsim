@@ -1,40 +1,18 @@
 {
   "elements": [
     {
-      "name": "R1",
-      "rotation": 0,
-      "type": "Resistor",
-      "value": 1000.0,
-      "x": 9,
-      "y": 4
-    },
-    {
-      "name": "C1",
-      "rotation": 90,
-      "type": "Capacitor",
-      "value": 1E-7,
-      "x": 14,
-      "y": 7
-    },
-    {
-      "rotation": 0,
-      "type": "Ground",
-      "x": 9,
-      "y": 11
-    },
-    {
       "ac_magnitude": 1.0,
-      "amplitude": 1.0,
+      "amplitude": 5.0,
       "frequency": 1000.0,
       "name": "Vin1",
       "offset": 0.0,
       "pulse": {
         "delay": 0.0,
-        "fall": 0.000001,
+        "fall": 1e-06,
         "high": 5.0,
         "low": 0.0,
         "period": 0.001,
-        "rise": 0.000001,
+        "rise": 1e-06,
         "width": 0.0005
       },
       "rotation": 90,
@@ -43,11 +21,43 @@
       "value": 5.0,
       "x": 4,
       "y": 7
+    },
+    {
+      "model": "1N4148",
+      "name": "D1",
+      "rotation": 0,
+      "type": "Diode",
+      "x": 9,
+      "y": 4
+    },
+    {
+      "name": "C1",
+      "rotation": 90,
+      "type": "Capacitor",
+      "value": 1e-06,
+      "x": 14,
+      "y": 7
+    },
+    {
+      "name": "R1",
+      "rotation": 90,
+      "type": "Resistor",
+      "value": 1000.0,
+      "x": 19,
+      "y": 7
+    },
+    {
+      "rotation": 0,
+      "type": "Ground",
+      "x": 11,
+      "y": 11
     }
   ],
   "format": "imcsim-schematic",
   "measurements": {
-    "currents": [],
+    "currents": [
+      "D1"
+    ],
     "voltages": [
       [
         4,
@@ -65,7 +75,7 @@
       "start": 10.0,
       "stop": 1000000.0
     },
-    "analysis": "noise",
+    "analysis": "harmonic_balance",
     "dc_sweep": {
       "step_source": false,
       "stepped": {
@@ -81,61 +91,26 @@
         "stop": 5.0
       }
     },
-    "transient": {
-      "step": 0.000005,
-      "stop": 0.005
+    "harmonic_balance": {
+      "fundamental": 1000,
+      "harmonics": 24,
+      "samples": 128
     },
-    "noise": {
-      "source": "Vin1",
-      "output": [
-        14,
-        4
-      ],
-      "start": 10,
-      "stop": 1000000,
-      "points_per_decade": 20
+    "transient": {
+      "step": 5e-06,
+      "stop": 0.005
     }
   },
   "version": 1,
   "wires": [
     {
       "end": [
-        9,
-        11
-      ],
-      "start": [
-        9,
-        10
-      ]
-    },
-    {
-      "end": [
         4,
-        10
+        4
       ],
       "start": [
         4,
-        9
-      ]
-    },
-    {
-      "end": [
-        14,
-        10
-      ],
-      "start": [
-        14,
-        9
-      ]
-    },
-    {
-      "end": [
-        4,
-        10
-      ],
-      "start": [
-        14,
-        10
+        5
       ]
     },
     {
@@ -160,12 +135,12 @@
     },
     {
       "end": [
-        4,
+        19,
         4
       ],
       "start": [
-        4,
-        5
+        14,
+        4
       ]
     },
     {
@@ -176,6 +151,66 @@
       "start": [
         14,
         4
+      ]
+    },
+    {
+      "end": [
+        19,
+        5
+      ],
+      "start": [
+        19,
+        4
+      ]
+    },
+    {
+      "end": [
+        4,
+        10
+      ],
+      "start": [
+        4,
+        9
+      ]
+    },
+    {
+      "end": [
+        14,
+        10
+      ],
+      "start": [
+        14,
+        9
+      ]
+    },
+    {
+      "end": [
+        19,
+        10
+      ],
+      "start": [
+        19,
+        9
+      ]
+    },
+    {
+      "end": [
+        19,
+        10
+      ],
+      "start": [
+        4,
+        10
+      ]
+    },
+    {
+      "end": [
+        11,
+        11
+      ],
+      "start": [
+        11,
+        10
       ]
     }
   ]

@@ -14,14 +14,21 @@
 #include "circuit/components/logic_part.h"
 #include "circuit/components/source.h"
 #include "circuit/components/subcircuit.h"
+#include "circuit/node_voltage_targets.h"
 #include "circuit/subcircuit.h"
+#include "simulation/check_solver_options.h"
+#include "spice/spice_value.h"
 #include <algorithm>
+#include <cctype>
 #include <format>
 #include <functional>
+#include <map>
 #include <optional>
 #include <set>
 #include <string>
 #include <string_view>
+#include <utility>
+#include <vector>
 
 namespace Core {
 
@@ -214,6 +221,152 @@ std::optional<std::string> CheckBehavioralSources(const Circuit &circuit) {
     return std::nullopt;
 }
 
+/**
+ * @brief   Names a node as the user sees it: V(OUT) when a label names its net, "node 3" otherwise.
+ */
+std::string DescribeNode(const Circuit &circuit, const int node) {
+    for (const auto &[net, net_node] : circuit.GetNets()) {
+        if (net_node == node) {
+            return std::format("V({})", net);
+        }
+    }
+    return std::format("node {}", node);
+}
+
+/// How the checks name a kind of marker in their messages.
+struct NodeVoltageWords {
+    std::string_view WithArticle;
+    std::string_view Plural;
+};
+
+NodeVoltageWords DescribeKind(const NodeVoltageKind kind) {
+    return kind == NodeVoltageKind::INITIAL
+               ? NodeVoltageWords{.WithArticle = "an initial voltage", .Plural = "initial voltages"}
+               : NodeVoltageWords{.WithArticle = "a nodeset", .Plural = "nodesets"};
+}
+
+/// The words of a message that starts with the marker, such as "An initial voltage".
+std::string Capitalized(const std::string_view text) {
+    std::string capitalized(text);
+    capitalized.front() = static_cast<char>(std::toupper(static_cast<unsigned char>(capitalized.front())));
+    return capitalized;
+}
+
+/**
+ * @brief   A marker needs a node of its own to act on: not ground, which is 0 V by definition, and a node some part of
+ *          its circuit is connected to, since a loose one has no equations to start from.
+ * @param[in] where  Where the circuit is, for the message: empty at the top, " in block NAME" inside a definition.
+ */
+std::optional<std::string> CheckNodeVoltagePlaces(const Circuit &circuit, const NodeVoltageKind kind,
+                                                  const std::string_view where) {
+    const NodeVoltageWords words = DescribeKind(kind);
+    std::set<int> used_nodes;
+    for (const CircuitEntry &entry : circuit.GetEntries()) {
+        used_nodes.insert(entry.Nodes.begin(), entry.Nodes.end());
+    }
+    for (const CircuitNodeVoltage &marker : circuit.GetNodeVoltages(kind)) {
+        if (marker.Node == 0) {
+            return std::format("{}{} is on ground, which is always 0 V; place it on another node",
+                               Capitalized(words.WithArticle), where);
+        }
+        if (!used_nodes.contains(marker.Node)) {
+            return std::format("{} of {} V{} is on {}, which no part is connected to", Capitalized(words.WithArticle),
+                               FormatValue(marker.Volts), where, DescribeNode(circuit, marker.Node));
+        }
+    }
+    return std::nullopt;
+}
+
+/**
+ * @brief   Names the node a target sets as the user sees it, with the instance it belongs to inside a block.
+ */
+std::string DescribeTarget(const NodeVoltageTarget &target) {
+    const std::string node = DescribeNode(*target.Owner, target.Node);
+    return target.Path.empty() ? node : std::format("{} of {}", node, FormatInstancePath(target.Path));
+}
+
+/**
+ * @brief   One voltage per node once the blocks are expanded, which a marker on a pin of a block and another on the net
+ *          it joins can break, and none on ground, which a pin tied to ground would reach.
+ */
+std::optional<std::string> CheckNodeVoltageTargets(const Circuit &circuit, const NodeVoltageKind kind) {
+    const NodeVoltageWords words = DescribeKind(kind);
+    std::map<std::pair<std::vector<std::string>, int>, const NodeVoltageTarget *> known_by_node;
+    const std::vector<NodeVoltageTarget> targets = ResolveNodeVoltages(circuit, kind);
+    for (const NodeVoltageTarget &target : targets) {
+        const std::string where =
+            target.MarkerPath.empty() ? "" : std::format(" in {}", FormatInstancePath(target.MarkerPath));
+        if (target.Node == 0) {
+            return std::format("{} of {} V{} reaches ground, which is always 0 V, through a pin that its instance "
+                               "connects to ground",
+                               Capitalized(words.WithArticle), FormatValue(target.Volts), where);
+        }
+        const auto [known, is_new] = known_by_node.try_emplace({target.Path, target.Node}, &target);
+        if (!is_new && known->second->Volts != target.Volts) {
+            const std::string known_where = known->second->MarkerPath.empty()
+                                                ? ""
+                                                : std::format(" in {}", FormatInstancePath(known->second->MarkerPath));
+            return std::format("{} has two {}, {} V{} and {} V{}; keep one", DescribeTarget(target), words.Plural,
+                               FormatValue(known->second->Volts), known_where, FormatValue(target.Volts), where);
+        }
+    }
+    return std::nullopt;
+}
+
+/**
+ * @brief   The first problem with the markers of a kind in the circuit and in the blocks it places.
+ */
+std::optional<std::string> CheckNodeVoltages(const Circuit &circuit, const NodeVoltageKind kind) {
+    if (std::optional<std::string> problem = CheckNodeVoltagePlaces(circuit, kind, "")) {
+        return problem;
+    }
+    for (const auto &definition : circuit.GetSubcircuits()) {
+        if (std::optional<std::string> problem =
+                CheckNodeVoltagePlaces(definition->Body, kind, std::format(" in block {}", definition->Name))) {
+            return problem;
+        }
+    }
+    return CheckNodeVoltageTargets(circuit, kind);
+}
+
+/**
+ * @brief   Checks that every current-controlled source follows a current that some other part reports.
+ */
+std::optional<std::string> CheckControllingCurrents(const Circuit &circuit) {
+    for (const CircuitEntry &entry : circuit.GetEntries()) {
+        if (!IsCurrentControlled(entry.Part->GetType())) {
+            continue;
+        }
+        const std::string &name = entry.Part->GetName();
+        const std::string &current = static_cast<const ControlledSource &>(*entry.Part).GetControllingCurrent();
+        if (current.empty()) {
+            return std::format("{} follows no current; pick its controlling current in Properties", name);
+        }
+        if (current == name) {
+            return std::format("{} cannot follow its own current", name);
+        }
+        if (!FindControllingSource(circuit, current)) {
+            return std::format("{} follows I({}), which is not in the circuit", name, current);
+        }
+    }
+    return std::nullopt;
+}
+
+/**
+ * @brief   Checks the behavioral sources of a circuit and of the bodies of its blocks, naming the block of a problem.
+ */
+std::optional<std::string> CheckAllBehavioralSources(const Circuit &circuit) {
+    if (std::optional<std::string> problem = CheckBehavioralSources(circuit)) {
+        return problem;
+    }
+    for (const auto &definition : circuit.GetSubcircuits()) {
+        if (std::optional<std::string> problem = CheckBehavioralSources(definition->Body)) {
+            return std::format("In block {}: {}", definition->Name, *problem);
+        }
+    }
+    return std::nullopt;
+}
+
 } // namespace
 
 /**
@@ -222,7 +375,9 @@ std::optional<std::string> CheckBehavioralSources(const Circuit &circuit) {
  * @return  The reason it cannot, in words for the user: it is empty, it has no ground (a circuit of only clocks, logic
  *          inputs, supply rails and logic parts, in blocks or not, needs none), a subcircuit instance or definition
  * cannot be written (an unknown definition, a pin on ground, a parameter it lacks), a part uses a library model the
- * circuit lacks or of another kind, or a current-controlled source follows no valid current; no value when it can.
+ * circuit lacks or of another kind, an initial voltage is on ground, on a node nothing is connected to, inside a block
+ * or twice with different voltages on one node, or a current-controlled source follows no valid current; no value when
+ * it can.
  */
 std::optional<std::string> CheckCircuit(const Circuit &circuit) {
     if (circuit.GetEntries().empty()) {
@@ -240,32 +395,18 @@ std::optional<std::string> CheckCircuit(const Circuit &circuit) {
     if (std::optional<std::string> problem = CheckSourceWaveforms(circuit)) {
         return problem;
     }
-    // A current-controlled source needs a current that some other part reports
-    for (const CircuitEntry &entry : circuit.GetEntries()) {
-        if (!IsCurrentControlled(entry.Part->GetType())) {
-            continue;
-        }
-        const std::string &name = entry.Part->GetName();
-        const std::string &current = static_cast<const ControlledSource &>(*entry.Part).GetControllingCurrent();
-        if (current.empty()) {
-            return std::format("{} follows no current; pick its controlling current in Properties", name);
-        }
-        if (current == name) {
-            return std::format("{} cannot follow its own current", name);
-        }
-        if (!FindControllingSource(circuit, current)) {
-            return std::format("{} follows I({}), which is not in the circuit", name, current);
+    for (const NodeVoltageKind kind : {NodeVoltageKind::INITIAL, NodeVoltageKind::NODESET}) {
+        if (std::optional<std::string> problem = CheckNodeVoltages(circuit, kind)) {
+            return problem;
         }
     }
-    if (std::optional<std::string> problem = CheckBehavioralSources(circuit)) {
+    if (std::optional<std::string> problem = CheckSolverOptions(circuit.GetSolverOptions())) {
         return problem;
     }
-    for (const auto &definition : circuit.GetSubcircuits()) {
-        if (std::optional<std::string> problem = CheckBehavioralSources(definition->Body)) {
-            return std::format("In block {}: {}", definition->Name, *problem);
-        }
+    if (std::optional<std::string> problem = CheckControllingCurrents(circuit)) {
+        return problem;
     }
-    return std::nullopt;
+    return CheckAllBehavioralSources(circuit);
 }
 
 /**

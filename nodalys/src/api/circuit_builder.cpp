@@ -147,6 +147,34 @@ VoltageSourceDevice *FindVoltageSource(const std::map<std::string, Device *> &so
     return nullptr;
 }
 
+/**
+ * @brief   Scales the parameters of a diode by its area, as SPICE does: the currents and the capacitance grow with
+ *          it and the series resistance shrinks.
+ */
+DiodeParameters ScaleByArea(DiodeParameters parameters, const double area) {
+    parameters.SaturationCurrent *= area;
+    parameters.BreakdownCurrent *= area;
+    parameters.JunctionCapacitance *= area;
+    parameters.SeriesResistance /= area;
+    return parameters;
+}
+
+/**
+ * @brief   Scales the parameters of a bipolar transistor by its area, as SPICE does: the currents and the
+ *          capacitances grow with it and the resistances shrink.
+ */
+BjtParameters ScaleByArea(BjtParameters parameters, const double area) {
+    parameters.SaturationCurrent *= area;
+    parameters.LeakageSaturationCurrent *= area;
+    parameters.ForwardKneeCurrent *= area;
+    parameters.EmitterCapacitance *= area;
+    parameters.CollectorCapacitance *= area;
+    parameters.BaseResistance /= area;
+    parameters.CollectorResistance /= area;
+    parameters.EmitterResistance /= area;
+    return parameters;
+}
+
 } // namespace
 
 class CircuitBuilderImpl {
@@ -440,11 +468,10 @@ public:
         });
     }
 
-    void AddDiode(std::string name, NodeId anode, NodeId cathode, const DiodeParameters &params, double area) {
-        (void)area;
+    void AddDiode(std::string name, NodeId anode, NodeId cathode, const DiodeParameters &unit_params, double area) {
         Track(anode);
         Track(cathode);
-        Defer([this, name = std::move(name), anode, cathode, params]() mutable {
+        Defer([this, name = std::move(name), anode, cathode, params = ScaleByArea(unit_params, area)]() mutable {
             const int ua = MapNode(anode);
             const int uc = MapNode(cathode);
             const int internal = (params.SeriesResistance > 0.0) ? AllocateInternalNode() : -1;
@@ -459,12 +486,12 @@ public:
         });
     }
 
-    void AddBjt(std::string name, NodeId c, NodeId b, NodeId e, bool is_npn, const BjtParameters &params, double area) {
-        (void)area;
+    void AddBjt(std::string name, NodeId c, NodeId b, NodeId e, bool is_npn, const BjtParameters &unit_params,
+                double area) {
         Track(c);
         Track(b);
         Track(e);
-        Defer([this, name = std::move(name), c, b, e, is_npn, params]() mutable {
+        Defer([this, name = std::move(name), c, b, e, is_npn, params = ScaleByArea(unit_params, area)]() mutable {
             const int uc = MapNode(c);
             const int ub = MapNode(b);
             const int ue = MapNode(e);
@@ -892,6 +919,16 @@ public:
         });
     }
 
+    void SetNodeset(const NodeId node, const double voltage) {
+        Track(node);
+        Defer([this, node, voltage]() {
+            const int mapped = MapNode(node);
+            if (mapped >= 0) {
+                m_NodesetVoltages[mapped] = voltage;
+            }
+        });
+    }
+
     std::expected<Circuit, std::string> Build() {
         const int total_top_nodes = std::max(m_CircuitNodeCount, m_MaxNode + 1);
         SetCircuitNodeCount(total_top_nodes);
@@ -903,7 +940,18 @@ public:
         for (const auto &[node, voltage] : m_InitialNodeVoltages) {
             m_Compiled.Devices.push_back(std::make_unique<NodeInitialConditionDevice>(node, voltage));
         }
+        if (!m_InitialNodeVoltages.empty()) {
+            for (const auto &device : m_Compiled.Devices) {
+                if (auto *capacitor = dynamic_cast<CapacitorDevice *>(device.get())) {
+                    capacitor->TakeInitialVoltageFrom(m_InitialNodeVoltages);
+                }
+            }
+        }
         m_InitialNodeVoltages.clear();
+        for (const auto &[node, voltage] : m_NodesetVoltages) {
+            m_Compiled.Devices.push_back(std::make_unique<NodesetDevice>(node, voltage));
+        }
+        m_NodesetVoltages.clear();
         BindBehavioralCurrents();
         if (!m_Errors.empty()) {
             return std::unexpected(m_Errors.front());
@@ -949,6 +997,7 @@ private:
     std::vector<bool> m_IsNodeUnknown;
     std::vector<bool> m_DynamicUnknown;
     std::map<int, double> m_InitialNodeVoltages;
+    std::map<int, double> m_NodesetVoltages;
     CompiledCircuit m_Compiled;
 };
 
@@ -1313,9 +1362,25 @@ void CircuitBuilder::AddDFlipFlop(std::string name, const NodeId q, const NodeId
  * @brief   Sets the initial voltage of a node at $t = 0$ in a transient analysis (SPICE `.ic`).
  * @param[in] node     Node to clamp at the start of the transient; ground (0) is ignored.
  * @param[in] voltage  Initial voltage in volts.
+ * @note    The node is held at the voltage while the operating point that starts the transient is found, and then
+ *          released. A transient that starts from initial conditions (`uic`) has no operating point: there the
+ *          capacitors with no `IC` of their own that touch the node start at its voltage, as in SPICE.
  */
 void CircuitBuilder::SetInitialVoltage(const NodeId node, const double voltage) {
     m_Impl->SetInitialVoltage(node, voltage);
+}
+
+/**
+ * @brief   Sets the voltage the solver starts the operating point of a node from (SPICE `.nodeset`).
+ * @param[in] node     Node to pull toward the voltage; ground (0) is ignored.
+ * @param[in] voltage  Voltage in volts.
+ * @note    A guess and not a held value: the solver first finds the point with the node pulled to the voltage, then
+ * lets go and converges again, so where a circuit has several stable states it ends in the one nearest the guess. Every
+ * analysis that starts from an operating point reads it, except the harmonic balance; the transient that starts from
+ * initial conditions (`uic`) has no operating point, and a DC sweep reads it for its first point only.
+ */
+void CircuitBuilder::SetNodeset(const NodeId node, const double voltage) {
+    m_Impl->SetNodeset(node, voltage);
 }
 
 std::expected<Circuit, std::string> CircuitBuilder::Build() {

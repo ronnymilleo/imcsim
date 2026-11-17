@@ -6,19 +6,25 @@
 #include "nodalys/netlist_parser.h"
 #include "nodalys/circuit_builder.h"
 #include "nodalys/expression.h"
+#include "parser/model_cards.h"
+#include "parser/netlist_subcircuits.h"
+#include "parser/source_waveforms.h"
 #include "parser/spice_number.h"
+#include "parser/spice_text.h"
 
 #include <algorithm>
 #include <cctype>
 #include <charconv>
 #include <cmath>
 #include <format>
+#include <limits>
 #include <map>
 #include <optional>
 #include <ranges>
 #include <set>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace Nodalys {
@@ -119,114 +125,6 @@ std::vector<std::string> TokenizeLine(std::string_view line) {
     return tokens;
 }
 
-struct ParsedModel {
-    enum class ModelKind {
-        DIODE,
-        BJT_NPN,
-        BJT_PNP,
-        MOSFET_NMOS,
-        MOSFET_PMOS,
-        SWITCH
-    };
-    ModelKind Kind = ModelKind::DIODE;
-    std::map<std::string, double> Params;
-};
-
-DiodeParameters BuildDiodeParameters(const ParsedModel &m) {
-    DiodeParameters p;
-    auto get = [&](std::string_view k, double def) {
-        auto it = m.Params.find(std::string(k));
-        return it != m.Params.end() ? it->second : def;
-    };
-    p.SaturationCurrent = get("IS", p.SaturationCurrent);
-    p.SeriesResistance = get("RS", p.SeriesResistance);
-    p.EmissionCoefficient = get("N", p.EmissionCoefficient);
-    p.BreakdownVoltage = get("BV", p.BreakdownVoltage);
-    p.BreakdownCurrent = get("IBV", p.BreakdownCurrent);
-    p.JunctionCapacitance = get("CJO", p.JunctionCapacitance);
-    p.JunctionPotential = get("VJ", p.JunctionPotential);
-    p.GradingCoefficient = get("M", p.GradingCoefficient);
-    p.TransitTime = get("TT", p.TransitTime);
-    p.EnergyGap = get("EG", p.EnergyGap);
-    p.SaturationCurrentExponent = get("XTI", p.SaturationCurrentExponent);
-    return p;
-}
-
-BjtParameters BuildBjtParameters(const ParsedModel &m) {
-    BjtParameters p;
-    auto get = [&](std::string_view k, double def) {
-        auto it = m.Params.find(std::string(k));
-        return it != m.Params.end() ? it->second : def;
-    };
-    p.SaturationCurrent = get("IS", p.SaturationCurrent);
-    p.ForwardBeta = get("BF", p.ForwardBeta);
-    p.ReverseBeta = get("BR", p.ReverseBeta);
-    p.EarlyVoltage = get("VAF", p.EarlyVoltage);
-    p.ForwardKneeCurrent = get("IKF", p.ForwardKneeCurrent);
-    p.LeakageSaturationCurrent = get("ISE", p.LeakageSaturationCurrent);
-    p.LeakageEmissionCoefficient = get("NE", p.LeakageEmissionCoefficient);
-    p.BaseResistance = get("RB", p.BaseResistance);
-    p.CollectorResistance = get("RC", p.CollectorResistance);
-    p.EmitterResistance = get("RE", p.EmitterResistance);
-    p.EmitterCapacitance = get("CJE", p.EmitterCapacitance);
-    p.CollectorCapacitance = get("CJC", p.CollectorCapacitance);
-    p.TransitTime = get("TF", p.TransitTime);
-    p.EnergyGap = get("EG", p.EnergyGap);
-    p.SaturationCurrentExponent = get("XTI", p.SaturationCurrentExponent);
-    p.BetaExponent = get("XTB", p.BetaExponent);
-    return p;
-}
-
-MosfetParameters BuildMosfetParameters(const ParsedModel &m) {
-    MosfetParameters p;
-    auto get = [&](std::string_view k, double def) {
-        auto it = m.Params.find(std::string(k));
-        return it != m.Params.end() ? it->second : def;
-    };
-    p.ThresholdVoltage = get("VTO", p.ThresholdVoltage);
-    p.Transconductance = get("KP", p.Transconductance);
-    p.ChannelModulation = get("LAMBDA", p.ChannelModulation);
-    p.DrainResistance = get("RD", p.DrainResistance);
-    p.SourceResistance = get("RS", p.SourceResistance);
-    p.GateSourceOverlap = get("CGSO", p.GateSourceOverlap);
-    p.GateDrainOverlap = get("CGDO", p.GateDrainOverlap);
-    p.Length = get("L", p.Length);
-    p.Width = get("W", p.Width);
-    p.SurfacePotential = get("PHI", p.SurfacePotential);
-    return p;
-}
-
-SwitchParameters BuildSwitchParameters(const ParsedModel &m) {
-    SwitchParameters p;
-    auto get = [&](std::string_view k, double def) {
-        auto it = m.Params.find(std::string(k));
-        return it != m.Params.end() ? it->second : def;
-    };
-    if (m.Params.contains("VT")) {
-        p.Threshold = m.Params.at("VT");
-    } else if (m.Params.contains("VTHRESHOLD")) {
-        p.Threshold = m.Params.at("VTHRESHOLD");
-    }
-    if (m.Params.contains("VH")) {
-        p.Hysteresis = m.Params.at("VH");
-    } else if (m.Params.contains("VHYSTERESIS")) {
-        p.Hysteresis = m.Params.at("VHYSTERESIS");
-    }
-    if (m.Params.contains("RON")) {
-        p.OnResistance = m.Params.at("RON");
-    }
-    if (m.Params.contains("ROFF")) {
-        p.OffResistance = m.Params.at("ROFF");
-    }
-    return p;
-}
-
-struct SubcircuitDef {
-    std::string Name;
-    std::vector<std::string> Pins;
-    std::vector<std::string> Lines;
-};
-
 // Map node string (e.g. "0", "GND", "IN", "1") to NodeId
 class NodeManager {
 public:
@@ -265,6 +163,9 @@ public:
         const int total_nodes = std::max(next_id, 1);
         builder.SetCircuitNodeCount(total_nodes);
     }
+
+    /// Gives a name to a node that something else made, such as an internal node of a subcircuit instance.
+    void Bind(const std::string &upper_name, const NodeId node) { m_NodeMap[upper_name] = node; }
 
     NodeId Resolve(std::string_view name) const {
         const std::string upper = ToUpper(Trim(name));
@@ -325,10 +226,11 @@ std::expected<IcAssignment, std::string> NextIcAssignment(const std::vector<std:
     return std::unexpected(std::format("Malformed entry '{}' in .ic: '{}'", tokens[index], line));
 }
 
-/// Parses a `.ic` directive such as `.ic v(1)=5 v(out) = 0` and records each node initial voltage.
-std::expected<void, std::string> ParseInitialConditionDirective(const std::vector<std::string> &tokens,
-                                                                std::string_view line, const NodeManager &nodes,
-                                                                CircuitBuilder &builder) {
+/// Parses a `.ic` or `.nodeset` directive such as `.ic v(1)=5 v(out) = 0` and records each node voltage, as the
+/// initial voltage of the node or as its nodeset.
+std::expected<void, std::string> ParseNodeVoltageDirective(const std::vector<std::string> &tokens,
+                                                           std::string_view line, const NodeManager &nodes,
+                                                           CircuitBuilder &builder, const bool is_nodeset) {
     for (std::size_t i = 1; i < tokens.size(); ++i) {
         const auto assignment = NextIcAssignment(tokens, i, line);
         if (!assignment) {
@@ -343,7 +245,11 @@ std::expected<void, std::string> ParseInitialConditionDirective(const std::vecto
         if (!voltage) {
             return std::unexpected(std::format("Invalid voltage '{}' in .ic: '{}'", assignment->Rhs, line));
         }
-        builder.SetInitialVoltage(nodes.Resolve(node_name), *voltage);
+        if (is_nodeset) {
+            builder.SetNodeset(nodes.Resolve(node_name), *voltage);
+        } else {
+            builder.SetInitialVoltage(nodes.Resolve(node_name), *voltage);
+        }
     }
     return {};
 }
@@ -379,6 +285,165 @@ std::pair<std::string, std::string> ParseVoltageNodes(std::string_view s) {
         return {std::string(Trim(inner)), "0"};
     }
     return {std::string(s), "0"};
+}
+
+/// The names of the independent sources of the circuit lines that have an AC magnitude, which is what drives an AC
+/// sensitivity. Sources inside a block are not seen: a block's own sources have no AC to name from outside.
+std::vector<std::string> FindAcSources(const std::vector<std::string> &circuit_lines) {
+    std::vector<std::string> names;
+    for (const std::string &line : circuit_lines) {
+        const std::vector<std::string> tokens = TokenizeLine(line);
+        if (tokens.size() < 3) {
+            continue;
+        }
+        const char kind = static_cast<char>(std::toupper(static_cast<unsigned char>(tokens[0].front())));
+        if (kind != 'V' && kind != 'I') {
+            continue;
+        }
+        for (std::size_t index = 3; index + 1 < tokens.size(); ++index) {
+            if (ToUpper(tokens[index]) == "AC") {
+                if (ParseSpiceNumber(tokens[index + 1]).value_or(1.0) != 0.0) {
+                    names.push_back(tokens[0]);
+                }
+                break;
+            }
+        }
+    }
+    return names;
+}
+
+/// The sweep of an `.ac`, `.noise` or `.sens ... ac` directive as it is written.
+struct FrequencySweepWords {
+    FrequencySweepType Type = FrequencySweepType::DECADE;
+    int Points = 0;
+    double StartFrequency = 0.0;
+    double StopFrequency = 0.0;
+};
+
+/// Where the sweep of `.sens <out_var> AC <type> <np> <fstart> <fstop>` starts among the tokens.
+constexpr std::size_t FIRST_AC_SENSITIVITY_SWEEP_TOKEN = 3;
+
+/// The words that follow the sweep type, which are the points, the start and the stop.
+constexpr std::size_t SWEEP_NUMBER_COUNT = 3;
+
+std::optional<FrequencySweepType> FindSweepType(const std::string &word) {
+    const std::string upper = ToUpper(word);
+    if (upper == "DEC") {
+        return FrequencySweepType::DECADE;
+    }
+    if (upper == "OCT") {
+        return FrequencySweepType::OCTAVE;
+    }
+    if (upper == "LIN") {
+        return FrequencySweepType::LINEAR;
+    }
+    return std::nullopt;
+}
+
+/**
+ * @brief   Reads `[DEC|OCT|LIN] <np> <fstart> <fstop>` from the tokens of a directive.
+ * @details The point count is a whole number of at least 1 and the range needs 0 < fstart <= fstop, for a linear
+ *          sweep too: the engine solves at each frequency as it is asked, and a zero start has no meaning for the
+ *          noise of a part that falls with frequency. ngspice accepts a start of 0 in a linear sweep; this reader
+ *          does not.
+ * @param[in] tokens             Tokens of the directive.
+ * @param[in] first_token        Index of the sweep type, or of the point count when the type is optional and absent.
+ * @param[in] is_type_required   True when the type word must be there, as in `.sens ac`; otherwise a missing one is a
+ *                               sweep by decade.
+ * @param[in] directive          Name used in the messages, such as ".ac".
+ * @param[in] line               Text of the directive, quoted in the messages.
+ * @return  The sweep, or the message that tells what is wrong with it.
+ */
+std::expected<FrequencySweepWords, std::string>
+ReadFrequencySweep(const std::vector<std::string> &tokens, const std::size_t first_token, const bool is_type_required,
+                   const std::string_view directive, const std::string_view line) {
+    FrequencySweepWords sweep;
+    std::size_t number_token = first_token;
+    if (first_token >= tokens.size()) {
+        return std::unexpected(std::format("Malformed {} directive: '{}'", directive, line));
+    }
+    const std::optional<FrequencySweepType> type = FindSweepType(tokens[first_token]);
+    if (type) {
+        sweep.Type = *type;
+        ++number_token;
+    } else if (is_type_required) {
+        return std::unexpected(std::format("Unknown sweep type '{}' in {}, use dec, oct or lin: '{}'",
+                                           tokens[first_token], directive, line));
+    }
+    if (tokens.size() < number_token + SWEEP_NUMBER_COUNT) {
+        return std::unexpected(std::format("Malformed {} directive: '{}'", directive, line));
+    }
+    const std::optional<double> points = ParseSpiceNumber(tokens[number_token]);
+    if (!points || *points < 1.0 || std::floor(*points) != *points ||
+        *points > static_cast<double>(std::numeric_limits<int>::max())) {
+        return std::unexpected(std::format(
+            "Invalid number of points in {}, it must be a whole number of at least 1: '{}'", directive, line));
+    }
+    sweep.Points = static_cast<int>(*points);
+    const std::optional<double> start = ParseSpiceNumber(tokens[number_token + 1]);
+    const std::optional<double> stop = ParseSpiceNumber(tokens[number_token + 2]);
+    if (!start || !stop || *start <= 0.0 || *stop < *start) {
+        return std::unexpected(
+            std::format("Invalid frequency range in {}, it needs 0 < fstart <= fstop: '{}'", directive, line));
+    }
+    sweep.StartFrequency = *start;
+    sweep.StopFrequency = *stop;
+    return sweep;
+}
+
+/// The input of an AC sensitivity: the ngspice syntax names none, so it is the one source with an AC magnitude.
+std::expected<std::string, std::string> FindAcSensitivityInput(const std::vector<std::string> &circuit_lines) {
+    const std::vector<std::string> sources = FindAcSources(circuit_lines);
+    if (sources.empty()) {
+        return std::unexpected("No source has an AC magnitude, so .sens ac has no input; give one source 'AC 1'");
+    }
+    if (sources.size() > 1) {
+        std::string names;
+        for (const std::string &name : sources) {
+            names += (names.empty() ? "" : ", ") + name;
+        }
+        return std::unexpected(std::format("More than one source has an AC magnitude ({}), so .sens ac cannot tell "
+                                           "its input; leave AC on one source only",
+                                           names));
+    }
+    return sources.front();
+}
+
+/// Reads the rest of `.sens <out_var> AC [DEC|OCT|LIN] <np> <fstart> <fstop>` after the output nodes, and picks the
+/// input source.
+std::expected<AcSensitivityConfig, std::string> ParseAcSensitivity(const std::vector<std::string> &tokens,
+                                                                   const NodeId positive, const NodeId negative,
+                                                                   const std::vector<std::string> &circuit_lines,
+                                                                   const std::string_view line) {
+    constexpr std::size_t TOKENS_WITH_SWEEP_TYPE = 7;
+    if (tokens.size() != TOKENS_WITH_SWEEP_TYPE) {
+        return std::unexpected("Malformed .sens ac directive, expected '.sens <out_var> ac dec|oct|lin <np> <fstart> "
+                               "<fstop>'");
+    }
+    const std::expected<FrequencySweepWords, std::string> sweep =
+        ReadFrequencySweep(tokens, FIRST_AC_SENSITIVITY_SWEEP_TOKEN, true, ".sens ac", line);
+    if (!sweep) {
+        return std::unexpected(sweep.error());
+    }
+    AcSensitivityConfig cfg;
+    cfg.SweepType = sweep->Type;
+    cfg.PointsPerDecade = sweep->Points;
+    cfg.StartFrequency = sweep->StartFrequency;
+    cfg.StopFrequency = sweep->StopFrequency;
+    if (positive == GROUND_NODE) {
+        return std::unexpected("The output of .sens ac must have a node other than ground as its positive one");
+    }
+    if (positive == negative) {
+        return std::unexpected("The two output nodes of .sens ac are the same node");
+    }
+    cfg.OutputPositiveNode = positive;
+    cfg.OutputNegativeNode = negative;
+    const std::expected<std::string, std::string> input = FindAcSensitivityInput(circuit_lines);
+    if (!input) {
+        return std::unexpected(input.error());
+    }
+    cfg.InputSource = *input;
+    return cfg;
 }
 
 /// The kind and the text of the expression of a B element line, `B1 n+ n- V=<expression>`; the text is taken from
@@ -464,13 +529,14 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
     // SPICE standard: first line is circuit title
     result.Title = logical_lines.front();
 
-    // 2. First pass: Collect .model and .subckt definitions
+    // 2. First pass: Collect .model definitions and the lines the subcircuits are placed from
     std::map<std::string, ParsedModel> models;
-    std::map<std::string, SubcircuitDef> subcircuits;
     std::vector<std::string> circuit_lines;
+    // The .subckt blocks, .model cards and .param lines, which every X line is placed over
+    std::vector<std::string> definition_lines;
 
-    bool in_subcircuit = false;
-    SubcircuitDef current_subckt;
+    int subcircuit_depth = 0;
+    std::string open_subcircuit_name;
 
     for (std::size_t line_idx = 1; line_idx < logical_lines.size(); ++line_idx) {
         const std::string &line = logical_lines[line_idx];
@@ -490,25 +556,29 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
             if (tokens.size() < 2) {
                 return std::unexpected(std::format("Malformed .subckt directive on line {}", line_idx + 1));
             }
-            in_subcircuit = true;
-            current_subckt.Name = ToUpper(tokens[1]);
-            current_subckt.Pins.clear();
-            for (std::size_t p = 2; p < tokens.size(); ++p) {
-                current_subckt.Pins.push_back(ToUpper(tokens[p]));
+            if (subcircuit_depth == 0) {
+                open_subcircuit_name = tokens[1];
             }
-            current_subckt.Lines.clear();
+            ++subcircuit_depth;
+            definition_lines.push_back(line);
             continue;
         }
 
         if (directive == ".ENDS") {
-            in_subcircuit = false;
-            subcircuits[current_subckt.Name] = std::move(current_subckt);
-            current_subckt = SubcircuitDef{};
+            if (subcircuit_depth > 0) {
+                --subcircuit_depth;
+                definition_lines.push_back(line);
+            }
             continue;
         }
 
-        if (in_subcircuit) {
-            current_subckt.Lines.push_back(line);
+        if (subcircuit_depth > 0) {
+            definition_lines.push_back(line);
+            continue;
+        }
+
+        if (directive == ".PARAM") {
+            definition_lines.push_back(line);
             continue;
         }
 
@@ -589,6 +659,7 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
             }
 
             models[model_name] = std::move(model);
+            definition_lines.push_back(line);
             continue;
         }
 
@@ -599,105 +670,15 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
         circuit_lines.push_back(line);
     }
 
-    // 3. Expand Subcircuits ('X' devices) into flat circuit lines
-    std::vector<std::string> flat_lines;
-    std::function<std::expected<void, std::string>(const std::string &line, const std::string &prefix,
-                                                   const std::map<std::string, std::string> &pin_map)>
-        expand_line;
-
-    expand_line = [&](const std::string &line, const std::string &prefix,
-                      const std::map<std::string, std::string> &pin_map) -> std::expected<void, std::string> {
-        const auto tokens = TokenizeLine(line);
-        if (tokens.empty()) {
-            return {};
-        }
-
-        if (ToUpper(tokens[0]).starts_with('X')) {
-            // Subcircuit instantiation: X<name> <pins...> <subckt_name>
-            if (tokens.size() < 3) {
-                return std::unexpected(std::format("Malformed subcircuit call: '{}'", line));
-            }
-            const std::string inst_name = prefix.empty() ? tokens[0] : prefix + "." + tokens[0];
-            const std::string subckt_name = ToUpper(tokens.back());
-
-            auto it = subcircuits.find(subckt_name);
-            if (it == subcircuits.end()) {
-                return std::unexpected(std::format("Subcircuit '{}' not found", subckt_name));
-            }
-
-            const auto &sub = it->second;
-            const std::size_t formal_pin_count = sub.Pins.size();
-            const std::size_t actual_pin_count = tokens.size() - 2;
-            if (actual_pin_count != formal_pin_count) {
-                return std::unexpected(std::format("Subcircuit '{}' expects {} pins, got {}", subckt_name,
-                                                   formal_pin_count, actual_pin_count));
-            }
-
-            std::map<std::string, std::string> child_pin_map;
-            for (std::size_t p = 0; p < formal_pin_count; ++p) {
-                std::string actual_pin = ToUpper(tokens[1 + p]);
-                auto p_it = pin_map.find(actual_pin);
-                if (p_it != pin_map.end()) {
-                    actual_pin = p_it->second;
-                } else if (!prefix.empty() && actual_pin != "0" && actual_pin != "GND") {
-                    actual_pin = prefix + "." + actual_pin;
-                }
-                child_pin_map[sub.Pins[p]] = actual_pin;
-            }
-
-            for (const auto &sub_line : sub.Lines) {
-                auto exp_res = expand_line(sub_line, inst_name, child_pin_map);
-                if (!exp_res) {
-                    return exp_res;
-                }
-            }
-            return {};
-        }
-
-        // Normal element inside subcircuit: map its nodes and prepend instance prefix
-        if (!prefix.empty() && std::toupper(static_cast<unsigned char>(tokens[0].front())) == 'B') {
-            // The nodes and sources an expression names are not renamed for the instance, which would read the nodes of
-            // the circuit around it instead
-            return std::unexpected(
-                std::format("A behavioral source inside a subcircuit is not supported, since its expression cannot be "
-                            "renamed for each instance: '{}'",
-                            line));
-        }
-        if (!prefix.empty()) {
-            std::string rewritten = prefix + "." + tokens[0];
-            for (std::size_t i = 1; i < tokens.size(); ++i) {
-                rewritten.push_back(' ');
-                const std::string upper_tok = ToUpper(tokens[i]);
-                auto it = pin_map.find(upper_tok);
-                if (it != pin_map.end()) {
-                    rewritten.append(it->second);
-                } else if (i <= 4 && !upper_tok.starts_with('.') && !ParseSpiceNumber(tokens[i]) && upper_tok != "0" &&
-                           upper_tok != "GND") {
-                    rewritten.append(prefix + "." + tokens[i]);
-                } else {
-                    rewritten.append(tokens[i]);
-                }
-            }
-            flat_lines.push_back(std::move(rewritten));
-        } else {
-            flat_lines.push_back(line);
-        }
-        return {};
-    };
-
-    for (const auto &line : circuit_lines) {
-        auto res = expand_line(line, "", {});
-        if (!res) {
-            return std::unexpected(res.error());
-        }
+    if (subcircuit_depth > 0) {
+        return std::unexpected(std::format("The subcircuit '{}' has no .ends", open_subcircuit_name));
     }
-
     // 4. Parse components and analyses using CircuitBuilder
     CircuitBuilder builder;
     NodeManager nodes;
 
-    // Pre-scan all flat_lines to discover and register all circuit nodes
-    for (const auto &line : flat_lines) {
+    // Pre-scan all circuit_lines to discover and register all circuit nodes
+    for (const auto &line : circuit_lines) {
         const auto tokens = TokenizeLine(line);
         if (tokens.empty()) {
             continue;
@@ -794,6 +775,14 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
             break;
         }
 
+        case 'X':
+            if (const std::optional<InstanceLine> instance = SplitInstanceLine(SplitTokens(line))) {
+                for (const std::string &node_name : instance->NodeNames) {
+                    nodes.Register(node_name);
+                }
+            }
+            break;
+
         case 'U': {
             for (std::size_t i = 1; i < tokens.size(); ++i) {
                 if (tokens[i].find('=') != std::string::npos) {
@@ -817,7 +806,39 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
 
     nodes.Finalize(builder);
 
-    for (const auto &line : flat_lines) {
+    // Subcircuits come first, since their internal nodes (X1.MID) are named by the directives that follow, wherever
+    // those stand in the netlist
+    struct BlockSource {
+        std::string Name;
+        NodeId Positive;
+        NodeId Negative;
+    };
+    std::vector<BlockSource> block_sources;
+    const InstanceObservers observers{
+        .OnInternalNode = [&nodes](const std::string &name, const NodeId node) { nodes.Bind(name, node); },
+        .OnSource = [&block_sources](const std::string &name, const NodeId positive,
+                                     const NodeId negative) { block_sources.push_back({name, positive, negative}); }};
+    for (const auto &line : circuit_lines) {
+        const auto tokens = TokenizeLine(line);
+        if (tokens.empty() || std::toupper(static_cast<unsigned char>(tokens[0].front())) != 'X') {
+            continue;
+        }
+        const auto added = AddNetlistInstance(
+            builder, definition_lines, line, [&nodes](const std::string_view name) { return nodes.Resolve(name); },
+            observers);
+        if (!added) {
+            return std::unexpected(added.error());
+        }
+        for (const std::string &warning : *added) {
+            const bool is_reported = std::ranges::any_of(
+                result.Diagnostics, [&warning](const DiagnosticMessage &message) { return message.Text == warning; });
+            if (!is_reported) {
+                result.Diagnostics.push_back({warning});
+            }
+        }
+    }
+
+    for (const auto &line : circuit_lines) {
         const auto tokens = TokenizeLine(line);
         if (tokens.empty()) {
             continue;
@@ -875,15 +896,16 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                 if (tokens.size() < 4) {
                     return std::unexpected(std::format("Malformed .ac directive: '{}'", line));
                 }
-                AcSweepConfig cfg;
-                int start_idx = 1;
-                const std::string scale_type = ToUpper(tokens[1]);
-                if (scale_type == "DEC" || scale_type == "OCT" || scale_type == "LIN") {
-                    start_idx = 2;
+                const std::expected<FrequencySweepWords, std::string> sweep =
+                    ReadFrequencySweep(tokens, 1, false, ".ac", line);
+                if (!sweep) {
+                    return std::unexpected(sweep.error());
                 }
-                cfg.PointsPerDecade = static_cast<int>(ParseSpiceNumber(tokens[start_idx]).value_or(10));
-                cfg.StartFrequency = ParseSpiceNumber(tokens[start_idx + 1]).value_or(1.0);
-                cfg.StopFrequency = ParseSpiceNumber(tokens[start_idx + 2]).value_or(1e6);
+                AcSweepConfig cfg;
+                cfg.SweepType = sweep->Type;
+                cfg.PointsPerDecade = sweep->Points;
+                cfg.StartFrequency = sweep->StartFrequency;
+                cfg.StopFrequency = sweep->StopFrequency;
                 result.Analyses.push_back({AnalysisKind::AC_SWEEP, cfg});
             } else if (dir == ".TF") {
                 // .TF <out_var> <in_src>
@@ -906,14 +928,15 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                 cfg.OutputPositiveNode = nodes.Resolve(pos_str);
                 cfg.OutputNegativeNode = nodes.Resolve(neg_str);
                 cfg.InputSource = tokens[2];
-                int sidx = 3;
-                const std::string stype = ToUpper(tokens[3]);
-                if (stype == "DEC" || stype == "OCT" || stype == "LIN") {
-                    sidx = 4;
+                const std::expected<FrequencySweepWords, std::string> sweep =
+                    ReadFrequencySweep(tokens, 3, false, ".noise", line);
+                if (!sweep) {
+                    return std::unexpected(sweep.error());
                 }
-                cfg.PointsPerDecade = static_cast<int>(ParseSpiceNumber(tokens[sidx]).value_or(10));
-                cfg.StartFrequency = ParseSpiceNumber(tokens[sidx + 1]).value_or(1.0);
-                cfg.StopFrequency = ParseSpiceNumber(tokens[sidx + 2]).value_or(1e6);
+                cfg.SweepType = sweep->Type;
+                cfg.PointsPerDecade = sweep->Points;
+                cfg.StartFrequency = sweep->StartFrequency;
+                cfg.StopFrequency = sweep->StopFrequency;
                 result.Analyses.push_back({AnalysisKind::NOISE, cfg});
             } else if (dir == ".SP") {
                 // .SP [DEC|OCT|LIN] <np> <fstart> <fstop>
@@ -949,8 +972,8 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                     const std::string in_neg = tokens[2];
                     const std::string out_pos = tokens[3];
                     cfg.OutputNode = nodes.Resolve(out_pos);
-                    // Search flat_lines for a source connected between in_pos and in_neg
-                    for (const auto &cand_line : flat_lines) {
+                    // Search circuit_lines for a source connected between in_pos and in_neg
+                    for (const auto &cand_line : circuit_lines) {
                         const auto cand_toks = TokenizeLine(cand_line);
                         if (cand_toks.size() >= 3) {
                             const char fc =
@@ -962,6 +985,17 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                                     break;
                                 }
                             }
+                        }
+                    }
+                    for (const BlockSource &source : block_sources) {
+                        if (!cfg.InputSource.empty()) {
+                            break;
+                        }
+                        const NodeId in_positive = nodes.Resolve(in_pos);
+                        const NodeId in_negative = nodes.Resolve(in_neg);
+                        if ((source.Positive == in_positive && source.Negative == in_negative) ||
+                            (source.Positive == in_negative && source.Negative == in_positive)) {
+                            cfg.InputSource = source.Name;
                         }
                     }
                     if (cfg.InputSource.empty()) {
@@ -992,14 +1026,26 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                 result.Analyses.push_back({AnalysisKind::POLE_ZERO, cfg});
             } else if (dir == ".SENS") {
                 // .SENS <out_var> (e.g. .sens v(out) or .sens v(out, ref))
+                // .SENS <out_var> AC [DEC|OCT|LIN] <np> <fstart> <fstop>
                 if (tokens.size() < 2) {
                     return std::unexpected(std::format("Malformed .sens directive: '{}'", line));
                 }
-                SensitivityConfig cfg;
                 const auto [pos_str, neg_str] = ParseVoltageNodes(tokens[1]);
-                cfg.OutputPositiveNode = nodes.Resolve(pos_str);
-                cfg.OutputNegativeNode = nodes.Resolve(neg_str);
-                result.Analyses.push_back({AnalysisKind::SENSITIVITY, cfg});
+                const NodeId positive = nodes.Resolve(pos_str);
+                const NodeId negative = nodes.Resolve(neg_str);
+                if (tokens.size() >= 3 && ToUpper(tokens[2]) == "AC") {
+                    const std::expected<AcSensitivityConfig, std::string> cfg =
+                        ParseAcSensitivity(tokens, positive, negative, circuit_lines, line);
+                    if (!cfg) {
+                        return std::unexpected(std::format("{}: '{}'", cfg.error(), line));
+                    }
+                    result.Analyses.push_back({AnalysisKind::AC_SENSITIVITY, *cfg});
+                } else {
+                    SensitivityConfig cfg;
+                    cfg.OutputPositiveNode = positive;
+                    cfg.OutputNegativeNode = negative;
+                    result.Analyses.push_back({AnalysisKind::SENSITIVITY, cfg});
+                }
             } else if (dir == ".HB") {
                 // .HB <f0> <harmonics> [samples=<M>]
                 if (tokens.size() < 3) {
@@ -1078,8 +1124,9 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                         return std::unexpected(std::format("Invalid temperature '{}' in .temp: '{}'", tokens[1], line));
                     }
                 }
-            } else if (dir == ".IC") {
-                if (const auto ic_res = ParseInitialConditionDirective(tokens, line, nodes, builder); !ic_res) {
+            } else if (dir == ".IC" || dir == ".NODESET") {
+                if (const auto ic_res = ParseNodeVoltageDirective(tokens, line, nodes, builder, dir == ".NODESET");
+                    !ic_res) {
                     return std::unexpected(ic_res.error());
                 }
             }
@@ -1171,18 +1218,7 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
             int port_num = 0;
             double z0 = 50.0;
 
-            enum class WaveformType {
-                NONE,
-                PULSE,
-                SINE,
-                EXP,
-                PWL,
-                SFFM,
-                AM,
-                TRNOISE,
-                TRRANDOM
-            };
-            WaveformType wtype = WaveformType::NONE;
+            SourceWaveform wtype = SourceWaveform::NONE;
             std::string waveform_token;
 
             std::size_t idx = 3;
@@ -1228,29 +1264,9 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                         }
                         continue;
                     }
-                } else if (u.starts_with("PULSE(")) {
-                    wtype = WaveformType::PULSE;
-                    waveform_token = tokens[idx];
-                } else if (u.starts_with("SIN(") || u.starts_with("SINE(")) {
-                    wtype = WaveformType::SINE;
-                    waveform_token = tokens[idx];
-                } else if (u.starts_with("EXP(")) {
-                    wtype = WaveformType::EXP;
-                    waveform_token = tokens[idx];
-                } else if (u.starts_with("PWL(")) {
-                    wtype = WaveformType::PWL;
-                    waveform_token = tokens[idx];
-                } else if (u.starts_with("SFFM(")) {
-                    wtype = WaveformType::SFFM;
-                    waveform_token = tokens[idx];
-                } else if (u.starts_with("AM(")) {
-                    wtype = WaveformType::AM;
-                    waveform_token = tokens[idx];
-                } else if (u.starts_with("TRNOISE(")) {
-                    wtype = WaveformType::TRNOISE;
-                    waveform_token = tokens[idx];
-                } else if (u.starts_with("TRRANDOM(")) {
-                    wtype = WaveformType::TRRANDOM;
+                } else if (const SourceWaveform found = FindSourceWaveform(tokens[idx]);
+                           found != SourceWaveform::NONE) {
+                    wtype = found;
                     waveform_token = tokens[idx];
                 } else if (const auto num = ParseSpiceNumber(tokens[idx])) {
                     dc_val = *num;
@@ -1273,201 +1289,9 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
 
             const bool is_voltage = (first_char == 'V');
 
-            switch (wtype) {
-            case WaveformType::PULSE: {
-                const auto vals = ExtractParenthesizedValues(waveform_token);
-                PulseParameters p;
-                if (vals.size() >= 1) {
-                    p.Low = vals[0];
-                }
-                if (vals.size() >= 2) {
-                    p.High = vals[1];
-                }
-                if (vals.size() >= 3) {
-                    p.Delay = vals[2];
-                }
-                if (vals.size() >= 4) {
-                    p.RiseTime = vals[3];
-                }
-                if (vals.size() >= 5) {
-                    p.FallTime = vals[4];
-                }
-                if (vals.size() >= 6) {
-                    p.Width = vals[5];
-                }
-                if (vals.size() >= 7) {
-                    p.Period = vals[6];
-                }
-                if (is_voltage) {
-                    builder.AddVpulse(name, n_pos, n_neg, p, ac_mag, ac_phase);
-                } else {
-                    builder.AddIpulse(name, n_pos, n_neg, p, ac_mag, ac_phase);
-                }
-                break;
-            }
-            case WaveformType::SINE: {
-                const auto vals = ExtractParenthesizedValues(waveform_token);
-                SineParameters p;
-                if (vals.size() >= 1) {
-                    p.Offset = vals[0];
-                }
-                if (vals.size() >= 2) {
-                    p.Amplitude = vals[1];
-                }
-                if (vals.size() >= 3) {
-                    p.Frequency = vals[2];
-                }
-                if (vals.size() >= 4) {
-                    p.Phase = vals[3];
-                }
-                p.Magnitude = ac_mag > 0.0 ? ac_mag : p.Amplitude;
-                const bool damped = vals.size() >= 5 && vals[4] != 0.0;
-                if (is_voltage) {
-                    builder.AddVsine(name, n_pos, n_neg, p, ac_mag, ac_phase, damped);
-                } else {
-                    builder.AddIsine(name, n_pos, n_neg, p, ac_mag, ac_phase, damped);
-                }
-                break;
-            }
-            case WaveformType::EXP: {
-                const auto vals = ExtractParenthesizedValues(waveform_token);
-                ExpParameters p;
-                if (vals.size() >= 1) {
-                    p.InitialValue = vals[0];
-                }
-                if (vals.size() >= 2) {
-                    p.PeakValue = vals[1];
-                }
-                if (vals.size() >= 3) {
-                    p.RiseDelay = vals[2];
-                }
-                if (vals.size() >= 4) {
-                    p.RiseTimeConstant = vals[3];
-                }
-                if (vals.size() >= 5) {
-                    p.FallDelay = vals[4];
-                }
-                if (vals.size() >= 6) {
-                    p.FallTimeConstant = vals[5];
-                }
-                if (is_voltage) {
-                    builder.AddVexp(name, n_pos, n_neg, p, ac_mag, ac_phase);
-                } else {
-                    builder.AddIexp(name, n_pos, n_neg, p, ac_mag, ac_phase);
-                }
-                break;
-            }
-            case WaveformType::PWL: {
-                const auto vals = ExtractParenthesizedValues(waveform_token);
-                PwlParameters p;
-                p.Points.clear();
-                for (std::size_t i = 0; i + 1 < vals.size(); i += 2) {
-                    p.Points.push_back({vals[i], vals[i + 1]});
-                }
-                if (is_voltage) {
-                    builder.AddVpwl(name, n_pos, n_neg, p, ac_mag, ac_phase);
-                } else {
-                    builder.AddIpwl(name, n_pos, n_neg, p, ac_mag, ac_phase);
-                }
-                break;
-            }
-            case WaveformType::SFFM: {
-                const auto vals = ExtractParenthesizedValues(waveform_token);
-                SffmParameters p;
-                if (vals.size() >= 1) {
-                    p.Offset = vals[0];
-                }
-                if (vals.size() >= 2) {
-                    p.Amplitude = vals[1];
-                }
-                if (vals.size() >= 3) {
-                    p.CarrierFrequency = vals[2];
-                }
-                if (vals.size() >= 4) {
-                    p.ModulationIndex = vals[3];
-                }
-                if (vals.size() >= 5) {
-                    p.SignalFrequency = vals[4];
-                }
-                if (is_voltage) {
-                    builder.AddVsffm(name, n_pos, n_neg, p, ac_mag, ac_phase);
-                } else {
-                    builder.AddIsffm(name, n_pos, n_neg, p, ac_mag, ac_phase);
-                }
-                break;
-            }
-            case WaveformType::AM: {
-                const auto vals = ExtractParenthesizedValues(waveform_token);
-                AmParameters p;
-                if (vals.size() >= 1) {
-                    p.Amplitude = vals[0];
-                }
-                if (vals.size() >= 2) {
-                    p.Offset = vals[1];
-                }
-                if (vals.size() >= 3) {
-                    p.ModulatingFrequency = vals[2];
-                }
-                if (vals.size() >= 4) {
-                    p.CarrierFrequency = vals[3];
-                }
-                if (vals.size() >= 5) {
-                    p.Delay = vals[4];
-                }
-                if (is_voltage) {
-                    builder.AddVam(name, n_pos, n_neg, p, ac_mag, ac_phase);
-                } else {
-                    builder.AddIam(name, n_pos, n_neg, p, ac_mag, ac_phase);
-                }
-                break;
-            }
-            case WaveformType::TRNOISE: {
-                const auto vals = ExtractParenthesizedValues(waveform_token);
-                NoiseParameters p;
-                p.Offset = dc_val;
-                p.WhiteAmplitude = vals.size() >= 1 ? vals[0] : 0.0;
-                p.TimeStep = vals.size() >= 2 ? vals[1] : 0.0;
-                p.FlickerExponent = vals.size() >= 3 ? vals[2] : 1.0;
-                p.FlickerAmplitude = vals.size() >= 4 ? vals[3] : 0.0;
-                p.TelegraphAmplitude = vals.size() >= 5 ? vals[4] : 0.0;
-                p.CaptureTime = vals.size() >= 6 ? vals[5] : 0.0;
-                p.EmissionTime = vals.size() >= 7 ? vals[6] : 0.0;
-                if (is_voltage) {
-                    builder.AddVnoise(name, n_pos, n_neg, p, ac_mag);
-                } else {
-                    builder.AddInoise(name, n_pos, n_neg, p, ac_mag);
-                }
-                break;
-            }
-            case WaveformType::TRRANDOM: {
-                const auto vals = ExtractParenthesizedValues(waveform_token);
-                RandomParameters p;
-                if (vals.size() >= 1) {
-                    const int dist = static_cast<int>(vals[0]);
-                    if (dist >= 1 && dist <= 4) {
-                        p.Distribution = static_cast<RandomDistribution>(dist);
-                    }
-                }
-                p.TimeStep = vals.size() >= 2 ? vals[1] : 10e-6;
-                p.Delay = vals.size() >= 3 ? vals[2] : 0.0;
-                p.First = vals.size() >= 4 ? vals[3] : 0.1;
-                p.Second = dc_val + (vals.size() >= 5 ? vals[4] : 0.0);
-                if (is_voltage) {
-                    builder.AddVrandom(name, n_pos, n_neg, p, ac_mag);
-                } else {
-                    builder.AddIrandom(name, n_pos, n_neg, p, ac_mag);
-                }
-                break;
-            }
-            case WaveformType::NONE:
-            default:
-                if (is_voltage) {
-                    builder.AddVdc(name, n_pos, n_neg, dc_val, ac_mag, ac_phase);
-                } else {
-                    builder.AddIdc(name, n_pos, n_neg, dc_val, ac_mag, ac_phase);
-                }
-                break;
-            }
+            AddWaveformSource(builder, name, is_voltage, n_pos, n_neg, wtype,
+                              ExtractParenthesizedValues(waveform_token),
+                              {.Dc = dc_val, .AcMagnitude = ac_mag, .AcPhaseDegrees = ac_phase});
             break;
         }
 
@@ -1792,6 +1616,9 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
             builder.AddLogicGate(name, gate_type, out, std::move(inputs), params);
             break;
         }
+
+        case 'X': // placed before the loop
+            break;
 
         default:
             result.Diagnostics.push_back({std::format("Ignored unrecognized device line: '{}'", line)});

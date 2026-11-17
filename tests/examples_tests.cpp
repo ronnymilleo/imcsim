@@ -11,14 +11,19 @@
 #include "circuit/components/source.h"
 #include "circuit/components/switch.h"
 #include "digital_models.h"
+#include "nodalys_in_use.h"
 #include "plots/spectrum.h"
+#include "results/ac_sensitivity_view.h"
 #include "results/circuit_snapshot.h"
 #include "results/fuse_readings.h"
 #include "results/logic_outputs.h"
 #include "results/logic_trace.h"
 #include "results/monte_carlo_results.h"
+#include "results/stability_circles.h"
+#include "results/stability_summary.h"
 #include "results/trace_math.h"
 #include "results/trace_statistics.h"
+#include "results/two_port_metrics.h"
 #include "schematic/examples.h"
 #include "schematic/schematic.h"
 #include "simulation/analysis_sources.h"
@@ -30,16 +35,21 @@
 #include <array>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 #include <cmath>
 #include <complex>
 #include <format>
 #include <numbers>
 #include <optional>
+#include <set>
 #include <string>
 #include <string_view>
 #include <vector>
 
 namespace {
+
+/// Seed of the noise source of the noise example in the tests, so every run draws the same numbers.
+constexpr unsigned int NOISE_EXAMPLE_SEED = 1;
 
 /**
  * @brief   Loads an example into a schematic, as the editor does.
@@ -134,14 +144,6 @@ TEST_CASE("Every example either runs on Nodalys or is flagged unsupported", "[ex
             continue;
         }
 
-        // The precision rectifier example uses a vendor op-amp subcircuit kept as raw SPICE text
-        if (std::string_view(example.FileName) == "precision_rectifier.imcsim") {
-            const Core::OperatingPointRun op = nodalys.RunOperatingPoint(circuit, std::nullopt);
-            REQUIRE_FALSE(op.Result.has_value());
-            CHECK(op.Result.error().find("SPICE text") != std::string::npos);
-            continue;
-        }
-
         const Core::OperatingPointRun operating_point = nodalys.RunOperatingPoint(circuit, std::nullopt);
         INFO((operating_point.Result ? std::string{} : operating_point.Result.error()));
         REQUIRE(operating_point.Result.has_value());
@@ -194,7 +196,11 @@ TEST_CASE("The noise example shows a flat floor at the input that the low-pass c
     const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
     REQUIRE(settings.Selected == GUI::Analysis::TRANSIENT);
 
-    const Core::TransientRun run = Core::RunTransient(schematic.BuildCircuit(), settings.Transient);
+    // The noise is drawn anew on each run, and a band of a few dozen bins scatters by about 15%, so a free draw lands
+    // 30% off now and then; a fixed seed makes every run the same draw
+    Core::TransientSettings seeded = settings.Transient;
+    seeded.Seed = NOISE_EXAMPLE_SEED;
+    const Core::TransientRun run = Core::RunTransient(schematic.BuildCircuit(), seeded);
     REQUIRE(run.Result.has_value());
     const Core::Transient &transient = *run.Result;
     // The whole run fits the default window of 2000 points, so the Spectrum tab covers all of it
@@ -226,7 +232,7 @@ TEST_CASE("The noise example shows a flat floor at the input that the low-pass c
     const double resolution = 1.0 / transient.Times.back();
     const double expected_floor = std::sqrt(2.0 * 1e-6 * 1.5 * resolution);
     CHECK_THAT(band_rms(input, 200.0, 2000.0), Catch::Matchers::WithinRel(expected_floor, 0.3));
-    // A few dozen bins per band scatter by 10% or more, so the limits are wide enough never to fail by chance
+    // A few dozen bins per band scatter by 10% or more, so the limits are wide for any draw, and the seed fixes it
     // The floor stays flat up to the 10 kHz Nyquist band, losing a little to the straight lines between samples
     CHECK_THAT(band_rms(input, 3e3, 4.5e3) / band_rms(input, 200.0, 2000.0), Catch::Matchers::WithinRel(0.93, 0.5));
     // The output follows the floor below the 1.6 kHz corner and is far below it near 10 kHz
@@ -237,8 +243,9 @@ TEST_CASE("The noise example shows a flat floor at the input that the low-pass c
 TEST_CASE("The noise example reads as broadband noise of 1 mV/sqrt(Hz) at its input", "[examples]") {
     GUI::Schematic schematic;
     OpenExample("noise_through_rc_low_pass.imcsim", schematic);
-    const Core::TransientRun run =
-        Core::RunTransient(schematic.BuildCircuit(), schematic.GetSimulationSettings().Transient);
+    Core::TransientSettings seeded = schematic.GetSimulationSettings().Transient;
+    seeded.Seed = NOISE_EXAMPLE_SEED;
+    const Core::TransientRun run = Core::RunTransient(schematic.BuildCircuit(), seeded);
     REQUIRE(run.Result.has_value());
     const Core::Transient &transient = *run.Result;
     const std::size_t input = NodeAt(schematic, {4, 4});
@@ -1449,4 +1456,183 @@ TEST_CASE("The Monte Carlo bias example spreads the collector voltage around its
     INFO(std::format("Collector {} V nominal, {} to {} V", nominal, lowest, highest));
     CHECK(lowest < nominal - 0.2);
     CHECK(highest > nominal + 0.2);
+}
+
+TEST_CASE("The noise example opens on its noise analysis and totals the kT/C noise of the capacitor", "[examples]") {
+    GUI::Schematic schematic;
+    OpenExample("noise_analysis_rc_low_pass.imcsim", schematic);
+    const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
+    REQUIRE(settings.Selected == GUI::Analysis::NOISE);
+    REQUIRE(settings.NoiseOutput.has_value());
+
+    const Core::NoiseRun run = Core::RunNoise(schematic.BuildCircuit(),
+                                              {.OutputNode = static_cast<int>(NodeAt(schematic, *settings.NoiseOutput)),
+                                               .InputSource = settings.NoiseSource,
+                                               .StartFrequency = settings.NoiseRange.StartFrequency,
+                                               .StopFrequency = settings.NoiseRange.StopFrequency,
+                                               .PointsPerDecade = settings.NoiseRange.PointsPerDecade});
+    REQUIRE(run.Result.has_value());
+    const Core::Noise &noise = *run.Result;
+    // R1 is the only source of noise, and the noise it puts on C1 integrates to sqrt(kT/C), whatever its value:
+    // for 10 nF at 27 degrees Celsius is 0.64 uV
+    constexpr double BOLTZMANN = 1.380649e-23;
+    constexpr double TEMPERATURE_KELVIN = 300.15;
+    const double expected_total = std::sqrt(BOLTZMANN * TEMPERATURE_KELVIN / 10e-9);
+    INFO(noise.OutputTotal);
+    CHECK_THAT(noise.OutputTotal, Catch::Matchers::WithinRel(expected_total, 0.05));
+    // Flat at the 4kTR density of 10k, 12.9 nV/sqrt(Hz), far below the 1.6 kHz corner
+    CHECK_THAT(noise.OutputDensities.front(),
+               Catch::Matchers::WithinRel(std::sqrt(4.0 * BOLTZMANN * 300.15 * 10e3), 0.02));
+    REQUIRE(noise.Contributions.size() == 1);
+    CHECK(noise.Contributions.front().Name == "R1");
+}
+
+TEST_CASE("The transfer function example reads a gain of 0.5 and impedances of 20 kOhm and 5 kOhm", "[examples]") {
+    GUI::Schematic schematic;
+    OpenExample("transfer_function_attenuator.imcsim", schematic);
+    const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
+    REQUIRE(settings.Selected == GUI::Analysis::TRANSFER_FUNCTION);
+    REQUIRE(settings.TransferFunctionOutput.has_value());
+
+    const Core::TransferFunctionRun run = Core::RunTransferFunction(
+        schematic.BuildCircuit(), {.OutputNode = static_cast<int>(NodeAt(schematic, *settings.TransferFunctionOutput)),
+                                   .InputSource = settings.TransferFunctionSource});
+    REQUIRE(run.Result.has_value());
+    // R2 and R3 in parallel make 10k, so R1 and they halve the input; the source sees 10k + 10k and the output node
+    // looks back into R1, R2 and R3 in parallel
+    CHECK_THAT(run.Result->Gain, Catch::Matchers::WithinRel(0.5, 1e-3));
+    CHECK_THAT(run.Result->InputImpedance, Catch::Matchers::WithinRel(20e3, 1e-3));
+    CHECK_THAT(run.Result->OutputImpedance, Catch::Matchers::WithinRel(5e3, 1e-3));
+}
+
+TEST_CASE("The harmonic balance example finds a rectified DC level with harmonics of the line frequency",
+          "[examples]") {
+    GUI::Schematic schematic;
+    OpenExample("harmonic_balance_rectifier.imcsim", schematic);
+    const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
+    REQUIRE(settings.Selected == GUI::Analysis::HARMONIC_BALANCE);
+
+    const TestSupport::NodalysInUse nodalys;
+    const Core::HarmonicBalanceRun run = Core::RunHarmonicBalance(schematic.BuildCircuit(), settings.HarmonicBalance);
+    REQUIRE(run.Result.has_value());
+    const Core::HarmonicBalance &balance = *run.Result;
+    CHECK_THAT(balance.FundamentalFrequency, Catch::Matchers::WithinRel(1e3, 1e-9));
+    CHECK(balance.Frequencies.size() == static_cast<std::size_t>(settings.HarmonicBalance.Harmonics) + 1);
+    const std::size_t output = NodeAt(schematic, {11, 4});
+    const std::vector<std::complex<double>> &phasors = balance.NodePhasors[output];
+    // The 5 V peak sine leaves a DC level well under it, as the 1 ms time constant lets the capacitor droop a lot, and
+    // that ripple puts its energy in the harmonics, falling with their order
+    INFO(std::abs(phasors[0]));
+    CHECK(phasors[0].real() > 2.5);
+    CHECK(phasors[0].real() < 4.0);
+    CHECK(std::abs(phasors[1]) > 0.1);
+    CHECK(std::abs(phasors[1]) > std::abs(phasors[3]));
+    CHECK(balance.Warnings.empty());
+}
+
+TEST_CASE("The stability example is potentially unstable up to about 290 MHz, with K and MSG as worked by hand",
+          "[examples][s_parameters]") {
+    GUI::Schematic schematic;
+    OpenExample("stability_common_emitter.imcsim", schematic);
+    const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
+    CHECK(settings.Selected == GUI::Analysis::S_PARAMETERS);
+    const Core::SParametersRun run = Core::RunSParameters(schematic.BuildCircuit(), settings.SParameters);
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    REQUIRE(run.Result->GetPortCount() == 2);
+    REQUIRE(run.Result->Frequencies.size() == 91);
+    // 30 points per decade from 1 MHz: index 60 is 100 MHz
+    REQUIRE_THAT(run.Result->Frequencies[60], Catch::Matchers::WithinRel(1e8, 1e-6));
+    const std::complex<double> s11(0.13653, -0.802204);
+    const std::complex<double> s12(0.0608979, 0.053971);
+    const std::complex<double> s21(-2.00554, 2.38591);
+    const std::complex<double> s22(0.790769, -0.251073);
+    CHECK(std::abs(run.Result->Get(60, 1, 1) - s11) < 2e-3);
+    CHECK(std::abs(run.Result->Get(60, 1, 2) - s12) < 2e-3);
+    CHECK(std::abs(run.Result->Get(60, 2, 1) - s21) < 2e-3);
+    CHECK(std::abs(run.Result->Get(60, 2, 2) - s22) < 2e-3);
+    // By hand from that matrix: Delta = S11 S22 - S12 S21, K = (1 - |S11|^2 - |S22|^2 + |Delta|^2) / (2 |S12 S21|),
+    // MSG = 10 log10 |S21 / S12|; the figures were worked out with an independent script
+    const GUI::TwoPortSweep sweep = GUI::ComputeTwoPortSweep(*run.Result);
+    const GUI::TwoPortMetrics &at_100_mhz = sweep.Metrics[60];
+    CHECK_THAT(at_100_mhz.K, Catch::Matchers::WithinAbs(0.33962, 5e-3));
+    CHECK_THAT(at_100_mhz.Mu, Catch::Matchers::WithinAbs(0.56267, 5e-3));
+    CHECK(at_100_mhz.Gain == GUI::GainKind::MSG);
+    REQUIRE(at_100_mhz.GainDecibels);
+    CHECK_THAT(*at_100_mhz.GainDecibels, Catch::Matchers::WithinAbs(15.832, 0.05));
+    // Unstable below 250 MHz, stable above 400 MHz
+    const std::vector<GUI::UnstableRegion> regions = GUI::FindUnstableRegions(sweep);
+    REQUIRE(regions.size() == 1);
+    CHECK(regions.front().First == 0);
+    CHECK(sweep.Frequencies[regions.front().Last] > 250e6);
+    CHECK(sweep.Frequencies[regions.front().Last] < 400e6);
+    CHECK(sweep.Frequencies[GUI::FindLowestMu(sweep).value()] > 30e6);
+    CHECK(sweep.Frequencies[GUI::FindLowestMu(sweep).value()] < 40e6);
+    CHECK_THAT(GUI::DescribeStability(sweep),
+               Catch::Matchers::StartsWith("Potentially unstable up to 292.9MHz (K < 1)"));
+    // Both circles cross the chart at the worst case, and leave it at 1 GHz
+    const std::size_t worst = GUI::FindLowestMu(sweep).value();
+    CHECK(GUI::DescribeCircles(GUI::ComputeStabilityCircles(GUI::ReadTwoPortMatrix(*run.Result, worst)),
+                               sweep.Frequencies[worst])
+              .empty());
+    // At 464 MHz the source circle has left the chart, which is wholly stable there, and the note says so
+    CHECK_THAT(GUI::DescribeCircles(GUI::ComputeStabilityCircles(GUI::ReadTwoPortMatrix(*run.Result, 80)),
+                                    sweep.Frequencies[80]),
+               Catch::Matchers::StartsWith("Source circle: the whole chart is stable at"));
+}
+
+TEST_CASE("The Sallen-Key sensitivity example ranks the four filter parts at the corner and obeys frequency scaling",
+          "[examples]") {
+    const TestSupport::NodalysInUse nodalys;
+    GUI::Schematic schematic;
+    OpenExample("ac_sensitivity_sallen_key.imcsim", schematic);
+    const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
+    CHECK(settings.Selected == GUI::Analysis::SENSITIVITY);
+    CHECK(settings.SensitivityType == GUI::SensitivityKind::AC);
+    REQUIRE(settings.SensitivityOutput.has_value());
+    const Core::ACSensitivitySettings run_settings{.OutputNode =
+                                                       static_cast<int>(NodeAt(schematic, *settings.SensitivityOutput)),
+                                                   .InputSource = settings.ACSensitivitySource,
+                                                   .StartFrequency = settings.ACSensitivityRange.StartFrequency,
+                                                   .StopFrequency = settings.ACSensitivityRange.StopFrequency,
+                                                   .PointsPerDecade = settings.ACSensitivityRange.PointsPerDecade};
+
+    const Core::ACSensitivityRun run = Core::RunACSensitivity(schematic.BuildCircuit(), run_settings);
+
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const Core::ACSensitivity &sensitivity = *run.Result;
+    CHECK(sensitivity.Warnings.empty());
+    // The marker starts at the -3 dB point, near 1.1 kHz
+    const std::size_t corner = GUI::FindCornerFrequencyIndex(sensitivity);
+    CHECK_THAT(sensitivity.Frequencies[corner], Catch::Matchers::WithinRel(1.1e3, 0.05));
+    // The four filter parts lead the table, and the supplies and the source, which a linear stage does not feel, are
+    // last with no influence
+    const std::vector<GUI::ACSensitivityRow> rows = GUI::MakeACSensitivityRows(sensitivity, corner);
+    REQUIRE(rows.size() == 7);
+    const std::set<std::string> leaders = {rows[0].PartName, rows[1].PartName, rows[2].PartName, rows[3].PartName};
+    CHECK(leaders == std::set<std::string>{"R1", "R2", "C1", "C2"});
+    CHECK(rows[0].PartName == "C2");
+    CHECK(rows[4].Share == 0.0);
+
+    // The response depends on the frequency through the products R C only, so scaling every resistor and capacitor by
+    // a factor scales those products by its square, and the four changes of ln H for 1 % of each add up to twice
+    // d(ln H)/d(ln f), which the neighbouring points of the sweep give
+    std::complex<double> total;
+    for (const Core::ACPartSensitivity &part : sensitivity.Parts) {
+        if (part.Name == "R1" || part.Name == "R2" || part.Name == "C1" || part.Name == "C2") {
+            const double decibels = part.MagnitudeDecibelsPerPercent[corner].value();
+            const double degrees = part.PhaseDegreesPerPercent[corner].value();
+            total +=
+                std::complex<double>(decibels / (20.0 / std::numbers::ln10), degrees / (180.0 / std::numbers::pi)) /
+                0.01;
+        }
+    }
+    const std::complex<double> slope =
+        (std::log(sensitivity.Output[corner + 1]) - std::log(sensitivity.Output[corner - 1])) /
+        std::log(sensitivity.Frequencies[corner + 1] / sensitivity.Frequencies[corner - 1]);
+    CHECK_THAT(total.real(), Catch::Matchers::WithinRel(2.0 * slope.real(), 0.02));
+    CHECK_THAT(total.imag(), Catch::Matchers::WithinRel(2.0 * slope.imag(), 0.02));
 }

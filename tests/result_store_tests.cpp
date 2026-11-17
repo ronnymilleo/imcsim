@@ -165,3 +165,42 @@ TEST_CASE("Storing a trace drops the table of an earlier Monte Carlo analysis", 
 
     CHECK_FALSE(results.GetMonteCarlo().has_value());
 }
+
+TEST_CASE("A DC and an AC sensitivity replace each other, and the AC one is read at its -3 dB point at first",
+          "[result_store]") {
+    GUI::ResultStore results;
+    const std::size_t version = results.GetSensitivityVersion();
+
+    results.SetSensitivity(Core::Sensitivity{});
+    CHECK(results.GetSensitivity().has_value());
+    CHECK(results.GetSensitivityVersion() == version + 1);
+
+    // A low-pass response of 1, 0.9, 0.5 and 0.1 falls under 1/sqrt(2) between the second and the third frequency
+    Core::ACSensitivity ac;
+    ac.Frequencies = {10.0, 100.0, 1e3, 1e4};
+    ac.Output = {1.0, 0.9, 0.5, 0.1};
+    results.SetACSensitivity(ac);
+    CHECK_FALSE(results.GetSensitivity().has_value());
+    REQUIRE(results.GetACSensitivity().has_value());
+    CHECK(results.GetSensitivityVersion() == version + 2);
+    CHECK(results.GetACSensitivityFrequency() == 1);
+
+    results.SetACSensitivityFrequency(3);
+    CHECK(results.GetACSensitivityFrequency() == 3);
+
+    results.SetSensitivity(Core::Sensitivity{});
+    CHECK_FALSE(results.GetACSensitivity().has_value());
+    CHECK(results.GetSensitivityVersion() == version + 3);
+}
+
+TEST_CASE("A change of the circuit drops the AC sensitivity too", "[result_store]") {
+    GUI::ResultStore results;
+    Core::ACSensitivity ac;
+    ac.Frequencies = {1.0};
+    ac.Output = {1.0};
+    results.SetACSensitivity(ac);
+
+    results.OnCircuitChanged();
+
+    CHECK_FALSE(results.GetACSensitivity().has_value());
+}

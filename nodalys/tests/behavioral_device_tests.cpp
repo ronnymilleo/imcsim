@@ -343,7 +343,7 @@ TEST_CASE("The B element of a netlist names nodes and sources as the netlist doe
         REQUIRE(parsed.has_value());
         CHECK_THAT(OperatingPoint(parsed->CircuitInstance).NodeVoltages[2], WithinAbs(6.0, GMIN_TOLERANCE));
     }
-    SECTION("A malformed line, a wrong expression and a source inside a subcircuit are refused") {
+    SECTION("A malformed line and a wrong expression are refused") {
         const auto no_kind = Nodalys::ParseNetlist("* title\nB1 1 0 v(2)\n.end\n");
         REQUIRE_FALSE(no_kind.has_value());
         CHECK_THAT(no_kind.error(), ContainsSubstring("Malformed behavioral source"));
@@ -352,15 +352,5 @@ TEST_CASE("The B element of a netlist names nodes and sources as the netlist doe
         REQUIRE_FALSE(wrong.has_value());
         CHECK_THAT(wrong.error(), ContainsSubstring("B1"));
         CHECK_THAT(wrong.error(), ContainsSubstring("atan2"));
-
-        const auto inside = Nodalys::ParseNetlist("* subcircuit\n"
-                                                  ".subckt DOUBLER in out\n"
-                                                  "B1 out 0 V=2*v(in)\n"
-                                                  ".ends\n"
-                                                  "V1 1 0 1\n"
-                                                  "X1 1 2 DOUBLER\n"
-                                                  ".end\n");
-        REQUIRE_FALSE(inside.has_value());
-        CHECK_THAT(inside.error(), ContainsSubstring("inside a subcircuit"));
     }
 }

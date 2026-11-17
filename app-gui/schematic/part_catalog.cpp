@@ -23,7 +23,8 @@ constexpr auto OP_AMP = std::to_array({ComponentType::OP_AMP});
 // Groups, the first part being the one a group places until another is picked
 constexpr auto SOURCES =
     std::to_array({ComponentType::VOLTAGE_SOURCE, ComponentType::CURRENT_SOURCE, ComponentType::CLOCK});
-constexpr auto SUPPLIES = std::to_array({ComponentType::VCC, ComponentType::NET_LABEL, ComponentType::PIN});
+constexpr auto SUPPLIES = std::to_array({ComponentType::VCC, ComponentType::NET_LABEL, ComponentType::INITIAL_VOLTAGE,
+                                         ComponentType::NODESET, ComponentType::PIN});
 constexpr auto DIODES = std::to_array({ComponentType::DIODE, ComponentType::ZENER_DIODE, ComponentType::LED});
 constexpr auto TRANSISTORS =
     std::to_array({ComponentType::NPN, ComponentType::PNP, ComponentType::NMOS, ComponentType::PMOS});

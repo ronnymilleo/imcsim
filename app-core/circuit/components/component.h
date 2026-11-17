@@ -42,6 +42,8 @@ enum class ComponentType {
     OP_AMP,
     SUBCIRCUIT,
     NET_LABEL,
+    INITIAL_VOLTAGE,
+    NODESET,
     PIN,
     POTENTIOMETER,
     SWITCH,
@@ -84,7 +86,8 @@ constexpr double MAX_TOLERANCE_PERCENT = 50.0;
  *          a voltage-controlled switch is S1, a relay K1 and a fuse FU1, with no value either;
  *          a transformer is T1, its value the inductance of its primary;
  *          logic gates and flip-flops are U1, U2... like op-amps, with no value;
- *          a clock and a logic input are voltage sources named V1, V2... to ground, with no value either.
+ *          a clock and a logic input are voltage sources named V1, V2... to ground, with no value either;
+ *          an initial voltage has no name, its value is the voltage its node starts a transient at.
  */
 class Component {
 public:

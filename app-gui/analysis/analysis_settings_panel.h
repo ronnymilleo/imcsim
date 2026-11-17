@@ -51,6 +51,8 @@ private:
     std::array<ValueField, 3> m_SteppedFields;
     ValueField m_NoiseStartFrequency;
     ValueField m_NoiseStopFrequency;
+    ValueField m_ACSensitivityStartFrequency;
+    ValueField m_ACSensitivityStopFrequency;
     ValueField m_SStartFrequency;
     ValueField m_SStopFrequency;
     ValueField m_HBFundamental;
@@ -59,6 +61,10 @@ private:
     /// The tolerance in percent that the buttons of Monte Carlo give every part of a kind.
     ValueField m_ToleranceAllField;
     double m_ToleranceAllPercent = 5.0;
+    ValueField m_RelativeTolerance;
+    ValueField m_CurrentTolerance;
+    ValueField m_VoltageTolerance;
+    ValueField m_NominalTemperature;
 
     // Settings fields
     void DrawSelectedSettings(SimulationSettings &settings);
@@ -69,6 +75,7 @@ private:
     void DrawNoiseSettings(SimulationSettings &settings);
     void DrawTransferFunctionSettings(SimulationSettings &settings);
     void DrawSensitivitySettings(SimulationSettings &settings);
+    void DrawACSensitivityInputs(SimulationSettings &settings);
     void DrawPoleZeroSettings(SimulationSettings &settings);
     void DrawSParameterSettings(SimulationSettings &settings);
     void DrawPortSummary();
@@ -77,6 +84,7 @@ private:
     void DrawTruthTableSettings(SimulationSettings &settings);
     void DrawHarmonicBalanceSettings(SimulationSettings &settings);
     void DrawRunModeSettings(SimulationSettings &settings);
+    void DrawSolverSettings(Core::SolverOptions &options);
     void DrawParameterStepSettings(ParameterStepSettings &step);
     void DrawMonteCarloSettings(Core::MonteCarloSettings &monte_carlo);
     void DrawToleranceButtons();
@@ -84,6 +92,7 @@ private:
     void DrawParameterPicker(ParameterStepSettings &step, const Core::Circuit &circuit);
     void DrawStepValues(ParameterStepSettings &step, const std::string &unit);
     void LoadParameterStepFields(const ParameterStepSettings &step);
+    void LoadSolverFields(const Core::SolverOptions &options);
 };
 
 } // namespace GUI

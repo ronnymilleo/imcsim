@@ -6,11 +6,40 @@
 #include "nodalys/exporters.h"
 
 #include <algorithm>
+#include <complex>
 #include <format>
 #include <numbers>
+#include <optional>
 #include <sstream>
 
 namespace Nodalys {
+
+namespace {
+
+/// The header of the columns of a matrix of ports, such as Z11_re,Z11_im for the impedance.
+void WritePortMatrixHeader(std::ostringstream &ss, const char letter, const int ports) {
+    for (int i = 1; i <= ports; ++i) {
+        for (int j = 1; j <= ports; ++j) {
+            ss << std::format(",{0}{1}{2}_re,{0}{1}{2}_im", letter, i, j);
+        }
+    }
+}
+
+/// The columns of a matrix of ports at one frequency, empty where the circuit has no finite matrix.
+void WritePortMatrixRow(std::ostringstream &ss, const std::optional<PortMatrix> &matrix, const int ports) {
+    for (int i = 0; i < ports; ++i) {
+        for (int j = 0; j < ports; ++j) {
+            if (matrix) {
+                const std::complex<double> value = (*matrix)[static_cast<std::size_t>(i * ports + j)];
+                ss << std::format(",{:.8g},{:.8g}", value.real(), value.imag());
+            } else {
+                ss << ",,";
+            }
+        }
+    }
+}
+
+} // namespace
 
 std::string ExportCsv(const OperatingPointResult &result) {
     std::ostringstream ss;
@@ -162,6 +191,12 @@ std::string ExportCsv(const SParameterResult &result) {
             ss << std::format(",S{0}{1}_dB,S{0}{1}_deg,S{0}{1}_re,S{0}{1}_im", i, j);
         }
     }
+    const bool has_matrices = result.ImpedanceMatrices.size() == result.Frequencies.size() &&
+                              result.AdmittanceMatrices.size() == result.Frequencies.size();
+    if (has_matrices) {
+        WritePortMatrixHeader(ss, 'Z', ports);
+        WritePortMatrixHeader(ss, 'Y', ports);
+    }
     ss << "\n";
 
     constexpr double RAD_TO_DEG = 180.0 / std::numbers::pi;
@@ -175,6 +210,10 @@ std::string ExportCsv(const SParameterResult &result) {
                 const double phase_deg = std::arg(s) * RAD_TO_DEG;
                 ss << std::format(",{:.8g},{:.8g},{:.8g},{:.8g}", mag_db, phase_deg, s.real(), s.imag());
             }
+        }
+        if (has_matrices) {
+            WritePortMatrixRow(ss, result.ImpedanceMatrices[pt], ports);
+            WritePortMatrixRow(ss, result.AdmittanceMatrices[pt], ports);
         }
         ss << "\n";
     }
@@ -203,6 +242,32 @@ std::string ExportCsv(const SensitivityResult &result) {
     ss << "Vector,Value\n";
     for (const auto &[name, val] : result.Vectors) {
         ss << name << "," << std::format("{:.8g}", val) << "\n";
+    }
+    return ss.str();
+}
+
+std::string ExportCsv(const AcSensitivityResult &result) {
+    std::ostringstream ss;
+    ss << "Frequency,Output_re,Output_im";
+    for (const AcElementSensitivity &element : result.Elements) {
+        ss << std::format(",{0}_dB_per_percent,{0}_deg_per_percent", element.Name);
+    }
+    ss << "\n";
+    for (std::size_t pt = 0; pt < result.Frequencies.size(); ++pt) {
+        ss << std::format("{:.8g},{:.8g},{:.8g}", result.Frequencies[pt], result.Output[pt].real(),
+                          result.Output[pt].imag());
+        for (const AcElementSensitivity &element : result.Elements) {
+            // Empty where the output is too small for a relative change to mean anything
+            for (const std::optional<double> &figure :
+                 {element.MagnitudeDecibelsPerPercent[pt], element.PhaseDegreesPerPercent[pt]}) {
+                ss << ",";
+                if (figure) {
+                    // Adding zero turns the negative zero of a part with no effect into "0", not "-0"
+                    ss << std::format("{:.8g}", *figure + 0.0);
+                }
+            }
+        }
+        ss << "\n";
     }
     return ss.str();
 }

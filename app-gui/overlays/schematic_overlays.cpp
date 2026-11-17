@@ -14,6 +14,7 @@
 #include "overlays/led_glow.h"
 #include "overlays/live_current.h"
 #include "overlays/readout_placement.h"
+#include "results/ac_sensitivity_view.h"
 #include "results/current_flow.h"
 #include "results/fuse_readings.h"
 #include "results/logic_outputs.h"
@@ -109,6 +110,16 @@ std::optional<ComponentPower> FindPower(const std::vector<ComponentPower> &power
     const std::string part = name.substr(0, name.find('.'));
     const auto found = std::ranges::find(powers, part, &ComponentPower::Name);
     return found != powers.end() ? std::optional(*found) : std::nullopt;
+}
+
+/**
+ * @brief   Whether a part has a current or power of its own to color it by: ground, net labels, initial voltages,
+ *          nodesets, logic displays and subcircuit pin markers have none.
+ */
+bool CarriesHeat(const Core::ComponentType type) {
+    return type != Core::ComponentType::GROUND && type != Core::ComponentType::NET_LABEL &&
+           type != Core::ComponentType::INITIAL_VOLTAGE && type != Core::ComponentType::NODESET &&
+           !Core::IsLogicDisplay(type) && !Core::IsSubcircuitPin(type);
 }
 
 } // namespace
@@ -563,10 +574,7 @@ ImU32 SchematicOverlays::GetElementColor(const Schematic &schematic, const std::
     }
     const UIElement &element = *schematic.GetElements()[index];
     const Core::Component &component = element.GetComponent();
-    // Ground, net labels, logic displays and subcircuit pin markers carry no current or power of their own
-    const Core::ComponentType type = component.GetType();
-    if (type == Core::ComponentType::GROUND || type == Core::ComponentType::NET_LABEL || Core::IsLogicDisplay(type) ||
-        Core::IsSubcircuitPin(type)) {
+    if (!CarriesHeat(component.GetType())) {
         return GetPalette().Element;
     }
     if (!by_current) {
@@ -586,12 +594,17 @@ ImU32 SchematicOverlays::GetElementColor(const Schematic &schematic, const std::
  *          analysis does not list, such as a diode or a ground, keeps the color of the theme.
  */
 ImU32 SchematicOverlays::GetSensitivityColor(const Schematic &schematic, const std::size_t index) const {
+    const std::string &part_name = schematic.GetElements()[index]->GetComponent().GetName();
+    if (const auto &ac_sensitivity = m_Results->GetACSensitivity()) {
+        const std::optional<float> level =
+            FindACSensitivityLevel(*ac_sensitivity, part_name, m_Results->GetACSensitivityFrequency());
+        return level ? GetHeatColor(*level) : GetPalette().Element;
+    }
     const auto &sensitivity = m_Results->GetSensitivity();
     if (!sensitivity) {
         return GetPalette().Element;
     }
-    const std::optional<float> level =
-        FindSensitivityLevel(*sensitivity, schematic.GetElements()[index]->GetComponent().GetName());
+    const std::optional<float> level = FindSensitivityLevel(*sensitivity, part_name);
     return level ? GetHeatColor(*level) : GetPalette().Element;
 }
 
@@ -633,6 +646,19 @@ void SchematicOverlays::DrawLogicReading(SchematicCanvas &canvas, const ViewTran
  */
 std::optional<SchematicOverlays::LegendLabels> SchematicOverlays::GetLegendLabels(Schematic &schematic) const {
     if (m_Preferences.WireColors == WireColoring::SENSITIVITY) {
+        if (const auto &ac_sensitivity = m_Results->GetACSensitivity()) {
+            // The legend reads the change of the response for 1 % of the value, in percent of the response
+            const std::size_t frequency_index =
+                std::min(m_Results->GetACSensitivityFrequency(), ac_sensitivity->Frequencies.size() - 1);
+            const double largest_percent = GetLargestInfluence(*ac_sensitivity, frequency_index) * SENSITIVITY_PERCENT;
+            return LegendLabels{
+                .Low =
+                    std::format("<{} %", Core::FormatValue(largest_percent * std::pow(10.0, -AC_SENSITIVITY_DECADES))),
+                .High = std::format("{} %", Core::FormatValue(largest_percent)),
+                .Title = std::format("Change of {} at {}Hz per 1 %",
+                                     GetVoltageLabel(schematic.GetConnectivity(), ac_sensitivity->OutputNode),
+                                     Core::FormatValue(ac_sensitivity->Frequencies[frequency_index]))};
+        }
         const auto &sensitivity = m_Results->GetSensitivity();
         if (!sensitivity) {
             return std::nullopt;
@@ -677,7 +703,7 @@ bool SchematicOverlays::AreWiresHeatColored() const {
  */
 bool SchematicOverlays::ArePartsHeatColored(const Schematic &schematic) const {
     if (m_Preferences.WireColors == WireColoring::SENSITIVITY) {
-        return m_Results->GetSensitivity().has_value();
+        return m_Results->GetSensitivity().has_value() || m_Results->GetACSensitivity().has_value();
     }
     return m_Displayed &&
            (m_Preferences.WireColors == WireColoring::CURRENT || m_Preferences.WireColors == WireColoring::POWER);

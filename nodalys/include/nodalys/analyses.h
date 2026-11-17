@@ -65,13 +65,25 @@ struct TransientConfig {
 };
 
 /**
+ * @enum    FrequencySweepType
+ * @brief   Frequency spacing mode for AC, noise, AC sensitivity and S-parameter frequency sweeps.
+ */
+enum class FrequencySweepType {
+    LINEAR,
+    DECADE,
+    OCTAVE
+};
+
+/**
  * @struct  AcSweepConfig
  * @brief   Configuration for small-signal AC frequency sweep (.ac).
  */
 struct AcSweepConfig {
     double StartFrequency = 1.0;
     double StopFrequency = 1e6;
+    /// Points per decade or per octave of a logarithmic sweep, or the points in all of a linear one.
     int PointsPerDecade = 10;
+    FrequencySweepType SweepType = FrequencySweepType::DECADE;
 };
 
 /**
@@ -94,17 +106,9 @@ struct NoiseConfig {
     std::string InputSource;
     double StartFrequency = 1.0;
     double StopFrequency = 1e6;
+    /// Points per decade or per octave of a logarithmic sweep, or the points in all of a linear one.
     int PointsPerDecade = 10;
-};
-
-/**
- * @enum    FrequencySweepType
- * @brief   Frequency spacing mode for AC and S-parameter frequency sweeps.
- */
-enum class FrequencySweepType {
-    LINEAR,
-    DECADE,
-    OCTAVE
+    FrequencySweepType SweepType = FrequencySweepType::DECADE;
 };
 
 /**
@@ -137,6 +141,23 @@ struct PoleZeroConfig {
 struct SensitivityConfig {
     int OutputPositiveNode = 0;
     int OutputNegativeNode = 0;
+};
+
+/**
+ * @struct  AcSensitivityConfig
+ * @brief   Configuration for small-signal AC sensitivity analysis: the output voltage, the source that drives the
+ *          circuit and the frequency range.
+ */
+struct AcSensitivityConfig {
+    int OutputPositiveNode = 0;
+    int OutputNegativeNode = 0;
+    /// Independent source with an AC magnitude; the others are silent for this analysis.
+    std::string InputSource;
+    double StartFrequency = 1.0;
+    double StopFrequency = 1e6;
+    /// Points per decade or per octave of a logarithmic sweep, or the points in all of a linear one.
+    int PointsPerDecade = 10;
+    FrequencySweepType SweepType = FrequencySweepType::DECADE;
 };
 
 /**
@@ -207,6 +228,10 @@ std::expected<SensitivityResult, std::string> ComputeSensitivity(const Circuit &
                                                                  const SensitivityConfig &config,
                                                                  const ConvergenceOptions &options = {},
                                                                  std::vector<DiagnosticMessage> *messages = nullptr);
+
+std::expected<AcSensitivityResult, std::string>
+ComputeAcSensitivity(const Circuit &circuit, const AcSensitivityConfig &config, const ConvergenceOptions &options = {},
+                     std::vector<DiagnosticMessage> *messages = nullptr);
 
 std::expected<HarmonicBalanceResult, std::string>
 ComputeHarmonicBalance(const Circuit &circuit, const HarmonicBalanceConfig &config,

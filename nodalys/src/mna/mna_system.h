@@ -43,8 +43,15 @@ struct TimeContext {
     bool IsTransient = false;
     /// True at t = 0 when starting a transient from user-specified initial conditions (`uic`).
     bool UseInitialConditions = false;
-    /// True at t = 0 of a transient solve (both with and without `uic`), so `.ic` node voltages clamp only the start.
+    /// True at t = 0 of a transient solve (both with and without `uic`); `.ic` node voltages clamp only the solve that
+    /// is not `uic`, the operating point that starts the transient.
     bool IsTransientStart = false;
+    /// True on the first pass of an operating-point solve that has nodesets: they pull their nodes to their voltages.
+    /// The second pass, which converges again with them released, and every solve that is not an operating point have
+    /// it false.
+    bool IsNodesetPass = false;
+    /// False for the solves that continue a sweep, which start from the point before them and not from the nodesets.
+    bool AppliesNodesets = true;
     /// True on the first integration step of a transient and on the step that leaves a source corner: uses Backward
     /// Euler (1st-order, needs no past derivatives) whatever `Method` says.
     bool BackwardEuler = false;
@@ -141,6 +148,22 @@ public:
      */
     bool SolveAcTranspose(const MnaSystem &reactive, double omega, int output_unknown,
                           std::vector<std::complex<double>> &adjoint) const;
+
+    /**
+     * @brief   Solves the transposed small-signal system $Y(j\omega)^T \cdot \lambda = \text{rhs}$ for any
+     *          complex right-hand side, which the AC sensitivity uses for an output that is a node difference.
+     * @return  False if the matrix is singular or the sizes differ.
+     */
+    bool SolveAcTransposeFor(const MnaSystem &reactive, double omega, const std::vector<std::complex<double>> &rhs,
+                             std::vector<std::complex<double>> &adjoint) const;
+
+    /**
+     * @brief   Solves $A^T \cdot x = \text{rhs}$ for a complex right-hand side, where $A$ is the real matrix of the
+     *          system, as the DC adjoint of a small-signal quantity needs.
+     * @return  False if the matrix is singular or the sizes differ.
+     */
+    bool SolveTransposeComplex(const std::vector<std::complex<double>> &rhs,
+                               std::vector<std::complex<double>> &x) const;
 
     /// Verifies that the equation residual $|A \cdot x - \text{rhs}|$ satisfies KCL and branch tolerances.
     bool CheckResidual(const std::vector<double> &x, double voltage_abstol, double current_abstol, double reltol) const;

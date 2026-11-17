@@ -30,8 +30,11 @@ elements, so the results are those of ngspice with the models below. Some things
   Parts that are several elements in the netlist, such as op-amps, fuses, relays and transformers, and parts with no
   value, such as switches, are not listed. ngspice also reports model parameters of diodes and transistors, but most
   read the same meaningless number or nan, so they are left out. Logic parts are refused, since ngspice cannot recover
-  from a sensitivity analysis that holds them. The AC form of `.sens` is not used: ngspice leaves the small-signal
-  conductance of forward-biased diodes and transistors out of it, so it is wrong for nonlinear circuits.
+  from a sensitivity analysis that holds them. The AC form of ngspice's `.sens` is not used: it leaves the small-signal
+  conductance of forward-biased diodes and transistors out of it, and gives a wrong current for a resistor, so it is
+  wrong for nonlinear circuits. The AC kind of the sensitivity analysis runs on Nodalys only, which differentiates the
+  small-signal response with an adjoint solve per frequency and adds the effect of the bias point on the
+  conductances and capacitances of the nonlinear parts; it lists the same parts as the DC kind.
 - A pole-zero analysis is ngspice's `.pz`: it finds the poles and zeros of the small-signal transfer function from an
   independent source to the voltage of a node, with the circuit linearized at its DC operating point, so a diode or
   transistor contributes its bias-point conductance and capacitances. The input port is the source's terminals, and
@@ -58,7 +61,11 @@ elements, so the results are those of ngspice with the models below. Some things
   the stop frequency is below the start. The impedance, VSWR and return loss are computed from S, not read from the Z
   matrix of ngspice, which is meaningless (around 1e17 ohm) when the circuit has no finite impedance matrix, as for a
   series resistor. Logic parts are refused, since the digital models of ngspice are fixed levels in a small-signal
-  analysis.
+  analysis. Nodalys has none of these limits: it takes a single port and a linear sweep of two points, reports a wrong
+  port or frequency range in words, and also works out the impedance (Z) and admittance (Y) matrices of the ports from
+  S, each absent at a frequency where the circuit has no finite one (the Z of two floating ports joined by a series
+  element, the Y of a port shorted to ground). Ports numbered with a gap or a repeat are refused on both engines, since
+  the matrix and the Touchstone file index the ports by number.
 - A truth table runs one operating point per combination of the chosen logic inputs, each on a copy of the circuit
   with the inputs set, so a row never depends on the one before it. That describes combinational logic; a latch or
   flip-flop that holds its state has no operating point for those combinations, and the row reads X.
@@ -95,8 +102,13 @@ in these points:
   the sweeps and the small-signal analyses, as in ngspice. A transient draws it, from a generator Nodalys seeds, so
   the seed of the transient settings repeats the whole run, white and 1/f noise included; the values differ from those
   of ngspice, which draws its own.
-- A block imported from a library, which imcsim keeps as SPICE text, and a MOSFET model of a level other than 1 are
-  refused with the reason; the harmonic balance also refuses voltage-controlled switches and relays.
+- A block imported from a library, which imcsim keeps as SPICE text, runs on Nodalys as on ngspice: the engine reads
+  its elements (R, C, L, V, I, E, G, H, F, B, D, Q, M, S and nested blocks), `.param` lines, `{expressions}`, `.model`
+  cards and nested `.subckt` definitions (see [`nodalys/subcircuit_text.md`](nodalys/subcircuit_text.md)). What it holds
+  that Nodalys cannot simulate (a JFET, a `.func`, a model of a type or level it lacks) is refused
+  with the line, before the run, and a model parameter its devices do not read is named in a message of the run.
+  A MOSFET model of a level other than 1 is refused with the reason, and the harmonic balance also refuses
+  voltage-controlled switches and relays.
 - The transient lands a time point on every corner of a source waveform (each edge of a pulse or clock, each point of
   a piecewise linear source, the delays of the exponential and AM sources) and keeps it in the results, so a pulse
   narrower than the time step still shows; ngspice does the same with its breakpoints.
@@ -388,6 +400,69 @@ either: it only joins the nodes of every point with the same name, compared with
 has no line for it and the nodes are numbered as if those points were wired together. A net named `0` or `GND` is ground, and one named `VCC` joins every VCC supply, so two supplies of different
 voltages must not share that name.
 
+An **initial voltage** is no element either: it sets the voltage its node starts a transient at, and the netlist has
+one line for it, `.ic V(node)=value`, with no element. Its value is that voltage, in volts and of either sign. Only
+the transient reads it:
+
+- Without a capacitor or inductor that has an initial condition, the transient starts from an operating point, and the
+  node is held at the voltage in that solve, as ngspice does with `.ic` and Nodalys does with a stiff source that it
+  removes afterwards. The rest of the circuit starts at the point that is consistent with the held node, the
+  capacitors charged to it, and the node is released when the transient begins at t = 0. A divider whose middle node is
+  held at 4 V, over two equal resistors, starts its lower node at 2 V.
+- With such a part, the transient runs with `uic` and has no operating point to hold the node in. The voltage then only
+  sets the starting voltage of the capacitors that have no initial condition of their own and sit across the node, as
+  in SPICE (a capacitor to ground starts at the node voltage, one between two nodes at their difference); a node with
+  no capacitor on it has nothing to start from and is solved as usual. Nodalys follows the same rule, so the two
+  engines agree.
+- The operating point, the DC sweep, the AC sweep and the other small-signal analyses leave it out of the circuit.
+- Two parts on one node need the same voltage. A part on ground or on a node nothing is connected to is refused with a
+  message. A circuit of only an initial voltage and parts that tie themselves to ground needs no Ground.
+- A part inside a block body starts the node of each instance of the block, and the instances of blocks inside it too.
+  ngspice does not read `.ic` inside a `.subckt`, so the netlist writes one line per instance at the top, named by the
+  instances down to the node (`.ic V(X1.X2.5)=value`); Nodalys gives the initial condition to the node it makes for each
+  instance. A part on a pin of the block sets the outer node that instance connects the pin to, so it must agree with a
+  part on that net outside, and is refused when the instance connects the pin to ground.
+
+A **nodeset** is no element either, and writes one line, `.nodeset V(node)=value`. Its value is a voltage, in volts and of
+either sign, and it is a starting guess and not a held value, unlike an initial voltage:
+
+- Every solve of an operating point starts with the node pulled to the voltage by a stiff conductance, and then lets it
+  go and converges again from the point it found, as SPICE does. A circuit with one operating point ends there
+  whatever the guess; a circuit with several ends in the one nearest it. ngspice does this natively, and Nodalys does
+  it in `SolveNewton`: a first pass with the `NodesetDevice` stamped, a second without it, and a plain solve if the
+  first finds nothing.
+- Every analysis that starts from an operating point reads it: the operating point, the DC sweep (for its first point;
+  the next points start from the one before, so a sweep through a hysteresis loop keeps its branch), the AC sweep, the
+  transfer function, the noise, sensitivity, pole-zero and S-parameter analyses, and the transient that starts from an
+  operating point. A transient with `uic` has no operating point to guess, so it ignores it. The harmonic balance
+  solves its own periodic steady state and ignores it.
+- It adds nothing to the circuit once released, so it never changes the result of a circuit that has one operating
+  point, and a nodeset and an initial voltage on one node may differ.
+- The checks are those of the initial voltage: two different voltages on one node, ground and a node no part touches
+  are refused with a message, and a part in a block body acts on the node of each instance (`.nodeset V(X1.X2.5)=value`
+  at the top of the netlist, since ngspice does not read it inside a `.subckt`).
+
+## Solver options
+
+The tolerances, the integration method and the nominal temperature of a run are options of the schematic, in the Solver
+section of the analysis settings. Both engines read them:
+
+| Option | ngspice | Nodalys | Default |
+|---|---|---|---|
+| Relative tolerance | `.options reltol=` | `ConvergenceOptions::RelTol` | 1e-3 |
+| Current tolerance | `.options abstol=` | `ConvergenceOptions::CurrentAbsTol` | 1e-12 A |
+| Voltage tolerance | `.options vntol=` | `ConvergenceOptions::VoltageAbsTol` | 1e-6 V |
+| Integration method | `.options method=trap\|gear` | `TransientConfig::Method` (trapezoidal or Gear-2) | trapezoidal |
+| Nominal temperature | `.options tnom=` | the nominal temperature of `Circuit::SetTemperature()` | 27 C |
+
+The netlist writes one `.options` line with the options that are not the default, so a circuit that leaves them alone has
+no line. A circuit with a fuse that leaves the method to the program writes `.options method=gear` on a line of its own,
+once (a fuse in a block too), and an explicit method replaces it, so the method is never written twice; Nodalys follows
+the same rule. The ranges are checked before a run: reltol 1e-9 to 0.1, abstol 1e-18 to 1e-6 A, vntol 1e-12 to
+1e-2 V, tnom -200 to 500 C. The nominal temperature is where the parameters of the diode, BJT and MOSFET models are
+given; the run itself is at 27 C unless the temperature is stepped, so a model that says it was extracted at 77 C and
+is simulated at 27 C has a lower saturation current than its parameters say.
+
 ## Controlled sources
 
 | Part | SPICE element | Output | Gain unit |
@@ -628,7 +703,8 @@ die, with 0.13 mA of supply current and picoamperes of bias current, which is no
 - The `.model` lines inside a block are renamed after it (`imcsim_RC_LOWPASS_...`), since ngspice keeps model names
   global and two blocks with a custom part of the same name would otherwise share one model.
 - A block kept as SPICE text is written as it came from its library, between a `.subckt` line with its own ports and
-  `.ends`; imcsim reads none of it, so it simulates whatever the vendor modeled, and only what ngspice understands.
+  `.ends`; imcsim reads none of it for ngspice, which simulates whatever the vendor modeled, and Nodalys reads it with
+  its own subcircuit reader, which refuses what its devices cannot simulate.
 - The ready logic blocks are ordinary blocks of the gates and flip-flops above, at a 5 V logic level and a 10 ns
   propagation delay per part. They inherit the timing of their parts: the 4-bit counter is a ripple counter, so its
   outputs change one after another and pass through other values for a few tens of nanoseconds, which a bus lane shows

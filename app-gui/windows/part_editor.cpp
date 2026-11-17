@@ -189,19 +189,32 @@ void PartEditor::DrawFields(Core::Component &component) {
         DrawControlledSource(static_cast<Core::ControlledSource &>(component), m_Value, *m_Schematic);
     } else if (Core::IsBehavioralSource(type)) {
         DrawBehavioralSource(static_cast<Core::BehavioralSource &>(component), m_ExpressionText, *m_Schematic);
-    } else if (type == Core::ComponentType::TRANSFORMER) {
-        DrawValue(component, m_Value, m_BlockParameters, m_Preferences, *m_Schematic);
-        DrawTransformer(static_cast<Core::Transformer &>(component), m_Electromechanical, *m_Schematic);
     } else {
-        DrawValue(component, m_Value, m_BlockParameters, m_Preferences, *m_Schematic);
-        if (type == Core::ComponentType::POTENTIOMETER) {
-            DrawWiper(static_cast<Core::Potentiometer &>(component), *m_Schematic);
-        } else if (component.SupportsInitialCondition()) {
-            DrawInitialCondition(component, m_Passives, *m_Schematic);
-        }
+        DrawValuedPart(component);
     }
     if (component.SupportsTolerance()) {
         DrawTolerance(component, m_Passives, m_Preferences, *m_Schematic);
+    }
+}
+
+/**
+ * @brief   The parts set by one value, with what each kind adds to it: the windings of a transformer, the wiper of a
+ *          potentiometer, the initial condition of a capacitor or inductor, the note of an initial voltage or a
+ * nodeset.
+ */
+void PartEditor::DrawValuedPart(Core::Component &component) {
+    const Core::ComponentType type = component.GetType();
+    DrawValue(component, m_Value, m_BlockParameters, m_Preferences, *m_Schematic);
+    if (type == Core::ComponentType::TRANSFORMER) {
+        DrawTransformer(static_cast<Core::Transformer &>(component), m_Electromechanical, *m_Schematic);
+    } else if (type == Core::ComponentType::INITIAL_VOLTAGE) {
+        ImGui::TextDisabled("The node starts a transient at this voltage; other analyses ignore it");
+    } else if (type == Core::ComponentType::NODESET) {
+        ImGui::TextDisabled("A guess the operating point starts from, not a held voltage");
+    } else if (type == Core::ComponentType::POTENTIOMETER) {
+        DrawWiper(static_cast<Core::Potentiometer &>(component), *m_Schematic);
+    } else if (component.SupportsInitialCondition()) {
+        DrawInitialCondition(component, m_Passives, *m_Schematic);
     }
 }
 

@@ -38,6 +38,13 @@ CircuitCopy::CircuitCopy(const Circuit &circuit) {
     for (const CircuitPort &port : circuit.GetPorts()) {
         m_Circuit.AddPort(port);
     }
+    for (const CircuitNodeVoltage &initial_voltage : circuit.GetInitialVoltages()) {
+        m_Circuit.AddInitialVoltage(initial_voltage);
+    }
+    for (const CircuitNodeVoltage &nodeset : circuit.GetNodesets()) {
+        m_Circuit.AddNodeset(nodeset);
+    }
+    m_Circuit.SetSolverOptions(circuit.GetSolverOptions());
     for (const auto &[net, node] : circuit.GetNets()) {
         m_Circuit.NameNet(net, node);
     }

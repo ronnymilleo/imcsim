@@ -589,4 +589,46 @@ ExportFigure BuildNoiseFigure(const Core::Noise &noise, Schematic &schematic, co
     return figure;
 }
 
+/**
+ * @brief   The figure of the AC sensitivity for the export: the change of the gain and of the phase for a 1 % higher
+ *          value of each checked part, in two panels over frequency.
+ * @param[in] sensitivity   The result.
+ * @param[in] curves        The figures of every part as curves, in the order of the parts of the result.
+ * @param[in] part_colors   The color of every part, in the same order, which the plots draw it in.
+ * @param[in] shown         Names of the parts checked in the panel.
+ * @param[in] output_label  The output node as the plots name it, such as "V(OUT)", for the titles.
+ * @param[in] view          The frequencies the plot shows.
+ * @return  Two panels, one with the gain and one with the phase.
+ */
+ExportFigure BuildACSensitivityFigure(const Core::ACSensitivity &sensitivity,
+                                      const std::vector<ACSensitivityCurve> &curves,
+                                      const std::vector<ImU32> &part_colors, const std::set<std::string> &shown,
+                                      const std::string &output_label, const PlotSpan &view) {
+    ExportFigure figure;
+    figure.XAxis = {.Name = "Frequency", .Unit = "Hz"};
+    figure.XLogarithmic = true;
+    figure.Xs = sensitivity.Frequencies;
+    figure.XRange = ExportRange{.From = view.From, .To = view.To};
+    ExportPanel gain{.Title = std::format("Change of the gain of {} for a 1 % higher value", output_label),
+                     .YAxes = {{.Name = "Gain (dB per 1 %)", .Unit = "dB", .UsesPrefixes = false}},
+                     .Series = {},
+                     .Notes = {}};
+    ExportPanel phase{.Title = std::format("Change of the phase of {} for a 1 % higher value", output_label),
+                      .YAxes = {{.Name = "Phase (deg per 1 %)", .Unit = "deg", .UsesPrefixes = false}},
+                      .Series = {},
+                      .Notes = {}};
+    for (std::size_t index = 0; index < sensitivity.Parts.size(); ++index) {
+        const std::string &name = sensitivity.Parts[index].Name;
+        if (!shown.contains(name)) {
+            continue;
+        }
+        const ExportColor color = ToExportColor(part_colors[index]);
+        gain.Series.push_back({.Name = name, .LegendLabel = name, .Values = curves[index].Magnitude, .Color = color});
+        phase.Series.push_back({.Name = name, .LegendLabel = name, .Values = curves[index].Phase, .Color = color});
+    }
+    figure.Panels.push_back(std::move(gain));
+    figure.Panels.push_back(std::move(phase));
+    return figure;
+}
+
 } // namespace GUI

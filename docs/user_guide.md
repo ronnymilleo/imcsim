@@ -32,6 +32,31 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   as a warning. Capacitors and inductors left empty then start at zero, not at their operating point values, so set
   every part that should start charged. The operating point, the AC sweep and the DC sweep ignore the initial
   conditions.
+- **Initial voltage of a node**: the small square on a lead, in the same button as net labels and VCC (search "initial"),
+  placed on a wire or a terminal, sets the voltage that node starts a transient at, and reads `IC 2.5V` beside it, the
+  voltage being the part's Value. Use it when a circuit has no source to start it, such as an RC network that should
+  discharge from a chosen voltage, or when it has a balance point that it would never leave by itself, such as an
+  astable multivibrator or a ring oscillator (see the astable multivibrator example). Without initial conditions of
+  capacitors or inductors, the node is held at its voltage while the starting point of the transient is found, so every
+  other node starts where that is consistent with it (a node of a divider held at 4 V pulls the rest with it), and then
+  the node is released and the circuit evolves on its own. With the Initial field of a capacitor or inductor in use,
+  the transient has no operating point (`uic`) and a node voltage only reaches the capacitors across that node, which
+  start at it; a node with no capacitor on it does not start anywhere in particular. Both engines mean the same. Two
+  parts on one node must agree, ground cannot take one, and a node needs a part connected to it. A part inside a block
+  body starts that node in every instance of the block; on a pin of the block it starts the net each instance connects
+  the pin to, and must agree with a part on that net outside. Only the transient reads it; the operating point, the AC and DC
+  sweeps and the other small-signal analyses ignore it, so it never changes their results.
+- **Nodeset**: the small diamond on a lead beside the initial voltage in the same button (search "nodeset"), placed on a
+  wire or a terminal, reads `NS 2.5V` beside it, the voltage being the part's Value. It is a starting guess for the
+  operating point and not a held voltage: the solver first finds the point with the node pulled to the guess, then lets
+  go and converges again from there. A circuit with one operating point ends where it always does, whatever the guess;
+  a circuit with several, such as a latch, a flip-flop made of transistors or a Schmitt trigger, ends in the stable
+  state nearest the guess, so a nodeset on each of two cross-coupled nodes picks which transistor conducts. Every
+  analysis that starts from an operating point reads it, the transient included (when it starts from one, that is,
+  without the Initial field of a capacitor or inductor in use, which has none to guess), and a DC sweep reads it for its
+  first point only, the others continuing from the point before. The harmonic balance leaves it out. The same rules as
+  the initial voltage apply: two on one node must agree, ground cannot take one, a node needs a part connected to it,
+  and one inside a block acts on the node of each instance. Both engines mean the same.
 - **Switches**: a switch and a push button have a Closed (or Pressed) box in their properties, and the symbol and a
   label under it show the state. Both start open. Outside a live run, the state holds for the whole simulation. During
   a live run, click a switch to flip it or hold a push button to press it (see Live runs).
@@ -296,7 +321,8 @@ takes the size of the part names, so it follows the zoom, and is left out when z
   delivers power).
 - **Sensitivity** colors each part the sensitivity analysis lists by the size of its normalized sensitivity, on a
   logarithmic scale of four decades below the largest one; the legend gives the volts for a 1 % change of the value (titled with
-  the output it refers to), and marks the floor with `<`. Parts the analysis does not list, such as diodes, transistors and ground, keep the theme color.
+  the output it refers to), and marks the floor with `<`. After an AC sensitivity the scale is three decades and the
+  legend gives the percent of the response a 1 % change moves, at the frequency of the marker. Parts the analysis does not list, such as diodes, transistors and ground, keep the theme color.
 
 ## Transient on the schematic
 
@@ -713,6 +739,9 @@ The panel gives the RMS noise over the whole range at the output and at the inpu
 the output noise, largest first, as RMS and as a percentage of the noise power (the percentages add up to 100).
 Check a part to plot its share; parts whose noise does not reach the output are left out.
 
+The Noise example (Examples > Basics) is a 10k and 10n low-pass with the analysis saved: its output noise totals the
+sqrt(kT/C) of the capacitor, whatever the resistor.
+
 When the input source hardly reaches the output (a gain under -120 dB, as through a logic gate), its input-referred
 noise would only grow without meaning, so it is left out and the tab says why. When no noise reaches the output at
 all, as on a node an ideal source holds, the tab says so instead of an empty plot. [Simulation models](models.md) lists which parts add noise.
@@ -737,6 +766,9 @@ The Transfer function tab of the Output window is a table of three values:
 
 An output an ideal voltage source holds has an output impedance of 0 Ohm, and an input path held open reads as
 `open` rather than a giant number. The table is a readout like the operating point, so it is not exported.
+
+The Transfer function example (Examples > Basics) is a resistive attenuator whose gain of 0.5 and impedances of
+20 kOhm and 5 kOhm can be checked by hand.
 
 ## Sensitivity
 
@@ -770,6 +802,38 @@ operating point, so it is not exported. To see the same values on the schematic,
 1 %", with the volts for a 1 % change at its two ends. A supply rail is named in the table as on the schematic, such
 as `VCC 12V`; clicking its row still selects it.
 
+### The AC kind
+
+**Kind** at the top of the settings is **DC**, as above, or **AC**: how much the gain and the phase at the output change
+with the value of each part, across frequency. It answers questions such as which part sets the corner of a filter, and
+which one to trim to move it. The AC kind runs on the Nodalys engine only (ngspice's own AC sensitivity is wrong for
+circuits with forward-biased diodes and transistors); with ngspice it is disabled, with that reason as its tooltip.
+
+Set **Output** as for the DC kind, **Input** to the source that drives the circuit (a voltage or current source set to
+AC, picked as in the noise analysis), and the frequency range, **Start**, **Stop** and the points per decade, with a
+Suggest button as in the AC sweep. A transistor counts through its operating point: a part that sets the bias, such as
+a divider resistor or the supply, moves the gain through the bias too, and the result includes that. The parts listed
+are the ones of the DC kind, with a potentiometer as its total resistance and a block by the element inside it that
+moves the response most.
+
+The Sensitivity tab then has two plots over a logarithmic frequency axis: the change of the **gain**, in dB, and of the
+**phase**, in degrees, for a value 1 % higher, one curve for each part that is checked. The five most influential parts
+are checked at first; tick or untick the others in the table, or use All and None. A gap in a curve is a
+frequency where the output is almost zero (a notch), whose relative change means nothing; a warning above the plots says
+so.
+
+The table below ranks every part at the frequency of the marker, the vertical line in both plots, which starts at
+the **-3 dB point** of the response, so the table answers which part sets the corner. Drag the marker to read another
+frequency, or use **Go to the -3 dB point**. The columns are the value, the change of the gain and of the phase for 1 %,
+and the **share of largest**: how much of the response a 1 % change of the part moves, gain and phase together, as a
+share of the part that moves it most. A negative gain change means a higher value lowers the gain at that frequency. A
+click on a part selects it in the editor.
+
+**Color the schematic** colors the parts by the same share at the marked frequency, so dragging the marker shows what
+matters at the corner, at the passband or in the stopband; the legend gives the change of the response in percent for 1 %
+of the value. The plots export as SVG or CSV like the other plots (gain and phase panels, with the checked parts); the
+table is a readout. The Sallen-Key sensitivity example (Examples > Op-amps) shows it on a second-order filter.
+
 ## Poles and zeros
 
 The Poles and zeros analysis finds where the transfer function from a source to a node has its poles and zeros, which
@@ -801,7 +865,7 @@ The table has one row per real root and per complex pair:
 
 A pole and a zero at the same place cancel, so they are left out and the note under the plot counts them: ngspice
 reports such pairs for parts the signal never reaches. A warning above the plot says when ngspice gave up searching for
-some roots, so some may be missing.
+some roots, so some may be missing; Nodalys gives one when its roots do not rebuild the circuit's own response.
 
 To compare with the Bode plot, run the AC sweep too and tick **Show poles and zeros** on its tab: each pole and zero is
 a dashed vertical line at its natural frequency on both plots, colored as in the s-plane, and labelled on the magnitude
@@ -810,7 +874,10 @@ its -3 dB point near its natural frequency, a little above it when Q is over 0.7
 
 ngspice's pole-zero solver is not reliable on every circuit. It can find nothing without saying why, as with some ideal
 op-amp circuits at certain gain-bandwidth products (try another product or a real op-amp model), and it may leave out
-roots or return wrong ones; treat the result as a check on the AC sweep rather than as the last word. The table is a
+roots or return wrong ones; treat the result as a check on the AC sweep rather than as the last word. The Nodalys
+engine does not have these limits: it finds every root of those circuits, and it says so when an output does not respond
+to the input (a diode that is off), when the transfer is a constant gain, or when its roots fail its own check against the
+AC response. Pick it in Edit > Preferences to run the analysis there; imcsim never switches engine for you. The table is a
 readout like the operating point, so it is not exported.
 
 ## S-parameters
@@ -822,22 +889,24 @@ of 0 is a perfect match and an S21 of 0 dB passes everything.
 
 **Ports**: the ports are Block pin markers of the top-level schematic. Select a marker, turn on **S-parameter port**
 in its properties, and set its **Number** and **Z0**. A new port takes the lowest number no other marker uses; the
-numbers must run from 1 to N with no gap and no repeat, and the symbol reads `P1`, `P2 (OUT)`. A marker that is not a
-port does nothing here, and a port is invisible to every other analysis: only in an S-parameter run does imcsim put a
-source and the reference impedance at its node. Inside a block, port settings are kept and ignored. The analysis needs two
-or more ports in all, a Ground in the circuit, a node of its own for each port (not ground, not shared) and a Z0 above
-zero; imcsim says which is wrong before it runs.
+numbers must run from 1 to N with no gap and no repeat, in whatever order the markers sit, and the symbol reads `P1`,
+`P2 (OUT)`. A marker that is not a port does nothing here, and a port is invisible to every other analysis: only in an
+S-parameter run does imcsim put a source and the reference impedance at its node. Inside a block, port settings are
+kept and ignored. The analysis needs a Ground in the circuit, at least one port with Nodalys (two with ngspice), a node
+of its own for each port (not ground, not shared) and a Z0 above zero; imcsim says which is wrong before it runs.
 
-**Measuring a one-port**: the analysis needs two ports, as ngspice refuses a single one. Add a second port on an
-isolated node, with nothing connected to it: S11 is then the reflection of the first port, and S22 reads 1.
+**Measuring a one-port**: with Nodalys, a single port is enough: S11 is the reflection of the circuit, and the readings
+under the pointer and the Touchstone file (`.s1p`) work as with more ports. ngspice refuses a single port, and the
+message says so and that Nodalys takes one; to measure a one-port on ngspice, add a second port on an isolated node,
+with nothing connected to it: S11 is then the reflection of the first port, and S22 reads 1.
 
 **Bias**: a port holds its node at 0 V in DC and loads the circuit with its reference impedance, so a node that has a
 bias belongs behind a capacitor (or an inductor, for a port on a supply line), as the bias tee of a network analyzer
 does. The circuit's own sources keep their DC value and are AC ground for the measurement.
 
 **Settings**: pick S-parameters beside Run, then the **Start** and **Stop** frequencies (1 MHz to 1 GHz by default),
-the **Sweep** type and the points: log with points per decade (100 by default), or linear with the number of points in all (at least 3,
-since ngspice gives a single point for two). The settings are saved with the schematic. Circuits with logic gates or
+the **Sweep** type and the points: log with points per decade (100 by default), or linear with the number of points in all (at least 2
+with Nodalys, and at least 3 with ngspice, which gives a single point for two; the field follows the engine in use). The settings are saved with the schematic. Circuits with logic gates or
 flip-flops cannot run it, and the analysis is disabled with that reason as its tooltip.
 
 The **S-parameters** tab of the Output window has:
@@ -856,9 +925,80 @@ The **S-parameters** tab of the Output window has:
   (1 + |S|) / (1 - |S|), and the return loss, -20 log |S| (positive when the port absorbs power); an open circuit or a
   perfect match reads infinite.
 
-**Exports**: Export... saves the plot shown as an SVG image (the Smith chart or the magnitude and phase panels, redrawn
-from the data, in the light or dark theme) or as a CSV table with the frequency and the real and imaginary parts of each
-checked entry. **Save Touchstone...** opens a small popup for the frequency unit and format, then writes the whole
+**Quantity: S, Z or Y.** The **Quantity** choice at the top of the tab switches the matrix shown. S is the default.
+Z, the impedance matrix (the voltage at a port per current into another, the other ports left open), and Y, the
+admittance matrix (the current at a port per voltage on another, the others shorted), come from the Nodalys engine
+only; with ngspice the two choices are grayed out and their tooltip says so. They exist where the circuit has a finite
+matrix: Z is absent for two ports joined only by a series element with nothing to ground, Y for ports that are one wire
+with only elements to ground. At a frequency where it is absent the curve has a gap, and the line under the controls
+counts them; when it is absent at every frequency the plot area says why instead of drawing. With Z or Y the entries
+read Z11, Z12... (or Y...), the plot is magnitude and phase only, the magnitude in ohms or siemens on a logarithmic
+axis (an entry that is exactly 0 cannot be drawn there and leaves a gap), and the Smith chart choice is grayed out,
+since a Smith chart plots reflections. Each quantity keeps its own checked entries, and S comes back with the view you
+had. Touchstone files are S only.
+
+**Stability of a two-port.** With exactly two ports and S chosen, the **Stability** view tells whether the circuit can
+oscillate when connected to passive terminations. Under the controls, a sentence says it in words, such as
+"Potentially unstable up to 292.9MHz (K < 1); lowest K is 0.0666 at 10MHz. Unconditionally stable elsewhere in the
+sweep." The plots are K and mu against frequency, with a dashed line at 1 above which the circuit is unconditionally
+stable, and the gain bound in decibels, one curve in two kinds.
+
+Why a circuit that runs can still be called unstable: an amplifier passes some of its output back to its input
+(S12 is not 0), so what the input looks like depends on what is connected to the output. For some loads the input
+reflects more than it receives, more power coming back than went in. That is a negative resistance, and a negative
+resistance beside any resonance is an oscillator. "Potentially unstable" means that such a load, or such a source for
+the output, exists among the passive ones; with the 50 Ohm ports of the analysis the circuit may be perfectly quiet.
+The risk comes with a filter, an antenna or a mismatched cable, whose impedance wanders over the chart with frequency.
+"Unconditionally stable" means that no passive termination can do it.
+
+The definitions, from the S matrix and with Delta = S11 S22 - S12 S21:
+
+- **K** (Rollett) = (1 - |S11|^2 - |S22|^2 + |Delta|^2) / (2 |S12 S21|).
+- **mu** (Edwards and Sinsky) = (1 - |S11|^2) / (|S22 - Delta S11*| + |S12 S21|), the distance from the center of the
+  chart to the nearest unstable load. Above 1, that load lies outside the chart, where no passive load is, so mu above
+  1 is the one test of unconditional stability (K above 1 with |Delta| below 1 says the same), and the smaller mu is,
+  the closer the trouble comes to a matched load. mu' is the same from the source side. A lossless filter has mu = 1
+  exactly and counts as stable.
+- **MAG**, the maximum available gain, |S21/S12| (K - sqrt(K^2 - 1)), where the circuit is unconditionally stable: the
+  most power gain a conjugate match of both ports gives.
+- **MSG**, the maximum stable gain, |S21/S12|, where it is not: the gain bound with the amplifier made stable by
+  resistive loading. Both gains are power ratios, so 10 log of them in decibels.
+
+A circuit with S12 = 0 is unilateral: K is infinite, stability needs only |S11| and |S22| below 1, and the gain shown is
+the unilateral power gain, which the sentence says. A circuit with S21 = 0 transmits nothing and has no gain to bound.
+The formulas read power waves, so ports of different reference impedances need no conversion; each circle lives in the
+reflection plane of its own port.
+
+On the Smith chart, with two ports, the **Stability circles** checkbox draws the source and the load stability circle at
+one frequency, set with **Circles at** (it starts where mu is lowest, the worst case, each time a new result arrives;
+**Worst case** goes back there). The chart's top-left corner says which frequency the circles are drawn at and the mu
+found there. They answer one question: which terminations may be connected without the circuit
+oscillating?
+
+Every point of the chart is an impedance: the center is the reference impedance, the upper half is inductive, the lower
+half capacitive, and the rim holds the purely reactive ones. The **load stability circle** is the edge, among the loads,
+where the reflection seen at the input is exactly 1: loads on one side of it leave the input well behaved, and loads on
+the other make it a negative resistance. The **source stability circle** is the same the other way round, the sources
+that make the output reflect more than it receives. The hatched side is the unstable one, so the chart reads as a map of
+loads (or sources) to avoid: a termination inside the hatching can make the circuit oscillate. Hatching over the upper
+half, for example, says that an inductive, strongly reflecting termination is the dangerous one at that frequency.
+
+A circle that lies wholly outside the chart draws nothing, and a note says that the whole chart is stable (or unstable)
+there for that source or load. The circles show one frequency at a time; K and mu in the Stability view sum up the
+same for every frequency, and the frequency where mu is lowest is where the hatching comes closest to the center.
+
+The Stability view links to the circles: a vertical line on the K and mu plot and on the gain plot marks the frequency
+of the circles, and a click on either plot (not a drag, which pans it) moves it and the circles to the swept frequency
+nearest to the pointer, so you can pick a frequency by looking at where K or mu dips and then read the circles there on
+the Smith chart.
+
+**Readings** in the Stability view: hover for K, |Delta|, mu, mu' and the gain bound at the nearest frequency.
+
+**Exports**: Export... saves the plot shown as an SVG image (the Smith chart, with the stability circles when shown, the
+magnitude and phase panels or the stability panels, redrawn from the data, in the light or dark theme) or as a CSV table
+with the frequency and the real and imaginary parts of each checked entry of S, Z or Y (empty cells where Z or Y is
+absent; the Stability view lists K, mu, mu', |Delta| and the gain instead, and a Smith chart with circles adds a table of
+them below). **Save Touchstone...** opens a small popup for the frequency unit and format, then writes the whole
 matrix as a Touchstone version 1 file, `.sNp` for N ports, in the frequency unit (Hz, kHz, MHz or GHz) and format you
 pick there: RI (real and imaginary parts), MA (magnitude and angle in
 degrees) or DB (decibels and angle in degrees). The default, the one most tools write, is `# GHz S MA R 50`. A two-port
@@ -868,7 +1008,9 @@ and the message names them.
 
 The S-parameters example (Examples > Basics) is a T low-pass of two 8 uH inductors and a 3.18 nF capacitor between two
 50 ohm ports: S11 starts at the center of the chart, matched, and sweeps out to the rim as the inductors block the
-signal, while S21 stays near 0 dB up to about 1 MHz.
+signal, while S21 stays near 0 dB up to about 1 MHz. A filter like it is unconditionally stable; the example with an
+active two-port is "Stability of a common-emitter amplifier" (Examples > Transistors): a 2N3904 stage that can oscillate
+below about 290 MHz, for the Stability view and the circles.
 
 ## Truth table
 
@@ -899,31 +1041,67 @@ imcsim solves circuits with one of two engines, picked in Edit > Preferences > S
   the default. Logic gates and flip-flops run as its digital models, with X states, and its results are the ones the
   rest of this guide describes.
 - **Nodalys** is the solver built into imcsim. It reads the circuit directly, with no netlist, and runs every analysis
-  of ngspice plus the harmonic balance, which ngspice cannot. Its logic gates and flip-flops are continuous (a smooth
+  of ngspice plus the harmonic balance and the AC kind of the sensitivity, which ngspice cannot. Its logic gates and flip-flops are continuous (a smooth
   step of the inputs, with no X states), so an AC sweep or a noise analysis sees through them, and a run is repeatable
   from its seed even for white and 1/f noise.
 
-Pick ngspice when you want the established reference, an X state in a latch or a library model that is only SPICE
-text. Pick Nodalys for the harmonic balance, for an AC sweep or a noise analysis of a circuit with logic gates, or to
+Pick ngspice when you want the established reference, an X state in a latch, or a library model that holds more than
+Nodalys reads (see below). Pick Nodalys for the harmonic balance, for an AC sweep or a noise analysis of a circuit with logic gates, or to
 compare the two engines on a circuit: a difference between them is worth a second look at the circuit. Both use the
-same part models (see the models page, which lists where Nodalys differs).
+same part models (see the models page, which lists where Nodalys differs). For poles and zeros, prefer Nodalys: ngspice
+can return nothing, drop roots or return right-half-plane roots that are not real on some circuits.
 
 What an engine cannot run is said, not guessed at:
 
 - An analysis the engine cannot run on the circuit is grayed out in the analysis list, and its tooltip gives the
-  reason. This covers analyses and the kinds of parts on the schematic: the harmonic balance with ngspice, a
+  reason. This covers analyses and the kinds of parts on the schematic: the harmonic balance with ngspice (the AC kind
+  of the sensitivity is disabled in its settings, with the same kind of reason), a
   voltage-controlled switch or a relay in the harmonic balance, and logic gates and flip-flops in the sensitivity,
   pole-zero and S-parameters analyses with either engine (and with ngspice also in any analysis when its digital
   models, `digital.cm`, are missing).
+- The S-parameters analysis asks for different things of the ports and the sweep: ngspice needs at least two ports and
+  three points of a linear sweep, and Nodalys takes one port and two points. The refusal says which, and that the other
+  engine takes it. Only Nodalys gives the impedance (Z) and admittance (Y) matrices in the S-parameters tab; with ngspice
+  those choices are grayed out, and the stability factors and circles, worked out from S, work on both.
 - Other limits depend on what a part holds, so they show when you run, as an error with the reason: on Nodalys, a
   behavioral source whose expression uses something it does not read (`limit()`, the random functions, `hertz`, or
   `time` in the harmonic balance), a MOSFET model that is not level 1, and a block imported from a library, which is
-  kept as SPICE text.
+  kept as SPICE text, when its text holds something Nodalys cannot simulate. Nodalys reads the resistors, capacitors,
+  inductors, DC and AC sources, controlled and behavioral sources, diodes, bipolar and level 1 MOSFET transistors,
+  switches and nested subcircuits of such a text, with its `.param` lines, `{expressions}` and `.model` cards; it
+  refuses the rest by name, such as a JFET, a `.func` or a transmission line, and says so before
+  the run. A model parameter its devices do not read, such as a junction capacitance of a substrate, is named in a
+  message of the run.
 
 A run keeps the engine it started on, a paused live run too. If you change the engine in Preferences meanwhile, the
 change takes effect once no run is using it, that is, once the run ends, or its paused live run is ended or
 discarded.
 Results already in the Output window stay as they are until you run again.
+
+## Solver options
+
+Every analysis shares a few numerical options, at the end of the analysis settings, in the **Solver** section (closed
+until opened, since the defaults suit most circuits). They are saved with the schematic and honoured by both engines:
+
+- **Rel. tolerance** (`reltol`, default 1m, 1n to 0.1): how close two iterations of the solver must be, relative to the
+  value, and how fast a transient may change its step. A smaller value gives more exact results, and a transient on
+  ngspice more points; a larger one is faster and less exact.
+- **Current tolerance** (`abstol`, default 1p, 1a to 1u) and **Voltage tolerance** (`vntol`, default 1u, 1p to 10m):
+  the smallest current and voltage that count next to the relative tolerance. They matter for circuits with tiny
+  signals, where the default can be coarse.
+- **Integration** (`method`): how a transient steps capacitors and inductors in time. Default keeps what imcsim always
+  did: the trapezoidal rule, or Gear when the circuit has a fuse, whose cut inductor makes the trapezoidal rule ring.
+  Trapezoidal and Gear fix it for every circuit; picking Trapezoidal on a circuit with a fuse is allowed, and may ring.
+  Gear damps the ringing that the trapezoidal rule leaves after a sudden change, at a little more error.
+- **Nominal temp.** (`tnom`, default 27 C, -200 to 500 C): the temperature the model parameters of diodes and
+  transistors are given at. A run is at 27 C unless you step the temperature, so a model given at another temperature
+  behaves as that model scaled from there: a diode of a datasheet measured at 77 C drops more at 27 C. It does not
+  change the temperature of the run.
+
+A value outside its range is not applied while you type it, the field turns red, and a file that holds one is read with
+the defaults and a warning. Reset to defaults puts all of them back. ngspice reads them as one `.options` line of the
+netlist, which the Netlist window shows when any is changed, and Nodalys takes them as its convergence options, its
+integration method and its nominal temperature.
 
 ## Harmonic balance
 
@@ -946,6 +1124,8 @@ Amplitudes are peak values or RMS ones, as Preferences > Results > Harmonic ampl
 switch); DC is never scaled. The tables list DC and THD per trace and each harmonic with its phase. The Stop button
 ends a long run between its iterations. Export saves the plot as SVG or CSV, and Export CSV... the spectra and the
 waveforms together.
+
+The Harmonic balance example (Examples > Diodes) is a half-wave rectifier on a 1 kHz sine, with the analysis saved.
 
 ## Exports
 

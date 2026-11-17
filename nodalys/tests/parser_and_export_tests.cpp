@@ -708,6 +708,38 @@ TEST_CASE("The Nodalys command line runs netlists from arguments or standard inp
         CHECK(csv->contains("V(2),Voltage,6,V"));
     }
 
+    SECTION("It places a subcircuit with parameters, as imcsim does") {
+        const std::optional<std::string> csv = folder.Run("-b -f csv", "* Subcircuit\n"
+                                                                       ".subckt DIVIDER IN OUT params: RT=1k RB=1k\n"
+                                                                       "R1 IN OUT {RT}\n"
+                                                                       "R2 OUT 0 {RB}\n"
+                                                                       ".ends\n"
+                                                                       "V1 1 0 12\n"
+                                                                       "X1 1 2 DIVIDER RT=2k RB=2k\n"
+                                                                       "X2 1 3 DIVIDER RT=1k RB=3k\n"
+                                                                       ".op\n"
+                                                                       ".end\n");
+        REQUIRE(csv.has_value());
+        CHECK(csv->contains("V(2),Voltage,6,V"));
+        CHECK(csv->contains("V(3),Voltage,9,V"));
+    }
+
+    SECTION("It lists the internal nodes of a subcircuit instance after the nodes of the netlist") {
+        const std::optional<std::string> csv = folder.Run("-b -f csv", "* Internal node\n"
+                                                                       ".subckt CHAIN IN OUT\n"
+                                                                       "R1 IN MID 1k\n"
+                                                                       "R2 MID OUT 1k\n"
+                                                                       "R3 OUT 0 2k\n"
+                                                                       ".ends\n"
+                                                                       "V1 1 0 12\n"
+                                                                       "X1 1 2 CHAIN\n"
+                                                                       ".op\n"
+                                                                       ".end\n");
+        REQUIRE(csv.has_value());
+        CHECK(csv->contains("V(2),Voltage,6,V"));
+        CHECK(csv->contains("V(3),Voltage,9,V"));
+    }
+
     SECTION("It reads the netlist from standard input") {
         const std::optional<std::string> csv = folder.Run("-b -f csv",
                                                           "* Divider\n"

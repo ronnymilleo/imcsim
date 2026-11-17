@@ -514,7 +514,8 @@ void Application::ShowNewResults() {
     show_if_new(m_ShownNoiseVersion, m_Results.GetNoiseVersion(), m_Results.GetNoise().has_value(), PlotTab::NOISE);
     show_if_new(m_ShownTransferFunctionVersion, m_Results.GetTransferFunctionVersion(),
                 m_Results.GetTransferFunction().has_value(), PlotTab::TRANSFER_FUNCTION);
-    show_if_new(m_ShownSensitivityVersion, m_Results.GetSensitivityVersion(), m_Results.GetSensitivity().has_value(),
+    show_if_new(m_ShownSensitivityVersion, m_Results.GetSensitivityVersion(),
+                m_Results.GetSensitivity().has_value() || m_Results.GetACSensitivity().has_value(),
                 PlotTab::SENSITIVITY);
     show_if_new(m_ShownPoleZeroVersion, m_Results.GetPoleZeroVersion(), m_Results.GetPoleZero().has_value(),
                 PlotTab::POLE_ZERO);

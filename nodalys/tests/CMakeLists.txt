@@ -5,17 +5,26 @@
 include(Catch)
 
 add_executable(nodalys-tests
+    ac_sens_analysis_tests.cpp
+    ac_sens_netlist_tests.cpp
     behavioral_device_tests.cpp
     expression_tests.cpp
     fft_tests.cpp
+    frequency_sweep_tests.cpp
     fuse_device_tests.cpp
     hb_analysis_tests.cpp
     linear_tests.cpp
     netlist_elements_tests.cpp
+    netlist_subcircuits_tests.cpp
+    nodeset_tests.cpp
     parser_and_export_tests.cpp
+    pole_zero_oracle.cpp
+    pz_analysis_tests.cpp
     random_draws_tests.cpp
     sens_analysis_tests.cpp
+    subcircuit_text_tests.cpp
     smooth_logic_tests.cpp
+    sp_analysis_tests.cpp
     thermal_tests.cpp
     transient_analysis_tests.cpp
     transient_noise_tests.cpp

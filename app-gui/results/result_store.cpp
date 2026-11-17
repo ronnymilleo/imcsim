@@ -5,6 +5,7 @@
 
 #include "results/result_store.h"
 
+#include "results/ac_sensitivity_view.h"
 #include <algorithm>
 #include <iterator>
 #include <utility>
@@ -33,6 +34,7 @@ void ResultStore::OnLiveChanged() {
     m_Noise.reset();
     m_TransferFunction.reset();
     m_Sensitivity.reset();
+    m_ACSensitivity.reset();
     m_PoleZero.reset();
     m_SParameters.reset();
     m_TruthTable.reset();
@@ -382,9 +384,11 @@ std::size_t ResultStore::GetTransferFunctionVersion() const {
 /**
  * @brief   Stores the result of a sensitivity analysis of the current schematic.
  * @param[in] sensitivity  Sensitivity of the output node to each part, or no value to clear it.
- * @note    The result is dropped on the next change, since it no longer matches the circuit.
+ * @note    The result is dropped on the next change, since it no longer matches the circuit. It replaces an AC
+ *          result, since the Sensitivity tab shows the last one made.
  */
 void ResultStore::SetSensitivity(std::optional<Core::Sensitivity> sensitivity) {
+    m_ACSensitivity.reset();
     m_Sensitivity = std::move(sensitivity);
     ++m_SensitivityVersion;
 }
@@ -398,11 +402,51 @@ const std::optional<Core::Sensitivity> &ResultStore::GetSensitivity() const {
 }
 
 /**
- * @brief   Returns a number that changes whenever a sensitivity result is stored.
+ * @brief   Returns a number that changes whenever a sensitivity result, DC or AC, is stored.
  * @return  The sensitivity version; compare it with a stored one to know whether the result was replaced.
  */
 std::size_t ResultStore::GetSensitivityVersion() const {
     return m_SensitivityVersion;
+}
+
+/**
+ * @brief   Stores the result of an AC sensitivity analysis of the current schematic.
+ * @param[in] sensitivity  Sensitivity of the output node to each part across frequency, or no value to clear it.
+ * @note    The result is dropped on the next change, since it no longer matches the circuit. It replaces a DC result,
+ *          since the Sensitivity tab shows the last one made, and the frequency it is read at starts at the -3 dB
+ *          point of the response.
+ */
+void ResultStore::SetACSensitivity(std::optional<Core::ACSensitivity> sensitivity) {
+    m_Sensitivity.reset();
+    if (sensitivity) {
+        m_ACSensitivityFrequency = FindCornerFrequencyIndex(*sensitivity);
+    }
+    m_ACSensitivity = std::move(sensitivity);
+    ++m_SensitivityVersion;
+}
+
+/**
+ * @brief   Returns the last AC sensitivity simulated for the current schematic.
+ * @return  The AC sensitivity result, or no value when there was no simulation since the last change.
+ */
+const std::optional<Core::ACSensitivity> &ResultStore::GetACSensitivity() const {
+    return m_ACSensitivity;
+}
+
+/**
+ * @brief   Picks the frequency the AC sensitivity table and the schematic read.
+ * @param[in] frequency_index  Index into the frequencies of the AC sensitivity result.
+ */
+void ResultStore::SetACSensitivityFrequency(const std::size_t frequency_index) {
+    m_ACSensitivityFrequency = frequency_index;
+}
+
+/**
+ * @brief   Returns the frequency the AC sensitivity table and the schematic read.
+ * @return  Index into the frequencies of the AC sensitivity result; the -3 dB point until the user picks another.
+ */
+std::size_t ResultStore::GetACSensitivityFrequency() const {
+    return m_ACSensitivityFrequency;
 }
 
 /**

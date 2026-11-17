@@ -5,6 +5,8 @@
 include(Catch)
 
 add_executable(imcsim-tests
+            ac_sensitivity_tests.cpp
+            ac_sensitivity_view_tests.cpp
             analysis_controls_tests.cpp
             analysis_inputs_tests.cpp
             analysis_sources_tests.cpp
@@ -43,6 +45,7 @@ add_executable(imcsim-tests
             harmonic_balance_view_tests.cpp
             heat_glow_tests.cpp
             helpers_tests.cpp
+            initial_voltages_tests.cpp
             led_glow_tests.cpp
             live_change_tests.cpp
             live_input_tests.cpp
@@ -57,6 +60,7 @@ add_executable(imcsim-tests
             nodalys_backend_tests.cpp
             nodalys_benchmark_tests.cpp
             nodalys_in_use.cpp
+            nodeset_tests.cpp
             nonlinear_tests.cpp
             op_amp_tests.cpp
             parameter_conversion_tests.cpp
@@ -72,7 +76,9 @@ add_executable(imcsim-tests
             plot_helpers_tests.cpp
             plot_tab_tests.cpp
             plot_ticks_tests.cpp
+            port_matrix_view_tests.cpp
             point_window_tests.cpp
+            pole_zero_robustness_tests.cpp
             pole_zero_tests.cpp
             pole_zero_view_tests.cpp
             preferences_tests.cpp
@@ -81,6 +87,7 @@ add_executable(imcsim-tests
             ready_blocks_tests.cpp
             result_store_tests.cpp
             run_status_tests.cpp
+            s_parameter_ports_tests.cpp
             s_parameter_view_tests.cpp
             s_parameters_tests.cpp
             schematic_canvas_tests.cpp
@@ -95,11 +102,16 @@ add_executable(imcsim-tests
             simulation_service_tests.cpp
             simulator_tests.cpp
             smith_chart_tests.cpp
+            solver_options_tests.cpp
             spectrum_tests.cpp
+            spice_block_check_tests.cpp
             spice_import_tests.cpp
             spice_inclusions_tests.cpp
             spice_library_tests.cpp
             spice_value_tests.cpp
+            stability_circles_tests.cpp
+            stability_summary_tests.cpp
+            stability_view_tests.cpp
             standard_values_tests.cpp
             statistics_table_tests.cpp
             stepped_circuit_tests.cpp
@@ -112,6 +124,7 @@ add_executable(imcsim-tests
             trace_fit_state_tests.cpp
             trace_math_tests.cpp
             trace_statistics_tests.cpp
+            two_port_metrics_tests.cpp
             transient_chunks_tests.cpp
             transient_window_tests.cpp
             truth_table_tests.cpp
@@ -123,9 +136,16 @@ add_executable(imcsim-tests
             wire_routing_tests.cpp
 )
 
+# The oracle that rebuilds a response from its poles and zeros is shared with the Nodalys tests
+target_sources(imcsim-tests
+        PRIVATE
+            ${PROJECT_SOURCE_DIR}/nodalys/tests/pole_zero_oracle.cpp
+)
+
 target_include_directories(imcsim-tests
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}
+            ${PROJECT_SOURCE_DIR}/nodalys/tests
 )
 
 target_link_libraries(imcsim-tests

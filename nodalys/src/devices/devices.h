@@ -19,6 +19,7 @@
 #include <cstdint>
 #include <functional>
 #include <limits>
+#include <map>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -226,6 +227,9 @@ public:
     int GetNodeB() const { return m_NodeB; }
     double GetCapacitance() const { return m_Capacitance; }
 
+    /// A capacitor with no IC= of its own starts at the difference of the initial voltages of its nodes, as in SPICE.
+    void TakeInitialVoltageFrom(const std::map<int, double> &node_voltages);
+
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     void StampAc(MnaSystem &reactive, const std::vector<double> &x_dc) const override;
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
@@ -329,6 +333,7 @@ public:
 
     double GetDcValue() const;
     void SetDcValue(double value);
+    double GetAcMagnitude() const { return m_AcMagnitude; }
     int GetNodeA() const { return m_NodeA; }
     int GetNodeB() const { return m_NodeB; }
     int GetBranch() const { return m_Branch; }
@@ -370,6 +375,7 @@ public:
 
     double GetDcValue() const;
     void SetDcValue(double value);
+    double GetAcMagnitude() const { return m_AcMagnitude; }
     int GetNodeA() const { return m_NodeA; }
     int GetNodeB() const { return m_NodeB; }
     const SourcePeriodicity &GetPeriodicity() const { return m_Periodicity; }
@@ -582,13 +588,42 @@ private:
 
 /**
  * @class   NodeInitialConditionDevice
- * @brief   Clamps a node to a fixed initial voltage at the start of a transient (SPICE `.ic`), then disconnects.
- * @details Stamps a stiff Norton companion to ground only while `IsTransientStart` is true, leaving operating point
- *          and small-signal analyses unaffected and letting the node evolve freely for $t > 0$.
+ * @brief   Clamps a node to a fixed initial voltage while the operating point that starts a transient is found (SPICE
+ *          `.ic`), then disconnects.
+ * @details Stamps a stiff Norton companion to ground only in that solve, so the rest of the circuit starts from the
+ *          point that is consistent with the node, and the node evolves freely for $t > 0$. A transient that starts
+ *          from initial conditions (`uic`) has no operating point: there the voltage reaches the circuit only through
+ *          the capacitors on the node, which `CapacitorDevice::TakeInitialVoltageFrom()` sets up, as in SPICE.
+ *          Operating point and small-signal analyses are unaffected.
  */
 class NodeInitialConditionDevice : public Device {
 public:
     NodeInitialConditionDevice(int node, double voltage);
+
+    void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
+    double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
+    std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
+                                           const std::vector<std::complex<double>> &x_ac, double omega) const override;
+
+private:
+    int m_Node;
+    double m_Voltage;
+};
+
+/**
+ * @class   NodesetDevice
+ * @brief   Pulls a node to a voltage in the first pass of the solve of an operating point (SPICE `.nodeset`), which
+ *          then lets go and converges again.
+ * @details A stiff Norton companion to ground, stamped only while `TimeContext::IsNodesetPass` is true. The solver
+ *          finds the point with every nodeset held, releases them and converges again from there, so a circuit with
+ *          several stable states, such as a latch, ends in the one nearest the voltages, and a circuit with one ends
+ *          where it always does. A nodeset is a guess where `NodeInitialConditionDevice` is a held value, which the
+ *          transient keeps in the operating point that starts it. Every solve that starts from an operating point reads
+ *          it, the transient's without `uic` included; the solves that continue a DC sweep do not.
+ */
+class NodesetDevice : public Device {
+public:
+    NodesetDevice(int node, double voltage);
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;

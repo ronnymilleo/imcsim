@@ -5,12 +5,16 @@
 
 #include "analyses/analyses.h"
 
+#include "analyses/frequency_sweep.h"
+#include "analyses/port_matrices.h"
 #include "devices/devices.h"
 #include <algorithm>
 #include <cmath>
 #include <complex>
 #include <format>
 #include <numbers>
+#include <optional>
+#include <set>
 #include <utility>
 #include <vector>
 
@@ -29,109 +33,85 @@ struct DeviceRestoreGuard {
     }
 };
 
+// The messages of the checks that imcsim runs before any backend are worded the same way here, so a cause reads the
+// same wherever it is found: tests/s_parameters_tests.cpp keeps the two in step
+
 std::expected<std::vector<double>, std::string> GenerateFrequencyPoints(const SParameterConfig &settings) {
-    if (settings.StartFrequency <= 0.0 || settings.StopFrequency < settings.StartFrequency) {
-        return std::unexpected("The S-parameter analysis has invalid frequency range; start must be > 0 and <= stop");
+    if (settings.StartFrequency <= 0.0) {
+        return std::unexpected("The start frequency must be positive");
+    }
+    if (settings.StopFrequency < settings.StartFrequency) {
+        return std::unexpected("The stop frequency must be higher than the start frequency");
     }
     if (settings.Points <= 0) {
-        return std::unexpected("The S-parameter analysis must have at least 1 point");
+        return std::unexpected(settings.SweepType == FrequencySweepType::LINEAR
+                                   ? "The number of points must be at least 1"
+                                   : "The points per decade or octave must be at least 1");
     }
 
-    std::vector<double> frequencies;
-    switch (settings.SweepType) {
-    case FrequencySweepType::LINEAR: {
-        if (settings.Points == 1 || settings.StartFrequency == settings.StopFrequency) {
-            frequencies.push_back(settings.StartFrequency);
-        } else {
-            const double step =
-                (settings.StopFrequency - settings.StartFrequency) / static_cast<double>(settings.Points - 1);
-            for (int i = 0; i < settings.Points; ++i) {
-                const double f = settings.StartFrequency + static_cast<double>(i) * step;
-                frequencies.push_back(std::min(f, settings.StopFrequency));
+    return MakeFrequencySweep(settings.SweepType, settings.StartFrequency, settings.StopFrequency, settings.Points);
+}
+
+std::optional<std::string> CheckPortNumbers(const std::vector<CircuitPort> &sorted_ports) {
+    std::set<int> numbers;
+    for (const CircuitPort &port : sorted_ports) {
+        if (!numbers.insert(port.Number).second) {
+            return std::format("Two S-parameter ports are numbered {}; give each port its own number", port.Number);
+        }
+    }
+    // The matrix and the Touchstone file index the ports by number, so a gap would leave a row with no port
+    for (int number = 1; number <= static_cast<int>(sorted_ports.size()); ++number) {
+        if (!numbers.contains(number)) {
+            return std::format("The S-parameter ports must be numbered 1 to {} with no gap; port {} is missing",
+                               sorted_ports.size(), number);
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<std::string> CheckPortNodes(const std::vector<CircuitPort> &ports, const int circuit_node_count) {
+    for (std::size_t first = 0; first < ports.size(); ++first) {
+        const CircuitPort &port = ports[first];
+        if (port.ReferenceOhms <= 0.0) {
+            return std::format("The reference impedance of port {} must be positive", port.Number);
+        }
+        if (port.Node == 0) {
+            return std::format("Port {} is on ground; an S-parameter port needs a node of its own", port.Number);
+        }
+        if (port.Node < 0 || port.Node >= circuit_node_count) {
+            return std::format("Port {} is on a node that is not in the circuit", port.Number);
+        }
+        for (std::size_t second = first + 1; second < ports.size(); ++second) {
+            if (ports[second].Node == port.Node) {
+                return std::format("Ports {} and {} are on the same node; each port needs a node of its own",
+                                   port.Number, ports[second].Number);
             }
         }
-        break;
     }
-    case FrequencySweepType::DECADE: {
-        if (settings.StartFrequency == settings.StopFrequency) {
-            frequencies.push_back(settings.StartFrequency);
-        } else {
-            for (int index = 0;; ++index) {
-                const double frequency =
-                    settings.StartFrequency *
-                    std::pow(10.0, static_cast<double>(index) / static_cast<double>(settings.Points));
-                if (frequency > settings.StopFrequency * (1.0 + 1e-9)) {
-                    break;
-                }
-                frequencies.push_back(std::min(frequency, settings.StopFrequency));
-                if (frequency >= settings.StopFrequency * (1.0 - 1e-9)) {
-                    break;
-                }
-            }
-        }
-        break;
-    }
-    case FrequencySweepType::OCTAVE: {
-        if (settings.StartFrequency == settings.StopFrequency) {
-            frequencies.push_back(settings.StartFrequency);
-        } else {
-            for (int index = 0;; ++index) {
-                const double frequency =
-                    settings.StartFrequency *
-                    std::pow(2.0, static_cast<double>(index) / static_cast<double>(settings.Points));
-                if (frequency > settings.StopFrequency * (1.0 + 1e-9)) {
-                    break;
-                }
-                frequencies.push_back(std::min(frequency, settings.StopFrequency));
-                if (frequency >= settings.StopFrequency * (1.0 - 1e-9)) {
-                    break;
-                }
-            }
-        }
-        break;
-    }
-    default:
-        return std::unexpected("Unknown frequency sweep type for S-parameter analysis");
-    }
-    return frequencies;
+    return std::nullopt;
 }
 
 std::expected<std::vector<CircuitPort>, std::string> ValidatePorts(const std::vector<CircuitPort> &raw_ports,
                                                                    const int circuit_node_count) {
     if (raw_ports.empty()) {
-        return std::unexpected("The S-parameter analysis requires at least one port");
+        return std::unexpected("The circuit has no S-parameter port");
     }
-
+    // The ports may be listed in any order; the matrix follows their numbers
     std::vector<CircuitPort> ports = raw_ports;
     std::ranges::sort(ports, {}, &CircuitPort::Number);
-
-    for (std::size_t i = 0; i < ports.size(); ++i) {
-        const int expected_number = static_cast<int>(i + 1);
-        if (ports[i].Number != expected_number) {
-            return std::unexpected(
-                std::format("The S-parameter ports must be numbered 1 to N without gaps; expected port {}, found {}",
-                            expected_number, ports[i].Number));
-        }
-        if (ports[i].ReferenceOhms <= 0.0) {
-            return std::unexpected(
-                std::format("The reference impedance of port {} must be greater than zero", ports[i].Number));
-        }
-        if (ports[i].Node <= 0 || ports[i].Node >= circuit_node_count) {
-            return std::unexpected(
-                std::format("Port {} is connected to ground or an invalid circuit node", ports[i].Number));
-        }
+    if (const std::optional<std::string> error = CheckPortNumbers(ports)) {
+        return std::unexpected(*error);
     }
-
-    for (std::size_t i = 0; i < ports.size(); ++i) {
-        for (std::size_t j = i + 1; j < ports.size(); ++j) {
-            if (ports[i].Node == ports[j].Node) {
-                return std::unexpected(std::format("Ports {} and {} cannot connect to the same node {}",
-                                                   ports[i].Number, ports[j].Number, ports[i].Node));
-            }
-        }
+    if (const std::optional<std::string> error = CheckPortNodes(ports, circuit_node_count)) {
+        return std::unexpected(*error);
     }
-
     return ports;
+}
+
+/// Fills the impedance and admittance matrices of a frequency from its S matrix.
+void AddPortMatrices(SParameterResult &result, const PortMatrix &scattering) {
+    result.ImpedanceMatrices.push_back(ComputeImpedanceMatrix(scattering, result.ReferenceOhms));
+    result.AdmittanceMatrices.push_back(ComputeAdmittanceMatrix(scattering, result.ReferenceOhms));
 }
 
 } // namespace
@@ -221,6 +201,8 @@ std::expected<SParameterResult, std::string> ComputeSParameters(CompiledCircuit 
         }
 
         // 5. Convert port voltages to power-wave scattering matrix S_ij = V_i * sqrt(G_i) - delta_ij
+        PortMatrix scattering;
+        scattering.reserve(static_cast<std::size_t>(num_ports * num_ports));
         for (std::size_t i = 0; i < static_cast<std::size_t>(num_ports); ++i) {
             const int ui = port_unknowns[i];
             const double gi_sqrt = sqrt_g[i];
@@ -233,9 +215,11 @@ std::expected<SParameterResult, std::string> ComputeSParameters(CompiledCircuit 
                     return std::unexpected(std::format("The native solver produced non-finite S({}, {}) at f = {} Hz",
                                                        i + 1, j + 1, frequency));
                 }
-                result.Values.push_back(s_ij);
+                scattering.push_back(s_ij);
             }
         }
+        result.Values.insert(result.Values.end(), scattering.begin(), scattering.end());
+        AddPortMatrices(result, scattering);
     }
 
     if (messages != nullptr) {

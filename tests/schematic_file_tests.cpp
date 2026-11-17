@@ -460,6 +460,9 @@ TEST_CASE("Simulation settings load back unchanged", "[schematic_file]") {
     settings.TransferFunctionSource = "V2";
     settings.TransferFunctionOutput = GUI::GridPoint{6, 3};
     settings.SensitivityOutput = GUI::GridPoint{10, 14};
+    settings.SensitivityType = GUI::SensitivityKind::AC;
+    settings.ACSensitivitySource = "Vin1";
+    settings.ACSensitivityRange = {.StartFrequency = 5.0, .StopFrequency = 2e6, .PointsPerDecade = 33};
     settings.PoleZeroSource = "Vin1";
     settings.PoleZeroOutput = GUI::GridPoint{8, 2};
     settings.TruthTableInputs = {"V1", "V3"};
@@ -467,6 +470,11 @@ TEST_CASE("Simulation settings load back unchanged", "[schematic_file]") {
         .Enabled = true, .Part = "R2", .UsesList = true, .Start = 1e3, .Stop = 4e3, .Step = 1e3, .List = "1k, 2.2k"};
     settings.MonteCarlo = {
         .Enabled = true, .Runs = 250, .Distribution = Core::ToleranceDistribution::UNIFORM, .Seed = 4000000000U};
+    settings.Solver = {.RelativeTolerance = 1e-4,
+                       .CurrentToleranceAmperes = 1e-13,
+                       .VoltageToleranceVolts = 1e-7,
+                       .Method = Core::IntegrationMethod::GEAR,
+                       .NominalTemperatureCelsius = 50.0};
 
     const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic({}, {}, settings, {}));
     CHECK(loaded.Warnings.empty());
@@ -508,6 +516,33 @@ TEST_CASE("Invalid sensitivity settings fall back to their defaults with a warni
     const GUI::LoadedSchematic loaded = LoadOrFail(text);
     CHECK(loaded.Warnings.size() == 1);
     CHECK_FALSE(loaded.Settings.SensitivityOutput);
+}
+
+TEST_CASE("Invalid AC sensitivity settings fall back to their defaults with a warning", "[schematic_file]") {
+    const std::string text = R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
+                             R"("sensitivity": {"kind": "ac", "ac": {"start": -1.0, "stop": 1e3, "source": "V1"}}}})";
+    const GUI::LoadedSchematic loaded = LoadOrFail(text);
+    CHECK(loaded.Warnings.size() == 1);
+    CHECK(loaded.Settings.SensitivityType == GUI::SensitivityKind::DC);
+    CHECK(loaded.Settings.ACSensitivitySource.empty());
+    CHECK(loaded.Settings.ACSensitivityRange == GUI::SimulationSettings{}.ACSensitivityRange);
+}
+
+TEST_CASE("An unknown sensitivity kind falls back to the DC one with a warning", "[schematic_file]") {
+    const std::string text = R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
+                             R"("sensitivity": {"kind": "sideways"}}})";
+    const GUI::LoadedSchematic loaded = LoadOrFail(text);
+    CHECK(loaded.Warnings.size() == 1);
+    CHECK(loaded.Settings.SensitivityType == GUI::SensitivityKind::DC);
+}
+
+TEST_CASE("A file saved before the AC sensitivity loads the sensitivity as the DC one", "[schematic_file]") {
+    const std::string text = R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
+                             R"("analysis": "sensitivity", "sensitivity": {"output": [3, 4]}}})";
+    const GUI::LoadedSchematic loaded = LoadOrFail(text);
+    CHECK(loaded.Warnings.empty());
+    CHECK(loaded.Settings.SensitivityType == GUI::SensitivityKind::DC);
+    CHECK(loaded.Settings.ACSensitivityRange == GUI::SimulationSettings{}.ACSensitivityRange);
 }
 
 TEST_CASE("Invalid pole-zero settings fall back to their defaults with a warning", "[schematic_file]") {
@@ -1281,7 +1316,7 @@ TEST_CASE("The S-parameter settings load back unchanged", "[schematic_file]") {
 
 TEST_CASE("Invalid S-parameter settings fall back to their defaults with a warning", "[schematic_file]") {
     for (const char *settings : {R"({"start": -1, "stop": 1e9})", R"({"points_per_decade": 0})",
-                                 R"({"linear_points": 2})", R"({"logarithmic": "yes"})"}) {
+                                 R"({"linear_points": 1})", R"({"logarithmic": "yes"})"}) {
         const std::string text = std::string(R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
                                              R"("s_parameters": )") +
                                  settings + "}}";
@@ -1289,6 +1324,16 @@ TEST_CASE("Invalid S-parameter settings fall back to their defaults with a warni
         CHECK(loaded.Warnings.size() == 1);
         CHECK(loaded.Settings.SParameters == Core::SParameterSettings{});
     }
+}
+
+TEST_CASE("A linear S-parameter sweep of two points loads, as Nodalys runs it and ngspice says it cannot",
+          "[schematic_file]") {
+    const std::string text = R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
+                             R"("s_parameters": {"logarithmic": false, "linear_points": 2}}})";
+    const GUI::LoadedSchematic loaded = LoadOrFail(text);
+    CHECK(loaded.Warnings.empty());
+    CHECK(loaded.Settings.SParameters.LinearPoints == 2);
+    CHECK_FALSE(loaded.Settings.SParameters.IsLogarithmic);
 }
 
 TEST_CASE("A file saved before the S-parameter analysis loads it as its defaults", "[schematic_file]") {

@@ -165,7 +165,8 @@ std::expected<std::string, std::string> FormatTouchstone(const Core::SParameters
         }
     }
     const double unit_factor = GetUnitFactor(options.Unit);
-    std::string text = std::format("! S-parameters from imcsim, {} ports\n", result.GetPortCount());
+    std::string text = std::format("! S-parameters from imcsim, {} {}\n", result.GetPortCount(),
+                                   result.GetPortCount() == 1 ? "port" : "ports");
     if (result.GetPortCount() == PORTS_IN_ONE_LINE) {
         text += "! Frequency S11 S21 S12 S22\n";
     }

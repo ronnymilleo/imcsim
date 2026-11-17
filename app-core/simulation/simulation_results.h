@@ -215,16 +215,30 @@ struct PoleZero {
  *          matrices one after the other, frequency by frequency and row by row, so S(i, j) at a frequency is the wave
  *          leaving port i for a wave entering port j. The waves are power waves, normalized to the reference impedance
  *          of each port.
+ *
+ *          A backend that works out the impedance and admittance matrices of the ports gives them too, one per
+ *          frequency in the same row by row layout; a frequency whose circuit has no finite matrix, such as the
+ *          impedance of two ports joined by a series element and nothing else, has none there. They are empty when the
+ *          backend does not give them, as ngspice, whose Z matrix is unusable when the circuit has no finite one.
  */
 struct SParameters {
     std::vector<double> Frequencies;
     /// One reference impedance in ohms per port, in the order of the port numbers.
     std::vector<double> ReferenceOhms;
     std::vector<std::complex<double>> Values;
+    /// Impedance matrix Z in ohms at each frequency, or none where the circuit has no finite one; empty for a backend
+    /// that does not give it.
+    std::vector<std::optional<std::vector<std::complex<double>>>> ImpedanceMatrices;
+    /// Admittance matrix Y in siemens at each frequency, or none where the circuit has no finite one; empty for a
+    /// backend that does not give it.
+    std::vector<std::optional<std::vector<std::complex<double>>>> AdmittanceMatrices;
     std::vector<std::string> Warnings;
 
     int GetPortCount() const;
     std::complex<double> Get(std::size_t frequency, int row, int column) const;
+    bool HasPortMatrices() const;
+    std::optional<std::complex<double>> GetImpedance(std::size_t frequency, int row, int column) const;
+    std::optional<std::complex<double>> GetAdmittance(std::size_t frequency, int row, int column) const;
 };
 
 /**
@@ -258,6 +272,46 @@ struct PartSensitivity {
 struct Sensitivity {
     int OutputNode = 0;
     std::vector<PartSensitivity> Parts;
+};
+
+/**
+ * @struct  ACPartSensitivity
+ * @brief   How the response at the output changes with the value of one part, at every frequency of the sweep.
+ * @details The figures are for a 1 % higher value of the part, which compares parts of different kinds. A block
+ *          reports its most influential element inside, named by Element, and a potentiometer the two halves
+ *          together, as its total resistance.
+ */
+struct ACPartSensitivity {
+    std::string Name;
+    /// Kind of the part, which tells how the schematic labels it.
+    ComponentType Type = ComponentType::RESISTOR;
+    /// The element inside the block that has the largest effect, such as "R1"; empty for other parts.
+    std::string Element;
+    /// Unit of the value of the part, as Component::GetUnit() gives it; empty for a gain.
+    std::string Unit;
+    double Value = 0.0;
+    /// Decibels the magnitude of the response changes by, at each frequency; none where the output is too small for a
+    /// relative change to mean anything.
+    std::vector<std::optional<double>> MagnitudeDecibelsPerPercent;
+    /// Degrees the phase of the response changes by, at each frequency; none where the output is too small.
+    std::vector<std::optional<double>> PhaseDegreesPerPercent;
+};
+
+/**
+ * @struct  ACSensitivity
+ * @brief   The AC sensitivity of the voltage of a node to every part with a value, across frequency.
+ * @details Parts are listed in circuit order; the view ranks them at the frequency it shows. Diodes, transistors,
+ *          op-amps, switches and other parts without a value of their own are not listed.
+ */
+struct ACSensitivity {
+    int OutputNode = 0;
+    std::string InputSource;
+    std::vector<double> Frequencies;
+    /// The phasor of the output at each frequency, for the AC magnitude of the input source.
+    std::vector<std::complex<double>> Output;
+    std::vector<ACPartSensitivity> Parts;
+    /// What the user should know about the run, such as the frequencies where the output was too small to measure.
+    std::vector<std::string> Warnings;
 };
 
 /**
@@ -339,6 +393,7 @@ using ACSweepRun = SimulationRun<ACSweep>;
 using DCSweepRun = SimulationRun<DCSweep>;
 using NoiseRun = SimulationRun<Noise>;
 using SensitivityRun = SimulationRun<Sensitivity>;
+using ACSensitivityRun = SimulationRun<ACSensitivity>;
 using PoleZeroRun = SimulationRun<PoleZero>;
 using SParametersRun = SimulationRun<SParameters>;
 using TransferFunctionRun = SimulationRun<TransferFunction>;

@@ -115,6 +115,21 @@ std::string ScopeModels(const std::string &body, const std::string_view definiti
     return scoped;
 }
 
+/**
+ * @brief   Takes the ".ic" and ".nodeset" lines out of a body, since ngspice does not read them inside a ".subckt".
+ */
+void RemoveNodeVoltageLines(std::string &body) {
+    std::string kept;
+    std::istringstream lines(body);
+    std::string line;
+    while (std::getline(lines, line)) {
+        if (!line.starts_with(".ic ") && !line.starts_with(".nodeset ")) {
+            kept += line + '\n';
+        }
+    }
+    body = std::move(kept);
+}
+
 } // namespace
 
 /**
@@ -159,6 +174,9 @@ std::string FormatSubcircuit(const SubcircuitDefinition &definition) {
         if (body.ends_with(".end\n")) {
             body.erase(body.size() - 5);
         }
+        // The root netlist writes the initial voltages and nodesets of every instance at the top, where ngspice reads
+        // them
+        RemoveNodeVoltageLines(body);
         // Options are global and the root netlist writes them once, for the fuses of the blocks too
         if (const std::size_t option = body.find(FUSE_INTEGRATION_OPTION); option != std::string::npos) {
             body.erase(option, FUSE_INTEGRATION_OPTION.size());

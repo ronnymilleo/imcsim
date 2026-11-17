@@ -137,7 +137,8 @@ OutputWindow::OutputWindow(Schematic &schematic, ResultStore &results, AnalysisC
       m_Preferences(preferences), m_MathChannels(schematic), m_Buses(schematic),
       m_OperatingPointTab(schematic, results), m_TransientTab(schematic, results, controls, playback),
       m_SpectrumTab(schematic, results), m_ACSweepTab(schematic, results), m_DCSweepTab(schematic, results),
-      m_NoiseTab(schematic, results), m_PoleZeroTab(schematic, results), m_SParameterTab(schematic, results),
+      m_NoiseTab(schematic, results), m_ACSensitivityTab(schematic, results, preferences),
+      m_PoleZeroTab(schematic, results), m_SParameterTab(schematic, results),
       m_HarmonicBalanceTab(schematic, results, preferences), m_MonteCarloTab(schematic, results) {
     SetInitialSize(INITIAL_SIZE);
 }
@@ -455,7 +456,7 @@ TabResults OutputWindow::FindTabResults() const {
     set(PlotTab::DC_SWEEP, m_Results.GetDCSweep().has_value());
     set(PlotTab::NOISE, m_Results.GetNoise().has_value());
     set(PlotTab::TRANSFER_FUNCTION, m_Results.GetTransferFunction().has_value());
-    set(PlotTab::SENSITIVITY, m_Results.GetSensitivity().has_value());
+    set(PlotTab::SENSITIVITY, m_Results.GetSensitivity().has_value() || m_Results.GetACSensitivity().has_value());
     set(PlotTab::POLE_ZERO, m_Results.GetPoleZero().has_value());
     set(PlotTab::S_PARAMETERS, m_Results.GetSParameters().has_value());
     set(PlotTab::TRUTH_TABLE, m_Results.GetTruthTable().has_value());
@@ -522,7 +523,12 @@ void OutputWindow::DrawTab(const PlotTab tab, const FrameResults &frame) {
         DrawTransferFunctionTab(m_Results, m_Schematic);
         break;
     case PlotTab::SENSITIVITY:
-        DrawSensitivityTab(m_Results, m_Schematic, m_Preferences);
+        // The tab shows the last sensitivity made, DC or AC
+        if (m_Results.GetACSensitivity()) {
+            m_ACSensitivityTab.Draw();
+        } else {
+            DrawSensitivityTab(m_Results, m_Schematic, m_Preferences);
+        }
         break;
     case PlotTab::POLE_ZERO:
         m_PoleZeroTab.Draw();
@@ -611,13 +617,14 @@ bool OutputWindow::CanExport(const FrameResults &frame) const {
         return m_DCSweepTab.CanExport(frame);
     case PlotTab::NOISE:
         return m_NoiseTab.CanExport();
+    case PlotTab::SENSITIVITY:
+        return m_ACSensitivityTab.CanExport();
     case PlotTab::S_PARAMETERS:
         return m_SParameterTab.CanExport();
     case PlotTab::HARMONIC_BALANCE:
         return m_HarmonicBalanceTab.CanExport();
     case PlotTab::OPERATING_POINT:
     case PlotTab::TRANSFER_FUNCTION:
-    case PlotTab::SENSITIVITY:
     case PlotTab::POLE_ZERO:
     case PlotTab::TRUTH_TABLE:
     case PlotTab::MONTE_CARLO:
@@ -652,13 +659,14 @@ ExportFigure OutputWindow::BuildShownFigure(const FrameResults &frame, const boo
         return m_DCSweepTab.BuildFigure(frame);
     case PlotTab::NOISE:
         return m_NoiseTab.BuildFigure();
+    case PlotTab::SENSITIVITY:
+        return m_ACSensitivityTab.BuildFigure();
     case PlotTab::S_PARAMETERS:
         return m_SParameterTab.BuildFigure(is_table);
     case PlotTab::HARMONIC_BALANCE:
         return m_HarmonicBalanceTab.BuildFigure();
     case PlotTab::OPERATING_POINT:
     case PlotTab::TRANSFER_FUNCTION:
-    case PlotTab::SENSITIVITY:
     case PlotTab::POLE_ZERO:
     case PlotTab::TRUTH_TABLE:
     case PlotTab::MONTE_CARLO:
