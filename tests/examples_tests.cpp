@@ -19,6 +19,7 @@
 #include "results/logic_outputs.h"
 #include "results/logic_trace.h"
 #include "results/monte_carlo_results.h"
+#include "results/point_window.h"
 #include "results/stability_circles.h"
 #include "results/stability_summary.h"
 #include "results/trace_math.h"
@@ -203,9 +204,9 @@ TEST_CASE("The noise example shows a flat floor at the input that the low-pass c
     const Core::TransientRun run = Core::RunTransient(schematic.BuildCircuit(), seeded);
     REQUIRE(run.Result.has_value());
     const Core::Transient &transient = *run.Result;
-    // The whole run fits the default window of 2000 points, so the Spectrum tab covers all of it
+    // The whole run fits the default window, so the Spectrum tab covers all of it
     INFO(transient.Times.size());
-    CHECK(transient.Times.size() <= 2000);
+    CHECK(transient.Times.size() <= static_cast<std::size_t>(GUI::DEFAULT_WINDOW_POINTS));
     const std::size_t input = NodeAt(schematic, {4, 4});
     const std::size_t output = NodeAt(schematic, {11, 4});
 
@@ -856,6 +857,24 @@ TEST_CASE("The buck converter settles near its duty cycle times the supply, afte
     CHECK(settled_high - settled_low < 0.5);
     // The LC filter overshoots on the way up
     CHECK(highest > 8.0);
+}
+
+TEST_CASE("The buck converter's switch node peaks near its true 19 V on both engines, since the step resolves the ring",
+          "[examples]") {
+    GUI::Schematic schematic;
+    OpenExample("buck_converter.imcsim", schematic);
+    const Core::Circuit circuit = schematic.BuildCircuit();
+    const Core::TransientSettings &settings = schematic.GetSimulationSettings().Transient;
+    // The diode node rings after each edge at about 17 us, which the step has to resolve in many points
+    const std::size_t switch_node = NodeAt(schematic, {14, 10});
+    Core::NodalysBackend nodalys;
+    for (Core::SimulationBackend *backend : std::array<Core::SimulationBackend *, 2>{&Core::GetBackend(), &nodalys}) {
+        const Core::TransientRun run = backend->RunTransient(circuit, settings, std::nullopt, {});
+        REQUIRE(run.Result.has_value());
+        const double peak = PeakOf(run.Result->NodeVoltages[switch_node]);
+        INFO(std::format("peak {} V", peak));
+        CHECK_THAT(peak, Catch::Matchers::WithinAbs(19.3, 1.0));
+    }
 }
 
 TEST_CASE("The relay contact closes and opens a coil time constant after the transistor does", "[examples]") {
