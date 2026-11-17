@@ -9,6 +9,7 @@
 #include "circuit/components/source.h"
 #include "ui_elements/ui_element.h"
 #include <memory>
+#include <string>
 
 namespace GUI {
 
@@ -34,6 +35,9 @@ protected:
     void DrawCircle(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const;
     bool DrawWaveform(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const;
 };
+
+// Labels
+std::string GetWaveformLabel(const Core::Source &source);
 
 } // namespace GUI
 
