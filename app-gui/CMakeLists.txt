@@ -39,6 +39,8 @@ add_library(imcsim-gui-lib
             overlays/live_current.cpp
             overlays/readout_placement.cpp
             overlays/schematic_overlays.cpp
+            plots/ai_copy.cpp
+            plots/ai_result_summary.cpp
             plots/harmonic_balance_view.cpp
             plots/logic_buses.cpp
             plots/math_channels.cpp
@@ -159,6 +161,7 @@ add_library(imcsim-gui-lib
             ui_elements/ui_wire.cpp
             windows/app_window.cpp
             windows/block_dialog.cpp
+            windows/copy_for_ai.cpp
             windows/dock_layout.cpp
             windows/editor_canvas_drawing.cpp
             windows/editor_context_menu.cpp

@@ -12,6 +12,7 @@
 #include "schematic/selection_editing.h"
 #include "schematic/wire_editing.h"
 #include "windows/block_dialog.h"
+#include "windows/copy_for_ai.h"
 #include "windows/editor_canvas_drawing.h"
 #include "windows/editor_status_bar.h"
 #include "windows/mode_input.h"
@@ -277,7 +278,9 @@ void EditorWindow::Draw() {
     if (const std::optional<std::size_t> picked = DrawBlockBar(m_Blocks, origin)) {
         ReturnToLevel(*picked);
     }
-    DrawStatusBar(m_Mode, *m_Schematic, m_Controls, GetShownResults().GetTransient(), view, hovered);
+    const bool is_notice_shown = ImGui::GetTime() < m_NoticeUntilSeconds;
+    DrawStatusBar(m_Mode, *m_Schematic, m_Controls, GetShownResults().GetTransient(), view, hovered,
+                  is_notice_shown ? COPIED_FOR_AI_NOTICE : std::string_view());
     const ContextMenuServices services = {.Shown = *m_Schematic,
                                           .Mode = m_Mode,
                                           .Controls = m_Controls,
@@ -757,6 +760,9 @@ void EditorWindow::HandleGlobalShortcuts() {
     if (ImGui::GetIO().WantTextInput) {
         return;
     }
+    if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_C, ImGuiInputFlags_RouteGlobal)) {
+        m_RequestedCommand = EditorCommand::COPY_FOR_AI;
+    }
     if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_A, ImGuiInputFlags_RouteGlobal)) {
         SelectAll(*m_Schematic, m_Mode);
     }
@@ -837,6 +843,10 @@ bool EditorWindow::RunClipboardCommand(const EditorCommand command) {
         return true;
     case EditorCommand::COPY:
         CopySelected();
+        return true;
+    case EditorCommand::COPY_FOR_AI:
+        CopyForAI(m_RootSchematic, m_RootResults);
+        m_NoticeUntilSeconds = ImGui::GetTime() + COPY_NOTICE_SECONDS;
         return true;
     case EditorCommand::PASTE:
         StartPasting();

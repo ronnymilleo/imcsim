@@ -98,10 +98,14 @@ float DrawRunStatus(const RunStatusLine &line, const AnalysisControls &controls,
  * @param[in]     transient  The transient of the results on show, which a run status counts the steps of.
  * @param[in]     view       Pan and zoom of the canvas, to read the grid point under the cursor.
  * @param[in]     hovered    Whether the cursor is over the canvas, which shows its position.
+ * @param[in]     notice     What the last command did, such as "Copied for AI", shown in place of the hint while it is
+ *                           not empty.
  */
 void DrawStatusBar(const EditorMode &mode, Schematic &schematic, const AnalysisControls &controls,
-                   const std::optional<Core::Transient> &transient, const ViewTransform &view, const bool hovered) {
-    const std::string hint = DescribeEditorHint(mode, schematic, controls.IsLive());
+                   const std::optional<Core::Transient> &transient, const ViewTransform &view, const bool hovered,
+                   const std::string_view notice) {
+    const std::string hint =
+        notice.empty() ? DescribeEditorHint(mode, schematic, controls.IsLive()) : std::string(notice);
     const ImVec2 line_start = ImGui::GetCursorScreenPos();
     const float gap = ImGui::GetFontSize() * STATUS_GAP_FONT_SIZES;
     float right_edge = line_start.x + ImGui::GetContentRegionAvail().x;

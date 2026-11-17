@@ -109,6 +109,8 @@ private:
     std::vector<PlotTab> m_OtherTabs;
 
     PlotExporter m_Exporter;
+    /// Time of the ImGui clock until which the Copy for AI button reads "Copied".
+    double m_CopiedUntilSeconds = 0.0;
 
     // Frame
     void Draw() override;
@@ -127,6 +129,7 @@ private:
     void DrawRunFailure(Analysis analysis) const;
     void DrawTab(PlotTab tab, const FrameResults &frame);
     void DrawOtherAnalyses(float width);
+    void DrawCopyForAIButton(float width);
 
     // Export
     void DrawExportButton(ImVec2 tab_row, float tab_row_width, float export_width, const FrameResults &frame);

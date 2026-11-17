@@ -140,6 +140,8 @@ private:
 
     /// Menu command waiting for the next Update().
     std::optional<EditorCommand> m_RequestedCommand;
+    /// Time of the ImGui clock until which the status bar shows what the last command did.
+    double m_NoticeUntilSeconds = 0.0;
 
     // Frame
     void Draw() override;

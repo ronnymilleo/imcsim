@@ -33,6 +33,7 @@ enum class EditorCommand {
     FLIP_KEEP_WIRES,
     CUT,
     COPY,
+    COPY_FOR_AI,
     PASTE,
     SELECT_ALL,
     DELETE_SELECTION

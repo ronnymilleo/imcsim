@@ -12,12 +12,14 @@
 #include "schematic/schematic.h"
 #include "simulation/simulation_results.h"
 #include <optional>
+#include <string_view>
 
 namespace GUI {
 
 // Drawing
 void DrawStatusBar(const EditorMode &mode, Schematic &schematic, const AnalysisControls &controls,
-                   const std::optional<Core::Transient> &transient, const ViewTransform &view, bool hovered);
+                   const std::optional<Core::Transient> &transient, const ViewTransform &view, bool hovered,
+                   std::string_view notice);
 
 } // namespace GUI
 

@@ -12,6 +12,7 @@
 #include "implot.h"
 #include "plots/plot_figures.h"
 #include "schematic/probing.h"
+#include "windows/copy_for_ai.h"
 #include "windows/output_tabs/plot_widgets.h"
 #include "windows/output_tabs/result_tables.h"
 #include <algorithm>
@@ -31,6 +32,9 @@ constexpr ImVec2 FIT_PADDING = {0.0f, 0.4f};
 /// The button that lists the analyses without a result.
 constexpr const char *MORE_LABEL = "More analyses";
 constexpr const char *EXPORT_LABEL = "Export...";
+constexpr const char *COPY_FOR_AI_LABEL = "Copy for AI";
+/// What the Copy for AI button reads for a moment after it copied.
+constexpr const char *COPIED_LABEL = "Copied";
 
 /**
  * @brief   Like ImGui::BeginTabBar(), but the bar and the line under it stop short of the right edge by the given
@@ -187,9 +191,10 @@ void OutputWindow::Draw() {
     const float tab_row_width = ImGui::GetContentRegionAvail().x;
     const float export_width = ImGui::CalcTextSize(EXPORT_LABEL).x + ImGui::GetStyle().FramePadding.x * 2.0f;
     const float more_width = ImGui::CalcTextSize(MORE_LABEL).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+    const float copy_width = ImGui::CalcTextSize(COPY_FOR_AI_LABEL).x + ImGui::GetStyle().FramePadding.x * 2.0f;
     const float spacing = ImGui::GetStyle().ItemSpacing.x;
     // More and Export sit after the tabs, outside the bar, so the tabs with results keep the rest of the row
-    if (!BeginTabBarBefore("plots", more_width + export_width + spacing * 2.0f)) {
+    if (!BeginTabBarBefore("plots", more_width + copy_width + export_width + spacing * 3.0f)) {
         ImGui::EndChild();
         return;
     }
@@ -203,8 +208,11 @@ void OutputWindow::Draw() {
     if (!has_tabs) {
         ImGui::TextDisabled("Run an analysis (F5) to see its results here; pick it beside Run in the editor");
     }
-    ImGui::SetCursorScreenPos({tab_row.x + tab_row_width - export_width - spacing - more_width, tab_row.y});
+    ImGui::SetCursorScreenPos(
+        {tab_row.x + tab_row_width - export_width - spacing - copy_width - spacing - more_width, tab_row.y});
     DrawOtherAnalyses(more_width);
+    ImGui::SetCursorScreenPos({tab_row.x + tab_row_width - export_width - spacing - copy_width, tab_row.y});
+    DrawCopyForAIButton(copy_width);
     DrawExportButton(tab_row, tab_row_width, export_width, frame);
     ImGui::EndChild();
 }
@@ -578,6 +586,22 @@ void OutputWindow::DrawOtherAnalyses(const float width) {
         }
         ImGui::EndPopup();
     }
+}
+
+/**
+ * @brief   A button beside Export that puts the circuit and the result of the selected analysis on the clipboard as
+ * text for an AI assistant; it reads "Copied" for a moment after.
+ * @param[in] width  Width of the button, which the tab bar left free.
+ */
+void OutputWindow::DrawCopyForAIButton(const float width) {
+    const bool is_copied = ImGui::GetTime() < m_CopiedUntilSeconds;
+    if (ImGui::Button(is_copied ? COPIED_LABEL : COPY_FOR_AI_LABEL, {width, 0.0f})) {
+        CopyForAI(m_Schematic, m_Results);
+        m_CopiedUntilSeconds = ImGui::GetTime() + COPY_NOTICE_SECONDS;
+    }
+    ImGui::SetItemTooltip(
+        "Copy the netlist, the settings of the analysis and a summary of its result as text, to paste "
+        "into a conversation with an AI assistant");
 }
 
 /**

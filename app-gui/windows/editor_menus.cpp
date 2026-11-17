@@ -104,6 +104,12 @@ std::optional<EditorCommand> DrawEditItems(Schematic &schematic) {
     if (ImGui::MenuItem("Copy", IMCSIM_SHORTCUT "C", false, schematic.HasSelection())) {
         command = EditorCommand::COPY;
     }
+    if (ImGui::MenuItem("Copy for AI", IMCSIM_SHORTCUT "Shift+C")) {
+        command = EditorCommand::COPY_FOR_AI;
+    }
+    ImGui::SetItemTooltip(
+        "Copy the netlist, the settings of the analysis and a summary of its result as text, to paste "
+        "into a conversation with an AI assistant");
     const char *clipboard_text = ImGui::GetClipboardText();
     const bool can_paste = clipboard_text != nullptr && LooksLikeCopiedSchematic(clipboard_text);
     if (ImGui::MenuItem("Paste", IMCSIM_SHORTCUT "V", false, can_paste)) {
