@@ -167,6 +167,9 @@ public:
     /// Gives a name to a node that something else made, such as an internal node of a subcircuit instance.
     void Bind(const std::string &upper_name, const NodeId node) { m_NodeMap[upper_name] = node; }
 
+    /// Every named node of the circuit with its number, names in upper case.
+    const std::map<std::string, NodeId> &GetNames() const { return m_NodeMap; }
+
     NodeId Resolve(std::string_view name) const {
         const std::string upper = ToUpper(Trim(name));
         if (upper.empty() || upper == "0" || upper == "GND" || upper == "GROUND") {
@@ -1632,6 +1635,7 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
         return std::unexpected(circuit_res.error());
     }
     result.CircuitInstance = std::move(*circuit_res);
+    result.NodeNames = nodes.GetNames();
 
     if (integration_method || random_seed) {
         for (ParsedAnalysis &analysis : result.Analyses) {

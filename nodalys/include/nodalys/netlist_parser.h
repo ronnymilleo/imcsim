@@ -11,6 +11,7 @@
 #include "nodalys/types.h"
 
 #include <expected>
+#include <map>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -68,6 +69,9 @@ struct ParsedNetlist {
     std::vector<ParsedAnalysis> Analyses;
     ConvergenceOptions Options;
     std::vector<DiagnosticMessage> Diagnostics;
+    /// Node numbers by the name the netlist gives them, in upper case; ground is not listed. A node inside a
+    /// subcircuit instance is named with its instance path, such as "X1.MID".
+    std::map<std::string, NodeId> NodeNames;
 };
 
 // Parsing
