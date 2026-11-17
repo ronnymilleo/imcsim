@@ -153,8 +153,8 @@
 | **Fourier / Spectrum Analysis** | ✅ **Ready** | High-resolution FFT post-processed over `ComputeTransient` waveforms. |
 | **Live Simulation Mode** | ✅ **Ready** | Live transient paced against the clock (`simulation/live_pace.h`, shared with ngspice), paused and resumed, with changes applied between chunks. |
 | **Temperature Sweep ($T$)** | ✅ **Ready** | `Circuit::SetTemperature()` applies the SPICE temperature laws of the diode, BJT and MOSFET relative to the nominal $T_{\text{nom}} = 27\,^\circ\text{C}$, and `temper` in an expression reads it. |
-| **Initial Conditions (`.ic`, `.nodeset`)** | 🟡 **Partial** | Element-level `uic` on capacitors ($V_0$) and inductors ($I_0$) and node `.ic` (held in the operating point, or the start of the capacitors on the node with `uic`; see [`transient_analysis.md`](./transient_analysis.md)) supported; `.nodeset` pending. |
-| **Gear-2 / BDF-2 Integration** | 🟡 **Partial** | 3rd divided-difference LTE step control with Trapezoidal/Euler supported; Gear-2 for stiff switching circuits pending. |
+| **Initial Conditions (`.ic`, `.nodeset`)** | ✅ **Ready** | Element-level `uic` on capacitors ($V_0$) and inductors ($I_0$), node `.ic` (held in the operating point, or the start of the capacitors on the node with `uic`; see [`transient_analysis.md`](./transient_analysis.md)) and `.nodeset`, a first Newton pass pulled to the guesses and then released ([`dc_analysis.md`](./dc_analysis.md), 1.7). |
+| **Gear-2 / BDF-2 Integration** | ✅ **Ready** | Variable-step Gear-2 beside the trapezoidal rule and Backward Euler, picked by `TransientConfig::Method` or the integration method of the solver options, with 3rd divided-difference LTE step control ([`transient_analysis.md`](./transient_analysis.md), 1.2). |
 | **Vendor SPICE `.subckt` Parsing** | ✅ **Ready** | `AddSubcircuitText()` reads a subcircuit kept as text, and `ParseNetlist()` and the CLI place the `X` lines of a netlist through it, with its parameters, `{expressions}`, `.model` cards and nested subcircuits; what it cannot simulate is refused with the line ([`subcircuit_text.md`](./subcircuit_text.md)). |
 
 ---
