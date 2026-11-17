@@ -71,6 +71,8 @@ struct BackendCapabilities {
     std::map<ComponentType, std::string> UnsupportedParts;
     /// Parts the backend cannot simulate in one analysis only, each with the reason shown to the user.
     std::map<AnalysisKind, std::map<ComponentType, std::string>> UnsupportedPartsByAnalysis;
+    /// Analyses the backend cannot run on a circuit that has nodesets, each with the reason shown to the user.
+    std::map<AnalysisKind, std::string> UnsupportedWithNodesets;
     /// Why the backend cannot simulate at a temperature other than the default one, or none when it can.
     std::optional<std::string> TemperatureUnsupported;
     /// What the backend asks of the ports and of the sweep of an S-parameter analysis.

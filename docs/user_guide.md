@@ -58,6 +58,8 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   balance leaves it out. The same rules as
   the initial voltage apply: two on one node must agree, ground cannot take one, a node needs a part connected to it,
   and one inside a block acts on the node of each instance. Both engines mean the same.
+  The Transfer function analysis is the one exception: ngspice cannot run it on a circuit with a nodeset, so it is
+  disabled with the reason while ngspice is the engine, and Nodalys runs it.
 - **Switches**: a switch and a push button have a Closed (or Pressed) box in their properties, and the symbol and a
   label under it show the state. Both start open. Outside a live run, the state holds for the whole simulation. During
   a live run, click a switch to flip it or hold a push button to press it (see Live runs).
