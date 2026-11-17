@@ -311,10 +311,26 @@ constexpr auto EXAMPLES = std::to_array<Example>({
             "there the circuit oscillates by itself. Run the transient, which lasts 2 ms, about three periods, "
             "and look at both collectors, which swing between about 0.1 V and the 5 V supply. Its 0.2 us step is "
             "short on purpose: the edges are steep, and with a longer one ngspice misplaces them. The plot opens "
-            "on the first 2000 points, up to the first edge: drag its scroll bar, or raise Plot points to 10000 "
-            "to see the whole run. Only the transient uses the part: the operating point shows the balance "
-            "point.",
+            "on its first 10000 points, nearly the whole run; its scroll bar reaches the rest. Only the transient "
+            "uses the part: the operating point shows the balance point.",
         .FileName = "astable_multivibrator.imcsim",
+    },
+    {
+        .Title = "Bistable started in the state a nodeset picks",
+        .Group = "Transistors",
+        .Description =
+            "Two 2N3904 stages, each driving the base of the other through a 10k resistor: a bistable, the cell of "
+            "a flip-flop. It has two stable states, one with the first transistor on and the second off and the "
+            "other the other way round, and an unstable balance point between them, so the circuit alone does not "
+            "say which one a solver finds. The Nodeset parts, NS 0.2V on the first collector and NS 5V on the "
+            "second, are a starting guess for the operating point: they pick the state with the first transistor "
+            "conducting, and the operating point lands in it on both engines, with the first collector near "
+            "0.1 V and the second near 5 V. A nodeset only guides the search, it does not hold the voltage, so "
+            "the result is a true state of the circuit. Swap the two values, 5 V on the first and 0.2 V on the "
+            "second, and run again to get the other state. Use it for any circuit with more than one operating "
+            "point, such as a latch or a Schmitt trigger. The net labels C1 and C2 join each collector to the "
+            "base resistor of the other stage.",
+        .FileName = "bistable_nodeset.imcsim",
     },
     {
         .Title = "Op-amp inverting amplifier",
@@ -399,7 +415,9 @@ constexpr auto EXAMPLES = std::to_array<Example>({
             "A voltage-controlled switch, driven by a 10 kHz pulse at 50% duty, chops a 12 V supply. A 1N5819 "
             "keeps the inductor current flowing while the switch is open, and L1 (1 mH) with C1 (100u) "
             "average it into about 5.8 V on a 10 Ohm load. Run the transient: the output overshoots to "
-            "about 9 V, rings at the LC resonance near 500 Hz and settles with a ripple of 0.2 V.",
+            "about 9 V, rings at the LC resonance near 500 Hz and settles with a ripple of 0.2 V. The step is 0.1 us "
+            "so that the ring of the switch node after each edge, which peaks near 19 V, is resolved; the plot "
+            "opens on its first millisecond, and its scroll bar reaches the rest.",
         .FileName = "buck_converter.imcsim",
     },
     {

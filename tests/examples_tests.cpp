@@ -19,6 +19,7 @@
 #include "results/logic_outputs.h"
 #include "results/logic_trace.h"
 #include "results/monte_carlo_results.h"
+#include "results/point_window.h"
 #include "results/stability_circles.h"
 #include "results/stability_summary.h"
 #include "results/trace_math.h"
@@ -203,9 +204,9 @@ TEST_CASE("The noise example shows a flat floor at the input that the low-pass c
     const Core::TransientRun run = Core::RunTransient(schematic.BuildCircuit(), seeded);
     REQUIRE(run.Result.has_value());
     const Core::Transient &transient = *run.Result;
-    // The whole run fits the default window of 2000 points, so the Spectrum tab covers all of it
+    // The whole run fits the default window, so the Spectrum tab covers all of it
     INFO(transient.Times.size());
-    CHECK(transient.Times.size() <= 2000);
+    CHECK(transient.Times.size() <= static_cast<std::size_t>(GUI::DEFAULT_WINDOW_POINTS));
     const std::size_t input = NodeAt(schematic, {4, 4});
     const std::size_t output = NodeAt(schematic, {11, 4});
 
@@ -755,6 +756,63 @@ TEST_CASE("The current mirror copies the reference current while Q2 is out of sa
     }
 }
 
+TEST_CASE("The bistable example lands in the state its nodesets pick, on both engines, and in the other when swapped",
+          "[examples]") {
+    // A saturated collector reads below this level, in volts, and a cut-off one above the other
+    constexpr double LOW_LEVEL_VOLTS = 0.5;
+    constexpr double HIGH_LEVEL_VOLTS = 4.0;
+    constexpr double FIRST_ON_VOLTS = 0.2;
+    constexpr double SECOND_ON_VOLTS = 5.0;
+
+    GUI::Schematic schematic;
+    OpenExample("bistable_nodeset.imcsim", schematic);
+    CHECK(schematic.GetSimulationSettings().Selected == GUI::Analysis::OPERATING_POINT);
+    const std::size_t first_collector = NodeAt(schematic, {13, 12});
+    const std::size_t second_collector = NodeAt(schematic, {29, 12});
+
+    // The nodesets are the first on the first collector (left) and the second on the second one (right)
+    std::vector<Core::Component *> nodesets;
+    for (const auto &element : schematic.GetElements()) {
+        if (element->GetComponent().GetType() == Core::ComponentType::NODESET) {
+            nodesets.push_back(&element->GetComponent());
+        }
+    }
+    REQUIRE(nodesets.size() == 2);
+    std::ranges::sort(nodesets, {}, [](const Core::Component *nodeset) { return nodeset->GetValue(); });
+    // Sorted by value, the first is 0.2 V (on the first collector) and the second 5 V
+    REQUIRE(nodesets[0]->GetValue() == FIRST_ON_VOLTS);
+    REQUIRE(nodesets[1]->GetValue() == SECOND_ON_VOLTS);
+
+    const auto check_state = [&](const bool is_first_on) {
+        const Core::OperatingPointRun run = Core::RunOperatingPoint(schematic.BuildCircuit());
+        REQUIRE(run.Result.has_value());
+        const double first = run.Result->NodeVoltages[first_collector];
+        const double second = run.Result->NodeVoltages[second_collector];
+        INFO(std::format("First collector {} V, second collector {} V", first, second));
+        CHECK((is_first_on ? first : second) < LOW_LEVEL_VOLTS);
+        CHECK((is_first_on ? second : first) > HIGH_LEVEL_VOLTS);
+    };
+    const auto check_both_engines = [&](const bool is_first_on) {
+        SECTION("ngspice") {
+            check_state(is_first_on);
+        }
+        SECTION("Nodalys") {
+            const TestSupport::NodalysInUse nodalys_in_use;
+            check_state(is_first_on);
+        }
+    };
+
+    SECTION("As saved, the first transistor conducts") {
+        check_both_engines(true);
+    }
+    SECTION("With the nodesets swapped, the second transistor conducts") {
+        // The 0.2 V nodeset is the one on the first collector, so each takes the other's value
+        nodesets[0]->SetValue(SECOND_ON_VOLTS);
+        nodesets[1]->SetValue(FIRST_ON_VOLTS);
+        check_both_engines(false);
+    }
+}
+
 TEST_CASE("Every example is in a group, and the examples of a group are listed together", "[examples]") {
     const std::vector<const char *> groups = GUI::GetExampleGroups();
     REQUIRE_FALSE(groups.empty());
@@ -856,6 +914,24 @@ TEST_CASE("The buck converter settles near its duty cycle times the supply, afte
     CHECK(settled_high - settled_low < 0.5);
     // The LC filter overshoots on the way up
     CHECK(highest > 8.0);
+}
+
+TEST_CASE("The buck converter's switch node peaks near its true 19 V on both engines, since the step resolves the ring",
+          "[examples]") {
+    GUI::Schematic schematic;
+    OpenExample("buck_converter.imcsim", schematic);
+    const Core::Circuit circuit = schematic.BuildCircuit();
+    const Core::TransientSettings &settings = schematic.GetSimulationSettings().Transient;
+    // The diode node rings after each edge at about 17 us, which the step has to resolve in many points
+    const std::size_t switch_node = NodeAt(schematic, {14, 10});
+    Core::NodalysBackend nodalys;
+    for (Core::SimulationBackend *backend : std::array<Core::SimulationBackend *, 2>{&Core::GetBackend(), &nodalys}) {
+        const Core::TransientRun run = backend->RunTransient(circuit, settings, std::nullopt, {});
+        REQUIRE(run.Result.has_value());
+        const double peak = PeakOf(run.Result->NodeVoltages[switch_node]);
+        INFO(std::format("peak {} V", peak));
+        CHECK_THAT(peak, Catch::Matchers::WithinAbs(19.3, 1.0));
+    }
 }
 
 TEST_CASE("The relay contact closes and opens a coil time constant after the transistor does", "[examples]") {

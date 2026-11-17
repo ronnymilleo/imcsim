@@ -170,9 +170,10 @@ TEST_CASE("A window with a span holds the points of that stretch of time, wherev
     CHECK(moved.First == 100);
     CHECK(growing.Times[moved.First + moved.Count - 1] == Catch::Approx(growing.Times[100] + 1e-3).margin(1e-9));
 
-    // Without the span it goes back to the number of points
+    // Without the span it goes back to the number of points, and the default window holds the whole run
     window.SetSpan(std::nullopt);
-    CHECK(window.Update(&growing, 1, true).Count == static_cast<std::size_t>(GUI::DEFAULT_WINDOW_POINTS));
+    static_assert(GUI::DEFAULT_WINDOW_POINTS >= 5000);
+    CHECK(window.Update(&growing, 1, true).Count == 5000);
 }
 
 TEST_CASE("A span with more points than the largest window shows its newest ones", "[transient_window]") {
