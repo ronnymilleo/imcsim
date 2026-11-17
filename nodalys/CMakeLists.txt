@@ -79,7 +79,21 @@ endif()
 
 # The command line is a library apart from main(), so the tests run it in their own process
 add_library(nodalys-cli-lib STATIC
+    src/cli/analysis_runner.cpp
     src/cli/cli.cpp
+    src/mcp/analysis_names.cpp
+    src/mcp/json_arguments.cpp
+    src/mcp/mcp_protocol.cpp
+    src/mcp/mcp_server.cpp
+    src/mcp/mcp_tool.cpp
+    src/mcp/mcp_tools.cpp
+    src/mcp/node_labels.cpp
+    src/mcp/signal_measures.cpp
+    src/mcp/simulation_request.cpp
+    src/mcp/simulation_summary.cpp
+    src/mcp/tool_check_netlist.cpp
+    src/mcp/tool_list_models.cpp
+    src/mcp/tool_simulate.cpp
 )
 
 target_include_directories(nodalys-cli-lib
@@ -92,6 +106,8 @@ target_link_libraries(nodalys-cli-lib
         nodalys
     PRIVATE
         CLI11::CLI11
+        # JSON-RPC of the MCP server; only the command line uses it, so the engine keeps depending on nothing
+        nlohmann_json::nlohmann_json
 )
 
 add_executable(nodalys-cli

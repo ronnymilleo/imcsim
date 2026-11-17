@@ -14,6 +14,7 @@ add_executable(nodalys-tests
     fuse_device_tests.cpp
     hb_analysis_tests.cpp
     linear_tests.cpp
+    mcp_server_tests.cpp
     netlist_elements_tests.cpp
     netlist_subcircuits_tests.cpp
     nodeset_tests.cpp
@@ -22,6 +23,7 @@ add_executable(nodalys-tests
     pz_analysis_tests.cpp
     random_draws_tests.cpp
     sens_analysis_tests.cpp
+    signal_measures_tests.cpp
     subcircuit_text_tests.cpp
     smooth_logic_tests.cpp
     sp_analysis_tests.cpp
@@ -40,6 +42,8 @@ target_link_libraries(nodalys-tests
     PRIVATE
         nodalys
         nodalys-cli-lib
+        # The MCP tests read the JSON answers of the server
+        nlohmann_json::nlohmann_json
         Catch2::Catch2WithMain
 )
 
