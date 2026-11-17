@@ -5,6 +5,8 @@
 
 #include "cli/cli.h"
 
+#include "cli/analysis_runner.h"
+#include "mcp/mcp_server.h"
 #include "nodalys/nodalys.h"
 #include "nodalys/version.h"
 
@@ -143,11 +145,18 @@ int RunCli(const int argc, const char *const *argv, std::istream &input, std::os
     app.set_version_flag("--version",
                          std::format("nodalys {} (imcsim engine, standalone SPICE simulator)", NODALYS_VERSION_STRING));
 
+    CLI::App *mcp_command = app.add_subcommand(
+        "mcp", "Run an MCP server on standard input and output, so an AI assistant can check and simulate netlists");
+
     try {
         app.parse(argc, argv);
     } catch (const CLI::ParseError &error) {
         // CLI11 reports a parse failure, and a request for the help or the version, by throwing
         return app.exit(error, output, errors);
+    }
+
+    if (mcp_command->parsed()) {
+        return RunMcpServer(input, output, errors);
     }
 
     if (input_file.empty()) {
@@ -251,189 +260,21 @@ int RunCli(const int argc, const char *const *argv, std::istream &input, std::os
         auto &analysis = parsed.Analyses[a_idx];
         const auto sim_start = std::chrono::steady_clock::now();
 
-        Nodalys::SimulationResult sim_result;
-
-        switch (analysis.Kind) {
-        case Nodalys::AnalysisKind::OPERATING_POINT: {
-            if (verbose && !batch_mode) {
-                output << "Running Operating Point (.op) analysis...\n";
+        if (step_override || stop_override) {
+            if (auto *transient = std::get_if<Nodalys::TransientConfig>(&analysis.Config)) {
+                transient->TimeStep = step_override.value_or(transient->TimeStep);
+                transient->StopTime = stop_override.value_or(transient->StopTime);
             }
-            auto res = Nodalys::ComputeOperatingPoint(parsed.CircuitInstance, parsed.Options,
-                                                      verbose ? &diagnostics : nullptr);
-            if (!res) {
-                errors << std::format("Simulation Error: {}\n", res.error());
-                return EXIT_FAILURE;
-            }
-            sim_result = std::move(*res);
-            break;
         }
-
-        case Nodalys::AnalysisKind::TRANSIENT: {
-            auto &cfg = std::get<Nodalys::TransientConfig>(analysis.Config);
-            if (step_override) {
-                cfg.TimeStep = *step_override;
-            }
-            if (stop_override) {
-                cfg.StopTime = *stop_override;
-            }
-            if (cfg.MaxStep <= 0.0) {
-                cfg.MaxStep = cfg.TimeStep;
-            }
-            if (verbose && !batch_mode) {
-                output << std::format("Running Transient (.tran) analysis: tstep={}, tstop={}\n", cfg.TimeStep,
-                                      cfg.StopTime);
-            }
-            auto res = Nodalys::ComputeTransient(parsed.CircuitInstance, cfg, cfg.UseInitialConditions, {},
-                                                 parsed.Options, verbose ? &diagnostics : nullptr);
-            if (!res) {
-                errors << std::format("Simulation Error: {}\n", res.error());
-                return EXIT_FAILURE;
-            }
-            sim_result = std::move(*res);
-            break;
+        if (verbose && !batch_mode) {
+            output << Nodalys::DescribeAnalysis(analysis) << "\n";
         }
-
-        case Nodalys::AnalysisKind::DC_SWEEP: {
-            const auto &cfg = std::get<Nodalys::DcSweepConfig>(analysis.Config);
-            if (verbose && !batch_mode) {
-                output << std::format("Running DC Sweep (.dc) analysis on source {}\n", cfg.SweptSource);
-            }
-            auto res =
-                Nodalys::ComputeDCSweep(parsed.CircuitInstance, cfg, parsed.Options, verbose ? &diagnostics : nullptr);
-            if (!res) {
-                errors << std::format("Simulation Error: {}\n", res.error());
-                return EXIT_FAILURE;
-            }
-            sim_result = std::move(*res);
-            break;
+        auto run = Nodalys::RunAnalysis(parsed, analysis, verbose ? &diagnostics : nullptr);
+        if (!run) {
+            errors << std::format("Simulation Error: {}\n", run.error());
+            return EXIT_FAILURE;
         }
-
-        case Nodalys::AnalysisKind::AC_SWEEP: {
-            const auto &cfg = std::get<Nodalys::AcSweepConfig>(analysis.Config);
-            if (verbose && !batch_mode) {
-                output << std::format("Running AC Sweep (.ac) analysis: {} Hz to {} Hz\n", cfg.StartFrequency,
-                                      cfg.StopFrequency);
-            }
-            auto res =
-                Nodalys::ComputeACSweep(parsed.CircuitInstance, cfg, parsed.Options, verbose ? &diagnostics : nullptr);
-            if (!res) {
-                errors << std::format("Simulation Error: {}\n", res.error());
-                return EXIT_FAILURE;
-            }
-            sim_result = std::move(*res);
-            break;
-        }
-
-        case Nodalys::AnalysisKind::TRANSFER_FUNCTION: {
-            const auto &cfg = std::get<Nodalys::TransferFunctionConfig>(analysis.Config);
-            if (verbose && !batch_mode) {
-                output << std::format("Running Transfer Function (.tf) analysis for source {}\n", cfg.InputSource);
-            }
-            auto res = Nodalys::ComputeTransferFunction(parsed.CircuitInstance, cfg, parsed.Options,
-                                                        verbose ? &diagnostics : nullptr);
-            if (!res) {
-                errors << std::format("Simulation Error: {}\n", res.error());
-                return EXIT_FAILURE;
-            }
-            sim_result = std::move(*res);
-            break;
-        }
-
-        case Nodalys::AnalysisKind::NOISE: {
-            const auto &cfg = std::get<Nodalys::NoiseConfig>(analysis.Config);
-            if (verbose && !batch_mode) {
-                output << std::format("Running Noise (.noise) analysis for source {}\n", cfg.InputSource);
-            }
-            auto res =
-                Nodalys::ComputeNoise(parsed.CircuitInstance, cfg, parsed.Options, verbose ? &diagnostics : nullptr);
-            if (!res) {
-                errors << std::format("Simulation Error: {}\n", res.error());
-                return EXIT_FAILURE;
-            }
-            sim_result = std::move(*res);
-            break;
-        }
-
-        case Nodalys::AnalysisKind::S_PARAMETERS: {
-            const auto &cfg = std::get<Nodalys::SParameterConfig>(analysis.Config);
-            if (verbose && !batch_mode) {
-                output << std::format("Running S-Parameter (.sp) analysis: {} Hz to {} Hz\n", cfg.StartFrequency,
-                                      cfg.StopFrequency);
-            }
-            auto res = Nodalys::ComputeSParameters(parsed.CircuitInstance, cfg, parsed.Options,
-                                                   verbose ? &diagnostics : nullptr);
-            if (!res) {
-                errors << std::format("Simulation Error: {}\n", res.error());
-                return EXIT_FAILURE;
-            }
-            sim_result = std::move(*res);
-            break;
-        }
-
-        case Nodalys::AnalysisKind::POLE_ZERO: {
-            const auto &cfg = std::get<Nodalys::PoleZeroConfig>(analysis.Config);
-            if (verbose && !batch_mode) {
-                output << std::format("Running Pole-Zero (.pz) analysis: output={}, input={}\n", cfg.OutputNode,
-                                      cfg.InputSource);
-            }
-            auto res =
-                Nodalys::ComputePoleZero(parsed.CircuitInstance, cfg, parsed.Options, verbose ? &diagnostics : nullptr);
-            if (!res) {
-                errors << std::format("Simulation Error: {}\n", res.error());
-                return EXIT_FAILURE;
-            }
-            sim_result = std::move(*res);
-            break;
-        }
-
-        case Nodalys::AnalysisKind::SENSITIVITY: {
-            const auto &cfg = std::get<Nodalys::SensitivityConfig>(analysis.Config);
-            if (verbose && !batch_mode) {
-                output << std::format("Running DC Sensitivity (.sens) analysis: pos={}, neg={}\n",
-                                      cfg.OutputPositiveNode, cfg.OutputNegativeNode);
-            }
-            auto res = Nodalys::ComputeSensitivity(parsed.CircuitInstance, cfg, parsed.Options,
-                                                   verbose ? &diagnostics : nullptr);
-            if (!res) {
-                errors << std::format("Simulation Error: {}\n", res.error());
-                return EXIT_FAILURE;
-            }
-            sim_result = std::move(*res);
-            break;
-        }
-
-        case Nodalys::AnalysisKind::AC_SENSITIVITY: {
-            const auto &cfg = std::get<Nodalys::AcSensitivityConfig>(analysis.Config);
-            if (verbose && !batch_mode) {
-                output << std::format("Running AC Sensitivity (.sens ... ac) analysis: pos={}, neg={}, input={}\n",
-                                      cfg.OutputPositiveNode, cfg.OutputNegativeNode, cfg.InputSource);
-            }
-            auto res = Nodalys::ComputeAcSensitivity(parsed.CircuitInstance, cfg, parsed.Options,
-                                                     verbose ? &diagnostics : nullptr);
-            if (!res) {
-                errors << std::format("Simulation Error: {}\n", res.error());
-                return EXIT_FAILURE;
-            }
-            sim_result = std::move(*res);
-            break;
-        }
-
-        case Nodalys::AnalysisKind::HARMONIC_BALANCE: {
-            const auto &cfg = std::get<Nodalys::HarmonicBalanceConfig>(analysis.Config);
-            if (verbose && !batch_mode) {
-                output << std::format("Running Harmonic Balance (.hb) analysis: f0={} Hz, H={}\n",
-                                      cfg.FundamentalFrequency, cfg.Harmonics);
-            }
-            auto res = Nodalys::ComputeHarmonicBalance(parsed.CircuitInstance, cfg, parsed.Options,
-                                                       verbose ? &diagnostics : nullptr);
-            if (!res) {
-                errors << std::format("Simulation Error: {}\n", res.error());
-                return EXIT_FAILURE;
-            }
-            sim_result = std::move(*res);
-            break;
-        }
-        }
+        const Nodalys::SimulationResult sim_result = std::move(*run);
 
         const auto sim_end = std::chrono::steady_clock::now();
         if (verbose && !batch_mode) {
