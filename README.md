@@ -81,6 +81,9 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   them together as one value in binary, hexadecimal or decimal
 - Exports for reports: plots as SVG images (light for print or dark, at any size) or CSV tables, and the schematic
   as an SVG image with its probes, so the two figures can be shown side by side
+- Copy for AI (Edit menu, Ctrl+Shift+C, or beside Export in the Output window): the netlist, the parts, the settings of
+  the selected analysis and a short summary of its result as Markdown on the clipboard, to paste into a conversation
+  with an AI assistant
 - Nine color themes, seven dark and two light, switched in Edit > Preferences or from View > Theme (see
   [Themes](docs/themes.md))
 - Multi-selection (Shift+click, selection box, whole node by double click), moving and turning groups, sliding wire

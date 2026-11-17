@@ -1144,5 +1144,22 @@ style shown (IEC or ANSI), part names and values, terminal numbers when they are
 and currents. Light, for print, darkens colors the same way as plot exports, so a probe and its trace keep matching
 colors across the two figures; As on screen keeps the colors of the current theme.
 
+**Copy for AI**: Edit > Copy for AI (Ctrl+Shift+C), or the Copy for AI button beside Export in the Output window, puts
+the circuit and what the selected analysis found on the clipboard as Markdown, ready to paste into a conversation with
+an AI assistant. The status bar says it was copied. The text has these sections:
+
+- **Netlist**: the SPICE netlist the Netlist window shows, without the probes, and the engine that runs the analyses.
+- **Parts**: each part with its kind and value, and the named nets with the node numbers the netlist gives them.
+- **Analysis**: the settings of the selected analysis, such as the stop time or the frequency range, and the stepped
+  parameter, Monte Carlo runs and solver options when they are not at rest.
+- **Results**: a summary of the last result of that analysis, never its points. It holds the figures the Output tabs
+  measure, a few per signal: the operating point tables; the minimum, maximum, mean, RMS, frequency and end values of a
+  transient; the peak gain, cutoffs and phase margin of an AC sweep; the extremes of a DC sweep; the noise totals and the
+  parts that add most; the transfer function; the most influential parts of a sensitivity analysis; the poles and zeros;
+  the S-parameters at three frequencies and the stability of a two-port; the truth table; the THD of a harmonic balance;
+  the spread of a Monte Carlo run; and the warnings of the run. It reads the measured nodes, or the first twelve when
+  none is measured, and says how many it left out; a transient is read over the whole run, not only the window on show.
+  When the analysis has no result on the circuit as it is, the text says it has not been run.
+
 The save dialogs suggest a name after the schematic file and the tab, such as `rc_filter-transient.svg` or
 `rc_filter-schematic.svg`, next to the schematic.
