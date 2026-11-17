@@ -9,6 +9,8 @@
 
 #include <nodalys/nodalys.h>
 
+#include <cmath>
+#include <complex>
 #include <format>
 #include <string>
 #include <string_view>
@@ -24,9 +26,9 @@ constexpr double HIGH_LEVEL_VOLTS = 4.0;
 
 /// Two NPN transistors with cross-coupled collectors and bases, which has two stable operating points: node 2 low and
 /// node 3 high, or the other way round. The extra lines say what to compute and where to start.
-std::string BistableNetlist(const std::string_view extra) {
+std::string BistableNetlist(const std::string_view extra, const std::string_view supply = "5") {
     return std::format("* bistable\n"
-                       "V1 1 0 5\n"
+                       "V1 1 0 {}\n"
                        "R1 1 2 1k\n"
                        "R2 1 3 1k\n"
                        "R3 2 5 10k\n"
@@ -35,7 +37,25 @@ std::string BistableNetlist(const std::string_view extra) {
                        "Q2 3 5 0 QN\n"
                        ".model QN NPN(IS=1e-15 BF=100)\n"
                        "{}.end\n",
-                       extra);
+                       supply, extra);
+}
+
+/// The bistable with a small tone on its supply, so the harmonic balance has a bias to start from and a swing around
+/// it.
+constexpr std::string_view TONE_SUPPLY = "SIN(5 0.05 1k)";
+constexpr int TONE_HARMONICS = 3;
+
+Nodalys::HarmonicBalanceResult SolveBalance(const std::string &extra) {
+    const auto parsed = Nodalys::ParseNetlist(BistableNetlist(extra, TONE_SUPPLY));
+    REQUIRE(parsed.has_value());
+    const auto balance = Nodalys::ComputeHarmonicBalance(parsed->CircuitInstance,
+                                                         {.FundamentalFrequency = 1e3, .Harmonics = TONE_HARMONICS});
+    REQUIRE(balance.has_value());
+    return *balance;
+}
+
+double DcVoltage(const Nodalys::HarmonicBalanceResult &balance, const std::size_t node) {
+    return balance.NodePhasors[node][0].real();
 }
 
 Nodalys::ParsedNetlist Parse(const std::string &netlist) {
@@ -139,4 +159,47 @@ TEST_CASE("A transient that starts from initial conditions has no operating poin
 TEST_CASE("Malformed .nodeset directives are rejected", "[nodalys][nodeset]") {
     CHECK_FALSE(Nodalys::ParseNetlist("* bad\nR1 1 0 1k\n.nodeset 1=5\n.op\n.end\n").has_value());
     CHECK_FALSE(Nodalys::ParseNetlist("* bad\nR1 1 0 1k\n.nodeset v(1)=abc\n.op\n.end\n").has_value());
+}
+
+TEST_CASE("The harmonic balance starts from the bias state a nodeset picks", "[nodalys][nodeset][hb]") {
+    SECTION("The first transistor on") {
+        const auto balance = SolveBalance(".nodeset v(2)=0.2 v(3)=5\n");
+        CHECK(DcVoltage(balance, 2) < LOW_LEVEL_VOLTS);
+        CHECK(DcVoltage(balance, 3) > HIGH_LEVEL_VOLTS);
+    }
+    SECTION("The second transistor on") {
+        const auto balance = SolveBalance(".nodeset v(2)=5 v(3)=0.2\n");
+        CHECK(DcVoltage(balance, 3) < LOW_LEVEL_VOLTS);
+        CHECK(DcVoltage(balance, 2) > HIGH_LEVEL_VOLTS);
+    }
+    SECTION("The tone rides on the state of the nodeset, not on the other one") {
+        const auto first = SolveBalance(".nodeset v(2)=0.2 v(3)=5\n");
+        const auto second = SolveBalance(".nodeset v(2)=5 v(3)=0.2\n");
+        // The collector that conducts follows the supply tone through its divider, in each state on a different node
+        CHECK(std::abs(first.NodePhasors[3][1]) > 0.0);
+        CHECK(std::abs(second.NodePhasors[2][1]) > 0.0);
+        CHECK(DcVoltage(first, 2) != DcVoltage(second, 2));
+    }
+    SECTION("Without nodesets the balance takes the state it always did") {
+        const auto balance = SolveBalance("");
+        const auto parsed = Parse(BistableNetlist(""));
+        const auto op = Nodalys::ComputeOperatingPoint(parsed.CircuitInstance);
+        REQUIRE(op.has_value());
+        constexpr double SAME_STATE_TOLERANCE_VOLTS = 0.1;
+        CHECK_THAT(DcVoltage(balance, 2), WithinAbs(op->NodeVoltages[2], SAME_STATE_TOLERANCE_VOLTS));
+        CHECK_THAT(DcVoltage(balance, 3), WithinAbs(op->NodeVoltages[3], SAME_STATE_TOLERANCE_VOLTS));
+    }
+}
+
+TEST_CASE("A nodeset leaves the harmonic balance of a circuit with one state unchanged", "[nodalys][nodeset][hb]") {
+    const auto parsed = Parse("* divider\nV1 1 0 SIN(2 1 1k)\nR1 1 2 1k\nR2 2 0 1k\nD1 2 0 DX\n"
+                              ".model DX D(IS=1e-14)\n.end\n");
+    const auto guided = Parse("* divider\nV1 1 0 SIN(2 1 1k)\nR1 1 2 1k\nR2 2 0 1k\nD1 2 0 DX\n"
+                              ".model DX D(IS=1e-14)\n.nodeset v(2)=-3\n.end\n");
+    const Nodalys::HarmonicBalanceConfig config{.FundamentalFrequency = 1e3, .Harmonics = TONE_HARMONICS};
+    const auto plain_result = Nodalys::ComputeHarmonicBalance(parsed.CircuitInstance, config);
+    const auto guided_result = Nodalys::ComputeHarmonicBalance(guided.CircuitInstance, config);
+    REQUIRE(plain_result.has_value());
+    REQUIRE(guided_result.has_value());
+    CHECK_THAT(DcVoltage(*guided_result, 2), WithinAbs(DcVoltage(*plain_result, 2), 1e-6));
 }

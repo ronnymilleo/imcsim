@@ -24,6 +24,7 @@
 #include "devices/devices.h"
 #include "linear/dense_matrix.h"
 #include "linear/fft.h"
+#include "newton/newton.h"
 #include <algorithm>
 #include <cmath>
 #include <complex>
@@ -51,6 +52,8 @@ constexpr double FREQ_RATIO_RELTOL = 1e-9;
 struct PartitionedCircuit {
     std::vector<Device *> LinearDevices;
     std::vector<Device *> NonlinearDevices;
+    /// The nodesets, which only guide the DC bias that starts the balance.
+    std::vector<Device *> Nodesets;
     std::vector<const VoltageSourceDevice *> VoltageSources;
     std::vector<const CurrentSourceDevice *> CurrentSources;
 };
@@ -111,6 +114,8 @@ struct HbWorkspace {
     MnaSystem GLin;
     MnaSystem CLin;
     std::vector<Device *> NonlinearDevices;
+    /// The nodesets, stamped in the pulled pass of the DC bias only.
+    std::vector<Device *> Nodesets;
     std::vector<double> BaseRhsHarmonics; // B in [u * C + c]
 
     // Scratch buffers reused across Newton iterations
@@ -227,7 +232,9 @@ std::expected<PartitionedCircuit, std::string> ValidateAndPartitionDevices(const
                                    "behavioral source that reads time");
         }
 
-        if (device->IsLinear()) {
+        if (dynamic_cast<const NodesetDevice *>(device.get()) != nullptr) {
+            partitioned.Nodesets.push_back(device.get());
+        } else if (device->IsLinear()) {
             partitioned.LinearDevices.push_back(device.get());
         } else {
             partitioned.NonlinearDevices.push_back(device.get());
@@ -351,8 +358,19 @@ std::string_view FindFault(const std::vector<Device *> &devices) {
     return {};
 }
 
+/// Adds the stiff pull of the nodesets to the DC system while the pulled pass runs, and nothing otherwise.
+void StampNodesets(const HbWorkspace &ws, const bool is_nodeset_pass, const std::vector<double> &x, MnaSystem &sys) {
+    if (!is_nodeset_pass) {
+        return;
+    }
+    const TimeContext pulled{.IsNodesetPass = true};
+    for (Device *nodeset : ws.Nodesets) {
+        nodeset->Stamp(sys, x, pulled);
+    }
+}
+
 bool RunDcNewtonWithB0(const HbWorkspace &ws, const std::vector<double> &b0, const double b0_scale, const double gmin,
-                       const ConvergenceOptions &options, std::vector<double> &x) {
+                       const ConvergenceOptions &options, const bool is_nodeset_pass, std::vector<double> &x) {
     const int n = ws.UnknownCount;
     MnaSystem sys(ws.IsNodeUnknown);
     std::vector<double> candidate(static_cast<std::size_t>(n), 0.0);
@@ -366,6 +384,7 @@ bool RunDcNewtonWithB0(const HbWorkspace &ws, const std::vector<double> &b0, con
         for (Device *device : ws.NonlinearDevices) {
             device->Stamp(sys, x, TimeContext{});
         }
+        StampNodesets(ws, is_nodeset_pass, x, sys);
         sys.AddGminToNodes(gmin);
 
         if (!sys.Solve(candidate)) {
@@ -400,6 +419,7 @@ bool RunDcNewtonWithB0(const HbWorkspace &ws, const std::vector<double> &b0, con
             for (Device *device : ws.NonlinearDevices) {
                 device->Stamp(sys, x, TimeContext{});
             }
+            StampNodesets(ws, is_nodeset_pass, x, sys);
             sys.AddGminToNodes(gmin);
             if (FindFault(ws.NonlinearDevices).empty() &&
                 sys.CheckResidual(x, options.VoltageAbsTol, options.CurrentAbsTol, options.RelTol)) {
@@ -410,18 +430,26 @@ bool RunDcNewtonWithB0(const HbWorkspace &ws, const std::vector<double> &b0, con
     return false;
 }
 
-bool SolveDcBiasForB0(const HbWorkspace &ws, const ConvergenceOptions &options, std::vector<double> &x_dc) {
+/// One pass of the DC bias: the direct Newton and its two fallbacks. The released pass of the nodesets starts from the
+/// point the pulled one found, so it applies no seed and tries the direct Newton only; the solve then falls back to a
+/// plain one.
+bool SolveDcBiasPass(const HbWorkspace &ws, const ConvergenceOptions &options, const NodesetPass pass,
+                     std::vector<double> &x_dc) {
     const int n = ws.UnknownCount;
     std::vector<double> b0(static_cast<std::size_t>(n), 0.0);
     for (int u = 0; u < n; ++u) {
         b0[static_cast<std::size_t>(u)] = ws.BaseRhsHarmonics[ws.Index(u, 0)];
     }
 
+    const bool is_nodeset_pass = pass == NodesetPass::PULLED;
+    if (pass == NodesetPass::RELEASED) {
+        return RunDcNewtonWithB0(ws, b0, 1.0, options.Gmin, options, false, x_dc);
+    }
     x_dc.assign(static_cast<std::size_t>(n), 0.0);
     for (const Device *device : ws.NonlinearDevices) {
         device->SeedOperatingPoint(x_dc);
     }
-    if (RunDcNewtonWithB0(ws, b0, 1.0, options.Gmin, options, x_dc)) {
+    if (RunDcNewtonWithB0(ws, b0, 1.0, options.Gmin, options, is_nodeset_pass, x_dc)) {
         return true;
     }
 
@@ -435,7 +463,7 @@ bool SolveDcBiasForB0(const HbWorkspace &ws, const ConvergenceOptions &options, 
     bool gmin_ok = true;
     for (int step = 0; step <= options.GminSteps; ++step) {
         const double gmin = std::max(GMIN_START * std::pow(GMIN_FACTOR, static_cast<double>(step)), options.Gmin);
-        if (!RunDcNewtonWithB0(ws, b0, 1.0, gmin, options, x_dc)) {
+        if (!RunDcNewtonWithB0(ws, b0, 1.0, gmin, options, is_nodeset_pass, x_dc)) {
             gmin_ok = false;
             break;
         }
@@ -452,11 +480,21 @@ bool SolveDcBiasForB0(const HbWorkspace &ws, const ConvergenceOptions &options, 
     }
     for (int step = 1; step <= source_steps; ++step) {
         const double scale = static_cast<double>(step) / static_cast<double>(source_steps);
-        if (!RunDcNewtonWithB0(ws, b0, scale, options.Gmin, options, x_dc)) {
+        if (!RunDcNewtonWithB0(ws, b0, scale, options.Gmin, options, is_nodeset_pass, x_dc)) {
             return false;
         }
     }
     return true;
+}
+
+bool SolveDcBiasForB0(const HbWorkspace &ws, const ConvergenceOptions &options, std::vector<double> &x_dc) {
+    if (ws.Nodesets.empty()) {
+        return SolveDcBiasPass(ws, options, NodesetPass::PLAIN, x_dc);
+    }
+    // The nodesets pick the state of the bias that the balance then starts from, as they pick an operating point
+    return SolveInNodesetPasses(x_dc, [&](std::vector<double> &guess, const NodesetPass pass) {
+        return SolveDcBiasPass(ws, options, pass, guess);
+    });
 }
 
 /**
@@ -1176,6 +1214,7 @@ std::expected<HarmonicBalanceResult, std::string> ComputeHarmonicBalance(Compile
         outcome.Strategy = "linear";
     } else {
         ws.NonlinearDevices = partitioned->NonlinearDevices;
+        ws.Nodesets = partitioned->Nodesets;
         outcome = SolveHarmonicBalanceNonlinear(ws, settings, options, x_hb);
         if (ws.IsStopped) {
             return std::unexpected("The harmonic balance was stopped before it converged");

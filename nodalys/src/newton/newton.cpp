@@ -200,20 +200,28 @@ NewtonOutcome SolveWithStrategies(MnaSystem &sys, const std::vector<std::unique_
 
 NewtonOutcome SolveNewton(MnaSystem &sys, const std::vector<std::unique_ptr<Device>> &devices, std::vector<double> &x,
                           const TimeContext &time, const ConvergenceOptions &options) {
-    if (time.AppliesNodesets && IsOperatingPointSolve(time) && HasNodesets(devices)) {
-        // As SPICE does: find the point with the nodes pulled to their guesses, then let go and converge again from it
-        const std::vector<double> start = x;
-        TimeContext held = time;
-        held.IsNodesetPass = true;
-        if (SolveWithStrategies(sys, devices, x, held, options, false).Converged) {
-            if (const NewtonOutcome released = SolveWithStrategies(sys, devices, x, time, options, true);
-                released.Converged) {
-                return released;
-            }
-        }
-        x = start;
+    if (!(time.AppliesNodesets && IsOperatingPointSolve(time) && HasNodesets(devices))) {
+        return SolveWithStrategies(sys, devices, x, time, options, false);
     }
-    return SolveWithStrategies(sys, devices, x, time, options, false);
+    // As SPICE does: find the point with the nodes pulled to their guesses, then let go and converge again from it
+    NewtonOutcome outcome;
+    SolveInNodesetPasses(x, [&](std::vector<double> &guess, const NodesetPass pass) {
+        TimeContext pass_time = time;
+        pass_time.IsNodesetPass = pass == NodesetPass::PULLED;
+        outcome = SolveWithStrategies(sys, devices, guess, pass_time, options, pass == NodesetPass::RELEASED);
+        return outcome.Converged;
+    });
+    return outcome;
+}
+
+bool SolveInNodesetPasses(std::vector<double> &x,
+                          const std::function<bool(std::vector<double> &, NodesetPass)> &solve) {
+    const std::vector<double> start = x;
+    if (solve(x, NodesetPass::PULLED) && solve(x, NodesetPass::RELEASED)) {
+        return true;
+    }
+    x = start;
+    return solve(x, NodesetPass::PLAIN);
 }
 
 std::string DescribeFailure(std::string message, const NewtonOutcome &outcome) {
