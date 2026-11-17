@@ -56,6 +56,44 @@ const char *GetMethodName(const Core::IntegrationMethod method) {
 }
 
 /**
+ * @brief   The bullet of the stepped source of a DC sweep, or nothing when it steps none.
+ */
+std::string DescribeSteppedSource(const SimulationSettings &settings) {
+    if (!settings.StepSource) {
+        return {};
+    }
+    return std::format("- Stepped source: {}, from {} to {} in steps of {}\n",
+                       DescribeSource(settings.SteppedRange.Source), Core::FormatValue(settings.SteppedRange.Start),
+                       Core::FormatValue(settings.SteppedRange.Stop), Core::FormatValue(settings.SteppedRange.Step));
+}
+
+/**
+ * @brief   The bullets of the kind of a sensitivity analysis, with the input and sweep of the AC kind.
+ */
+std::string DescribeSensitivityKind(const SimulationSettings &settings) {
+    if (settings.SensitivityType != SensitivityKind::AC) {
+        return "- Kind: DC, the voltage of the output\n";
+    }
+    return std::format("- Kind: AC, the response across frequency\n- Input source: {}\n- Sweep: {}\n",
+                       DescribeSource(settings.ACSensitivitySource),
+                       DescribeFrequencyRange(settings.ACSensitivityRange));
+}
+
+std::string DescribeSParameterRange(const SimulationSettings &settings) {
+    const std::string points = settings.SParameters.IsLogarithmic
+                                   ? std::format("{} points per decade", settings.SParameters.PointsPerDecade)
+                                   : std::format("{} linear points", settings.SParameters.LinearPoints);
+    return std::format("Range: {}Hz to {}Hz, {}", Core::FormatValue(settings.SParameters.StartFrequency),
+                       Core::FormatValue(settings.SParameters.StopFrequency), points);
+}
+
+std::string DescribeTruthTableInputs(const SimulationSettings &settings) {
+    return settings.TruthTableInputs.empty()
+               ? "Inputs: every logic input"
+               : std::format("Inputs: {} logic inputs chosen", settings.TruthTableInputs.size());
+}
+
+/**
  * @brief   The lines about the settings of the selected analysis, a bullet each.
  */
 std::string DescribeAnalysisSettings(const SimulationSettings &settings, const Connectivity &connectivity) {
@@ -73,12 +111,7 @@ std::string DescribeAnalysisSettings(const SimulationSettings &settings, const C
         add(std::format("Swept source: {}, from {} to {} in steps of {}", DescribeSource(settings.SweptRange.Source),
                         Core::FormatValue(settings.SweptRange.Start), Core::FormatValue(settings.SweptRange.Stop),
                         Core::FormatValue(settings.SweptRange.Step)));
-        if (settings.StepSource) {
-            add(std::format(
-                "Stepped source: {}, from {} to {} in steps of {}", DescribeSource(settings.SteppedRange.Source),
-                Core::FormatValue(settings.SteppedRange.Start), Core::FormatValue(settings.SteppedRange.Stop),
-                Core::FormatValue(settings.SteppedRange.Step)));
-        }
+        text += DescribeSteppedSource(settings);
         break;
     case Analysis::NOISE:
         add(std::format("Output: {}", DescribeOutput(settings.NoiseOutput, connectivity)));
@@ -91,29 +124,17 @@ std::string DescribeAnalysisSettings(const SimulationSettings &settings, const C
         break;
     case Analysis::SENSITIVITY:
         add(std::format("Output: {}", DescribeOutput(settings.SensitivityOutput, connectivity)));
-        if (settings.SensitivityType == SensitivityKind::AC) {
-            add("Kind: AC, the response across frequency");
-            add(std::format("Input source: {}", DescribeSource(settings.ACSensitivitySource)));
-            add(std::format("Sweep: {}", DescribeFrequencyRange(settings.ACSensitivityRange)));
-        } else {
-            add("Kind: DC, the voltage of the output");
-        }
+        text += DescribeSensitivityKind(settings);
         break;
     case Analysis::POLE_ZERO:
         add(std::format("Output: {}", DescribeOutput(settings.PoleZeroOutput, connectivity)));
         add(std::format("Input source: {}", DescribeSource(settings.PoleZeroSource)));
         break;
     case Analysis::S_PARAMETERS:
-        add(std::format("Range: {}Hz to {}Hz, {}", Core::FormatValue(settings.SParameters.StartFrequency),
-                        Core::FormatValue(settings.SParameters.StopFrequency),
-                        settings.SParameters.IsLogarithmic
-                            ? std::format("{} points per decade", settings.SParameters.PointsPerDecade)
-                            : std::format("{} linear points", settings.SParameters.LinearPoints)));
+        add(DescribeSParameterRange(settings));
         break;
     case Analysis::TRUTH_TABLE:
-        add(settings.TruthTableInputs.empty()
-                ? "Inputs: every logic input"
-                : std::format("Inputs: {} logic inputs chosen", settings.TruthTableInputs.size()));
+        add(DescribeTruthTableInputs(settings));
         break;
     case Analysis::HARMONIC_BALANCE:
         add(std::format("Fundamental: {}Hz, harmonics: {}",

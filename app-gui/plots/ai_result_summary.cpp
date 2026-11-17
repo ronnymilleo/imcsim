@@ -207,6 +207,105 @@ std::string WriteWarnings(const std::vector<std::string> &warnings) {
     return text;
 }
 
+/**
+ * @brief   Summarizes the last result of the operating point, transient, AC sweep or DC sweep, the analyses that repeat
+ *          in steps.
+ * @return  Markdown, or no value when another analysis is selected or the selected one has no result.
+ */
+std::optional<std::string> SummarizeRepeatableResult(Schematic &schematic, const ResultStore &results) {
+    switch (schematic.GetSimulationSettings().Selected) {
+    case Analysis::OPERATING_POINT:
+        if (const auto &result = results.GetOperatingPoint()) {
+            const std::string steps =
+                results.GetOperatingPointSteps() ? DescribeSteps(*results.GetOperatingPointSteps()) : "";
+            return steps + SummarizeOperatingPoint(*result, MakeSummaryContext(schematic, 0));
+        }
+        return std::nullopt;
+    case Analysis::TRANSIENT:
+        if (const auto &result = results.GetTransient()) {
+            const std::string steps = results.GetTransientSteps() ? DescribeSteps(*results.GetTransientSteps()) : "";
+            return steps + SummarizeTransient(*result, MakeSummaryContext(schematic, result->NodeVoltages.size()));
+        }
+        return std::nullopt;
+    case Analysis::AC_SWEEP:
+        if (const auto &result = results.GetACSweep()) {
+            const std::string steps = results.GetACSweepSteps() ? DescribeSteps(*results.GetACSweepSteps()) : "";
+            return steps +
+                   SummarizeACSweep(*result, MakeSummaryContext(schematic, result->NodeMagnitudesDecibels.size()));
+        }
+        return std::nullopt;
+    case Analysis::DC_SWEEP:
+        if (const auto &result = results.GetDCSweep()) {
+            const std::size_t nodes = result->Curves.empty() ? 0 : result->Curves.front().NodeVoltages.size();
+            return SummarizeDCSweep(*result, MakeSummaryContext(schematic, nodes));
+        }
+        return std::nullopt;
+    default:
+        return std::nullopt;
+    }
+}
+
+/**
+ * @brief   Summarizes the last result of the noise, transfer function, sensitivity or pole-zero analysis.
+ * @return  Markdown, or no value when another analysis is selected or the selected one has no result.
+ */
+std::optional<std::string> SummarizeSmallSignalResult(Schematic &schematic, const ResultStore &results) {
+    const SimulationSettings &settings = schematic.GetSimulationSettings();
+    switch (settings.Selected) {
+    case Analysis::NOISE:
+        if (const auto &result = results.GetNoise()) {
+            return SummarizeNoise(*result, MakeSummaryContext(schematic, 0));
+        }
+        return std::nullopt;
+    case Analysis::TRANSFER_FUNCTION:
+        if (const auto &result = results.GetTransferFunction()) {
+            return SummarizeTransferFunction(*result, MakeSummaryContext(schematic, 0));
+        }
+        return std::nullopt;
+    case Analysis::SENSITIVITY:
+        if (settings.SensitivityType == SensitivityKind::AC && results.GetACSensitivity()) {
+            return SummarizeACSensitivity(*results.GetACSensitivity(), MakeSummaryContext(schematic, 0));
+        }
+        if (settings.SensitivityType == SensitivityKind::DC && results.GetSensitivity()) {
+            return SummarizeSensitivity(*results.GetSensitivity(), MakeSummaryContext(schematic, 0));
+        }
+        return std::nullopt;
+    case Analysis::POLE_ZERO:
+        if (const auto &result = results.GetPoleZero()) {
+            return SummarizePoleZero(*result, MakeSummaryContext(schematic, 0));
+        }
+        return std::nullopt;
+    default:
+        return std::nullopt;
+    }
+}
+
+/**
+ * @brief   Summarizes the last result of the S-parameters, truth table or harmonic balance.
+ * @return  Markdown, or no value when another analysis is selected or the selected one has no result.
+ */
+std::optional<std::string> SummarizeOtherResult(Schematic &schematic, const ResultStore &results) {
+    switch (schematic.GetSimulationSettings().Selected) {
+    case Analysis::S_PARAMETERS:
+        if (const auto &result = results.GetSParameters()) {
+            return SummarizeSParameters(*result);
+        }
+        return std::nullopt;
+    case Analysis::TRUTH_TABLE:
+        if (const auto &result = results.GetTruthTable()) {
+            return SummarizeTruthTable(*result, schematic.BuildCircuit(), MakeSummaryContext(schematic, 0));
+        }
+        return std::nullopt;
+    case Analysis::HARMONIC_BALANCE:
+        if (const auto &result = results.GetHarmonicBalance()) {
+            return SummarizeHarmonicBalance(*result, MakeSummaryContext(schematic, result->NodePhasors.size()));
+        }
+        return std::nullopt;
+    default:
+        return std::nullopt;
+    }
+}
+
 } // namespace
 
 /**
@@ -571,75 +670,13 @@ std::optional<std::string> SummarizeLastResult(Schematic &schematic, const Resul
     if (IsMonteCarloRun(settings) && results.GetMonteCarlo()) {
         return SummarizeMonteCarlo(*results.GetMonteCarlo(), MakeSummaryContext(schematic, 0));
     }
-    switch (settings.Selected) {
-    case Analysis::OPERATING_POINT:
-        if (const auto &result = results.GetOperatingPoint()) {
-            const std::string steps =
-                results.GetOperatingPointSteps() ? DescribeSteps(*results.GetOperatingPointSteps()) : "";
-            return steps + SummarizeOperatingPoint(*result, MakeSummaryContext(schematic, 0));
-        }
-        break;
-    case Analysis::TRANSIENT:
-        if (const auto &result = results.GetTransient()) {
-            const std::string steps = results.GetTransientSteps() ? DescribeSteps(*results.GetTransientSteps()) : "";
-            return steps + SummarizeTransient(*result, MakeSummaryContext(schematic, result->NodeVoltages.size()));
-        }
-        break;
-    case Analysis::AC_SWEEP:
-        if (const auto &result = results.GetACSweep()) {
-            const std::string steps = results.GetACSweepSteps() ? DescribeSteps(*results.GetACSweepSteps()) : "";
-            return steps +
-                   SummarizeACSweep(*result, MakeSummaryContext(schematic, result->NodeMagnitudesDecibels.size()));
-        }
-        break;
-    case Analysis::DC_SWEEP:
-        if (const auto &result = results.GetDCSweep()) {
-            const std::size_t nodes = result->Curves.empty() ? 0 : result->Curves.front().NodeVoltages.size();
-            return SummarizeDCSweep(*result, MakeSummaryContext(schematic, nodes));
-        }
-        break;
-    case Analysis::NOISE:
-        if (const auto &result = results.GetNoise()) {
-            return SummarizeNoise(*result, MakeSummaryContext(schematic, 0));
-        }
-        break;
-    case Analysis::TRANSFER_FUNCTION:
-        if (const auto &result = results.GetTransferFunction()) {
-            return SummarizeTransferFunction(*result, MakeSummaryContext(schematic, 0));
-        }
-        break;
-    case Analysis::SENSITIVITY:
-        if (settings.SensitivityType == SensitivityKind::AC && results.GetACSensitivity()) {
-            return SummarizeACSensitivity(*results.GetACSensitivity(), MakeSummaryContext(schematic, 0));
-        }
-        if (settings.SensitivityType == SensitivityKind::DC && results.GetSensitivity()) {
-            return SummarizeSensitivity(*results.GetSensitivity(), MakeSummaryContext(schematic, 0));
-        }
-        break;
-    case Analysis::POLE_ZERO:
-        if (const auto &result = results.GetPoleZero()) {
-            return SummarizePoleZero(*result, MakeSummaryContext(schematic, 0));
-        }
-        break;
-    case Analysis::S_PARAMETERS:
-        if (const auto &result = results.GetSParameters()) {
-            return SummarizeSParameters(*result);
-        }
-        break;
-    case Analysis::TRUTH_TABLE:
-        if (const auto &result = results.GetTruthTable()) {
-            return SummarizeTruthTable(*result, schematic.BuildCircuit(), MakeSummaryContext(schematic, 0));
-        }
-        break;
-    case Analysis::HARMONIC_BALANCE:
-        if (const auto &result = results.GetHarmonicBalance()) {
-            return SummarizeHarmonicBalance(*result, MakeSummaryContext(schematic, result->NodePhasors.size()));
-        }
-        break;
-    default:
-        break;
+    if (const std::optional<std::string> summary = SummarizeRepeatableResult(schematic, results)) {
+        return summary;
     }
-    return std::nullopt;
+    if (const std::optional<std::string> summary = SummarizeSmallSignalResult(schematic, results)) {
+        return summary;
+    }
+    return SummarizeOtherResult(schematic, results);
 }
 
 } // namespace GUI
