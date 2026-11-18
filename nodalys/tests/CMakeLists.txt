@@ -15,6 +15,7 @@ add_executable(nodalys-tests
     fuse_device_tests.cpp
     hb_analysis_tests.cpp
     linear_tests.cpp
+    mosfet_device_tests.cpp
     netlist_elements_tests.cpp
     netlist_subcircuits_tests.cpp
     nodeset_tests.cpp
