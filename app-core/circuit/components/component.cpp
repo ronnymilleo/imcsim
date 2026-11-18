@@ -10,64 +10,424 @@
 #include <cctype>
 #include <charconv>
 #include <cmath>
+#include <cstddef>
 #include <format>
+#include <string_view>
 #include <utility>
 
 namespace Core {
 
 namespace {
 
-constexpr auto ALL_TYPES = std::to_array<ComponentType>({
-    ComponentType::RESISTOR,
-    ComponentType::CAPACITOR,
-    ComponentType::INDUCTOR,
-    ComponentType::GROUND,
-    ComponentType::VCC,
-    ComponentType::VOLTAGE_SOURCE,
-    ComponentType::CURRENT_SOURCE,
-    ComponentType::DIODE,
-    ComponentType::ZENER_DIODE,
-    ComponentType::LED,
-    ComponentType::NPN,
-    ComponentType::PNP,
-    ComponentType::NMOS,
-    ComponentType::PMOS,
-    ComponentType::VCVS,
-    ComponentType::VCCS,
-    ComponentType::CCCS,
-    ComponentType::CCVS,
-    ComponentType::BEHAVIORAL_VOLTAGE,
-    ComponentType::BEHAVIORAL_CURRENT,
-    ComponentType::OP_AMP,
-    ComponentType::SUBCIRCUIT,
-    ComponentType::NET_LABEL,
-    ComponentType::INITIAL_VOLTAGE,
-    ComponentType::NODESET,
-    ComponentType::PIN,
-    ComponentType::POTENTIOMETER,
-    ComponentType::SWITCH,
-    ComponentType::PUSH_BUTTON,
-    ComponentType::V_SWITCH,
-    ComponentType::RELAY,
-    ComponentType::FUSE,
-    ComponentType::TRANSFORMER,
-    ComponentType::AND,
-    ComponentType::OR,
-    ComponentType::NOT,
-    ComponentType::NAND,
-    ComponentType::NOR,
-    ComponentType::XOR,
-    ComponentType::XNOR,
-    ComponentType::BUFFER,
-    ComponentType::D_FLIP_FLOP,
-    ComponentType::JK_FLIP_FLOP,
-    ComponentType::T_FLIP_FLOP,
-    ComponentType::SR_FLIP_FLOP,
-    ComponentType::CLOCK,
-    ComponentType::LOGIC_INPUT,
-    ComponentType::LOGIC_OUTPUT,
-    ComponentType::SEVEN_SEGMENT,
+/**
+ * @enum    ValueRule
+ * @brief   Which values a kind of component accepts.
+ */
+enum class ValueRule {
+    /// The component has no value, so no value is valid.
+    NONE,
+    /// Any number, negative and not-a-number included.
+    ANY,
+    /// Strictly above zero, as for a resistance, a capacitance or an inductance.
+    POSITIVE,
+    /// Any finite number.
+    FINITE,
+};
+
+/**
+ * @struct  ComponentTraits
+ * @brief   What is fixed for a kind of component, whatever its instance.
+ * @details One row per ComponentType in COMPONENT_TRAITS, so a new type is described in one place.
+ */
+struct ComponentTraits {
+    ComponentType Type;
+    /// Text written to files, read back by ParseComponentType(). All traits strings are literals, so they end in a
+    /// null character and can be returned as C strings.
+    std::string_view TypeName;
+    /// SPICE letter that starts the instance name; empty when the kind is not named.
+    std::string_view NamePrefix;
+    /// Unit of the value, or of the gain for a controlled source; empty when there is none.
+    std::string_view Unit;
+    /// Rule for the value; a component has a value exactly when the rule is not NONE.
+    ValueRule AcceptedValues;
+};
+
+constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
+    {
+        .Type = ComponentType::RESISTOR,
+        .TypeName = "Resistor",
+        .NamePrefix = "R",
+        .Unit = "Ohm",
+        .AcceptedValues = ValueRule::POSITIVE,
+    },
+    {
+        .Type = ComponentType::CAPACITOR,
+        .TypeName = "Capacitor",
+        .NamePrefix = "C",
+        .Unit = "F",
+        .AcceptedValues = ValueRule::POSITIVE,
+    },
+    {
+        .Type = ComponentType::INDUCTOR,
+        .TypeName = "Inductor",
+        .NamePrefix = "L",
+        .Unit = "H",
+        .AcceptedValues = ValueRule::POSITIVE,
+    },
+    {
+        .Type = ComponentType::GROUND,
+        .TypeName = "Ground",
+        .NamePrefix = "",
+        .Unit = "",
+        .AcceptedValues = ValueRule::NONE,
+    },
+    // A supply rail, a clock and a logic input are simulated as voltage sources to ground
+    {
+        .Type = ComponentType::VCC,
+        .TypeName = "VCC",
+        .NamePrefix = "V",
+        .Unit = "V",
+        .AcceptedValues = ValueRule::ANY,
+    },
+    {
+        .Type = ComponentType::VOLTAGE_SOURCE,
+        .TypeName = "VoltageSource",
+        .NamePrefix = "Vin",
+        .Unit = "V",
+        .AcceptedValues = ValueRule::ANY,
+    },
+    {
+        .Type = ComponentType::CURRENT_SOURCE,
+        .TypeName = "CurrentSource",
+        .NamePrefix = "I",
+        .Unit = "A",
+        .AcceptedValues = ValueRule::ANY,
+    },
+    {
+        .Type = ComponentType::DIODE,
+        .TypeName = "Diode",
+        .NamePrefix = "D",
+        .Unit = "",
+        .AcceptedValues = ValueRule::NONE,
+    },
+    {
+        .Type = ComponentType::ZENER_DIODE,
+        .TypeName = "ZenerDiode",
+        .NamePrefix = "D",
+        .Unit = "",
+        .AcceptedValues = ValueRule::NONE,
+    },
+    {
+        .Type = ComponentType::LED,
+        .TypeName = "LED",
+        .NamePrefix = "D",
+        .Unit = "",
+        .AcceptedValues = ValueRule::NONE,
+    },
+    {
+        .Type = ComponentType::NPN,
+        .TypeName = "NPN",
+        .NamePrefix = "Q",
+        .Unit = "",
+        .AcceptedValues = ValueRule::NONE,
+    },
+    {
+        .Type = ComponentType::PNP,
+        .TypeName = "PNP",
+        .NamePrefix = "Q",
+        .Unit = "",
+        .AcceptedValues = ValueRule::NONE,
+    },
+    {
+        .Type = ComponentType::NMOS,
+        .TypeName = "NMOS",
+        .NamePrefix = "M",
+        .Unit = "",
+        .AcceptedValues = ValueRule::NONE,
+    },
+    {
+        .Type = ComponentType::PMOS,
+        .TypeName = "PMOS",
+        .NamePrefix = "M",
+        .Unit = "",
+        .AcceptedValues = ValueRule::NONE,
+    },
+    {
+        .Type = ComponentType::VCVS,
+        .TypeName = "VCVS",
+        .NamePrefix = "E",
+        .Unit = "V/V",
+        .AcceptedValues = ValueRule::ANY,
+    },
+    {
+        .Type = ComponentType::VCCS,
+        .TypeName = "VCCS",
+        .NamePrefix = "G",
+        .Unit = "A/V",
+        .AcceptedValues = ValueRule::ANY,
+    },
+    {
+        .Type = ComponentType::CCCS,
+        .TypeName = "CCCS",
+        .NamePrefix = "F",
+        .Unit = "A/A",
+        .AcceptedValues = ValueRule::ANY,
+    },
+    {
+        .Type = ComponentType::CCVS,
+        .TypeName = "CCVS",
+        .NamePrefix = "H",
+        .Unit = "V/A",
+        .AcceptedValues = ValueRule::ANY,
+    },
+    // The expression sets the voltage, so the part has a unit but no value
+    {
+        .Type = ComponentType::BEHAVIORAL_VOLTAGE,
+        .TypeName = "BehavioralVoltage",
+        .NamePrefix = "B",
+        .Unit = "V",
+        .AcceptedValues = ValueRule::NONE,
+    },
+    {
+        .Type = ComponentType::BEHAVIORAL_CURRENT,
+        .TypeName = "BehavioralCurrent",
+        .NamePrefix = "B",
+        .Unit = "A",
+        .AcceptedValues = ValueRule::NONE,
+    },
+    {
+        .Type = ComponentType::OP_AMP,
+        .TypeName = "OpAmp",
+        .NamePrefix = "U",
+        .Unit = "",
+        .AcceptedValues = ValueRule::NONE,
+    },
+    {
+        .Type = ComponentType::SUBCIRCUIT,
+        .TypeName = "Subcircuit",
+        .NamePrefix = "X",
+        .Unit = "",
+        .AcceptedValues = ValueRule::NONE,
+    },
+    {
+        .Type = ComponentType::NET_LABEL,
+        .TypeName = "NetLabel",
+        .NamePrefix = "",
+        .Unit = "",
+        .AcceptedValues = ValueRule::NONE,
+    },
+    {
+        .Type = ComponentType::INITIAL_VOLTAGE,
+        .TypeName = "InitialVoltage",
+        .NamePrefix = "",
+        .Unit = "V",
+        .AcceptedValues = ValueRule::FINITE,
+    },
+    {
+        .Type = ComponentType::NODESET,
+        .TypeName = "Nodeset",
+        .NamePrefix = "",
+        .Unit = "V",
+        .AcceptedValues = ValueRule::FINITE,
+    },
+    {
+        .Type = ComponentType::PIN,
+        .TypeName = "Pin",
+        .NamePrefix = "",
+        .Unit = "",
+        .AcceptedValues = ValueRule::NONE,
+    },
+    {
+        .Type = ComponentType::POTENTIOMETER,
+        .TypeName = "Potentiometer",
+        .NamePrefix = "RV",
+        .Unit = "Ohm",
+        .AcceptedValues = ValueRule::POSITIVE,
+    },
+    {
+        .Type = ComponentType::SWITCH,
+        .TypeName = "Switch",
+        .NamePrefix = "SW",
+        .Unit = "",
+        .AcceptedValues = ValueRule::NONE,
+    },
+    {
+        .Type = ComponentType::PUSH_BUTTON,
+        .TypeName = "PushButton",
+        .NamePrefix = "PB",
+        .Unit = "",
+        .AcceptedValues = ValueRule::NONE,
+    },
+    {
+        .Type = ComponentType::V_SWITCH,
+        .TypeName = "VSwitch",
+        .NamePrefix = "S",
+        .Unit = "",
+        .AcceptedValues = ValueRule::NONE,
+    },
+    {
+        .Type = ComponentType::RELAY,
+        .TypeName = "Relay",
+        .NamePrefix = "K",
+        .Unit = "",
+        .AcceptedValues = ValueRule::NONE,
+    },
+    {
+        .Type = ComponentType::FUSE,
+        .TypeName = "Fuse",
+        .NamePrefix = "FU",
+        .Unit = "",
+        .AcceptedValues = ValueRule::NONE,
+    },
+    {
+        .Type = ComponentType::TRANSFORMER,
+        .TypeName = "Transformer",
+        .NamePrefix = "T",
+        .Unit = "H",
+        .AcceptedValues = ValueRule::POSITIVE,
+    },
+    {
+        .Type = ComponentType::AND,
+        .TypeName = "And",
+        .NamePrefix = "U",
+        .Unit = "",
+        .AcceptedValues = ValueRule::NONE,
+    },
+    {
+        .Type = ComponentType::OR,
+        .TypeName = "Or",
+        .NamePrefix = "U",
+        .Unit = "",
+        .AcceptedValues = ValueRule::NONE,
+    },
+    {
+        .Type = ComponentType::NOT,
+        .TypeName = "Not",
+        .NamePrefix = "U",
+        .Unit = "",
+        .AcceptedValues = ValueRule::NONE,
+    },
+    {
+        .Type = ComponentType::NAND,
+        .TypeName = "Nand",
+        .NamePrefix = "U",
+        .Unit = "",
+        .AcceptedValues = ValueRule::NONE,
+    },
+    {
+        .Type = ComponentType::NOR,
+        .TypeName = "Nor",
+        .NamePrefix = "U",
+        .Unit = "",
+        .AcceptedValues = ValueRule::NONE,
+    },
+    {
+        .Type = ComponentType::XOR,
+        .TypeName = "Xor",
+        .NamePrefix = "U",
+        .Unit = "",
+        .AcceptedValues = ValueRule::NONE,
+    },
+    {
+        .Type = ComponentType::XNOR,
+        .TypeName = "Xnor",
+        .NamePrefix = "U",
+        .Unit = "",
+        .AcceptedValues = ValueRule::NONE,
+    },
+    {
+        .Type = ComponentType::BUFFER,
+        .TypeName = "Buffer",
+        .NamePrefix = "U",
+        .Unit = "",
+        .AcceptedValues = ValueRule::NONE,
+    },
+    {
+        .Type = ComponentType::D_FLIP_FLOP,
+        .TypeName = "DFlipFlop",
+        .NamePrefix = "U",
+        .Unit = "",
+        .AcceptedValues = ValueRule::NONE,
+    },
+    {
+        .Type = ComponentType::JK_FLIP_FLOP,
+        .TypeName = "JKFlipFlop",
+        .NamePrefix = "U",
+        .Unit = "",
+        .AcceptedValues = ValueRule::NONE,
+    },
+    {
+        .Type = ComponentType::T_FLIP_FLOP,
+        .TypeName = "TFlipFlop",
+        .NamePrefix = "U",
+        .Unit = "",
+        .AcceptedValues = ValueRule::NONE,
+    },
+    {
+        .Type = ComponentType::SR_FLIP_FLOP,
+        .TypeName = "SRFlipFlop",
+        .NamePrefix = "U",
+        .Unit = "",
+        .AcceptedValues = ValueRule::NONE,
+    },
+    // Simulated as a voltage source to ground, like a supply rail
+    {
+        .Type = ComponentType::CLOCK,
+        .TypeName = "Clock",
+        .NamePrefix = "V",
+        .Unit = "V",
+        .AcceptedValues = ValueRule::NONE,
+    },
+    // Simulated as a voltage source to ground, like a supply rail
+    {
+        .Type = ComponentType::LOGIC_INPUT,
+        .TypeName = "LogicInput",
+        .NamePrefix = "V",
+        .Unit = "V",
+        .AcceptedValues = ValueRule::NONE,
+    },
+    {
+        .Type = ComponentType::LOGIC_OUTPUT,
+        .TypeName = "LogicOutput",
+        .NamePrefix = "",
+        .Unit = "",
+        .AcceptedValues = ValueRule::NONE,
+    },
+    {
+        .Type = ComponentType::SEVEN_SEGMENT,
+        .TypeName = "SevenSegment",
+        .NamePrefix = "",
+        .Unit = "",
+        .AcceptedValues = ValueRule::NONE,
+    },
 });
+
+/**
+ * @brief   Checks that the table has one row per type, in the order of the enum.
+ * @return  True when the row at each index describes the type with that index and no type is left out.
+ */
+constexpr bool HasOneRowPerType() {
+    if (COMPONENT_TRAITS.size() != static_cast<std::size_t>(LAST_COMPONENT_TYPE) + 1) {
+        return false;
+    }
+    for (std::size_t index = 0; index < COMPONENT_TRAITS.size(); ++index) {
+        if (static_cast<std::size_t>(COMPONENT_TRAITS[index].Type) != index) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static_assert(HasOneRowPerType(), "COMPONENT_TRAITS needs one row per ComponentType, in the order of the enum");
+
+/**
+ * @brief   Looks up the row of a kind of component.
+ * @param[in] type  Kind of component.
+ * @return  The row of the type.
+ */
+constexpr const ComponentTraits &GetTraits(const ComponentType type) {
+    return COMPONENT_TRAITS[static_cast<std::size_t>(type)];
+}
 
 } // namespace
 
@@ -101,83 +461,7 @@ const char *Component::GetTypeName() const {
  *          for ground, net labels and subcircuit pin markers, which are not named.
  */
 const char *Component::GetNamePrefix() const {
-    switch (m_Type) {
-    case ComponentType::RESISTOR:
-        return "R";
-    case ComponentType::CAPACITOR:
-        return "C";
-    case ComponentType::INDUCTOR:
-        return "L";
-    case ComponentType::VCC:
-    case ComponentType::CLOCK:
-    case ComponentType::LOGIC_INPUT:
-        // A supply rail, a clock and a logic input are simulated as voltage sources to ground
-        return "V";
-    case ComponentType::VOLTAGE_SOURCE:
-        return "Vin";
-    case ComponentType::CURRENT_SOURCE:
-        return "I";
-    case ComponentType::DIODE:
-    case ComponentType::ZENER_DIODE:
-    case ComponentType::LED:
-        return "D";
-    case ComponentType::NPN:
-    case ComponentType::PNP:
-        return "Q";
-    case ComponentType::NMOS:
-    case ComponentType::PMOS:
-        return "M";
-    case ComponentType::VCVS:
-        return "E";
-    case ComponentType::VCCS:
-        return "G";
-    case ComponentType::CCCS:
-        return "F";
-    case ComponentType::CCVS:
-        return "H";
-    case ComponentType::BEHAVIORAL_VOLTAGE:
-    case ComponentType::BEHAVIORAL_CURRENT:
-        return "B";
-    case ComponentType::SUBCIRCUIT:
-        return "X";
-    case ComponentType::OP_AMP:
-    case ComponentType::AND:
-    case ComponentType::OR:
-    case ComponentType::NOT:
-    case ComponentType::NAND:
-    case ComponentType::NOR:
-    case ComponentType::XOR:
-    case ComponentType::XNOR:
-    case ComponentType::BUFFER:
-    case ComponentType::D_FLIP_FLOP:
-    case ComponentType::JK_FLIP_FLOP:
-    case ComponentType::T_FLIP_FLOP:
-    case ComponentType::SR_FLIP_FLOP:
-        return "U";
-    case ComponentType::POTENTIOMETER:
-        return "RV";
-    case ComponentType::SWITCH:
-        return "SW";
-    case ComponentType::PUSH_BUTTON:
-        return "PB";
-    case ComponentType::V_SWITCH:
-        return "S";
-    case ComponentType::RELAY:
-        return "K";
-    case ComponentType::FUSE:
-        return "FU";
-    case ComponentType::TRANSFORMER:
-        return "T";
-    case ComponentType::GROUND:
-    case ComponentType::NET_LABEL:
-    case ComponentType::INITIAL_VOLTAGE:
-    case ComponentType::NODESET:
-    case ComponentType::PIN:
-    case ComponentType::LOGIC_OUTPUT:
-    case ComponentType::SEVEN_SEGMENT:
-        return "";
-    }
-    return "";
+    return GetTraits(m_Type).NamePrefix.data();
 }
 
 /**
@@ -186,69 +470,7 @@ const char *Component::GetNamePrefix() const {
  *          when the component has no value.
  */
 const char *Component::GetUnit() const {
-    switch (m_Type) {
-    case ComponentType::RESISTOR:
-    case ComponentType::POTENTIOMETER:
-        return "Ohm";
-    case ComponentType::CAPACITOR:
-        return "F";
-    case ComponentType::INDUCTOR:
-    case ComponentType::TRANSFORMER:
-        return "H";
-    case ComponentType::VCC:
-    case ComponentType::VOLTAGE_SOURCE:
-    case ComponentType::CLOCK:
-    case ComponentType::LOGIC_INPUT:
-    case ComponentType::INITIAL_VOLTAGE:
-    case ComponentType::NODESET:
-        return "V";
-    case ComponentType::CURRENT_SOURCE:
-    case ComponentType::BEHAVIORAL_CURRENT:
-        return "A";
-    case ComponentType::BEHAVIORAL_VOLTAGE:
-        return "V";
-    case ComponentType::VCVS:
-        return "V/V";
-    case ComponentType::VCCS:
-        return "A/V";
-    case ComponentType::CCCS:
-        return "A/A";
-    case ComponentType::CCVS:
-        return "V/A";
-    case ComponentType::OP_AMP:
-    case ComponentType::SUBCIRCUIT:
-    case ComponentType::AND:
-    case ComponentType::OR:
-    case ComponentType::NOT:
-    case ComponentType::NAND:
-    case ComponentType::NOR:
-    case ComponentType::XOR:
-    case ComponentType::XNOR:
-    case ComponentType::BUFFER:
-    case ComponentType::D_FLIP_FLOP:
-    case ComponentType::JK_FLIP_FLOP:
-    case ComponentType::T_FLIP_FLOP:
-    case ComponentType::SR_FLIP_FLOP:
-    case ComponentType::GROUND:
-    case ComponentType::NET_LABEL:
-    case ComponentType::PIN:
-    case ComponentType::LOGIC_OUTPUT:
-    case ComponentType::SEVEN_SEGMENT:
-    case ComponentType::SWITCH:
-    case ComponentType::PUSH_BUTTON:
-    case ComponentType::V_SWITCH:
-    case ComponentType::RELAY:
-    case ComponentType::FUSE:
-    case ComponentType::DIODE:
-    case ComponentType::ZENER_DIODE:
-    case ComponentType::LED:
-    case ComponentType::NPN:
-    case ComponentType::PNP:
-    case ComponentType::NMOS:
-    case ComponentType::PMOS:
-        return "";
-    }
-    return "";
+    return GetTraits(m_Type).Unit.data();
 }
 
 /**
@@ -257,60 +479,7 @@ const char *Component::GetUnit() const {
  *          true for the rest.
  */
 bool Component::HasValue() const {
-    switch (m_Type) {
-    case ComponentType::BEHAVIORAL_VOLTAGE:
-    case ComponentType::BEHAVIORAL_CURRENT:
-    case ComponentType::GROUND:
-    case ComponentType::NET_LABEL:
-    case ComponentType::PIN:
-    case ComponentType::LOGIC_OUTPUT:
-    case ComponentType::SEVEN_SEGMENT:
-    case ComponentType::SWITCH:
-    case ComponentType::PUSH_BUTTON:
-    case ComponentType::V_SWITCH:
-    case ComponentType::RELAY:
-    case ComponentType::FUSE:
-    case ComponentType::DIODE:
-    case ComponentType::ZENER_DIODE:
-    case ComponentType::LED:
-    case ComponentType::NPN:
-    case ComponentType::PNP:
-    case ComponentType::NMOS:
-    case ComponentType::PMOS:
-    case ComponentType::OP_AMP:
-    case ComponentType::SUBCIRCUIT:
-    case ComponentType::AND:
-    case ComponentType::OR:
-    case ComponentType::NOT:
-    case ComponentType::NAND:
-    case ComponentType::NOR:
-    case ComponentType::XOR:
-    case ComponentType::XNOR:
-    case ComponentType::BUFFER:
-    case ComponentType::D_FLIP_FLOP:
-    case ComponentType::JK_FLIP_FLOP:
-    case ComponentType::T_FLIP_FLOP:
-    case ComponentType::SR_FLIP_FLOP:
-    case ComponentType::CLOCK:
-    case ComponentType::LOGIC_INPUT:
-        return false;
-    case ComponentType::RESISTOR:
-    case ComponentType::CAPACITOR:
-    case ComponentType::INDUCTOR:
-    case ComponentType::POTENTIOMETER:
-    case ComponentType::TRANSFORMER:
-    case ComponentType::VCC:
-    case ComponentType::VOLTAGE_SOURCE:
-    case ComponentType::CURRENT_SOURCE:
-    case ComponentType::VCVS:
-    case ComponentType::VCCS:
-    case ComponentType::CCCS:
-    case ComponentType::CCVS:
-    case ComponentType::INITIAL_VOLTAGE:
-    case ComponentType::NODESET:
-        return true;
-    }
-    return false;
+    return GetTraits(m_Type).AcceptedValues != ValueRule::NONE;
 }
 
 /**
@@ -320,62 +489,17 @@ bool Component::HasValue() const {
  *          voltage, and any gain, negative included, for a controlled source.
  */
 bool Component::IsValidValue(const double value) const {
-    switch (m_Type) {
-    case ComponentType::RESISTOR:
-    case ComponentType::CAPACITOR:
-    case ComponentType::INDUCTOR:
-    case ComponentType::POTENTIOMETER:
-    case ComponentType::TRANSFORMER:
-        return value > 0.0;
-    case ComponentType::VCC:
-    case ComponentType::VOLTAGE_SOURCE:
-    case ComponentType::CURRENT_SOURCE:
-    case ComponentType::VCVS:
-    case ComponentType::VCCS:
-    case ComponentType::CCCS:
-    case ComponentType::CCVS:
+    switch (GetTraits(m_Type).AcceptedValues) {
+    case ValueRule::ANY:
         return true;
-    case ComponentType::INITIAL_VOLTAGE:
-    case ComponentType::NODESET:
+    case ValueRule::POSITIVE:
+        return value > 0.0;
+    case ValueRule::FINITE:
         return std::isfinite(value);
-    case ComponentType::BEHAVIORAL_VOLTAGE:
-    case ComponentType::BEHAVIORAL_CURRENT:
-    case ComponentType::GROUND:
-    case ComponentType::NET_LABEL:
-    case ComponentType::PIN:
-    case ComponentType::LOGIC_OUTPUT:
-    case ComponentType::SEVEN_SEGMENT:
-    case ComponentType::SWITCH:
-    case ComponentType::PUSH_BUTTON:
-    case ComponentType::V_SWITCH:
-    case ComponentType::RELAY:
-    case ComponentType::FUSE:
-    case ComponentType::DIODE:
-    case ComponentType::ZENER_DIODE:
-    case ComponentType::LED:
-    case ComponentType::NPN:
-    case ComponentType::PNP:
-    case ComponentType::NMOS:
-    case ComponentType::PMOS:
-    case ComponentType::OP_AMP:
-    case ComponentType::SUBCIRCUIT:
-    case ComponentType::AND:
-    case ComponentType::OR:
-    case ComponentType::NOT:
-    case ComponentType::NAND:
-    case ComponentType::NOR:
-    case ComponentType::XOR:
-    case ComponentType::XNOR:
-    case ComponentType::BUFFER:
-    case ComponentType::D_FLIP_FLOP:
-    case ComponentType::JK_FLIP_FLOP:
-    case ComponentType::T_FLIP_FLOP:
-    case ComponentType::SR_FLIP_FLOP:
-    case ComponentType::CLOCK:
-    case ComponentType::LOGIC_INPUT:
+    case ValueRule::NONE:
+    default:
         return false;
     }
-    return false;
 }
 
 /**
@@ -608,107 +732,7 @@ bool IsLogicDisplay(const ComponentType type) {
  * @return  The type as text, such as "Resistor"; ParseComponentType() reads it back.
  */
 const char *GetTypeName(const ComponentType type) {
-    switch (type) {
-    case ComponentType::RESISTOR:
-        return "Resistor";
-    case ComponentType::CAPACITOR:
-        return "Capacitor";
-    case ComponentType::INDUCTOR:
-        return "Inductor";
-    case ComponentType::GROUND:
-        return "Ground";
-    case ComponentType::VCC:
-        return "VCC";
-    case ComponentType::VOLTAGE_SOURCE:
-        return "VoltageSource";
-    case ComponentType::CURRENT_SOURCE:
-        return "CurrentSource";
-    case ComponentType::DIODE:
-        return "Diode";
-    case ComponentType::ZENER_DIODE:
-        return "ZenerDiode";
-    case ComponentType::LED:
-        return "LED";
-    case ComponentType::NPN:
-        return "NPN";
-    case ComponentType::PNP:
-        return "PNP";
-    case ComponentType::NMOS:
-        return "NMOS";
-    case ComponentType::PMOS:
-        return "PMOS";
-    case ComponentType::VCVS:
-        return "VCVS";
-    case ComponentType::VCCS:
-        return "VCCS";
-    case ComponentType::CCCS:
-        return "CCCS";
-    case ComponentType::CCVS:
-        return "CCVS";
-    case ComponentType::BEHAVIORAL_VOLTAGE:
-        return "BehavioralVoltage";
-    case ComponentType::BEHAVIORAL_CURRENT:
-        return "BehavioralCurrent";
-    case ComponentType::OP_AMP:
-        return "OpAmp";
-    case ComponentType::SUBCIRCUIT:
-        return "Subcircuit";
-    case ComponentType::NET_LABEL:
-        return "NetLabel";
-    case ComponentType::INITIAL_VOLTAGE:
-        return "InitialVoltage";
-    case ComponentType::NODESET:
-        return "Nodeset";
-    case ComponentType::PIN:
-        return "Pin";
-    case ComponentType::POTENTIOMETER:
-        return "Potentiometer";
-    case ComponentType::SWITCH:
-        return "Switch";
-    case ComponentType::PUSH_BUTTON:
-        return "PushButton";
-    case ComponentType::V_SWITCH:
-        return "VSwitch";
-    case ComponentType::RELAY:
-        return "Relay";
-    case ComponentType::FUSE:
-        return "Fuse";
-    case ComponentType::TRANSFORMER:
-        return "Transformer";
-    case ComponentType::AND:
-        return "And";
-    case ComponentType::OR:
-        return "Or";
-    case ComponentType::NOT:
-        return "Not";
-    case ComponentType::NAND:
-        return "Nand";
-    case ComponentType::NOR:
-        return "Nor";
-    case ComponentType::XOR:
-        return "Xor";
-    case ComponentType::XNOR:
-        return "Xnor";
-    case ComponentType::BUFFER:
-        return "Buffer";
-    case ComponentType::D_FLIP_FLOP:
-        return "DFlipFlop";
-    case ComponentType::JK_FLIP_FLOP:
-        return "JKFlipFlop";
-    case ComponentType::T_FLIP_FLOP:
-        return "TFlipFlop";
-    case ComponentType::SR_FLIP_FLOP:
-        return "SRFlipFlop";
-    case ComponentType::CLOCK:
-        return "Clock";
-    case ComponentType::LOGIC_INPUT:
-        return "LogicInput";
-    case ComponentType::LOGIC_OUTPUT:
-        return "LogicOutput";
-    case ComponentType::SEVEN_SEGMENT:
-        return "SevenSegment";
-    }
-    return "Unknown";
+    return GetTraits(type).TypeName.data();
 }
 
 /**
@@ -717,9 +741,9 @@ const char *GetTypeName(const ComponentType type) {
  * @return  The matching type, or no value for an unknown name.
  */
 std::optional<ComponentType> ParseComponentType(const std::string_view text) {
-    for (const ComponentType type : ALL_TYPES) {
-        if (text == GetTypeName(type)) {
-            return type;
+    for (const ComponentTraits &traits : COMPONENT_TRAITS) {
+        if (text == traits.TypeName) {
+            return traits.Type;
         }
     }
     return std::nullopt;

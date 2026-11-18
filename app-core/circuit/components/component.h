@@ -70,6 +70,10 @@ enum class ComponentType {
     SEVEN_SEGMENT,
 };
 
+/// Last enumerator of ComponentType, which the table of traits in component.cpp is checked against: a new type goes
+/// before it, or this moves to the new type.
+constexpr ComponentType LAST_COMPONENT_TYPE = ComponentType::SEVEN_SEGMENT;
+
 /// Largest tolerance a part may have, in percent: far beyond any real part, and well short of the 100 % that could take
 /// a value to zero.
 constexpr double MAX_TOLERANCE_PERCENT = 50.0;
