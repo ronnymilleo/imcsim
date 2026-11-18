@@ -14,8 +14,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <expected>
-#include <format>
-#include <ngspice/sharedspice.h>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -32,11 +31,12 @@ namespace Core {
  */
 std::expected<DCSweep, std::string> ReadDCSweep(const Circuit &circuit, const DCSweepSettings &settings) {
     const Component &swept = *FindSweepableSource(circuit, settings.Swept.Source);
-    const pvector_info scale = FindVector(swept.GetType() == ComponentType::CURRENT_SOURCE ? "i-sweep" : "v-sweep");
-    if (scale == nullptr) {
+    const std::optional<std::vector<double>> swept_values =
+        ReadRealVector(swept.GetType() == ComponentType::CURRENT_SOURCE ? "i-sweep" : "v-sweep");
+    if (!swept_values) {
         return std::unexpected("ngspice returned no swept values");
     }
-    const std::vector<double> all_values = RealPart(*scale);
+    const std::vector<double> &all_values = *swept_values;
     const auto repeat = std::ranges::find(all_values.begin() + 1, all_values.end(), all_values.front());
     const auto curve_length = static_cast<std::size_t>(repeat - all_values.begin());
     if (all_values.size() % curve_length != 0) {
@@ -68,29 +68,19 @@ std::expected<DCSweep, std::string> ReadDCSweep(const Circuit &circuit, const DC
             store(result.Curves[curve], std::vector<double>(begin, begin + static_cast<std::ptrdiff_t>(curve_length)));
         }
     };
-    for (int node = 0; node < circuit.GetNodeCount(); ++node) {
-        std::vector<double> voltages(all_values.size(), 0.0);
-        if (node > 0) {
-            const pvector_info vector = FindVector(std::format("v({})", node));
-            if (vector == nullptr || static_cast<std::size_t>(vector->v_length) != all_values.size()) {
-                return std::unexpected(std::format("ngspice returned no voltages for node {}", node));
-            }
-            voltages = RealPart(*vector);
-        }
-        split(voltages, [node](DCSweepCurve &curve, std::vector<double> values) {
-            curve.NodeVoltages[static_cast<std::size_t>(node)] = std::move(values);
+    const auto vectors = ReadNodeAndCurrentVectors(circuit, all_values.size());
+    if (!vectors) {
+        return std::unexpected(vectors.error());
+    }
+    for (std::size_t node = 0; node < vectors->NodeVoltages.size(); ++node) {
+        split(vectors->NodeVoltages[node], [node](DCSweepCurve &curve, std::vector<double> values) {
+            curve.NodeVoltages[node] = std::move(values);
         });
     }
-    for (const CircuitEntry &entry : circuit.GetEntries()) {
-        for (const CurrentVector &current : CurrentVectors(*entry.Part)) {
-            const pvector_info vector = FindVector(current.VectorName);
-            if (vector == nullptr || static_cast<std::size_t>(vector->v_length) != all_values.size()) {
-                return std::unexpected(std::format("ngspice returned no currents for {}", current.TraceName));
-            }
-            split(RealPart(*vector), [&current](DCSweepCurve &curve, std::vector<double> values) {
-                curve.Currents.push_back({current.TraceName, std::move(values)});
-            });
-        }
+    for (const ComponentTrace &current : vectors->Currents) {
+        split(current.Values, [&current](DCSweepCurve &curve, std::vector<double> values) {
+            curve.Currents.push_back({current.Name, std::move(values)});
+        });
     }
     return result;
 }

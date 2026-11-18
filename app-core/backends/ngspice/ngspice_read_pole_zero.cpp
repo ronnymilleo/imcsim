@@ -22,20 +22,6 @@ namespace Core {
 namespace {
 
 /**
- * @brief   The plot a pole-zero analysis leaves; its name starts with "pz".
- */
-std::optional<std::string> FindPoleZeroPlot() {
-    char *const *names = ngSpice_AllPlots();
-    for (; names != nullptr && *names != nullptr; ++names) {
-        const std::string name(*names);
-        if (name.starts_with("pz")) {
-            return name;
-        }
-    }
-    return std::nullopt;
-}
-
-/**
  * @brief   The roots of one kind in the plot, from its vectors "pole(1)", "pole(2)"... or "zero(1)"...
  */
 ComplexRoots ReadRoots(const std::string &plot, const std::string_view kind) {
@@ -63,7 +49,7 @@ ComplexRoots ReadRoots(const std::string &plot, const std::string_view kind) {
  *          fails.
  */
 std::expected<PoleZero, std::string> ReadPoleZero(const Circuit &circuit, const PoleZeroSettings &settings) {
-    const std::optional<std::string> plot = FindPoleZeroPlot();
+    const std::optional<std::string> plot = FindPlotStartingWith("pz");
     if (!plot) {
         return std::unexpected("ngspice returned no pole-zero plot");
     }
