@@ -370,7 +370,7 @@ const BackendCapabilities &NgspiceBackend::GetCapabilities() const {
         // The digital models allocate nodes while ngspice sets up the sensitivity analysis, which it cannot recover
         // from, and they leave the pole-zero solver nothing to follow; the parts are told apart by type, from the
         // first to the last of the enumeration
-        for (int index = 0; index <= static_cast<int>(ComponentType::SEVEN_SEGMENT); ++index) {
+        for (int index = 0; index <= static_cast<int>(LAST_COMPONENT_TYPE); ++index) {
             const auto type = static_cast<ComponentType>(index);
             if (IsLogicPart(type)) {
                 m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::SENSITIVITY][type] =
@@ -384,7 +384,7 @@ const BackendCapabilities &NgspiceBackend::GetCapabilities() const {
         }
         if (!AreDigitalModelsAvailable()) {
             // The parts are told apart by type, from the first to the last of the enumeration
-            for (int index = 0; index <= static_cast<int>(ComponentType::SEVEN_SEGMENT); ++index) {
+            for (int index = 0; index <= static_cast<int>(LAST_COMPONENT_TYPE); ++index) {
                 const auto type = static_cast<ComponentType>(index);
                 if (IsLogicPart(type)) {
                     m_Capabilities.UnsupportedParts[type] =

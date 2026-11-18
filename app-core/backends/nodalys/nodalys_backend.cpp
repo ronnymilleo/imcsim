@@ -263,7 +263,7 @@ std::string DescribeConstantTransfer(const PoleZeroSettings &settings, const int
 NodalysBackend::NodalysBackend() {
     m_Capabilities.Analyses = NODALYS_ANALYSES;
     m_Capabilities.FindPartProblem = FindPartProblem;
-    for (int index = 0; index <= static_cast<int>(ComponentType::SEVEN_SEGMENT); ++index) {
+    for (int index = 0; index <= static_cast<int>(LAST_COMPONENT_TYPE); ++index) {
         const auto type = static_cast<ComponentType>(index);
         if (IsLogicPart(type)) {
             m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::SENSITIVITY][type] =
