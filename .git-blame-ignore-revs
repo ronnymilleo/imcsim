@@ -1,0 +1,4 @@
+# Formatting-only commits, which git blame skips with: git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# Put each argument and parameter on a line of its own when a call does not fit
+2ea88cd25cc085f79cde8068e01d32b1591b28c0
