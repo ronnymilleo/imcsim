@@ -116,9 +116,6 @@ bool DiodeDevice::Limit(std::vector<double> &x_new, const std::vector<double> &x
     return true;
 }
 
-void DiodeDevice::SeedOperatingPoint(std::vector<double> &) const {
-}
-
 double DiodeDevice::TerminalCurrent(const int terminal, const std::vector<double> &x) const {
     const double v = VoltageAt(x);
     const double current = Evaluate(v).Current + m_CapConductance * v + m_CapEquivalent;

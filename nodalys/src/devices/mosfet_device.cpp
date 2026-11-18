@@ -335,7 +335,4 @@ void MosfetDevice::SetTemperature(const ThermalConditions &thermal) {
     ApplyTemperature(thermal);
 }
 
-void MosfetDevice::SeedOperatingPoint(std::vector<double> &) const {
-}
-
 } // namespace Nodalys
