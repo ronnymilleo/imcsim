@@ -14,8 +14,9 @@
 #include <cstddef>
 #include <expected>
 #include <format>
-#include <ngspice/sharedspice.h>
+#include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace Core {
@@ -27,12 +28,12 @@ namespace Core {
  *          number.
  */
 std::expected<SParameters, std::string> ReadSParameters(const Circuit &circuit) {
-    const pvector_info frequency = FindVector("frequency");
-    if (frequency == nullptr) {
+    const std::optional<std::vector<double>> frequencies = ReadRealVector("frequency");
+    if (!frequencies) {
         return std::unexpected("ngspice returned no frequency points");
     }
     SParameters result;
-    result.Frequencies = RealPart(*frequency);
+    result.Frequencies = *frequencies;
     const std::size_t point_count = result.Frequencies.size();
     std::vector<CircuitPort> ports = circuit.GetPorts();
     std::ranges::sort(ports, {}, &CircuitPort::Number);
@@ -43,11 +44,12 @@ std::expected<SParameters, std::string> ReadSParameters(const Circuit &circuit) 
     std::vector<std::vector<std::complex<double>>> entries;
     for (int row = 1; row <= port_count; ++row) {
         for (int column = 1; column <= port_count; ++column) {
-            const pvector_info vector = FindVector(std::format("s_{}_{}", row, column));
-            if (vector == nullptr || static_cast<std::size_t>(vector->v_length) != point_count) {
-                return std::unexpected(std::format("ngspice returned no S({}, {})", row, column));
+            auto values = ReadComplexVectorOfLength(std::format("s_{}_{}", row, column), point_count,
+                                                    std::format("S({}, {})", row, column));
+            if (!values) {
+                return std::unexpected(values.error());
             }
-            entries.push_back(ComplexValues(*vector));
+            entries.push_back(std::move(*values));
         }
     }
     for (std::size_t point = 0; point < point_count; ++point) {

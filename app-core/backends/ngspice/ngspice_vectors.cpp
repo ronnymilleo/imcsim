@@ -12,8 +12,39 @@
 #include "circuit/components/source.h"
 #include "spice/spice_text.h"
 #include <format>
+#include <utility>
 
 namespace Core {
+
+/**
+ * @brief   Lists the plots ngspice holds whose name starts with a prefix, such as "noise" for the plots of a noise run.
+ * @param[in] prefix  Start of the plot names to look for.
+ * @return  The names in the order ngspice lists them, none when there is no such plot.
+ */
+std::vector<std::string> ListPlotsStartingWith(const std::string_view prefix) {
+    std::vector<std::string> plots;
+    char *const *names = ngSpice_AllPlots();
+    for (; names != nullptr && *names != nullptr; ++names) {
+        const std::string name(*names);
+        if (name.starts_with(prefix)) {
+            plots.push_back(name);
+        }
+    }
+    return plots;
+}
+
+/**
+ * @brief   Finds the plot an analysis leaves, which ngspice names after the analysis, such as "tf" or "sens".
+ * @param[in] prefix  Start of the plot name to look for.
+ * @return  The name of the first plot that matches, or no value when there is none.
+ */
+std::optional<std::string> FindPlotStartingWith(const std::string_view prefix) {
+    const std::vector<std::string> plots = ListPlotsStartingWith(prefix);
+    if (plots.empty()) {
+        return std::nullopt;
+    }
+    return plots.front();
+}
 
 /**
  * @brief   ngspice keeps no reference to the name after the call.
@@ -59,6 +90,101 @@ std::vector<std::string> ListVectors(std::string plot) {
         names.emplace_back(*vectors);
     }
     return names;
+}
+
+/**
+ * @brief   Reads the real values of a vector, of any length.
+ * @details ngspice describes every vector in the same static record, so the values are copied before the next lookup.
+ * @param[in] name  Name of the vector.
+ * @return  The values, or no value when the vector is missing.
+ */
+std::optional<std::vector<double>> ReadRealVector(std::string name) {
+    const pvector_info vector = FindVector(std::move(name));
+    if (vector == nullptr) {
+        return std::nullopt;
+    }
+    return RealPart(*vector);
+}
+
+/**
+ * @brief   Reads the first value of a vector that holds real numbers, as the analyses with a single point leave.
+ * @param[in] name  Name of the vector.
+ * @param[in] what  What the vector holds, for the error: "ngspice returned no <what>".
+ * @return  The value, or the error when the vector is missing or holds complex numbers.
+ */
+std::expected<double, std::string> ReadScalar(std::string name, const std::string_view what) {
+    const pvector_info vector = FindVector(std::move(name));
+    if (vector == nullptr || vector->v_realdata == nullptr) {
+        return std::unexpected(std::format("ngspice returned no {}", what));
+    }
+    return vector->v_realdata[0];
+}
+
+/**
+ * @brief   Reads a real vector that must have as many points as the scale of the run.
+ * @param[in] name         Name of the vector.
+ * @param[in] length       Number of points the vector must have.
+ * @param[in] what         What the vector holds, for the error: "ngspice returned no <what>".
+ * @param[in] first_point  Index of the first point to keep; the ones before it are dropped.
+ * @return  The values from first_point on, or the error when the vector is missing or has another length.
+ */
+std::expected<std::vector<double>, std::string> ReadRealVectorOfLength(std::string name, const std::size_t length,
+                                                                       const std::string_view what,
+                                                                       const std::size_t first_point) {
+    const pvector_info vector = FindVector(std::move(name));
+    if (vector == nullptr || static_cast<std::size_t>(vector->v_length) != length) {
+        return std::unexpected(std::format("ngspice returned no {}", what));
+    }
+    return RealPart(*vector, first_point);
+}
+
+/**
+ * @brief   Reads a vector as complex numbers, which must have as many points as the scale of the run.
+ * @param[in] name    Name of the vector.
+ * @param[in] length  Number of points the vector must have.
+ * @param[in] what    What the vector holds, for the error: "ngspice returned no <what>".
+ * @return  The values, or the error when the vector is missing or has another length.
+ */
+std::expected<std::vector<std::complex<double>>, std::string>
+ReadComplexVectorOfLength(std::string name, const std::size_t length, const std::string_view what) {
+    const pvector_info vector = FindVector(std::move(name));
+    if (vector == nullptr || static_cast<std::size_t>(vector->v_length) != length) {
+        return std::unexpected(std::format("ngspice returned no {}", what));
+    }
+    return ComplexValues(*vector);
+}
+
+/**
+ * @brief   Reads the voltage of every node and the currents of every component, for the runs that sweep a scale.
+ * @param[in] circuit      Circuit that was simulated, whose parts say which vectors to look for.
+ * @param[in] length       Number of points of the scale, which every vector must have.
+ * @param[in] first_point  Index of the first point to keep; the ones before it are dropped.
+ * @return  The voltages and currents, or the error naming the node or current whose vector is missing.
+ */
+std::expected<NodeAndCurrentVectors, std::string>
+ReadNodeAndCurrentVectors(const Circuit &circuit, const std::size_t length, const std::size_t first_point) {
+    NodeAndCurrentVectors result;
+    result.NodeVoltages.resize(static_cast<std::size_t>(circuit.GetNodeCount()));
+    result.NodeVoltages[0].assign(length > first_point ? length - first_point : 0, 0.0);
+    for (int node = 1; node < circuit.GetNodeCount(); ++node) {
+        auto voltages = ReadRealVectorOfLength(std::format("v({})", node), length,
+                                               std::format("voltages for node {}", node), first_point);
+        if (!voltages) {
+            return std::unexpected(voltages.error());
+        }
+        result.NodeVoltages[static_cast<std::size_t>(node)] = std::move(*voltages);
+    }
+    for (const CircuitEntry &entry : circuit.GetEntries()) {
+        for (const CurrentVector &current : CurrentVectors(*entry.Part)) {
+            auto values = ReadRealVectorOfLength(current.VectorName, length,
+                                                 std::format("currents for {}", current.TraceName), first_point);
+            if (!values) {
+                return std::unexpected(values.error());
+            }
+            result.Currents.push_back({current.TraceName, std::move(*values)});
+        }
+    }
+    return result;
 }
 
 /**

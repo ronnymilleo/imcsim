@@ -23,20 +23,6 @@ namespace Core {
 namespace {
 
 /**
- * @brief   The plot a sensitivity analysis leaves; its name starts with "sens".
- */
-std::optional<std::string> FindSensitivityPlot() {
-    char *const *names = ngSpice_AllPlots();
-    for (; names != nullptr && *names != nullptr; ++names) {
-        const std::string name(*names);
-        if (name.starts_with("sens")) {
-            return name;
-        }
-    }
-    return std::nullopt;
-}
-
-/**
  * @brief   The first value of every vector of the plot that has a finite one, by name.
  * @details ngspice also saves the parameters of each model under "device:parameter", which are left out, and reports
  *          some as nan when the model does not use them.
@@ -68,7 +54,7 @@ SensitivityVectors ReadSensitivityVectors(const std::string &plot) {
  * @return  The sensitivity of every part with a value, or the error when ngspice left no sensitivity plot.
  */
 std::expected<Sensitivity, std::string> ReadSensitivity(const Circuit &circuit, const SensitivitySettings &settings) {
-    const std::optional<std::string> plot = FindSensitivityPlot();
+    const std::optional<std::string> plot = FindPlotStartingWith("sens");
     if (!plot) {
         return std::unexpected("ngspice returned no sensitivity plot");
     }
