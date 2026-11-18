@@ -57,12 +57,31 @@ private:
         double DIfwdQbDvbc; ///< $\partial (I_{\text{fwd}} / q_b) / \partial v_{bc}$ for SPICE `geqcb` base-width
                             ///< modulation transcapacitance.
     };
+    /// Operating point of the intrinsic transistor at one solution vector, in the polarity of the circuit.
+    struct JunctionState {
+        double Vbe;       ///< Base-emitter voltage as the circuit sees it.
+        double Vbc;       ///< Base-collector voltage as the circuit sees it.
+        double VbeSigned; ///< $v_{be}$ flipped for a PNP, so it is forward-positive in both polarities.
+        double VbcSigned; ///< $v_{bc}$ flipped for a PNP, so it is forward-positive in both polarities.
+        Intrinsic Dc;     ///< Currents and conductances in the polarity of the circuit.
+    };
+    /// Charges and capacitances of the two junctions in forward-positive polarity, depletion plus transit time.
+    struct JunctionCharges {
+        double BaseEmitterCharge;        ///< $Q_{BE}$, depletion charge plus $\tau_F I_{\text{fwd}} / q_b$.
+        double BaseEmitterCapacitance;   ///< $\partial Q_{BE} / \partial v_{be}$.
+        double BaseCollectorCharge;      ///< $Q_{BC}$, depletion charge.
+        double BaseCollectorCapacitance; ///< $\partial Q_{BC} / \partial v_{bc}$.
+        /// SPICE `geqcb`, $\partial Q_{BE} / \partial v_{bc}$: the base-width modulation transcapacitance.
+        double Transcapacitance;
+    };
     /// Recomputes the parameters at the temperature, from the ones given at the nominal temperature.
     void ApplyTemperature(const ThermalConditions &thermal);
     /// Evaluates the intrinsic transport equations in NPN polarity ($v_{be}, v_{bc}$ forward-positive).
     Intrinsic Evaluate(double vbe, double vbc) const;
-    /// Evaluates the intrinsic transistor at state vector `x`, accounting for NPN/PNP polarity.
-    Intrinsic EvaluateAt(const std::vector<double> &x) const;
+    /// Reads the junction voltages from `x` and evaluates the intrinsic transistor there.
+    JunctionState EvaluateState(const std::vector<double> &x) const;
+    /// Evaluates the charges of both junctions at a junction state.
+    JunctionCharges EvaluateCharges(const JunctionState &state) const;
 
     int m_Collector;
     int m_Base;

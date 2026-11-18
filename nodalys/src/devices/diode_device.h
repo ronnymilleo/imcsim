@@ -31,7 +31,6 @@ public:
     bool IsLinear() const override { return false; }
     void StampCharge(MnaSystem &sys, const std::vector<double> &x) const override;
     bool Limit(std::vector<double> &x_new, const std::vector<double> &x_old) const override;
-    void SeedOperatingPoint(std::vector<double> &x) const override;
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
     double TerminalCharge(int terminal, const std::vector<double> &x) const override;
     std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,

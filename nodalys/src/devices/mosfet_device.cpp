@@ -75,42 +75,54 @@ MosfetDevice::Channel MosfetDevice::Evaluate(const double vgs_eff, const double 
     return result;
 }
 
-double MosfetDevice::Vgs(const std::vector<double> &x) const {
+/**
+ * @brief   Finds which terminal acts as the drain and evaluates the channel in that frame.
+ * @details The level-1 equations only hold for $v_{ds} \ge 0$, so when the intrinsic drain sits on the wrong side of
+ *          the source (judged on the circuit voltages, with the sign of the polarity) the two swap roles.
+ * @param[in] x  Solution vector.
+ * @return  The effective drain and source nodes, whether they swapped, and the channel evaluated between them.
+ */
+MosfetDevice::ChannelState MosfetDevice::EvaluateChannel(const std::vector<double> &x) const {
     const double vg = NodeVoltage(x, m_Gate);
-    const double vs = NodeVoltage(x, m_S);
-    return m_Pmos ? vs - vg : vg - vs;
-}
-
-double MosfetDevice::Vds(const std::vector<double> &x) const {
     const double vd = NodeVoltage(x, m_D);
     const double vs = NodeVoltage(x, m_S);
-    return m_Pmos ? vs - vd : vd - vs;
+
+    ChannelState state{};
+    state.Polarity = m_Pmos ? -1.0 : 1.0;
+    state.IsReversed = (state.Polarity * (vd - vs)) < 0.0;
+    state.Drain = state.IsReversed ? m_S : m_D;
+    state.Source = state.IsReversed ? m_D : m_S;
+    const double vgs_eff = state.Polarity * (vg - NodeVoltage(x, state.Source));
+    const double vds_eff = state.Polarity * (NodeVoltage(x, state.Drain) - NodeVoltage(x, state.Source));
+    state.Conduction = Evaluate(vgs_eff, vds_eff);
+    return state;
+}
+
+/**
+ * @brief   Finds the terminals of the body-drain diode.
+ * @details The body is tied to the external source terminal. For NMOS the anode is the source and the cathode the
+ *          drain; for PMOS the anode is the drain and the cathode the source.
+ */
+MosfetDevice::BodyDiodeNodes MosfetDevice::GetBodyDiodeNodes() const {
+    return {.Anode = m_Pmos ? m_D : m_Source, .Cathode = m_Pmos ? m_Source : m_D};
 }
 
 void MosfetDevice::Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) {
     StampSeriesResistor(sys, m_Drain, m_D, m_Parameters.DrainResistance);
     StampSeriesResistor(sys, m_Source, m_S, m_Parameters.SourceResistance);
 
+    // 1. Channel conduction (with symmetric source/drain role swap when Vds_eff < 0)
+    const ChannelState state = EvaluateChannel(x);
+    const Channel &channel = state.Conduction;
+    const int d_eff = state.Drain;
+    const int s_eff = state.Source;
     const double vg = NodeVoltage(x, m_Gate);
-    const double vd = NodeVoltage(x, m_D);
-    const double vs = NodeVoltage(x, m_S);
-
-    // 1. Channel conduction (with symmetric source/drain role swap when Vds_eff < 0):
-    //    `pol` is +1 for NMOS and -1 for PMOS.
-    const double pol = m_Pmos ? -1.0 : 1.0;
-    const bool reversed = (pol * (vd - vs)) < 0.0;
-    const int d_eff = reversed ? m_S : m_D;
-    const int s_eff = reversed ? m_D : m_S;
     const double vd_eff = NodeVoltage(x, d_eff);
     const double vs_eff = NodeVoltage(x, s_eff);
 
-    const double vgs_eff = pol * (vg - vs_eff);
-    const double vds_eff = pol * (vd_eff - vs_eff);
-    const Channel channel = Evaluate(vgs_eff, vds_eff);
-
     // Small-signal companion between d_eff and s_eff:
     //   I(d_eff -> s_eff) ≈ Gm * (V(Gate) - V(s_eff)) + Gds * (V(d_eff) - V(s_eff)) + ieq
-    const double i_channel = pol * channel.Current;
+    const double i_channel = state.Polarity * channel.Current;
     const double ieq = i_channel - channel.Gm * (vg - vs_eff) - channel.Gds * (vd_eff - vs_eff);
 
     StampConductance(sys, d_eff, s_eff, channel.Gds);
@@ -121,14 +133,12 @@ void MosfetDevice::Stamp(MnaSystem &sys, const std::vector<double> &x, const Tim
     StampCurrentSource(sys, d_eff, s_eff, ieq);
 
     // 2. Body-drain PN junction diode (body is tied to the external source terminal):
-    //    For NMOS, anode = Source, cathode = Drain. For PMOS, anode = Drain, cathode = Source.
-    const int body_anode = m_Pmos ? m_D : m_Source;
-    const int body_cathode = m_Pmos ? m_Source : m_D;
-    const double vbody = NodeVoltage(x, body_anode) - NodeVoltage(x, body_cathode);
+    const BodyDiodeNodes body = GetBodyDiodeNodes();
+    const double vbody = NodeVoltage(x, body.Anode) - NodeVoltage(x, body.Cathode);
     const double diode_exp = Exponential(vbody / m_Vt);
     const double diode_current = MOSFET_BODY_SATURATION_CURRENT * (diode_exp - 1.0);
     const double diode_cond = MOSFET_BODY_SATURATION_CURRENT * diode_exp / m_Vt;
-    StampNortonBranch(sys, body_anode, body_cathode, diode_cond, diode_current, vbody);
+    StampNortonBranch(sys, body.Anode, body.Cathode, diode_cond, diode_current, vbody);
 
     // 3. Linear gate-overlap capacitances (CGSO*W between Gate-Source, CGDO*W between Gate-Drain)
     m_Gcgs = m_Gcgd = m_Ieqgs = m_Ieqgd = 0.0;
@@ -149,26 +159,15 @@ void MosfetDevice::Stamp(MnaSystem &sys, const std::vector<double> &x, const Tim
 }
 
 double MosfetDevice::TerminalCurrent(const int terminal, const std::vector<double> &x) const {
-    const double vg = NodeVoltage(x, m_Gate);
-    const double vd = NodeVoltage(x, m_D);
-    const double vs = NodeVoltage(x, m_S);
-
-    const double pol = m_Pmos ? -1.0 : 1.0;
-    const bool reversed = (pol * (vd - vs)) < 0.0;
-    const int d_eff = reversed ? m_S : m_D;
-    const int s_eff = reversed ? m_D : m_S;
-    const double vgs_eff = pol * (vg - NodeVoltage(x, s_eff));
-    const double vds_eff = pol * (NodeVoltage(x, d_eff) - NodeVoltage(x, s_eff));
-    const Channel channel = Evaluate(vgs_eff, vds_eff);
+    const ChannelState state = EvaluateChannel(x);
 
     // Channel current entering the physical drain terminal m_D
-    const double i_d_eff_to_s_eff = pol * channel.Current;
-    const double channel_into_drain = reversed ? -i_d_eff_to_s_eff : i_d_eff_to_s_eff;
+    const double i_d_eff_to_s_eff = state.Polarity * state.Conduction.Current;
+    const double channel_into_drain = state.IsReversed ? -i_d_eff_to_s_eff : i_d_eff_to_s_eff;
 
     // Body diode current entering the physical drain terminal m_D
-    const int body_anode = m_Pmos ? m_D : m_Source;
-    const int body_cathode = m_Pmos ? m_Source : m_D;
-    const double vbody = NodeVoltage(x, body_anode) - NodeVoltage(x, body_cathode);
+    const BodyDiodeNodes body = GetBodyDiodeNodes();
+    const double vbody = NodeVoltage(x, body.Anode) - NodeVoltage(x, body.Cathode);
     const double diode_current = MOSFET_BODY_SATURATION_CURRENT * (Exponential(vbody / m_Vt) - 1.0);
     const double diode_into_drain = m_Pmos ? diode_current : -diode_current;
 
@@ -222,30 +221,20 @@ double MosfetDevice::TerminalCharge(const int terminal, const std::vector<double
 std::complex<double> MosfetDevice::AcTerminalCurrent(const int terminal, const std::vector<double> &x_dc,
                                                      const std::vector<std::complex<double>> &x_ac,
                                                      const double omega) const {
-    const double vg = NodeVoltage(x_dc, m_Gate);
-    const double vd = NodeVoltage(x_dc, m_D);
-    const double vs = NodeVoltage(x_dc, m_S);
-
-    const double pol = m_Pmos ? -1.0 : 1.0;
-    const bool reversed = (pol * (vd - vs)) < 0.0;
-    const int d_eff = reversed ? m_S : m_D;
-    const int s_eff = reversed ? m_D : m_S;
-    const double vgs_eff = pol * (vg - NodeVoltage(x_dc, s_eff));
-    const double vds_eff = pol * (NodeVoltage(x_dc, d_eff) - NodeVoltage(x_dc, s_eff));
-    const Channel channel = Evaluate(vgs_eff, vds_eff);
+    const ChannelState state = EvaluateChannel(x_dc);
+    const Channel &channel = state.Conduction;
 
     const std::complex<double> vg_ac = AcNodeVoltage(x_ac, m_Gate);
-    const std::complex<double> vd_eff_ac = AcNodeVoltage(x_ac, d_eff);
-    const std::complex<double> vs_eff_ac = AcNodeVoltage(x_ac, s_eff);
+    const std::complex<double> vd_eff_ac = AcNodeVoltage(x_ac, state.Drain);
+    const std::complex<double> vs_eff_ac = AcNodeVoltage(x_ac, state.Source);
     const std::complex<double> i_d_eff_to_s_eff =
         channel.Gm * (vg_ac - vs_eff_ac) + channel.Gds * (vd_eff_ac - vs_eff_ac);
-    const std::complex<double> channel_into_drain = reversed ? -i_d_eff_to_s_eff : i_d_eff_to_s_eff;
+    const std::complex<double> channel_into_drain = state.IsReversed ? -i_d_eff_to_s_eff : i_d_eff_to_s_eff;
 
-    const int body_anode = m_Pmos ? m_D : m_Source;
-    const int body_cathode = m_Pmos ? m_Source : m_D;
-    const double vbody_dc = NodeVoltage(x_dc, body_anode) - NodeVoltage(x_dc, body_cathode);
+    const BodyDiodeNodes body = GetBodyDiodeNodes();
+    const double vbody_dc = NodeVoltage(x_dc, body.Anode) - NodeVoltage(x_dc, body.Cathode);
     const double diode_cond = MOSFET_BODY_SATURATION_CURRENT * Exponential(vbody_dc / m_Vt) / m_Vt;
-    const std::complex<double> vbody_ac = AcNodeVoltage(x_ac, body_anode) - AcNodeVoltage(x_ac, body_cathode);
+    const std::complex<double> vbody_ac = AcNodeVoltage(x_ac, body.Anode) - AcNodeVoltage(x_ac, body.Cathode);
     const std::complex<double> diode_into_drain = (m_Pmos ? diode_cond : -diode_cond) * vbody_ac;
 
     const std::complex<double> igs_ac =
@@ -277,26 +266,16 @@ double MosfetDevice::OutputNoiseVariance(const std::vector<double> &x_dc,
         const std::complex<double> rs_tf = AcNodeVoltage(adjoint, m_Source) - AcNodeVoltage(adjoint, m_S);
         variance += (four_kt / p.SourceResistance) * std::norm(rs_tf);
     }
-    const double pol = m_Pmos ? -1.0 : 1.0;
-    const double vd = NodeVoltage(x_dc, m_D);
-    const double vg = NodeVoltage(x_dc, m_Gate);
-    const double vs = NodeVoltage(x_dc, m_S);
-    const bool reversed = (pol * (vd - vs)) < 0.0;
-    const int d_eff = reversed ? m_S : m_D;
-    const int s_eff = reversed ? m_D : m_S;
-    const double vgs_eff = pol * (vg - NodeVoltage(x_dc, s_eff));
-    const double vds_eff = pol * (NodeVoltage(x_dc, d_eff) - NodeVoltage(x_dc, s_eff));
-    const Channel channel = Evaluate(vgs_eff, vds_eff);
+    const Channel channel = EvaluateChannel(x_dc).Conduction;
     const std::complex<double> ch_tf = AcNodeVoltage(adjoint, m_D) - AcNodeVoltage(adjoint, m_S);
     variance += (2.0 / 3.0) * four_kt * std::fabs(channel.Gm) * std::norm(ch_tf);
     return variance;
 }
 
 bool MosfetDevice::Limit(std::vector<double> &x_new, const std::vector<double> &x_old) const {
-    const int body_anode = m_Pmos ? m_D : m_Source;
-    const int body_cathode = m_Pmos ? m_Source : m_D;
-    const double voltage_new = NodeVoltage(x_new, body_anode) - NodeVoltage(x_new, body_cathode);
-    const double voltage_old = NodeVoltage(x_old, body_anode) - NodeVoltage(x_old, body_cathode);
+    const BodyDiodeNodes body = GetBodyDiodeNodes();
+    const double voltage_new = NodeVoltage(x_new, body.Anode) - NodeVoltage(x_new, body.Cathode);
+    const double voltage_old = NodeVoltage(x_old, body.Anode) - NodeVoltage(x_old, body.Cathode);
     const double limited = PnLimit(voltage_new, voltage_old, m_Critical, m_Vt);
     const double delta = limited - voltage_new;
     if (delta == 0.0 || m_D < 0) {
@@ -333,9 +312,6 @@ void MosfetDevice::RejectStep() {
  */
 void MosfetDevice::SetTemperature(const ThermalConditions &thermal) {
     ApplyTemperature(thermal);
-}
-
-void MosfetDevice::SeedOperatingPoint(std::vector<double> &) const {
 }
 
 } // namespace Nodalys
