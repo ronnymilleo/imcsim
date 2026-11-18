@@ -104,6 +104,14 @@ bool Source::IsValidAC(const ACParameters &ac) const {
 }
 
 /**
+ * @brief   Returns the magnitude the source drives in an AC sweep.
+ * @return  The AC magnitude of an AC source, zero for any other waveform, which sits at zero in a sweep.
+ */
+double Source::GetACMagnitude() const {
+    return m_Type == SourceType::AC ? m_AC.Magnitude : 0.0;
+}
+
+/**
  * @brief   Returns the shape of the pulse.
  * @return  Levels in the unit of the source and times in seconds.
  */

@@ -359,6 +359,17 @@ TEST_CASE("A voltage source keeps its sine parameters while switching type", "[c
     CHECK_FALSE(source.IsValidAC({.Frequency = -1.0}));
 }
 
+TEST_CASE("A source drives its AC magnitude only while it is an AC source", "[component]") {
+    Core::VoltageSource source;
+    source.SetAC({.Magnitude = 2.5});
+    // The magnitude is kept apart from the waveform, so a DC source sits at zero in a sweep
+    CHECK(source.GetACMagnitude() == 0.0);
+    source.SetSourceType(Core::VoltageSource::SourceType::PULSE);
+    CHECK(source.GetACMagnitude() == 0.0);
+    source.SetSourceType(Core::VoltageSource::SourceType::AC);
+    CHECK(source.GetACMagnitude() == 2.5);
+}
+
 TEST_CASE("Source type names convert both ways", "[component]") {
     for (const auto type : {Core::VoltageSource::SourceType::DC,
                             Core::VoltageSource::SourceType::AC,

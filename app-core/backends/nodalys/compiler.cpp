@@ -31,7 +31,6 @@
 #include "circuit/subcircuit.h"
 #include "spice/spice_value.h"
 #include <algorithm>
-#include <cmath>
 #include <format>
 #include <map>
 #include <set>
@@ -192,6 +191,115 @@ Parameters InstanceParameters(const SubcircuitInstance &instance, const Subcircu
     return values;
 }
 
+using ProbeNodes = std::map<int, std::map<int, int>>;
+
+/**
+ * @struct  CompileScope
+ * @brief   One circuit level being compiled: the top circuit or the body of one subcircuit instance.
+ */
+struct CompileScope {
+    /// The circuit whose entries are compiled, where the nets and the controlling currents are looked up.
+    const Circuit &Owner;
+    /// The node of the compiled circuit that each node of the owner stands for.
+    const std::vector<int> &NodeMap;
+    /// The value of each parameter the instance of this level passes; empty at the top.
+    const Parameters &Values;
+    /// Dotted name of the instance, empty at the top, which keeps the names of the devices apart between instances.
+    const std::string &Prefix;
+    /// entry_index -> terminal_index -> probe_node, the nodes that replace a terminal whose current is read.
+    ProbeNodes Probes;
+};
+
+/**
+ * @struct  EntryContext
+ * @brief   What every device of one entry needs, worked out once: the name, the nodes in the compiled circuit and the
+ *          value.
+ */
+struct EntryContext {
+    const Component &Part;
+    ComponentType Type;
+    std::string Name;
+    /// The compiled nodes of the terminals, with a probe node in place of each probed terminal.
+    std::vector<int> Nodes;
+    /// The value with its parameter references resolved; zero for a part that has none.
+    double Value = 0.0;
+};
+
+/**
+ * @brief   Tells whether a part is built from its value, which may be an expression of the parameters of its block.
+ */
+bool HasEffectiveValue(const ComponentType type) {
+    switch (type) {
+    case ComponentType::RESISTOR:
+    case ComponentType::CAPACITOR:
+    case ComponentType::INDUCTOR:
+    case ComponentType::VCC:
+    case ComponentType::POTENTIOMETER:
+    case ComponentType::VCVS:
+    case ComponentType::VCCS:
+    case ComponentType::CCCS:
+    case ComponentType::CCVS:
+        return true;
+    default:
+        return false;
+    }
+}
+
+/**
+ * @brief   Maps the type of a gate part to the gate of the engine.
+ */
+Nodalys::LogicGateType GetGateType(const ComponentType type) {
+    switch (type) {
+    case ComponentType::NAND:
+        return Nodalys::LogicGateType::NAND;
+    case ComponentType::OR:
+        return Nodalys::LogicGateType::OR;
+    case ComponentType::NOR:
+        return Nodalys::LogicGateType::NOR;
+    case ComponentType::XOR:
+        return Nodalys::LogicGateType::XOR;
+    case ComponentType::XNOR:
+        return Nodalys::LogicGateType::XNOR;
+    case ComponentType::AND:
+    default:
+        return Nodalys::LogicGateType::AND;
+    }
+}
+
+/**
+ * @brief   Works out the name, the nodes and the value of one entry of a scope.
+ */
+std::expected<EntryContext, std::string> ResolveEntry(const CompileScope &scope, const int entry_index) {
+    const CircuitEntry &entry = scope.Owner.GetEntries()[static_cast<std::size_t>(entry_index)];
+    const Component &part = *entry.Part;
+    EntryContext context{
+        .Part = part,
+        .Type = part.GetType(),
+        .Name = scope.Prefix.empty() ? part.GetName() : std::format("{}.{}", scope.Prefix, part.GetName()),
+        .Nodes = {},
+        .Value = 0.0,
+    };
+
+    context.Nodes.reserve(entry.Nodes.size());
+    for (const int local_node : entry.Nodes) {
+        context.Nodes.push_back(scope.NodeMap[static_cast<std::size_t>(local_node)]);
+    }
+    if (const auto probes = scope.Probes.find(entry_index); probes != scope.Probes.end()) {
+        for (const auto &[terminal, probe_node] : probes->second) {
+            context.Nodes[static_cast<std::size_t>(terminal)] = probe_node;
+        }
+    }
+
+    if (HasEffectiveValue(context.Type)) {
+        const auto value = EffectiveValue(part, scope.Values);
+        if (!value) {
+            return std::unexpected(value.error());
+        }
+        context.Value = *value;
+    }
+    return context;
+}
+
 class CircuitCompiler {
 public:
     explicit CircuitCompiler(const Circuit &circuit) : m_Circuit(circuit) {}
@@ -220,6 +328,11 @@ public:
     std::vector<std::string> TakeWarnings() { return std::move(m_Warnings); }
 
 private:
+    const Circuit &m_Circuit;
+    std::unique_ptr<Nodalys::CircuitBuilder> m_Builder;
+    std::vector<std::string> m_Warnings;
+
+    // Circuit levels
     /// Hands the engine the initial voltages and the nodesets of a circuit, at the nodes its node map gives.
     void AddNodeVoltages(const Circuit &circuit, const std::vector<int> &node_map) {
         for (const CircuitNodeVoltage &initial_voltage : circuit.GetInitialVoltages()) {
@@ -231,10 +344,247 @@ private:
         }
     }
 
-    const Circuit &m_Circuit;
-    std::unique_ptr<Nodalys::CircuitBuilder> m_Builder;
-    std::vector<std::string> m_Warnings;
+    std::expected<void, std::string> AddCircuit(const Circuit &circuit,
+                                                const std::vector<int> &node_map,
+                                                const Parameters &parameters,
+                                                const std::string &prefix = "") {
+        const auto probes = PlanProbes(circuit);
+        if (!probes) {
+            return std::unexpected(probes.error());
+        }
 
+        CompileScope scope{.Owner = circuit, .NodeMap = node_map, .Values = parameters, .Prefix = prefix, .Probes = {}};
+        for (const ProbeSpec &probe : *probes) {
+            const CircuitEntry &target = circuit.GetEntries()[static_cast<std::size_t>(probe.Entry)];
+            const int original_node =
+                node_map[static_cast<std::size_t>(target.Nodes[static_cast<std::size_t>(probe.Terminal)])];
+            const int probe_node = m_Builder->AddNode();
+            m_Builder->AddCurrentProbe(ProbeName(prefix, probe.Entry, probe.Terminal), original_node, probe_node);
+            scope.Probes[probe.Entry][probe.Terminal] = probe_node;
+        }
+
+        for (std::size_t index = 0; index < circuit.GetEntries().size(); ++index) {
+            if (const auto result = AddEntry(scope, static_cast<int>(index)); !result) {
+                return std::unexpected(result.error());
+            }
+        }
+        return {};
+    }
+
+    // Entries
+    std::expected<void, std::string> AddEntry(const CompileScope &scope, const int entry_index) {
+        const auto resolved = ResolveEntry(scope, entry_index);
+        if (!resolved) {
+            return std::unexpected(resolved.error());
+        }
+        const EntryContext &entry = *resolved;
+        const Component &part = entry.Part;
+        const std::string &name = entry.Name;
+        const std::vector<int> &nodes = entry.Nodes;
+
+        switch (entry.Type) {
+        case ComponentType::GROUND:
+        case ComponentType::NET_LABEL:
+        case ComponentType::INITIAL_VOLTAGE:
+        case ComponentType::NODESET:
+        case ComponentType::PIN:
+            return {};
+
+        case ComponentType::RESISTOR:
+            m_Builder->AddResistor(name, nodes[0], nodes[1], entry.Value);
+            return {};
+
+        case ComponentType::CAPACITOR:
+            m_Builder->AddCapacitor(name, nodes[0], nodes[1], entry.Value, part.GetInitialCondition().value_or(0.0));
+            return {};
+
+        case ComponentType::INDUCTOR:
+            m_Builder->AddInductor(name, nodes[0], nodes[1], entry.Value, part.GetInitialCondition().value_or(0.0));
+            return {};
+
+        case ComponentType::SWITCH:
+        case ComponentType::PUSH_BUTTON:
+            m_Builder->AddResistor(name, nodes[0], nodes[1], static_cast<const Switch &>(part).GetResistance());
+            return {};
+
+        case ComponentType::VCC:
+            m_Builder->AddVdc(name, nodes[0], 0, entry.Value);
+            return {};
+
+        case ComponentType::VOLTAGE_SOURCE:
+        case ComponentType::CURRENT_SOURCE:
+            AddSource(entry);
+            return {};
+
+        case ComponentType::CLOCK:
+            m_Builder->AddClock(name, nodes[0], 0, ToNodalys(static_cast<const Clock &>(part).GetParameters()));
+            return {};
+
+        case ComponentType::LOGIC_INPUT: {
+            const auto &input = static_cast<const LogicInput &>(part);
+            m_Builder->AddLogicInput(name, nodes[0], 0, input.IsHigh(), input.GetParameters().LogicLevel, 0.0);
+            return {};
+        }
+
+        case ComponentType::POTENTIOMETER:
+            m_Builder->AddPotentiometer(name,
+                                        nodes[0],
+                                        nodes[2],
+                                        nodes[1],
+                                        entry.Value,
+                                        static_cast<const Potentiometer &>(part).GetWiper());
+            return {};
+
+        case ComponentType::SUBCIRCUIT:
+            return AddSubcircuitInstance(entry, scope);
+
+        case ComponentType::DIODE:
+        case ComponentType::ZENER_DIODE:
+        case ComponentType::LED: {
+            const auto resolved_diode = ResolveParameters(m_Circuit, static_cast<const Diode &>(part));
+            if (!resolved_diode) {
+                return std::unexpected(resolved_diode.error());
+            }
+            m_Builder->AddDiode(name, nodes[0], nodes[1], ToNodalys(*resolved_diode));
+            return {};
+        }
+
+        case ComponentType::NPN:
+        case ComponentType::PNP: {
+            const auto resolved_bjt = ResolveParameters(m_Circuit, static_cast<const BJT &>(part));
+            if (!resolved_bjt) {
+                return std::unexpected(resolved_bjt.error());
+            }
+            m_Builder->AddBjt(name,
+                              nodes[0],
+                              nodes[1],
+                              nodes[2],
+                              entry.Type != ComponentType::PNP,
+                              ToNodalys(*resolved_bjt));
+            return {};
+        }
+
+        case ComponentType::NMOS:
+        case ComponentType::PMOS: {
+            const auto resolved_mosfet = ResolveParameters(m_Circuit, static_cast<const MOSFET &>(part));
+            if (!resolved_mosfet) {
+                return std::unexpected(resolved_mosfet.error());
+            }
+            const int body = nodes.size() > 3 ? nodes[3] : nodes[2];
+            m_Builder->AddMosfet(name,
+                                 nodes[0],
+                                 nodes[1],
+                                 nodes[2],
+                                 body,
+                                 entry.Type != ComponentType::PMOS,
+                                 ToNodalys(*resolved_mosfet));
+            return {};
+        }
+
+        case ComponentType::V_SWITCH:
+            m_Builder->AddVoltageControlledSwitch(
+                name,
+                nodes[0],
+                nodes[1],
+                nodes[2],
+                nodes[3],
+                ToNodalys(static_cast<const VoltageControlledSwitch &>(part).GetParameters()));
+            return {};
+
+        case ComponentType::FUSE:
+            m_Builder->AddFuse(name, nodes[0], nodes[1], ToNodalys(static_cast<const Fuse &>(part).GetParameters()));
+            return {};
+
+        case ComponentType::RELAY: {
+            const auto &relay = static_cast<const Relay &>(part);
+            const RelayParameters &figures = relay.GetParameters();
+            m_Builder->AddRelay(name,
+                                nodes[2],
+                                nodes[3],
+                                nodes[0],
+                                nodes[1],
+                                figures.CoilResistance,
+                                figures.CoilInductance,
+                                ToNodalys(relay.GetContactParameters()));
+            return {};
+        }
+
+        case ComponentType::TRANSFORMER: {
+            const auto &transformer = static_cast<const Transformer &>(part);
+            const TransformerParameters &figures = transformer.GetParameters();
+            m_Builder->AddTransformer(name,
+                                      nodes[0],
+                                      nodes[1],
+                                      nodes[2],
+                                      nodes[3],
+                                      transformer.GetValue(),
+                                      transformer.GetSecondaryInductance(),
+                                      figures.Coupling,
+                                      figures.WindingResistance);
+            return {};
+        }
+
+        case ComponentType::VCVS:
+        case ComponentType::VCCS:
+        case ComponentType::CCCS:
+        case ComponentType::CCVS:
+            return AddControlledSource(entry, scope);
+
+        case ComponentType::BEHAVIORAL_VOLTAGE:
+        case ComponentType::BEHAVIORAL_CURRENT:
+            return AddBehavioralSource(entry, scope);
+
+        case ComponentType::NOT:
+            m_Builder->AddInverter(name, nodes[1], nodes[0], MakeLogicParams(static_cast<const LogicPart &>(part)));
+            return {};
+
+        case ComponentType::BUFFER:
+            m_Builder->AddLogicBuffer(name, nodes[1], nodes[0], MakeLogicParams(static_cast<const LogicPart &>(part)));
+            return {};
+
+        case ComponentType::AND:
+        case ComponentType::NAND:
+        case ComponentType::OR:
+        case ComponentType::NOR:
+        case ComponentType::XOR:
+        case ComponentType::XNOR:
+            AddLogicGate(entry);
+            return {};
+
+        case ComponentType::D_FLIP_FLOP:
+            m_Builder->AddDFlipFlop(name,
+                                    nodes[4],
+                                    nodes[5],
+                                    nodes[0],
+                                    nodes[1],
+                                    MakeLogicParams(static_cast<const LogicPart &>(part)),
+                                    nodes[2],
+                                    nodes[3]);
+            return {};
+
+        case ComponentType::SR_FLIP_FLOP:
+            ExpandSrFlipFlop(entry);
+            return {};
+
+        case ComponentType::T_FLIP_FLOP:
+            ExpandTFlipFlop(entry);
+            return {};
+
+        case ComponentType::JK_FLIP_FLOP:
+            ExpandJkFlipFlop(entry);
+            return {};
+
+        case ComponentType::OP_AMP:
+            AddOpAmp(entry);
+            return {};
+
+        default:
+            return std::unexpected(
+                std::format("Nodalys has no device for {} (a {} part) yet", part.GetName(), GetTypeName(entry.Type)));
+        }
+    }
+
+    // Blocks
     /**
      * @brief   Hands a block kept as SPICE text to the engine, which reads it as an instance of its own.
      */
@@ -254,545 +604,272 @@ private:
         return {};
     }
 
-    std::expected<void, std::string> AddCircuit(const Circuit &circuit,
-                                                const std::vector<int> &node_map,
-                                                const Parameters &parameters,
-                                                const std::string &prefix = "") {
-        const auto probes = PlanProbes(circuit);
-        if (!probes) {
-            return std::unexpected(probes.error());
+    /**
+     * @brief   Compiles the body of a block into the circuit, with the pins on the nodes of the instance and a fresh
+     *          node for every other node the body uses; a block kept as SPICE text goes to the engine as it is.
+     */
+    std::expected<void, std::string> AddSubcircuitInstance(const EntryContext &entry, const CompileScope &scope) {
+        const auto &instance = static_cast<const SubcircuitInstance &>(entry.Part);
+        const std::shared_ptr<const SubcircuitDefinition> definition =
+            m_Circuit.FindSubcircuit(instance.GetDefinitionName());
+        if (!definition) {
+            return std::unexpected(std::format("The subcircuit {} is not defined", instance.GetDefinitionName()));
         }
-
-        // entry_index -> terminal_index -> probe_node
-        std::map<int, std::map<int, int>> probe_nodes;
-        for (const ProbeSpec &probe : *probes) {
-            const CircuitEntry &target = circuit.GetEntries()[static_cast<std::size_t>(probe.Entry)];
-            const int original_node =
-                node_map[static_cast<std::size_t>(target.Nodes[static_cast<std::size_t>(probe.Terminal)])];
-            const int probe_node = m_Builder->AddNode();
-            m_Builder->AddCurrentProbe(ProbeName(prefix, probe.Entry, probe.Terminal), original_node, probe_node);
-            probe_nodes[probe.Entry][probe.Terminal] = probe_node;
+        const std::string sub_prefix =
+            scope.Prefix.empty() ? instance.GetName() : std::format("{}.{}", scope.Prefix, instance.GetName());
+        if (definition->Spice) {
+            return AddSpiceBlock(*definition, *definition->Spice, instance, entry.Nodes, sub_prefix);
         }
-
-        for (std::size_t index = 0; index < circuit.GetEntries().size(); ++index) {
-            if (const auto result = AddEntry(circuit.GetEntries()[index],
-                                             circuit,
-                                             static_cast<int>(index),
-                                             node_map,
-                                             parameters,
-                                             probe_nodes,
-                                             prefix);
-                !result) {
-                return std::unexpected(result.error());
+        const std::set<int> used = UsedNodes(definition->Body);
+        std::vector<int> body_map(static_cast<std::size_t>(definition->Body.GetNodeCount()), 0);
+        for (std::size_t pin = 0; pin < definition->Pins.size() && pin < entry.Nodes.size(); ++pin) {
+            body_map[static_cast<std::size_t>(definition->Pins[pin].Node)] = entry.Nodes[pin];
+        }
+        for (const int body_node : used) {
+            if (body_map[static_cast<std::size_t>(body_node)] == 0
+                && std::ranges::none_of(definition->Pins,
+                                        [body_node](const SubcircuitPin &p) { return p.Node == body_node; })) {
+                body_map[static_cast<std::size_t>(body_node)] = m_Builder->AddNode();
             }
+        }
+        // A marker in the body acts on this instance's own node, or on the outer node when it sits on a pin
+        AddNodeVoltages(definition->Body, body_map);
+        return AddCircuit(definition->Body, body_map, InstanceParameters(instance, *definition), sub_prefix);
+    }
+
+    // Sources
+    /**
+     * @brief   Adds a voltage or a current source of any waveform; the two kinds differ only in the builder method.
+     */
+    void AddSource(const EntryContext &entry) {
+        const auto &source = static_cast<const Source &>(entry.Part);
+        const bool is_voltage = entry.Type == ComponentType::VOLTAGE_SOURCE;
+        const std::string &name = entry.Name;
+        const int positive = entry.Nodes[0];
+        const int negative = entry.Nodes[1];
+        const double ac_magnitude = source.GetACMagnitude();
+        switch (source.GetSourceType()) {
+        case Source::SourceType::DC:
+            if (is_voltage) {
+                m_Builder->AddVdc(name, positive, negative, source.GetValue(), ac_magnitude);
+            } else {
+                m_Builder->AddIdc(name, positive, negative, source.GetValue(), ac_magnitude);
+            }
+            break;
+        case Source::SourceType::AC:
+            if (is_voltage) {
+                m_Builder->AddVsine(name, positive, negative, ToNodalys(source.GetAC()), ac_magnitude);
+            } else {
+                m_Builder->AddIsine(name, positive, negative, ToNodalys(source.GetAC()), ac_magnitude);
+            }
+            break;
+        case Source::SourceType::PULSE:
+            if (is_voltage) {
+                m_Builder->AddVpulse(name, positive, negative, ToNodalys(source.GetPulse()), ac_magnitude);
+            } else {
+                m_Builder->AddIpulse(name, positive, negative, ToNodalys(source.GetPulse()), ac_magnitude);
+            }
+            break;
+        case Source::SourceType::EXP:
+            if (is_voltage) {
+                m_Builder->AddVexp(name, positive, negative, ToNodalys(source.GetEXP()), ac_magnitude);
+            } else {
+                m_Builder->AddIexp(name, positive, negative, ToNodalys(source.GetEXP()), ac_magnitude);
+            }
+            break;
+        case Source::SourceType::PWL:
+            if (is_voltage) {
+                m_Builder->AddVpwl(name, positive, negative, ToNodalys(source.GetPWL()), ac_magnitude);
+            } else {
+                m_Builder->AddIpwl(name, positive, negative, ToNodalys(source.GetPWL()), ac_magnitude);
+            }
+            break;
+        case Source::SourceType::SFFM:
+            if (is_voltage) {
+                m_Builder->AddVsffm(name, positive, negative, ToNodalys(source.GetSFFM()), ac_magnitude);
+            } else {
+                m_Builder->AddIsffm(name, positive, negative, ToNodalys(source.GetSFFM()), ac_magnitude);
+            }
+            break;
+        case Source::SourceType::AM:
+            if (is_voltage) {
+                m_Builder->AddVam(name, positive, negative, ToNodalys(source.GetAM()), ac_magnitude);
+            } else {
+                m_Builder->AddIam(name, positive, negative, ToNodalys(source.GetAM()), ac_magnitude);
+            }
+            break;
+        case Source::SourceType::NOISE:
+            if (is_voltage) {
+                m_Builder->AddVnoise(name, positive, negative, ToNodalys(source.GetNoise()), ac_magnitude);
+            } else {
+                m_Builder->AddInoise(name, positive, negative, ToNodalys(source.GetNoise()), ac_magnitude);
+            }
+            break;
+        case Source::SourceType::RANDOM:
+        default:
+            if (is_voltage) {
+                m_Builder->AddVrandom(name, positive, negative, ToNodalys(source.GetRandom()), ac_magnitude);
+            } else {
+                m_Builder->AddIrandom(name, positive, negative, ToNodalys(source.GetRandom()), ac_magnitude);
+            }
+            break;
+        }
+    }
+
+    /**
+     * @brief   Adds a source controlled by a voltage or by a current; the current ones read the probe planned for the
+     *          controlling current.
+     */
+    std::expected<void, std::string> AddControlledSource(const EntryContext &entry, const CompileScope &scope) {
+        const std::vector<int> &nodes = entry.Nodes;
+        switch (entry.Type) {
+        case ComponentType::VCVS:
+            m_Builder->AddVcvs(entry.Name, nodes[0], nodes[1], nodes[2], nodes[3], entry.Value);
+            break;
+        case ComponentType::VCCS:
+            m_Builder->AddVccs(entry.Name, nodes[0], nodes[1], nodes[2], nodes[3], entry.Value);
+            break;
+        case ComponentType::CCCS:
+        case ComponentType::CCVS: {
+            const auto &source = static_cast<const ControlledSource &>(entry.Part);
+            const auto target = FindControllingCurrent(scope.Owner, source.GetControllingCurrent());
+            if (!target) {
+                return std::unexpected(target.error());
+            }
+            const std::string probe_name = ProbeName(scope.Prefix, target->Entry, target->Terminal);
+            if (entry.Type == ComponentType::CCCS) {
+                m_Builder->AddCccs(entry.Name, nodes[0], nodes[1], probe_name, entry.Value);
+            } else {
+                m_Builder->AddCcvs(entry.Name, nodes[0], nodes[1], probe_name, entry.Value);
+            }
+            break;
+        }
+        default:
+            break;
         }
         return {};
     }
 
-    std::expected<void, std::string> AddEntry(const CircuitEntry &entry,
-                                              const Circuit &owner,
-                                              const int entry_index,
-                                              const std::vector<int> &node_map,
-                                              const Parameters &parameters,
-                                              const std::map<int, std::map<int, int>> &probe_map,
-                                              const std::string &prefix = "") {
-        const Component &part = *entry.Part;
-        const ComponentType type = part.GetType();
-        const std::string name = prefix.empty() ? part.GetName() : std::format("{}.{}", prefix, part.GetName());
-
-        std::vector<int> nodes;
-        nodes.reserve(entry.Nodes.size());
-        for (const int local_node : entry.Nodes) {
-            nodes.push_back(node_map[static_cast<std::size_t>(local_node)]);
+    /**
+     * @brief   Adds a behavioral source, with the nets of its expression turned into nodes and the currents it reads
+     *          into the probes planned for them, so the engine gets an expression of plain node numbers and source
+     *          names.
+     */
+    std::expected<void, std::string> AddBehavioralSource(const EntryContext &entry, const CompileScope &scope) {
+        const auto expression = TranslateBehavioralExpression(
+            static_cast<const BehavioralSource &>(entry.Part).GetExpression(),
+            [&scope](const std::string_view net) -> std::optional<int> {
+                const std::optional<int> node = scope.Owner.FindNodeOfNet(net);
+                return node ? std::optional<int>(scope.NodeMap[static_cast<std::size_t>(*node)]) : std::nullopt;
+            },
+            [&scope](const std::string_view current) -> std::optional<std::string> {
+                const auto target = FindControllingCurrent(scope.Owner, std::string(current));
+                return target ? std::optional<std::string>(ProbeName(scope.Prefix, target->Entry, target->Terminal))
+                              : std::nullopt;
+            });
+        if (!expression) {
+            return std::unexpected(std::format("{}: {}", entry.Name, expression.error()));
         }
-
-        if (const auto probes = probe_map.find(entry_index); probes != probe_map.end()) {
-            for (const auto &[terminal, probe_node] : probes->second) {
-                nodes[static_cast<std::size_t>(terminal)] = probe_node;
-            }
+        if (entry.Type == ComponentType::BEHAVIORAL_VOLTAGE) {
+            m_Builder->AddBehavioralVoltage(entry.Name, entry.Nodes[0], entry.Nodes[1], *expression);
+        } else {
+            m_Builder->AddBehavioralCurrent(entry.Name, entry.Nodes[0], entry.Nodes[1], *expression);
         }
+        return {};
+    }
 
-        switch (type) {
-        case ComponentType::GROUND:
-        case ComponentType::NET_LABEL:
-        case ComponentType::INITIAL_VOLTAGE:
-        case ComponentType::NODESET:
-        case ComponentType::PIN:
-            return {};
+    // Logic
+    void AddLogicGate(const EntryContext &entry) {
+        const auto &logic = static_cast<const LogicPart &>(entry.Part);
+        const std::size_t input_count = static_cast<std::size_t>(logic.GetInputCount());
+        const std::vector<Nodalys::NodeId> inputs(entry.Nodes.begin(),
+                                                  entry.Nodes.begin() + static_cast<std::ptrdiff_t>(input_count));
+        m_Builder->AddLogicGate(entry.Name,
+                                GetGateType(entry.Type),
+                                entry.Nodes[input_count],
+                                inputs,
+                                MakeLogicParams(logic));
+    }
 
-        case ComponentType::RESISTOR: {
-            const auto value = EffectiveValue(part, parameters);
-            if (!value) {
-                return std::unexpected(value.error());
-            }
-            m_Builder->AddResistor(name, nodes[0], nodes[1], *value);
-            return {};
-        }
+    /**
+     * @brief   Builds a set-reset flip-flop from a D flip-flop, whose D input is S OR (NOT R AND Q).
+     */
+    void ExpandSrFlipFlop(const EntryContext &entry) {
+        const std::vector<int> &nodes = entry.Nodes;
+        const Nodalys::SmoothLogicParameters params = MakeLogicParams(static_cast<const LogicPart &>(entry.Part));
+        const int node_not_r = m_Builder->AddNode();
+        const int node_and = m_Builder->AddNode();
+        const int node_d = m_Builder->AddNode();
+        m_Builder->AddInverter(entry.Name + ".NOT_R", node_not_r, nodes[1], params);
+        m_Builder->AddLogicGate(entry.Name + ".AND",
+                                Nodalys::LogicGateType::AND,
+                                node_and,
+                                {node_not_r, nodes[5]},
+                                params);
+        m_Builder->AddLogicGate(entry.Name + ".OR", Nodalys::LogicGateType::OR, node_d, {nodes[0], node_and}, params);
+        m_Builder->AddDFlipFlop(entry.Name, nodes[5], nodes[6], node_d, nodes[2], params, nodes[3], nodes[4]);
+    }
 
-        case ComponentType::CAPACITOR: {
-            const auto value = EffectiveValue(part, parameters);
-            if (!value) {
-                return std::unexpected(value.error());
-            }
-            const std::optional<double> initial = part.GetInitialCondition();
-            m_Builder->AddCapacitor(name, nodes[0], nodes[1], *value, initial.value_or(0.0));
-            return {};
-        }
+    /**
+     * @brief   Builds a toggle flip-flop from a D flip-flop, whose D input is T XOR Q.
+     */
+    void ExpandTFlipFlop(const EntryContext &entry) {
+        const std::vector<int> &nodes = entry.Nodes;
+        const Nodalys::SmoothLogicParameters params = MakeLogicParams(static_cast<const LogicPart &>(entry.Part));
+        const int internal_d = m_Builder->AddNode();
+        m_Builder->AddLogicGate(entry.Name + ".XOR",
+                                Nodalys::LogicGateType::XOR,
+                                internal_d,
+                                {nodes[0], nodes[4]},
+                                params);
+        m_Builder->AddDFlipFlop(entry.Name, nodes[4], nodes[5], internal_d, nodes[1], params, nodes[2], nodes[3]);
+    }
 
-        case ComponentType::INDUCTOR: {
-            const auto value = EffectiveValue(part, parameters);
-            if (!value) {
-                return std::unexpected(value.error());
-            }
-            const std::optional<double> initial = part.GetInitialCondition();
-            m_Builder->AddInductor(name, nodes[0], nodes[1], *value, initial.value_or(0.0));
-            return {};
-        }
+    /**
+     * @brief   Builds a JK flip-flop from a D flip-flop, whose D input is (J AND NOT Q) OR (NOT K AND Q).
+     */
+    void ExpandJkFlipFlop(const EntryContext &entry) {
+        const std::vector<int> &nodes = entry.Nodes;
+        const Nodalys::SmoothLogicParameters params = MakeLogicParams(static_cast<const LogicPart &>(entry.Part));
+        const int node_not_k = m_Builder->AddNode();
+        const int node_and1 = m_Builder->AddNode();
+        const int node_and2 = m_Builder->AddNode();
+        const int node_d = m_Builder->AddNode();
+        m_Builder->AddInverter(entry.Name + ".NOT_K", node_not_k, nodes[1], params);
+        m_Builder->AddLogicGate(entry.Name + ".AND1",
+                                Nodalys::LogicGateType::AND,
+                                node_and1,
+                                {nodes[0], nodes[6]},
+                                params);
+        m_Builder->AddLogicGate(entry.Name + ".AND2",
+                                Nodalys::LogicGateType::AND,
+                                node_and2,
+                                {node_not_k, nodes[5]},
+                                params);
+        m_Builder->AddLogicGate(entry.Name + ".OR", Nodalys::LogicGateType::OR, node_d, {node_and1, node_and2}, params);
+        m_Builder->AddDFlipFlop(entry.Name, nodes[5], nodes[6], node_d, nodes[2], params, nodes[3], nodes[4]);
+    }
 
-        case ComponentType::SWITCH:
-        case ComponentType::PUSH_BUTTON: {
-            const auto &contact = static_cast<const Switch &>(part);
-            m_Builder->AddResistor(name, nodes[0], nodes[1], contact.GetResistance());
-            return {};
-        }
-
-        case ComponentType::VCC: {
-            const auto value = EffectiveValue(part, parameters);
-            if (!value) {
-                return std::unexpected(value.error());
-            }
-            m_Builder->AddVdc(name, nodes[0], 0, *value);
-            return {};
-        }
-
-        case ComponentType::VOLTAGE_SOURCE: {
-            const auto &source = static_cast<const Source &>(part);
-            const double ac_magnitude =
-                source.GetSourceType() == Source::SourceType::AC ? source.GetAC().Magnitude : 0.0;
-            switch (source.GetSourceType()) {
-            case Source::SourceType::DC:
-                m_Builder->AddVdc(name, nodes[0], nodes[1], source.GetValue(), ac_magnitude);
-                break;
-            case Source::SourceType::AC:
-                m_Builder->AddVsine(name, nodes[0], nodes[1], ToNodalys(source.GetAC()), ac_magnitude);
-                break;
-            case Source::SourceType::PULSE:
-                m_Builder->AddVpulse(name, nodes[0], nodes[1], ToNodalys(source.GetPulse()), ac_magnitude);
-                break;
-            case Source::SourceType::EXP:
-                m_Builder->AddVexp(name, nodes[0], nodes[1], ToNodalys(source.GetEXP()), ac_magnitude);
-                break;
-            case Source::SourceType::PWL:
-                m_Builder->AddVpwl(name, nodes[0], nodes[1], ToNodalys(source.GetPWL()), ac_magnitude);
-                break;
-            case Source::SourceType::SFFM:
-                m_Builder->AddVsffm(name, nodes[0], nodes[1], ToNodalys(source.GetSFFM()), ac_magnitude);
-                break;
-            case Source::SourceType::AM:
-                m_Builder->AddVam(name, nodes[0], nodes[1], ToNodalys(source.GetAM()), ac_magnitude);
-                break;
-            case Source::SourceType::NOISE:
-                m_Builder->AddVnoise(name, nodes[0], nodes[1], ToNodalys(source.GetNoise()), ac_magnitude);
-                break;
-            case Source::SourceType::RANDOM:
-            default:
-                m_Builder->AddVrandom(name, nodes[0], nodes[1], ToNodalys(source.GetRandom()), ac_magnitude);
-                break;
-            }
-            return {};
-        }
-
-        case ComponentType::CURRENT_SOURCE: {
-            const auto &source = static_cast<const Source &>(part);
-            const double ac_magnitude =
-                source.GetSourceType() == Source::SourceType::AC ? source.GetAC().Magnitude : 0.0;
-            switch (source.GetSourceType()) {
-            case Source::SourceType::DC:
-                m_Builder->AddIdc(name, nodes[0], nodes[1], source.GetValue(), ac_magnitude);
-                break;
-            case Source::SourceType::AC:
-                m_Builder->AddIsine(name, nodes[0], nodes[1], ToNodalys(source.GetAC()), ac_magnitude);
-                break;
-            case Source::SourceType::PULSE:
-                m_Builder->AddIpulse(name, nodes[0], nodes[1], ToNodalys(source.GetPulse()), ac_magnitude);
-                break;
-            case Source::SourceType::EXP:
-                m_Builder->AddIexp(name, nodes[0], nodes[1], ToNodalys(source.GetEXP()), ac_magnitude);
-                break;
-            case Source::SourceType::PWL:
-                m_Builder->AddIpwl(name, nodes[0], nodes[1], ToNodalys(source.GetPWL()), ac_magnitude);
-                break;
-            case Source::SourceType::SFFM:
-                m_Builder->AddIsffm(name, nodes[0], nodes[1], ToNodalys(source.GetSFFM()), ac_magnitude);
-                break;
-            case Source::SourceType::AM:
-                m_Builder->AddIam(name, nodes[0], nodes[1], ToNodalys(source.GetAM()), ac_magnitude);
-                break;
-            case Source::SourceType::NOISE:
-                m_Builder->AddInoise(name, nodes[0], nodes[1], ToNodalys(source.GetNoise()), ac_magnitude);
-                break;
-            case Source::SourceType::RANDOM:
-            default:
-                m_Builder->AddIrandom(name, nodes[0], nodes[1], ToNodalys(source.GetRandom()), ac_magnitude);
-                break;
-            }
-            return {};
-        }
-
-        case ComponentType::CLOCK: {
-            const auto &clock = static_cast<const Clock &>(part);
-            m_Builder->AddClock(name, nodes[0], 0, ToNodalys(clock.GetParameters()));
-            return {};
-        }
-
-        case ComponentType::LOGIC_INPUT: {
-            const auto &input = static_cast<const LogicInput &>(part);
-            m_Builder->AddLogicInput(name, nodes[0], 0, input.IsHigh(), input.GetParameters().LogicLevel, 0.0);
-            return {};
-        }
-
-        case ComponentType::POTENTIOMETER: {
-            const auto &pot = static_cast<const Potentiometer &>(part);
-            const auto value = EffectiveValue(part, parameters);
-            if (!value) {
-                return std::unexpected(value.error());
-            }
-            m_Builder->AddPotentiometer(name, nodes[0], nodes[2], nodes[1], *value, pot.GetWiper());
-            return {};
-        }
-
-        case ComponentType::SUBCIRCUIT: {
-            const auto &instance = static_cast<const SubcircuitInstance &>(part);
-            const std::shared_ptr<const SubcircuitDefinition> definition =
-                m_Circuit.FindSubcircuit(instance.GetDefinitionName());
-            if (!definition) {
-                return std::unexpected(std::format("The subcircuit {} is not defined", instance.GetDefinitionName()));
-            }
-            const std::string sub_prefix =
-                prefix.empty() ? instance.GetName() : std::format("{}.{}", prefix, instance.GetName());
-            if (definition->Spice) {
-                return AddSpiceBlock(*definition, *definition->Spice, instance, nodes, sub_prefix);
-            }
-            const std::set<int> used = UsedNodes(definition->Body);
-            std::vector<int> body_map(static_cast<std::size_t>(definition->Body.GetNodeCount()), 0);
-            for (std::size_t pin = 0; pin < definition->Pins.size() && pin < nodes.size(); ++pin) {
-                body_map[static_cast<std::size_t>(definition->Pins[pin].Node)] = nodes[pin];
-            }
-            for (const int body_node : used) {
-                if (body_map[static_cast<std::size_t>(body_node)] == 0
-                    && std::ranges::none_of(definition->Pins,
-                                            [body_node](const SubcircuitPin &p) { return p.Node == body_node; })) {
-                    body_map[static_cast<std::size_t>(body_node)] = m_Builder->AddNode();
-                }
-            }
-            // A marker in the body acts on this instance's own node, or on the outer node when it sits on a pin
-            AddNodeVoltages(definition->Body, body_map);
-            return AddCircuit(definition->Body, body_map, InstanceParameters(instance, *definition), sub_prefix);
-        }
-
-        case ComponentType::DIODE:
-        case ComponentType::ZENER_DIODE:
-        case ComponentType::LED: {
-            const auto &diode = static_cast<const Diode &>(part);
-            const auto resolved = ResolveParameters(m_Circuit, diode);
-            if (!resolved) {
-                return std::unexpected(resolved.error());
-            }
-            m_Builder->AddDiode(name, nodes[0], nodes[1], ToNodalys(*resolved));
-            return {};
-        }
-
-        case ComponentType::NPN:
-        case ComponentType::PNP: {
-            const auto &bjt = static_cast<const BJT &>(part);
-            const auto resolved = ResolveParameters(m_Circuit, bjt);
-            if (!resolved) {
-                return std::unexpected(resolved.error());
-            }
-            m_Builder->AddBjt(name, nodes[0], nodes[1], nodes[2], type != ComponentType::PNP, ToNodalys(*resolved));
-            return {};
-        }
-
-        case ComponentType::NMOS:
-        case ComponentType::PMOS: {
-            const auto &mosfet = static_cast<const MOSFET &>(part);
-            const auto resolved = ResolveParameters(m_Circuit, mosfet);
-            if (!resolved) {
-                return std::unexpected(resolved.error());
-            }
-            const int body = nodes.size() > 3 ? nodes[3] : nodes[2];
-            m_Builder->AddMosfet(name,
-                                 nodes[0],
-                                 nodes[1],
-                                 nodes[2],
-                                 body,
-                                 type != ComponentType::PMOS,
-                                 ToNodalys(*resolved));
-            return {};
-        }
-
-        case ComponentType::V_SWITCH: {
-            const auto &controlled = static_cast<const VoltageControlledSwitch &>(part);
-            m_Builder->AddVoltageControlledSwitch(name,
-                                                  nodes[0],
-                                                  nodes[1],
-                                                  nodes[2],
-                                                  nodes[3],
-                                                  ToNodalys(controlled.GetParameters()));
-            return {};
-        }
-
-        case ComponentType::FUSE: {
-            m_Builder->AddFuse(name, nodes[0], nodes[1], ToNodalys(static_cast<const Fuse &>(part).GetParameters()));
-            return {};
-        }
-
-        case ComponentType::RELAY: {
-            const auto &relay = static_cast<const Relay &>(part);
-            const RelayParameters &figures = relay.GetParameters();
-            m_Builder->AddRelay(name,
-                                nodes[2],
-                                nodes[3],
-                                nodes[0],
-                                nodes[1],
-                                figures.CoilResistance,
-                                figures.CoilInductance,
-                                ToNodalys(relay.GetContactParameters()));
-            return {};
-        }
-
-        case ComponentType::TRANSFORMER: {
-            const auto &transformer = static_cast<const Transformer &>(part);
-            const TransformerParameters &figures = transformer.GetParameters();
-            const double l1 = transformer.GetValue();
-            const double l2 = transformer.GetSecondaryInductance();
-            m_Builder->AddTransformer(name,
-                                      nodes[0],
-                                      nodes[1],
-                                      nodes[2],
-                                      nodes[3],
-                                      l1,
-                                      l2,
-                                      figures.Coupling,
-                                      figures.WindingResistance);
-            return {};
-        }
-
-        case ComponentType::VCVS:
-        case ComponentType::VCCS:
-        case ComponentType::CCCS:
-        case ComponentType::CCVS: {
-            const auto value = EffectiveValue(part, parameters);
-            if (!value) {
-                return std::unexpected(value.error());
-            }
-            const auto &source = static_cast<const ControlledSource &>(part);
-            switch (type) {
-            case ComponentType::VCVS:
-                m_Builder->AddVcvs(name, nodes[0], nodes[1], nodes[2], nodes[3], *value);
-                break;
-            case ComponentType::VCCS:
-                m_Builder->AddVccs(name, nodes[0], nodes[1], nodes[2], nodes[3], *value);
-                break;
-            case ComponentType::CCCS:
-            case ComponentType::CCVS: {
-                const auto target = FindControllingCurrent(owner, source.GetControllingCurrent());
-                if (!target) {
-                    return std::unexpected(target.error());
-                }
-                const std::string probe_name = ProbeName(prefix, target->Entry, target->Terminal);
-                if (type == ComponentType::CCCS) {
-                    m_Builder->AddCccs(name, nodes[0], nodes[1], probe_name, *value);
-                } else {
-                    m_Builder->AddCcvs(name, nodes[0], nodes[1], probe_name, *value);
-                }
-                break;
-            }
-            default:
-                break;
-            }
-            return {};
-        }
-
-        case ComponentType::BEHAVIORAL_VOLTAGE:
-        case ComponentType::BEHAVIORAL_CURRENT: {
-            // The nets of the expression become the nodes of the compiled circuit, and the currents it reads the
-            // probes planned for them, so the engine gets an expression of plain node numbers and source names
-            const auto expression = TranslateBehavioralExpression(
-                static_cast<const BehavioralSource &>(part).GetExpression(),
-                [&owner, &node_map](const std::string_view net) -> std::optional<int> {
-                    const std::optional<int> node = owner.FindNodeOfNet(net);
-                    return node ? std::optional<int>(node_map[static_cast<std::size_t>(*node)]) : std::nullopt;
-                },
-                [&owner, &prefix](const std::string_view current) -> std::optional<std::string> {
-                    const auto target = FindControllingCurrent(owner, std::string(current));
-                    return target ? std::optional<std::string>(ProbeName(prefix, target->Entry, target->Terminal))
-                                  : std::nullopt;
-                });
-            if (!expression) {
-                return std::unexpected(std::format("{}: {}", name, expression.error()));
-            }
-            if (type == ComponentType::BEHAVIORAL_VOLTAGE) {
-                m_Builder->AddBehavioralVoltage(name, nodes[0], nodes[1], *expression);
-            } else {
-                m_Builder->AddBehavioralCurrent(name, nodes[0], nodes[1], *expression);
-            }
-            return {};
-        }
-
-        case ComponentType::NOT: {
-            const auto &logic = static_cast<const LogicPart &>(part);
-            m_Builder->AddInverter(name, nodes[1], nodes[0], MakeLogicParams(logic));
-            return {};
-        }
-
-        case ComponentType::BUFFER: {
-            const auto &logic = static_cast<const LogicPart &>(part);
-            m_Builder->AddLogicBuffer(name, nodes[1], nodes[0], MakeLogicParams(logic));
-            return {};
-        }
-
-        case ComponentType::AND:
-        case ComponentType::NAND:
-        case ComponentType::OR:
-        case ComponentType::NOR:
-        case ComponentType::XOR:
-        case ComponentType::XNOR: {
-            const auto &logic = static_cast<const LogicPart &>(part);
-            const int input_count = logic.GetInputCount();
-            std::vector<Nodalys::NodeId> inputs;
-            inputs.reserve(static_cast<std::size_t>(input_count));
-            for (int i = 0; i < input_count; ++i) {
-                inputs.push_back(nodes[static_cast<std::size_t>(i)]);
-            }
-            const int out_node = nodes[static_cast<std::size_t>(input_count)];
-            Nodalys::LogicGateType gate_type = Nodalys::LogicGateType::AND;
-            switch (type) {
-            case ComponentType::AND:
-                gate_type = Nodalys::LogicGateType::AND;
-                break;
-            case ComponentType::NAND:
-                gate_type = Nodalys::LogicGateType::NAND;
-                break;
-            case ComponentType::OR:
-                gate_type = Nodalys::LogicGateType::OR;
-                break;
-            case ComponentType::NOR:
-                gate_type = Nodalys::LogicGateType::NOR;
-                break;
-            case ComponentType::XOR:
-                gate_type = Nodalys::LogicGateType::XOR;
-                break;
-            case ComponentType::XNOR:
-                gate_type = Nodalys::LogicGateType::XNOR;
-                break;
-            default:
-                break;
-            }
-            m_Builder->AddLogicGate(name, gate_type, out_node, std::move(inputs), MakeLogicParams(logic));
-            return {};
-        }
-
-        case ComponentType::D_FLIP_FLOP: {
-            const auto &logic = static_cast<const LogicPart &>(part);
-            m_Builder->AddDFlipFlop(name,
-                                    nodes[4],
-                                    nodes[5],
-                                    nodes[0],
-                                    nodes[1],
-                                    MakeLogicParams(logic),
-                                    nodes[2],
-                                    nodes[3]);
-            return {};
-        }
-
-        case ComponentType::SR_FLIP_FLOP: {
-            const auto &logic = static_cast<const LogicPart &>(part);
-            const int node_not_r = m_Builder->AddNode();
-            const int node_and = m_Builder->AddNode();
-            const int node_d = m_Builder->AddNode();
-            m_Builder->AddInverter(name + ".NOT_R", node_not_r, nodes[1], MakeLogicParams(logic));
-            m_Builder->AddLogicGate(name + ".AND",
-                                    Nodalys::LogicGateType::AND,
-                                    node_and,
-                                    {node_not_r, nodes[5]},
-                                    MakeLogicParams(logic));
-            m_Builder->AddLogicGate(name + ".OR",
-                                    Nodalys::LogicGateType::OR,
-                                    node_d,
-                                    {nodes[0], node_and},
-                                    MakeLogicParams(logic));
-            m_Builder
-                ->AddDFlipFlop(name, nodes[5], nodes[6], node_d, nodes[2], MakeLogicParams(logic), nodes[3], nodes[4]);
-            return {};
-        }
-
-        case ComponentType::T_FLIP_FLOP: {
-            const auto &logic = static_cast<const LogicPart &>(part);
-            const int internal_d = m_Builder->AddNode();
-            m_Builder->AddLogicGate(name + ".XOR",
-                                    Nodalys::LogicGateType::XOR,
-                                    internal_d,
-                                    {nodes[0], nodes[4]},
-                                    MakeLogicParams(logic));
-            m_Builder->AddDFlipFlop(name,
-                                    nodes[4],
-                                    nodes[5],
-                                    internal_d,
-                                    nodes[1],
-                                    MakeLogicParams(logic),
-                                    nodes[2],
-                                    nodes[3]);
-            return {};
-        }
-
-        case ComponentType::JK_FLIP_FLOP: {
-            const auto &logic = static_cast<const LogicPart &>(part);
-            const int node_not_k = m_Builder->AddNode();
-            const int node_and1 = m_Builder->AddNode();
-            const int node_and2 = m_Builder->AddNode();
-            const int node_d = m_Builder->AddNode();
-            m_Builder->AddInverter(name + ".NOT_K", node_not_k, nodes[1], MakeLogicParams(logic));
-            m_Builder->AddLogicGate(name + ".AND1",
-                                    Nodalys::LogicGateType::AND,
-                                    node_and1,
-                                    {nodes[0], nodes[6]},
-                                    MakeLogicParams(logic));
-            m_Builder->AddLogicGate(name + ".AND2",
-                                    Nodalys::LogicGateType::AND,
-                                    node_and2,
-                                    {node_not_k, nodes[5]},
-                                    MakeLogicParams(logic));
-            m_Builder->AddLogicGate(name + ".OR",
-                                    Nodalys::LogicGateType::OR,
-                                    node_d,
-                                    {node_and1, node_and2},
-                                    MakeLogicParams(logic));
-            m_Builder
-                ->AddDFlipFlop(name, nodes[5], nodes[6], node_d, nodes[2], MakeLogicParams(logic), nodes[3], nodes[4]);
-            return {};
-        }
-
-        case ComponentType::OP_AMP: {
-            const auto &op_amp = static_cast<const OpAmp &>(part);
-            if (op_amp.IsIdeal()) {
-                m_Builder
-                    ->AddIdealOpAmp(name, nodes[0], nodes[1], nodes[2], nodes[3], nodes[4], op_amp.GetIdealBandwidth());
-            } else {
-                m_Builder->AddBoyleOpAmp(name,
-                                         nodes[0],
-                                         nodes[1],
-                                         nodes[2],
-                                         nodes[3],
-                                         nodes[4],
-                                         MakeBoyleParams(op_amp.GetParameters()));
-            }
-            return {};
-        }
-
-        default:
-            return std::unexpected(
-                std::format("Nodalys has no device for {} (a {} part) yet", part.GetName(), GetTypeName(type)));
+    // Amplifiers
+    void AddOpAmp(const EntryContext &entry) {
+        const std::vector<int> &nodes = entry.Nodes;
+        const auto &op_amp = static_cast<const OpAmp &>(entry.Part);
+        if (op_amp.IsIdeal()) {
+            m_Builder->AddIdealOpAmp(entry.Name,
+                                     nodes[0],
+                                     nodes[1],
+                                     nodes[2],
+                                     nodes[3],
+                                     nodes[4],
+                                     op_amp.GetIdealBandwidth());
+        } else {
+            m_Builder->AddBoyleOpAmp(entry.Name,
+                                     nodes[0],
+                                     nodes[1],
+                                     nodes[2],
+                                     nodes[3],
+                                     nodes[4],
+                                     MakeBoyleParams(op_amp.GetParameters()));
         }
     }
 };
