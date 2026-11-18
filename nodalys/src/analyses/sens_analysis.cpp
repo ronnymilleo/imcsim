@@ -18,8 +18,6 @@
 
 namespace Nodalys {
 
-namespace {} // namespace
-
 /**
  * @brief   Calculates small-signal DC sensitivity vectors for all circuit elements using the adjoint method.
  * @param[in,out] compiled  Compiled circuit representation with MNA matrix and stamped devices.
