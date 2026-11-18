@@ -111,8 +111,8 @@ constexpr auto PARTS = std::to_array<PartInfo>({
  * @param[in] rotation  Orientation on the grid.
  * @return  The new element; its component starts unnamed and with the default value.
  */
-std::unique_ptr<UIElement> CreateElement(const Core::ComponentType type, const GridPoint position,
-                                         const Rotation rotation) {
+std::unique_ptr<UIElement>
+CreateElement(const Core::ComponentType type, const GridPoint position, const Rotation rotation) {
     switch (type) {
     case Core::ComponentType::RESISTOR:
         return std::make_unique<UIResistor>(position, rotation);

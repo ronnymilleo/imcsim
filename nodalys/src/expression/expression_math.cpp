@@ -397,8 +397,8 @@ constexpr auto OPERATION_NAMES = std::to_array<std::pair<Operation, std::string_
  * @return  The value and the two partial derivatives, or why the operands are out of range, such as `sqrt(-1)` or
  *          `ln(-2)`, which ngspice refuses too.
  */
-std::expected<OperationResult, std::string> ApplyOperation(const Operation operation, const double first,
-                                                           const double second) {
+std::expected<OperationResult, std::string>
+ApplyOperation(const Operation operation, const double first, const double second) {
     if (operation == Operation::NEGATE) {
         return OperationResult{.Value = -first, .PartialFirst = -1.0};
     }

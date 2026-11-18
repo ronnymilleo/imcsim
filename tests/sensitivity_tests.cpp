@@ -75,8 +75,8 @@ const Core::PartSensitivity &FindPart(const Core::Sensitivity &sensitivity, cons
 TEST_CASE("The sensitivity lists the parts with a value, the largest influence first", "[sensitivity]") {
     const Divider divider;
     // ngspice gives resistors both vectors, sources only their absolute one and has none for a capacitor at DC
-    const Core::SensitivityVectors vectors = {{"r1", -1e-3},     {"r1_scale", -1.0}, {"r2", 5e-4},
-                                              {"r2_scale", 1.0}, {"v1", 0.5},        {"d1_area", 7.0}};
+    const Core::SensitivityVectors vectors =
+        {{"r1", -1e-3}, {"r1_scale", -1.0}, {"r2", 5e-4}, {"r2_scale", 1.0}, {"v1", 0.5}, {"d1_area", 7.0}};
     const Core::Sensitivity sensitivity = Core::BuildSensitivity(divider.Circuit, 2, vectors);
 
     CHECK(sensitivity.OutputNode == 2);

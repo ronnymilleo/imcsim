@@ -72,8 +72,9 @@ struct RefusedName {
 constexpr std::string_view RANDOM_REASON = "draws random numbers, which Nodalys does not run in an expression";
 
 constexpr auto REFUSED_FUNCTIONS = std::to_array<RefusedName>({
-    {"limit", "limit() is a Monte Carlo function of ngspice (the nominal value plus or minus a deviation, chosen at "
-              "random), not a clamp; clamp with min(max(x, low), high)"},
+    {"limit",
+     "limit() is a Monte Carlo function of ngspice (the nominal value plus or minus a deviation, chosen at "
+     "random), not a clamp; clamp with min(max(x, low), high)"},
     {"atan2", "atan2() is not available in a behavioral expression of ngspice either; use atan(y / x)"},
     {"gauss", RANDOM_REASON},
     {"agauss", RANDOM_REASON},
@@ -486,7 +487,8 @@ private:
         const std::string_view arguments = m_Text.substr(open + 1, close - open - 1);
         const std::string_view reader = is_voltage ? "v" : "i";
         if (arguments.contains('(')) {
-            return Fail(std::format("{}() takes the name of {}, not an expression", reader,
+            return Fail(std::format("{}() takes the name of {}, not an expression",
+                                    reader,
                                     is_voltage ? "a node" : "a source"));
         }
         ExpressionInput input{.Type = is_voltage ? ExpressionInput::Kind::VOLTAGE : ExpressionInput::Kind::CURRENT};
@@ -509,8 +511,9 @@ private:
     }
 
     int FindOrAddInput(const ExpressionInput &input) {
-        const auto found = std::ranges::find_if(
-            m_Program.Inputs, [&input](const ExpressionInput &known) { return IsSameInput(known, input); });
+        const auto found = std::ranges::find_if(m_Program.Inputs, [&input](const ExpressionInput &known) {
+            return IsSameInput(known, input);
+        });
         if (found != m_Program.Inputs.end()) {
             return static_cast<int>(found - m_Program.Inputs.begin());
         }
@@ -554,8 +557,11 @@ private:
             }
         }
         if (count != function->OperandCount) {
-            return Fail(std::format("{}() takes {} operand{}, not {}", written, function->OperandCount,
-                                    function->OperandCount == 1 ? "" : "s", count));
+            return Fail(std::format("{}() takes {} operand{}, not {}",
+                                    written,
+                                    function->OperandCount,
+                                    function->OperandCount == 1 ? "" : "s",
+                                    count));
         }
         return AddOperation(function->Kind, operands[0], operands[1]);
     }

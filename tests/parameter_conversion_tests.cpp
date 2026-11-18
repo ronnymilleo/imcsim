@@ -50,8 +50,10 @@ TEST_CASE("Every model figure of a semiconductor reaches Nodalys, and the rating
                                                                .Width = 2e-3,
                                                                .Length = 1e-6});
 
-    const Core::BJTParameters bjt{
-        .SaturationCurrent = 2e-14, .ForwardBeta = 250.0, .EarlyVoltage = 74.0, .TransitTime = 4e-10};
+    const Core::BJTParameters bjt{.SaturationCurrent = 2e-14,
+                                  .ForwardBeta = 250.0,
+                                  .EarlyVoltage = 74.0,
+                                  .TransitTime = 4e-10};
     const Nodalys::BjtParameters converted = Core::ToNodalys(bjt);
     CHECK(converted.SaturationCurrent == 2e-14);
     CHECK(converted.ForwardBeta == 250.0);
@@ -67,8 +69,13 @@ TEST_CASE("A waveform reaches Nodalys as it is, and an AC source starts at phase
     const Core::PWLParameters pwl{.Points = {{0.0, 1.0}, {1e-3, -1.0}}};
     CHECK(Core::ToNodalys(pwl) == Nodalys::PwlParameters{.Points = {{0.0, 1.0}, {1e-3, -1.0}}});
 
-    const Core::PulseParameters pulse{
-        .Low = -1.0, .High = 3.0, .Delay = 1e-6, .RiseTime = 2e-9, .FallTime = 3e-9, .Width = 4e-6, .Period = 1e-5};
+    const Core::PulseParameters pulse{.Low = -1.0,
+                                      .High = 3.0,
+                                      .Delay = 1e-6,
+                                      .RiseTime = 2e-9,
+                                      .FallTime = 3e-9,
+                                      .Width = 4e-6,
+                                      .Period = 1e-5};
     CHECK(Core::ToNodalys(pulse) == Nodalys::PulseParameters{.Low = -1.0,
                                                              .High = 3.0,
                                                              .Delay = 1e-6,
@@ -81,8 +88,10 @@ TEST_CASE("A waveform reaches Nodalys as it is, and an AC source starts at phase
     CHECK(Core::ToNodalys(clock) ==
           Nodalys::ClockParameters{.Frequency = 2e3, .DutyCycle = 0.25, .LogicLevel = 3.3, .StartDelay = 1e-4});
 
-    const Core::SwitchParameters contact{
-        .Threshold = 1.0, .Hysteresis = 0.2, .OnResistance = 0.5, .OffResistance = 1e6};
+    const Core::SwitchParameters contact{.Threshold = 1.0,
+                                         .Hysteresis = 0.2,
+                                         .OnResistance = 0.5,
+                                         .OffResistance = 1e6};
     CHECK(Core::ToNodalys(contact) ==
           Nodalys::SwitchParameters{.Threshold = 1.0, .Hysteresis = 0.2, .OnResistance = 0.5, .OffResistance = 1e6});
 }

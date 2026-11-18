@@ -23,7 +23,9 @@ inline constexpr float SCREEN_TERMINAL_RING_SCALE = 0.2f;
 
 // Static annotations
 void DrawMeasurementMarkers(SchematicCanvas &canvas, const ViewTransform &view, Schematic &schematic);
-void DrawTerminalNumbers(SchematicCanvas &canvas, const ViewTransform &view, const Schematic &schematic,
+void DrawTerminalNumbers(SchematicCanvas &canvas,
+                         const ViewTransform &view,
+                         const Schematic &schematic,
                          float ring_scale);
 
 /**
@@ -39,8 +41,8 @@ struct SchematicBounds {
 std::optional<SchematicBounds> MeasureSchematic(Schematic &schematic, SymbolStyle style, bool terminal_numbers);
 
 // Export
-std::expected<std::string, std::string> RenderSchematicSvg(Schematic &schematic, SymbolStyle style,
-                                                           bool terminal_numbers, bool dark);
+std::expected<std::string, std::string>
+RenderSchematicSvg(Schematic &schematic, SymbolStyle style, bool terminal_numbers, bool dark);
 
 } // namespace GUI
 

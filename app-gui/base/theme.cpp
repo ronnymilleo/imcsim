@@ -19,7 +19,9 @@ namespace GUI {
 namespace {
 
 constexpr ImVec4 Rgb(const int red, const int green, const int blue, const float alpha = 1.0f) {
-    return {static_cast<float>(red) / 255.0f, static_cast<float>(green) / 255.0f, static_cast<float>(blue) / 255.0f,
+    return {static_cast<float>(red) / 255.0f,
+            static_cast<float>(green) / 255.0f,
+            static_cast<float>(blue) / 255.0f,
             alpha};
 }
 

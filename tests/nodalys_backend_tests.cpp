@@ -252,20 +252,28 @@ TEST_CASE("A Nodalys transient runs noise and random sources and repeats when gi
 
 TEST_CASE("The Nodalys backend reports logic parts and analog parts as supported") {
     const Core::NodalysBackend backend;
-    const std::optional<std::string> gate = Core::FindUnsupported(
-        backend, std::set<Core::ComponentType>{Core::ComponentType::AND}, Core::AnalysisKind::OPERATING_POINT);
+    const std::optional<std::string> gate =
+        Core::FindUnsupported(backend,
+                              std::set<Core::ComponentType>{Core::ComponentType::AND},
+                              Core::AnalysisKind::OPERATING_POINT);
     REQUIRE(!gate.has_value());
-    const std::optional<std::string> flip_flop = Core::FindUnsupported(
-        backend, std::set<Core::ComponentType>{Core::ComponentType::JK_FLIP_FLOP}, Core::AnalysisKind::TRANSIENT);
+    const std::optional<std::string> flip_flop =
+        Core::FindUnsupported(backend,
+                              std::set<Core::ComponentType>{Core::ComponentType::JK_FLIP_FLOP},
+                              Core::AnalysisKind::TRANSIENT);
     REQUIRE(!flip_flop.has_value());
     // Resistors, sources and the other analog parts raise no objection
-    const std::optional<std::string> analog = Core::FindUnsupported(
-        backend,
-        std::set<Core::ComponentType>{Core::ComponentType::RESISTOR, Core::ComponentType::CAPACITOR,
-                                      Core::ComponentType::VOLTAGE_SOURCE, Core::ComponentType::DIODE,
-                                      Core::ComponentType::NPN, Core::ComponentType::NMOS, Core::ComponentType::OP_AMP,
-                                      Core::ComponentType::TRANSFORMER},
-        Core::AnalysisKind::DC_SWEEP);
+    const std::optional<std::string> analog =
+        Core::FindUnsupported(backend,
+                              std::set<Core::ComponentType>{Core::ComponentType::RESISTOR,
+                                                            Core::ComponentType::CAPACITOR,
+                                                            Core::ComponentType::VOLTAGE_SOURCE,
+                                                            Core::ComponentType::DIODE,
+                                                            Core::ComponentType::NPN,
+                                                            Core::ComponentType::NMOS,
+                                                            Core::ComponentType::OP_AMP,
+                                                            Core::ComponentType::TRANSFORMER},
+                              Core::AnalysisKind::DC_SWEEP);
     REQUIRE(!analog.has_value());
 }
 
@@ -313,8 +321,9 @@ TEST_CASE("A capacitor is open and an inductor is a short at the operating point
 TEST_CASE("The DC sweep of a divider scales the operating point") {
     const Divider divider;
     Core::NodalysBackend backend;
-    const Core::DCSweepRun run = backend.RunDCSweep(
-        divider.Circuit, {.Swept = {.Source = "V1", .Start = 0.0, .Stop = 5.0, .Step = 1.0}}, std::nullopt);
+    const Core::DCSweepRun run = backend.RunDCSweep(divider.Circuit,
+                                                    {.Swept = {.Source = "V1", .Start = 0.0, .Stop = 5.0, .Step = 1.0}},
+                                                    std::nullopt);
     REQUIRE(run.Result.has_value());
     REQUIRE(run.Result->SweptValues == std::vector<double>{0.0, 1.0, 2.0, 3.0, 4.0, 5.0});
     REQUIRE(run.Result->SweptUnit == "V");
@@ -604,8 +613,10 @@ TEST_CASE("The AC sweep of an RC low-pass filter hits -3 dB and -45 deg at the c
     circuit.Add(ground, {0});
 
     Core::NodalysBackend backend;
-    const Core::ACSweepRun run = backend.RunACSweep(
-        circuit, {.StartFrequency = 10.0, .StopFrequency = 100e3, .PointsPerDecade = 10}, std::nullopt);
+    const Core::ACSweepRun run =
+        backend.RunACSweep(circuit,
+                           {.StartFrequency = 10.0, .StopFrequency = 100e3, .PointsPerDecade = 10},
+                           std::nullopt);
     REQUIRE(run.Result.has_value());
     const Core::ACSweep &ac = *run.Result;
     // Index 20 is 10 * 10^(20/10) = 1000 Hz
@@ -868,10 +879,15 @@ TEST_CASE("Nodalys simulates behavioral sources and does not list them among wha
     const Core::BackendCapabilities &capabilities = backend.GetCapabilities();
     CHECK_FALSE(capabilities.UnsupportedParts.contains(Core::ComponentType::BEHAVIORAL_VOLTAGE));
     CHECK_FALSE(capabilities.UnsupportedParts.contains(Core::ComponentType::BEHAVIORAL_CURRENT));
-    for (const Core::AnalysisKind kind :
-         {Core::AnalysisKind::OPERATING_POINT, Core::AnalysisKind::TRANSIENT, Core::AnalysisKind::AC_SWEEP,
-          Core::AnalysisKind::DC_SWEEP, Core::AnalysisKind::NOISE, Core::AnalysisKind::TRANSFER_FUNCTION,
-          Core::AnalysisKind::SENSITIVITY, Core::AnalysisKind::POLE_ZERO, Core::AnalysisKind::HARMONIC_BALANCE}) {
+    for (const Core::AnalysisKind kind : {Core::AnalysisKind::OPERATING_POINT,
+                                          Core::AnalysisKind::TRANSIENT,
+                                          Core::AnalysisKind::AC_SWEEP,
+                                          Core::AnalysisKind::DC_SWEEP,
+                                          Core::AnalysisKind::NOISE,
+                                          Core::AnalysisKind::TRANSFER_FUNCTION,
+                                          Core::AnalysisKind::SENSITIVITY,
+                                          Core::AnalysisKind::POLE_ZERO,
+                                          Core::AnalysisKind::HARMONIC_BALANCE}) {
         const BehavioralStage stage("1m*tanh(V(IN)/26m) + V(IN)^2");
         INFO(Core::GetAnalysisKindName(kind));
         CHECK_FALSE(Core::FindUnsupported(backend, stage.Circuit, kind).has_value());
@@ -933,13 +949,16 @@ TEST_CASE("The results of Nodalys hold the nodes of the circuit, though a curren
     REQUIRE(transient.Result.has_value());
     CHECK(transient.Result->NodeVoltages.size() == static_cast<std::size_t>(node_count));
 
-    const Core::DCSweepRun sweep = backend.RunDCSweep(
-        stage.Circuit, {.Swept = {.Source = "V1", .Start = 0.0, .Stop = 2.0, .Step = 1.0}}, std::nullopt);
+    const Core::DCSweepRun sweep =
+        backend.RunDCSweep(stage.Circuit,
+                           {.Swept = {.Source = "V1", .Start = 0.0, .Stop = 2.0, .Step = 1.0}},
+                           std::nullopt);
     REQUIRE(sweep.Result.has_value());
     CHECK(sweep.Result->Curves.front().NodeVoltages.size() == static_cast<std::size_t>(node_count));
 
-    const Core::ACSweepRun ac = backend.RunACSweep(
-        stage.Circuit, {.StartFrequency = 1e3, .StopFrequency = 1e4, .PointsPerDecade = 1}, std::nullopt);
+    const Core::ACSweepRun ac = backend.RunACSweep(stage.Circuit,
+                                                   {.StartFrequency = 1e3, .StopFrequency = 1e4, .PointsPerDecade = 1},
+                                                   std::nullopt);
     REQUIRE(ac.Result.has_value());
     CHECK(ac.Result->NodeMagnitudesDecibels.size() == static_cast<std::size_t>(node_count));
     CHECK(ac.Result->NodePhasesDegrees.size() == static_cast<std::size_t>(node_count));
@@ -1158,8 +1177,10 @@ TEST_CASE("A block kept as SPICE text runs a transient and an AC sweep on Nodaly
     Core::NodalysBackend backend;
     const Core::Transient transient = RunTransient(backend, blocks.Circuit, 2e-3, 1e-6);
     CHECK(transient.NodeVoltages[2].back() > 0.0);
-    const Core::ACSweepRun sweep = backend.RunACSweep(
-        blocks.Circuit, {.StartFrequency = 10.0, .StopFrequency = 1e5, .PointsPerDecade = 5}, std::nullopt);
+    const Core::ACSweepRun sweep =
+        backend.RunACSweep(blocks.Circuit,
+                           {.StartFrequency = 10.0, .StopFrequency = 1e5, .PointsPerDecade = 5},
+                           std::nullopt);
     CHECK(sweep.Result.has_value());
 }
 

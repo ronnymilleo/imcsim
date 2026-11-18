@@ -50,8 +50,11 @@ struct TerminalMoves {
 /**
  * @brief   Brings one instance of a definition that changed up to date, and notes where its wires go.
  */
-void RefreshInstance(UIElement &element, const SavedSubcircuit &definition, const std::vector<std::string> &old_names,
-                     const std::vector<std::optional<std::size_t>> &matches, TerminalMoves &moves) {
+void RefreshInstance(UIElement &element,
+                     const SavedSubcircuit &definition,
+                     const std::vector<std::string> &old_names,
+                     const std::vector<std::optional<std::size_t>> &matches,
+                     TerminalMoves &moves) {
     auto &instance = static_cast<Core::SubcircuitInstance &>(element.GetComponent());
     const std::vector<std::string> instance_pins = instance.GetPins();
     const std::vector<GridPoint> old_terminals = element.GetTerminals();
@@ -135,9 +138,9 @@ std::expected<void, std::string> ValidateExpressions(const std::vector<std::uniq
     for (const auto &element : elements) {
         const Core::Component &component = element->GetComponent();
         const std::optional<std::string> &expression = component.GetValueExpression();
-        if (expression &&
-            !std::ranges::contains(parameters, Core::SubcircuitInstance::GetExpressionParameter(*expression),
-                                   &Core::SubcircuitParameter::Name)) {
+        if (expression && !std::ranges::contains(parameters,
+                                                 Core::SubcircuitInstance::GetExpressionParameter(*expression),
+                                                 &Core::SubcircuitParameter::Name)) {
             return std::unexpected(
                 std::format("{} follows {}, which is not a parameter of the block", component.GetName(), *expression));
         }
@@ -174,7 +177,8 @@ std::expected<void, std::string> CheckPinChoice(const std::vector<SubcircuitPinC
  * @return  The markers in the order of the parts; the reason when two give one name or share a node.
  */
 std::expected<std::vector<SubcircuitPinCandidate>, std::string>
-CollectSubcircuitPinMarkers(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires,
+CollectSubcircuitPinMarkers(const std::vector<std::unique_ptr<UIElement>> &elements,
+                            const std::vector<UIWire> &wires,
                             const std::set<std::size_t> *selected) {
     const Connectivity connectivity(elements, wires);
     std::vector<SubcircuitPinCandidate> candidates;
@@ -249,10 +253,12 @@ std::vector<std::optional<std::size_t>> MatchPins(const std::vector<SavedSubcirc
  * @param[in] definition         The block with its name, pins and parameters set, which receives the contents.
  * @return  The block with its parts and wires; the reason when its pins cannot connect.
  */
-std::expected<SavedSubcircuit, std::string>
-DrawDefinition(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires,
-               const std::set<std::size_t> &selected_elements, const std::set<std::size_t> &selected_wires,
-               const std::vector<SavedSubcircuit> &definitions, SavedSubcircuit definition) {
+std::expected<SavedSubcircuit, std::string> DrawDefinition(const std::vector<std::unique_ptr<UIElement>> &elements,
+                                                           const std::vector<UIWire> &wires,
+                                                           const std::set<std::size_t> &selected_elements,
+                                                           const std::set<std::size_t> &selected_wires,
+                                                           const std::vector<SavedSubcircuit> &definitions,
+                                                           SavedSubcircuit definition) {
     std::vector<const UIElement *> copied_elements;
     for (const std::size_t index : selected_elements) {
         copied_elements.push_back(elements[index].get());
@@ -330,8 +336,10 @@ std::string FindFreeName(const std::string &name, const std::vector<SavedSubcirc
  *          stretching them could run them along it. They are stretched as before when none leaves the box, and the new
  *          wire bends once when no route is found.
  */
-void RefreshInstancesIn(std::vector<std::unique_ptr<UIElement>> &elements, std::vector<UIWire> &wires,
-                        const SavedSubcircuit &definition, const std::vector<std::string> &old_names,
+void RefreshInstancesIn(std::vector<std::unique_ptr<UIElement>> &elements,
+                        std::vector<UIWire> &wires,
+                        const SavedSubcircuit &definition,
+                        const std::vector<std::string> &old_names,
                         const std::vector<std::optional<std::size_t>> &matches) {
     TerminalMoves moves;
     for (auto &element : elements) {

@@ -63,7 +63,8 @@ std::optional<std::string> CheckPortNumbers(const std::vector<CircuitPort> &sort
     for (int number = 1; number <= static_cast<int>(sorted_ports.size()); ++number) {
         if (!numbers.contains(number)) {
             return std::format("The S-parameter ports must be numbered 1 to {} with no gap; port {} is missing",
-                               sorted_ports.size(), number);
+                               sorted_ports.size(),
+                               number);
         }
     }
     return std::nullopt;
@@ -84,7 +85,8 @@ std::optional<std::string> CheckPortNodes(const std::vector<CircuitPort> &ports,
         for (std::size_t second = first + 1; second < ports.size(); ++second) {
             if (ports[second].Node == port.Node) {
                 return std::format("Ports {} and {} are on the same node; each port needs a node of its own",
-                                   port.Number, ports[second].Number);
+                                   port.Number,
+                                   ports[second].Number);
             }
         }
     }
@@ -149,8 +151,9 @@ std::expected<SParameterResult, std::string> ComputeSParameters(CompiledCircuit 
     std::vector<double> x_dc(static_cast<std::size_t>(size), 0.0);
     const NewtonOutcome outcome = SolveNewton(*compiled.System, compiled.Devices, x_dc, TimeContext{}, options);
     if (!outcome.Converged) {
-        return std::unexpected(DescribeFailure(
-            "The native solver found no operating point to linearize the S-parameter analysis around", outcome));
+        return std::unexpected(
+            DescribeFailure("The native solver found no operating point to linearize the S-parameter analysis around",
+                            outcome));
     }
     DescribeOutcome(outcome, "operating point", messages);
 
@@ -213,7 +216,9 @@ std::expected<SParameterResult, std::string> ComputeSParameters(CompiledCircuit 
                 const std::complex<double> s_ij = vi * gi_sqrt - delta_ij;
                 if (!std::isfinite(s_ij.real()) || !std::isfinite(s_ij.imag())) {
                     return std::unexpected(std::format("The native solver produced non-finite S({}, {}) at f = {} Hz",
-                                                       i + 1, j + 1, frequency));
+                                                       i + 1,
+                                                       j + 1,
+                                                       frequency));
                 }
                 scattering.push_back(s_ij);
             }
@@ -224,7 +229,8 @@ std::expected<SParameterResult, std::string> ComputeSParameters(CompiledCircuit 
 
     if (messages != nullptr) {
         messages->push_back({std::format("nodalys: computed S-parameters for {} ports across {} frequency points",
-                                         num_ports, frequencies.size()),
+                                         num_ports,
+                                         frequencies.size()),
                              false});
     }
 

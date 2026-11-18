@@ -37,7 +37,9 @@ public:
     OperatingPointRun RunOperatingPoint(const Circuit &, const std::optional<double> &) override {
         return Fail<OperatingPointRun>();
     }
-    TransientRun RunTransient(const Circuit &, const TransientSettings &, const std::optional<double> &,
+    TransientRun RunTransient(const Circuit &,
+                              const TransientSettings &,
+                              const std::optional<double> &,
                               const RunMonitor &) override {
         return Fail<TransientRun>();
     }
@@ -191,8 +193,8 @@ HarmonicBalanceRun SimulationBackend::RunHarmonicBalance(const Circuit & /*circu
  * @param[in] kind     Analysis to run.
  * @return  The reason, written for the user, or no value when the backend can run it.
  */
-std::optional<std::string> FindUnsupported(const SimulationBackend &backend, const std::set<ComponentType> &parts,
-                                           const AnalysisKind kind) {
+std::optional<std::string>
+FindUnsupported(const SimulationBackend &backend, const std::set<ComponentType> &parts, const AnalysisKind kind) {
     const BackendCapabilities &capabilities = backend.GetCapabilities();
     if (!capabilities.Analyses.contains(GetRequiredAnalysis(kind))) {
         return std::format("{} does not run the {} analysis", backend.GetName(), GetAnalysisKindName(kind));
@@ -223,8 +225,8 @@ std::optional<std::string> FindUnsupported(const SimulationBackend &backend, con
  * @param[in] kind     Analysis to run.
  * @return  The reason, written for the user, or no value when the backend can run it.
  */
-std::optional<std::string> FindUnsupported(const SimulationBackend &backend, const Circuit &circuit,
-                                           const AnalysisKind kind) {
+std::optional<std::string>
+FindUnsupported(const SimulationBackend &backend, const Circuit &circuit, const AnalysisKind kind) {
     std::set<ComponentType> parts;
     const std::vector<const Component *> all_parts = CollectParts(circuit);
     for (const Component *part : all_parts) {

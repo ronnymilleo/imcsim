@@ -39,13 +39,19 @@ constexpr float MIN_CANVAS_SIZE = 50.0f;
  * @param[in] playback        Instant of the transient to show, which the time bar moves; it must outlive the window.
  * @param[in] preferences     How the schematic is drawn and exported; they must outlive the window.
  */
-EditorWindow::EditorWindow(Schematic &schematic, const ResultStore &results, AnalysisControls &controls,
-                           AnalysisSettingsPanel &settings_panel, PartEditor &part_editor, GlowRenderer &glow_renderer,
-                           TransientPlayback &playback, const Preferences &preferences)
+EditorWindow::EditorWindow(Schematic &schematic,
+                           const ResultStore &results,
+                           AnalysisControls &controls,
+                           AnalysisSettingsPanel &settings_panel,
+                           PartEditor &part_editor,
+                           GlowRenderer &glow_renderer,
+                           TransientPlayback &playback,
+                           const Preferences &preferences)
     : AppWindow("Schematic", false), m_RootSchematic(schematic), m_Schematic(&schematic), m_RootResults(results),
       m_Blocks(schematic), m_Controls(controls), m_SettingsPanel(settings_panel), m_PartEditor(part_editor),
       m_Playback(playback), m_Preferences(preferences),
-      m_Files(schematic, preferences,
+      m_Files(schematic,
+              preferences,
               {.StopEditing = [this] { GUI::StopEditing(*m_Schematic, m_Mode); },
                .FrameSchematic = [this] { m_View.RequestDefaultFrame(); },
                .PlaceGroup = [this](PastedGroup group) { StartPastingGroup(std::move(group)); },
@@ -210,7 +216,8 @@ void EditorWindow::Draw() {
     if (IsEditingSubcircuit()) {
         ImGui::SetNextItemAllowOverlap();
     }
-    ImGui::InvisibleButton("canvas", size,
+    ImGui::InvisibleButton("canvas",
+                           size,
                            ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight |
                                ImGuiButtonFlags_MouseButtonMiddle);
     const bool hovered = ImGui::IsItemHovered();
@@ -240,7 +247,10 @@ void EditorWindow::Draw() {
     DrawListCanvas canvas(draw_list);
     m_Overlays.DrawWires(canvas, view, *m_Schematic, m_View.GetZoom());
     const std::optional<std::size_t> held_button = m_Live.GetHeldButton();
-    m_Overlays.DrawElements(canvas, view, *m_Schematic, m_Controls.IsLive() && IsSelecting(m_Mode),
+    m_Overlays.DrawElements(canvas,
+                            view,
+                            *m_Schematic,
+                            m_Controls.IsLive() && IsSelecting(m_Mode),
                             held_button ? held_button : live_part);
     // Over the symbols, so a lit LED looks lit through its own lines
     m_Overlays.DrawGlows(draw_list, view, *m_Schematic, m_View.GetZoom());
@@ -560,8 +570,11 @@ void EditorWindow::CopySelected() {
         return;
     }
     const Selection selection = {m_Schematic->GetSelectedElements(), m_Schematic->GetSelectedWires()};
-    ImGui::SetClipboardText(CopySelection(m_Schematic->GetElements(), m_Schematic->GetWires(), selection,
-                                          m_Schematic->GetSubcircuits(), m_Schematic->GetLibraryModels())
+    ImGui::SetClipboardText(CopySelection(m_Schematic->GetElements(),
+                                          m_Schematic->GetWires(),
+                                          selection,
+                                          m_Schematic->GetSubcircuits(),
+                                          m_Schematic->GetLibraryModels())
                                 .c_str());
 }
 
@@ -632,7 +645,9 @@ void EditorWindow::HandleSelection(const ViewTransform &view, const bool hovered
  */
 void EditorWindow::HandleSelectionClick(SelectingMode &selecting, const ImVec2 cursor_world) {
     const bool shift = ImGui::GetIO().KeyShift;
-    const Selection picked = PickAt(m_Schematic->GetElements(), m_Schematic->GetWires(), cursor_world,
+    const Selection picked = PickAt(m_Schematic->GetElements(),
+                                    m_Schematic->GetWires(),
+                                    cursor_world,
                                     WIRE_PICK_DISTANCE / m_View.GetZoom());
     const Selection current = {m_Schematic->GetSelectedElements(), m_Schematic->GetSelectedWires()};
     if (picked.Empty()) {
@@ -716,7 +731,8 @@ void EditorWindow::HandleSelectionKeys(const SelectingMode &selecting) {
         m_Popover.Open();
     }
     if (ImGui::IsKeyPressed(ImGuiKey_M)) {
-        TransformSelection(*m_Schematic, m_Mode,
+        TransformSelection(*m_Schematic,
+                           m_Mode,
                            shift ? PointTransform::Kind::MIRROR_TOP_BOTTOM : PointTransform::Kind::MIRROR_LEFT_RIGHT,
                            keep_wires);
     }

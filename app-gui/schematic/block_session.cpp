@@ -50,8 +50,9 @@ const Schematic &BlockSession::GetShown() const {
  *          any depth.
  */
 bool BlockSession::CanPlaceBlock(const std::string_view name) const {
-    return std::ranges::none_of(
-        m_OpenBlocks, [&](const OpenBlock &block) { return ContainsBlock(m_Root.GetSubcircuits(), name, block.Name); });
+    return std::ranges::none_of(m_OpenBlocks, [&](const OpenBlock &block) {
+        return ContainsBlock(m_Root.GetSubcircuits(), name, block.Name);
+    });
 }
 
 /**
@@ -205,7 +206,8 @@ bool BlockSession::Close(const bool apply) {
  * @return  Nothing, or why the settings were refused; the document is left as it was then.
  */
 std::expected<void, std::string>
-BlockSession::ApplySpiceUpdate(const std::string &name, const std::vector<SavedSubcircuitPin> &pins,
+BlockSession::ApplySpiceUpdate(const std::string &name,
+                               const std::vector<SavedSubcircuitPin> &pins,
                                const std::vector<Core::SubcircuitParameter> &parameters) {
     const auto updated = m_Root.UpdateSpiceSubcircuit(name, pins, parameters);
     if (!updated) {

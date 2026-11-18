@@ -243,13 +243,19 @@ const MOSFETModel *FindMOSFETModel(const ComponentType type, const std::string_v
  * @param[in] parameters  Model parameters; W and L go on the MOSFET line instead, since SPICE sets them per part.
  * @return  The line, newline included, with values in exponent notation and six significant digits.
  */
-std::string FormatMOSFETModel(const ComponentType type, const std::string_view spice_name,
-                              const MOSFETParameters &parameters) {
+std::string
+FormatMOSFETModel(const ComponentType type, const std::string_view spice_name, const MOSFETParameters &parameters) {
     return std::format(".model {} {}(LEVEL=1 VTO={:.6g} KP={:.6g} LAMBDA={:.6g} RD={:.6g} RS={:.6g} CGSO={:.6g} "
                        "CGDO={:.6g})\n",
-                       spice_name, type == ComponentType::PMOS ? "PMOS" : "NMOS", parameters.ThresholdVoltage,
-                       parameters.Transconductance, parameters.ChannelModulation, parameters.DrainResistance,
-                       parameters.SourceResistance, parameters.GateSourceOverlap, parameters.GateDrainOverlap);
+                       spice_name,
+                       type == ComponentType::PMOS ? "PMOS" : "NMOS",
+                       parameters.ThresholdVoltage,
+                       parameters.Transconductance,
+                       parameters.ChannelModulation,
+                       parameters.DrainResistance,
+                       parameters.SourceResistance,
+                       parameters.GateSourceOverlap,
+                       parameters.GateDrainOverlap);
 }
 
 } // namespace Core

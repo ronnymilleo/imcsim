@@ -55,10 +55,10 @@ inline constexpr double LANE_MARGIN = 0.3;
 
 std::vector<double> BuildLane(const std::vector<double> &voltages, double logic_level, std::size_t lane);
 std::vector<LogicNode> FindLogicNodes(const Core::Circuit &circuit);
-std::vector<LogicSegment> FindLogicSegments(std::span<const double> times, std::span<const double> voltages,
-                                            double logic_level);
-std::vector<std::vector<LogicSegment>> FindBitCells(std::span<const double> times, std::span<const LogicSignal> signals,
-                                                    double from, double to);
+std::vector<LogicSegment>
+FindLogicSegments(std::span<const double> times, std::span<const double> voltages, double logic_level);
+std::vector<std::vector<LogicSegment>>
+FindBitCells(std::span<const double> times, std::span<const LogicSignal> signals, double from, double to);
 
 } // namespace GUI
 

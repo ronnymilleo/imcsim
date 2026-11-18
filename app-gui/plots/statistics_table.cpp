@@ -91,7 +91,8 @@ void AddRows(std::vector<StatisticsRow> &rows, const std::array<std::string_view
  *          without points in the span reads a dash in the measured rows.
  */
 std::vector<StatisticsRow> BuildTransientStatistics(const std::span<const double> times,
-                                                    const std::vector<MeasuredTrace> &traces, const PlotSpan span,
+                                                    const std::vector<MeasuredTrace> &traces,
+                                                    const PlotSpan span,
                                                     const std::optional<PlotCursors> &cursors) {
     std::vector<StatisticsRow> rows;
     AddRows(rows, MEASURED_ROWS);
@@ -149,10 +150,13 @@ std::vector<StatisticsRow> BuildBodeStatistics(const std::span<const double> fre
     for (const BodeTrace &trace : traces) {
         std::size_t row = 0;
         const auto add = [&rows, &row](StatisticsCell cell) { rows[row++].Cells.push_back(std::move(cell)); };
-        const std::optional<BodeStatistics> statistics =
-            frequencies.empty() ? std::nullopt
-                                : ComputeBodeStatistics(frequencies, trace.MagnitudesDecibels, trace.PhasesDegrees,
-                                                        frequencies.front(), frequencies.back());
+        const std::optional<BodeStatistics> statistics = frequencies.empty()
+                                                             ? std::nullopt
+                                                             : ComputeBodeStatistics(frequencies,
+                                                                                     trace.MagnitudesDecibels,
+                                                                                     trace.PhasesDegrees,
+                                                                                     frequencies.front(),
+                                                                                     frequencies.back());
         if (statistics) {
             add(FixedCell(statistics->PeakGain, "dB"));
             add(PlainCell(statistics->PeakFrequency, "Hz"));
@@ -193,8 +197,10 @@ std::vector<StatisticsRow> BuildBodeStatistics(const std::span<const double> fre
  *          voltage; then Min, Max and Mean. A current over a swept voltage reads its slope as a resistance too, "open"
  *          when it carries nothing; other curves read a dash there.
  */
-std::vector<StatisticsRow> BuildSweepStatistics(const std::span<const double> swept, const std::string_view swept_unit,
-                                                const std::vector<SweptTrace> &traces, const PlotSpan span,
+std::vector<StatisticsRow> BuildSweepStatistics(const std::span<const double> swept,
+                                                const std::string_view swept_unit,
+                                                const std::vector<SweptTrace> &traces,
+                                                const PlotSpan span,
                                                 const std::optional<PlotCursors> &cursors) {
     const auto reads_resistance = [swept_unit](const SweptTrace &trace) {
         return trace.Unit == "A" && swept_unit == "V";

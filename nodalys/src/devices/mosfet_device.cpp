@@ -20,8 +20,13 @@ constexpr double MOSFET_BODY_SATURATION_CURRENT = 1e-14;
 
 } // namespace
 
-MosfetDevice::MosfetDevice(const int drain, const int gate, const int source, const int internal_drain,
-                           const int internal_source, MosfetParameters parameters, const bool pmos)
+MosfetDevice::MosfetDevice(const int drain,
+                           const int gate,
+                           const int source,
+                           const int internal_drain,
+                           const int internal_source,
+                           MosfetParameters parameters,
+                           const bool pmos)
     : m_Drain(drain), m_Gate(gate), m_Source(source), m_D(internal_drain >= 0 ? internal_drain : drain),
       m_S(internal_source >= 0 ? internal_source : source), m_Given(parameters), m_Parameters(parameters), m_Pmos(pmos),
       m_Beta(parameters.Transconductance * parameters.Width / parameters.Length), m_Vt(THERMAL_VOLTAGE),
@@ -218,7 +223,8 @@ double MosfetDevice::TerminalCharge(const int terminal, const std::vector<double
     }
 }
 
-std::complex<double> MosfetDevice::AcTerminalCurrent(const int terminal, const std::vector<double> &x_dc,
+std::complex<double> MosfetDevice::AcTerminalCurrent(const int terminal,
+                                                     const std::vector<double> &x_dc,
                                                      const std::vector<std::complex<double>> &x_ac,
                                                      const double omega) const {
     const ChannelState state = EvaluateChannel(x_dc);

@@ -103,9 +103,13 @@ private:
  * @details The suffix tells the curves of a DC sweep family apart in the CSV headers; only the first curve of a family
  *          has a legend entry.
  */
-void AddExportTraces(PanelBuilder &builder, const std::vector<std::vector<double>> &node_values,
-                     const std::vector<Core::ComponentTrace> &currents, Schematic &schematic, const std::string &suffix,
-                     const bool in_legend, const std::vector<int> &excluded = {}) {
+void AddExportTraces(PanelBuilder &builder,
+                     const std::vector<std::vector<double>> &node_values,
+                     const std::vector<Core::ComponentTrace> &currents,
+                     Schematic &schematic,
+                     const std::string &suffix,
+                     const bool in_legend,
+                     const std::vector<int> &excluded = {}) {
     for (std::size_t node = 1; node < node_values.size(); ++node) {
         if (!schematic.IsVoltageMeasured(static_cast<int>(node)) ||
             std::ranges::contains(excluded, static_cast<int>(node))) {
@@ -136,7 +140,9 @@ void AddExportTraces(PanelBuilder &builder, const std::vector<std::vector<double
  * @brief   A note for each cell that is wide enough for its label in what the image shows, which has no pixels to
  *          measure it with, so a share of the span stands for the width of the box.
  */
-void AddBitNotes(ExportPanel &panel, const Core::Transient &transient, const std::vector<LogicNode> &lanes,
+void AddBitNotes(ExportPanel &panel,
+                 const Core::Transient &transient,
+                 const std::vector<LogicNode> &lanes,
                  const PlotSpan &view) {
     std::vector<LogicSignal> signals;
     for (const LogicNode &node : lanes) {
@@ -160,8 +166,12 @@ void AddBitNotes(ExportPanel &panel, const Core::Transient &transient, const std
  * @brief   The lanes of the buses, on top: each a band pinched at every change of its value, with the value written in
  *          every stretch wide enough for it, while the CSV lists the values as numbers.
  */
-void AddBusLanes(ExportPanel &panel, ExportAxis &axis, const Core::Transient &transient,
-                 const std::vector<BusLane> &buses, const std::size_t lane_count, const PlotSpan &view) {
+void AddBusLanes(ExportPanel &panel,
+                 ExportAxis &axis,
+                 const Core::Transient &transient,
+                 const std::vector<BusLane> &buses,
+                 const std::size_t lane_count,
+                 const PlotSpan &view) {
     for (std::size_t bus = 0; bus < buses.size(); ++bus) {
         const std::size_t position = lane_count - 1 - bus;
         const BusLane &lane = buses[bus];
@@ -195,8 +205,11 @@ void AddBusLanes(ExportPanel &panel, ExportAxis &axis, const Core::Transient &tr
  *          lanes, while the CSV lists the voltages.
  * @details The buses take the top lanes and the signals the ones below, in order, as in the plot.
  */
-ExportPanel BuildLanePanel(const Core::Transient &transient, const std::vector<LogicNode> &lanes,
-                           const std::vector<BusLane> &buses, Schematic &schematic, const bool bit_values,
+ExportPanel BuildLanePanel(const Core::Transient &transient,
+                           const std::vector<LogicNode> &lanes,
+                           const std::vector<BusLane> &buses,
+                           Schematic &schematic,
+                           const bool bit_values,
                            const PlotSpan &view) {
     ExportPanel panel;
     ExportAxis axis{.Name = "", .Unit = "V", .UsesPrefixes = false};
@@ -222,7 +235,9 @@ ExportPanel BuildLanePanel(const Core::Transient &transient, const std::vector<L
     return panel;
 }
 
-void AddExportMath(PanelBuilder &builder, const std::vector<MathTrace> &math, const std::string &suffix,
+void AddExportMath(PanelBuilder &builder,
+                   const std::vector<MathTrace> &math,
+                   const std::string &suffix,
                    const bool in_legend) {
     for (const MathTrace &trace : math) {
         builder.Add({.Name = trace.Label + suffix,
@@ -295,7 +310,9 @@ bool CurvesDiffer(const std::vector<const std::vector<double> *> &curves, const 
  * @param[in] math           Math traces of each curve, in the order of the curves.
  * @return  The families of the measured voltages, then currents, then math channels.
  */
-std::vector<CurveFamily> ListCurveFamilies(const Core::DCSweep &sweep, Schematic &schematic, const bool show_currents,
+std::vector<CurveFamily> ListCurveFamilies(const Core::DCSweep &sweep,
+                                           Schematic &schematic,
+                                           const bool show_currents,
                                            const std::vector<std::vector<MathTrace>> &math) {
     std::vector<CurveFamily> families;
     const Core::DCSweepCurve &first_curve = sweep.Curves.front();
@@ -391,9 +408,13 @@ std::string GetDensityUnit(const std::string &unit) {
  * @param[in] view        The X range the plot shows, so zooming in before exporting crops the image as well.
  * @return  The figure; the analog panel is left out when only logic signals are measured, as on screen.
  */
-ExportFigure BuildTransientFigure(const Core::Transient &transient, const std::vector<MathTrace> &math,
-                                  const std::vector<LogicNode> &lanes, const std::vector<BusLane> &buses,
-                                  Schematic &schematic, const bool bit_values, const PlotSpan &view) {
+ExportFigure BuildTransientFigure(const Core::Transient &transient,
+                                  const std::vector<MathTrace> &math,
+                                  const std::vector<LogicNode> &lanes,
+                                  const std::vector<BusLane> &buses,
+                                  Schematic &schematic,
+                                  const bool bit_values,
+                                  const PlotSpan &view) {
     ExportFigure figure;
     figure.XAxis = {.Name = "Time", .Unit = "s"};
     figure.Xs = transient.Times;
@@ -419,7 +440,9 @@ ExportFigure BuildTransientFigure(const Core::Transient &transient, const std::v
  * @param[in] view         The frequencies the plot shows.
  * @return  One panel with every spectrum that is defined over the span.
  */
-ExportFigure BuildSpectrumFigure(const TransientSpectra &spectra, const bool logarithmic, const bool is_density,
+ExportFigure BuildSpectrumFigure(const TransientSpectra &spectra,
+                                 const bool logarithmic,
+                                 const bool is_density,
                                  const PlotSpan &view) {
     ExportFigure figure;
     figure.XAxis = {.Name = "Frequency", .Unit = "Hz"};
@@ -452,8 +475,11 @@ ExportFigure BuildSpectrumFigure(const TransientSpectra &spectra, const bool log
  * @param[in] view       The frequencies the plots show.
  * @return  The magnitude and phase panels.
  */
-ExportFigure BuildACSweepFigure(const Core::ACSweep &sweep, const ACMathTraces &math, const ResultStore &results,
-                                Schematic &schematic, const PlotSpan &view) {
+ExportFigure BuildACSweepFigure(const Core::ACSweep &sweep,
+                                const ACMathTraces &math,
+                                const ResultStore &results,
+                                Schematic &schematic,
+                                const PlotSpan &view) {
     const std::string third_unit = ThirdAxisUnit(math.Magnitudes);
     const std::string third_name = third_unit.empty() ? "Math" : third_unit;
     ExportFigure figure;
@@ -462,15 +488,17 @@ ExportFigure BuildACSweepFigure(const Core::ACSweep &sweep, const ACMathTraces &
     figure.Xs = sweep.Frequencies;
     figure.XRange = ExportRange{.From = view.From, .To = view.To};
     PanelBuilder magnitude(
-        "Magnitude", {.Voltage = {.Name = "Gain (dB)", .Unit = "dB", .UsesPrefixes = false},
-                      .Current = {.Name = "Current (dB)", .Unit = "dB", .UsesPrefixes = false},
-                      .Third = {.Name = std::format("{} (dB)", third_name), .Unit = "dB", .UsesPrefixes = false}});
+        "Magnitude",
+        {.Voltage = {.Name = "Gain (dB)", .Unit = "dB", .UsesPrefixes = false},
+         .Current = {.Name = "Current (dB)", .Unit = "dB", .UsesPrefixes = false},
+         .Third = {.Name = std::format("{} (dB)", third_name), .Unit = "dB", .UsesPrefixes = false}});
     AddExportTraces(magnitude, sweep.NodeMagnitudesDecibels, sweep.CurrentMagnitudesDecibels, schematic, "", true);
     AddExportMath(magnitude, math.Magnitudes, "", true);
     PanelBuilder phase(
-        "Phase", {.Voltage = {.Name = "Phase (deg)", .Unit = "deg", .UsesPrefixes = false},
-                  .Current = {.Name = "Current phase (deg)", .Unit = "deg", .UsesPrefixes = false},
-                  .Third = {.Name = std::format("{} phase (deg)", third_name), .Unit = "deg", .UsesPrefixes = false}});
+        "Phase",
+        {.Voltage = {.Name = "Phase (deg)", .Unit = "deg", .UsesPrefixes = false},
+         .Current = {.Name = "Current phase (deg)", .Unit = "deg", .UsesPrefixes = false},
+         .Third = {.Name = std::format("{} phase (deg)", third_name), .Unit = "deg", .UsesPrefixes = false}});
     AddExportTraces(phase, sweep.NodePhasesDegrees, sweep.CurrentPhasesDegrees, schematic, "", true);
     AddExportMath(phase, math.Phases, "", true);
     // The other steps share the frequencies, so they go in as more columns, without legend entries
@@ -481,7 +509,11 @@ ExportFigure BuildACSweepFigure(const Core::ACSweep &sweep, const ACMathTraces &
             }
             const Core::ACSweep &other = steps->Results[step];
             const std::string suffix = " at " + FormatStepValue(steps->Parameter, steps->Values[step], steps->Unit);
-            AddExportTraces(magnitude, other.NodeMagnitudesDecibels, other.CurrentMagnitudesDecibels, schematic, suffix,
+            AddExportTraces(magnitude,
+                            other.NodeMagnitudesDecibels,
+                            other.CurrentMagnitudesDecibels,
+                            schematic,
+                            suffix,
                             false);
             AddExportTraces(phase, other.NodePhasesDegrees, other.CurrentPhasesDegrees, schematic, suffix, false);
         }
@@ -500,8 +532,10 @@ ExportFigure BuildACSweepFigure(const Core::ACSweep &sweep, const ACMathTraces &
  * @param[in] view       The swept values the plot shows.
  * @return  One panel with every curve.
  */
-ExportFigure BuildDCSweepFigure(const Core::DCSweep &sweep, const std::vector<std::vector<MathTrace>> &math,
-                                Schematic &schematic, const PlotSpan &view) {
+ExportFigure BuildDCSweepFigure(const Core::DCSweep &sweep,
+                                const std::vector<std::vector<MathTrace>> &math,
+                                Schematic &schematic,
+                                const PlotSpan &view) {
     static const std::vector<MathTrace> no_math;
     ExportFigure figure;
     figure.XAxis = {.Name = sweep.SweptSource, .Unit = sweep.SweptUnit};
@@ -546,7 +580,9 @@ ExportFigure BuildDCSweepFigure(const Core::DCSweep &sweep, const std::vector<st
  * @param[in] view       The frequencies the plot shows.
  * @return  One panel with the output, the checked shares and the input-referred noise.
  */
-ExportFigure BuildNoiseFigure(const Core::Noise &noise, Schematic &schematic, const std::set<std::string> &shown,
+ExportFigure BuildNoiseFigure(const Core::Noise &noise,
+                              Schematic &schematic,
+                              const std::set<std::string> &shown,
                               const PlotSpan &view) {
     ExportFigure figure;
     figure.XAxis = {.Name = "Frequency", .Unit = "Hz"};
@@ -602,8 +638,10 @@ ExportFigure BuildNoiseFigure(const Core::Noise &noise, Schematic &schematic, co
  */
 ExportFigure BuildACSensitivityFigure(const Core::ACSensitivity &sensitivity,
                                       const std::vector<ACSensitivityCurve> &curves,
-                                      const std::vector<ImU32> &part_colors, const std::set<std::string> &shown,
-                                      const std::string &output_label, const PlotSpan &view) {
+                                      const std::vector<ImU32> &part_colors,
+                                      const std::set<std::string> &shown,
+                                      const std::string &output_label,
+                                      const PlotSpan &view) {
     ExportFigure figure;
     figure.XAxis = {.Name = "Frequency", .Unit = "Hz"};
     figure.XLogarithmic = true;

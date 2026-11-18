@@ -283,9 +283,9 @@ TEST_CASE("ToSpiceNetlist writes random values with the type number of the distr
                                       "Vr1 1 0 DC 2 TRRANDOM(1 100u 1m 500m 0)\n"
                                       ".end\n");
 
-    for (const auto &[distribution, number] :
-         {std::pair{Core::RandomDistribution::GAUSSIAN, 2}, std::pair{Core::RandomDistribution::EXPONENTIAL, 3},
-          std::pair{Core::RandomDistribution::POISSON, 4}}) {
+    for (const auto &[distribution, number] : {std::pair{Core::RandomDistribution::GAUSSIAN, 2},
+                                               std::pair{Core::RandomDistribution::EXPONENTIAL, 3},
+                                               std::pair{Core::RandomDistribution::POISSON, 4}}) {
         source.SetRandom({.Distribution = distribution, .TimeStep = 1e-6, .Delay = 0.0, .First = 1.0, .Second = 0.0});
         Core::Circuit other;
         other.Add(source, {1, 0});

@@ -34,7 +34,8 @@ const char *GetPinSideName(Core::PinSide side);
 std::optional<Core::PinSide> ParsePinSide(std::string_view name);
 
 // S-parameter ports
-bool IsPortNumberTaken(const std::vector<std::unique_ptr<UIElement>> &elements, int number,
+bool IsPortNumberTaken(const std::vector<std::unique_ptr<UIElement>> &elements,
+                       int number,
                        const Core::Component *except);
 int FindFreePortNumber(const std::vector<std::unique_ptr<UIElement>> &elements, const Core::Component *except);
 

@@ -25,8 +25,11 @@ public:
     UISevenSegment(GridPoint position, Rotation rotation);
     ~UISevenSegment() override = default;
 
-    void DrawReading(SchematicCanvas &canvas, const ViewTransform &view,
-                     std::span<const std::optional<LogicState>> segments, ImU32 color, bool are_lights_on) const;
+    void DrawReading(SchematicCanvas &canvas,
+                     const ViewTransform &view,
+                     std::span<const std::optional<LogicState>> segments,
+                     ImU32 color,
+                     bool are_lights_on) const;
 
 protected:
     void DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const override;
@@ -39,7 +42,10 @@ protected:
 
 private:
     void FillSegment(SchematicCanvas &canvas, const ViewTransform &view, std::size_t segment, ImU32 color) const;
-    void OutlineSegment(SchematicCanvas &canvas, const ViewTransform &view, std::size_t segment, ImU32 color,
+    void OutlineSegment(SchematicCanvas &canvas,
+                        const ViewTransform &view,
+                        std::size_t segment,
+                        ImU32 color,
                         float thickness) const;
     std::array<ImVec2, 6> GetSegmentOnScreen(const ViewTransform &view, std::size_t segment) const;
 };

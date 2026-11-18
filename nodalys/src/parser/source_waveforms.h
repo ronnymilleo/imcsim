@@ -43,8 +43,13 @@ struct SourceLevels {
 SourceWaveform FindSourceWaveform(std::string_view token);
 
 // Building
-void AddWaveformSource(CircuitBuilder &builder, const std::string &name, bool is_voltage, NodeId positive,
-                       NodeId negative, SourceWaveform waveform, const std::vector<double> &values,
+void AddWaveformSource(CircuitBuilder &builder,
+                       const std::string &name,
+                       bool is_voltage,
+                       NodeId positive,
+                       NodeId negative,
+                       SourceWaveform waveform,
+                       const std::vector<double> &values,
                        const SourceLevels &levels);
 
 } // namespace Nodalys

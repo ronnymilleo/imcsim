@@ -113,7 +113,8 @@ ReadNoiseContributions(const Circuit &circuit, const NoisePlots &plots, const st
             if (!IsDeviceOf(device, elements)) {
                 continue;
             }
-            const auto densities = ReadRealVectorOfLength(std::format("onoise_{}", device), point_count,
+            const auto densities = ReadRealVectorOfLength(std::format("onoise_{}", device),
+                                                          point_count,
                                                           std::format("noise for {}", device));
             if (!densities) {
                 return std::unexpected(densities.error());
@@ -128,7 +129,8 @@ ReadNoiseContributions(const Circuit &circuit, const NoisePlots &plots, const st
         if (!has_noise || contribution.OutputTotal <= 0.0) {
             continue;
         }
-        std::ranges::transform(contribution.OutputDensities, contribution.OutputDensities.begin(),
+        std::ranges::transform(contribution.OutputDensities,
+                               contribution.OutputDensities.begin(),
                                [](const double power) { return std::sqrt(power); });
         contribution.OutputTotal = std::sqrt(contribution.OutputTotal);
         contributions.push_back(std::move(contribution));

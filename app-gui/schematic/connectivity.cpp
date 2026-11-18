@@ -119,8 +119,10 @@ PointClasses ClassifyPoints(const std::vector<std::unique_ptr<UIElement>> &eleme
  * @brief   Joins the two ends of every wire, and the points a wire passes through; a point reached that way counts for
  *          the junction dot, which returns the points where three or more connections meet.
  */
-std::vector<GridPoint> UniteWires(DisjointSet &nodes, const std::map<GridPoint, std::size_t> &index_of_point,
-                                  std::map<GridPoint, int> &connection_count, const std::vector<UIWire> &wires) {
+std::vector<GridPoint> UniteWires(DisjointSet &nodes,
+                                  const std::map<GridPoint, std::size_t> &index_of_point,
+                                  std::map<GridPoint, int> &connection_count,
+                                  const std::vector<UIWire> &wires) {
     std::vector<GridPoint> junctions;
     for (const UIWire &wire : wires) {
         nodes.Unite(index_of_point.at(wire.GetStart()), index_of_point.at(wire.GetEnd()));
@@ -142,7 +144,8 @@ std::vector<GridPoint> UniteWires(DisjointSet &nodes, const std::map<GridPoint, 
 /**
  * @brief   Labels with one name are one node, with or without a wire between them.
  */
-void UniteLabels(DisjointSet &nodes, const std::map<GridPoint, std::size_t> &index_of_point,
+void UniteLabels(DisjointSet &nodes,
+                 const std::map<GridPoint, std::size_t> &index_of_point,
                  const std::map<std::string, std::vector<GridPoint>> &labeled_points) {
     for (const auto &[name, points] : labeled_points) {
         for (const GridPoint point : points) {
@@ -154,7 +157,8 @@ void UniteLabels(DisjointSet &nodes, const std::map<GridPoint, std::size_t> &ind
 /**
  * @brief   Ground first as node 0, the rest in grid order from 1.
  */
-std::map<GridPoint, int> NumberNodes(DisjointSet &nodes, const std::map<GridPoint, std::size_t> &index_of_point,
+std::map<GridPoint, int> NumberNodes(DisjointSet &nodes,
+                                     const std::map<GridPoint, std::size_t> &index_of_point,
                                      const std::vector<GridPoint> &ground_points) {
     std::map<std::size_t, int> node_of_root;
     for (const GridPoint point : ground_points) {

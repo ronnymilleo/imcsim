@@ -12,8 +12,12 @@
 
 namespace GUI {
 
-void DrawLiveCurrent(SchematicCanvas &canvas, const ViewTransform &view, const Schematic &schematic,
-                     const Core::OperatingPoint &operating_point, const HeatScale &scale, double time);
+void DrawLiveCurrent(SchematicCanvas &canvas,
+                     const ViewTransform &view,
+                     const Schematic &schematic,
+                     const Core::OperatingPoint &operating_point,
+                     const HeatScale &scale,
+                     double time);
 
 } // namespace GUI
 

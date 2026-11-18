@@ -97,12 +97,16 @@ std::vector<CurrentProbe> ProbesFor(const Component &component, const bool add_c
  * @brief   Moves every probed terminal onto a node of its own, joined to its circuit node by a 0 V source whose current
  *          flows into the terminal, and returns the lines of those sources.
  */
-std::string ProbeTerminals(const Component &component, const std::vector<CurrentProbe> &probes, std::vector<int> &nodes,
+std::string ProbeTerminals(const Component &component,
+                           const std::vector<CurrentProbe> &probes,
+                           std::vector<int> &nodes,
                            int &next_probe_node) {
     std::string lines;
     for (const CurrentProbe &probe : probes) {
         const auto terminal = static_cast<std::size_t>(probe.Terminal);
-        lines += std::format("{} {} {} DC 0\n", GetCurrentProbeName(component, probe.Label), nodes[terminal],
+        lines += std::format("{} {} {} DC 0\n",
+                             GetCurrentProbeName(component, probe.Label),
+                             nodes[terminal],
                              next_probe_node);
         nodes[terminal] = next_probe_node++;
     }
@@ -112,7 +116,9 @@ std::string ProbeTerminals(const Component &component, const std::vector<Current
 /**
  * @brief   Parts that share a ready model share its line, written the first time the model comes up.
  */
-void AddModelLine(std::string spice_name, const std::string &line, std::vector<std::string> &written_names,
+void AddModelLine(std::string spice_name,
+                  const std::string &line,
+                  std::vector<std::string> &written_names,
                   std::string &models) {
     if (std::ranges::contains(written_names, spice_name)) {
         return;
@@ -134,8 +140,10 @@ std::string FormatComponentValue(const Component &component) {
  *          tied to its source, past its probe, so the source current includes it; a library model brings its own
  *          channel size.
  */
-std::string FormatModeledPart(const Component &component, const std::vector<int> &nodes,
-                              std::vector<std::string> &model_names, std::string &models) {
+std::string FormatModeledPart(const Component &component,
+                              const std::vector<int> &nodes,
+                              std::vector<std::string> &model_names,
+                              std::string &models) {
     const ComponentType type = component.GetType();
     if (IsDiode(type)) {
         const auto &diode = static_cast<const Diode &>(component);
@@ -160,8 +168,15 @@ std::string FormatModeledPart(const Component &component, const std::vector<int>
     }
     const MOSFETParameters &parameters = mosfet.GetParameters();
     AddModelLine(model_name, FormatMOSFETModel(type, model_name, parameters), model_names, models);
-    return std::format("{} {} {} {} {} {} W={:.6g} L={:.6g}\n", mosfet.GetName(), nodes[0], nodes[1], nodes[2],
-                       nodes[2], model_name, parameters.Width, parameters.Length);
+    return std::format("{} {} {} {} {} {} W={:.6g} L={:.6g}\n",
+                       mosfet.GetName(),
+                       nodes[0],
+                       nodes[1],
+                       nodes[2],
+                       nodes[2],
+                       model_name,
+                       parameters.Width,
+                       parameters.Length);
 }
 
 /**
@@ -256,17 +271,22 @@ std::string FormatClock(const Clock &clock, const std::vector<int> &nodes) {
     const double edge = CLOCK_EDGE_FRACTION * period;
     // Half of each edge lies above half the level, so the flat top is a whole edge shorter than the duty share
     const double width = std::max(figures.DutyCycle * period - edge, 0.0);
-    return std::format("{} {} 0 DC 0 PULSE(0 {} {} {} {} {} {})\n", clock.GetName(), nodes[0],
-                       FormatSpiceValue(figures.LogicLevel), FormatSpiceValue(figures.StartDelay),
-                       FormatSpiceValue(edge), FormatSpiceValue(edge), FormatSpiceValue(width),
+    return std::format("{} {} 0 DC 0 PULSE(0 {} {} {} {} {} {})\n",
+                       clock.GetName(),
+                       nodes[0],
+                       FormatSpiceValue(figures.LogicLevel),
+                       FormatSpiceValue(figures.StartDelay),
+                       FormatSpiceValue(edge),
+                       FormatSpiceValue(edge),
+                       FormatSpiceValue(width),
                        FormatSpiceValue(period));
 }
 
 /**
  * @brief   ngspice follows the current through a voltage source: the controlling part's own, or its probe.
  */
-std::string FormatCurrentControlledSource(const Circuit &circuit, const ControlledSource &source,
-                                          const std::vector<int> &nodes) {
+std::string
+FormatCurrentControlledSource(const Circuit &circuit, const ControlledSource &source, const std::vector<int> &nodes) {
     const std::string &current = source.GetControllingCurrent();
     const std::string control = FindControllingSource(circuit, current).value_or(current);
     return std::format("{} {} {} {} {}\n", source.GetName(), nodes[0], nodes[1], control, FormatComponentValue(source));
@@ -275,12 +295,16 @@ std::string FormatCurrentControlledSource(const Circuit &circuit, const Controll
 /**
  * @brief   A source the checks refuse still shows in the Netlist window, with its expression as the user wrote it.
  */
-std::string FormatBehavioralSource(const Circuit &circuit, const BehavioralSource &source,
-                                   const std::vector<int> &nodes) {
+std::string
+FormatBehavioralSource(const Circuit &circuit, const BehavioralSource &source, const std::vector<int> &nodes) {
     const auto expression = TranslateBehavioralExpression(
-        source.GetExpression(), [&circuit](const std::string_view net) { return circuit.FindNodeOfNet(net); },
+        source.GetExpression(),
+        [&circuit](const std::string_view net) { return circuit.FindNodeOfNet(net); },
         [&circuit](const std::string_view current) { return FindControllingSource(circuit, current); });
-    return std::format("{} {} {} {}={}\n", source.GetName(), nodes[0], nodes[1],
+    return std::format("{} {} {} {}={}\n",
+                       source.GetName(),
+                       nodes[0],
+                       nodes[1],
                        source.GetType() == ComponentType::BEHAVIORAL_VOLTAGE ? "V" : "I",
                        expression.value_or(source.GetExpression()));
 }
@@ -307,9 +331,17 @@ std::string FormatOpAmpPart(const OpAmp &op_amp, const std::vector<int> &nodes, 
         return FormatIdealOpAmp(op_amp, nodes, extras.NextExtraNode++);
     }
     const std::string subcircuit = op_amp.GetSpiceModelName();
-    AddModelLine(subcircuit, FormatOpAmpSubcircuit(subcircuit, op_amp.GetParameters()), extras.ModelNames,
+    AddModelLine(subcircuit,
+                 FormatOpAmpSubcircuit(subcircuit, op_amp.GetParameters()),
+                 extras.ModelNames,
                  extras.Models);
-    return std::format("X-{} {} {} {} {} {} {}\n", op_amp.GetName(), nodes[0], nodes[1], nodes[2], nodes[3], nodes[4],
+    return std::format("X-{} {} {} {} {} {} {}\n",
+                       op_amp.GetName(),
+                       nodes[0],
+                       nodes[1],
+                       nodes[2],
+                       nodes[3],
+                       nodes[4],
                        subcircuit);
 }
 
@@ -317,16 +349,24 @@ std::string FormatOpAmpPart(const OpAmp &op_amp, const std::vector<int> &nodes, 
  * @brief   The wiper, terminal 3, splits the track into two resistors.
  */
 std::string FormatPotentiometer(const Potentiometer &pot, const std::vector<int> &nodes) {
-    return std::format("R-{}a {} {} {}\n", pot.GetName(), nodes[0], nodes[2],
+    return std::format("R-{}a {} {} {}\n",
+                       pot.GetName(),
+                       nodes[0],
+                       nodes[2],
                        FormatSpiceValue(pot.GetFirstTrackResistance())) +
-           std::format("R-{}b {} {} {}\n", pot.GetName(), nodes[2], nodes[1],
+           std::format("R-{}b {} {} {}\n",
+                       pot.GetName(),
+                       nodes[2],
+                       nodes[1],
                        FormatSpiceValue(pot.GetSecondTrackResistance()));
 }
 
-std::string FormatVoltageSwitch(const VoltageControlledSwitch &controlled, const std::vector<int> &nodes,
-                                NetlistExtras &extras) {
+std::string
+FormatVoltageSwitch(const VoltageControlledSwitch &controlled, const std::vector<int> &nodes, NetlistExtras &extras) {
     const std::string model_name = std::format("SW-{}", controlled.GetName());
-    AddModelLine(model_name, FormatSwitchModel(model_name, controlled.GetParameters()), extras.ModelNames,
+    AddModelLine(model_name,
+                 FormatSwitchModel(model_name, controlled.GetParameters()),
+                 extras.ModelNames,
                  extras.Models);
     return std::format("{} {} {} {} {} {}\n", controlled.GetName(), nodes[0], nodes[1], nodes[2], nodes[3], model_name);
 }
@@ -339,10 +379,17 @@ std::string FormatRelay(const Relay &relay, const std::vector<int> &nodes, Netli
     const RelayParameters &figures = relay.GetParameters();
     const int coil_middle = extras.NextExtraNode++;
     const std::string model_name = std::format("SW-{}", relay.GetName());
-    AddModelLine(model_name, FormatSwitchModel(model_name, relay.GetContactParameters()), extras.ModelNames,
+    AddModelLine(model_name,
+                 FormatSwitchModel(model_name, relay.GetContactParameters()),
+                 extras.ModelNames,
                  extras.Models);
-    return std::format("R-{0}coil {1} {2} {3}\nL-{0}coil {2} {4} {5}\n", relay.GetName(), nodes[2], coil_middle,
-                       FormatSpiceValue(figures.CoilResistance), nodes[3], FormatSpiceValue(figures.CoilInductance)) +
+    return std::format("R-{0}coil {1} {2} {3}\nL-{0}coil {2} {4} {5}\n",
+                       relay.GetName(),
+                       nodes[2],
+                       coil_middle,
+                       FormatSpiceValue(figures.CoilResistance),
+                       nodes[3],
+                       FormatSpiceValue(figures.CoilInductance)) +
            std::format("S-{} {} {} {} {} {}\n", relay.GetName(), nodes[0], nodes[1], nodes[2], coil_middle, model_name);
 }
 
@@ -352,9 +399,14 @@ std::string FormatRelay(const Relay &relay, const std::vector<int> &nodes, Netli
 std::string FormatFuse(const Fuse &fuse, const std::vector<int> &nodes, NetlistExtras &extras) {
     const FuseParameters &figures = fuse.GetParameters();
     AddModelLine(GetFuseSubcircuitName(), FormatFuseSubcircuit(), extras.ModelNames, extras.Models);
-    return std::format("X-{} {} {} {} Ih={} Tau={} Rc={} Rb={}\n", fuse.GetName(), nodes[0], nodes[1],
-                       GetFuseSubcircuitName(), FormatSpiceValue(figures.RatedCurrent),
-                       FormatSpiceValue(GetCoolingTimeConstant(figures)), FormatSpiceValue(figures.ColdResistance),
+    return std::format("X-{} {} {} {} Ih={} Tau={} Rc={} Rb={}\n",
+                       fuse.GetName(),
+                       nodes[0],
+                       nodes[1],
+                       GetFuseSubcircuitName(),
+                       FormatSpiceValue(figures.RatedCurrent),
+                       FormatSpiceValue(GetCoolingTimeConstant(figures)),
+                       FormatSpiceValue(figures.ColdResistance),
                        FormatSpiceValue(figures.BlownResistance));
 }
 
@@ -366,10 +418,20 @@ std::string FormatTransformer(const Transformer &transformer, const std::vector<
     const int primary_middle = extras.NextExtraNode++;
     const int secondary_middle = extras.NextExtraNode++;
     const std::string &name = transformer.GetName();
-    return std::format("R-{0}p {1} {2} {3}\nL-{0}p {2} {4} {5}\n", name, nodes[0], primary_middle, resistance, nodes[1],
+    return std::format("R-{0}p {1} {2} {3}\nL-{0}p {2} {4} {5}\n",
+                       name,
+                       nodes[0],
+                       primary_middle,
+                       resistance,
+                       nodes[1],
                        FormatSpiceValue(transformer.GetValue())) +
-           std::format("R-{0}s {1} {2} {3}\nL-{0}s {2} {4} {5}\n", name, nodes[2], secondary_middle, resistance,
-                       nodes[3], FormatSpiceValue(transformer.GetSecondaryInductance())) +
+           std::format("R-{0}s {1} {2} {3}\nL-{0}s {2} {4} {5}\n",
+                       name,
+                       nodes[2],
+                       secondary_middle,
+                       resistance,
+                       nodes[3],
+                       FormatSpiceValue(transformer.GetSecondaryInductance())) +
            std::format("K-{0} L-{0}p L-{0}s {1}\n", name, FormatSpiceValue(transformer.GetParameters().Coupling));
 }
 
@@ -377,8 +439,8 @@ std::string FormatTransformer(const Transformer &transformer, const std::vector<
  * @brief   The lines of one part, on the nodes its terminals reach, which are the probe nodes where it is probed.
  * @details Ground, labels, pin markers and the parts that only read a node write no line.
  */
-std::string FormatPart(const Circuit &circuit, const Component &component, const std::vector<int> &nodes,
-                       NetlistExtras &extras) {
+std::string
+FormatPart(const Circuit &circuit, const Component &component, const std::vector<int> &nodes, NetlistExtras &extras) {
     const std::string &name = component.GetName();
     switch (component.GetType()) {
     case ComponentType::RESISTOR:
@@ -395,11 +457,18 @@ std::string FormatPart(const Circuit &circuit, const Component &component, const
         return FormatClock(static_cast<const Clock &>(component), nodes);
     case ComponentType::LOGIC_INPUT:
         // A constant source from its terminal to ground: the logic level when high, 0 V when low
-        return std::format("{} {} 0 DC {}\n", name, nodes[0],
+        return std::format("{} {} 0 DC {}\n",
+                           name,
+                           nodes[0],
                            FormatSpiceValue(static_cast<const LogicInput &>(component).GetVoltage()));
     case ComponentType::VCVS:
     case ComponentType::VCCS:
-        return std::format("{} {} {} {} {} {}\n", name, nodes[0], nodes[1], nodes[2], nodes[3],
+        return std::format("{} {} {} {} {} {}\n",
+                           name,
+                           nodes[0],
+                           nodes[1],
+                           nodes[2],
+                           nodes[3],
                            FormatComponentValue(component));
     case ComponentType::CCCS:
     case ComponentType::CCVS:
@@ -423,7 +492,10 @@ std::string FormatPart(const Circuit &circuit, const Component &component, const
         return FormatPotentiometer(static_cast<const Potentiometer &>(component), nodes);
     case ComponentType::SWITCH:
     case ComponentType::PUSH_BUTTON:
-        return std::format("R-{} {} {} {}\n", name, nodes[0], nodes[1],
+        return std::format("R-{} {} {} {}\n",
+                           name,
+                           nodes[0],
+                           nodes[1],
                            FormatSpiceValue(static_cast<const Switch &>(component).GetResistance()));
     case ComponentType::V_SWITCH:
         return FormatVoltageSwitch(static_cast<const VoltageControlledSwitch &>(component), nodes, extras);
@@ -504,9 +576,11 @@ std::string WriteSpiceNetlist(const Circuit &circuit, const std::string_view ana
         const Component &component = *entry.Part;
         // Probed parts connect through the probe nodes; the probe lines follow the part
         std::vector<int> nodes = entry.Nodes;
-        const std::string probes = ProbeTerminals(
-            component, ProbesFor(component, add_current_probes, CarriesCurrent(component, controlling_currents)), nodes,
-            extras.NextExtraNode);
+        const std::string probes =
+            ProbeTerminals(component,
+                           ProbesFor(component, add_current_probes, CarriesCurrent(component, controlling_currents)),
+                           nodes,
+                           extras.NextExtraNode);
         netlist += FormatPart(circuit, component, nodes, extras);
         netlist += probes;
     }
@@ -544,8 +618,12 @@ std::vector<std::string> GetElementNames(const Component &component) {
         return GetLogicElementNames(component);
     }
     if (type == ComponentType::OP_AMP && static_cast<const OpAmp &>(component).IsIdeal()) {
-        return {std::format("G-{}", name),   std::format("R-{}", name),   std::format("C-{}", name),
-                std::format("D-{}-P", name), std::format("D-{}-N", name), std::format("E-{}", name)};
+        return {std::format("G-{}", name),
+                std::format("R-{}", name),
+                std::format("C-{}", name),
+                std::format("D-{}-P", name),
+                std::format("D-{}-N", name),
+                std::format("E-{}", name)};
     }
     if (type == ComponentType::OP_AMP || type == ComponentType::FUSE) {
         return {std::format("X-{}", name)};
@@ -560,8 +638,11 @@ std::vector<std::string> GetElementNames(const Component &component) {
         return {std::format("R-{}coil", name), std::format("L-{}coil", name), std::format("S-{}", name)};
     }
     if (type == ComponentType::TRANSFORMER) {
-        return {std::format("R-{}p", name), std::format("L-{}p", name), std::format("R-{}s", name),
-                std::format("L-{}s", name), std::format("K-{}", name)};
+        return {std::format("R-{}p", name),
+                std::format("L-{}p", name),
+                std::format("R-{}s", name),
+                std::format("L-{}s", name),
+                std::format("K-{}", name)};
     }
     // Every other part is one element named after it
     return {name};

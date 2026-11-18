@@ -32,10 +32,15 @@ struct PassiveFields {
 void LoadPassiveFields(PassiveFields &fields, const Core::Component &component);
 
 // Drawing
-void DrawValue(Core::Component &component, ValueField &main_value, const std::vector<std::string> &block_parameters,
-               const Preferences &preferences, Schematic &schematic);
+void DrawValue(Core::Component &component,
+               ValueField &main_value,
+               const std::vector<std::string> &block_parameters,
+               const Preferences &preferences,
+               Schematic &schematic);
 void DrawInitialCondition(Core::Component &component, PassiveFields &fields, Schematic &schematic);
-void DrawTolerance(Core::Component &component, PassiveFields &fields, const Preferences &preferences,
+void DrawTolerance(Core::Component &component,
+                   PassiveFields &fields,
+                   const Preferences &preferences,
                    Schematic &schematic);
 void DrawWiper(Core::Potentiometer &pot, Schematic &schematic);
 

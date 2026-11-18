@@ -32,10 +32,14 @@ struct Selection {
     bool operator==(const Selection &) const = default;
 };
 
-Selection PickAt(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires,
-                 ImVec2 world_pos, float wire_tolerance);
-Selection PickInRectangle(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires,
-                          ImVec2 corner, ImVec2 opposite_corner);
+Selection PickAt(const std::vector<std::unique_ptr<UIElement>> &elements,
+                 const std::vector<UIWire> &wires,
+                 ImVec2 world_pos,
+                 float wire_tolerance);
+Selection PickInRectangle(const std::vector<std::unique_ptr<UIElement>> &elements,
+                          const std::vector<UIWire> &wires,
+                          ImVec2 corner,
+                          ImVec2 opposite_corner);
 Selection PickNode(const std::vector<UIWire> &wires, const Connectivity &connectivity, std::size_t wire_index);
 Selection PickAll(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires);
 Selection Toggled(const Selection &current, const Selection &picked);

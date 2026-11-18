@@ -47,7 +47,10 @@ class EditorToolbar {
 public:
     EditorToolbar(AnalysisControls &controls, AnalysisSettingsPanel &settings_panel, const Schematic &root_schematic);
 
-    ToolbarRequest Draw(const EditorMode &mode, const Schematic &schematic, bool is_editing_block, PartPicker &search,
+    ToolbarRequest Draw(const EditorMode &mode,
+                        const Schematic &schematic,
+                        bool is_editing_block,
+                        PartPicker &search,
                         const std::vector<const SavedSubcircuit *> &blocks);
 
 private:

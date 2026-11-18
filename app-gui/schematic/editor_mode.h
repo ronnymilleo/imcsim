@@ -106,8 +106,8 @@ std::optional<Core::ComponentType> GetPlacingType(const EditorMode &mode);
 
 // Status hints
 std::optional<std::string> DescribeMode(const EditorMode &mode);
-std::string DescribeSelecting(bool is_live, const std::optional<std::string> &selected_part,
-                              std::size_t selected_count);
+std::string
+DescribeSelecting(bool is_live, const std::optional<std::string> &selected_part, std::size_t selected_count);
 std::string DescribeEditorHint(const EditorMode &mode, Schematic &schematic, bool is_live);
 
 // Placing

@@ -9,3 +9,7 @@ AllowShortEnumsOnASingleLine: false
 AllowShortLoopsOnASingleLine: false
 AllowShortIfStatementsOnASingleLine: Never
 InsertBraces: true
+BinPackParameters: false
+BinPackArguments: false
+AllowAllParametersOfDeclarationOnNextLine: false
+AllowAllArgumentsOnNextLine: false

@@ -36,7 +36,9 @@ UISwitch::UISwitch(const Core::ComponentType type, const GridPoint position, con
     : UIElement(std::make_unique<Core::Switch>(type), position, rotation) {
 }
 
-void UISwitch::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
+void UISwitch::DrawSymbol(SchematicCanvas &canvas,
+                          const ViewTransform &view,
+                          const ImU32 color,
                           const SymbolStyle /*style*/) const {
     const ImVec2 origin = LocalToScreen(view, 0, 0);
     const ImVec2 unit = LocalToScreen(view, 1, 0) - origin;
@@ -47,16 +49,22 @@ void UISwitch::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, co
     if (!IsPushButton()) {
         // The lever swings from the first contact, down onto the second when closed
         const ImVec2 tip = IsClosed() ? ImVec2{CONTACT_X - CONTACT_RADIUS, 0.0f} : OPEN_LEVER_TIP;
-        canvas.AddLine(LocalToScreen(view, -CONTACT_X + CONTACT_RADIUS, 0), LocalToScreen(view, tip.x, tip.y), color,
+        canvas.AddLine(LocalToScreen(view, -CONTACT_X + CONTACT_RADIUS, 0),
+                       LocalToScreen(view, tip.x, tip.y),
+                       color,
                        LINE_THICKNESS);
         return;
     }
     const float bar_y = IsClosed() ? 0.0f : RAISED_BAR_Y;
-    canvas.AddLine(LocalToScreen(view, -BAR_HALF_LENGTH, bar_y), LocalToScreen(view, BAR_HALF_LENGTH, bar_y), color,
+    canvas.AddLine(LocalToScreen(view, -BAR_HALF_LENGTH, bar_y),
+                   LocalToScreen(view, BAR_HALF_LENGTH, bar_y),
+                   color,
                    LINE_THICKNESS);
     canvas.AddLine(LocalToScreen(view, 0, bar_y), LocalToScreen(view, 0, bar_y - STEM_LENGTH), color, LINE_THICKNESS);
     canvas.AddLine(LocalToScreen(view, -CAP_HALF_LENGTH, bar_y - STEM_LENGTH),
-                   LocalToScreen(view, CAP_HALF_LENGTH, bar_y - STEM_LENGTH), color, LINE_THICKNESS);
+                   LocalToScreen(view, CAP_HALF_LENGTH, bar_y - STEM_LENGTH),
+                   color,
+                   LINE_THICKNESS);
 }
 
 /**

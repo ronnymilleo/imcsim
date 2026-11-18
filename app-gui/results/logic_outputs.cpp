@@ -12,8 +12,10 @@ namespace GUI {
 
 namespace {
 
-std::optional<LogicState> ReadTerminal(const GridPoint terminal, const double logic_level,
-                                       const Connectivity &connectivity, const Core::OperatingPoint &point) {
+std::optional<LogicState> ReadTerminal(const GridPoint terminal,
+                                       const double logic_level,
+                                       const Connectivity &connectivity,
+                                       const Core::OperatingPoint &point) {
     const std::optional<int> node = connectivity.GetNode(terminal);
     if (!node || *node < 0 || static_cast<std::size_t>(*node) >= point.NodeVoltages.size()) {
         return std::nullopt;
@@ -31,8 +33,8 @@ std::optional<LogicState> ReadTerminal(const GridPoint terminal, const double lo
  * @return  0, 1 or unknown; none when the result has no voltage for its node, as for an output wired to nothing that
  *          was simulated.
  */
-std::optional<LogicState> ReadLogicOutput(const UIElement &output, const Connectivity &connectivity,
-                                          const Core::OperatingPoint &point) {
+std::optional<LogicState>
+ReadLogicOutput(const UIElement &output, const Connectivity &connectivity, const Core::OperatingPoint &point) {
     const double level = static_cast<const Core::LogicOutput &>(output.GetComponent()).GetParameters().LogicLevel;
     return ReadTerminal(output.GetTerminals().front(), level, connectivity, point);
 }
@@ -45,8 +47,8 @@ std::optional<LogicState> ReadLogicOutput(const UIElement &output, const Connect
  * @return  What each terminal reads, in terminal order, none for one the result has no voltage for; nothing for an
  *          element of another kind.
  */
-std::vector<std::optional<LogicState>> ReadLogicDisplay(const UIElement &display, const Connectivity &connectivity,
-                                                        const Core::OperatingPoint &point) {
+std::vector<std::optional<LogicState>>
+ReadLogicDisplay(const UIElement &display, const Connectivity &connectivity, const Core::OperatingPoint &point) {
     const Core::Component &component = display.GetComponent();
     double level = 0.0;
     if (component.GetType() == Core::ComponentType::LOGIC_OUTPUT) {

@@ -35,14 +35,20 @@ UICurrentSource::UICurrentSource(const GridPoint position, const Rotation rotati
  * @brief   The arrow points from the first terminal to the second, the way a positive current flows through the source.
  * @details ANSI draws it inside the circle; IEC, and any source showing its waveform, draw it outside.
  */
-void UICurrentSource::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
+void UICurrentSource::DrawSymbol(SchematicCanvas &canvas,
+                                 const ViewTransform &view,
+                                 const ImU32 color,
                                  const SymbolStyle style) const {
     const auto draw_arrow = [&](const float start, const float end, const float height) {
         canvas.AddLine(LocalToScreen(view, start, height), LocalToScreen(view, end, height), color, LINE_THICKNESS);
         canvas.AddLine(LocalToScreen(view, end - ARROW_HEAD_LENGTH, height - ARROW_HEAD_HALF_WIDTH),
-                       LocalToScreen(view, end, height), color, LINE_THICKNESS);
+                       LocalToScreen(view, end, height),
+                       color,
+                       LINE_THICKNESS);
         canvas.AddLine(LocalToScreen(view, end - ARROW_HEAD_LENGTH, height + ARROW_HEAD_HALF_WIDTH),
-                       LocalToScreen(view, end, height), color, LINE_THICKNESS);
+                       LocalToScreen(view, end, height),
+                       color,
+                       LINE_THICKNESS);
     };
 
     DrawCircle(canvas, view, color);
@@ -53,7 +59,9 @@ void UICurrentSource::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &v
     }
     if (!has_waveform) {
         // IEC crosses the circle with a bar perpendicular to the conductor
-        canvas.AddLine(LocalToScreen(view, 0, -CIRCLE_RADIUS), LocalToScreen(view, 0, CIRCLE_RADIUS), color,
+        canvas.AddLine(LocalToScreen(view, 0, -CIRCLE_RADIUS),
+                       LocalToScreen(view, 0, CIRCLE_RADIUS),
+                       color,
                        LINE_THICKNESS);
     }
     draw_arrow(OUTER_ARROW_START, OUTER_ARROW_END, -OUTER_ARROW_HEIGHT);

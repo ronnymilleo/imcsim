@@ -80,14 +80,16 @@ void Connect(Bench &bench, std::unique_ptr<GUI::UIElement> driver, const std::st
 
 void DriveLogic(Bench &bench, const std::string &pin, const bool is_high) {
     auto input = GUI::CreateElement(Core::ComponentType::LOGIC_INPUT,
-                                    {static_cast<int>(10 * bench.DriverCount++), DRIVER_ROW}, GUI::Rotation::R0);
+                                    {static_cast<int>(10 * bench.DriverCount++), DRIVER_ROW},
+                                    GUI::Rotation::R0);
     static_cast<Core::LogicInput &>(input->GetComponent()).SetHigh(is_high);
     Connect(bench, std::move(input), pin);
 }
 
 void DriveClock(Bench &bench, const std::string &pin) {
     auto clock = GUI::CreateElement(Core::ComponentType::CLOCK,
-                                    {static_cast<int>(10 * bench.DriverCount++), DRIVER_ROW}, GUI::Rotation::R0);
+                                    {static_cast<int>(10 * bench.DriverCount++), DRIVER_ROW},
+                                    GUI::Rotation::R0);
     // 1 kHz with the first rising edge at 0.5 ms, so edges land at 0.5, 1.5, 2.5 ms...
     static_cast<Core::Clock &>(clock->GetComponent())
         .SetParameters({.Frequency = 1e3, .DutyCycle = 0.5, .LogicLevel = 5.0, .StartDelay = 0.5e-3});
@@ -330,8 +332,18 @@ TEST_CASE("The BCD decoder lights the segments of each digit and none past 9", "
     SKIP_WITHOUT_DIGITAL_MODELS();
     // Segments a to g of 0 to 9, with the tails on 6 and 9
     const std::map<int, std::string> lit = {
-        {0, "abcdef"}, {1, "bc"},  {2, "abdeg"},   {3, "abcdg"},  {4, "bcfg"}, {5, "acdfg"},
-        {6, "acdefg"}, {7, "abc"}, {8, "abcdefg"}, {9, "abcdfg"}, {10, ""},    {15, ""},
+        {0, "abcdef"},
+        {1, "bc"},
+        {2, "abdeg"},
+        {3, "abcdg"},
+        {4, "bcfg"},
+        {5, "acdfg"},
+        {6, "acdefg"},
+        {7, "abc"},
+        {8, "abcdefg"},
+        {9, "abcdfg"},
+        {10, ""},
+        {15, ""},
     };
     for (const auto &[digit, segments] : lit) {
         CAPTURE(digit);

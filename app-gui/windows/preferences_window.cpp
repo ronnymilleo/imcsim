@@ -20,9 +20,13 @@ namespace {
 constexpr ImVec2 INITIAL_SIZE = {30.0f, 40.0f};
 /// Width of the column that names each choice, in font sizes.
 constexpr float LABEL_COLUMN_WIDTH = 12.0f;
-constexpr auto VALUE_SERIES =
-    std::to_array({Core::ValueSeries::FREE, Core::ValueSeries::E6, Core::ValueSeries::E12, Core::ValueSeries::E24,
-                   Core::ValueSeries::E48, Core::ValueSeries::E96, Core::ValueSeries::E192});
+constexpr auto VALUE_SERIES = std::to_array({Core::ValueSeries::FREE,
+                                             Core::ValueSeries::E6,
+                                             Core::ValueSeries::E12,
+                                             Core::ValueSeries::E24,
+                                             Core::ValueSeries::E48,
+                                             Core::ValueSeries::E96,
+                                             Core::ValueSeries::E192});
 
 std::string GetValueSeriesLabel(const Core::ValueSeries series) {
     if (series == Core::ValueSeries::FREE) {
@@ -223,8 +227,13 @@ void PreferencesWindow::DrawResults() {
                           "circuit, so the results follow your edits; a live run follows them already");
     BeginChoice("Wait after an edit");
     ImGui::BeginDisabled(!m_Preferences.RerunOnEdit);
-    ImGui::SliderScalar("##rerun_delay", ImGuiDataType_Double, &m_Preferences.RerunDelaySeconds,
-                        &MIN_RERUN_DELAY_SECONDS, &MAX_RERUN_DELAY_SECONDS, "%.1f s", ImGuiSliderFlags_AlwaysClamp);
+    ImGui::SliderScalar("##rerun_delay",
+                        ImGuiDataType_Double,
+                        &m_Preferences.RerunDelaySeconds,
+                        &MIN_RERUN_DELAY_SECONDS,
+                        &MAX_RERUN_DELAY_SECONDS,
+                        "%.1f s",
+                        ImGuiSliderFlags_AlwaysClamp);
     ImGui::EndDisabled();
     ImGui::SetItemTooltip("How long the circuit must stay unchanged before the analysis runs again: shorter follows "
                           "edits sooner, longer waits for a series of edits to end");

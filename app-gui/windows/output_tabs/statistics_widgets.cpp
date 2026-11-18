@@ -59,7 +59,9 @@ void DrawCursorTable(const CursorReadings &readings) {
     if (ImGui::GetContentRegionAvail().x < table_width) {
         ImGui::NewLine();
     }
-    if (!ImGui::BeginTable("cursor_readings", 2, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_RowBg,
+    if (!ImGui::BeginTable("cursor_readings",
+                           2,
+                           ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_RowBg,
                            {table_width, 0.0f})) {
         return;
     }
@@ -129,7 +131,8 @@ void DrawMeasuredValue(const char *name, const double value, const double scale,
     }
     DrawStatistic(name, std::format("~0{}", unit));
     ImGui::SetItemTooltip(
-        "%s", std::format("{}{}, negligible next to the trace", Core::FormatMeasurement(value), unit).c_str());
+        "%s",
+        std::format("{}{}, negligible next to the trace", Core::FormatMeasurement(value), unit).c_str());
 }
 
 /**
@@ -161,7 +164,9 @@ void DrawStatisticsHeader(const char *span_text) {
  * @note    The table is as wide as its widest cells, and the statistics panel scrolls sideways when the traces do not
  *          fit.
  */
-void DrawTraceTable(const char *id, const std::vector<PlottedTrace> &traces, const std::vector<StatisticsRow> &rows,
+void DrawTraceTable(const char *id,
+                    const std::vector<PlottedTrace> &traces,
+                    const std::vector<StatisticsRow> &rows,
                     const CursorReadings &cursor_readings) {
     const auto measure = [](const std::string &text) { return ImGui::CalcTextSize(text.c_str()).x; };
     // Each column is as wide as its widest text, so the table width is known before it begins
@@ -185,7 +190,9 @@ void DrawTraceTable(const char *id, const std::vector<PlottedTrace> &traces, con
     for (const float width : widths) {
         table_width += width + padding;
     }
-    if (!ImGui::BeginTable(id, static_cast<int>(widths.size()), ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_RowBg,
+    if (!ImGui::BeginTable(id,
+                           static_cast<int>(widths.size()),
+                           ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_RowBg,
                            {table_width, 0.0f})) {
         return;
     }
@@ -241,7 +248,9 @@ void DrawWithStatistics(const std::function<void()> &draw_plots, const std::func
     }
     ImGui::EndChild();
     ImGui::SetNextWindowSizeConstraints({0.0f, 0.0f}, {FLT_MAX, max_height});
-    if (ImGui::BeginChild("statistics", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY,
+    if (ImGui::BeginChild("statistics",
+                          ImVec2(0.0f, 0.0f),
+                          ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY,
                           ImGuiWindowFlags_HorizontalScrollbar)) {
         draw_statistics();
     }

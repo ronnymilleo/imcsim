@@ -108,7 +108,8 @@ double FuseDevice::TerminalCurrent(const int terminal, const std::vector<double>
     return terminal == 0 ? current : -current;
 }
 
-std::complex<double> FuseDevice::AcTerminalCurrent(const int terminal, const std::vector<double> & /*x_dc*/,
+std::complex<double> FuseDevice::AcTerminalCurrent(const int terminal,
+                                                   const std::vector<double> & /*x_dc*/,
                                                    const std::vector<std::complex<double>> &x_ac,
                                                    const double /*omega*/) const {
     const std::complex<double> voltage = AcNodeVoltage(x_ac, m_NodeA) - AcNodeVoltage(x_ac, m_NodeB);

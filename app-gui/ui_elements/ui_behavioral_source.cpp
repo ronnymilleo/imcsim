@@ -36,7 +36,8 @@ constexpr std::string_view ELLIPSIS = "\xE2\x80\xA6";
  * @param[in] position  Grid position in world units.
  * @param[in] rotation  Orientation on the grid.
  */
-UIBehavioralSource::UIBehavioralSource(const Core::ComponentType type, const GridPoint position,
+UIBehavioralSource::UIBehavioralSource(const Core::ComponentType type,
+                                       const GridPoint position,
                                        const Rotation rotation)
     : UIElement(std::make_unique<Core::BehavioralSource>(type), position, rotation) {
 }
@@ -53,10 +54,14 @@ void UIBehavioralSource::DrawTerminals(SchematicCanvas &canvas, const ViewTransf
  * @brief   A source that sets a voltage shows its polarity, + toward terminal 1; one that sets a current shows the way
  *          it pushes it, from terminal 1 to terminal 2 through itself, as SPICE does.
  */
-void UIBehavioralSource::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
+void UIBehavioralSource::DrawSymbol(SchematicCanvas &canvas,
+                                    const ViewTransform &view,
+                                    const ImU32 color,
                                     SymbolStyle /*style*/) const {
-    const ImVec2 diamond[4] = {LocalToScreen(view, 0, -DIAMOND_RADIUS), LocalToScreen(view, DIAMOND_RADIUS, 0),
-                               LocalToScreen(view, 0, DIAMOND_RADIUS), LocalToScreen(view, -DIAMOND_RADIUS, 0)};
+    const ImVec2 diamond[4] = {LocalToScreen(view, 0, -DIAMOND_RADIUS),
+                               LocalToScreen(view, DIAMOND_RADIUS, 0),
+                               LocalToScreen(view, 0, DIAMOND_RADIUS),
+                               LocalToScreen(view, -DIAMOND_RADIUS, 0)};
     canvas.AddPolyline(diamond, 4, color, ImDrawFlags_Closed, LINE_THICKNESS);
     if (GetComponent().GetType() == Core::ComponentType::BEHAVIORAL_VOLTAGE) {
         DrawSign(canvas, view, {0.0f, -INNER_SIGN_OFFSET}, true, color);
@@ -65,9 +70,13 @@ void UIBehavioralSource::DrawSymbol(SchematicCanvas &canvas, const ViewTransform
     }
     const ImVec2 tip = LocalToScreen(view, 0, ARROW_HALF_LENGTH);
     canvas.AddLine(LocalToScreen(view, 0, -ARROW_HALF_LENGTH), tip, color, LINE_THICKNESS);
-    canvas.AddLine(LocalToScreen(view, -ARROW_HEAD_HALF_WIDTH, ARROW_HALF_LENGTH - ARROW_HEAD_LENGTH), tip, color,
+    canvas.AddLine(LocalToScreen(view, -ARROW_HEAD_HALF_WIDTH, ARROW_HALF_LENGTH - ARROW_HEAD_LENGTH),
+                   tip,
+                   color,
                    LINE_THICKNESS);
-    canvas.AddLine(LocalToScreen(view, ARROW_HEAD_HALF_WIDTH, ARROW_HALF_LENGTH - ARROW_HEAD_LENGTH), tip, color,
+    canvas.AddLine(LocalToScreen(view, ARROW_HEAD_HALF_WIDTH, ARROW_HALF_LENGTH - ARROW_HEAD_LENGTH),
+                   tip,
+                   color,
                    LINE_THICKNESS);
 }
 
@@ -100,13 +109,20 @@ const Core::BehavioralSource &UIBehavioralSource::GetSource() const {
     return static_cast<const Core::BehavioralSource &>(GetComponent());
 }
 
-void UIBehavioralSource::DrawSign(SchematicCanvas &canvas, const ViewTransform &view, const ImVec2 center,
-                                  const bool plus, const ImU32 color) const {
+void UIBehavioralSource::DrawSign(SchematicCanvas &canvas,
+                                  const ViewTransform &view,
+                                  const ImVec2 center,
+                                  const bool plus,
+                                  const ImU32 color) const {
     canvas.AddLine(LocalToScreen(view, center.x - SIGN_HALF_SIZE, center.y),
-                   LocalToScreen(view, center.x + SIGN_HALF_SIZE, center.y), color, LINE_THICKNESS);
+                   LocalToScreen(view, center.x + SIGN_HALF_SIZE, center.y),
+                   color,
+                   LINE_THICKNESS);
     if (plus) {
         canvas.AddLine(LocalToScreen(view, center.x, center.y - SIGN_HALF_SIZE),
-                       LocalToScreen(view, center.x, center.y + SIGN_HALF_SIZE), color, LINE_THICKNESS);
+                       LocalToScreen(view, center.x, center.y + SIGN_HALF_SIZE),
+                       color,
+                       LINE_THICKNESS);
     }
 }
 

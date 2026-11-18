@@ -131,7 +131,8 @@ bool CarriesHeat(const Core::ComponentType type) {
  *                           overlays.
  * @param[in] preferences    How the schematic is colored; they must outlive the overlays.
  */
-SchematicOverlays::SchematicOverlays(GlowRenderer &glow_renderer, const TransientPlayback &playback,
+SchematicOverlays::SchematicOverlays(GlowRenderer &glow_renderer,
+                                     const TransientPlayback &playback,
                                      const Preferences &preferences)
     : m_GlowRenderer(glow_renderer), m_Playback(playback), m_Preferences(preferences) {
 }
@@ -152,7 +153,8 @@ void SchematicOverlays::Update(Schematic &schematic, const ResultStore &results,
     const auto &transient = results.GetTransient();
     const bool show_transient = transient && !transient->Times.empty() &&
                                 (!operating_point || controls.GetLastRun() != Analysis::OPERATING_POINT);
-    UpdateFuses(schematic, show_transient ? &*transient : nullptr,
+    UpdateFuses(schematic,
+                show_transient ? &*transient : nullptr,
                 show_transient ? std::optional(m_Playback.Time) : std::nullopt);
     if (!show_transient && !operating_point) {
         return;
@@ -200,7 +202,8 @@ void SchematicOverlays::Update(Schematic &schematic, const ResultStore &results,
  *          with a fuse already blown does not flash, and it lasts FUSE_FLASH_SECONDS of the screen clock, whatever the
  *          speed of the playback.
  */
-void SchematicOverlays::UpdateFuses(Schematic &schematic, const Core::Transient *shown,
+void SchematicOverlays::UpdateFuses(Schematic &schematic,
+                                    const Core::Transient *shown,
                                     const std::optional<double> instant) {
     const auto &elements = schematic.GetElements();
     if (shown == nullptr) {
@@ -256,7 +259,9 @@ const std::optional<DisplayedState> &SchematicOverlays::GetDisplayed() const {
  *          it. Wires carry no power, so they stay plain by power. Over heat colors a selected wire is marked by a halo
  *          instead of a color of its own, which could pass for a value on the scale.
  */
-void SchematicOverlays::DrawWires(SchematicCanvas &canvas, const ViewTransform &view, Schematic &schematic,
+void SchematicOverlays::DrawWires(SchematicCanvas &canvas,
+                                  const ViewTransform &view,
+                                  Schematic &schematic,
                                   const float zoom) const {
     const Connectivity &connectivity = schematic.GetConnectivity();
     const auto &wires = schematic.GetWires();
@@ -301,7 +306,9 @@ void SchematicOverlays::DrawWires(SchematicCanvas &canvas, const ViewTransform &
  * @param[in]     marks_live_parts  Whether to outline the parts the user sets during a live run.
  * @param[in]     lit_live_part     The live part under the cursor or held, outlined more strongly, or none.
  */
-void SchematicOverlays::DrawElements(SchematicCanvas &canvas, const ViewTransform &view, const Schematic &schematic,
+void SchematicOverlays::DrawElements(SchematicCanvas &canvas,
+                                     const ViewTransform &view,
+                                     const Schematic &schematic,
                                      const bool marks_live_parts,
                                      const std::optional<std::size_t> lit_live_part) const {
     const auto &elements = schematic.GetElements();
@@ -328,7 +335,9 @@ void SchematicOverlays::DrawElements(SchematicCanvas &canvas, const ViewTransfor
  * @param[in] zoom       Pixels per grid unit, which sizes the glows.
  * @details Additive light needs a dark background, so light themes blend the glows instead.
  */
-void SchematicOverlays::DrawGlows(ImDrawList *draw_list, const ViewTransform &view, const Schematic &schematic,
+void SchematicOverlays::DrawGlows(ImDrawList *draw_list,
+                                  const ViewTransform &view,
+                                  const Schematic &schematic,
                                   const float zoom) const {
     const bool leds = m_Preferences.IsEffectOn(LiveEffect::LED_GLOW);
     const bool resistors = m_Preferences.IsEffectOn(LiveEffect::HEAT_GLOW);
@@ -338,7 +347,10 @@ void SchematicOverlays::DrawGlows(ImDrawList *draw_list, const ViewTransform &vi
     const bool additive = !GetPalette().Light;
     const float intensity = additive ? ADDITIVE_GLOW_INTENSITY : BLENDED_GLOW_INTENSITY;
     std::vector<Glow> glows;
-    const auto add_glow = [&](const GridPoint center, ImVec4 light, const float brightness, const float min_radius,
+    const auto add_glow = [&](const GridPoint center,
+                              ImVec4 light,
+                              const float brightness,
+                              const float min_radius,
                               const float max_radius) {
         light.w = intensity * brightness;
         const float radius = min_radius + (max_radius - min_radius) * brightness;
@@ -409,8 +421,11 @@ void SchematicOverlays::DrawNodeVoltages(ImDrawList *draw_list, const ViewTransf
         draw_list->AddRect(corner, corner + size, border, rounding);
         const ImVec2 dot_center = {corner.x + padding.x + dot_radius, corner.y + size.y / 2.0f};
         draw_list->AddCircleFilled(dot_center, dot_radius, GetNodeColor(*node));
-        draw_list->AddText(font, font_size, {dot_center.x + dot_radius + padding.x, corner.y + padding.y},
-                           palette.VoltageLabel, text.c_str());
+        draw_list->AddText(font,
+                           font_size,
+                           {dot_center.x + dot_radius + padding.x, corner.y + padding.y},
+                           palette.VoltageLabel,
+                           text.c_str());
     };
 
     for (const UIWire &wire : schematic.GetWires()) {
@@ -462,7 +477,9 @@ void SchematicOverlays::DrawHoveredValue(const MeasurementTarget &target, Schema
  *                          its output.
  * @note    Nothing shows unless the preferences color by voltage, current, power or sensitivity.
  */
-void SchematicOverlays::DrawColorLegend(ImDrawList *draw_list, const ImVec2 origin, const ImVec2 size,
+void SchematicOverlays::DrawColorLegend(ImDrawList *draw_list,
+                                        const ImVec2 origin,
+                                        const ImVec2 size,
                                         Schematic &schematic) const {
     if (m_Preferences.WireColors != WireColoring::VOLTAGE && m_Preferences.WireColors != WireColoring::CURRENT &&
         m_Preferences.WireColors != WireColoring::POWER && m_Preferences.WireColors != WireColoring::SENSITIVITY) {
@@ -473,7 +490,8 @@ void SchematicOverlays::DrawColorLegend(ImDrawList *draw_list, const ImVec2 orig
     const std::optional<LegendLabels> labels = GetLegendLabels(schematic);
     if (!labels) {
         const bool is_sensitivity = m_Preferences.WireColors == WireColoring::SENSITIVITY;
-        draw_list->AddText(corner, GetPalette().CanvasText,
+        draw_list->AddText(corner,
+                           GetPalette().CanvasText,
                            is_sensitivity
                                ? "Run a sensitivity analysis to color the parts by their influence on its output"
                                : "Run an operating point (.op) or a transient to color by voltage, current or power");
@@ -488,7 +506,8 @@ void SchematicOverlays::DrawColorLegend(ImDrawList *draw_list, const ImVec2 orig
     for (int step = 0; step < LEGEND_STEPS; ++step) {
         const float left = corner.x + bar_size.x * static_cast<float>(step) / LEGEND_STEPS;
         const float right = corner.x + bar_size.x * static_cast<float>(step + 1) / LEGEND_STEPS;
-        draw_list->AddRectFilled({left, corner.y}, {right, corner.y + bar_size.y},
+        draw_list->AddRectFilled({left, corner.y},
+                                 {right, corner.y + bar_size.y},
                                  GetHeatColor((static_cast<float>(step) + 0.5f) / LEGEND_STEPS));
     }
     const float text_y = corner.y + bar_size.y + 2.0f;
@@ -500,15 +519,18 @@ void SchematicOverlays::DrawColorLegend(ImDrawList *draw_list, const ImVec2 orig
 /**
  * @brief   Over heat colors a selected wire has a halo behind it.
  */
-void SchematicOverlays::DrawWireSelectionHalos(SchematicCanvas &canvas, const ViewTransform &view,
+void SchematicOverlays::DrawWireSelectionHalos(SchematicCanvas &canvas,
+                                               const ViewTransform &view,
                                                const Schematic &schematic) const {
     if (!AreWiresHeatColored()) {
         return;
     }
     for (const std::size_t selected : schematic.GetSelectedWires()) {
         const UIWire &wire = schematic.GetWires()[selected];
-        canvas.AddLine(view.ToScreen(ToVec2(wire.GetStart())), view.ToScreen(ToVec2(wire.GetEnd())),
-                       WithAlpha(GetPalette().Selected, SELECTION_HALO_ALPHA), LINE_THICKNESS + SELECTION_HALO_EXTRA);
+        canvas.AddLine(view.ToScreen(ToVec2(wire.GetStart())),
+                       view.ToScreen(ToVec2(wire.GetEnd())),
+                       WithAlpha(GetPalette().Selected, SELECTION_HALO_ALPHA),
+                       LINE_THICKNESS + SELECTION_HALO_EXTRA);
     }
 }
 
@@ -516,7 +538,8 @@ void SchematicOverlays::DrawWireSelectionHalos(SchematicCanvas &canvas, const Vi
  * @brief   Each piece of wire takes the heat color of its own current, so the path of the current shows along the
  *          wires.
  */
-void SchematicOverlays::DrawWireCurrents(SchematicCanvas &canvas, const ViewTransform &view,
+void SchematicOverlays::DrawWireCurrents(SchematicCanvas &canvas,
+                                         const ViewTransform &view,
                                          const Schematic &schematic) const {
     if (!m_Displayed) {
         return;
@@ -531,7 +554,8 @@ void SchematicOverlays::DrawWireCurrents(SchematicCanvas &canvas, const ViewTran
 /**
  * @brief   The number of the node on the middle of each wire.
  */
-void SchematicOverlays::DrawNodeNumbers(SchematicCanvas &canvas, const ViewTransform &view,
+void SchematicOverlays::DrawNodeNumbers(SchematicCanvas &canvas,
+                                        const ViewTransform &view,
                                         Schematic &schematic) const {
     const Connectivity &connectivity = schematic.GetConnectivity();
     for (const UIWire &wire : schematic.GetWires()) {
@@ -583,8 +607,9 @@ ImU32 SchematicOverlays::GetElementColor(const Schematic &schematic, const std::
     }
     double current = 0.0;
     for (std::size_t terminal = 0; terminal < element.GetTerminals().size(); ++terminal) {
-        current = std::max(
-            current, std::abs(GetTerminalCurrent(component, terminal, m_Displayed->Point.Currents).value_or(0.0)));
+        current =
+            std::max(current,
+                     std::abs(GetTerminalCurrent(component, terminal, m_Displayed->Point.Currents).value_or(0.0)));
     }
     return GetHeatColor(CurrentLevel(current, m_Displayed->Scale.LargestCurrent));
 }
@@ -613,7 +638,9 @@ ImU32 SchematicOverlays::GetSensitivityColor(const Schematic &schematic, const s
  *          a 7-segment display that read 1, and lights a logic input that is high with that effect; nothing for the
  *          other parts, nor for a display before there is a result.
  */
-void SchematicOverlays::DrawLogicReading(SchematicCanvas &canvas, const ViewTransform &view, const UIElement &element,
+void SchematicOverlays::DrawLogicReading(SchematicCanvas &canvas,
+                                         const ViewTransform &view,
+                                         const UIElement &element,
                                          const std::size_t index) const {
     const bool are_lights_on = m_Preferences.IsEffectOn(LiveEffect::LOGIC_LIGHTS);
     if (element.GetComponent().GetType() == Core::ComponentType::LOGIC_INPUT) {

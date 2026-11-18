@@ -47,28 +47,43 @@ inline constexpr ImU32 INPUT_NOISE_COLOR = IM_COL32(150, 230, 90, 255);
 bool HasMeasuredCurrent(const std::vector<Core::ComponentTrace> &currents, const Schematic &schematic);
 std::vector<int> ListNodes(const std::vector<LogicNode> &lanes);
 bool CurvesDiffer(const std::vector<const std::vector<double> *> &curves, std::size_t sample);
-std::vector<CurveFamily> ListCurveFamilies(const Core::DCSweep &sweep, Schematic &schematic, bool show_currents,
+std::vector<CurveFamily> ListCurveFamilies(const Core::DCSweep &sweep,
+                                           Schematic &schematic,
+                                           bool show_currents,
                                            const std::vector<std::vector<MathTrace>> &math);
 std::string FormatStepLabel(const Core::DCSweep &sweep, const Core::DCSweepCurve &curve);
 bool HasInputGain(const Core::Noise &noise);
 std::string GetDensityUnit(const std::string &unit);
 
 // Figures
-ExportFigure BuildTransientFigure(const Core::Transient &transient, const std::vector<MathTrace> &math,
-                                  const std::vector<LogicNode> &lanes, const std::vector<BusLane> &buses,
-                                  Schematic &schematic, bool bit_values, const PlotSpan &view);
-ExportFigure BuildSpectrumFigure(const TransientSpectra &spectra, bool logarithmic, bool is_density,
-                                 const PlotSpan &view);
-ExportFigure BuildACSweepFigure(const Core::ACSweep &sweep, const ACMathTraces &math, const ResultStore &results,
-                                Schematic &schematic, const PlotSpan &view);
-ExportFigure BuildDCSweepFigure(const Core::DCSweep &sweep, const std::vector<std::vector<MathTrace>> &math,
-                                Schematic &schematic, const PlotSpan &view);
-ExportFigure BuildNoiseFigure(const Core::Noise &noise, Schematic &schematic, const std::set<std::string> &shown,
+ExportFigure BuildTransientFigure(const Core::Transient &transient,
+                                  const std::vector<MathTrace> &math,
+                                  const std::vector<LogicNode> &lanes,
+                                  const std::vector<BusLane> &buses,
+                                  Schematic &schematic,
+                                  bool bit_values,
+                                  const PlotSpan &view);
+ExportFigure
+BuildSpectrumFigure(const TransientSpectra &spectra, bool logarithmic, bool is_density, const PlotSpan &view);
+ExportFigure BuildACSweepFigure(const Core::ACSweep &sweep,
+                                const ACMathTraces &math,
+                                const ResultStore &results,
+                                Schematic &schematic,
+                                const PlotSpan &view);
+ExportFigure BuildDCSweepFigure(const Core::DCSweep &sweep,
+                                const std::vector<std::vector<MathTrace>> &math,
+                                Schematic &schematic,
+                                const PlotSpan &view);
+ExportFigure BuildNoiseFigure(const Core::Noise &noise,
+                              Schematic &schematic,
+                              const std::set<std::string> &shown,
                               const PlotSpan &view);
 ExportFigure BuildACSensitivityFigure(const Core::ACSensitivity &sensitivity,
                                       const std::vector<ACSensitivityCurve> &curves,
-                                      const std::vector<ImU32> &part_colors, const std::set<std::string> &shown,
-                                      const std::string &output_label, const PlotSpan &view);
+                                      const std::vector<ImU32> &part_colors,
+                                      const std::set<std::string> &shown,
+                                      const std::string &output_label,
+                                      const PlotSpan &view);
 
 } // namespace GUI
 

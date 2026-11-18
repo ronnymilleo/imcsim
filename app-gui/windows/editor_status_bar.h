@@ -16,8 +16,12 @@
 namespace GUI {
 
 // Drawing
-void DrawStatusBar(const EditorMode &mode, Schematic &schematic, const AnalysisControls &controls,
-                   const std::optional<Core::Transient> &transient, const ViewTransform &view, bool hovered);
+void DrawStatusBar(const EditorMode &mode,
+                   Schematic &schematic,
+                   const AnalysisControls &controls,
+                   const std::optional<Core::Transient> &transient,
+                   const ViewTransform &view,
+                   bool hovered);
 
 } // namespace GUI
 

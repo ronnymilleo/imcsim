@@ -40,8 +40,12 @@ constexpr float FLOW_SPEED = 1.5f;
  *          current is below the heat scale, down to none at all, are left out: they are noise next to the rest, and
  *          in a transient their direction would flicker.
  */
-void DrawLiveCurrent(SchematicCanvas &canvas, const ViewTransform &view, const Schematic &schematic,
-                     const Core::OperatingPoint &operating_point, const HeatScale &scale, const double time) {
+void DrawLiveCurrent(SchematicCanvas &canvas,
+                     const ViewTransform &view,
+                     const Schematic &schematic,
+                     const Core::OperatingPoint &operating_point,
+                     const HeatScale &scale,
+                     const double time) {
     const double largest = scale.LargestCurrent;
     if (largest <= 0.0) {
         return;
@@ -70,13 +74,16 @@ void DrawLiveCurrent(SchematicCanvas &canvas, const ViewTransform &view, const S
         const float high = std::max(start_projection, end_projection) - FLOW_ARROW_LENGTH * 0.5f;
         const ImU32 color = GetHeatColor(std::min(level, 1.0f));
         for (int arrow = static_cast<int>(std::ceil((low - phase) / FLOW_ARROW_SPACING));
-             arrow <= static_cast<int>(std::floor((high - phase) / FLOW_ARROW_SPACING)); ++arrow) {
+             arrow <= static_cast<int>(std::floor((high - phase) / FLOW_ARROW_SPACING));
+             ++arrow) {
             const float distance = phase + static_cast<float>(arrow) * FLOW_ARROW_SPACING - start_projection;
             const ImVec2 center = start + flow * distance;
             const ImVec2 tip = center + flow * (FLOW_ARROW_LENGTH * 0.5f);
             const ImVec2 back = center - flow * (FLOW_ARROW_LENGTH * 0.5f);
-            canvas.AddTriangleFilled(view.ToScreen(tip), view.ToScreen(back + across * FLOW_ARROW_HALF_WIDTH),
-                                     view.ToScreen(back - across * FLOW_ARROW_HALF_WIDTH), color);
+            canvas.AddTriangleFilled(view.ToScreen(tip),
+                                     view.ToScreen(back + across * FLOW_ARROW_HALF_WIDTH),
+                                     view.ToScreen(back - across * FLOW_ARROW_HALF_WIDTH),
+                                     color);
         }
     }
 }

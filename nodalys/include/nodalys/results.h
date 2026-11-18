@@ -173,14 +173,14 @@ struct SParameterResult {
     }
 
     /// Z(row, column) at a frequency; none when the result has no impedance matrices or the circuit has no finite Z.
-    std::optional<std::complex<double>> Impedance(const std::size_t frequency_idx, const int row,
-                                                  const int column) const {
+    std::optional<std::complex<double>>
+    Impedance(const std::size_t frequency_idx, const int row, const int column) const {
         return ReadMatrix(ImpedanceMatrices, frequency_idx, row, column);
     }
 
     /// Y(row, column) at a frequency; none when the result has no admittance matrices or the circuit has no finite Y.
-    std::optional<std::complex<double>> Admittance(const std::size_t frequency_idx, const int row,
-                                                   const int column) const {
+    std::optional<std::complex<double>>
+    Admittance(const std::size_t frequency_idx, const int row, const int column) const {
         return ReadMatrix(AdmittanceMatrices, frequency_idx, row, column);
     }
 
@@ -194,8 +194,8 @@ struct SParameterResult {
         return -20.0 * std::log10(mag);
     }
 
-    std::optional<double> InsertionLossDb(const std::size_t frequency_idx, const int to_port,
-                                          const int from_port) const {
+    std::optional<double>
+    InsertionLossDb(const std::size_t frequency_idx, const int to_port, const int from_port) const {
         constexpr double MIN_MAG = 1e-15;
         const auto s = Get(frequency_idx, to_port, from_port);
         const double mag = std::abs(s);
@@ -230,7 +230,8 @@ struct SParameterResult {
 
 private:
     std::optional<std::complex<double>> ReadMatrix(const std::vector<std::optional<PortMatrix>> &matrices,
-                                                   const std::size_t frequency_idx, const int row,
+                                                   const std::size_t frequency_idx,
+                                                   const int row,
                                                    const int column) const {
         if (frequency_idx >= matrices.size()) {
             return std::nullopt;
@@ -351,9 +352,17 @@ struct HarmonicBalanceResult {
 
 [[nodiscard]] double ComputeThd(std::span<const std::complex<double>> phasors);
 
-using SimulationResult = std::variant<OperatingPointResult, TransientResult, DcSweepResult, AcSweepResult,
-                                      TransferFunctionResult, NoiseResult, SParameterResult, PoleZeroResult,
-                                      SensitivityResult, AcSensitivityResult, HarmonicBalanceResult>;
+using SimulationResult = std::variant<OperatingPointResult,
+                                      TransientResult,
+                                      DcSweepResult,
+                                      AcSweepResult,
+                                      TransferFunctionResult,
+                                      NoiseResult,
+                                      SParameterResult,
+                                      PoleZeroResult,
+                                      SensitivityResult,
+                                      AcSensitivityResult,
+                                      HarmonicBalanceResult>;
 
 } // namespace Nodalys
 

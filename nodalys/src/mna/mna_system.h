@@ -137,7 +137,8 @@ public:
      * @param[out] solutions Output list of complex solution vectors.
      * @return  False if the complex matrix at frequency $\omega$ is singular.
      */
-    bool SolveAcMultiple(const MnaSystem &reactive, double omega,
+    bool SolveAcMultiple(const MnaSystem &reactive,
+                         double omega,
                          const std::vector<std::vector<std::complex<double>>> &rhs_list,
                          std::vector<std::vector<std::complex<double>>> &solutions) const;
 
@@ -146,7 +147,9 @@ public:
      * \lambda = e_{\text{out}}$ for a unit excitation at `output_unknown`, used by small-signal noise analysis
      * (`.noise`).
      */
-    bool SolveAcTranspose(const MnaSystem &reactive, double omega, int output_unknown,
+    bool SolveAcTranspose(const MnaSystem &reactive,
+                          double omega,
+                          int output_unknown,
                           std::vector<std::complex<double>> &adjoint) const;
 
     /**
@@ -154,7 +157,9 @@ public:
      *          complex right-hand side, which the AC sensitivity uses for an output that is a node difference.
      * @return  False if the matrix is singular or the sizes differ.
      */
-    bool SolveAcTransposeFor(const MnaSystem &reactive, double omega, const std::vector<std::complex<double>> &rhs,
+    bool SolveAcTransposeFor(const MnaSystem &reactive,
+                             double omega,
+                             const std::vector<std::complex<double>> &rhs,
                              std::vector<std::complex<double>> &adjoint) const;
 
     /**

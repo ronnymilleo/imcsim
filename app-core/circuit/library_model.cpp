@@ -97,8 +97,9 @@ std::optional<LibraryModel> ReadLibraryModel(const std::string_view text) {
     if (!model_text.ends_with('\n')) {
         model_text += '\n';
     }
-    return LibraryModel{
-        .Name = std::string(text.substr(name->first, name->second)), .Kind = kind->Kind, .Text = std::move(model_text)};
+    return LibraryModel{.Name = std::string(text.substr(name->first, name->second)),
+                        .Kind = kind->Kind,
+                        .Text = std::move(model_text)};
 }
 
 /**

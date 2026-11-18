@@ -32,8 +32,11 @@ double FindPeak(const Nodalys::TransientResult &result, const int node) {
  * @details The steps stay at the output step as long as the truncation error is small, which the circuits of the
  *          accuracy tests keep, so halving the output step halves every step.
  */
-Nodalys::TransientResult RunTransient(const Nodalys::Circuit &circuit, const double stop_time, const double time_step,
-                                      const Nodalys::IntegrationMethod method, const bool uses_initial_conditions) {
+Nodalys::TransientResult RunTransient(const Nodalys::Circuit &circuit,
+                                      const double stop_time,
+                                      const double time_step,
+                                      const Nodalys::IntegrationMethod method,
+                                      const bool uses_initial_conditions) {
     const Nodalys::TransientConfig config{.StopTime = stop_time,
                                           .TimeStep = time_step,
                                           .MaxStep = time_step,
@@ -107,7 +110,9 @@ double ReadNodeAt(const Nodalys::TransientResult &result, const int node, const 
  * @details A wrong history in the companion model of a device makes a method drift away from the other one, so the
  *          agreement tests that each charge of the device is integrated by both formulas.
  */
-void CheckMethodsAgree(const Nodalys::Circuit &circuit, const int node, const double stop_time,
+void CheckMethodsAgree(const Nodalys::Circuit &circuit,
+                       const int node,
+                       const double stop_time,
                        const double time_step) {
     const Nodalys::TransientResult trapezoidal =
         RunTransient(circuit, stop_time, time_step, Nodalys::IntegrationMethod::TRAPEZOIDAL, false);
@@ -126,8 +131,13 @@ void CheckMethodsAgree(const Nodalys::Circuit &circuit, const int node, const do
 
 TEST_CASE("A pulse narrower than the time step still drives the circuit", "[nodalys][transient]") {
     // 2 us at 5 V between output points 10 us apart, into an RC of 1 us
-    const Nodalys::PulseParameters pulse{
-        .Low = 0.0, .High = 5.0, .Delay = 11e-6, .RiseTime = 1e-9, .FallTime = 1e-9, .Width = 2e-6, .Period = 100e-6};
+    const Nodalys::PulseParameters pulse{.Low = 0.0,
+                                         .High = 5.0,
+                                         .Delay = 11e-6,
+                                         .RiseTime = 1e-9,
+                                         .FallTime = 1e-9,
+                                         .Width = 2e-6,
+                                         .Period = 100e-6};
     Nodalys::CircuitBuilder builder;
     builder.AddVpulse("V1", 1, 0, pulse);
     builder.AddResistor("R1", 1, 2, 1e3);
@@ -164,8 +174,8 @@ TEST_CASE("A clock edge lands on an output point even between two of them", "[no
 }
 
 TEST_CASE("The corners of a pulse come in order, edge by edge and period by period", "[nodalys][transient]") {
-    const Nodalys::PulseParameters pulse{
-        .Low = 0.0, .High = 1.0, .Delay = 1.0, .RiseTime = 0.1, .FallTime = 0.2, .Width = 0.5, .Period = 2.0};
+    const Nodalys::PulseParameters
+        pulse{.Low = 0.0, .High = 1.0, .Delay = 1.0, .RiseTime = 0.1, .FallTime = 0.2, .Width = 0.5, .Period = 2.0};
 
     CHECK_THAT(Nodalys::FindNextPulseCorner(pulse, 0.0), WithinRel(1.0));
     CHECK_THAT(Nodalys::FindNextPulseCorner(pulse, 1.0), WithinRel(1.1));
@@ -177,8 +187,8 @@ TEST_CASE("The corners of a pulse come in order, edge by edge and period by peri
 }
 
 TEST_CASE("A single pulse has no corner once it has ended", "[nodalys][transient]") {
-    const Nodalys::PulseParameters pulse{
-        .Low = 0.0, .High = 1.0, .Delay = 0.0, .RiseTime = 0.1, .FallTime = 0.1, .Width = 0.3, .Period = 0.0};
+    const Nodalys::PulseParameters
+        pulse{.Low = 0.0, .High = 1.0, .Delay = 0.0, .RiseTime = 0.1, .FallTime = 0.1, .Width = 0.3, .Period = 0.0};
 
     CHECK_THAT(Nodalys::FindNextPulseCorner(pulse, 0.45), WithinRel(0.5));
     CHECK(Nodalys::FindNextPulseCorner(pulse, 0.5) == std::numeric_limits<double>::infinity());
@@ -259,10 +269,12 @@ TEST_CASE("Gear-2 settles an inductor whose current is cut, where the trapezoida
     builder.AddVdc("V1", 1, 0, 10.0);
     builder.AddResistor("R1", 1, 2, 10.0);
     builder.AddVpulse(
-        "VC", 5, 0,
+        "VC",
+        5,
+        0,
         {.Low = 5.0, .High = 0.0, .Delay = CUT_TIME, .RiseTime = 1e-9, .FallTime = 1e-9, .Width = 1.0, .Period = 2.0});
-    builder.AddSwitch("S1", 2, 3, 5, 0,
-                      {.Threshold = 2.5, .Hysteresis = 0.1, .OnResistance = 0.01, .OffResistance = 1e9});
+    builder
+        .AddSwitch("S1", 2, 3, 5, 0, {.Threshold = 2.5, .Hysteresis = 0.1, .OnResistance = 0.01, .OffResistance = 1e9});
     builder.AddInductor("L1", 3, 0, 1e-3);
     auto circuit = builder.Build();
     REQUIRE(circuit.has_value());
@@ -288,7 +300,9 @@ TEST_CASE("Gear-2 follows an underdamped RLC step with the adaptive step", "[nod
     const double omega_d = std::sqrt(1e8 - ALPHA * ALPHA);
     Nodalys::CircuitBuilder builder;
     builder.AddVpulse(
-        "V1", 1, 0,
+        "V1",
+        1,
+        0,
         {.Low = 0.0, .High = 10.0, .Delay = 0.0, .RiseTime = 1e-9, .FallTime = 1e-9, .Width = 1.0, .Period = 2.0});
     builder.AddResistor("R1", 1, 2, 20.0);
     builder.AddInductor("L1", 2, 3, 10e-3);
@@ -311,8 +325,8 @@ TEST_CASE("Gear-2 follows an underdamped RLC step with the adaptive step", "[nod
 
 TEST_CASE("Gear-2 integrates the junction charges of a diode, a BJT and a MOSFET like the trapezoidal rule",
           "[nodalys][transient][gear]") {
-    const Nodalys::PulseParameters step{
-        .Low = 0.0, .High = 5.0, .Delay = 0.0, .RiseTime = 1e-9, .FallTime = 1e-9, .Width = 1.0, .Period = 2.0};
+    const Nodalys::PulseParameters
+        step{.Low = 0.0, .High = 5.0, .Delay = 0.0, .RiseTime = 1e-9, .FallTime = 1e-9, .Width = 1.0, .Period = 2.0};
 
     SECTION("A diode with a junction capacitance and a transit time") {
         Nodalys::CircuitBuilder builder;
@@ -330,7 +344,11 @@ TEST_CASE("Gear-2 integrates the junction charges of a diode, a BJT and a MOSFET
         builder.AddVpulse("V1", 1, 0, step);
         builder.AddResistor("RB", 1, 2, 10e3);
         builder.AddResistor("RC", 3, 4, 1e3);
-        builder.AddBjt("Q1", 4, 2, 0, true,
+        builder.AddBjt("Q1",
+                       4,
+                       2,
+                       0,
+                       true,
                        {.EmitterCapacitance = 10e-12, .CollectorCapacitance = 5e-12, .TransitTime = 5e-9});
         auto circuit = builder.Build();
         REQUIRE(circuit.has_value());
@@ -342,7 +360,12 @@ TEST_CASE("Gear-2 integrates the junction charges of a diode, a BJT and a MOSFET
         builder.AddVpulse("V1", 1, 0, step);
         builder.AddResistor("RG", 1, 2, 1e3);
         builder.AddResistor("RD", 3, 4, 1e3);
-        builder.AddMosfet("M1", 4, 2, 0, 0, true,
+        builder.AddMosfet("M1",
+                          4,
+                          2,
+                          0,
+                          0,
+                          true,
                           {.ThresholdVoltage = 1.0,
                            .Transconductance = 2e-3,
                            .GateSourceOverlap = 5e-10,
@@ -370,7 +393,9 @@ TEST_CASE("Gear-2 integrates the filter capacitance of a smooth logic gate like 
           "[nodalys][transient][gear]") {
     Nodalys::CircuitBuilder builder;
     builder.AddVpulse(
-        "V1", 1, 0,
+        "V1",
+        1,
+        0,
         {.Low = 0.0, .High = 5.0, .Delay = 1e-6, .RiseTime = 10e-9, .FallTime = 10e-9, .Width = 1.0, .Period = 2.0});
     builder.AddInverter("U1", 2, 1);
     builder.AddResistor("RL", 2, 0, 10e3);
@@ -388,7 +413,9 @@ TEST_CASE("A switch that closes onto a capacitor leaves no ringing of the trapez
     constexpr double TIME_STEP = 1e-6;
     Nodalys::CircuitBuilder builder;
     builder.AddVdc("V1", 1, 0, 12.0);
-    builder.AddVpulse("VC", 5, 0,
+    builder.AddVpulse("VC",
+                      5,
+                      0,
                       {.Low = 0.0,
                        .High = 5.0,
                        .Delay = CLOSE_TIME,
@@ -396,8 +423,8 @@ TEST_CASE("A switch that closes onto a capacitor leaves no ringing of the trapez
                        .FallTime = 100e-9,
                        .Width = 1.0,
                        .Period = 2.0});
-    builder.AddSwitch("S1", 1, 2, 5, 0,
-                      {.Threshold = 2.5, .Hysteresis = 0.1, .OnResistance = 0.01, .OffResistance = 1e9});
+    builder
+        .AddSwitch("S1", 1, 2, 5, 0, {.Threshold = 2.5, .Hysteresis = 0.1, .OnResistance = 0.01, .OffResistance = 1e9});
     builder.AddCapacitor("C1", 2, 0, 110e-12);
     builder.AddResistor("R1", 2, 0, 1e3);
     auto circuit = builder.Build();

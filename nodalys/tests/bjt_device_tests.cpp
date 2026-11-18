@@ -33,7 +33,13 @@ Nodalys::BjtParameters MakeFullParameters() {
 }
 
 Nodalys::BjtDevice MakeTransistor(const bool is_pnp) {
-    return {COLLECTOR, BASE, EMITTER, NO_INTERNAL_NODE, NO_INTERNAL_NODE, NO_INTERNAL_NODE, MakeFullParameters(),
+    return {COLLECTOR,
+            BASE,
+            EMITTER,
+            NO_INTERNAL_NODE,
+            NO_INTERNAL_NODE,
+            NO_INTERNAL_NODE,
+            MakeFullParameters(),
             is_pnp};
 }
 

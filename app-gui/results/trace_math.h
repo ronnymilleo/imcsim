@@ -93,7 +93,8 @@ using NetResolver = std::function<std::optional<int>(std::string_view)>;
 
 std::expected<MathProgram, std::string> CompileExpression(std::string_view text);
 std::expected<MathProgram, std::string> ResolveNetNames(MathProgram program, const NetResolver &find_node);
-std::expected<MathResult, std::string> EvaluateExpression(const MathProgram &program, std::span<const double> xs,
+std::expected<MathResult, std::string> EvaluateExpression(const MathProgram &program,
+                                                          std::span<const double> xs,
                                                           Dimension x_unit,
                                                           const std::vector<std::vector<double>> &node_voltages,
                                                           const std::vector<Core::ComponentTrace> &currents);

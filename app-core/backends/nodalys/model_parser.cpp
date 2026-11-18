@@ -73,7 +73,9 @@ std::expected<double, std::string> Number(const LibraryModel &model, const std::
     if (text.starts_with('{')) {
         return std::unexpected(std::format("Nodalys cannot evaluate the expression {} of the parameter {} "
                                            "in the model {}",
-                                           text, key, model.Name));
+                                           text,
+                                           key,
+                                           model.Name));
     }
     if (const std::optional<double> parsed = ParseSpiceNumber(text)) {
         return *parsed;
@@ -91,7 +93,8 @@ std::expected<double, std::string> Number(const LibraryModel &model, const std::
 std::expected<const LibraryModel *, std::string> FindModel(const Circuit &circuit, const Component &part) {
     const LibraryModel *model = circuit.FindLibraryModel(part.GetLibraryModel());
     if (model == nullptr) {
-        return std::unexpected(std::format("{} uses the model {}, which the circuit does not have", part.GetName(),
+        return std::unexpected(std::format("{} uses the model {}, which the circuit does not have",
+                                           part.GetName(),
                                            part.GetLibraryModel()));
     }
     if (!CanUseLibraryModel(part.GetType(), model->Kind)) {
@@ -222,7 +225,8 @@ std::expected<MOSFETParameters, std::string> ResolveParameters(const Circuit &ci
         if (*number != 1.0) {
             return std::unexpected(std::format("Nodalys simulates MOSFETs with the level 1 model only, and "
                                                "the model {} is level {}",
-                                               (*model)->Name, *number));
+                                               (*model)->Name,
+                                               *number));
         }
     }
     for (const auto &[key, target] :

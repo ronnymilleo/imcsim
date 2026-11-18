@@ -132,11 +132,13 @@ TEST_CASE("Points are moved by a translation, a quarter turn and the two mirrors
     // A quarter turn goes the way NextRotation() does: a point to the right of the pivot ends up below it
     CHECK(turn.Apply({6, 4}) == GUI::GridPoint{4, 6});
     CHECK(turn.Apply({4, 4}) == GUI::GridPoint{4, 4});
-    const GUI::PointTransform left_right = {
-        .Type = GUI::PointTransform::Kind::MIRROR_LEFT_RIGHT, .Delta = {}, .Pivot = {5, 0}};
+    const GUI::PointTransform left_right = {.Type = GUI::PointTransform::Kind::MIRROR_LEFT_RIGHT,
+                                            .Delta = {},
+                                            .Pivot = {5, 0}};
     CHECK(left_right.Apply({2, 3}) == GUI::GridPoint{8, 3});
-    const GUI::PointTransform top_bottom = {
-        .Type = GUI::PointTransform::Kind::MIRROR_TOP_BOTTOM, .Delta = {}, .Pivot = {0, 5}};
+    const GUI::PointTransform top_bottom = {.Type = GUI::PointTransform::Kind::MIRROR_TOP_BOTTOM,
+                                            .Delta = {},
+                                            .Pivot = {0, 5}};
     CHECK(top_bottom.Apply({2, 3}) == GUI::GridPoint{2, 7});
 }
 
@@ -240,8 +242,9 @@ TEST_CASE("A selection turned about a point turns its wires and keeps the others
 
 TEST_CASE("A selection mirrored about a point swaps its sides", "[wire_editing]") {
     const std::vector<GUI::UIWire> wires{{{2, 0}, {4, 0}}};
-    const GUI::PointTransform mirror = {
-        .Type = GUI::PointTransform::Kind::MIRROR_LEFT_RIGHT, .Delta = {}, .Pivot = {5, 0}};
+    const GUI::PointTransform mirror = {.Type = GUI::PointTransform::Kind::MIRROR_LEFT_RIGHT,
+                                        .Delta = {},
+                                        .Pivot = {5, 0}};
     const GUI::MovedWires moved = GUI::MoveGroup(wires, {0}, {}, {}, {}, mirror);
 
     REQUIRE(moved.Wires.size() == 1);

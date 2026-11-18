@@ -173,8 +173,12 @@ void ACSweepTab::DrawPlot(const Core::ACSweep &sweep, const BodePlot &plot, cons
     }
     PlotMath(sweep.Frequencies, *plot.Math, "", plotted, plot.Unit);
     if (steps && plot.HasLabels) {
-        LabelSteps(step_traces, steps->Selected, ListStepLabels(steps->Parameter, steps->Unit, steps->Values),
-                   m_Schematic, fits.ShowsCurrents, {});
+        LabelSteps(step_traces,
+                   steps->Selected,
+                   ListStepLabels(steps->Parameter, steps->Unit, steps->Values),
+                   m_Schematic,
+                   fits.ShowsCurrents,
+                   {});
     }
     DrawRoots(plot.HasLabels);
     DrawCursors(m_Cursors, true);

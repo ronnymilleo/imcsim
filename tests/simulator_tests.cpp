@@ -552,7 +552,8 @@ std::vector<double> RunSeeded(const SourceOnLoad &setup, const unsigned int seed
 } // namespace
 
 TEST_CASE("A seeded random source repeats its values and a new seed changes them", "[simulator]") {
-    for (const auto distribution : {Core::RandomDistribution::UNIFORM, Core::RandomDistribution::EXPONENTIAL,
+    for (const auto distribution : {Core::RandomDistribution::UNIFORM,
+                                    Core::RandomDistribution::EXPONENTIAL,
                                     Core::RandomDistribution::POISSON}) {
         CAPTURE(Core::GetRandomDistributionName(distribution));
         SourceOnLoad setup;
@@ -719,8 +720,11 @@ TEST_CASE("A transient run follows the single-frequency FM of an SFFM source", "
     Core::VoltageSource source;
     source.SetName("Vin1");
     source.SetSourceType(Core::VoltageSource::SourceType::SFFM);
-    const Core::SFFMParameters sffm{
-        .Offset = 0.0, .Amplitude = 1.0, .CarrierFrequency = 1e3, .ModulationIndex = 5.0, .SignalFrequency = 100.0};
+    const Core::SFFMParameters sffm{.Offset = 0.0,
+                                    .Amplitude = 1.0,
+                                    .CarrierFrequency = 1e3,
+                                    .ModulationIndex = 5.0,
+                                    .SignalFrequency = 100.0};
     source.SetSFFM(sffm);
     Core::Resistor load;
     load.SetName("R1");
@@ -752,8 +756,11 @@ TEST_CASE("A transient run follows the amplitude modulation of an AM source", "[
     source.SetName("Vin1");
     source.SetSourceType(Core::VoltageSource::SourceType::AM);
     // No offset, so the source at t = 0 matches the operating point, and no delay, so the sines start at once
-    const Core::AMParameters am{
-        .Amplitude = 1.0, .Offset = 0.0, .ModulatingFrequency = 100.0, .CarrierFrequency = 1e3, .Delay = 0.0};
+    const Core::AMParameters am{.Amplitude = 1.0,
+                                .Offset = 0.0,
+                                .ModulatingFrequency = 100.0,
+                                .CarrierFrequency = 1e3,
+                                .Delay = 0.0};
     source.SetAM(am);
     Core::Resistor load;
     load.SetName("R1");
@@ -1424,10 +1431,11 @@ TEST_CASE("Each MOSFET model has its datasheet on-resistance at 10 V of gate dri
         const char *Model;
         double OnResistance;
     };
-    const Rating rating =
-        GENERATE(Rating{Core::ComponentType::NMOS, "2N7000", 1.8}, Rating{Core::ComponentType::NMOS, "BS170", 1.2},
-                 Rating{Core::ComponentType::NMOS, "IRF540N", 0.044}, Rating{Core::ComponentType::PMOS, "BS250", 14.0},
-                 Rating{Core::ComponentType::PMOS, "IRF9540N", 0.117});
+    const Rating rating = GENERATE(Rating{Core::ComponentType::NMOS, "2N7000", 1.8},
+                                   Rating{Core::ComponentType::NMOS, "BS170", 1.2},
+                                   Rating{Core::ComponentType::NMOS, "IRF540N", 0.044},
+                                   Rating{Core::ComponentType::PMOS, "BS250", 14.0},
+                                   Rating{Core::ComponentType::PMOS, "IRF9540N", 0.117});
     CAPTURE(rating.Model);
     LowSideSwitch stage(rating.Type, 10.0);
     stage.Transistor.SetModel(*Core::FindMOSFETModel(rating.Type, rating.Model));
@@ -1759,9 +1767,10 @@ TEST_CASE("A stepped DC sweep draws the collector characteristics of a BJT", "[s
     circuit.Add(transistor, {1, 2, 0});
     circuit.Add(reference, {0});
 
-    const Core::DCSweepRun run = Core::RunDCSweep(
-        circuit, {.Swept = {.Source = "V1", .Start = 0.0, .Stop = 5.0, .Step = 0.05},
-                  .Stepped = Core::SweepRange{.Source = "I1", .Start = 10e-6, .Stop = 30e-6, .Step = 10e-6}});
+    const Core::DCSweepRun run =
+        Core::RunDCSweep(circuit,
+                         {.Swept = {.Source = "V1", .Start = 0.0, .Stop = 5.0, .Step = 0.05},
+                          .Stepped = Core::SweepRange{.Source = "I1", .Start = 10e-6, .Stop = 30e-6, .Step = 10e-6}});
     if (!run.Result) {
         FAIL(run.Result.error());
     }
@@ -1910,8 +1919,9 @@ TEST_CASE("An ideal op-amp rolls off at its gain-bandwidth product", "[simulator
     amplifier.Input.SetSourceType(Core::VoltageSource::SourceType::AC);
     // A noise gain of 11 leaves 1 MHz / 11 of closed-loop bandwidth
     const double corner = 1e6 / 11.0;
-    const Core::ACSweepRun run = Core::RunACSweep(
-        amplifier.Circuit, {.StartFrequency = corner, .StopFrequency = corner * 10.0, .PointsPerDecade = 1});
+    const Core::ACSweepRun run =
+        Core::RunACSweep(amplifier.Circuit,
+                         {.StartFrequency = corner, .StopFrequency = corner * 10.0, .PointsPerDecade = 1});
     if (!run.Result) {
         FAIL(run.Result.error());
     }
@@ -2758,8 +2768,11 @@ TEST_CASE("The noise of an amplifier lists the share of each part, and the ideal
           "[simulator]") {
     InvertingAmplifier amplifier(0.0);
     amplifier.Input.SetSourceType(Core::VoltageSource::SourceType::AC);
-    const Core::NoiseSettings settings{
-        .OutputNode = 3, .InputSource = "Vin1", .StartFrequency = 10.0, .StopFrequency = 100.0, .PointsPerDecade = 1};
+    const Core::NoiseSettings settings{.OutputNode = 3,
+                                       .InputSource = "Vin1",
+                                       .StartFrequency = 10.0,
+                                       .StopFrequency = 100.0,
+                                       .PointsPerDecade = 1};
     const Core::NoiseRun run = Core::RunNoise(amplifier.Circuit, settings);
     WARN(amplifier.Circuit.ToSpiceNetlist(".options savecurrents", true));
     for (const auto &c : run.Result->Contributions) {

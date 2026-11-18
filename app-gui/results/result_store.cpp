@@ -132,15 +132,19 @@ void ResultStore::AppendTransient(Core::Transient chunk) {
         return;
     }
     Core::Transient &whole = *m_Transient;
-    const bool fits = whole.NodeVoltages.size() == chunk.NodeVoltages.size() &&
-                      std::ranges::equal(whole.Currents, chunk.Currents, {}, &Core::ComponentTrace::Name,
-                                         &Core::ComponentTrace::Name);
+    const bool fits =
+        whole.NodeVoltages.size() == chunk.NodeVoltages.size() && std::ranges::equal(whole.Currents,
+                                                                                     chunk.Currents,
+                                                                                     {},
+                                                                                     &Core::ComponentTrace::Name,
+                                                                                     &Core::ComponentTrace::Name);
     if (!fits) {
         return;
     }
     whole.Times.insert(whole.Times.end(), chunk.Times.begin(), chunk.Times.end());
     for (std::size_t node = 0; node < chunk.NodeVoltages.size(); ++node) {
-        whole.NodeVoltages[node].insert(whole.NodeVoltages[node].end(), chunk.NodeVoltages[node].begin(),
+        whole.NodeVoltages[node].insert(whole.NodeVoltages[node].end(),
+                                        chunk.NodeVoltages[node].begin(),
                                         chunk.NodeVoltages[node].end());
     }
     for (std::size_t current = 0; current < chunk.Currents.size(); ++current) {

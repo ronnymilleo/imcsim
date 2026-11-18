@@ -116,8 +116,8 @@ bool CanTurn(const std::size_t direction, const std::size_t next_direction, cons
 /**
  * @brief   The corners of the path that ends in a search state, followed back through the state before each.
  */
-std::vector<GridPoint> TracePath(const Region &region, const std::vector<std::size_t> &previous,
-                                 const std::size_t end) {
+std::vector<GridPoint>
+TracePath(const Region &region, const std::vector<std::size_t> &previous, const std::size_t end) {
     std::vector<GridPoint> path;
     for (std::size_t step = end; step != previous.size(); step = previous[step]) {
         path.push_back(region.GetPoint(step / STATES_PER_POINT));

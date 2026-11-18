@@ -48,7 +48,8 @@ double IntegrateNoiseStep(const double f1, const double f2, const double s1, con
 
 } // namespace
 
-std::expected<NoiseResult, std::string> ComputeNoise(CompiledCircuit &compiled, const NoiseConfig &settings,
+std::expected<NoiseResult, std::string> ComputeNoise(CompiledCircuit &compiled,
+                                                     const NoiseConfig &settings,
                                                      const ConvergenceOptions &options,
                                                      std::vector<DiagnosticMessage> *messages) {
 
@@ -95,7 +96,9 @@ std::expected<NoiseResult, std::string> ComputeNoise(CompiledCircuit &compiled, 
     result.OutputNode = out_node;
     result.InputSource = settings.InputSource;
     result.InputUnit = voltage_source != nullptr ? "V" : "A";
-    result.Frequencies = MakeFrequencySweep(settings.SweepType, settings.StartFrequency, settings.StopFrequency,
+    result.Frequencies = MakeFrequencySweep(settings.SweepType,
+                                            settings.StartFrequency,
+                                            settings.StopFrequency,
                                             settings.PointsPerDecade);
 
     const std::size_t point_count = result.Frequencies.size();

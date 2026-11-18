@@ -56,7 +56,9 @@ double LinearEdge(const double from, const double to, const double duration, con
  * @return  The first corner strictly after `time`, or infinity once a single pulse has ended.
  */
 double FindNextPulseCorner(const PulseParameters &pulse, const double time) {
-    const std::array<double, 4> offsets = {0.0, pulse.RiseTime, pulse.RiseTime + pulse.Width,
+    const std::array<double, 4> offsets = {0.0,
+                                           pulse.RiseTime,
+                                           pulse.RiseTime + pulse.Width,
                                            pulse.RiseTime + pulse.Width + pulse.FallTime};
     const bool is_periodic = pulse.Period > 0.0 && std::isfinite(pulse.Period);
     double cycle_start = pulse.Delay;

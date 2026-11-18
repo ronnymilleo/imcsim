@@ -61,15 +61,17 @@ struct BodeStatistics {
 
 bool IsNegligible(double value, double scale);
 double InterpolateAt(std::span<const double> xs, std::span<const double> ys, double x, bool logarithmic);
-std::optional<SweepStatistics> ComputeSweepStatistics(std::span<const double> xs, std::span<const double> ys,
-                                                      double from, double to);
+std::optional<SweepStatistics>
+ComputeSweepStatistics(std::span<const double> xs, std::span<const double> ys, double from, double to);
 std::optional<double> ComputeSlope(std::span<const double> xs, std::span<const double> ys, double from, double to);
 std::optional<double> ResistanceFromConductance(double conductance);
-std::optional<TraceStatistics> ComputeTraceStatistics(std::span<const double> xs, std::span<const double> ys,
-                                                      double from, double to);
+std::optional<TraceStatistics>
+ComputeTraceStatistics(std::span<const double> xs, std::span<const double> ys, double from, double to);
 std::optional<BodeStatistics> ComputeBodeStatistics(std::span<const double> frequencies,
-                                                    std::span<const double> magnitudes, std::span<const double> phases,
-                                                    double from, double to);
+                                                    std::span<const double> magnitudes,
+                                                    std::span<const double> phases,
+                                                    double from,
+                                                    double to);
 
 } // namespace GUI
 

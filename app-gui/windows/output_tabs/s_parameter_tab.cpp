@@ -56,8 +56,10 @@ constexpr float CIRCLE_WEIGHT = 2.0f;
 constexpr float HATCH_WEIGHT = 1.0f;
 
 ImVec4 ToImVec4(const ExportColor color) {
-    return {static_cast<float>(color.Red) / 255.0f, static_cast<float>(color.Green) / 255.0f,
-            static_cast<float>(color.Blue) / 255.0f, 1.0f};
+    return {static_cast<float>(color.Red) / 255.0f,
+            static_cast<float>(color.Green) / 255.0f,
+            static_cast<float>(color.Blue) / 255.0f,
+            1.0f};
 }
 
 /**
@@ -96,8 +98,11 @@ void PlotGrid() {
         ImPlotSpec spec;
         spec.LineColor = ImVec4(0.55f, 0.55f, 0.55f, index == 0 ? OUTER_CIRCLE_ALPHA : GRID_ALPHA);
         spec.LineWeight = 1.0f;
-        ImPlot::PlotLine(std::format("##smith_grid_{}", index).c_str(), lines[index].Xs.data(), lines[index].Ys.data(),
-                         static_cast<int>(lines[index].Xs.size()), spec);
+        ImPlot::PlotLine(std::format("##smith_grid_{}", index).c_str(),
+                         lines[index].Xs.data(),
+                         lines[index].Ys.data(),
+                         static_cast<int>(lines[index].Xs.size()),
+                         spec);
     }
     const std::array<double, 2> real_axis_xs = {-1.0, 1.0};
     const std::array<double, 2> real_axis_ys = {0.0, 0.0};
@@ -123,8 +128,10 @@ void PlotGrid() {
 /**
  * @brief   Joins the readings of the entries at one frequency into the text of a tooltip.
  */
-std::string JoinReadings(const Core::SParameters &result, const std::size_t frequency,
-                         const std::vector<SParameterEntry> &entries, const SParameterQuantity quantity) {
+std::string JoinReadings(const Core::SParameters &result,
+                         const std::size_t frequency,
+                         const std::vector<SParameterEntry> &entries,
+                         const SParameterQuantity quantity) {
     std::string text;
     for (const SParameterEntry &entry : entries) {
         for (const std::string &line : DescribeMatrixReading(result, frequency, entry, quantity)) {
@@ -268,8 +275,10 @@ ExportFigure SParameterTab::BuildFigure(const bool is_table) const {
     const std::vector<SParameterEntry> entries = GetShownSelection(view).ListShown();
     if (m_Quantity != SParameterQuantity::S) {
         return is_table ? BuildMatrixTableFigure(*result, entries, m_Quantity)
-                        : BuildMatrixMagnitudePhaseFigure(
-                              *result, entries, ExportRange{.From = m_View.From, .To = m_View.To}, m_Quantity);
+                        : BuildMatrixMagnitudePhaseFigure(*result,
+                                                          entries,
+                                                          ExportRange{.From = m_View.From, .To = m_View.To},
+                                                          m_Quantity);
     }
     if (view == SParameterView::SMITH && m_AreCirclesShown && IsTwoPort(*result)) {
         return BuildSmithFigureWithCircles(*result, entries, m_CircleFrequency);
@@ -373,10 +382,12 @@ void SParameterTab::DrawControls(const Core::SParameters &result, PlotExporter &
  * @brief   The line that says what was analyzed, and the warnings of the run.
  */
 void SParameterTab::DrawHeader(const Core::SParameters &result) {
-    ImGui::TextUnformatted(std::format("S-parameters of {} {}, {}Hz to {}Hz, {} points", result.GetPortCount(),
+    ImGui::TextUnformatted(std::format("S-parameters of {} {}, {}Hz to {}Hz, {} points",
+                                       result.GetPortCount(),
                                        result.GetPortCount() == 1 ? "port" : "ports",
                                        Core::FormatValue(result.Frequencies.front()),
-                                       Core::FormatValue(result.Frequencies.back()), result.Frequencies.size())
+                                       Core::FormatValue(result.Frequencies.back()),
+                                       result.Frequencies.size())
                                .c_str());
     ImGui::PushTextWrapPos(0.0f);
     for (const std::string &warning : result.Warnings) {
@@ -400,7 +411,9 @@ void SParameterTab::DrawQuantityChoice(const Core::SParameters &result) {
         ImGui::SameLine();
         const bool is_available = IsQuantityAvailable(result, quantity);
         const std::string label(1, GetQuantityLetter(quantity));
-        if (DrawChoice(label.c_str(), m_Quantity == quantity, is_available,
+        if (DrawChoice(label.c_str(),
+                       m_Quantity == quantity,
+                       is_available,
                        is_available ? std::string(description) : DescribeUnavailableQuantity(quantity))) {
             m_Quantity = quantity;
             m_IsFitting = true;
@@ -415,7 +428,9 @@ void SParameterTab::DrawQuantityChoice(const Core::SParameters &result) {
  */
 void SParameterTab::DrawViewChoice(const Core::SParameters &result, const SParameterView view, PlotExporter &exporter) {
     const bool is_s = m_Quantity == SParameterQuantity::S;
-    if (DrawChoice("Smith chart", view == SParameterView::SMITH, is_s,
+    if (DrawChoice("Smith chart",
+                   view == SParameterView::SMITH,
+                   is_s,
                    is_s ? "" : "A Smith chart plots reflections, so it shows S only")) {
         m_Display = SParameterView::SMITH;
         m_IsFitting = true;
@@ -452,9 +467,10 @@ void SParameterTab::DrawCircleControls(const Core::SParameters &result) {
     ImGui::Checkbox("Stability circles", &m_AreCirclesShown);
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip | ImGuiHoveredFlags_AllowWhenDisabled)) {
-        ImGui::SetTooltip("%s", is_two_port ? "The source and load stability circles at one frequency; the hatching "
-                                              "marks the terminations that make the two-port unstable"
-                                            : DescribeNeedsTwoPorts(result, "Stability circles").c_str());
+        ImGui::SetTooltip("%s",
+                          is_two_port ? "The source and load stability circles at one frequency; the hatching "
+                                        "marks the terminations that make the two-port unstable"
+                                      : DescribeNeedsTwoPorts(result, "Stability circles").c_str());
     }
     if (!is_two_port || !m_AreCirclesShown) {
         return;
@@ -467,7 +483,11 @@ void SParameterTab::DrawCircleControls(const Core::SParameters &result) {
     ImGui::SetNextItemWidth(ImGui::GetFontSize() * CIRCLE_SLIDER_WIDTH);
     int index = static_cast<int>(m_CircleFrequency);
     const std::string frequency = Core::FormatValue(result.Frequencies[m_CircleFrequency]) + "Hz";
-    if (ImGui::SliderInt("##circles_at", &index, 0, static_cast<int>(result.Frequencies.size()) - 1, frequency.c_str(),
+    if (ImGui::SliderInt("##circles_at",
+                         &index,
+                         0,
+                         static_cast<int>(result.Frequencies.size()) - 1,
+                         frequency.c_str(),
                          ImGuiSliderFlags_AlwaysClamp)) {
         m_CircleFrequency = static_cast<std::size_t>(index);
     }
@@ -659,8 +679,11 @@ void SParameterTab::PlotStabilityCircles(const Core::SParameters &result) {
         hatch_spec.LineWeight = HATCH_WEIGHT;
         hatch_spec.Flags = static_cast<int>(ImPlotItemFlags_NoLegend) | static_cast<int>(ImPlotItemFlags_NoFit) |
                            static_cast<int>(ImPlotLineFlags_Segments);
-        ImPlot::PlotLine(std::format("##hatch_{}", index).c_str(), hatch_xs.data(), hatch_ys.data(),
-                         static_cast<int>(hatch_xs.size()), hatch_spec);
+        ImPlot::PlotLine(std::format("##hatch_{}", index).c_str(),
+                         hatch_xs.data(),
+                         hatch_ys.data(),
+                         static_cast<int>(hatch_xs.size()),
+                         hatch_spec);
         for (const std::vector<std::complex<double>> &piece : SampleBoundary(*boundary)) {
             std::vector<double> xs;
             std::vector<double> ys;
@@ -685,7 +708,8 @@ void SParameterTab::ShowCircleFrequency() {
     const std::string text = DescribeCircleFrequency(m_Sweep.Metrics[frequency], m_Sweep.Frequencies[frequency]);
     const ImVec2 corner = ImPlot::GetPlotPos();
     ImPlot::GetPlotDrawList()->AddText(ImVec2(corner.x + LABEL_OFFSET, corner.y + LABEL_OFFSET),
-                                       ImGui::GetColorU32(ImGuiCol_Text), text.c_str());
+                                       ImGui::GetColorU32(ImGuiCol_Text),
+                                       text.c_str());
 }
 
 /**
@@ -714,8 +738,11 @@ void SParameterTab::ShowSmithReading(const Core::SParameters &result, const std:
     }
     const std::complex<double> value =
         result.Get(hovered->second, entries[hovered->first].Row, entries[hovered->first].Column);
-    ImPlot::GetPlotDrawList()->AddCircle(ImPlot::PlotToPixels(value.real(), value.imag()), READING_RING_RADIUS,
-                                         ImGui::GetColorU32(ToImVec4(GetEntryColor(hovered->first))), 0, CURVE_WEIGHT);
+    ImPlot::GetPlotDrawList()->AddCircle(ImPlot::PlotToPixels(value.real(), value.imag()),
+                                         READING_RING_RADIUS,
+                                         ImGui::GetColorU32(ToImVec4(GetEntryColor(hovered->first))),
+                                         0,
+                                         CURVE_WEIGHT);
     ImGui::SetTooltip("%s",
                       JoinReadings(result, hovered->second, {entries[hovered->first]}, SParameterQuantity::S).c_str());
 }
@@ -737,8 +764,10 @@ void SParameterTab::DrawMagnitudePhase(const Core::SParameters &result, const SP
  * @details The magnitude of Z and Y is in ohms and siemens on a logarithmic axis; where the matrix does not exist the
  *          curve breaks.
  */
-void SParameterTab::DrawBodePlot(const Core::SParameters &result, const std::vector<SParameterEntry> &entries,
-                                 const bool is_phase, const float height) {
+void SParameterTab::DrawBodePlot(const Core::SParameters &result,
+                                 const std::vector<SParameterEntry> &entries,
+                                 const bool is_phase,
+                                 const float height) {
     const bool is_s = m_Quantity == SParameterQuantity::S;
     const bool is_decade_axis = !is_s && !is_phase;
     if (m_IsFitting) {
@@ -768,7 +797,8 @@ void SParameterTab::DrawBodePlot(const Core::SParameters &result, const std::vec
         }
         const ExportRange range = FindDecadeRange(magnitudes);
         ImPlot::SetupAxisLimits(ImAxis_Y1, range.From, range.To, m_IsFitting ? ImPlotCond_Always : ImPlotCond_Once);
-        ImPlot::SetupAxisFormat(ImAxis_Y1, FormatAxisValue,
+        ImPlot::SetupAxisFormat(ImAxis_Y1,
+                                FormatAxisValue,
                                 const_cast<char *>(m_Quantity == SParameterQuantity::Z ? "Ohm" : "S"));
     }
     for (std::size_t index = 0; index < entries.size(); ++index) {
@@ -777,8 +807,11 @@ void SParameterTab::DrawBodePlot(const Core::SParameters &result, const std::vec
         ImPlotSpec spec;
         spec.LineColor = ToImVec4(GetEntryColor(index));
         spec.LineWeight = CURVE_WEIGHT;
-        ImPlot::PlotLine(GetMatrixEntryName(entries[index], m_Quantity).c_str(), result.Frequencies.data(),
-                         values.data(), static_cast<int>(values.size()), spec);
+        ImPlot::PlotLine(GetMatrixEntryName(entries[index], m_Quantity).c_str(),
+                         result.Frequencies.data(),
+                         values.data(),
+                         static_cast<int>(values.size()),
+                         spec);
     }
     if (ImPlot::IsPlotHovered()) {
         const std::size_t frequency = FindNearestFrequency(result.Frequencies, ImPlot::GetPlotMousePos().x);
@@ -812,7 +845,9 @@ void SParameterTab::DrawFactorPlot(const float height) {
     ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
     ImPlot::SetupAxisLinks(ImAxis_X1, &m_View.From, &m_View.To);
     ImPlot::SetupAxisFormat(ImAxis_X1, FormatAxisValue, const_cast<char *>("Hz"));
-    ImPlot::SetupAxisLimits(ImAxis_Y1, m_Curves.FactorRange.From, m_Curves.FactorRange.To,
+    ImPlot::SetupAxisLimits(ImAxis_Y1,
+                            m_Curves.FactorRange.From,
+                            m_Curves.FactorRange.To,
                             m_IsFitting ? ImPlotCond_Always : ImPlotCond_Once);
     const std::size_t count = m_Curves.Frequencies.size();
     ImPlotSpec k_spec;
@@ -864,15 +899,21 @@ void SParameterTab::DrawGainPlot(const float height) {
         ImPlotSpec spec;
         spec.LineColor = ToImVec4(STABILITY_MAG_COLOR);
         spec.LineWeight = CURVE_WEIGHT;
-        ImPlot::PlotLine(m_Curves.MaximumAvailableGainLabel.c_str(), m_Curves.Frequencies.data(),
-                         m_Curves.MaximumAvailableGainDecibels.data(), static_cast<int>(count), spec);
+        ImPlot::PlotLine(m_Curves.MaximumAvailableGainLabel.c_str(),
+                         m_Curves.Frequencies.data(),
+                         m_Curves.MaximumAvailableGainDecibels.data(),
+                         static_cast<int>(count),
+                         spec);
     }
     if (has_value(m_Curves.MaximumStableGainDecibels)) {
         ImPlotSpec spec;
         spec.LineColor = ToImVec4(STABILITY_MSG_COLOR);
         spec.LineWeight = CURVE_WEIGHT;
-        ImPlot::PlotLine(m_Curves.MaximumStableGainLabel.c_str(), m_Curves.Frequencies.data(),
-                         m_Curves.MaximumStableGainDecibels.data(), static_cast<int>(count), spec);
+        ImPlot::PlotLine(m_Curves.MaximumStableGainLabel.c_str(),
+                         m_Curves.Frequencies.data(),
+                         m_Curves.MaximumStableGainDecibels.data(),
+                         static_cast<int>(count),
+                         spec);
     }
     MarkCircleFrequency();
     if (ImPlot::IsPlotHovered()) {

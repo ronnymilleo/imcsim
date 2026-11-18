@@ -28,22 +28,29 @@ std::expected<OperatingPointResult, std::string> ComputeOperatingPoint(const Cir
     return ComputeOperatingPoint(PrepareCircuit(circuit), options, messages);
 }
 
-std::expected<DcSweepResult, std::string> ComputeDCSweep(const Circuit &circuit, const DcSweepConfig &config,
+std::expected<DcSweepResult, std::string> ComputeDCSweep(const Circuit &circuit,
+                                                         const DcSweepConfig &config,
                                                          const ConvergenceOptions &options,
                                                          std::vector<DiagnosticMessage> *messages) {
     return ComputeDCSweep(PrepareCircuit(circuit), config, options, messages);
 }
 
-std::expected<TransientResult, std::string> ComputeTransient(const Circuit &circuit, const TransientConfig &config,
+std::expected<TransientResult, std::string> ComputeTransient(const Circuit &circuit,
+                                                             const TransientConfig &config,
                                                              const bool has_initial_conditions,
                                                              const RunMonitor &monitor,
                                                              const ConvergenceOptions &options,
                                                              std::vector<DiagnosticMessage> *messages) {
-    return ComputeTransient(PrepareCircuit(circuit), config, has_initial_conditions || config.UseInitialConditions,
-                            monitor, options, messages);
+    return ComputeTransient(PrepareCircuit(circuit),
+                            config,
+                            has_initial_conditions || config.UseInitialConditions,
+                            monitor,
+                            options,
+                            messages);
 }
 
-std::expected<AcSweepResult, std::string> ComputeACSweep(const Circuit &circuit, const AcSweepConfig &config,
+std::expected<AcSweepResult, std::string> ComputeACSweep(const Circuit &circuit,
+                                                         const AcSweepConfig &config,
                                                          const ConvergenceOptions &options,
                                                          std::vector<DiagnosticMessage> *messages) {
     return ComputeACSweep(PrepareCircuit(circuit), config, options, messages);
@@ -56,19 +63,22 @@ std::expected<TransferFunctionResult, std::string> ComputeTransferFunction(const
     return ComputeTransferFunction(PrepareCircuit(circuit), config, options, messages);
 }
 
-std::expected<NoiseResult, std::string> ComputeNoise(const Circuit &circuit, const NoiseConfig &config,
+std::expected<NoiseResult, std::string> ComputeNoise(const Circuit &circuit,
+                                                     const NoiseConfig &config,
                                                      const ConvergenceOptions &options,
                                                      std::vector<DiagnosticMessage> *messages) {
     return ComputeNoise(PrepareCircuit(circuit), config, options, messages);
 }
 
-std::expected<SParameterResult, std::string> ComputeSParameters(const Circuit &circuit, const SParameterConfig &config,
+std::expected<SParameterResult, std::string> ComputeSParameters(const Circuit &circuit,
+                                                                const SParameterConfig &config,
                                                                 const ConvergenceOptions &options,
                                                                 std::vector<DiagnosticMessage> *messages) {
     return ComputeSParameters(PrepareCircuit(circuit), config, options, messages);
 }
 
-std::expected<PoleZeroResult, std::string> ComputePoleZero(const Circuit &circuit, const PoleZeroConfig &config,
+std::expected<PoleZeroResult, std::string> ComputePoleZero(const Circuit &circuit,
+                                                           const PoleZeroConfig &config,
                                                            const ConvergenceOptions &options,
                                                            std::vector<DiagnosticMessage> *messages) {
     return ComputePoleZero(PrepareCircuit(circuit), config, options, messages);

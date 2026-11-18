@@ -82,7 +82,8 @@ void DrawTransferFunction(const Core::TransferFunction &transfer, Schematic &sch
         ImGui::EndTable();
     }
     ImGui::PushTextWrapPos(0.0f);
-    ImGui::TextDisabled("Small-signal DC gain from %s to %s", transfer.InputSource.c_str(),
+    ImGui::TextDisabled("Small-signal DC gain from %s to %s",
+                        transfer.InputSource.c_str(),
                         GetVoltageLabel(schematic.GetConnectivity(), transfer.OutputNode).c_str());
     ImGui::PopTextWrapPos();
 }
@@ -124,16 +125,18 @@ void DrawSensitivity(const Core::Sensitivity &sensitivity, Schematic &schematic)
             ImGui::TableNextColumn();
             ImGui::TextUnformatted(row.Normalized.c_str());
             ImGui::TableNextColumn();
-            ImGui::ProgressBar(static_cast<float>(row.Share), {-FLT_MIN, 0.0f},
+            ImGui::ProgressBar(static_cast<float>(row.Share),
+                               {-FLT_MIN, 0.0f},
                                std::format("{:.1f} %", row.Share * 100.0).c_str());
         }
         ImGui::EndTable();
     }
     ImGui::PushTextWrapPos(0.0f);
     // The text holds percent signs, so it goes in as an argument and never as the format
-    ImGui::TextDisabled("%s", "Per 1 % is the change of the voltage for a 1 % higher value, which compares parts of "
-                              "different kinds. Model parameters of diodes and transistors are not shown, and a "
-                              "circuit driven only by AC sources reads zero");
+    ImGui::TextDisabled("%s",
+                        "Per 1 % is the change of the voltage for a 1 % higher value, which compares parts of "
+                        "different kinds. Model parameters of diodes and transistors are not shown, and a "
+                        "circuit driven only by AC sources reads zero");
     ImGui::PopTextWrapPos();
 }
 

@@ -40,7 +40,8 @@ ImVec4 ToVec4(const ImU32 color) {
     constexpr float CHANNEL_MAX = 255.0f;
     return {static_cast<float>((color >> IM_COL32_R_SHIFT) & 0xFF) / CHANNEL_MAX,
             static_cast<float>((color >> IM_COL32_G_SHIFT) & 0xFF) / CHANNEL_MAX,
-            static_cast<float>((color >> IM_COL32_B_SHIFT) & 0xFF) / CHANNEL_MAX, 1.0f};
+            static_cast<float>((color >> IM_COL32_B_SHIFT) & 0xFF) / CHANNEL_MAX,
+            1.0f};
 }
 
 } // namespace
@@ -72,9 +73,12 @@ TEST_CASE("The canvas text and voltages read on the canvas of every theme", "[th
 
 TEST_CASE("The node colors a light theme darkens stand out from its canvas", "[theme]") {
     // The colors of nodes 1 to 6, which AdaptToBackground() darkens through AdjustColorForPrint() on a light theme
-    const auto node_colors = {GUI::ExportColor{230, 120, 100}, GUI::ExportColor{110, 170, 240},
-                              GUI::ExportColor{240, 200, 90},  GUI::ExportColor{190, 130, 230},
-                              GUI::ExportColor{100, 210, 190}, GUI::ExportColor{240, 150, 200}};
+    const auto node_colors = {GUI::ExportColor{230, 120, 100},
+                              GUI::ExportColor{110, 170, 240},
+                              GUI::ExportColor{240, 200, 90},
+                              GUI::ExportColor{190, 130, 230},
+                              GUI::ExportColor{100, 210, 190},
+                              GUI::ExportColor{240, 150, 200}};
     for (const GUI::ThemePalette &palette : GUI::GetThemes()) {
         if (!palette.Light) {
             continue;
@@ -84,7 +88,8 @@ TEST_CASE("The node colors a light theme darkens stand out from its canvas", "[t
             const GUI::ExportColor adjusted = GUI::AdjustColorForPrint(color);
             const ImVec4 trace = {static_cast<float>(adjusted.Red) / 255.0f,
                                   static_cast<float>(adjusted.Green) / 255.0f,
-                                  static_cast<float>(adjusted.Blue) / 255.0f, 1.0f};
+                                  static_cast<float>(adjusted.Blue) / 255.0f,
+                                  1.0f};
             CAPTURE(adjusted.Red, adjusted.Green, adjusted.Blue);
             CHECK(GetContrast(trace, ToVec4(palette.CanvasBackground)) >= MIN_GRAPHIC_CONTRAST);
         }

@@ -35,10 +35,14 @@ void UIVCC::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, co
     canvas.AddLine(LocalToScreen(view, 0, 0), LocalToScreen(view, 0, -LEAD_LENGTH), color, LINE_THICKNESS);
 }
 
-void UIVCC::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
+void UIVCC::DrawSymbol(SchematicCanvas &canvas,
+                       const ViewTransform &view,
+                       const ImU32 color,
                        SymbolStyle /*style*/) const {
     canvas.AddLine(LocalToScreen(view, -BAR_HALF_WIDTH, -LEAD_LENGTH),
-                   LocalToScreen(view, BAR_HALF_WIDTH, -LEAD_LENGTH), color, LINE_THICKNESS);
+                   LocalToScreen(view, BAR_HALF_WIDTH, -LEAD_LENGTH),
+                   color,
+                   LINE_THICKNESS);
 }
 
 /**

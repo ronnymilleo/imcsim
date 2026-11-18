@@ -61,7 +61,9 @@ std::chrono::steady_clock::duration WaitWhilePaused(const RunControl *control) {
  * @param[in]     control  Where to look for a stop request and the pause, or null.
  * @return  True when the run goes on, false when it was asked to stop.
  */
-bool KeepLivePace(std::chrono::steady_clock::time_point &start, const double reached, const double pace,
+bool KeepLivePace(std::chrono::steady_clock::time_point &start,
+                  const double reached,
+                  const double pace,
                   const RunControl *control) {
     const auto due = start + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
                                  std::chrono::duration<double>(reached / pace));

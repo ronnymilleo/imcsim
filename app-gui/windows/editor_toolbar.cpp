@@ -38,7 +38,8 @@ void DrawGroupSeparator() {
     ImGui::SameLine(0.0f, gap / 2.0f);
     const ImVec2 top = ImGui::GetCursorScreenPos();
     const float side = GetToolButtonSide();
-    ImGui::GetWindowDrawList()->AddLine({top.x, top.y + side * 0.2f}, {top.x, top.y + side * 0.8f},
+    ImGui::GetWindowDrawList()->AddLine({top.x, top.y + side * 0.2f},
+                                        {top.x, top.y + side * 0.8f},
                                         ImGui::GetColorU32(ImGuiCol_Separator));
     ImGui::Dummy({1.0f, side});
     ImGui::SameLine(0.0f, gap / 2.0f);
@@ -59,7 +60,8 @@ void DrawDropdownArrow(const ImVec2 center) {
     const float arrow = ImGui::GetFontSize() * 0.25f;
     ImGui::GetWindowDrawList()->AddTriangleFilled(center + ImVec2(-arrow, -arrow * 0.5f),
                                                   center + ImVec2(arrow, -arrow * 0.5f),
-                                                  center + ImVec2(0.0f, arrow * 0.5f), GetIconColor(true));
+                                                  center + ImVec2(0.0f, arrow * 0.5f),
+                                                  GetIconColor(true));
 }
 
 /**
@@ -67,10 +69,17 @@ void DrawDropdownArrow(const ImVec2 center) {
  */
 float AnalysisButtonWidth() {
     float widest = 0.0f;
-    for (const Analysis analysis :
-         {Analysis::OPERATING_POINT, Analysis::TRANSIENT, Analysis::AC_SWEEP, Analysis::DC_SWEEP, Analysis::NOISE,
-          Analysis::TRANSFER_FUNCTION, Analysis::SENSITIVITY, Analysis::POLE_ZERO, Analysis::S_PARAMETERS,
-          Analysis::TRUTH_TABLE, Analysis::HARMONIC_BALANCE}) {
+    for (const Analysis analysis : {Analysis::OPERATING_POINT,
+                                    Analysis::TRANSIENT,
+                                    Analysis::AC_SWEEP,
+                                    Analysis::DC_SWEEP,
+                                    Analysis::NOISE,
+                                    Analysis::TRANSFER_FUNCTION,
+                                    Analysis::SENSITIVITY,
+                                    Analysis::POLE_ZERO,
+                                    Analysis::S_PARAMETERS,
+                                    Analysis::TRUTH_TABLE,
+                                    Analysis::HARMONIC_BALANCE}) {
         widest = std::max(widest, ImGui::CalcTextSize(GetAnalysisName(analysis)).x);
     }
     return widest + ImGui::GetStyle().FramePadding.x * 2.0f + ImGui::GetFontSize();
@@ -128,7 +137,8 @@ const char *GetRunButtonLabel(const RunAction action) {
  * @param[in] settings_panel  Analysis picker and settings, for the popover beside Run; it must outlive the toolbar.
  * @param[in] root_schematic  The document, whose settings name the analysis to run; it must outlive the toolbar.
  */
-EditorToolbar::EditorToolbar(AnalysisControls &controls, AnalysisSettingsPanel &settings_panel,
+EditorToolbar::EditorToolbar(AnalysisControls &controls,
+                             AnalysisSettingsPanel &settings_panel,
                              const Schematic &root_schematic)
     : m_Controls(controls), m_SettingsPanel(settings_panel), m_RootSchematic(root_schematic) {
 }
@@ -143,8 +153,11 @@ EditorToolbar::EditorToolbar(AnalysisControls &controls, AnalysisSettingsPanel &
  * @param[in]     blocks            The blocks that can be placed where the editor is, which the search finds too.
  * @return  The mode or the command the buttons pressed this frame ask for, which the editor carries out.
  */
-ToolbarRequest EditorToolbar::Draw(const EditorMode &mode, const Schematic &schematic, const bool is_editing_block,
-                                   PartPicker &search, const std::vector<const SavedSubcircuit *> &blocks) {
+ToolbarRequest EditorToolbar::Draw(const EditorMode &mode,
+                                   const Schematic &schematic,
+                                   const bool is_editing_block,
+                                   PartPicker &search,
+                                   const std::vector<const SavedSubcircuit *> &blocks) {
     ToolbarRequest request;
     const float font_size = ImGui::GetFontSize();
     const float spacing = font_size * BUTTON_SPACING;
@@ -153,18 +166,18 @@ ToolbarRequest EditorToolbar::Draw(const EditorMode &mode, const Schematic &sche
     const float row_right = row_left + ImGui::GetContentRegionAvail().x;
     ImDrawList *draw_list = ImGui::GetWindowDrawList();
     bool is_first = true;
-    const auto tool_button = [&](const char *id, const ToolIcon icon, const bool active, const bool enabled,
-                                 const char *tooltip) {
-        if (!std::exchange(is_first, false)) {
-            ImGui::SameLine(0.0f, spacing);
-        }
-        ImGui::BeginDisabled(!enabled);
-        const bool clicked = ToolButton(id, active);
-        ImGui::EndDisabled();
-        DrawToolIcon(draw_list, icon, GetItemCenter(), GetIconSize(), GetIconColor(enabled));
-        ImGui::SetItemTooltip("%s", tooltip);
-        return clicked;
-    };
+    const auto tool_button =
+        [&](const char *id, const ToolIcon icon, const bool active, const bool enabled, const char *tooltip) {
+            if (!std::exchange(is_first, false)) {
+                ImGui::SameLine(0.0f, spacing);
+            }
+            ImGui::BeginDisabled(!enabled);
+            const bool clicked = ToolButton(id, active);
+            ImGui::EndDisabled();
+            DrawToolIcon(draw_list, icon, GetItemCenter(), GetIconSize(), GetIconColor(enabled));
+            ImGui::SetItemTooltip("%s", tooltip);
+            return clicked;
+        };
 
     // Tools
     if (tool_button("##select", ToolIcon::SELECT, IsSelecting(mode), true, "Select (Esc)")) {
@@ -173,7 +186,10 @@ ToolbarRequest EditorToolbar::Draw(const EditorMode &mode, const Schematic &sche
     if (tool_button("##wire", ToolIcon::WIRE, std::holds_alternative<WiringMode>(mode), true, "Wire (W)")) {
         request.Mode = WiringMode{};
     }
-    if (tool_button("##probe", ToolIcon::PROBE, std::holds_alternative<ProbingMode>(mode), true,
+    if (tool_button("##probe",
+                    ToolIcon::PROBE,
+                    std::holds_alternative<ProbingMode>(mode),
+                    true,
                     "Probe (P): pick what the plots measure")) {
         request.Mode = ProbingMode{};
     }
@@ -229,8 +245,11 @@ void EditorToolbar::DrawRunButton() {
     if (PrimaryButton("##run", {side, side})) {
         m_Controls.PressRun();
     }
-    DrawToolIcon(ImGui::GetWindowDrawList(), action == RunAction::STOP ? ToolIcon::STOP : ToolIcon::RUN,
-                 GetItemCenter(), GetIconSize(), GetIconColor(true));
+    DrawToolIcon(ImGui::GetWindowDrawList(),
+                 action == RunAction::STOP ? ToolIcon::STOP : ToolIcon::RUN,
+                 GetItemCenter(),
+                 GetIconSize(),
+                 GetIconColor(true));
     ImGui::SetItemTooltip("%s", DescribeRunAction(m_Controls, selected).c_str());
 }
 

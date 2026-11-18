@@ -67,7 +67,10 @@ std::vector<SvgPoint> ToPixels(const std::vector<SmithPoint> &points, const Smit
  * @brief   Names a curve of the grid: a resistance circle above the real axis where it crosses it, a reactance arc
  *          outside the outer circle where it starts.
  */
-void DrawSmithLabel(SvgWriter &svg, const SmithCurve &curve, const SmithFrame &frame, const ExportTheme &theme,
+void DrawSmithLabel(SvgWriter &svg,
+                    const SmithCurve &curve,
+                    const SmithFrame &frame,
+                    const ExportTheme &theme,
                     const double scale) {
     if (curve.Label.empty()) {
         return;
@@ -75,7 +78,10 @@ void DrawSmithLabel(SvgWriter &svg, const SmithCurve &curve, const SmithFrame &f
     const double font_size = SMITH_LABEL_FONT * scale;
     SvgPoint anchor = frame.ToPixel(curve.LabelPosition.X, curve.LabelPosition.Y);
     if (curve.IsResistance) {
-        svg.Text({anchor.X - 2.0 * scale, anchor.Y - 3.0 * scale}, curve.Label, font_size, theme.MutedText,
+        svg.Text({anchor.X - 2.0 * scale, anchor.Y - 3.0 * scale},
+                 curve.Label,
+                 font_size,
+                 theme.MutedText,
                  TextAnchor::END);
         return;
     }
@@ -95,7 +101,10 @@ void DrawSmithGrid(SvgWriter &svg, const SmithFrame &frame, const ExportTheme &t
     }
 }
 
-void DrawSmithTraces(SvgWriter &svg, const ExportSmith &smith, const SmithFrame &frame, const ExportStyle &style,
+void DrawSmithTraces(SvgWriter &svg,
+                     const ExportSmith &smith,
+                     const SmithFrame &frame,
+                     const ExportStyle &style,
                      const double scale) {
     for (const ExportSmithTrace &trace : smith.Traces) {
         const ExportColor color = style.Dark ? trace.Color : AdjustColorForPrint(trace.Color);
@@ -112,7 +121,8 @@ void DrawSmithTraces(SvgWriter &svg, const ExportSmith &smith, const SmithFrame 
         // The first frequency is marked with a dot, so the direction the curve runs can be told
         if (!trace.Values.empty() && std::isfinite(std::abs(trace.Values.front()))) {
             svg.FilledCircle(frame.ToPixel(trace.Values.front().real(), trace.Values.front().imag()),
-                             SMITH_MARKER_RADIUS * scale, color);
+                             SMITH_MARKER_RADIUS * scale,
+                             color);
         }
     }
 }
@@ -125,13 +135,19 @@ std::string CircleDash(const double scale) {
 /**
  * @brief   Draws the stability circles: the hatching of the unstable side under the traces, and the boundary with it.
  */
-void DrawSmithCircles(SvgWriter &svg, const ExportSmith &smith, const SmithFrame &frame, const ExportStyle &style,
+void DrawSmithCircles(SvgWriter &svg,
+                      const ExportSmith &smith,
+                      const SmithFrame &frame,
+                      const ExportStyle &style,
                       const double scale) {
     for (const ExportSmithCircle &circle : smith.Circles) {
         const ExportColor color = style.Dark ? circle.Color : AdjustColorForPrint(circle.Color);
         for (const ExportSmithStroke &stroke : circle.Hatch) {
             svg.Line(frame.ToPixel(stroke.From.real(), stroke.From.imag()),
-                     frame.ToPixel(stroke.To.real(), stroke.To.imag()), color, HATCH_WIDTH * scale, HATCH_OPACITY);
+                     frame.ToPixel(stroke.To.real(), stroke.To.imag()),
+                     color,
+                     HATCH_WIDTH * scale,
+                     HATCH_OPACITY);
         }
         for (const std::vector<std::complex<double>> &piece : circle.Boundary) {
             std::vector<SvgPoint> pixels;
@@ -164,14 +180,22 @@ double GetSmithLegendWidth(const ExportSmith &smith, const double scale) {
     return legend_width;
 }
 
-void DrawSmithLegend(SvgWriter &svg, const ExportSmith &smith, const double baseline, const double right,
-                     const ExportStyle &style, const ExportTheme &theme, const double scale) {
+void DrawSmithLegend(SvgWriter &svg,
+                     const ExportSmith &smith,
+                     const double baseline,
+                     const double right,
+                     const ExportStyle &style,
+                     const ExportTheme &theme,
+                     const double scale) {
     double x = right - GetSmithLegendWidth(smith, scale) + LEGEND_SPACING * scale;
     for (const ExportSmithTrace &trace : smith.Traces) {
         const ExportColor color = style.Dark ? trace.Color : AdjustColorForPrint(trace.Color);
         svg.Polyline({{x, baseline}, {x + LEGEND_SAMPLE * scale, baseline}}, color, LINE_WIDTH * scale);
-        svg.Text({x + (LEGEND_SAMPLE + 6.0) * scale, baseline + LEGEND_FONT * scale * 0.35}, trace.Name,
-                 LEGEND_FONT * scale, theme.Text, TextAnchor::START);
+        svg.Text({x + (LEGEND_SAMPLE + 6.0) * scale, baseline + LEGEND_FONT * scale * 0.35},
+                 trace.Name,
+                 LEGEND_FONT * scale,
+                 theme.Text,
+                 TextAnchor::START);
         x += GetLegendEntryWidth(trace.Name, scale);
     }
     for (const ExportSmithCircle &circle : smith.Circles) {
@@ -179,10 +203,15 @@ void DrawSmithLegend(SvgWriter &svg, const ExportSmith &smith, const double base
             continue;
         }
         const ExportColor color = style.Dark ? circle.Color : AdjustColorForPrint(circle.Color);
-        svg.Polyline({{x, baseline}, {x + LEGEND_SAMPLE * scale, baseline}}, color, LINE_WIDTH * scale,
+        svg.Polyline({{x, baseline}, {x + LEGEND_SAMPLE * scale, baseline}},
+                     color,
+                     LINE_WIDTH * scale,
                      CircleDash(scale));
-        svg.Text({x + (LEGEND_SAMPLE + 6.0) * scale, baseline + LEGEND_FONT * scale * 0.35}, circle.Name,
-                 LEGEND_FONT * scale, theme.Text, TextAnchor::START);
+        svg.Text({x + (LEGEND_SAMPLE + 6.0) * scale, baseline + LEGEND_FONT * scale * 0.35},
+                 circle.Name,
+                 LEGEND_FONT * scale,
+                 theme.Text,
+                 TextAnchor::START);
         x += GetLegendEntryWidth(circle.Name, scale);
     }
 }
@@ -210,13 +239,17 @@ std::expected<std::string, std::string> RenderSmith(const ExportSmith &smith, co
                            .PixelsPerUnit = side / 2.0 / extent};
     SvgWriter svg;
     DrawSmithGrid(svg, frame, theme, scale);
-    svg.BeginClip({frame.Center.X - side / 2.0 - room, frame.Center.Y - side / 2.0 - room}, side + 2.0 * room,
+    svg.BeginClip({frame.Center.X - side / 2.0 - room, frame.Center.Y - side / 2.0 - room},
+                  side + 2.0 * room,
                   side + 2.0 * room);
     DrawSmithCircles(svg, smith, frame, style, scale);
     DrawSmithTraces(svg, smith, frame, style, scale);
     svg.EndClip();
     if (!smith.Title.empty()) {
-        svg.Text({outer, outer + TITLE_FONT * scale * 1.1}, smith.Title, TITLE_FONT * scale, theme.Text,
+        svg.Text({outer, outer + TITLE_FONT * scale * 1.1},
+                 smith.Title,
+                 TITLE_FONT * scale,
+                 theme.Text,
                  TextAnchor::START);
     }
     DrawSmithLegend(svg, smith, outer + header / 2.0, width - outer, style, theme, scale);

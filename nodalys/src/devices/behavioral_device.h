@@ -80,15 +80,21 @@ private:
  */
 class BehavioralVoltageDevice : public BehavioralSourceDevice {
 public:
-    BehavioralVoltageDevice(std::string name, int node_a, int node_b, int branch, Expression expression,
+    BehavioralVoltageDevice(std::string name,
+                            int node_a,
+                            int node_b,
+                            int branch,
+                            Expression expression,
                             std::vector<BehavioralBinding> bindings);
 
     int GetBranch() const;
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
-    std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
-                                           const std::vector<std::complex<double>> &x_ac, double omega) const override;
+    std::complex<double> AcTerminalCurrent(int terminal,
+                                           const std::vector<double> &x_dc,
+                                           const std::vector<std::complex<double>> &x_ac,
+                                           double omega) const override;
 
 private:
     int m_NodeA;
@@ -103,13 +109,18 @@ private:
  */
 class BehavioralCurrentDevice : public BehavioralSourceDevice {
 public:
-    BehavioralCurrentDevice(std::string name, int node_a, int node_b, Expression expression,
+    BehavioralCurrentDevice(std::string name,
+                            int node_a,
+                            int node_b,
+                            Expression expression,
                             std::vector<BehavioralBinding> bindings);
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
-    std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
-                                           const std::vector<std::complex<double>> &x_ac, double omega) const override;
+    std::complex<double> AcTerminalCurrent(int terminal,
+                                           const std::vector<double> &x_dc,
+                                           const std::vector<std::complex<double>> &x_ac,
+                                           double omega) const override;
 
 private:
     int m_NodeA;

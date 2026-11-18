@@ -47,7 +47,9 @@ Catch::Approx Pinned(const double value) {
 
 TEST_CASE("A seed draws the same uniform numbers on every platform", "[random_draws]") {
     std::mt19937_64 engine(PINNED_SEED);
-    constexpr std::array EXPECTED = {0.35762972288842587, 0.40044261704406114, 0.68938331700276845,
+    constexpr std::array EXPECTED = {0.35762972288842587,
+                                     0.40044261704406114,
+                                     0.68938331700276845,
                                      0.55973557064111557};
     for (const double expected : EXPECTED) {
         CHECK(Nodalys::DrawUniform(engine) == Pinned(expected));
@@ -56,7 +58,9 @@ TEST_CASE("A seed draws the same uniform numbers on every platform", "[random_dr
 
 TEST_CASE("A seed draws the same normal numbers on every platform", "[random_draws]") {
     std::mt19937_64 engine(PINNED_SEED);
-    constexpr std::array EXPECTED = {-0.76269092759341395, -1.4227288787842618, 0.34342317777493808,
+    constexpr std::array EXPECTED = {-0.76269092759341395,
+                                     -1.4227288787842618,
+                                     0.34342317777493808,
                                      -0.090293886742040627};
     for (const double expected : EXPECTED) {
         CHECK(Nodalys::DrawStandardNormal(engine) == Pinned(expected));

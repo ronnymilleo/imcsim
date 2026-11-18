@@ -185,49 +185,100 @@ constexpr Tolerance DIVIDED_BY_NOTHING_BOUND{NOISE_TOTAL.Relative, 1e8};
 /// Differences found by this test and investigated; each one is a task of its own. Keep the reason to one line, with
 /// the engine that is right.
 constexpr std::array KNOWN_DIFFERENCES{
-    KnownDifference{"full_bridge_rectifier.imcsim", NOISE_NAME, "input noise total", DIVIDED_BY_NOTHING_BOUND,
+    KnownDifference{"full_bridge_rectifier.imcsim",
+                    NOISE_NAME,
+                    "input noise total",
+                    DIVIDED_BY_NOTHING_BOUND,
                     "the input-referred noise divides by a gain of 1e-22 (every diode is off at DC), where ngspice "
                     "gives 20 and Nodalys 2e7; the output totals agree and neither input figure means anything"},
-    KnownDifference{"counter_8bit_blocks.imcsim", OPERATING_POINT_NAME, "node voltages", LOGIC_LOW_LEVEL_BOUND,
+    KnownDifference{"counter_8bit_blocks.imcsim",
+                    OPERATING_POINT_NAME,
+                    "node voltages",
+                    LOGIC_LOW_LEVEL_BOUND,
                     LOGIC_OPERATING_POINT},
-    KnownDifference{"decade_counter.imcsim", OPERATING_POINT_NAME, "node voltages", LOGIC_LOW_LEVEL_BOUND,
+    KnownDifference{"decade_counter.imcsim",
+                    OPERATING_POINT_NAME,
+                    "node voltages",
+                    LOGIC_LOW_LEVEL_BOUND,
                     LOGIC_OPERATING_POINT},
-    KnownDifference{"ripple_counter.imcsim", OPERATING_POINT_NAME, "node voltages", LOGIC_LOW_LEVEL_BOUND,
+    KnownDifference{"ripple_counter.imcsim",
+                    OPERATING_POINT_NAME,
+                    "node voltages",
+                    LOGIC_LOW_LEVEL_BOUND,
                     LOGIC_OPERATING_POINT},
     KnownDifference{"ripple_counter.imcsim", OPERATING_POINT_NAME, "current U", NO_VALUE_BOUND, LOGIC_CURRENTS_MISSING},
-    KnownDifference{"decoder_logic_outputs.imcsim", OPERATING_POINT_NAME, "node voltages", LOGIC_LOW_LEVEL_BOUND,
+    KnownDifference{"decoder_logic_outputs.imcsim",
+                    OPERATING_POINT_NAME,
+                    "node voltages",
+                    LOGIC_LOW_LEVEL_BOUND,
                     LOGIC_LOW_LEVEL},
     KnownDifference{"full_adder.imcsim", OPERATING_POINT_NAME, "node voltages", LOGIC_LOW_LEVEL_BOUND, LOGIC_LOW_LEVEL},
     KnownDifference{"half_adder.imcsim", OPERATING_POINT_NAME, "node voltages", LOGIC_LOW_LEVEL_BOUND, LOGIC_LOW_LEVEL},
-    KnownDifference{"logic_gates.imcsim", OPERATING_POINT_NAME, "node voltages", LOGIC_LOW_LEVEL_BOUND,
+    KnownDifference{"logic_gates.imcsim",
+                    OPERATING_POINT_NAME,
+                    "node voltages",
+                    LOGIC_LOW_LEVEL_BOUND,
                     LOGIC_LOW_LEVEL},
-    KnownDifference{"logic_truth_table.imcsim", OPERATING_POINT_NAME, "node voltages", LOGIC_LOW_LEVEL_BOUND,
+    KnownDifference{"logic_truth_table.imcsim",
+                    OPERATING_POINT_NAME,
+                    "node voltages",
+                    LOGIC_LOW_LEVEL_BOUND,
                     LOGIC_LOW_LEVEL},
     KnownDifference{"sr_latch.imcsim", OPERATING_POINT_NAME, "node voltages", LOGIC_LOW_LEVEL_BOUND, LOGIC_LOW_LEVEL},
     KnownDifference{"counter_8bit_blocks.imcsim", TRANSIENT_NAME, "V(", COUNTER_LOW_LEVEL_BOUND, COUNTER_LOW_LEVEL},
-    KnownDifference{"counter_8bit_blocks.imcsim", TRANSIENT_NAME, "current V", COUNTER_CLOCK_CURRENT_BOUND,
+    KnownDifference{"counter_8bit_blocks.imcsim",
+                    TRANSIENT_NAME,
+                    "current V",
+                    COUNTER_CLOCK_CURRENT_BOUND,
                     COUNTER_CLOCK_CURRENT},
-    KnownDifference{"decade_counter.imcsim", TRANSIENT_NAME, "current V", COUNTER_CLOCK_CURRENT_BOUND,
+    KnownDifference{"decade_counter.imcsim",
+                    TRANSIENT_NAME,
+                    "current V",
+                    COUNTER_CLOCK_CURRENT_BOUND,
                     COUNTER_CLOCK_CURRENT},
-    KnownDifference{"ripple_counter.imcsim", TRANSIENT_NAME, "current V", COUNTER_CLOCK_CURRENT_BOUND,
+    KnownDifference{"ripple_counter.imcsim",
+                    TRANSIENT_NAME,
+                    "current V",
+                    COUNTER_CLOCK_CURRENT_BOUND,
                     COUNTER_CLOCK_CURRENT},
     KnownDifference{"ripple_counter.imcsim", TRANSIENT_NAME, "current U", NO_VALUE_BOUND, LOGIC_CURRENTS_MISSING},
-    KnownDifference{"led_driver.imcsim", OPERATING_POINT_NAME, "node voltages", LEAKAGE_VOLTAGE_BOUND,
+    KnownDifference{"led_driver.imcsim",
+                    OPERATING_POINT_NAME,
+                    "node voltages",
+                    LEAKAGE_VOLTAGE_BOUND,
                     LEAKAGE_BIASED_NODES},
-    KnownDifference{"led_driver.imcsim", TRANSFER_FUNCTION_NAME, "gain", LEAKAGE_GAIN_BOUND,
+    KnownDifference{"led_driver.imcsim",
+                    TRANSFER_FUNCTION_NAME,
+                    "gain",
+                    LEAKAGE_GAIN_BOUND,
                     "the gain through a transistor that is off is set by its pico-ampere leakage: +2.6e-3 on "
                     "ngspice, -1.7e-3 on Nodalys, with the opposite sign"},
-    KnownDifference{"led_driver.imcsim", SENSITIVITY_NAME, "Vin", LEAKAGE_GAIN_BOUND,
+    KnownDifference{"led_driver.imcsim",
+                    SENSITIVITY_NAME,
+                    "Vin",
+                    LEAKAGE_GAIN_BOUND,
                     "the sensitivity to the input through a transistor that is off is set by its leakage, as the "
                     "transfer function is"},
-    KnownDifference{"switches_and_or.imcsim", OPERATING_POINT_NAME, "node voltages", LEAKAGE_VOLTAGE_BOUND,
+    KnownDifference{"switches_and_or.imcsim",
+                    OPERATING_POINT_NAME,
+                    "node voltages",
+                    LEAKAGE_VOLTAGE_BOUND,
                     "the node of the LED behind the off switch differs by 1 % (pico-ampere leakage)"},
-    KnownDifference{"half_adder.imcsim", TRANSFER_FUNCTION_NAME, "gain", SMOOTH_GATE_GAIN_BOUND,
+    KnownDifference{"half_adder.imcsim",
+                    TRANSFER_FUNCTION_NAME,
+                    "gain",
+                    SMOOTH_GATE_GAIN_BOUND,
                     "the smooth gate's tanh tail still has a 9e-4 slope at 0 V, whereas ngspice's digital gate has "
                     "zero gain"},
-    KnownDifference{"op_amp_input_offset.imcsim", TRANSFER_FUNCTION_NAME, "gain", SUPPLY_GAIN_BOUND,
+    KnownDifference{"op_amp_input_offset.imcsim",
+                    TRANSFER_FUNCTION_NAME,
+                    "gain",
+                    SUPPLY_GAIN_BOUND,
                     "gain from a supply to the output is 0 on ngspice and 7.7e-6 on Nodalys"},
-    KnownDifference{"op_amp_input_offset.imcsim", SENSITIVITY_NAME, "V", SUPPLY_SENSITIVITY_BOUND,
+    KnownDifference{"op_amp_input_offset.imcsim",
+                    SENSITIVITY_NAME,
+                    "V",
+                    SUPPLY_SENSITIVITY_BOUND,
                     "the normalized sensitivity to each supply is 1.2e-4 on Nodalys and under 2e-6 on ngspice"},
 };
 
@@ -282,8 +333,10 @@ public:
     }
 
     /// Same length required, then every pair compared.
-    void CompareSeries(const std::string &quantity, const std::vector<double> &expected,
-                       const std::vector<double> &actual, const Tolerance tolerance) {
+    void CompareSeries(const std::string &quantity,
+                       const std::vector<double> &expected,
+                       const std::vector<double> &actual,
+                       const Tolerance tolerance) {
         if (expected.size() != actual.size()) {
             Add(quantity, std::format("ngspice has {} points, Nodalys {}", expected.size(), actual.size()));
             return;
@@ -311,8 +364,9 @@ public:
 
 private:
     const KnownDifference *FindCovering(const std::string &quantity) const {
-        const auto found = std::ranges::find_if(
-            m_Known, [&quantity](const KnownDifference *known) { return quantity.starts_with(known->Quantity); });
+        const auto found = std::ranges::find_if(m_Known, [&quantity](const KnownDifference *known) {
+            return quantity.starts_with(known->Quantity);
+        });
         return found != m_Known.end() ? *found : nullptr;
     }
 
@@ -339,8 +393,8 @@ double ValueAt(const std::vector<double> &times, const std::vector<double> &valu
 }
 
 /// Smallest and largest value a waveform takes from one instant to another.
-std::pair<double, double> RangeBetween(const std::vector<double> &times, const std::vector<double> &values,
-                                       const double from, const double to) {
+std::pair<double, double>
+RangeBetween(const std::vector<double> &times, const std::vector<double> &values, const double from, const double to) {
     double low = std::min(ValueAt(times, values, from), ValueAt(times, values, to));
     double high = std::max(ValueAt(times, values, from), ValueAt(times, values, to));
     const auto first = std::ranges::lower_bound(times, from);
@@ -364,9 +418,14 @@ double PeakOf(const std::vector<double> &values) {
  * @details The Nodalys waveform must pass within the tolerance of the ngspice one, or of any value ngspice takes in
  *          a short window around the instant.
  */
-void CompareWaveforms(DifferenceLog &log, const std::string &quantity, const std::vector<double> &expected_times,
-                      const std::vector<double> &expected, const std::vector<double> &actual_times,
-                      const std::vector<double> &actual, const double stop_time, const double step,
+void CompareWaveforms(DifferenceLog &log,
+                      const std::string &quantity,
+                      const std::vector<double> &expected_times,
+                      const std::vector<double> &expected,
+                      const std::vector<double> &actual_times,
+                      const std::vector<double> &actual,
+                      const double stop_time,
+                      const double step,
                       const double floor_volts_or_amperes) {
     const double window = log.AllowedWindowSteps(quantity) * step;
     if (expected.empty() || actual.empty()) {
@@ -414,10 +473,14 @@ bool HasFewerNodes(const std::size_t expected_size, const std::size_t actual_siz
     return std::min(expected_size, actual_size) < static_cast<std::size_t>(node_count);
 }
 
-void CompareOperatingPoints(DifferenceLog &log, const Core::OperatingPoint &expected,
-                            const Core::OperatingPoint &actual, const int node_count) {
-    log.CompareSeries("node voltages", CircuitNodes(expected.NodeVoltages, node_count),
-                      CircuitNodes(actual.NodeVoltages, node_count), SOLVED_VOLTAGE);
+void CompareOperatingPoints(DifferenceLog &log,
+                            const Core::OperatingPoint &expected,
+                            const Core::OperatingPoint &actual,
+                            const int node_count) {
+    log.CompareSeries("node voltages",
+                      CircuitNodes(expected.NodeVoltages, node_count),
+                      CircuitNodes(actual.NodeVoltages, node_count),
+                      SOLVED_VOLTAGE);
     for (const Core::ComponentCurrent &current : expected.Currents) {
         const auto found = std::ranges::find(actual.Currents, current.Name, &Core::ComponentCurrent::Name);
         if (found == actual.Currents.end()) {
@@ -428,16 +491,29 @@ void CompareOperatingPoints(DifferenceLog &log, const Core::OperatingPoint &expe
     }
 }
 
-void CompareTransients(DifferenceLog &log, const Core::Transient &expected, const Core::Transient &actual,
-                       const Core::TransientSettings &settings, const int node_count) {
+void CompareTransients(DifferenceLog &log,
+                       const Core::Transient &expected,
+                       const Core::Transient &actual,
+                       const Core::TransientSettings &settings,
+                       const int node_count) {
     if (HasFewerNodes(expected.NodeVoltages.size(), actual.NodeVoltages.size(), node_count)) {
-        log.Add("node voltages", std::format("ngspice has {} nodes, Nodalys {}, of {}", expected.NodeVoltages.size(),
-                                             actual.NodeVoltages.size(), node_count));
+        log.Add("node voltages",
+                std::format("ngspice has {} nodes, Nodalys {}, of {}",
+                            expected.NodeVoltages.size(),
+                            actual.NodeVoltages.size(),
+                            node_count));
         return;
     }
     for (std::size_t node = 1; node < static_cast<std::size_t>(node_count); ++node) {
-        CompareWaveforms(log, std::format("V({})", node), expected.Times, expected.NodeVoltages[node], actual.Times,
-                         actual.NodeVoltages[node], settings.StopTime, settings.TimeStep, VOLTAGE_FLOOR_VOLTS);
+        CompareWaveforms(log,
+                         std::format("V({})", node),
+                         expected.Times,
+                         expected.NodeVoltages[node],
+                         actual.Times,
+                         actual.NodeVoltages[node],
+                         settings.StopTime,
+                         settings.TimeStep,
+                         VOLTAGE_FLOOR_VOLTS);
     }
     for (const Core::ComponentTrace &trace : expected.Currents) {
         const Core::ComponentTrace *other = FindTrace(actual.Currents, trace.Name);
@@ -445,8 +521,15 @@ void CompareTransients(DifferenceLog &log, const Core::Transient &expected, cons
             log.AddMissing("current " + trace.Name);
             continue;
         }
-        CompareWaveforms(log, "current " + trace.Name, expected.Times, trace.Values, actual.Times, other->Values,
-                         settings.StopTime, settings.TimeStep, CURRENT_FLOOR_AMPERES);
+        CompareWaveforms(log,
+                         "current " + trace.Name,
+                         expected.Times,
+                         trace.Values,
+                         actual.Times,
+                         other->Values,
+                         settings.StopTime,
+                         settings.TimeStep,
+                         CURRENT_FLOOR_AMPERES);
     }
 }
 
@@ -456,8 +539,11 @@ double PhaseDistance(const double expected, const double actual) {
     return std::min(difference, FULL_TURN_DEGREES - difference);
 }
 
-void CompareDecibelSeries(DifferenceLog &log, const std::string &quantity, const std::vector<double> &expected_db,
-                          const std::vector<double> &actual_db, const std::vector<double> &expected_deg,
+void CompareDecibelSeries(DifferenceLog &log,
+                          const std::string &quantity,
+                          const std::vector<double> &expected_db,
+                          const std::vector<double> &actual_db,
+                          const std::vector<double> &expected_deg,
                           const std::vector<double> &actual_deg) {
     if (expected_db.size() != actual_db.size() || expected_deg.size() != actual_deg.size()) {
         log.Add(quantity, std::format("ngspice has {} points, Nodalys {}", expected_db.size(), actual_db.size()));
@@ -468,18 +554,26 @@ void CompareDecibelSeries(DifferenceLog &log, const std::string &quantity, const
             continue;
         }
         if (std::fabs(expected_db[point] - actual_db[point]) > AC_MAGNITUDE_TOLERANCE_DECIBELS) {
-            log.Add(quantity + " magnitude", std::format("at point {} ngspice {:.4g} dB, Nodalys {:.4g} dB", point,
-                                                         expected_db[point], actual_db[point]));
+            log.Add(quantity + " magnitude",
+                    std::format("at point {} ngspice {:.4g} dB, Nodalys {:.4g} dB",
+                                point,
+                                expected_db[point],
+                                actual_db[point]));
         }
         if (point < expected_deg.size() &&
             PhaseDistance(expected_deg[point], actual_deg[point]) > AC_PHASE_TOLERANCE_DEGREES) {
-            log.Add(quantity + " phase", std::format("at point {} ngspice {:.4g} deg, Nodalys {:.4g} deg", point,
-                                                     expected_deg[point], actual_deg[point]));
+            log.Add(quantity + " phase",
+                    std::format("at point {} ngspice {:.4g} deg, Nodalys {:.4g} deg",
+                                point,
+                                expected_deg[point],
+                                actual_deg[point]));
         }
     }
 }
 
-void CompareACSweeps(DifferenceLog &log, const Core::ACSweep &expected, const Core::ACSweep &actual,
+void CompareACSweeps(DifferenceLog &log,
+                     const Core::ACSweep &expected,
+                     const Core::ACSweep &actual,
                      const int node_count) {
     log.CompareSeries("frequencies", expected.Frequencies, actual.Frequencies, {1e-6, 0.0});
     if (HasFewerNodes(expected.NodeMagnitudesDecibels.size(), actual.NodeMagnitudesDecibels.size(), node_count)) {
@@ -487,8 +581,11 @@ void CompareACSweeps(DifferenceLog &log, const Core::ACSweep &expected, const Co
         return;
     }
     for (std::size_t node = 1; node < static_cast<std::size_t>(node_count); ++node) {
-        CompareDecibelSeries(log, std::format("V({})", node), expected.NodeMagnitudesDecibels[node],
-                             actual.NodeMagnitudesDecibels[node], expected.NodePhasesDegrees[node],
+        CompareDecibelSeries(log,
+                             std::format("V({})", node),
+                             expected.NodeMagnitudesDecibels[node],
+                             actual.NodeMagnitudesDecibels[node],
+                             expected.NodePhasesDegrees[node],
                              actual.NodePhasesDegrees[node]);
     }
     for (std::size_t index = 0; index < expected.CurrentMagnitudesDecibels.size(); ++index) {
@@ -501,13 +598,18 @@ void CompareACSweeps(DifferenceLog &log, const Core::ACSweep &expected, const Co
         const Core::ComponentTrace *phase = FindTrace(expected.CurrentPhasesDegrees, magnitude.Name);
         const Core::ComponentTrace *other_phase = FindTrace(actual.CurrentPhasesDegrees, magnitude.Name);
         const std::vector<double> none;
-        CompareDecibelSeries(log, "current " + magnitude.Name, magnitude.Values, other->Values,
+        CompareDecibelSeries(log,
+                             "current " + magnitude.Name,
+                             magnitude.Values,
+                             other->Values,
                              phase != nullptr ? phase->Values : none,
                              other_phase != nullptr ? other_phase->Values : none);
     }
 }
 
-void CompareDCSweeps(DifferenceLog &log, const Core::DCSweep &expected, const Core::DCSweep &actual,
+void CompareDCSweeps(DifferenceLog &log,
+                     const Core::DCSweep &expected,
+                     const Core::DCSweep &actual,
                      const int node_count) {
     log.CompareSeries("swept values", expected.SweptValues, actual.SweptValues, {1e-6, 1e-9});
     if (expected.Curves.size() != actual.Curves.size()) {
@@ -522,12 +624,16 @@ void CompareDCSweeps(DifferenceLog &log, const Core::DCSweep &expected, const Co
             continue;
         }
         for (std::size_t node = 1; node < static_cast<std::size_t>(node_count); ++node) {
-            log.CompareSeries(std::format("curve {} V({})", curve, node), want.NodeVoltages[node],
-                              got.NodeVoltages[node], SOLVED_VOLTAGE);
+            log.CompareSeries(std::format("curve {} V({})", curve, node),
+                              want.NodeVoltages[node],
+                              got.NodeVoltages[node],
+                              SOLVED_VOLTAGE);
         }
         for (const Core::ComponentTrace &trace : want.Currents) {
             if (const Core::ComponentTrace *other = FindTrace(got.Currents, trace.Name)) {
-                log.CompareSeries(std::format("curve {} current {}", curve, trace.Name), trace.Values, other->Values,
+                log.CompareSeries(std::format("curve {} current {}", curve, trace.Name),
+                                  trace.Values,
+                                  other->Values,
                                   SOLVED_CURRENT);
             } else {
                 log.AddMissing("current " + trace.Name);
@@ -549,7 +655,8 @@ void CompareImpedance(DifferenceLog &log, const std::string &quantity, const dou
     log.Compare(quantity, expected, actual, TRANSFER_IMPEDANCE);
 }
 
-void CompareTransferFunctions(DifferenceLog &log, const Core::TransferFunction &expected,
+void CompareTransferFunctions(DifferenceLog &log,
+                              const Core::TransferFunction &expected,
                               const Core::TransferFunction &actual) {
     log.Compare("gain", expected.Gain, actual.Gain, TRANSFER_GAIN);
     CompareImpedance(log, "input impedance", expected.InputImpedance, actual.InputImpedance);
@@ -612,8 +719,13 @@ void CompareSParameters(DifferenceLog &log, const Core::SParameters &expected, c
         const std::complex<double> got = actual.Values[index];
         if (std::abs(want - got) >
             S_PARAMETER.Relative * std::max(std::abs(want), std::abs(got)) + S_PARAMETER.Absolute) {
-            log.Add("S", std::format("entry {} ngspice {:.5g}{:+.5g}j, Nodalys {:.5g}{:+.5g}j", index, want.real(),
-                                     want.imag(), got.real(), got.imag()));
+            log.Add("S",
+                    std::format("entry {} ngspice {:.5g}{:+.5g}j, Nodalys {:.5g}{:+.5g}j",
+                                index,
+                                want.real(),
+                                want.imag(),
+                                got.real(),
+                                got.imag()));
         }
     }
 }
@@ -639,7 +751,9 @@ void CompareTruthTables(DifferenceLog &log, const Core::TruthTable &expected, co
         for (std::size_t output = 0; output < want.OutputVoltages.size(); ++output) {
             if ((want.OutputVoltages[output] > threshold) != (got.OutputVoltages[output] > threshold)) {
                 log.Add(std::format("row {}", row),
-                        std::format("output {} ngspice {:.3g} V, Nodalys {:.3g} V", output, want.OutputVoltages[output],
+                        std::format("output {} ngspice {:.3g} V, Nodalys {:.3g} V",
+                                    output,
+                                    want.OutputVoltages[output],
                                     got.OutputVoltages[output]));
             }
         }
@@ -722,8 +836,10 @@ std::string Indented(const Differences &lines) {
  * @brief   Reports one comparison: a skip is listed, a known difference within its bound is a warning, any other is a
  *          failure, and so is a known difference that is gone.
  */
-void Judge(const GUI::Example &example, const std::string_view analysis,
-           const std::vector<const KnownDifference *> &known, const Outcome &outcome) {
+void Judge(const GUI::Example &example,
+           const std::string_view analysis,
+           const std::vector<const KnownDifference *> &known,
+           const Outcome &outcome) {
     if (!outcome.SkipReason.empty()) {
         WARN(std::format("Skipped {} of {}: {}", analysis, example.FileName, outcome.SkipReason));
         return;
@@ -736,23 +852,31 @@ void Judge(const GUI::Example &example, const std::string_view analysis,
         return;
     }
     for (const KnownDifference *entry : known) {
-        const bool is_found = std::ranges::any_of(
-            outcome.Found, [entry](const std::string &line) { return line.starts_with(entry->Quantity); });
+        const bool is_found = std::ranges::any_of(outcome.Found, [entry](const std::string &line) {
+            return line.starts_with(entry->Quantity);
+        });
         if (!is_found) {
-            FAIL_CHECK(std::format("Known difference gone: {} of {} now agrees on \"{}\"; remove the entry", analysis,
-                                   example.FileName, entry->Quantity));
+            FAIL_CHECK(std::format("Known difference gone: {} of {} now agrees on \"{}\"; remove the entry",
+                                   analysis,
+                                   example.FileName,
+                                   entry->Quantity));
         }
     }
     if (!outcome.Beyond.empty()) {
-        FAIL_CHECK(std::format("The engines differ in {} of {} beyond what its known differences allow:{}", analysis,
-                               example.FileName, Indented(outcome.Beyond)));
+        FAIL_CHECK(std::format("The engines differ in {} of {} beyond what its known differences allow:{}",
+                               analysis,
+                               example.FileName,
+                               Indented(outcome.Beyond)));
         return;
     }
     std::string reasons;
     for (const KnownDifference *entry : known) {
         reasons += std::format("\n    {}", entry->Reason);
     }
-    WARN(std::format("Known difference in {} of {}:{}\n  found:{}", analysis, example.FileName, reasons,
+    WARN(std::format("Known difference in {} of {}:{}\n  found:{}",
+                     analysis,
+                     example.FileName,
+                     reasons,
                      Indented(outcome.Found)));
 }
 
@@ -760,8 +884,12 @@ void Judge(const GUI::Example &example, const std::string_view analysis,
  * @brief   Compares one analysis of an example on both engines, unless one of them declares it unsupported.
  */
 template <typename Run, typename Compare>
-void Examine(const GUI::Example &example, const Core::Circuit &circuit, const std::string_view analysis,
-             const Core::AnalysisKind kind, Run &&run, Compare &&compare) {
+void Examine(const GUI::Example &example,
+             const Core::Circuit &circuit,
+             const std::string_view analysis,
+             const Core::AnalysisKind kind,
+             Run &&run,
+             Compare &&compare) {
     static const Core::NodalysBackend nodalys;
     if (const auto reason = Core::FindUnsupported(Core::GetBackend(), circuit, kind)) {
         WARN(std::format("Skipped {} of {} on ngspice: {}", analysis, example.FileName, *reason));
@@ -808,8 +936,11 @@ TEST_CASE("The precision rectifier, whose op-amp is SPICE text, gives the same w
     auto loaded = GUI::LoadExample(*example);
     REQUIRE(loaded.has_value());
     GUI::Schematic schematic;
-    schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings),
-                      std::move(loaded->Subcircuits), std::move(loaded->Models));
+    schematic.Replace(std::move(loaded->Elements),
+                      std::move(loaded->Wires),
+                      std::move(loaded->Settings),
+                      std::move(loaded->Subcircuits),
+                      std::move(loaded->Models));
     const Core::Circuit circuit = schematic.BuildCircuit();
     const Core::TransientSettings settings = schematic.GetSimulationSettings().Transient;
     // The load of the rectifier, where the example reads its output
@@ -842,8 +973,15 @@ TEST_CASE("The precision rectifier, whose op-amp is SPICE text, gives the same w
     DifferenceLog log;
     for (int node = 1; node < circuit.GetNodeCount(); ++node) {
         const auto index = static_cast<std::size_t>(node);
-        CompareWaveforms(log, std::format("V({})", node), expected.Times, expected.NodeVoltages[index], actual.Times,
-                         actual.NodeVoltages[index], settings.StopTime, settings.TimeStep, VOLTAGE_FLOOR_VOLTS);
+        CompareWaveforms(log,
+                         std::format("V({})", node),
+                         expected.Times,
+                         expected.NodeVoltages[index],
+                         actual.Times,
+                         actual.NodeVoltages[index],
+                         settings.StopTime,
+                         settings.TimeStep,
+                         VOLTAGE_FLOOR_VOLTS);
     }
     const Differences found = log.Take();
     INFO(Indented(found));
@@ -908,9 +1046,14 @@ TEST_CASE("The initial voltage of a node starts a transient the same way on both
         DifferenceLog log;
         for (int node = 1; node < asked.GetNodeCount(); ++node) {
             const auto index = static_cast<std::size_t>(node);
-            CompareWaveforms(log, std::format("V({})", node), on_ngspice.Result->Times,
-                             on_ngspice.Result->NodeVoltages[index], on_nodalys.Result->Times,
-                             on_nodalys.Result->NodeVoltages[index], settings.StopTime, settings.TimeStep,
+            CompareWaveforms(log,
+                             std::format("V({})", node),
+                             on_ngspice.Result->Times,
+                             on_ngspice.Result->NodeVoltages[index],
+                             on_nodalys.Result->Times,
+                             on_nodalys.Result->NodeVoltages[index],
+                             settings.StopTime,
+                             settings.TimeStep,
                              VOLTAGE_FLOOR_VOLTS);
         }
         const Differences found = log.Take();
@@ -939,8 +1082,11 @@ TEST_CASE("Every example gives the same results on ngspice and on Nodalys", "[cr
         FAIL(loaded.error());
     }
     GUI::Schematic schematic;
-    schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings),
-                      std::move(loaded->Subcircuits), std::move(loaded->Models));
+    schematic.Replace(std::move(loaded->Elements),
+                      std::move(loaded->Wires),
+                      std::move(loaded->Settings),
+                      std::move(loaded->Subcircuits),
+                      std::move(loaded->Models));
     schematic.RestoreMeasurements(loaded->Measurements);
     const Core::Circuit circuit = schematic.BuildCircuit();
     const GUI::SimulationSettings settings = schematic.GetSimulationSettings();
@@ -948,7 +1094,10 @@ TEST_CASE("Every example gives the same results on ngspice and on Nodalys", "[cr
 
     // The operating point is what every analysis starts from, so it is compared for every example
     Examine(
-        example, circuit, OPERATING_POINT_NAME, Core::AnalysisKind::OPERATING_POINT,
+        example,
+        circuit,
+        OPERATING_POINT_NAME,
+        Core::AnalysisKind::OPERATING_POINT,
         [&circuit] { return Core::RunOperatingPoint(circuit); },
         [node_count](DifferenceLog &log, const Core::OperatingPoint &expected, const Core::OperatingPoint &actual) {
             CompareOperatingPoints(log, expected, actual, node_count);
@@ -968,7 +1117,10 @@ TEST_CASE("Every example gives the same results on ngspice and on Nodalys", "[cr
             break;
         }
         Examine(
-            example, circuit, TRANSIENT_NAME, Core::AnalysisKind::TRANSIENT,
+            example,
+            circuit,
+            TRANSIENT_NAME,
+            Core::AnalysisKind::TRANSIENT,
             [&] { return Core::RunTransient(circuit, settings.Transient); },
             [&, node_count](DifferenceLog &log, const Core::Transient &expected, const Core::Transient &actual) {
                 CompareTransients(log, expected, actual, settings.Transient, node_count);
@@ -976,7 +1128,10 @@ TEST_CASE("Every example gives the same results on ngspice and on Nodalys", "[cr
         break;
     case GUI::Analysis::AC_SWEEP:
         Examine(
-            example, circuit, AC_SWEEP_NAME, Core::AnalysisKind::AC_SWEEP,
+            example,
+            circuit,
+            AC_SWEEP_NAME,
+            Core::AnalysisKind::AC_SWEEP,
             [&] { return Core::RunACSweep(circuit, settings.ACSweep); },
             [node_count](DifferenceLog &log, const Core::ACSweep &expected, const Core::ACSweep &actual) {
                 CompareACSweeps(log, expected, actual, node_count);
@@ -992,7 +1147,10 @@ TEST_CASE("Every example gives the same results on ngspice and on Nodalys", "[cr
             sweep.Stepped->Source = GUI::ResolveSweepSource(settings.SteppedRange, sources, GUI::STEPPED_SOURCE_INDEX);
         }
         Examine(
-            example, circuit, DC_SWEEP_NAME, Core::AnalysisKind::DC_SWEEP,
+            example,
+            circuit,
+            DC_SWEEP_NAME,
+            Core::AnalysisKind::DC_SWEEP,
             [&] { return Core::RunDCSweep(circuit, sweep); },
             [node_count](DifferenceLog &log, const Core::DCSweep &expected, const Core::DCSweep &actual) {
                 CompareDCSweeps(log, expected, actual, node_count);
@@ -1004,10 +1162,14 @@ TEST_CASE("Every example gives the same results on ngspice and on Nodalys", "[cr
         const std::optional<int> output = GUI::ResolveOutputNode(settings.PoleZeroOutput, circuit, schematic);
         REQUIRE_FALSE(sources.empty());
         REQUIRE(output);
-        const Core::PoleZeroSettings run_settings{
-            .OutputNode = *output, .InputSource = GUI::ResolveOptionalInput(settings.PoleZeroSource, sources)};
+        const Core::PoleZeroSettings run_settings{.OutputNode = *output,
+                                                  .InputSource =
+                                                      GUI::ResolveOptionalInput(settings.PoleZeroSource, sources)};
         Examine(
-            example, circuit, POLE_ZERO_NAME, Core::AnalysisKind::POLE_ZERO,
+            example,
+            circuit,
+            POLE_ZERO_NAME,
+            Core::AnalysisKind::POLE_ZERO,
             [&] { return Core::RunPoleZero(circuit, run_settings); },
             [](DifferenceLog &log, const Core::PoleZero &expected, const Core::PoleZero &actual) {
                 ComparePoleZeros(log, expected, actual);
@@ -1016,7 +1178,10 @@ TEST_CASE("Every example gives the same results on ngspice and on Nodalys", "[cr
     }
     case GUI::Analysis::S_PARAMETERS:
         Examine(
-            example, circuit, S_PARAMETERS_NAME, Core::AnalysisKind::S_PARAMETERS,
+            example,
+            circuit,
+            S_PARAMETERS_NAME,
+            Core::AnalysisKind::S_PARAMETERS,
             [&] { return Core::RunSParameters(circuit, settings.SParameters); },
             [](DifferenceLog &log, const Core::SParameters &expected, const Core::SParameters &actual) {
                 CompareSParameters(log, expected, actual);
@@ -1028,7 +1193,10 @@ TEST_CASE("Every example gives the same results on ngspice and on Nodalys", "[cr
             .Inputs = GUI::ResolveTruthTableInputs(settings.TruthTableInputs, available),
             .OutputNodes = GUI::ListMeasuredNodes(circuit, schematic)};
         Examine(
-            example, circuit, TRUTH_TABLE_NAME, Core::AnalysisKind::OPERATING_POINT,
+            example,
+            circuit,
+            TRUTH_TABLE_NAME,
+            Core::AnalysisKind::OPERATING_POINT,
             [&] { return Core::RunTruthTable(circuit, run_settings); },
             [](DifferenceLog &log, const Core::TruthTable &expected, const Core::TruthTable &actual) {
                 CompareTruthTables(log, expected, actual);
@@ -1055,7 +1223,11 @@ TEST_CASE("Every example gives the same results on ngspice and on Nodalys", "[cr
     if (!noise_sources.empty()) {
         const Core::NoiseSettings noise{.OutputNode = *output, .InputSource = noise_sources.front()};
         Examine(
-            example, circuit, NOISE_NAME, Core::AnalysisKind::NOISE, [&] { return Core::RunNoise(circuit, noise); },
+            example,
+            circuit,
+            NOISE_NAME,
+            Core::AnalysisKind::NOISE,
+            [&] { return Core::RunNoise(circuit, noise); },
             [](DifferenceLog &log, const Core::Noise &expected, const Core::Noise &actual) {
                 CompareNoise(log, expected, actual);
             });
@@ -1065,7 +1237,10 @@ TEST_CASE("Every example gives the same results on ngspice and on Nodalys", "[cr
     if (!transfer_sources.empty()) {
         const Core::TransferFunctionSettings transfer{.OutputNode = *output, .InputSource = transfer_sources.front()};
         Examine(
-            example, circuit, TRANSFER_FUNCTION_NAME, Core::AnalysisKind::TRANSFER_FUNCTION,
+            example,
+            circuit,
+            TRANSFER_FUNCTION_NAME,
+            Core::AnalysisKind::TRANSFER_FUNCTION,
             [&] { return Core::RunTransferFunction(circuit, transfer); },
             [](DifferenceLog &log, const Core::TransferFunction &expected, const Core::TransferFunction &actual) {
                 CompareTransferFunctions(log, expected, actual);
@@ -1073,7 +1248,10 @@ TEST_CASE("Every example gives the same results on ngspice and on Nodalys", "[cr
     }
     const Core::SensitivitySettings sensitivity{.OutputNode = *output};
     Examine(
-        example, circuit, SENSITIVITY_NAME, Core::AnalysisKind::SENSITIVITY,
+        example,
+        circuit,
+        SENSITIVITY_NAME,
+        Core::AnalysisKind::SENSITIVITY,
         [&] { return Core::RunSensitivity(circuit, sensitivity); },
         [](DifferenceLog &log, const Core::Sensitivity &expected, const Core::Sensitivity &actual) {
             CompareSensitivities(log, expected, actual);

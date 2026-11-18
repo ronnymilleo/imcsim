@@ -14,8 +14,8 @@
 
 namespace {
 
-std::unique_ptr<GUI::UIElement> Part(const Core::ComponentType type, const GUI::GridPoint position,
-                                     const std::string &name) {
+std::unique_ptr<GUI::UIElement>
+Part(const Core::ComponentType type, const GUI::GridPoint position, const std::string &name) {
     auto element = GUI::CreateElement(type, position, GUI::Rotation::R0);
     element->GetComponent().SetName(name);
     return element;

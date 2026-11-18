@@ -117,7 +117,8 @@ void DrawNetLabel(Core::NetLabel &label, BlockFields &fields, Schematic &schemat
         schematic.MarkModified();
     }
     if (!valid) {
-        ImGui::TextColored(GetErrorTextColor(), "%s",
+        ImGui::TextColored(GetErrorTextColor(),
+                           "%s",
                            is_pin ? "Use a letter or _, then letters, digits or _"
                                   : "1 to 32 letters, digits, _, - or .");
     } else if (is_pin) {

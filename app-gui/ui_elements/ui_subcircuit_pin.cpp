@@ -42,19 +42,24 @@ void UISubcircuitPin::DrawTerminals(SchematicCanvas &canvas, const ViewTransform
     canvas.AddLine(LocalToScreen(view, 0, 0), LocalToScreen(view, SQUARE_NEAR, 0), color, LINE_THICKNESS);
 }
 
-void UISubcircuitPin::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
+void UISubcircuitPin::DrawSymbol(SchematicCanvas &canvas,
+                                 const ViewTransform &view,
+                                 const ImU32 color,
                                  SymbolStyle /*style*/) const {
     const std::array square = {LocalToScreen(view, SQUARE_FAR, -HALF_SIDE),
                                LocalToScreen(view, SQUARE_NEAR, -HALF_SIDE),
-                               LocalToScreen(view, SQUARE_NEAR, HALF_SIDE), LocalToScreen(view, SQUARE_FAR, HALF_SIDE)};
+                               LocalToScreen(view, SQUARE_NEAR, HALF_SIDE),
+                               LocalToScreen(view, SQUARE_FAR, HALF_SIDE)};
     canvas.AddPolyline(square.data(), static_cast<int>(square.size()), color, ImDrawFlags_Closed, LINE_THICKNESS);
 
     const float tail = SQUARE_FAR + ARROW_INSET;
     const float tip = SQUARE_NEAR - ARROW_INSET;
     const float head_base = tip - HEAD_LENGTH;
     canvas.AddLine(LocalToScreen(view, tail, 0.0f), LocalToScreen(view, head_base, 0.0f), color, LINE_THICKNESS);
-    canvas.AddTriangleFilled(LocalToScreen(view, tip, 0.0f), LocalToScreen(view, head_base, -HEAD_HALF_WIDTH),
-                             LocalToScreen(view, head_base, HEAD_HALF_WIDTH), color);
+    canvas.AddTriangleFilled(LocalToScreen(view, tip, 0.0f),
+                             LocalToScreen(view, head_base, -HEAD_HALF_WIDTH),
+                             LocalToScreen(view, head_base, HEAD_HALF_WIDTH),
+                             color);
 }
 
 /**

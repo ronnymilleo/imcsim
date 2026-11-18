@@ -220,8 +220,10 @@ constexpr auto RANDOM_KEYS = std::to_array<ParameterKey<Core::RandomParameters>>
  *          apart.
  */
 template <typename Parameters, std::size_t Count>
-void WriteSourceParameters(const std::array<ParameterKey<Parameters>, Count> &keys, const Parameters &parameters,
-                           const char *name, nlohmann::json &object) {
+void WriteSourceParameters(const std::array<ParameterKey<Parameters>, Count> &keys,
+                           const Parameters &parameters,
+                           const char *name,
+                           nlohmann::json &object) {
     nlohmann::json values = nlohmann::json::object();
     WriteParameters(keys, parameters, values);
     object[name] = values;
@@ -231,7 +233,8 @@ void WriteSourceParameters(const std::array<ParameterKey<Parameters>, Count> &ke
  * @brief   One waveform of a source; nothing to read when the file has no key for it.
  */
 template <typename Parameters, std::size_t Count>
-std::expected<void, std::string> ReadSourceParameters(const nlohmann::json &object, const char *name,
+std::expected<void, std::string> ReadSourceParameters(const nlohmann::json &object,
+                                                      const char *name,
                                                       const std::array<ParameterKey<Parameters>, Count> &keys,
                                                       Parameters &parameters) {
     const auto entry = object.find(name);
@@ -248,7 +251,8 @@ std::expected<void, std::string> ReadSourceParameters(const nlohmann::json &obje
  * @brief   Parts whose parameters are all there is to them save them as one object.
  */
 template <typename Part, typename Parameters, std::size_t Count>
-void WritePartParameters(const Part &part, const std::array<ParameterKey<Parameters>, Count> &keys,
+void WritePartParameters(const Part &part,
+                         const std::array<ParameterKey<Parameters>, Count> &keys,
                          nlohmann::json &object) {
     nlohmann::json parameters = nlohmann::json::object();
     WriteParameters(keys, part.GetParameters(), parameters);
@@ -259,8 +263,8 @@ void WritePartParameters(const Part &part, const std::array<ParameterKey<Paramet
  * @brief   Missing parameters keep those the part starts with.
  */
 template <typename Part, typename Parameters, std::size_t Count>
-std::expected<void, std::string> ReadPartParameters(const nlohmann::json &object, Part &part,
-                                                    const std::array<ParameterKey<Parameters>, Count> &keys) {
+std::expected<void, std::string>
+ReadPartParameters(const nlohmann::json &object, Part &part, const std::array<ParameterKey<Parameters>, Count> &keys) {
     Parameters parameters = part.GetParameters();
     if (const auto parameters_object = object.find("parameters"); parameters_object != object.end()) {
         if (!parameters_object->is_object()) {
@@ -281,7 +285,8 @@ std::expected<void, std::string> ReadPartParameters(const nlohmann::json &object
  * @brief   Parts with a model save its name, plus their parameters when custom.
  */
 template <typename Part, typename Parameters, std::size_t Count>
-void WriteModelChoice(const Part &part, const std::array<ParameterKey<Parameters>, Count> &keys,
+void WriteModelChoice(const Part &part,
+                      const std::array<ParameterKey<Parameters>, Count> &keys,
                       nlohmann::json &object) {
     // A library model lives in the document, which the part names
     if (part.HasLibraryModel()) {
@@ -309,7 +314,8 @@ void WritePortSettings(const Core::PortSettings &port, nlohmann::json &object) {
  * @brief   Missing custom parameters keep those of the default model of the part.
  */
 template <typename Part, typename Model, typename Parameters, std::size_t Count>
-std::expected<void, std::string> ReadModelChoice(const nlohmann::json &object, Part &part,
+std::expected<void, std::string> ReadModelChoice(const nlohmann::json &object,
+                                                 Part &part,
                                                  const Model *(*find_model)(Core::ComponentType, std::string_view),
                                                  const char *custom_name,
                                                  const std::array<ParameterKey<Parameters>, Count> &keys) {
@@ -485,9 +491,13 @@ std::expected<void, std::string> ReadLogicInputState(const nlohmann::json &objec
 
 using StateReader = std::expected<void, std::string> (*)(const nlohmann::json &, Core::Component &);
 
-constexpr auto STATE_READERS =
-    std::to_array<StateReader>({&ReadControllingCurrent, &ReadBehavioralExpression, &ReadNetName, &ReadPortSettings,
-                                &ReadSwitchState, &ReadWiper, &ReadLogicInputState});
+constexpr auto STATE_READERS = std::to_array<StateReader>({&ReadControllingCurrent,
+                                                           &ReadBehavioralExpression,
+                                                           &ReadNetName,
+                                                           &ReadPortSettings,
+                                                           &ReadSwitchState,
+                                                           &ReadWiper,
+                                                           &ReadLogicInputState});
 
 /**
  * @brief   Each reader fills the figures of one kind of part and does nothing for the others; missing keys leave the
@@ -538,7 +548,8 @@ std::expected<void, std::string> ReadLogicFigures(const nlohmann::json &object, 
     const std::optional<int> inputs = ReadInt(object, "inputs");
     if (!inputs || !Core::LogicPart::IsValidInputCount(*inputs)) {
         return std::unexpected(std::format("has a number of inputs that is not a whole number from {} to {}",
-                                           Core::MIN_LOGIC_INPUTS, Core::MAX_LOGIC_INPUTS));
+                                           Core::MIN_LOGIC_INPUTS,
+                                           Core::MAX_LOGIC_INPUTS));
     }
     part.SetInputCount(*inputs);
     return {};
@@ -572,9 +583,15 @@ std::expected<void, std::string> ReadSevenSegmentFigures(const nlohmann::json &o
     return ReadPartParameters(object, static_cast<Core::SevenSegmentDisplay &>(component), SEVEN_SEGMENT_KEYS);
 }
 
-constexpr auto FIGURE_READERS = std::to_array<StateReader>(
-    {&ReadSwitchFigures, &ReadRelayFigures, &ReadFuseFigures, &ReadTransformerFigures, &ReadLogicFigures,
-     &ReadClockFigures, &ReadLogicInputFigures, &ReadLogicOutputFigures, &ReadSevenSegmentFigures});
+constexpr auto FIGURE_READERS = std::to_array<StateReader>({&ReadSwitchFigures,
+                                                            &ReadRelayFigures,
+                                                            &ReadFuseFigures,
+                                                            &ReadTransformerFigures,
+                                                            &ReadLogicFigures,
+                                                            &ReadClockFigures,
+                                                            &ReadLogicInputFigures,
+                                                            &ReadLogicOutputFigures,
+                                                            &ReadSevenSegmentFigures});
 
 } // namespace
 
@@ -826,16 +843,25 @@ std::expected<void, std::string> ReadSourceFields(const nlohmann::json &object, 
 std::expected<void, std::string> ReadModelFields(const nlohmann::json &object, Core::Component &component) {
     const Core::ComponentType type = component.GetType();
     if (Core::IsDiode(type)) {
-        return ReadModelChoice(object, static_cast<Core::Diode &>(component), &Core::FindDiodeModel,
-                               Core::CUSTOM_DIODE_MODEL_NAME, DIODE_KEYS);
+        return ReadModelChoice(object,
+                               static_cast<Core::Diode &>(component),
+                               &Core::FindDiodeModel,
+                               Core::CUSTOM_DIODE_MODEL_NAME,
+                               DIODE_KEYS);
     }
     if (Core::IsBJT(type)) {
-        return ReadModelChoice(object, static_cast<Core::BJT &>(component), &Core::FindBJTModel,
-                               Core::CUSTOM_BJT_MODEL_NAME, BJT_KEYS);
+        return ReadModelChoice(object,
+                               static_cast<Core::BJT &>(component),
+                               &Core::FindBJTModel,
+                               Core::CUSTOM_BJT_MODEL_NAME,
+                               BJT_KEYS);
     }
     if (Core::IsMOSFET(type)) {
-        return ReadModelChoice(object, static_cast<Core::MOSFET &>(component), &Core::FindMOSFETModel,
-                               Core::CUSTOM_MOSFET_MODEL_NAME, MOSFET_KEYS);
+        return ReadModelChoice(object,
+                               static_cast<Core::MOSFET &>(component),
+                               &Core::FindMOSFETModel,
+                               Core::CUSTOM_MOSFET_MODEL_NAME,
+                               MOSFET_KEYS);
     }
     // Files saved before op-amps had models hold ideal ones
     if (type == Core::ComponentType::OP_AMP) {

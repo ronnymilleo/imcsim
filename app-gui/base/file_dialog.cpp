@@ -29,8 +29,13 @@ void FileDialog::ShowOpen(const std::span<const SDL_DialogFileFilter> filters, s
     m_Location = std::move(location);
     // The callback owns this copy of the channel and deletes it, so the channel outlives the dialog's owner if needed
     auto *channel = new std::shared_ptr<Channel>(m_Channel);
-    SDL_ShowOpenFileDialog(HandleResult, channel, nullptr, filters.data(), static_cast<int>(filters.size()),
-                           m_Location.empty() ? nullptr : m_Location.c_str(), false);
+    SDL_ShowOpenFileDialog(HandleResult,
+                           channel,
+                           nullptr,
+                           filters.data(),
+                           static_cast<int>(filters.size()),
+                           m_Location.empty() ? nullptr : m_Location.c_str(),
+                           false);
 }
 
 /**
@@ -44,7 +49,11 @@ void FileDialog::ShowSave(const std::span<const SDL_DialogFileFilter> filters, s
     }
     m_Location = std::move(location);
     auto *channel = new std::shared_ptr<Channel>(m_Channel);
-    SDL_ShowSaveFileDialog(HandleResult, channel, nullptr, filters.data(), static_cast<int>(filters.size()),
+    SDL_ShowSaveFileDialog(HandleResult,
+                           channel,
+                           nullptr,
+                           filters.data(),
+                           static_cast<int>(filters.size()),
                            m_Location.empty() ? nullptr : m_Location.c_str());
 }
 

@@ -102,8 +102,11 @@ void MarkSteps(const std::vector<double> &xs, const std::span<const PlottedTrace
         spec.MarkerSize = STEP_MARKER_SIZE;
         spec.MarkerFillColor = ImGui::ColorConvertU32ToFloat4(trace.Color);
         spec.MarkerLineColor = spec.MarkerFillColor;
-        ImPlot::PlotScatter(std::format("##{} steps", trace.Label).c_str(), xs.data(), trace.Values->data(),
-                            static_cast<int>(xs.size()), spec);
+        ImPlot::PlotScatter(std::format("##{} steps", trace.Label).c_str(),
+                            xs.data(),
+                            trace.Values->data(),
+                            static_cast<int>(xs.size()),
+                            spec);
     }
     ImPlot::SetAxes(ImAxis_X1, ImAxis_Y1);
 }
@@ -220,7 +223,9 @@ void OperatingPointTab::DrawStepPlot(const Core::DCSweep &sweep) {
     if (!BeginTracePlot("##operating_point_steps", ImVec2(-1.0f, ImGui::GetFontSize() * STEP_PLOT_HEIGHT))) {
         return;
     }
-    ImPlot::SetupAxes(sweep.SweptSource.c_str(), "Voltage", ImPlotAxisFlags_None,
+    ImPlot::SetupAxes(sweep.SweptSource.c_str(),
+                      "Voltage",
+                      ImPlotAxisFlags_None,
                       VoltageAxisFlags(has_voltages, show_currents));
     ImPlot::SetupAxisFormat(ImAxis_X1, FormatAxisValue, const_cast<char *>(sweep.SweptUnit.c_str()));
     ImPlot::SetupAxisFormat(ImAxis_Y1, FormatAxisValue, const_cast<char *>("V"));

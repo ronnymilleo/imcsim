@@ -72,8 +72,8 @@ void SelectLongSteppedTransient(GUI::Schematic &schematic) {
     GUI::SimulationSettings settings = schematic.GetSimulationSettings();
     settings.Selected = GUI::Analysis::TRANSIENT;
     settings.Transient = {.StopTime = 0.05, .TimeStep = 1e-6};
-    settings.ParameterStep = {
-        .Enabled = true, .Part = "R1", .UsesList = false, .Start = 100.0, .Stop = 5000.0, .Step = 100.0, .List = ""};
+    settings.ParameterStep =
+        {.Enabled = true, .Part = "R1", .UsesList = false, .Start = 100.0, .Stop = 5000.0, .Step = 100.0, .List = ""};
     schematic.SetSimulationSettings(settings);
 }
 
@@ -85,8 +85,11 @@ void OpenExample(GUI::Schematic &schematic, const std::string_view file_name) {
     REQUIRE(example != GUI::GetExamples().end());
     auto loaded = GUI::LoadExample(*example);
     REQUIRE(loaded.has_value());
-    schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings),
-                      std::move(loaded->Subcircuits), std::move(loaded->Models));
+    schematic.Replace(std::move(loaded->Elements),
+                      std::move(loaded->Wires),
+                      std::move(loaded->Settings),
+                      std::move(loaded->Subcircuits),
+                      std::move(loaded->Models));
 }
 
 /**
@@ -195,8 +198,10 @@ void OpenMonteCarloFilter(GUI::Schematic &schematic, const GUI::Analysis analysi
 class FailingAboveBackend : public Core::SimulationBackend {
 public:
     FailingAboveBackend()
-        : m_Capabilities{.Analyses = {Core::AnalysisKind::OPERATING_POINT, Core::AnalysisKind::TRANSIENT,
-                                      Core::AnalysisKind::AC_SWEEP, Core::AnalysisKind::DC_SWEEP},
+        : m_Capabilities{.Analyses = {Core::AnalysisKind::OPERATING_POINT,
+                                      Core::AnalysisKind::TRANSIENT,
+                                      Core::AnalysisKind::AC_SWEEP,
+                                      Core::AnalysisKind::DC_SWEEP},
                          .UnsupportedParts = {},
                          .UnsupportedPartsByAnalysis = {}} {}
 
@@ -205,8 +210,10 @@ public:
     Core::OperatingPointRun RunOperatingPoint(const Core::Circuit &, const std::optional<double> &) override {
         return {std::unexpected("no"), {}};
     }
-    Core::TransientRun RunTransient(const Core::Circuit &circuit, const Core::TransientSettings &,
-                                    const std::optional<double> &, const Core::RunMonitor &) override {
+    Core::TransientRun RunTransient(const Core::Circuit &circuit,
+                                    const Core::TransientSettings &,
+                                    const std::optional<double> &,
+                                    const Core::RunMonitor &) override {
         for (const Core::CircuitEntry &entry : circuit.GetEntries()) {
             if (entry.Part->GetName() == "R1" && entry.Part->GetValue() > 1e3) {
                 return {std::unexpected("no convergence"), {}};
@@ -214,12 +221,12 @@ public:
         }
         return {Core::Transient{.Times = {0.0, 1.0}, .NodeVoltages = {{0.0, 0.0}, {1.0, 1.0}, {2.0, 2.0}}}, {}};
     }
-    Core::ACSweepRun RunACSweep(const Core::Circuit &, const Core::ACSweepSettings &,
-                                const std::optional<double> &) override {
+    Core::ACSweepRun
+    RunACSweep(const Core::Circuit &, const Core::ACSweepSettings &, const std::optional<double> &) override {
         return {std::unexpected("no"), {}};
     }
-    Core::DCSweepRun RunDCSweep(const Core::Circuit &, const Core::DCSweepSettings &,
-                                const std::optional<double> &) override {
+    Core::DCSweepRun
+    RunDCSweep(const Core::Circuit &, const Core::DCSweepSettings &, const std::optional<double> &) override {
         return {std::unexpected("no"), {}};
     }
     Core::NoiseRun RunNoise(const Core::Circuit &, const Core::NoiseSettings &) override {
@@ -286,7 +293,8 @@ class HeldBackend : public FailingAboveBackend {
 public:
     explicit HeldBackend(std::shared_ptr<TransientHold> hold) : m_Hold(std::move(hold)) {}
 
-    Core::TransientRun RunTransient(const Core::Circuit &circuit, const Core::TransientSettings &settings,
+    Core::TransientRun RunTransient(const Core::Circuit &circuit,
+                                    const Core::TransientSettings &settings,
                                     const std::optional<double> &temperature_celsius,
                                     const Core::RunMonitor &monitor) override {
         m_Hold->Enter();
@@ -418,8 +426,8 @@ TEST_CASE("A stepped run reports its progress and delivers one transient per val
     OpenRCFilter(schematic);
     GUI::SimulationSettings settings = schematic.GetSimulationSettings();
     settings.Selected = GUI::Analysis::TRANSIENT;
-    settings.ParameterStep = {
-        .Enabled = true, .Part = "R1", .UsesList = true, .Start = 0.0, .Stop = 0.0, .Step = 0.0, .List = "1k, 2k, 4k"};
+    settings.ParameterStep =
+        {.Enabled = true, .Part = "R1", .UsesList = true, .Start = 0.0, .Stop = 0.0, .Step = 0.0, .List = "1k, 2k, 4k"};
     schematic.SetSimulationSettings(settings);
     GUI::AnalysisControls controls(schematic, results);
 
@@ -477,8 +485,8 @@ TEST_CASE("A stepped AC sweep and a stepped DC sweep deliver one result per valu
     OpenRCFilter(schematic);
     GUI::AnalysisControls controls(schematic, results);
     GUI::SimulationSettings settings = schematic.GetSimulationSettings();
-    settings.ParameterStep = {
-        .Enabled = true, .Part = "R1", .UsesList = true, .Start = 0.0, .Stop = 0.0, .Step = 0.0, .List = "1k, 2k"};
+    settings.ParameterStep =
+        {.Enabled = true, .Part = "R1", .UsesList = true, .Start = 0.0, .Stop = 0.0, .Step = 0.0, .List = "1k, 2k"};
 
     settings.Selected = GUI::Analysis::AC_SWEEP;
     schematic.SetSimulationSettings(settings);
@@ -500,8 +508,8 @@ TEST_CASE("A stepped operating point delivers one result per value and shows the
     GUI::AnalysisControls controls(schematic, results);
     GUI::SimulationSettings settings = schematic.GetSimulationSettings();
     settings.Selected = GUI::Analysis::OPERATING_POINT;
-    settings.ParameterStep = {
-        .Enabled = true, .Part = "R1", .UsesList = true, .Start = 0.0, .Stop = 0.0, .Step = 0.0, .List = "1k, 2k, 5k"};
+    settings.ParameterStep =
+        {.Enabled = true, .Part = "R1", .UsesList = true, .Start = 0.0, .Stop = 0.0, .Step = 0.0, .List = "1k, 2k, 5k"};
     schematic.SetSimulationSettings(settings);
     RunAndWait(controls);
     REQUIRE_FALSE(controls.GetError(GUI::Analysis::OPERATING_POINT));
@@ -552,8 +560,8 @@ TEST_CASE("A run that cannot start says why, and a circuit that cannot run fails
     // A stepped parameter without values
     GUI::SimulationSettings settings = schematic.GetSimulationSettings();
     settings.Selected = GUI::Analysis::TRANSIENT;
-    settings.ParameterStep = {
-        .Enabled = true, .Part = "R1", .UsesList = true, .Start = 0.0, .Stop = 0.0, .Step = 0.0, .List = "abc"};
+    settings.ParameterStep =
+        {.Enabled = true, .Part = "R1", .UsesList = true, .Start = 0.0, .Stop = 0.0, .Step = 0.0, .List = "abc"};
     schematic.SetSimulationSettings(settings);
     controls.RunSelected();
     CHECK(controls.GetOutcome(GUI::Analysis::TRANSIENT) == GUI::RunOutcome::FAILED);
@@ -563,8 +571,10 @@ TEST_CASE("A run that cannot start says why, and a circuit that cannot run fails
     GUI::ResultStore empty_results;
     empty.SetListener(&empty_results);
     GUI::AnalysisControls empty_controls(empty, empty_results);
-    for (const GUI::Analysis analysis : {GUI::Analysis::DC_SWEEP, GUI::Analysis::NOISE,
-                                         GUI::Analysis::TRANSFER_FUNCTION, GUI::Analysis::SENSITIVITY}) {
+    for (const GUI::Analysis analysis : {GUI::Analysis::DC_SWEEP,
+                                         GUI::Analysis::NOISE,
+                                         GUI::Analysis::TRANSFER_FUNCTION,
+                                         GUI::Analysis::SENSITIVITY}) {
         Select(empty, analysis);
         empty_controls.RunSelected();
         CHECK(empty_controls.GetOutcome(analysis) == GUI::RunOutcome::FAILED);

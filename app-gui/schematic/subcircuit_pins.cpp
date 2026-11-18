@@ -141,7 +141,8 @@ std::optional<Core::PinSide> ParsePinSide(const std::string_view name) {
  * @param[in] except    Marker to leave out, the one being edited, or null.
  * @return  True when a marker other than except is a port with that number.
  */
-bool IsPortNumberTaken(const std::vector<std::unique_ptr<UIElement>> &elements, const int number,
+bool IsPortNumberTaken(const std::vector<std::unique_ptr<UIElement>> &elements,
+                       const int number,
                        const Core::Component *except) {
     return std::ranges::any_of(elements, [number, except](const std::unique_ptr<UIElement> &element) {
         const Core::Component &component = element->GetComponent();

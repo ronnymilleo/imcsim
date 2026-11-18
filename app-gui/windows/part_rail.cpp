@@ -45,7 +45,8 @@ void DrawGroupMark() {
     const float inset = size * 0.4f;
     ImGui::GetWindowDrawList()->AddTriangleFilled({corner.x - inset, corner.y - inset - size},
                                                   {corner.x - inset, corner.y - inset},
-                                                  {corner.x - inset - size, corner.y - inset}, GetIconColor(true));
+                                                  {corner.x - inset - size, corner.y - inset},
+                                                  GetIconColor(true));
 }
 
 /**
@@ -55,7 +56,8 @@ void DrawSectionSeparator() {
     const float gap = ImGui::GetFontSize() * SECTION_GAP;
     ImGui::Dummy({0.0f, gap});
     const ImVec2 start = ImGui::GetCursorScreenPos();
-    ImGui::GetWindowDrawList()->AddLine({start.x, start.y}, {start.x + GetToolButtonSide(), start.y},
+    ImGui::GetWindowDrawList()->AddLine({start.x, start.y},
+                                        {start.x + GetToolButtonSide(), start.y},
                                         ImGui::GetColorU32(ImGuiCol_Separator));
     ImGui::Dummy({0.0f, gap});
 }
@@ -111,7 +113,9 @@ float PartRail::GetWidth() const {
 RailRequest PartRail::Draw(const EditorMode &mode, const float height) {
     RailRequest request;
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, {0.0f, ImGui::GetFontSize() * BUTTON_SPACING});
-    if (ImGui::BeginChild("part_rail", {GetWidth(), height}, ImGuiChildFlags_AlwaysUseWindowPadding,
+    if (ImGui::BeginChild("part_rail",
+                          {GetWidth(), height},
+                          ImGuiChildFlags_AlwaysUseWindowPadding,
                           ImGuiWindowFlags_NoScrollbar)) {
         std::size_t index = 0;
         const auto sections = GetRailSections();
@@ -181,8 +185,8 @@ bool PartRail::DrawPartButton(const Core::ComponentType type, const EditorMode &
  *          the rail, as its corner mark tells.
  * @details Returns the part to place, or none.
  */
-std::optional<Core::ComponentType> PartRail::DrawGroup(const RailEntry &entry, const std::size_t index,
-                                                       const EditorMode &mode) {
+std::optional<Core::ComponentType>
+PartRail::DrawGroup(const RailEntry &entry, const std::size_t index, const EditorMode &mode) {
     Core::ComponentType &choice = m_GroupChoices[index];
     std::optional<Core::ComponentType> picked;
     ImGui::PushID(static_cast<int>(index));
@@ -233,7 +237,8 @@ std::optional<EditorMode> PartRail::DrawReadyBlocks() {
     DrawGroupMark();
     const ReadyBlock &chosen = blocks[m_ReadyBlockChoice];
     ImGui::SetItemTooltip("Logic block: %.*s (hold or right click for the others)",
-                          static_cast<int>(chosen.Title.size()), chosen.Title.data());
+                          static_cast<int>(chosen.Title.size()),
+                          chosen.Title.data());
     if (IsListAsked()) {
         OpenListBeside("blocks");
     } else if (is_clicked && !ImGui::IsPopupOpen("blocks")) {
@@ -253,12 +258,14 @@ std::optional<EditorMode> PartRail::DrawReadyBlocks() {
                 picked = index;
             }
             ImGui::PopID();
-            ImGui::SetItemTooltip("%.*s", static_cast<int>(blocks[index].Description.size()),
+            ImGui::SetItemTooltip("%.*s",
+                                  static_cast<int>(blocks[index].Description.size()),
                                   blocks[index].Description.data());
             DrawReadyBlockIcon(index, start + ImVec2(side, side) / 2.0f);
             ImGui::GetWindowDrawList()->AddText(
                 start + ImVec2(side + ImGui::GetStyle().ItemSpacing.x, (side - ImGui::GetTextLineHeight()) / 2.0f),
-                GetIconColor(true), blocks[index].Title.data(),
+                GetIconColor(true),
+                blocks[index].Title.data(),
                 blocks[index].Title.data() + blocks[index].Title.size());
         }
         ImGui::EndPopup();

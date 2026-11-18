@@ -15,7 +15,9 @@
 namespace GUI {
 
 // Cursors
-void DrawCursorReadout(const std::vector<double> &xs, const char *x_unit, bool logarithmic,
+void DrawCursorReadout(const std::vector<double> &xs,
+                       const char *x_unit,
+                       bool logarithmic,
                        const std::vector<PlottedTrace> &plotted);
 void DrawCursors(PlotCursors &cursors, bool logarithmic);
 PlotSpan MeasuredSpan(const PlotCursors &cursors, const PlotSpan &view);

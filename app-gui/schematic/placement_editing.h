@@ -23,7 +23,9 @@ void SwitchMode(EditorMode &current, EditorMode next, Schematic &schematic, cons
 void StopEditing(Schematic &schematic, EditorMode &mode);
 
 // Placing
-std::unique_ptr<UIElement> MakePlacementPreview(const PlacingMode &mode, GridPoint position, const Schematic &schematic,
+std::unique_ptr<UIElement> MakePlacementPreview(const PlacingMode &mode,
+                                                GridPoint position,
+                                                const Schematic &schematic,
                                                 const std::vector<SavedSubcircuit> &definitions);
 std::optional<std::string> PlacePastedGroup(Schematic &root, BlockSession &blocks, PastedGroup &group);
 std::string FindLastNet(const Schematic &schematic);

@@ -120,8 +120,12 @@ void LoadSweepFields(const Core::SweepRange &range, std::array<ValueField, 3> &f
 /**
  * @brief   Draws the source picker and the start, stop and step of one range; sources must not be empty.
  */
-void DrawSweepRange(const char *id, const char *source_label, const std::vector<SweepSource> &sources,
-                    const std::size_t preferred_index, Core::SweepRange &range, std::array<ValueField, 3> &fields) {
+void DrawSweepRange(const char *id,
+                    const char *source_label,
+                    const std::vector<SweepSource> &sources,
+                    const std::size_t preferred_index,
+                    Core::SweepRange &range,
+                    std::array<ValueField, 3> &fields) {
     ImGui::PushID(id);
     const std::string shown_source = ResolveSweepSource(range, sources, preferred_index);
     DrawFieldLabel(source_label);
@@ -171,10 +175,12 @@ void DrawStepSummary(const ParameterStepSettings &step, const std::string &unit)
         ImGui::TextColored(GetErrorTextColor(), "%s", values.error().c_str());
     } else {
         const std::string parameter = GetParameterLabel(step);
-        ImGui::TextDisabled("%s", std::format("{} runs, {} to {}", values->size(),
-                                              FormatStepValue(parameter, values->front(), unit),
-                                              FormatStepValue(parameter, values->back(), unit))
-                                      .c_str());
+        ImGui::TextDisabled("%s",
+                            std::format("{} runs, {} to {}",
+                                        values->size(),
+                                        FormatStepValue(parameter, values->front(), unit),
+                                        FormatStepValue(parameter, values->back(), unit))
+                                .c_str());
     }
     ImGui::PopTextWrapPos();
 }
@@ -330,7 +336,8 @@ void AnalysisSettingsPanel::DrawTransientSettings(SimulationSettings &settings) 
     }
     ImGui::SetItemTooltip("With Live on, the transient runs until it is stopped and covers the stop time in this long "
                           "on the clock, from %.0f to %.0f s; the plot and the schematic show the last stop time",
-                          MIN_LIVE_SECONDS, MAX_LIVE_SECONDS);
+                          MIN_LIVE_SECONDS,
+                          MAX_LIVE_SECONDS);
     DrawFieldLabel("Seed");
     // Files reject a negative seed, so the field never produces a value that would not load back
     int seed = static_cast<int>(settings.Transient.Seed);
@@ -356,7 +363,8 @@ void AnalysisSettingsPanel::DrawACSweepSettings(SimulationSettings &settings) {
         settings.ACSweep.PointsPerDecade = std::max(settings.ACSweep.PointsPerDecade, 1);
     }
     const auto suggested = Core::SuggestACSweepSettings(m_Schematic.BuildCircuit());
-    if (DrawSuggestButton(suggested.has_value(), "Two decades past the RC, RL and LC corners and the op-amp bandwidths",
+    if (DrawSuggestButton(suggested.has_value(),
+                          "Two decades past the RC, RL and LC corners and the op-amp bandwidths",
                           "Needs a capacitor, an inductor or an op-amp") &&
         suggested) {
         settings.ACSweep.StartFrequency = suggested->StartFrequency;
@@ -432,7 +440,8 @@ void AnalysisSettingsPanel::DrawNoiseSettings(SimulationSettings &settings) {
         settings.NoiseRange.PointsPerDecade = std::max(settings.NoiseRange.PointsPerDecade, 1);
     }
     const auto suggested = Core::SuggestACSweepSettings(circuit);
-    if (DrawSuggestButton(suggested.has_value(), "Two decades past the RC, RL and LC corners and the op-amp bandwidths",
+    if (DrawSuggestButton(suggested.has_value(),
+                          "Two decades past the RC, RL and LC corners and the op-amp bandwidths",
                           "Needs a capacitor, an inductor or an op-amp") &&
         suggested) {
         settings.NoiseRange.StartFrequency = suggested->StartFrequency;
@@ -448,7 +457,9 @@ void AnalysisSettingsPanel::DrawNoiseSettings(SimulationSettings &settings) {
  */
 void AnalysisSettingsPanel::DrawTransferFunctionSettings(SimulationSettings &settings) {
     DrawSourceAndOutputPickers(
-        settings.TransferFunctionSource, settings.TransferFunctionOutput, "tf",
+        settings.TransferFunctionSource,
+        settings.TransferFunctionOutput,
+        "tf",
         "Connect some parts to measure their transfer function",
         "The DC gain, the input impedance and the output impedance from this source to the output");
 }
@@ -509,7 +520,9 @@ void AnalysisSettingsPanel::DrawPortSummary() {
  * @brief   The pickers of the transfer function: the poles and zeros are those between a source and an output node.
  */
 void AnalysisSettingsPanel::DrawPoleZeroSettings(SimulationSettings &settings) {
-    DrawSourceAndOutputPickers(settings.PoleZeroSource, settings.PoleZeroOutput, "pole_zero",
+    DrawSourceAndOutputPickers(settings.PoleZeroSource,
+                               settings.PoleZeroOutput,
+                               "pole_zero",
                                "Connect some parts to find their poles and zeros",
                                "The poles and zeros of the transfer function from this source to the output; a voltage "
                                "source gives a voltage gain and a current source a transimpedance");
@@ -523,8 +536,10 @@ void AnalysisSettingsPanel::DrawPoleZeroSettings(SimulationSettings &settings) {
  * @param[in]     empty_text   Shown in place of the pickers when the circuit has no node to pick.
  * @param[in]     tooltip      What the input picker is for.
  */
-void AnalysisSettingsPanel::DrawSourceAndOutputPickers(std::string &source, std::optional<GridPoint> &output,
-                                                       const std::string &id, const char *empty_text,
+void AnalysisSettingsPanel::DrawSourceAndOutputPickers(std::string &source,
+                                                       std::optional<GridPoint> &output,
+                                                       const std::string &id,
+                                                       const char *empty_text,
                                                        const char *tooltip) {
     const Core::Circuit circuit = m_Schematic.BuildCircuit();
     const std::vector<std::string> sources = Core::GetTransferFunctionInputSources(circuit);
@@ -584,9 +599,10 @@ void AnalysisSettingsPanel::DrawSensitivitySettings(SimulationSettings &settings
         settings.SensitivityType = SensitivityKind::AC;
     }
     ImGui::EndDisabled();
-    ImGui::SetItemTooltip("%s", ac_unsupported ? ac_unsupported->c_str()
-                                               : "How much the gain and the phase at the output change with the "
-                                                 "value of each part, across frequency");
+    ImGui::SetItemTooltip("%s",
+                          ac_unsupported ? ac_unsupported->c_str()
+                                         : "How much the gain and the phase at the output change with the "
+                                           "value of each part, across frequency");
     const Connectivity &connectivity = m_Schematic.GetConnectivity();
     DrawFieldLabel("Output");
     if (ImGui::BeginCombo("##sensitivity_output", GetVoltageLabel(connectivity, *output).c_str())) {
@@ -634,7 +650,8 @@ void AnalysisSettingsPanel::DrawACSensitivityInputs(SimulationSettings &settings
         range.PointsPerDecade = std::max(range.PointsPerDecade, 1);
     }
     const auto suggested = Core::SuggestACSweepSettings(circuit);
-    if (DrawSuggestButton(suggested.has_value(), "Two decades past the RC, RL and LC corners and the op-amp bandwidths",
+    if (DrawSuggestButton(suggested.has_value(),
+                          "Two decades past the RC, RL and LC corners and the op-amp bandwidths",
                           "Needs a capacitor, an inductor or an op-amp") &&
         suggested) {
         range.StartFrequency = suggested->StartFrequency;
@@ -750,9 +767,10 @@ void AnalysisSettingsPanel::DrawHarmonicBalanceSettings(SimulationSettings &sett
         m_HBFundamental.Load(suggested->FundamentalFrequency);
     }
     ImGui::EndDisabled();
-    ImGui::SetItemTooltip(
-        "%s", suggested ? "Set the fundamental frequency and harmonic count from the circuit's periodic sources"
-                        : "Needs a sine, AC, pulse or clock source with commensurable frequencies");
+    ImGui::SetItemTooltip("%s",
+                          suggested
+                              ? "Set the fundamental frequency and harmonic count from the circuit's periodic sources"
+                              : "Needs a sine, AC, pulse or clock source with commensurable frequencies");
 }
 
 /**
@@ -805,37 +823,44 @@ void AnalysisSettingsPanel::DrawSolverSettings(Core::SolverOptions &options) {
         const auto is_between = [](const double minimum, const double maximum) {
             return [minimum, maximum](const double value) { return value >= minimum && value <= maximum; };
         };
-        if (const std::optional<double> value = m_RelativeTolerance.Draw(
-                "Rel. tolerance", "", is_between(Core::MIN_RELATIVE_TOLERANCE, Core::MAX_RELATIVE_TOLERANCE))) {
+        if (const std::optional<double> value =
+                m_RelativeTolerance.Draw("Rel. tolerance",
+                                         "",
+                                         is_between(Core::MIN_RELATIVE_TOLERANCE, Core::MAX_RELATIVE_TOLERANCE))) {
             options.RelativeTolerance = *value;
         }
-        ImGui::SetItemTooltip("%s", std::format("reltol: how close two Newton iterations must be, relative to the "
-                                                "value, and how fast a transient may change its step; default {}, "
-                                                "{} to {}",
-                                                Core::FormatValue(Core::DEFAULT_RELATIVE_TOLERANCE),
-                                                Core::FormatValue(Core::MIN_RELATIVE_TOLERANCE),
-                                                Core::FormatValue(Core::MAX_RELATIVE_TOLERANCE))
-                                        .c_str());
+        ImGui::SetItemTooltip("%s",
+                              std::format("reltol: how close two Newton iterations must be, relative to the "
+                                          "value, and how fast a transient may change its step; default {}, "
+                                          "{} to {}",
+                                          Core::FormatValue(Core::DEFAULT_RELATIVE_TOLERANCE),
+                                          Core::FormatValue(Core::MIN_RELATIVE_TOLERANCE),
+                                          Core::FormatValue(Core::MAX_RELATIVE_TOLERANCE))
+                                  .c_str());
         if (const std::optional<double> value = m_CurrentTolerance.Draw(
-                "Current tolerance", "A",
+                "Current tolerance",
+                "A",
                 is_between(Core::MIN_CURRENT_TOLERANCE_AMPERES, Core::MAX_CURRENT_TOLERANCE_AMPERES))) {
             options.CurrentToleranceAmperes = *value;
         }
-        ImGui::SetItemTooltip("%s", std::format("abstol: the smallest current that counts; default {}A, {}A to {}A",
-                                                Core::FormatValue(Core::DEFAULT_CURRENT_TOLERANCE_AMPERES),
-                                                Core::FormatValue(Core::MIN_CURRENT_TOLERANCE_AMPERES),
-                                                Core::FormatValue(Core::MAX_CURRENT_TOLERANCE_AMPERES))
-                                        .c_str());
+        ImGui::SetItemTooltip("%s",
+                              std::format("abstol: the smallest current that counts; default {}A, {}A to {}A",
+                                          Core::FormatValue(Core::DEFAULT_CURRENT_TOLERANCE_AMPERES),
+                                          Core::FormatValue(Core::MIN_CURRENT_TOLERANCE_AMPERES),
+                                          Core::FormatValue(Core::MAX_CURRENT_TOLERANCE_AMPERES))
+                                  .c_str());
         if (const std::optional<double> value = m_VoltageTolerance.Draw(
-                "Voltage tolerance", "V",
+                "Voltage tolerance",
+                "V",
                 is_between(Core::MIN_VOLTAGE_TOLERANCE_VOLTS, Core::MAX_VOLTAGE_TOLERANCE_VOLTS))) {
             options.VoltageToleranceVolts = *value;
         }
-        ImGui::SetItemTooltip("%s", std::format("vntol: the smallest voltage that counts; default {}V, {}V to {}V",
-                                                Core::FormatValue(Core::DEFAULT_VOLTAGE_TOLERANCE_VOLTS),
-                                                Core::FormatValue(Core::MIN_VOLTAGE_TOLERANCE_VOLTS),
-                                                Core::FormatValue(Core::MAX_VOLTAGE_TOLERANCE_VOLTS))
-                                        .c_str());
+        ImGui::SetItemTooltip("%s",
+                              std::format("vntol: the smallest voltage that counts; default {}V, {}V to {}V",
+                                          Core::FormatValue(Core::DEFAULT_VOLTAGE_TOLERANCE_VOLTS),
+                                          Core::FormatValue(Core::MIN_VOLTAGE_TOLERANCE_VOLTS),
+                                          Core::FormatValue(Core::MAX_VOLTAGE_TOLERANCE_VOLTS))
+                                  .c_str());
         DrawFieldLabel("Integration");
         if (ImGui::BeginCombo("##method", INTEGRATION_METHOD_NAMES[static_cast<std::size_t>(options.Method)])) {
             for (std::size_t index = 0; index < INTEGRATION_METHOD_NAMES.size(); ++index) {
@@ -850,14 +875,16 @@ void AnalysisSettingsPanel::DrawSolverSettings(Core::SolverOptions &options) {
                               "when the circuit has a fuse. Gear damps the ringing the trapezoidal rule leaves after "
                               "a sudden change, at a little more error");
         if (const std::optional<double> value = m_NominalTemperature.Draw(
-                "Nominal temp.", "C",
+                "Nominal temp.",
+                "C",
                 is_between(Core::MIN_NOMINAL_TEMPERATURE_CELSIUS, Core::MAX_NOMINAL_TEMPERATURE_CELSIUS))) {
             options.NominalTemperatureCelsius = *value;
         }
-        ImGui::SetItemTooltip("%s", std::format("tnom: the temperature the model parameters are given at; a run at "
-                                                "another temperature scales them from it; default {} C",
-                                                Core::FormatValue(Core::DEFAULT_NOMINAL_TEMPERATURE_CELSIUS))
-                                        .c_str());
+        ImGui::SetItemTooltip("%s",
+                              std::format("tnom: the temperature the model parameters are given at; a run at "
+                                          "another temperature scales them from it; default {} C",
+                                          Core::FormatValue(Core::DEFAULT_NOMINAL_TEMPERATURE_CELSIUS))
+                                  .c_str());
         ImGui::BeginDisabled(options == Core::SolverOptions{});
         if (ImGui::Button("Reset to defaults")) {
             options = {};
@@ -885,9 +912,11 @@ void AnalysisSettingsPanel::DrawMonteCarloSettings(Core::MonteCarloSettings &mon
     if (ImGui::InputInt("##runs", &monte_carlo.Runs, 1, 10)) {
         monte_carlo.Runs = std::clamp(monte_carlo.Runs, Core::MIN_MONTE_CARLO_RUNS, Core::MAX_MONTE_CARLO_RUNS);
     }
-    ImGui::SetItemTooltip("%s", std::format("Draws, besides the nominal run that keeps every value; {} to {}",
-                                            Core::MIN_MONTE_CARLO_RUNS, Core::MAX_MONTE_CARLO_RUNS)
-                                    .c_str());
+    ImGui::SetItemTooltip("%s",
+                          std::format("Draws, besides the nominal run that keeps every value; {} to {}",
+                                      Core::MIN_MONTE_CARLO_RUNS,
+                                      Core::MAX_MONTE_CARLO_RUNS)
+                              .c_str());
     DrawFieldLabel("Distribution");
     if (ImGui::BeginCombo("##distribution", Core::GetDistributionName(monte_carlo.Distribution))) {
         for (const Core::ToleranceDistribution candidate :
@@ -917,8 +946,9 @@ void AnalysisSettingsPanel::DrawMonteCarloSettings(Core::MonteCarloSettings &mon
  */
 void AnalysisSettingsPanel::DrawToleranceButtons() {
     ImGui::TextDisabled("Tolerance of all");
-    if (const std::optional<double> percent = m_ToleranceAllField.Draw(
-            "Percent", "%", [](const double value) { return value > 0.0 && value <= Core::MAX_TOLERANCE_PERCENT; })) {
+    if (const std::optional<double> percent = m_ToleranceAllField.Draw("Percent", "%", [](const double value) {
+            return value > 0.0 && value <= Core::MAX_TOLERANCE_PERCENT;
+        })) {
         m_ToleranceAllPercent = *percent;
     }
     struct Button {

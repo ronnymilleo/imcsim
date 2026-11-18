@@ -38,8 +38,13 @@ std::string_view FindFault(const std::vector<std::unique_ptr<Device>> &devices) 
     return {};
 }
 
-int RunNewton(MnaSystem &sys, const std::vector<std::unique_ptr<Device>> &devices, std::vector<double> &x,
-              const ConvergenceOptions &options, const double gmin, const TimeContext &time, std::string &fault) {
+int RunNewton(MnaSystem &sys,
+              const std::vector<std::unique_ptr<Device>> &devices,
+              std::vector<double> &x,
+              const ConvergenceOptions &options,
+              const double gmin,
+              const TimeContext &time,
+              std::string &fault) {
     const int size = sys.GetSize();
     std::vector<double> candidate(static_cast<std::size_t>(size), 0.0);
 
@@ -114,7 +119,8 @@ bool HasNodesets(const std::vector<std::unique_ptr<Device>> &devices) {
 /**
  * @brief   Gives the devices their starting guesses of an operating point, which a step inside a transient already has.
  */
-void SeedOperatingPoint(const std::vector<std::unique_ptr<Device>> &devices, std::vector<double> &x,
+void SeedOperatingPoint(const std::vector<std::unique_ptr<Device>> &devices,
+                        std::vector<double> &x,
                         const TimeContext &time) {
     if (!time.IsTransient || time.IsTransientStart) {
         for (const std::unique_ptr<Device> &device : devices) {
@@ -127,8 +133,12 @@ void SeedOperatingPoint(const std::vector<std::unique_ptr<Device>> &devices, std
  * @brief   Gmin stepping: a large conductance (1 mS) from every node to ground makes the network nearly linear, then it
  *          is reduced by 10x per step down to options.Gmin, warm-starting each step from the last.
  */
-bool TryGminStepping(MnaSystem &sys, const std::vector<std::unique_ptr<Device>> &devices, std::vector<double> &x,
-                     const TimeContext &time, const ConvergenceOptions &options, NewtonOutcome &outcome) {
+bool TryGminStepping(MnaSystem &sys,
+                     const std::vector<std::unique_ptr<Device>> &devices,
+                     std::vector<double> &x,
+                     const TimeContext &time,
+                     const ConvergenceOptions &options,
+                     NewtonOutcome &outcome) {
     constexpr double GMIN_STEP_START = 1e-3;
     constexpr double GMIN_STEP_FACTOR = 0.1;
     constexpr int GMIN_STEPS = 10;
@@ -149,8 +159,12 @@ bool TryGminStepping(MnaSystem &sys, const std::vector<std::unique_ptr<Device>> 
  * @brief   Source stepping: all independent sources are scaled from 0 up to 100% in 20 linear steps, tracking the
  *          operating point continuously from the trivial zero solution.
  */
-bool TrySourceStepping(MnaSystem &sys, const std::vector<std::unique_ptr<Device>> &devices, std::vector<double> &x,
-                       const TimeContext &time, const ConvergenceOptions &options, NewtonOutcome &outcome) {
+bool TrySourceStepping(MnaSystem &sys,
+                       const std::vector<std::unique_ptr<Device>> &devices,
+                       std::vector<double> &x,
+                       const TimeContext &time,
+                       const ConvergenceOptions &options,
+                       NewtonOutcome &outcome) {
     constexpr int SOURCE_STEPS = 20;
     x.assign(static_cast<std::size_t>(sys.GetSize()), 0.0);
     SeedOperatingPoint(devices, x, time);
@@ -177,8 +191,11 @@ bool TrySourceStepping(MnaSystem &sys, const std::vector<std::unique_ptr<Device>
  * @param[in] is_warm_start  Starts the plain attempt from the iterate it is given and not from the seeds of the
  * devices, for the pass that continues from a point already found.
  */
-NewtonOutcome SolveWithStrategies(MnaSystem &sys, const std::vector<std::unique_ptr<Device>> &devices,
-                                  std::vector<double> &x, const TimeContext &time, const ConvergenceOptions &options,
+NewtonOutcome SolveWithStrategies(MnaSystem &sys,
+                                  const std::vector<std::unique_ptr<Device>> &devices,
+                                  std::vector<double> &x,
+                                  const TimeContext &time,
+                                  const ConvergenceOptions &options,
                                   const bool is_warm_start) {
     if (!is_warm_start) {
         SeedOperatingPoint(devices, x, time);
@@ -198,8 +215,11 @@ NewtonOutcome SolveWithStrategies(MnaSystem &sys, const std::vector<std::unique_
 
 } // namespace
 
-NewtonOutcome SolveNewton(MnaSystem &sys, const std::vector<std::unique_ptr<Device>> &devices, std::vector<double> &x,
-                          const TimeContext &time, const ConvergenceOptions &options) {
+NewtonOutcome SolveNewton(MnaSystem &sys,
+                          const std::vector<std::unique_ptr<Device>> &devices,
+                          std::vector<double> &x,
+                          const TimeContext &time,
+                          const ConvergenceOptions &options) {
     if (!(time.AppliesNodesets && IsOperatingPointSolve(time) && HasNodesets(devices))) {
         return SolveWithStrategies(sys, devices, x, time, options, false);
     }

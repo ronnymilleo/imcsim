@@ -84,8 +84,8 @@ std::expected<SavedSubcircuitPin, std::string> ReadSubcircuitPin(const nlohmann:
 /**
  * @brief   The pins of a block, in order, each with a name of its own.
  */
-std::expected<void, std::string> ReadSubcircuitPins(const nlohmann::json &object, const bool is_text,
-                                                    std::vector<SavedSubcircuitPin> &pins) {
+std::expected<void, std::string>
+ReadSubcircuitPins(const nlohmann::json &object, const bool is_text, std::vector<SavedSubcircuitPin> &pins) {
     const auto list = object.find("pins");
     if (list == object.end()) {
         return {};

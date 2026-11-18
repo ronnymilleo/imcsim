@@ -165,8 +165,9 @@ TEST_CASE("A linear sweep of two points runs on Nodalys, which gives both, and i
     CHECK(CheckOnNodalys(load.Circuit, one_point).value_or("").contains("between 2 and"));
     CHECK(CheckOnNgspice(load.Circuit, one_point).has_value());
 
-    const Core::SParametersRun run = RunOnNodalys(
-        load.Circuit, {.StartFrequency = 1e6, .StopFrequency = 2e6, .IsLogarithmic = false, .LinearPoints = 2});
+    const Core::SParametersRun run =
+        RunOnNodalys(load.Circuit,
+                     {.StartFrequency = 1e6, .StopFrequency = 2e6, .IsLogarithmic = false, .LinearPoints = 2});
     REQUIRE(run.Result.has_value());
     CHECK(run.Result->Frequencies == std::vector<double>{1e6, 2e6});
 }

@@ -68,7 +68,8 @@ void DrawTurnItems(const ContextMenuServices &services) {
 void DrawMeasureItem(Schematic &schematic, const MeasurementTarget &target) {
     const bool measured =
         target.Node ? schematic.IsVoltageMeasured(*target.Node) : schematic.IsCurrentMeasured(target.Current);
-    const std::string label = std::format("{} {}", measured ? "Stop measuring" : "Measure",
+    const std::string label = std::format("{} {}",
+                                          measured ? "Stop measuring" : "Measure",
                                           GetMeasurementLabel(target, schematic.GetConnectivity()));
     if (ImGui::MenuItem(label.c_str())) {
         if (target.Node) {
@@ -102,7 +103,8 @@ void DrawRunItems(AnalysisControls &controls, const Analysis selected_analysis) 
 /**
  * @brief   What the empty canvas offers: finding a part, running and fitting the view.
  */
-void DrawCanvasItems(const ContextMenuServices &services, const Analysis selected_analysis,
+void DrawCanvasItems(const ContextMenuServices &services,
+                     const Analysis selected_analysis,
                      const bool is_editing_block) {
     if (ImGui::MenuItem("Find a Part...", "Space")) {
         services.Picker.RequestOpen();
@@ -126,8 +128,12 @@ void DrawCanvasItems(const ContextMenuServices &services, const Analysis selecte
  * @param[in]     hovered    Whether the cursor is over the canvas.
  * @param[in,out] popover    Properties popover, placed so the Properties item opens it where a double click would.
  */
-void EditorContextMenu::HandleRightClick(Schematic &schematic, EditorMode &mode, const ViewTransform &view,
-                                         const float zoom, const bool hovered, PartPopover &popover) {
+void EditorContextMenu::HandleRightClick(Schematic &schematic,
+                                         EditorMode &mode,
+                                         const ViewTransform &view,
+                                         const float zoom,
+                                         const bool hovered,
+                                         PartPopover &popover) {
     if (!IsSelecting(mode) || !hovered || !ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
         return;
     }
@@ -139,8 +145,11 @@ void EditorContextMenu::HandleRightClick(Schematic &schematic, EditorMode &mode,
     if (picked.Empty() || Joined(current, picked) != current) {
         ApplySelection(schematic, mode, picked);
     }
-    m_Target = FindMeasurementTarget(schematic.GetElements(), schematic.GetWires(), schematic.GetConnectivity(),
-                                     cursor_world, WIRE_PICK_DISTANCE / zoom);
+    m_Target = FindMeasurementTarget(schematic.GetElements(),
+                                     schematic.GetWires(),
+                                     schematic.GetConnectivity(),
+                                     cursor_world,
+                                     WIRE_PICK_DISTANCE / zoom);
     popover.Place();
     ImGui::OpenPopup(CONTEXT_MENU);
 }
@@ -153,7 +162,8 @@ void EditorContextMenu::HandleRightClick(Schematic &schematic, EditorMode &mode,
  * @param[in] is_editing_block   Whether a block is open, which has no run of its own.
  * @return  Whether the item that opens the contents of the selected block was picked, which the editor carries out.
  */
-bool EditorContextMenu::Draw(const ContextMenuServices &services, const Analysis selected_analysis,
+bool EditorContextMenu::Draw(const ContextMenuServices &services,
+                             const Analysis selected_analysis,
                              const bool is_editing_block) {
     if (!ImGui::BeginPopup(CONTEXT_MENU)) {
         return false;

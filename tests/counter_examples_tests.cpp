@@ -46,8 +46,11 @@ LoadedExample LoadCounterExample(const std::string_view file_name) {
     auto loaded = GUI::LoadExample(*example);
     REQUIRE(loaded.has_value());
     auto schematic = std::make_unique<GUI::Schematic>();
-    schematic->Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings),
-                       std::move(loaded->Subcircuits), std::move(loaded->Models));
+    schematic->Replace(std::move(loaded->Elements),
+                       std::move(loaded->Wires),
+                       std::move(loaded->Settings),
+                       std::move(loaded->Subcircuits),
+                       std::move(loaded->Models));
     Core::Circuit circuit = schematic->BuildCircuit();
     const Core::TransientSettings settings = schematic->GetSimulationSettings().Transient;
     return {.Schematic = std::move(schematic), .Circuit = std::move(circuit), .Settings = settings};
@@ -72,8 +75,8 @@ double VoltageAt(const Core::Transient &transient, const std::size_t node, const
 }
 
 /// What the counter reads at an instant, a bit at a time, or no value when a bit is neither high nor low.
-std::optional<int> ReadCount(const Core::Transient &transient, const std::vector<std::size_t> &bit_nodes,
-                             const double instant) {
+std::optional<int>
+ReadCount(const Core::Transient &transient, const std::vector<std::size_t> &bit_nodes, const double instant) {
     int count = 0;
     for (std::size_t bit = 0; bit < bit_nodes.size(); ++bit) {
         const GUI::LogicState state =
@@ -120,7 +123,9 @@ std::vector<std::optional<int>> ExpectedCounts(const std::size_t edge_count, con
  * @param[in] modulus      Count after which it wraps to 0.
  * @param[in] edge_count   Rising edges of the clock to run, which sets the stop time.
  */
-void CheckCounter(const std::string_view file_name, const std::size_t bit_count, const int modulus,
+void CheckCounter(const std::string_view file_name,
+                  const std::size_t bit_count,
+                  const int modulus,
                   const std::size_t edge_count) {
     const LoadedExample example = LoadCounterExample(file_name);
     // Long enough for the last edge to settle, and short enough to keep the 8-bit counter quick on Nodalys

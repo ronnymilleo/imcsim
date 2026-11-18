@@ -31,10 +31,14 @@ Core::SParameters MakeResult() {
     Core::SParameters result;
     result.Frequencies = {1e8, 2e8, 4e8};
     result.ReferenceOhms = {50.0, 50.0};
-    const GUI::TwoPortMatrix unstable{
-        .S11 = Polar(0.75, -115.0), .S12 = Polar(0.06, 60.0), .S21 = Polar(3.2, 70.0), .S22 = Polar(0.45, -40.0)};
-    const GUI::TwoPortMatrix stable{
-        .S11 = Polar(0.3, -70.0), .S12 = Polar(0.08, 60.0), .S21 = Polar(2.1, 80.0), .S22 = Polar(0.4, -40.0)};
+    const GUI::TwoPortMatrix unstable{.S11 = Polar(0.75, -115.0),
+                                      .S12 = Polar(0.06, 60.0),
+                                      .S21 = Polar(3.2, 70.0),
+                                      .S22 = Polar(0.45, -40.0)};
+    const GUI::TwoPortMatrix stable{.S11 = Polar(0.3, -70.0),
+                                    .S12 = Polar(0.08, 60.0),
+                                    .S21 = Polar(2.1, 80.0),
+                                    .S22 = Polar(0.4, -40.0)};
     for (const GUI::TwoPortMatrix &matrix : {unstable, unstable, stable}) {
         result.Values.insert(result.Values.end(), {matrix.S11, matrix.S12, matrix.S21, matrix.S22});
     }

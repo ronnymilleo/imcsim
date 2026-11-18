@@ -232,9 +232,9 @@ TEST_CASE("Eigenvalues twelve decades apart are all found, whichever way the pen
     // Four decoupled first-order modes, as in a circuit with a slow RC and a fast junction, each with a different
     // size of its equations, coupled by a triangular term so the pencil is not diagonal
     constexpr std::array<double, 4> ROOTS{3.0, 4.5e3, 2.0e7, 6.0e12};
-    for (const std::array<std::size_t, 4> order :
-         {std::array<std::size_t, 4>{0, 1, 2, 3}, std::array<std::size_t, 4>{3, 2, 1, 0},
-          std::array<std::size_t, 4>{1, 3, 0, 2}}) {
+    for (const std::array<std::size_t, 4> order : {std::array<std::size_t, 4>{0, 1, 2, 3},
+                                                   std::array<std::size_t, 4>{3, 2, 1, 0},
+                                                   std::array<std::size_t, 4>{1, 3, 0, 2}}) {
         Nodalys::DenseMatrix a(4, 4);
         Nodalys::DenseMatrix b(4, 4);
         for (std::size_t row = 0; row < 4; ++row) {

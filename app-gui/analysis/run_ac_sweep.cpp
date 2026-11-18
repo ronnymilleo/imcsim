@@ -13,7 +13,8 @@
 
 namespace GUI {
 
-void AnalysisControls::RunACSweepAnalysis(const Core::Circuit &circuit, const std::optional<StepPlan> &steps,
+void AnalysisControls::RunACSweepAnalysis(const Core::Circuit &circuit,
+                                          const std::optional<StepPlan> &steps,
                                           const std::optional<Core::MonteCarloSettings> &monte_carlo) {
     const Core::ACSweepSettings settings = m_Schematic.GetSimulationSettings().ACSweep;
     if (monte_carlo) {
@@ -22,13 +23,17 @@ void AnalysisControls::RunACSweepAnalysis(const Core::Circuit &circuit, const st
                      circuit,
                      [settings, monte_carlo = *monte_carlo](const Core::Circuit &copy, Core::RunControl &control) {
                          return RunMonteCarlo<Core::ACSweep>(
-                             monte_carlo, copy, control,
+                             monte_carlo,
+                             copy,
+                             control,
                              [&](const Core::Circuit &varied) { return Core::RunACSweep(varied, settings); },
                              MeasureACSweep);
                      },
                      [this](MonteCarloRuns<Core::ACSweep> runs) {
                          Finish(Analysis::AC_SWEEP,
-                                StoreMonteCarlo(std::move(runs.Family), std::move(runs.Table), m_Results,
+                                StoreMonteCarlo(std::move(runs.Family),
+                                                std::move(runs.Table),
+                                                m_Results,
                                                 [this](auto family) { m_Results.SetACSweepSteps(std::move(family)); }),
                                 std::move(runs.Messages));
                      }));
@@ -39,7 +44,10 @@ void AnalysisControls::RunACSweepAnalysis(const Core::Circuit &circuit, const st
                  MakeJob<SteppedRuns<Core::ACSweep>>(
                      circuit,
                      [settings, plan = *steps](const Core::Circuit &copy, Core::RunControl &control) {
-                         return RunSteps<Core::ACSweep>(plan.Settings, plan.Unit, plan.Values, control,
+                         return RunSteps<Core::ACSweep>(plan.Settings,
+                                                        plan.Unit,
+                                                        plan.Values,
+                                                        control,
                                                         [&](const Core::ParameterValue &value) {
                                                             return Core::RunACSweep(copy, settings, value);
                                                         });

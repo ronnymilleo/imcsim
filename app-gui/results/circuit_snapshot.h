@@ -48,9 +48,11 @@ Core::OperatingPoint SampleTransient(const Core::Transient &transient, double ti
 std::vector<ComponentPower> ComputePowers(const std::vector<std::unique_ptr<UIElement>> &elements,
                                           const Connectivity &connectivity,
                                           const Core::OperatingPoint &operating_point);
-HeatScale ScaleOf(const Core::OperatingPoint &operating_point, const std::vector<std::unique_ptr<UIElement>> &elements,
+HeatScale ScaleOf(const Core::OperatingPoint &operating_point,
+                  const std::vector<std::unique_ptr<UIElement>> &elements,
                   const Connectivity &connectivity);
-HeatScale ScaleOf(const Core::Transient &transient, const std::vector<std::unique_ptr<UIElement>> &elements,
+HeatScale ScaleOf(const Core::Transient &transient,
+                  const std::vector<std::unique_ptr<UIElement>> &elements,
                   const Connectivity &connectivity);
 float VoltageLevel(double voltage, const HeatScale &scale);
 float PowerLevel(double power, const HeatScale &scale);

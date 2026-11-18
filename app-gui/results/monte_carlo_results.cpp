@@ -100,7 +100,9 @@ Measurement MeasureTransient(const Core::Transient &transient) {
         const int number = static_cast<int>(node);
         AddColumn(measurement, number, MeasureKind::MEAN, statistics ? std::optional(statistics->Mean) : std::nullopt);
         AddColumn(measurement, number, MeasureKind::RMS, statistics ? std::optional(statistics->RMS) : std::nullopt);
-        AddColumn(measurement, number, MeasureKind::PEAK_TO_PEAK,
+        AddColumn(measurement,
+                  number,
+                  MeasureKind::PEAK_TO_PEAK,
                   statistics ? std::optional(statistics->PeakToPeak) : std::nullopt);
         AddColumn(measurement, number, MeasureKind::FREQUENCY, statistics ? statistics->Frequency : std::nullopt);
     }
@@ -120,15 +122,22 @@ Measurement MeasureACSweep(const Core::ACSweep &sweep) {
         std::optional<BodeStatistics> statistics;
         if (magnitudes.size() == sweep.Frequencies.size() && node < sweep.NodePhasesDegrees.size() &&
             sweep.NodePhasesDegrees[node].size() == magnitudes.size() && magnitudes.size() >= 2) {
-            statistics = ComputeBodeStatistics(sweep.Frequencies, magnitudes, sweep.NodePhasesDegrees[node],
-                                               sweep.Frequencies.front(), sweep.Frequencies.back());
+            statistics = ComputeBodeStatistics(sweep.Frequencies,
+                                               magnitudes,
+                                               sweep.NodePhasesDegrees[node],
+                                               sweep.Frequencies.front(),
+                                               sweep.Frequencies.back());
         }
         const int number = static_cast<int>(node);
         AddColumn(measurement, number, MeasureKind::UPPER_CUTOFF, statistics ? statistics->UpperCutoff : std::nullopt);
         AddColumn(measurement, number, MeasureKind::LOWER_CUTOFF, statistics ? statistics->LowerCutoff : std::nullopt);
-        AddColumn(measurement, number, MeasureKind::PEAK_GAIN,
+        AddColumn(measurement,
+                  number,
+                  MeasureKind::PEAK_GAIN,
                   statistics ? std::optional(statistics->PeakGain) : std::nullopt);
-        AddColumn(measurement, number, MeasureKind::UNITY_GAIN_FREQUENCY,
+        AddColumn(measurement,
+                  number,
+                  MeasureKind::UNITY_GAIN_FREQUENCY,
                   statistics ? statistics->UnityGainFrequency : std::nullopt);
         AddColumn(measurement, number, MeasureKind::PHASE_MARGIN, statistics ? statistics->PhaseMargin : std::nullopt);
     }
@@ -149,13 +158,19 @@ Measurement MeasureDCSweep(const Core::DCSweep &sweep) {
     for (std::size_t node = 1; node < voltages.size(); ++node) {
         std::optional<SweepStatistics> statistics;
         if (voltages[node].size() == sweep.SweptValues.size()) {
-            statistics = ComputeSweepStatistics(sweep.SweptValues, voltages[node], sweep.SweptValues.front(),
+            statistics = ComputeSweepStatistics(sweep.SweptValues,
+                                                voltages[node],
+                                                sweep.SweptValues.front(),
                                                 sweep.SweptValues.back());
         }
         const int number = static_cast<int>(node);
-        AddColumn(measurement, number, MeasureKind::MINIMUM,
+        AddColumn(measurement,
+                  number,
+                  MeasureKind::MINIMUM,
                   statistics ? std::optional(statistics->Minimum) : std::nullopt);
-        AddColumn(measurement, number, MeasureKind::MAXIMUM,
+        AddColumn(measurement,
+                  number,
+                  MeasureKind::MAXIMUM,
                   statistics ? std::optional(statistics->Maximum) : std::nullopt);
         AddColumn(measurement, number, MeasureKind::MEAN, statistics ? std::optional(statistics->Mean) : std::nullopt);
     }
@@ -436,7 +451,9 @@ std::optional<std::string> DescribeUnreadRuns(const MonteCarloTable &table, cons
     if (unread == 0) {
         return std::nullopt;
     }
-    return std::format("{} not reached in {} {}", GetMeasureName(table.Columns[column].Kind), unread,
+    return std::format("{} not reached in {} {}",
+                       GetMeasureName(table.Columns[column].Kind),
+                       unread,
                        unread == 1 ? "run" : "runs");
 }
 

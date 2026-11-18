@@ -18,8 +18,11 @@ namespace Nodalys {
  * @param[in] internal  MNA unknown index of the internal delay node (-1 for zero delay).
  * @param[in] params    Physical logic thresholds, delay, and output resistance.
  */
-SmoothLogicDevice::SmoothLogicDevice(const LogicGateType type, const int output, std::vector<int> inputs,
-                                     const int internal, SmoothLogicParameters params)
+SmoothLogicDevice::SmoothLogicDevice(const LogicGateType type,
+                                     const int output,
+                                     std::vector<int> inputs,
+                                     const int internal,
+                                     SmoothLogicParameters params)
     : m_Type(type), m_Output(output), m_Inputs(std::move(inputs)), m_Internal(internal), m_Params(std::move(params)) {
     if (m_Params.PropagationDelay > 0.0 && m_Internal >= 0) {
         constexpr double LN2 = 0.6931471805599453;
@@ -174,7 +177,8 @@ double SmoothLogicDevice::TerminalCurrent(const int terminal, const std::vector<
  * @param[in] omega     Angular frequency.
  * @return  Complex current phasor entering the terminal.
  */
-std::complex<double> SmoothLogicDevice::AcTerminalCurrent(const int terminal, const std::vector<double> & /*x_dc*/,
+std::complex<double> SmoothLogicDevice::AcTerminalCurrent(const int terminal,
+                                                          const std::vector<double> & /*x_dc*/,
                                                           const std::vector<std::complex<double>> &x_ac,
                                                           const double /*omega*/) const {
     if (terminal == 0) {

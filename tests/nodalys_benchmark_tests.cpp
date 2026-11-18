@@ -37,7 +37,9 @@ constexpr double VOLTAGE_TOLERANCE_RELATIVE = 1e-3;
 constexpr double VOLTAGE_TOLERANCE_ABSOLUTE = 1e-5;
 
 /// Closeness check with relative and absolute tolerances.
-bool Close(const double a, const double b, const double relative = VOLTAGE_TOLERANCE_RELATIVE,
+bool Close(const double a,
+           const double b,
+           const double relative = VOLTAGE_TOLERANCE_RELATIVE,
            const double absolute = VOLTAGE_TOLERANCE_ABSOLUTE) {
     return std::fabs(a - b) <= relative * std::max(std::fabs(a), std::fabs(b)) + absolute;
 }
@@ -57,15 +59,28 @@ template <typename Func> double MeasureMs(Func &&func, const int repetitions = 3
     return std::chrono::duration<double, std::milli>(end - start).count() / repetitions;
 }
 
-void PrintBenchmarkRow(const std::string &name, const std::string &type, const std::size_t nodes,
-                       const double ngspice_ms, const double nodalys_ms) {
+void PrintBenchmarkRow(const std::string &name,
+                       const std::string &type,
+                       const std::size_t nodes,
+                       const double ngspice_ms,
+                       const double nodalys_ms) {
     if (ngspice_ms > 0.0 && nodalys_ms > 0.0) {
         const double speedup = ngspice_ms / nodalys_ms;
-        std::cout << std::format("  | {:<34} | {:<10} | {:>5} | {:>8.3f} ms | {:>8.3f} ms | {:>8.2f}x |\n", name, type,
-                                 nodes, ngspice_ms, nodalys_ms, speedup);
+        std::cout << std::format("  | {:<34} | {:<10} | {:>5} | {:>8.3f} ms | {:>8.3f} ms | {:>8.2f}x |\n",
+                                 name,
+                                 type,
+                                 nodes,
+                                 ngspice_ms,
+                                 nodalys_ms,
+                                 speedup);
     } else {
-        std::cout << std::format("  | {:<34} | {:<10} | {:>5} | {:>11} | {:>8.3f} ms | {:>9} |\n", name, type, nodes,
-                                 "N/A", nodalys_ms, "Autonomous");
+        std::cout << std::format("  | {:<34} | {:<10} | {:>5} | {:>11} | {:>8.3f} ms | {:>9} |\n",
+                                 name,
+                                 type,
+                                 nodes,
+                                 "N/A",
+                                 nodalys_ms,
+                                 "Autonomous");
     }
 }
 
@@ -107,7 +122,10 @@ OwnedCircuit BuildRcLadder(const std::size_t stages, const double rs_val, const 
     return circuit;
 }
 
-OwnedCircuit BuildRlcLine(const std::size_t stages, const double r_val, const double l_val, const double c_val,
+OwnedCircuit BuildRlcLine(const std::size_t stages,
+                          const double r_val,
+                          const double l_val,
+                          const double c_val,
                           const double r_term) {
     OwnedCircuit circuit;
     auto &vin = circuit.AddPart<Core::VoltageSource>({1, 0});
@@ -365,8 +383,9 @@ TEST_CASE("The AC sweep of a 100-node network matches ngspice, timed against it"
     }
     circuit.AddPart<Core::Ground>({0});
 
-    const Core::ACSweepSettings settings{
-        .StartFrequency = 10.0, .StopFrequency = 100e6, .PointsPerDecade = 50}; // ~350 points
+    const Core::ACSweepSettings settings{.StartFrequency = 10.0,
+                                         .StopFrequency = 100e6,
+                                         .PointsPerDecade = 50}; // ~350 points
     Core::NodalysBackend nodalys;
 
     Core::ACSweepRun exp;
@@ -391,15 +410,19 @@ TEST_CASE("A 31-stage ring oscillator of smooth logic gates oscillates, timed", 
     for (int i = 1; i <= GATE_COUNT; ++i) {
         const int in_node = i;
         const int out_node = (i == GATE_COUNT) ? 1 : (i + 1);
-        builder.AddInverter(std::format("U{}", i), out_node, in_node,
+        builder.AddInverter(std::format("U{}", i),
+                            out_node,
+                            in_node,
                             {.VLow = 0.0, .VHigh = 5.0, .VThreshold = 2.5, .PropagationDelay = 1e-9});
     }
 
     auto circuit = builder.Build();
     REQUIRE(circuit.has_value());
 
-    Nodalys::TransientConfig tran{
-        .StopTime = 60e-9, .TimeStep = 0.2e-9, .MaxStep = 0.5e-9, .UseInitialConditions = true};
+    Nodalys::TransientConfig tran{.StopTime = 60e-9,
+                                  .TimeStep = 0.2e-9,
+                                  .MaxStep = 0.5e-9,
+                                  .UseInitialConditions = true};
 
     Nodalys::TransientResult res;
     const double nodalys_ms = MeasureMs([&]() {
@@ -477,8 +500,11 @@ TEST_CASE("The operating points of every truth table combination read the right 
 TEST_CASE("The DC sensitivity from one adjoint solve matches ngspice, timed against it", "[.benchmark][nodalys]") {
     Core::NodalysBackend nodalys;
 
-    auto run_sens_bench = [&](const std::string &label, const Core::Circuit &circuit, const int output_node,
-                              const std::size_t node_count, const int repetitions) {
+    auto run_sens_bench = [&](const std::string &label,
+                              const Core::Circuit &circuit,
+                              const int output_node,
+                              const std::size_t node_count,
+                              const int repetitions) {
         const Core::SensitivitySettings settings{.OutputNode = output_node};
         Core::SensitivityRun exp;
         const double ngspice_ms = MeasureMs([&]() { exp = Ngspice().RunSensitivity(circuit, settings); }, repetitions);
@@ -518,8 +544,11 @@ TEST_CASE("The DC sensitivity from one adjoint solve matches ngspice, timed agai
     SECTION("4-stage cascaded BJT amplifier sensitivity") {
         constexpr std::size_t STAGES = 4;
         const OwnedCircuit circuit = BuildCascadedBjtAmplifier(STAGES);
-        run_sens_bench("BJT Cascaded Amp (4 stages)", circuit.Instance, static_cast<int>(3 * STAGES + 1),
-                       3 * STAGES + 2, 15);
+        run_sens_bench("BJT Cascaded Amp (4 stages)",
+                       circuit.Instance,
+                       static_cast<int>(3 * STAGES + 1),
+                       3 * STAGES + 2,
+                       15);
     }
 }
 
@@ -621,8 +650,10 @@ TEST_CASE("The transfer function, noise, S-parameters and poles and zeros match 
         circuit.Instance.AddPort({.Number = 2, .Node = 2, .ReferenceOhms = 50.0});
         circuit.Instance.AddPort({.Number = 3, .Node = 3, .ReferenceOhms = 50.0});
 
-        const Core::SParameterSettings settings{
-            .StartFrequency = 10e6, .StopFrequency = 500e6, .IsLogarithmic = true, .PointsPerDecade = 10};
+        const Core::SParameterSettings settings{.StartFrequency = 10e6,
+                                                .StopFrequency = 500e6,
+                                                .IsLogarithmic = true,
+                                                .PointsPerDecade = 10};
         Core::SParametersRun exp;
         const double ngspice_ms = MeasureMs([&]() { exp = Ngspice().RunSParameters(circuit.Instance, settings); }, 20);
         REQUIRE(exp.Result.has_value());

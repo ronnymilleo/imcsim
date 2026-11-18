@@ -35,8 +35,10 @@ TEST_CASE("FindParts ignores case, spaces and punctuation", "[element_factory]")
     CHECK(GUI::FindParts("clock") == std::vector{ComponentType::CLOCK});
     CHECK(GUI::FindParts("logic input") == std::vector{ComponentType::LOGIC_INPUT});
     CHECK(GUI::FindParts("block pin") == std::vector{ComponentType::PIN});
-    CHECK(GUI::FindParts("flip flop") == std::vector{ComponentType::D_FLIP_FLOP, ComponentType::JK_FLIP_FLOP,
-                                                     ComponentType::T_FLIP_FLOP, ComponentType::SR_FLIP_FLOP});
+    CHECK(GUI::FindParts("flip flop") == std::vector{ComponentType::D_FLIP_FLOP,
+                                                     ComponentType::JK_FLIP_FLOP,
+                                                     ComponentType::T_FLIP_FLOP,
+                                                     ComponentType::SR_FLIP_FLOP});
     CHECK(GUI::FindParts("behavioral") ==
           std::vector{ComponentType::BEHAVIORAL_VOLTAGE, ComponentType::BEHAVIORAL_CURRENT});
     CHECK(GUI::FindParts("xyz").empty());

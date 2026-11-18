@@ -101,8 +101,15 @@ void DrawSourceTypes(Core::Source &source, Schematic &schematic) {
     const ImGuiStyle &style = ImGui::GetStyle();
     const float right_edge = ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvail().x;
     bool is_first = true;
-    for (const SourceType type : {SourceType::DC, SourceType::AC, SourceType::PULSE, SourceType::EXP, SourceType::SFFM,
-                                  SourceType::AM, SourceType::PWL, SourceType::NOISE, SourceType::RANDOM}) {
+    for (const SourceType type : {SourceType::DC,
+                                  SourceType::AC,
+                                  SourceType::PULSE,
+                                  SourceType::EXP,
+                                  SourceType::SFFM,
+                                  SourceType::AM,
+                                  SourceType::PWL,
+                                  SourceType::NOISE,
+                                  SourceType::RANDOM}) {
         const float button_width =
             ImGui::GetFrameHeight() + style.ItemInnerSpacing.x + ImGui::CalcTextSize(Core::GetSourceTypeName(type)).x;
         // A button that would cross the edge starts the next row, so a narrow Properties column cuts none of them
@@ -204,9 +211,12 @@ void DrawNoise(Core::Source &source, SourceFields &fields, Schematic &schematic)
     }
     if (noise.WhiteAmplitude > 0.0 && noise.TimeStep > 0.0) {
         const double density = noise.WhiteAmplitude * std::sqrt(2.0 * noise.TimeStep);
-        ImGui::TextDisabled("%s", std::format("White noise: {}{}/rtHz, flat up to {}Hz", Core::FormatValue(density),
-                                              source.GetUnit(), Core::FormatValue(0.5 / noise.TimeStep))
-                                      .c_str());
+        ImGui::TextDisabled("%s",
+                            std::format("White noise: {}{}/rtHz, flat up to {}Hz",
+                                        Core::FormatValue(density),
+                                        source.GetUnit(),
+                                        Core::FormatValue(0.5 / noise.TimeStep))
+                                .c_str());
     }
     ImGui::TextDisabled("1/f amplitude, telegraph amplitude and white rms at 0 turn that part off");
     ImGui::TextDisabled("Noise changes on each run; for noise over a signal, put a second source in series");
@@ -219,9 +229,10 @@ void DrawRandom(Core::Source &source, SourceFields &fields, Schematic &schematic
     Core::RandomParameters random = source.GetRandom();
     DrawFieldLabel("Distribution");
     if (ImGui::BeginCombo("##distribution", Core::GetRandomDistributionName(random.Distribution))) {
-        for (const Core::RandomDistribution distribution :
-             {Core::RandomDistribution::UNIFORM, Core::RandomDistribution::GAUSSIAN,
-              Core::RandomDistribution::EXPONENTIAL, Core::RandomDistribution::POISSON}) {
+        for (const Core::RandomDistribution distribution : {Core::RandomDistribution::UNIFORM,
+                                                            Core::RandomDistribution::GAUSSIAN,
+                                                            Core::RandomDistribution::EXPONENTIAL,
+                                                            Core::RandomDistribution::POISSON}) {
             const bool is_selected = distribution == random.Distribution;
             if (ImGui::Selectable(Core::GetRandomDistributionName(distribution), is_selected) && !is_selected) {
                 random.Distribution = distribution;
@@ -242,17 +253,20 @@ void DrawRandom(Core::Source &source, SourceFields &fields, Schematic &schematic
         return source.IsValidRandom(candidate);
     };
     bool changed = false;
-    const auto draw = [&](ValueField &field, const char *label, const char *field_unit,
-                          double Core::RandomParameters::*member) {
-        if (const std::optional<double> value =
-                field.Draw(label, field_unit, [&](const double candidate) { return is_valid(member, candidate); })) {
-            random.*member = *value;
-            changed = true;
-        }
-    };
+    const auto draw =
+        [&](ValueField &field, const char *label, const char *field_unit, double Core::RandomParameters::*member) {
+            if (const std::optional<double> value = field.Draw(label, field_unit, [&](const double candidate) {
+                    return is_valid(member, candidate);
+                })) {
+                random.*member = *value;
+                changed = true;
+            }
+        };
     draw(fields.Random[0], "Sample step", "s", &Core::RandomParameters::TimeStep);
     draw(fields.Random[1], "Delay", "s", &Core::RandomParameters::Delay);
-    draw(fields.Random[2], labels.First, labels.FirstUnit != nullptr ? labels.FirstUnit : unit,
+    draw(fields.Random[2],
+         labels.First,
+         labels.FirstUnit != nullptr ? labels.FirstUnit : unit,
          &Core::RandomParameters::First);
     draw(fields.Random[3], labels.Second, unit, &Core::RandomParameters::Second);
     if (changed) {

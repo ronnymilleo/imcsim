@@ -21,7 +21,8 @@ namespace GUI {
  * @brief   A source that is unset, or that left the circuit, uses a default; a stepped parameter and a second stepped
  *          source would both make the family of curves, so only one may be on.
  */
-void AnalysisControls::RunDCSweepAnalysis(const Core::Circuit &circuit, const std::optional<StepPlan> &steps,
+void AnalysisControls::RunDCSweepAnalysis(const Core::Circuit &circuit,
+                                          const std::optional<StepPlan> &steps,
                                           const std::optional<Core::MonteCarloSettings> &monte_carlo) {
     const SimulationSettings &settings = m_Schematic.GetSimulationSettings();
     const std::vector<SweepSource> sources = ListSweepSources(circuit);
@@ -46,14 +47,18 @@ void AnalysisControls::RunDCSweepAnalysis(const Core::Circuit &circuit, const st
                      circuit,
                      [run_settings, monte_carlo = *monte_carlo](const Core::Circuit &copy, Core::RunControl &control) {
                          return RunMonteCarlo<Core::DCSweep>(
-                             monte_carlo, copy, control,
+                             monte_carlo,
+                             copy,
+                             control,
                              [&](const Core::Circuit &varied) { return Core::RunDCSweep(varied, run_settings); },
                              MeasureDCSweep);
                      },
                      [this](MonteCarloRuns<Core::DCSweep> runs) {
                          Finish(Analysis::DC_SWEEP,
                                 StoreMonteCarlo(
-                                    std::move(runs.Family), std::move(runs.Table), m_Results,
+                                    std::move(runs.Family),
+                                    std::move(runs.Table),
+                                    m_Results,
                                     [this](auto family) { m_Results.SetDCSweep(JoinDCSweepSteps(std::move(family))); }),
                                 std::move(runs.Messages));
                      }));
@@ -64,7 +69,10 @@ void AnalysisControls::RunDCSweepAnalysis(const Core::Circuit &circuit, const st
                  MakeJob<SteppedRuns<Core::DCSweep>>(
                      circuit,
                      [run_settings, plan = *steps](const Core::Circuit &copy, Core::RunControl &control) {
-                         return RunSteps<Core::DCSweep>(plan.Settings, plan.Unit, plan.Values, control,
+                         return RunSteps<Core::DCSweep>(plan.Settings,
+                                                        plan.Unit,
+                                                        plan.Values,
+                                                        control,
                                                         [&](const Core::ParameterValue &value) {
                                                             return Core::RunDCSweep(copy, run_settings, value);
                                                         });

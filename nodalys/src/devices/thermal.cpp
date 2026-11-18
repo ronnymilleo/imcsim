@@ -88,7 +88,8 @@ double GetBandGap(const double temperature_kelvin) {
  * @return  The exponent of the growth factor; a diode or leakage current divides it by its emission coefficient
  *          before taking the exponential, and the factor is exactly 1 at the nominal temperature.
  */
-double GetSaturationCurrentLogRatio(const ThermalConditions &thermal, const double energy_gap,
+double GetSaturationCurrentLogRatio(const ThermalConditions &thermal,
+                                    const double energy_gap,
                                     const double saturation_current_exponent) {
     const double ratio = thermal.TemperatureKelvin / thermal.NominalKelvin;
     return (ratio - 1.0) * energy_gap / GetThermalVoltage(thermal) + saturation_current_exponent * std::log(ratio);
@@ -117,8 +118,10 @@ double GetJunctionPotential(const ThermalConditions &thermal, const double poten
  * @param[in] grading_coefficient    Grading coefficient `M` of the junction.
  * @return  Farads; the given capacitance itself at the nominal temperature.
  */
-double GetJunctionCapacitance(const ThermalConditions &thermal, const double capacitance_at_nominal,
-                              const double potential_at_nominal, const double grading_coefficient) {
+double GetJunctionCapacitance(const ThermalConditions &thermal,
+                              const double capacitance_at_nominal,
+                              const double potential_at_nominal,
+                              const double grading_coefficient) {
     if (IsNominal(thermal)) {
         return capacitance_at_nominal;
     }

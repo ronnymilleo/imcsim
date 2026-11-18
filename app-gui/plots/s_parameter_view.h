@@ -88,7 +88,8 @@ std::vector<double> ListAnglesDegrees(const Core::SParameters &result, const SPa
 std::vector<std::complex<double>> ListValues(const Core::SParameters &result, const SParameterEntry &entry);
 
 // Figures
-ExportFigure BuildMagnitudePhaseFigure(const Core::SParameters &result, const std::vector<SParameterEntry> &entries,
+ExportFigure BuildMagnitudePhaseFigure(const Core::SParameters &result,
+                                       const std::vector<SParameterEntry> &entries,
                                        const std::optional<ExportRange> &view);
 ExportFigure BuildSmithFigure(const Core::SParameters &result, const std::vector<SParameterEntry> &entries);
 

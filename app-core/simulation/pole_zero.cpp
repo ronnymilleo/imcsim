@@ -32,8 +32,9 @@ constexpr std::array<KnownFailure, 4> KNOWN_FAILURES = {{
     {"input signal is shorted on the way to the output",
      "No signal reaches the output node from the input source through a capacitor or an inductor; a circuit of only "
      "resistors has no poles or zeros, and the output must be linked to the source"},
-    {"Transfer function is unity", "The output node is the node of the input source, so the transfer is 1 and has no "
-                                   "poles or zeros; pick another output node"},
+    {"Transfer function is unity",
+     "The output node is the node of the input source, so the transfer is 1 and has no "
+     "poles or zeros; pick another output node"},
     {"Output is shorted", "The output node is held to ground, so there is nothing to measure there; pick another node"},
     {"Input is shorted", "The terminals of the input source are the same node; pick a source across two nodes"},
 }};
@@ -143,7 +144,9 @@ std::optional<PoleZeroInput> FindPoleZeroInput(const Circuit &circuit, const std
  *          without the poles and zeros that sit at the same place, which are only counted.
  * @note    Two roots are at the same place when they differ by less than a thousandth of the larger.
  */
-PoleZero BuildPoleZero(const Circuit &circuit, const PoleZeroSettings &settings, const ComplexRoots &poles,
+PoleZero BuildPoleZero(const Circuit &circuit,
+                       const PoleZeroSettings &settings,
+                       const ComplexRoots &poles,
                        const ComplexRoots &zeros) {
     PoleZero result;
     result.OutputNode = settings.OutputNode;

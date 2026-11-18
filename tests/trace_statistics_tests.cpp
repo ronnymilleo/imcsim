@@ -49,7 +49,9 @@ Trace Sine(const double amplitude, const double offset, const double frequency, 
 /**
  * @brief   Bode response of a first order low-pass with its corner at corner_frequency.
  */
-void LowPass(const double corner_frequency, std::vector<double> &frequencies, std::vector<double> &magnitudes,
+void LowPass(const double corner_frequency,
+             std::vector<double> &frequencies,
+             std::vector<double> &magnitudes,
              std::vector<double> &phases) {
     for (int step = 0; step <= 600; ++step) {
         const double decade = step * 0.01;

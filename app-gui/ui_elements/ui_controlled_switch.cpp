@@ -46,12 +46,14 @@ constexpr float LABEL_OFFSET_Y = 0.5f;
  * @param[in] position  Grid position in world units.
  * @param[in] rotation  Orientation on the grid.
  */
-UIControlledSwitch::UIControlledSwitch(const Core::ComponentType type, const GridPoint position,
+UIControlledSwitch::UIControlledSwitch(const Core::ComponentType type,
+                                       const GridPoint position,
                                        const Rotation rotation)
     : UIElement(type == Core::ComponentType::RELAY
                     ? std::unique_ptr<Core::Component>(std::make_unique<Core::Relay>())
                     : std::unique_ptr<Core::Component>(std::make_unique<Core::VoltageControlledSwitch>()),
-                position, rotation) {
+                position,
+                rotation) {
 }
 
 /**
@@ -59,24 +61,34 @@ UIControlledSwitch::UIControlledSwitch(const Core::ComponentType type, const Gri
  *          beside.
  */
 void UIControlledSwitch::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
-    canvas.AddLine(LocalToScreen(view, 0, -2), LocalToScreen(view, 0, -CONTACT_Y - CONTACT_RADIUS), color,
+    canvas.AddLine(LocalToScreen(view, 0, -2),
+                   LocalToScreen(view, 0, -CONTACT_Y - CONTACT_RADIUS),
+                   color,
                    LINE_THICKNESS);
-    canvas.AddLine(LocalToScreen(view, 0, CONTACT_Y + CONTACT_RADIUS), LocalToScreen(view, 0, 2), color,
+    canvas.AddLine(LocalToScreen(view, 0, CONTACT_Y + CONTACT_RADIUS),
+                   LocalToScreen(view, 0, 2),
+                   color,
                    LINE_THICKNESS);
     const float lead_end = IsRelay() ? -COIL_HALF_HEIGHT : -1.0f;
     canvas.AddLine(LocalToScreen(view, -2, -1), LocalToScreen(view, CONTROL_END_X, -1), color, LINE_THICKNESS);
     canvas.AddLine(LocalToScreen(view, -2, 1), LocalToScreen(view, CONTROL_END_X, 1), color, LINE_THICKNESS);
     if (IsRelay()) {
-        canvas.AddLine(LocalToScreen(view, CONTROL_END_X, -1), LocalToScreen(view, CONTROL_END_X, lead_end), color,
+        canvas.AddLine(LocalToScreen(view, CONTROL_END_X, -1),
+                       LocalToScreen(view, CONTROL_END_X, lead_end),
+                       color,
                        LINE_THICKNESS);
-        canvas.AddLine(LocalToScreen(view, CONTROL_END_X, 1), LocalToScreen(view, CONTROL_END_X, -lead_end), color,
+        canvas.AddLine(LocalToScreen(view, CONTROL_END_X, 1),
+                       LocalToScreen(view, CONTROL_END_X, -lead_end),
+                       color,
                        LINE_THICKNESS);
     }
     DrawSign(canvas, view, CONTROL_PLUS_SIGN, true, color);
     DrawSign(canvas, view, CONTROL_MINUS_SIGN, false, color);
 }
 
-void UIControlledSwitch::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
+void UIControlledSwitch::DrawSymbol(SchematicCanvas &canvas,
+                                    const ViewTransform &view,
+                                    const ImU32 color,
                                     const SymbolStyle /*style*/) const {
     // The contact, drawn open
     const ImVec2 origin = LocalToScreen(view, 0, 0);
@@ -84,8 +96,10 @@ void UIControlledSwitch::DrawSymbol(SchematicCanvas &canvas, const ViewTransform
     const float radius = std::hypot(unit.x, unit.y) * CONTACT_RADIUS;
     canvas.AddCircle(LocalToScreen(view, 0, -CONTACT_Y), radius, color, 0, LINE_THICKNESS);
     canvas.AddCircle(LocalToScreen(view, 0, CONTACT_Y), radius, color, 0, LINE_THICKNESS);
-    canvas.AddLine(LocalToScreen(view, 0, CONTACT_Y - CONTACT_RADIUS), LocalToScreen(view, LEVER_TIP.x, LEVER_TIP.y),
-                   color, LINE_THICKNESS);
+    canvas.AddLine(LocalToScreen(view, 0, CONTACT_Y - CONTACT_RADIUS),
+                   LocalToScreen(view, LEVER_TIP.x, LEVER_TIP.y),
+                   color,
+                   LINE_THICKNESS);
 
     if (IsRelay()) {
         const ImVec2 coil[4] = {LocalToScreen(view, CONTROL_END_X - COIL_HALF_WIDTH, -COIL_HALF_HEIGHT),
@@ -96,7 +110,9 @@ void UIControlledSwitch::DrawSymbol(SchematicCanvas &canvas, const ViewTransform
         DrawDashedLine(canvas, view, CONTROL_END_X + COIL_HALF_WIDTH, LINK_END_X, 0.0f, color);
         return;
     }
-    canvas.AddLine(LocalToScreen(view, CONTROL_END_X, -1), LocalToScreen(view, CONTROL_END_X, 1), color,
+    canvas.AddLine(LocalToScreen(view, CONTROL_END_X, -1),
+                   LocalToScreen(view, CONTROL_END_X, 1),
+                   color,
                    LINE_THICKNESS);
     DrawDashedLine(canvas, view, CONTROL_END_X, LINK_END_X, 0.0f, color);
 }
@@ -109,8 +125,12 @@ void UIControlledSwitch::DrawLabels(SchematicCanvas &canvas, const ViewTransform
         IsRelay() ? static_cast<const Core::Relay &>(GetComponent()).GetParameters().PullInVoltage
                   : static_cast<const Core::VoltageControlledSwitch &>(GetComponent()).GetParameters().Threshold;
     DrawLabel(canvas, view, {LABEL_OFFSET_X, -LABEL_OFFSET_Y}, {1.0f, 0.0f}, GetComponent().GetName(), color);
-    DrawLabel(canvas, view, {LABEL_OFFSET_X, LABEL_OFFSET_Y}, {1.0f, 0.0f},
-              std::format("{}{}V", IsRelay() ? "pull-in " : "Vt ", Core::FormatValue(voltage)), color);
+    DrawLabel(canvas,
+              view,
+              {LABEL_OFFSET_X, LABEL_OFFSET_Y},
+              {1.0f, 0.0f},
+              std::format("{}{}V", IsRelay() ? "pull-in " : "Vt ", Core::FormatValue(voltage)),
+              color);
 }
 
 /**
@@ -133,18 +153,29 @@ bool UIControlledSwitch::IsRelay() const {
     return GetComponent().GetType() == Core::ComponentType::RELAY;
 }
 
-void UIControlledSwitch::DrawSign(SchematicCanvas &canvas, const ViewTransform &view, const ImVec2 center,
-                                  const bool plus, const ImU32 color) const {
+void UIControlledSwitch::DrawSign(SchematicCanvas &canvas,
+                                  const ViewTransform &view,
+                                  const ImVec2 center,
+                                  const bool plus,
+                                  const ImU32 color) const {
     canvas.AddLine(LocalToScreen(view, center.x - SIGN_HALF_SIZE, center.y),
-                   LocalToScreen(view, center.x + SIGN_HALF_SIZE, center.y), color, LINE_THICKNESS);
+                   LocalToScreen(view, center.x + SIGN_HALF_SIZE, center.y),
+                   color,
+                   LINE_THICKNESS);
     if (plus) {
         canvas.AddLine(LocalToScreen(view, center.x, center.y - SIGN_HALF_SIZE),
-                       LocalToScreen(view, center.x, center.y + SIGN_HALF_SIZE), color, LINE_THICKNESS);
+                       LocalToScreen(view, center.x, center.y + SIGN_HALF_SIZE),
+                       color,
+                       LINE_THICKNESS);
     }
 }
 
-void UIControlledSwitch::DrawDashedLine(SchematicCanvas &canvas, const ViewTransform &view, const float from_x,
-                                        const float to_x, const float y, const ImU32 color) const {
+void UIControlledSwitch::DrawDashedLine(SchematicCanvas &canvas,
+                                        const ViewTransform &view,
+                                        const float from_x,
+                                        const float to_x,
+                                        const float y,
+                                        const ImU32 color) const {
     for (int dash = 0;; ++dash) {
         const float x = from_x + DASH_GAP + static_cast<float>(dash) * (DASH_LENGTH + DASH_GAP);
         if (x + DASH_LENGTH > to_x) {

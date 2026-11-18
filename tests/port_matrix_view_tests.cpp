@@ -39,10 +39,14 @@ Core::SParameters MakeResult(const bool is_middle_absent, const bool has_matrice
             result.ImpedanceMatrices.emplace_back(std::nullopt);
             result.AdmittanceMatrices.emplace_back(std::nullopt);
         } else {
-            result.ImpedanceMatrices.emplace_back(std::vector<Complex>{Complex(10.0 * scale, 5.0), Complex(1.0, 0.0),
-                                                                       Complex(2.0, 0.0), Complex(20.0, -5.0)});
-            result.AdmittanceMatrices.emplace_back(std::vector<Complex>{Complex(0.01 * scale, 0.0), Complex(0.001, 0.0),
-                                                                        Complex(0.002, 0.0), Complex(0.02, 0.0)});
+            result.ImpedanceMatrices.emplace_back(std::vector<Complex>{Complex(10.0 * scale, 5.0),
+                                                                       Complex(1.0, 0.0),
+                                                                       Complex(2.0, 0.0),
+                                                                       Complex(20.0, -5.0)});
+            result.AdmittanceMatrices.emplace_back(std::vector<Complex>{Complex(0.01 * scale, 0.0),
+                                                                        Complex(0.001, 0.0),
+                                                                        Complex(0.002, 0.0),
+                                                                        Complex(0.02, 0.0)});
         }
     }
     return result;

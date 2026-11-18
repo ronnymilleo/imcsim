@@ -17,8 +17,8 @@
 namespace Nodalys {
 
 // Refinement
-std::vector<std::complex<double>> RefineRoots(const DenseMatrix &mat_a, const DenseMatrix &mat_b,
-                                              const std::vector<std::complex<double>> &roots);
+std::vector<std::complex<double>>
+RefineRoots(const DenseMatrix &mat_a, const DenseMatrix &mat_b, const std::vector<std::complex<double>> &roots);
 
 } // namespace Nodalys
 

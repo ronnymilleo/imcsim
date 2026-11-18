@@ -37,7 +37,9 @@ std::optional<std::string> BreakdownWarning(const CircuitEntry &entry, const dou
         return std::nullopt;
     }
     return std::format("{} ({}) goes into reverse breakdown: it sees up to {}V in reverse but is rated for {}V",
-                       diode.GetName(), diode.GetModelName(), FormatValue(highest_reverse_voltage),
+                       diode.GetName(),
+                       diode.GetModelName(),
+                       FormatValue(highest_reverse_voltage),
                        FormatValue(breakdown_voltage));
 }
 
@@ -119,14 +121,24 @@ double AveragePower(const std::vector<double> &times, const TerminalWaveforms &t
     return energy / (times.back() - times.front());
 }
 
-void AddRatingWarning(const Component &part, const char *model_name, const std::string_view quantity,
-                      const double value, const double rating, const std::string_view unit,
+void AddRatingWarning(const Component &part,
+                      const char *model_name,
+                      const std::string_view quantity,
+                      const double value,
+                      const double rating,
+                      const std::string_view unit,
                       std::vector<std::string> &warnings) {
     if (value <= rating) {
         return;
     }
-    warnings.push_back(std::format("{} ({}) exceeds its {} rating: {}{} against {}{}", part.GetName(), model_name,
-                                   quantity, FormatValue(value), unit, FormatValue(rating), unit));
+    warnings.push_back(std::format("{} ({}) exceeds its {} rating: {}{} against {}{}",
+                                   part.GetName(),
+                                   model_name,
+                                   quantity,
+                                   FormatValue(value),
+                                   unit,
+                                   FormatValue(rating),
+                                   unit));
 }
 
 /**
@@ -134,8 +146,8 @@ void AddRatingWarning(const Component &part, const char *model_name, const std::
  * @details Voltages and the currents of transistors are checked at their peak, and power and the forward current of
  *          a diode on average.
  */
-std::vector<std::string> RatingWarnings(const Component &part, const std::vector<double> &times,
-                                        const TerminalWaveforms &terminals) {
+std::vector<std::string>
+RatingWarnings(const Component &part, const std::vector<double> &times, const TerminalWaveforms &terminals) {
     std::vector<std::string> warnings;
     // A library model carries no datasheet ratings, only the parameters ngspice reads
     if (part.HasLibraryModel()) {
@@ -147,28 +159,63 @@ std::vector<std::string> RatingWarnings(const Component &part, const std::vector
         const DiodeParameters &ratings = diode.GetParameters();
         const char *model = diode.GetModelName();
         // The forward current is the one into the anode, so a Zener in reverse breakdown is judged on power alone
-        AddRatingWarning(part, model, "average forward current", AverageForwardCurrent(times, terminals.Currents[0]),
-                         ratings.MaxForwardCurrent, "A", warnings);
-        AddRatingWarning(part, model, "power", AveragePower(times, AcrossAnodeAndCathode(terminals)), ratings.MaxPower,
-                         "W", warnings);
+        AddRatingWarning(part,
+                         model,
+                         "average forward current",
+                         AverageForwardCurrent(times, terminals.Currents[0]),
+                         ratings.MaxForwardCurrent,
+                         "A",
+                         warnings);
+        AddRatingWarning(part,
+                         model,
+                         "power",
+                         AveragePower(times, AcrossAnodeAndCathode(terminals)),
+                         ratings.MaxPower,
+                         "W",
+                         warnings);
     } else if (IsBJT(part.GetType())) {
         const auto &bjt = static_cast<const BJT &>(part);
         const BJTParameters &ratings = bjt.GetParameters();
         const char *model = bjt.GetModelName();
-        AddRatingWarning(part, model, "VCE", PeakVoltageBetween(voltages[0], voltages[2]),
-                         ratings.MaxCollectorEmitterVoltage, "V", warnings);
-        AddRatingWarning(part, model, "IC", PeakMagnitude(terminals.Currents[0]), ratings.MaxCollectorCurrent, "A",
+        AddRatingWarning(part,
+                         model,
+                         "VCE",
+                         PeakVoltageBetween(voltages[0], voltages[2]),
+                         ratings.MaxCollectorEmitterVoltage,
+                         "V",
+                         warnings);
+        AddRatingWarning(part,
+                         model,
+                         "IC",
+                         PeakMagnitude(terminals.Currents[0]),
+                         ratings.MaxCollectorCurrent,
+                         "A",
                          warnings);
         AddRatingWarning(part, model, "power", AveragePower(times, terminals), ratings.MaxPower, "W", warnings);
     } else if (IsMOSFET(part.GetType())) {
         const auto &mosfet = static_cast<const MOSFET &>(part);
         const MOSFETParameters &ratings = mosfet.GetParameters();
         const char *model = mosfet.GetModelName();
-        AddRatingWarning(part, model, "VDS", PeakVoltageBetween(voltages[0], voltages[2]),
-                         ratings.MaxDrainSourceVoltage, "V", warnings);
-        AddRatingWarning(part, model, "VGS", PeakVoltageBetween(voltages[1], voltages[2]), ratings.MaxGateSourceVoltage,
-                         "V", warnings);
-        AddRatingWarning(part, model, "ID", PeakMagnitude(terminals.Currents[0]), ratings.MaxDrainCurrent, "A",
+        AddRatingWarning(part,
+                         model,
+                         "VDS",
+                         PeakVoltageBetween(voltages[0], voltages[2]),
+                         ratings.MaxDrainSourceVoltage,
+                         "V",
+                         warnings);
+        AddRatingWarning(part,
+                         model,
+                         "VGS",
+                         PeakVoltageBetween(voltages[1], voltages[2]),
+                         ratings.MaxGateSourceVoltage,
+                         "V",
+                         warnings);
+        AddRatingWarning(part,
+                         model,
+                         "ID",
+                         PeakMagnitude(terminals.Currents[0]),
+                         ratings.MaxDrainCurrent,
+                         "A",
                          warnings);
         AddRatingWarning(part, model, "power", AveragePower(times, terminals), ratings.MaxPower, "W", warnings);
     }

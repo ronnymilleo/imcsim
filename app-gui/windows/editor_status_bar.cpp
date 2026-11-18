@@ -59,9 +59,10 @@ float DrawRunStatus(const RunStatusLine &line, const AnalysisControls &controls,
     const std::string text = ShortenToWidth(line.Text, max_width, measure);
     const float text_width = measure(text);
     // The reason gets what the state leaves
-    const std::string detail = line.Detail.empty() ? std::string()
-                                                   : ShortenToWidth(std::format(" {} {}", MIDDLE_DOT, line.Detail),
-                                                                    max_width - text_width, measure);
+    const std::string detail =
+        line.Detail.empty()
+            ? std::string()
+            : ShortenToWidth(std::format(" {} {}", MIDDLE_DOT, line.Detail), max_width - text_width, measure);
     // A run in progress keeps the width of its widest text, so the hint does not shift as its figures change
     const float width = std::min(max_width, std::max(text_width + measure(detail), measure(line.WidestText)));
     if (line.IsRunning) {
@@ -73,7 +74,8 @@ float DrawRunStatus(const RunStatusLine &line, const AnalysisControls &controls,
         ImGui::SetItemTooltip("Show what the run reported, with the ngspice output");
         ImDrawList *draw_list = ImGui::GetWindowDrawList();
         draw_list->AddText(line_start, ImGui::GetColorU32(GetToneColor(line.Tone)), text.c_str());
-        draw_list->AddText({line_start.x + text_width, line_start.y}, ImGui::GetColorU32(ImGuiCol_TextDisabled),
+        draw_list->AddText({line_start.x + text_width, line_start.y},
+                           ImGui::GetColorU32(ImGuiCol_TextDisabled),
                            detail.c_str());
     }
     if (ImGui::BeginPopup("run_report")) {
@@ -99,8 +101,12 @@ float DrawRunStatus(const RunStatusLine &line, const AnalysisControls &controls,
  * @param[in]     view       Pan and zoom of the canvas, to read the grid point under the cursor.
  * @param[in]     hovered    Whether the cursor is over the canvas, which shows its position.
  */
-void DrawStatusBar(const EditorMode &mode, Schematic &schematic, const AnalysisControls &controls,
-                   const std::optional<Core::Transient> &transient, const ViewTransform &view, const bool hovered) {
+void DrawStatusBar(const EditorMode &mode,
+                   Schematic &schematic,
+                   const AnalysisControls &controls,
+                   const std::optional<Core::Transient> &transient,
+                   const ViewTransform &view,
+                   const bool hovered) {
     const std::string hint = DescribeEditorHint(mode, schematic, controls.IsLive());
     const ImVec2 line_start = ImGui::GetCursorScreenPos();
     const float gap = ImGui::GetFontSize() * STATUS_GAP_FONT_SIZES;

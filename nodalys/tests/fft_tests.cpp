@@ -87,15 +87,23 @@ TEST_CASE("Real cosine/sine harmonic transforms preserve exact trigonometric sig
     constexpr int H = 8;
     // x(t) = 1.25 + 2.0*cos(w*t) - 1.5*sin(w*t) + 0.7*cos(3*w*t) + 0.4*sin(7*w*t)
     const std::vector<double> expected_coeffs = {
-        1.25,       // DC
-        2.0,  -1.5, // k = 1
-        0.0,  0.0,  // k = 2
-        0.7,  0.0,  // k = 3
-        0.0,  0.0,  // k = 4
-        0.0,  0.0,  // k = 5
-        0.0,  0.0,  // k = 6
-        0.0,  0.4,  // k = 7
-        0.0,  0.0,  // k = 8
+        1.25, // DC
+        2.0,
+        -1.5, // k = 1
+        0.0,
+        0.0, // k = 2
+        0.7,
+        0.0, // k = 3
+        0.0,
+        0.0, // k = 4
+        0.0,
+        0.0, // k = 5
+        0.0,
+        0.0, // k = 6
+        0.0,
+        0.4, // k = 7
+        0.0,
+        0.0, // k = 8
     };
 
     std::vector<double> samples;

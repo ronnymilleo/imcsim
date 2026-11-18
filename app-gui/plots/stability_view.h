@@ -61,7 +61,8 @@ StabilityCurves BuildStabilityCurves(const TwoPortSweep &sweep);
 // Figures
 ExportFigure BuildStabilityFigure(const TwoPortSweep &sweep, const std::optional<ExportRange> &view);
 ExportFigure BuildStabilityTableFigure(const TwoPortSweep &sweep);
-ExportFigure BuildSmithFigureWithCircles(const Core::SParameters &result, const std::vector<SParameterEntry> &entries,
+ExportFigure BuildSmithFigureWithCircles(const Core::SParameters &result,
+                                         const std::vector<SParameterEntry> &entries,
                                          std::size_t frequency);
 
 } // namespace GUI

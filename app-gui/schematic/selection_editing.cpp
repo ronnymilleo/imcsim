@@ -144,7 +144,9 @@ void SelectAll(Schematic &schematic, EditorMode &mode) {
  * @details The wires that meet them follow, unless keep_wires: then the parts turn alone and every wire stays where it
  *          was. A turn during a drag ends that move and goes on dragging from the new position.
  */
-void TransformSelection(Schematic &schematic, EditorMode &mode, const PointTransform::Kind kind,
+void TransformSelection(Schematic &schematic,
+                        EditorMode &mode,
+                        const PointTransform::Kind kind,
                         const bool keep_wires) {
     if (schematic.GetSelectedElements().empty()) {
         return;

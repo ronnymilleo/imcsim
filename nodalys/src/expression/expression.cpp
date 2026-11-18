@@ -30,7 +30,9 @@ constexpr double NOMINAL_TEMPERATURE_CELSIUS = 27.0;
  */
 class Evaluator {
 public:
-    Evaluator(const ExpressionProgram &program, const std::span<const double> inputs, const double time_seconds,
+    Evaluator(const ExpressionProgram &program,
+              const std::span<const double> inputs,
+              const double time_seconds,
               const double temperature_celsius)
         : m_Program(program), m_Inputs(inputs), m_TimeSeconds(time_seconds), m_TemperatureCelsius(temperature_celsius),
           m_InputCount(program.Inputs.size()), m_Values(program.Nodes.size(), 0.0),

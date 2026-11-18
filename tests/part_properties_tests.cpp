@@ -19,10 +19,14 @@ std::unique_ptr<GUI::UIElement> Make(const Core::ComponentType type) {
 } // namespace
 
 TEST_CASE("Every part but ground has something to edit", "[part_properties]") {
-    for (const Core::ComponentType type :
-         {Core::ComponentType::RESISTOR, Core::ComponentType::NET_LABEL, Core::ComponentType::SUBCIRCUIT,
-          Core::ComponentType::RELAY, Core::ComponentType::CLOCK, Core::ComponentType::AND,
-          Core::ComponentType::PUSH_BUTTON, Core::ComponentType::BEHAVIORAL_VOLTAGE}) {
+    for (const Core::ComponentType type : {Core::ComponentType::RESISTOR,
+                                           Core::ComponentType::NET_LABEL,
+                                           Core::ComponentType::SUBCIRCUIT,
+                                           Core::ComponentType::RELAY,
+                                           Core::ComponentType::CLOCK,
+                                           Core::ComponentType::AND,
+                                           Core::ComponentType::PUSH_BUTTON,
+                                           Core::ComponentType::BEHAVIORAL_VOLTAGE}) {
         CHECK(GUI::HasPropertyFields(Make(type)->GetComponent()));
     }
     CHECK_FALSE(GUI::HasPropertyFields(Make(Core::ComponentType::GROUND)->GetComponent()));

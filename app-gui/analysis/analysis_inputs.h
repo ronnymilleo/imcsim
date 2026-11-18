@@ -33,13 +33,13 @@ constexpr std::size_t STEPPED_SOURCE_INDEX = 1;
 
 // Sources
 std::vector<SweepSource> ListSweepSources(const Core::Circuit &circuit);
-const std::string &ResolveSweepSource(const Core::SweepRange &range, const std::vector<SweepSource> &sources,
-                                      std::size_t preferred_index);
+const std::string &
+ResolveSweepSource(const Core::SweepRange &range, const std::vector<SweepSource> &sources, std::size_t preferred_index);
 std::string ResolveOptionalInput(const std::string &stored, const std::vector<std::string> &sources);
 
 // Nodes and logic inputs
-std::optional<int> ResolveOutputNode(const std::optional<GridPoint> &point, const Core::Circuit &circuit,
-                                     Schematic &schematic);
+std::optional<int>
+ResolveOutputNode(const std::optional<GridPoint> &point, const Core::Circuit &circuit, Schematic &schematic);
 std::vector<int> ListMeasuredNodes(const Core::Circuit &circuit, const Schematic &schematic);
 std::vector<std::string> ResolveTruthTableInputs(const std::vector<std::string> &stored,
                                                  const std::vector<std::string> &available);

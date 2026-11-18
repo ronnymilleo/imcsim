@@ -472,8 +472,8 @@ void IterateQz(DenseMatrix &a, DenseMatrix &b, double &epsb_out) {
  * @param[in]     infinite_beta  Largest beta that still counts as an infinite eigenvalue.
  * @return  Vector of finite complex eigenvalues.
  */
-std::vector<std::complex<double>> ExtractEigenvalues(DenseMatrix &a, DenseMatrix &b, const double epsb,
-                                                     const double infinite_beta) {
+std::vector<std::complex<double>>
+ExtractEigenvalues(DenseMatrix &a, DenseMatrix &b, const double epsb, const double infinite_beta) {
     const std::size_t n = a.Rows();
     std::vector<double> alfr(n, 0.0);
     std::vector<double> alfi(n, 0.0);

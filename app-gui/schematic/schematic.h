@@ -82,8 +82,10 @@ public:
     void DeleteSelection();
     std::expected<void, std::string> RenameElement(std::size_t index, const std::string &name);
     void Clear();
-    void Replace(std::vector<std::unique_ptr<UIElement>> elements, std::vector<UIWire> wires,
-                 SimulationSettings settings, std::vector<SavedSubcircuit> subcircuits = {},
+    void Replace(std::vector<std::unique_ptr<UIElement>> elements,
+                 std::vector<UIWire> wires,
+                 SimulationSettings settings,
+                 std::vector<SavedSubcircuit> subcircuits = {},
                  std::vector<Core::LibraryModel> models = {});
 
     // Blocks
@@ -91,10 +93,12 @@ public:
     std::expected<std::vector<SubcircuitPinCandidate>, std::string> GetSubcircuitPinMarkers() const;
     bool SetPinMarkerSide(GridPoint point, Core::PinSide side);
     std::expected<void, std::string>
-    CreateSubcircuitFromSelection(std::string name, std::vector<SavedSubcircuitPin> pins,
+    CreateSubcircuitFromSelection(std::string name,
+                                  std::vector<SavedSubcircuitPin> pins,
                                   std::vector<Core::SubcircuitParameter> parameters = {});
     std::expected<std::unique_ptr<Schematic>, std::string> OpenSubcircuit(const std::string &name) const;
-    std::expected<void, std::string> UpdateSubcircuit(const std::string &name, const Schematic &content,
+    std::expected<void, std::string> UpdateSubcircuit(const std::string &name,
+                                                      const Schematic &content,
                                                       const std::vector<SavedSubcircuitPin> &pins,
                                                       const std::vector<Core::SubcircuitParameter> &parameters);
     std::expected<void, std::string> UpdateSpiceSubcircuit(const std::string &name,
@@ -242,7 +246,8 @@ private:
     std::optional<Connectivity> m_Connectivity;
 
     void InvalidateDerivedData();
-    void RefreshInstances(const SavedSubcircuit &definition, const std::vector<std::string> &old_names,
+    void RefreshInstances(const SavedSubcircuit &definition,
+                          const std::vector<std::string> &old_names,
                           const std::vector<std::optional<std::size_t>> &matches);
     void WireNewBlock(const std::vector<GridPoint> &old_points);
     std::string TakeSnapshot() const;

@@ -25,19 +25,25 @@ bool IsPowerOfTwo(const int value) {
     return value > 0 && (value & (value - 1)) == 0;
 }
 
-std::optional<std::string> CheckSourceHarmonicRatio(const std::string_view name, const double source_frequency,
+std::optional<std::string> CheckSourceHarmonicRatio(const std::string_view name,
+                                                    const double source_frequency,
                                                     const HarmonicBalanceSettings &settings) {
     if (!std::isfinite(source_frequency) || source_frequency <= 0.0) {
         return std::format("The frequency of {} must be positive for harmonic balance", name);
     }
     const std::optional<int> harmonic = FindHarmonicNumber(source_frequency, settings.FundamentalFrequency);
     if (!harmonic) {
-        return std::format("{} runs at {} Hz, which is not an integer multiple of the fundamental {} Hz", name,
-                           source_frequency, settings.FundamentalFrequency);
+        return std::format("{} runs at {} Hz, which is not an integer multiple of the fundamental {} Hz",
+                           name,
+                           source_frequency,
+                           settings.FundamentalFrequency);
     }
     if (*harmonic > settings.Harmonics) {
-        return std::format("{} runs at {} Hz (harmonic {}), which exceeds the {} configured harmonics", name,
-                           source_frequency, *harmonic, settings.Harmonics);
+        return std::format("{} runs at {} Hz (harmonic {}), which exceeds the {} configured harmonics",
+                           name,
+                           source_frequency,
+                           *harmonic,
+                           settings.Harmonics);
     }
     return std::nullopt;
 }
@@ -97,7 +103,8 @@ std::optional<std::string> CheckHarmonicBalanceSettings(const Circuit &circuit,
         case Source::SourceType::NOISE:
         case Source::SourceType::RANDOM:
         default:
-            return std::format("{} uses a {} waveform, which harmonic balance does not support", part->GetName(),
+            return std::format("{} uses a {} waveform, which harmonic balance does not support",
+                               part->GetName(),
                                GetSourceTypeName(source.GetSourceType()));
         }
     }
@@ -119,7 +126,8 @@ std::optional<std::string> CheckHarmonicBalanceGrid(const HarmonicBalanceSetting
     if (settings.Samples != 0 && (!IsPowerOfTwo(settings.Samples) || settings.Samples <= 2 * settings.Harmonics ||
                                   settings.Samples > MAX_HARMONIC_BALANCE_SAMPLES)) {
         return std::format("The sample count must be 0 (automatic) or a power of two greater than {} (up to {})",
-                           2 * settings.Harmonics, MAX_HARMONIC_BALANCE_SAMPLES);
+                           2 * settings.Harmonics,
+                           MAX_HARMONIC_BALANCE_SAMPLES);
     }
     return std::nullopt;
 }

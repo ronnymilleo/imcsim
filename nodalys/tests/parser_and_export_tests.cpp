@@ -78,7 +78,8 @@ public:
      * @brief   Runs the command line on a netlist and reads the file it writes.
      * @return  The contents of the output file, or none when the CLI failed or wrote nothing.
      */
-    std::optional<std::string> Run(const std::string_view arguments, const std::string_view netlist,
+    std::optional<std::string> Run(const std::string_view arguments,
+                                   const std::string_view netlist,
                                    const InputKind input = InputKind::FILE_ARGUMENT) const {
         const std::filesystem::path input_path = m_Path / "input.cir";
         const std::filesystem::path output_path = m_Path / "output";
@@ -603,8 +604,9 @@ TEST_CASE("Sweeps, the transfer function and the noise export to RAW, CSV and JS
     }
 
     SECTION("Transfer function") {
-        const auto transfer = Nodalys::ComputeTransferFunction(
-            circuit, std::get<Nodalys::TransferFunctionConfig>(parsed->Analyses[2].Config));
+        const auto transfer =
+            Nodalys::ComputeTransferFunction(circuit,
+                                             std::get<Nodalys::TransferFunctionConfig>(parsed->Analyses[2].Config));
         REQUIRE(transfer.has_value());
         const std::string csv = Nodalys::ExportCsv(*transfer);
         CHECK(csv.contains("Gain,0.5,"));
@@ -683,12 +685,13 @@ TEST_CASE("The Nodalys command line runs netlists from arguments or standard inp
     }
 
     SECTION("It writes an operating point as JSON") {
-        const std::optional<std::string> json = folder.Run("-b -f json", "* Divider\n"
-                                                                         "V1 1 0 10\n"
-                                                                         "R1 1 2 1k\n"
-                                                                         "R2 2 0 1k\n"
-                                                                         ".op\n"
-                                                                         ".end\n");
+        const std::optional<std::string> json = folder.Run("-b -f json",
+                                                           "* Divider\n"
+                                                           "V1 1 0 10\n"
+                                                           "R1 1 2 1k\n"
+                                                           "R2 2 0 1k\n"
+                                                           ".op\n"
+                                                           ".end\n");
         REQUIRE(json.has_value());
         CHECK(json->contains("\"analysis\": \"operating_point\""));
         CHECK(json->contains("\"1\": 10"));
@@ -696,12 +699,13 @@ TEST_CASE("The Nodalys command line runs netlists from arguments or standard inp
     }
 
     SECTION("It writes an operating point as CSV") {
-        const std::optional<std::string> csv = folder.Run("-b -f csv", "* Divider\n"
-                                                                       "V1 1 0 12\n"
-                                                                       "R1 1 2 2k\n"
-                                                                       "R2 2 0 2k\n"
-                                                                       ".op\n"
-                                                                       ".end\n");
+        const std::optional<std::string> csv = folder.Run("-b -f csv",
+                                                          "* Divider\n"
+                                                          "V1 1 0 12\n"
+                                                          "R1 1 2 2k\n"
+                                                          "R2 2 0 2k\n"
+                                                          ".op\n"
+                                                          ".end\n");
         REQUIRE(csv.has_value());
         CHECK(csv->contains("Variable,Type,Value,Unit"));
         CHECK(csv->contains("V(1),Voltage,12,V"));
@@ -709,32 +713,34 @@ TEST_CASE("The Nodalys command line runs netlists from arguments or standard inp
     }
 
     SECTION("It places a subcircuit with parameters, as imcsim does") {
-        const std::optional<std::string> csv = folder.Run("-b -f csv", "* Subcircuit\n"
-                                                                       ".subckt DIVIDER IN OUT params: RT=1k RB=1k\n"
-                                                                       "R1 IN OUT {RT}\n"
-                                                                       "R2 OUT 0 {RB}\n"
-                                                                       ".ends\n"
-                                                                       "V1 1 0 12\n"
-                                                                       "X1 1 2 DIVIDER RT=2k RB=2k\n"
-                                                                       "X2 1 3 DIVIDER RT=1k RB=3k\n"
-                                                                       ".op\n"
-                                                                       ".end\n");
+        const std::optional<std::string> csv = folder.Run("-b -f csv",
+                                                          "* Subcircuit\n"
+                                                          ".subckt DIVIDER IN OUT params: RT=1k RB=1k\n"
+                                                          "R1 IN OUT {RT}\n"
+                                                          "R2 OUT 0 {RB}\n"
+                                                          ".ends\n"
+                                                          "V1 1 0 12\n"
+                                                          "X1 1 2 DIVIDER RT=2k RB=2k\n"
+                                                          "X2 1 3 DIVIDER RT=1k RB=3k\n"
+                                                          ".op\n"
+                                                          ".end\n");
         REQUIRE(csv.has_value());
         CHECK(csv->contains("V(2),Voltage,6,V"));
         CHECK(csv->contains("V(3),Voltage,9,V"));
     }
 
     SECTION("It lists the internal nodes of a subcircuit instance after the nodes of the netlist") {
-        const std::optional<std::string> csv = folder.Run("-b -f csv", "* Internal node\n"
-                                                                       ".subckt CHAIN IN OUT\n"
-                                                                       "R1 IN MID 1k\n"
-                                                                       "R2 MID OUT 1k\n"
-                                                                       "R3 OUT 0 2k\n"
-                                                                       ".ends\n"
-                                                                       "V1 1 0 12\n"
-                                                                       "X1 1 2 CHAIN\n"
-                                                                       ".op\n"
-                                                                       ".end\n");
+        const std::optional<std::string> csv = folder.Run("-b -f csv",
+                                                          "* Internal node\n"
+                                                          ".subckt CHAIN IN OUT\n"
+                                                          "R1 IN MID 1k\n"
+                                                          "R2 MID OUT 1k\n"
+                                                          "R3 OUT 0 2k\n"
+                                                          ".ends\n"
+                                                          "V1 1 0 12\n"
+                                                          "X1 1 2 CHAIN\n"
+                                                          ".op\n"
+                                                          ".end\n");
         REQUIRE(csv.has_value());
         CHECK(csv->contains("V(2),Voltage,6,V"));
         CHECK(csv->contains("V(3),Voltage,9,V"));
@@ -754,37 +760,39 @@ TEST_CASE("The Nodalys command line runs netlists from arguments or standard inp
     }
 
     SECTION("It writes S-parameters as Touchstone") {
-        const std::optional<std::string> touchstone =
-            folder.Run("-b -a sp -f touchstone", "* Attenuator\n"
-                                                 "Vsport1 1 0 dc 0 portnum 1 z0 50\n"
-                                                 "Vsport2 2 0 dc 0 portnum 2 z0 50\n"
-                                                 "R1 1 2 50\n"
-                                                 ".sp dec 2 1e6 1e8\n"
-                                                 ".end\n");
+        const std::optional<std::string> touchstone = folder.Run("-b -a sp -f touchstone",
+                                                                 "* Attenuator\n"
+                                                                 "Vsport1 1 0 dc 0 portnum 1 z0 50\n"
+                                                                 "Vsport2 2 0 dc 0 portnum 2 z0 50\n"
+                                                                 "R1 1 2 50\n"
+                                                                 ".sp dec 2 1e6 1e8\n"
+                                                                 ".end\n");
         REQUIRE(touchstone.has_value());
         CHECK(touchstone->contains("# HZ S RI R 50"));
         CHECK(touchstone->contains("! Nodalys S-Parameter Simulation"));
     }
 
     SECTION("It writes poles and zeros as JSON") {
-        const std::optional<std::string> json = folder.Run("-b -a pz -f json", "* Pole-zero\n"
-                                                                               "Vin 1 0 0V\n"
-                                                                               "R1 1 2 1k\n"
-                                                                               "C1 2 0 1u\n"
-                                                                               ".pz 2 Vin pz\n"
-                                                                               ".end\n");
+        const std::optional<std::string> json = folder.Run("-b -a pz -f json",
+                                                           "* Pole-zero\n"
+                                                           "Vin 1 0 0V\n"
+                                                           "R1 1 2 1k\n"
+                                                           "C1 2 0 1u\n"
+                                                           ".pz 2 Vin pz\n"
+                                                           ".end\n");
         REQUIRE(json.has_value());
         CHECK(json->contains("\"analysis\": \"pole_zero\""));
         CHECK(json->contains("\"poles\""));
     }
 
     SECTION("It writes a harmonic balance as JSON") {
-        const std::optional<std::string> json = folder.Run("-b -a hb -f json", "* Harmonic balance\n"
-                                                                               "Vin 1 0 SIN(0 4 1k)\n"
-                                                                               "R1 1 2 1k\n"
-                                                                               "R2 2 0 1k\n"
-                                                                               ".hb 1k 4 samples=32\n"
-                                                                               ".end\n");
+        const std::optional<std::string> json = folder.Run("-b -a hb -f json",
+                                                           "* Harmonic balance\n"
+                                                           "Vin 1 0 SIN(0 4 1k)\n"
+                                                           "R1 1 2 1k\n"
+                                                           "R2 2 0 1k\n"
+                                                           ".hb 1k 4 samples=32\n"
+                                                           ".end\n");
         REQUIRE(json.has_value());
         CHECK(json->contains("\"analysis\": \"harmonic_balance\""));
         CHECK(json->contains("\"frequencies\": [0, 1000, 2000, 3000, 4000]"));

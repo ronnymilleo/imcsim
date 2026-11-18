@@ -56,8 +56,11 @@ template <typename Result> struct SteppedRuns {
  *          headed by its value, so a warning can be traced to the step that printed it.
  */
 template <typename Result, typename RunStep>
-SteppedRuns<Result> RunSteps(const ParameterStepSettings &step, const std::string &unit,
-                             const std::vector<double> &values, Core::RunControl &control, const RunStep &run_step) {
+SteppedRuns<Result> RunSteps(const ParameterStepSettings &step,
+                             const std::string &unit,
+                             const std::vector<double> &values,
+                             Core::RunControl &control,
+                             const RunStep &run_step) {
     StepFamily<Result> family{.Parameter = GetParameterLabel(step), .Unit = unit, .Values = values, .Results = {}};
     std::vector<Core::SimulatorMessage> messages;
     for (std::size_t index = 0; index < values.size(); ++index) {
@@ -100,8 +103,11 @@ MonteCarloTable MakeMonteCarloTable(const Core::Circuit &circuit, const Core::Mo
  * @details A stop keeps the runs made. Only the first runs keep their traces; every run keeps its measurements.
  */
 template <typename Result, typename RunCircuit, typename Measure>
-MonteCarloRuns<Result> RunMonteCarlo(const Core::MonteCarloSettings &settings, const Core::Circuit &circuit,
-                                     Core::RunControl &control, const RunCircuit &run_circuit, const Measure &measure) {
+MonteCarloRuns<Result> RunMonteCarlo(const Core::MonteCarloSettings &settings,
+                                     const Core::Circuit &circuit,
+                                     Core::RunControl &control,
+                                     const RunCircuit &run_circuit,
+                                     const Measure &measure) {
     StepFamily<Result> family{.Parameter = MONTE_CARLO_PARAMETER, .Unit = "", .Values = {}, .Results = {}};
     MonteCarloTable table = MakeMonteCarloTable(circuit, settings);
     std::vector<Core::SimulatorMessage> messages;
@@ -143,8 +149,10 @@ MonteCarloRuns<Result> RunMonteCarlo(const Core::MonteCarloSettings &settings, c
  * @brief   Hands the traces and the table of the runs to the results, or reports why they did not run.
  */
 template <typename Result, typename Store>
-std::optional<std::string> StoreMonteCarlo(std::expected<StepFamily<Result>, std::string> family, MonteCarloTable table,
-                                           ResultStore &results, Store store) {
+std::optional<std::string> StoreMonteCarlo(std::expected<StepFamily<Result>, std::string> family,
+                                           MonteCarloTable table,
+                                           ResultStore &results,
+                                           Store store) {
     if (!family) {
         return std::move(family.error());
     }

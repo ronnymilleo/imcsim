@@ -38,25 +38,33 @@ UIDiode::UIDiode(const Core::ComponentType type, const GridPoint position, const
     : UIElement(std::make_unique<Core::Diode>(type), position, rotation) {
 }
 
-void UIDiode::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
+void UIDiode::DrawSymbol(SchematicCanvas &canvas,
+                         const ViewTransform &view,
+                         const ImU32 color,
                          SymbolStyle /*style*/) const {
     canvas.AddLine(LocalToScreen(view, -1, 0), LocalToScreen(view, -BODY_HALF_LENGTH, 0), color, LINE_THICKNESS);
     canvas.AddLine(LocalToScreen(view, BODY_HALF_LENGTH, 0), LocalToScreen(view, 1, 0), color, LINE_THICKNESS);
     canvas.AddTriangle(LocalToScreen(view, -BODY_HALF_LENGTH, -BODY_HALF_HEIGHT),
                        LocalToScreen(view, -BODY_HALF_LENGTH, BODY_HALF_HEIGHT),
-                       LocalToScreen(view, BODY_HALF_LENGTH, 0), color, LINE_THICKNESS);
+                       LocalToScreen(view, BODY_HALF_LENGTH, 0),
+                       color,
+                       LINE_THICKNESS);
     canvas.AddLine(LocalToScreen(view, BODY_HALF_LENGTH, -BODY_HALF_HEIGHT),
-                   LocalToScreen(view, BODY_HALF_LENGTH, BODY_HALF_HEIGHT), color, LINE_THICKNESS);
+                   LocalToScreen(view, BODY_HALF_LENGTH, BODY_HALF_HEIGHT),
+                   color,
+                   LINE_THICKNESS);
 
     const Core::ComponentType type = GetComponent().GetType();
     if (type == Core::ComponentType::ZENER_DIODE) {
         // The ends of the bar bend in opposite directions, like a Z
         canvas.AddLine(LocalToScreen(view, BODY_HALF_LENGTH, -BODY_HALF_HEIGHT),
                        LocalToScreen(view, BODY_HALF_LENGTH - ZENER_WING_SIZE, -BODY_HALF_HEIGHT - ZENER_WING_SIZE),
-                       color, LINE_THICKNESS);
+                       color,
+                       LINE_THICKNESS);
         canvas.AddLine(LocalToScreen(view, BODY_HALF_LENGTH, BODY_HALF_HEIGHT),
                        LocalToScreen(view, BODY_HALF_LENGTH + ZENER_WING_SIZE, BODY_HALF_HEIGHT + ZENER_WING_SIZE),
-                       color, LINE_THICKNESS);
+                       color,
+                       LINE_THICKNESS);
     } else if (type == Core::ComponentType::LED) {
         DrawArrow(canvas, view, FIRST_ARROW_START, color);
         DrawArrow(canvas, view, SECOND_ARROW_START, color);
@@ -88,13 +96,19 @@ LocalBounds UIDiode::GetLocalBounds() const {
     return bounds;
 }
 
-void UIDiode::DrawArrow(SchematicCanvas &canvas, const ViewTransform &view, const ImVec2 start,
+void UIDiode::DrawArrow(SchematicCanvas &canvas,
+                        const ViewTransform &view,
+                        const ImVec2 start,
                         const ImU32 color) const {
     const ImVec2 tip = {start.x + ARROW_LENGTH, start.y - ARROW_LENGTH};
     canvas.AddLine(LocalToScreen(view, start.x, start.y), LocalToScreen(view, tip.x, tip.y), color, LINE_THICKNESS);
-    canvas.AddLine(LocalToScreen(view, tip.x, tip.y), LocalToScreen(view, tip.x - ARROW_HEAD_SIZE, tip.y), color,
+    canvas.AddLine(LocalToScreen(view, tip.x, tip.y),
+                   LocalToScreen(view, tip.x - ARROW_HEAD_SIZE, tip.y),
+                   color,
                    LINE_THICKNESS);
-    canvas.AddLine(LocalToScreen(view, tip.x, tip.y), LocalToScreen(view, tip.x, tip.y + ARROW_HEAD_SIZE), color,
+    canvas.AddLine(LocalToScreen(view, tip.x, tip.y),
+                   LocalToScreen(view, tip.x, tip.y + ARROW_HEAD_SIZE),
+                   color,
                    LINE_THICKNESS);
 }
 

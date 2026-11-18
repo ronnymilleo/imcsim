@@ -128,7 +128,8 @@ std::expected<double, std::string> ReadScalar(std::string name, const std::strin
  * @param[in] first_point  Index of the first point to keep; the ones before it are dropped.
  * @return  The values from first_point on, or the error when the vector is missing or has another length.
  */
-std::expected<std::vector<double>, std::string> ReadRealVectorOfLength(std::string name, const std::size_t length,
+std::expected<std::vector<double>, std::string> ReadRealVectorOfLength(std::string name,
+                                                                       const std::size_t length,
                                                                        const std::string_view what,
                                                                        const std::size_t first_point) {
     const pvector_info vector = FindVector(std::move(name));
@@ -167,8 +168,10 @@ ReadNodeAndCurrentVectors(const Circuit &circuit, const std::size_t length, cons
     result.NodeVoltages.resize(static_cast<std::size_t>(circuit.GetNodeCount()));
     result.NodeVoltages[0].assign(length > first_point ? length - first_point : 0, 0.0);
     for (int node = 1; node < circuit.GetNodeCount(); ++node) {
-        auto voltages = ReadRealVectorOfLength(std::format("v({})", node), length,
-                                               std::format("voltages for node {}", node), first_point);
+        auto voltages = ReadRealVectorOfLength(std::format("v({})", node),
+                                               length,
+                                               std::format("voltages for node {}", node),
+                                               first_point);
         if (!voltages) {
             return std::unexpected(voltages.error());
         }
@@ -176,8 +179,10 @@ ReadNodeAndCurrentVectors(const Circuit &circuit, const std::size_t length, cons
     }
     for (const CircuitEntry &entry : circuit.GetEntries()) {
         for (const CurrentVector &current : CurrentVectors(*entry.Part)) {
-            auto values = ReadRealVectorOfLength(current.VectorName, length,
-                                                 std::format("currents for {}", current.TraceName), first_point);
+            auto values = ReadRealVectorOfLength(current.VectorName,
+                                                 length,
+                                                 std::format("currents for {}", current.TraceName),
+                                                 first_point);
             if (!values) {
                 return std::unexpected(values.error());
             }

@@ -66,8 +66,11 @@ public:
 
     // Drawing, in the order the editor draws them
     void DrawWires(SchematicCanvas &canvas, const ViewTransform &view, Schematic &schematic, float zoom) const;
-    void DrawElements(SchematicCanvas &canvas, const ViewTransform &view, const Schematic &schematic,
-                      bool marks_live_parts, std::optional<std::size_t> lit_live_part) const;
+    void DrawElements(SchematicCanvas &canvas,
+                      const ViewTransform &view,
+                      const Schematic &schematic,
+                      bool marks_live_parts,
+                      std::optional<std::size_t> lit_live_part) const;
     void DrawGlows(ImDrawList *draw_list, const ViewTransform &view, const Schematic &schematic, float zoom) const;
     void DrawNodeVoltages(ImDrawList *draw_list, const ViewTransform &view, Schematic &schematic) const;
     void DrawHoveredValue(const MeasurementTarget &target, Schematic &schematic) const;
@@ -111,7 +114,9 @@ private:
     // Parts
     ImU32 GetElementColor(const Schematic &schematic, std::size_t index) const;
     ImU32 GetSensitivityColor(const Schematic &schematic, std::size_t index) const;
-    void DrawLogicReading(SchematicCanvas &canvas, const ViewTransform &view, const UIElement &element,
+    void DrawLogicReading(SchematicCanvas &canvas,
+                          const ViewTransform &view,
+                          const UIElement &element,
                           std::size_t index) const;
 
     // Fuses

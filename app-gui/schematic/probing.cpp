@@ -20,8 +20,8 @@ namespace {
  * @brief   A part that reports one current per probed terminal, such as a transistor, gives the one whose terminal is
  *          nearest the point; the result is the position among its currents.
  */
-std::size_t NearestCurrent(const UIElement &element, const std::vector<std::size_t> &current_terminals,
-                           const ImVec2 world_pos) {
+std::size_t
+NearestCurrent(const UIElement &element, const std::vector<std::size_t> &current_terminals, const ImVec2 world_pos) {
     const std::vector<GridPoint> terminals = element.GetTerminals();
     std::size_t nearest = 0;
     float nearest_distance = INFINITY;
@@ -51,7 +51,8 @@ std::size_t NearestCurrent(const UIElement &element, const std::vector<std::size
  */
 std::optional<MeasurementTarget> FindMeasurementTarget(const std::vector<std::unique_ptr<UIElement>> &elements,
                                                        const std::vector<UIWire> &wires,
-                                                       const Connectivity &connectivity, const ImVec2 world_pos,
+                                                       const Connectivity &connectivity,
+                                                       const ImVec2 world_pos,
                                                        const float wire_tolerance) {
     for (std::size_t index = elements.size(); index-- > 0;) {
         const UIElement &element = *elements[index];
@@ -130,7 +131,8 @@ std::optional<double> FindMeasuredValue(const MeasurementTarget &target, const C
  * @param[in] operating_point  The values on display, or null before a simulation.
  * @return  "V(3) = 4.5V" or "I(R1) = 2mA" once there is a value, or the label alone, "V(VOUT)".
  */
-std::string DescribeMeasurement(const MeasurementTarget &target, const Connectivity &connectivity,
+std::string DescribeMeasurement(const MeasurementTarget &target,
+                                const Connectivity &connectivity,
                                 const Core::OperatingPoint *operating_point) {
     const std::optional<double> value =
         operating_point != nullptr ? FindMeasuredValue(target, *operating_point) : std::nullopt;

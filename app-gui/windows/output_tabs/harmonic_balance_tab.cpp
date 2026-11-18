@@ -78,7 +78,8 @@ const char *GetCurrentSpectrumAxisLabel(const HarmonicAmplitudeUnit amp_unit, co
     }
 }
 
-void DrawSpectrumTooltip(const Core::HarmonicBalance &result, Schematic &schematic,
+void DrawSpectrumTooltip(const Core::HarmonicBalance &result,
+                         Schematic &schematic,
                          const HarmonicAmplitudeUnit amp_unit) {
     if (!ImPlot::IsPlotHovered() || result.Frequencies.empty()) {
         return;
@@ -96,8 +97,10 @@ void DrawSpectrumTooltip(const Core::HarmonicBalance &result, Schematic &schemat
             continue;
         }
         const HarmonicTableRow &row = summary.Rows[bin];
-        ImGui::Text("%s: %s (%.2f dBc, %.1f deg)", summary.Label.c_str(),
-                    FormatQuantity(row.MagnitudeLinear, summary.Unit.c_str()).c_str(), row.MagnitudeDbc,
+        ImGui::Text("%s: %s (%.2f dBc, %.1f deg)",
+                    summary.Label.c_str(),
+                    FormatQuantity(row.MagnitudeLinear, summary.Unit.c_str()).c_str(),
+                    row.MagnitudeDbc,
                     row.PhaseDegrees);
     }
     ImGui::EndTooltip();
@@ -126,10 +129,14 @@ void HarmonicBalanceTab::Draw(PlotExporter &exporter) {
         return;
     }
     const std::size_t harmonic_count = result->Frequencies.empty() ? 0 : result->Frequencies.size() - 1;
-    ImGui::TextDisabled("%s", std::format("Fundamental {}Hz, {} harmonics, {} samples ({}, {} iterations)",
-                                          Core::FormatValue(result->FundamentalFrequency), harmonic_count,
-                                          result->Times.size(), result->Strategy, result->Iterations)
-                                  .c_str());
+    ImGui::TextDisabled("%s",
+                        std::format("Fundamental {}Hz, {} harmonics, {} samples ({}, {} iterations)",
+                                    Core::FormatValue(result->FundamentalFrequency),
+                                    harmonic_count,
+                                    result->Times.size(),
+                                    result->Strategy,
+                                    result->Iterations)
+                            .c_str());
     for (const std::string &warning : result->Warnings) {
         ImGui::TextColored(GetWarningTextColor(), "%s", warning.c_str());
     }
@@ -179,7 +186,8 @@ ExportFigure HarmonicBalanceTab::BuildFigure() const {
     return BuildHarmonicBalanceFigure(*result, m_Schematic, m_Cycles, view);
 }
 
-void HarmonicBalanceTab::DrawControls(const Core::HarmonicBalance &result, const bool has_measured,
+void HarmonicBalanceTab::DrawControls(const Core::HarmonicBalance &result,
+                                      const bool has_measured,
                                       PlotExporter &exporter) {
     ImGui::TextUnformatted("Amplitudes:");
     ImGui::SameLine();
@@ -222,14 +230,17 @@ void HarmonicBalanceTab::DrawControls(const Core::HarmonicBalance &result, const
     ImGui::BeginDisabled(!has_measured);
     if (ImGui::Button("Export CSV...")) {
         exporter.StartText(BuildHarmonicBalanceCsv(result, m_Schematic, m_Preferences.HarmonicAmplitudes),
-                           m_Schematic.GetFilePath(), "harmonic-balance");
+                           m_Schematic.GetFilePath(),
+                           "harmonic-balance");
     }
     ImGui::EndDisabled();
     ImGui::SetItemTooltip("Save DC, THD, harmonic spectra and one-cycle waveforms as a CSV table");
 }
 
-void HarmonicBalanceTab::DrawSpectrumPlot(const Core::HarmonicBalance &result, const bool has_voltages,
-                                          const bool has_currents, const float height) {
+void HarmonicBalanceTab::DrawSpectrumPlot(const Core::HarmonicBalance &result,
+                                          const bool has_voltages,
+                                          const bool has_currents,
+                                          const float height) {
     if (result.Frequencies.empty()) {
         return;
     }
@@ -247,14 +258,17 @@ void HarmonicBalanceTab::DrawSpectrumPlot(const Core::HarmonicBalance &result, c
     if (!BeginTracePlot("##hb_spectrum", ImVec2(-1.0f, height))) {
         return;
     }
-    ImPlot::SetupAxes("Frequency", GetVoltageSpectrumAxisLabel(m_Preferences.HarmonicAmplitudes, m_Scale),
-                      ImPlotAxisFlags_None, VoltageAxisFlags(has_voltages, has_currents));
+    ImPlot::SetupAxes("Frequency",
+                      GetVoltageSpectrumAxisLabel(m_Preferences.HarmonicAmplitudes, m_Scale),
+                      ImPlotAxisFlags_None,
+                      VoltageAxisFlags(has_voltages, has_currents));
     ImPlot::SetupAxisFormat(ImAxis_X1, FormatAxisValue, const_cast<char *>("Hz"));
     if (m_Scale == HarmonicScale::LINEAR) {
         ImPlot::SetupAxisFormat(ImAxis_Y1, FormatAxisValue, const_cast<char *>("V"));
     }
     if (has_currents) {
-        ImPlot::SetupAxis(ImAxis_Y2, GetCurrentSpectrumAxisLabel(m_Preferences.HarmonicAmplitudes, m_Scale),
+        ImPlot::SetupAxis(ImAxis_Y2,
+                          GetCurrentSpectrumAxisLabel(m_Preferences.HarmonicAmplitudes, m_Scale),
                           ImPlotAxisFlags_AuxDefault);
         if (m_Scale == HarmonicScale::LINEAR) {
             ImPlot::SetupAxisFormat(ImAxis_Y2, FormatAxisValue, const_cast<char *>("A"));
@@ -274,7 +288,11 @@ void HarmonicBalanceTab::DrawSpectrumPlot(const Core::HarmonicBalance &result, c
             continue;
         }
         const std::string label = GetVoltageLabel(m_Schematic.GetConnectivity(), static_cast<int>(node));
-        ImPlot::PlotStems(label.c_str(), result.Frequencies.data(), values.data(), stem_count, stem_ref,
+        ImPlot::PlotStems(label.c_str(),
+                          result.Frequencies.data(),
+                          values.data(),
+                          stem_count,
+                          stem_ref,
                           BuildStemSpec(GetNodeColor(static_cast<int>(node)), ImPlotMarker_Circle));
     }
     if (has_currents) {
@@ -290,7 +308,11 @@ void HarmonicBalanceTab::DrawSpectrumPlot(const Core::HarmonicBalance &result, c
                 continue;
             }
             const std::string label = std::format("I({})", result.CurrentPhasors[index].Name);
-            ImPlot::PlotStems(label.c_str(), result.Frequencies.data(), values.data(), stem_count, stem_ref,
+            ImPlot::PlotStems(label.c_str(),
+                              result.Frequencies.data(),
+                              values.data(),
+                              stem_count,
+                              stem_ref,
                               BuildStemSpec(GetCurrentColor(index), ImPlotMarker_Square));
         }
         ImPlot::SetAxes(ImAxis_X1, ImAxis_Y1);
@@ -299,8 +321,10 @@ void HarmonicBalanceTab::DrawSpectrumPlot(const Core::HarmonicBalance &result, c
     ImPlot::EndPlot();
 }
 
-void HarmonicBalanceTab::DrawWaveformPlot(const Core::HarmonicBalance &result, const bool has_voltages,
-                                          const bool has_currents, const float height) {
+void HarmonicBalanceTab::DrawWaveformPlot(const Core::HarmonicBalance &result,
+                                          const bool has_voltages,
+                                          const bool has_currents,
+                                          const float height) {
     const HarmonicWaveformSet waveforms = BuildHarmonicWaveforms(result, m_Schematic, m_Cycles);
     if (waveforms.Times.empty()) {
         return;

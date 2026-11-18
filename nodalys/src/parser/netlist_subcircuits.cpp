@@ -63,8 +63,10 @@ std::optional<InstanceLine> SplitInstanceLine(const std::vector<std::string> &to
  *          be placed. The builder may hold part of the elements after a failure and must be discarded.
  */
 std::expected<std::vector<std::string>, std::string>
-AddNetlistInstance(CircuitBuilder &builder, const std::vector<std::string> &definition_lines,
-                   const std::string_view line, const std::function<NodeId(std::string_view)> &resolve_node,
+AddNetlistInstance(CircuitBuilder &builder,
+                   const std::vector<std::string> &definition_lines,
+                   const std::string_view line,
+                   const std::function<NodeId(std::string_view)> &resolve_node,
                    const InstanceObservers &observers) {
     const std::vector<std::string> tokens = SplitTokens(line);
     const std::optional<InstanceLine> instance = SplitInstanceLine(tokens);

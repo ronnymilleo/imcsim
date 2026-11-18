@@ -37,7 +37,8 @@ std::string BistableNetlist(const std::string_view extra, const std::string_view
                        "Q2 3 5 0 QN\n"
                        ".model QN NPN(IS=1e-15 BF=100)\n"
                        "{}.end\n",
-                       supply, extra);
+                       supply,
+                       extra);
 }
 
 /// The bistable with a small tone on its supply, so the harmonic balance has a bias to start from and a swing around
@@ -150,7 +151,8 @@ TEST_CASE("A DC sweep starts from the nodeset at its first point and continues f
 TEST_CASE("A transient that starts from initial conditions has no operating point to guess", "[nodalys][nodeset]") {
     const auto parsed = Parse("* uic\nV1 1 0 5\nR1 1 2 1k\nC1 2 0 1u IC=0\n.nodeset v(2)=4\n.tran 10u 5m uic\n.end\n");
     const auto tran = Nodalys::ComputeTransient(parsed.CircuitInstance,
-                                                std::get<Nodalys::TransientConfig>(parsed.Analyses[0].Config), true);
+                                                std::get<Nodalys::TransientConfig>(parsed.Analyses[0].Config),
+                                                true);
     REQUIRE(tran.has_value());
     // The capacitor starts from its own 0 V, not from the 4 V of the guess
     CHECK_THAT(tran->NodeVoltages[2].front(), WithinAbs(0.0, 0.05));

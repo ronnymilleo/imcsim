@@ -31,8 +31,8 @@ Nodalys::Expression Parse(const std::string_view text) {
     return *expression;
 }
 
-Nodalys::ExpressionResult Evaluate(const std::string_view text, const std::vector<double> &inputs = {},
-                                   const double time_seconds = 0.0) {
+Nodalys::ExpressionResult
+Evaluate(const std::string_view text, const std::vector<double> &inputs = {}, const double time_seconds = 0.0) {
     const auto result = Parse(text).Evaluate(inputs, time_seconds);
     INFO("expression: " << text);
     REQUIRE(result.has_value());

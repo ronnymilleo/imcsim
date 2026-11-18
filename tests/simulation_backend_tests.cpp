@@ -50,7 +50,8 @@ public:
         return {point, {}};
     }
 
-    Core::TransientRun RunTransient(const Core::Circuit &circuit, const Core::TransientSettings &settings,
+    Core::TransientRun RunTransient(const Core::Circuit &circuit,
+                                    const Core::TransientSettings &settings,
                                     const std::optional<double> &temperature_celsius,
                                     const Core::RunMonitor &) override {
         LastTransientSettings = settings;
@@ -58,13 +59,13 @@ public:
         return {Core::Transient{.Times = {0.0}, .NodeVoltages = {}, .Currents = {}, .Warnings = {}}, {}};
     }
 
-    Core::ACSweepRun RunACSweep(const Core::Circuit &, const Core::ACSweepSettings &,
-                                const std::optional<double> &) override {
+    Core::ACSweepRun
+    RunACSweep(const Core::Circuit &, const Core::ACSweepSettings &, const std::optional<double> &) override {
         return {std::unexpected("not run by the fake"), {}};
     }
 
-    Core::DCSweepRun RunDCSweep(const Core::Circuit &, const Core::DCSweepSettings &,
-                                const std::optional<double> &) override {
+    Core::DCSweepRun
+    RunDCSweep(const Core::Circuit &, const Core::DCSweepSettings &, const std::optional<double> &) override {
         return {std::unexpected("not run by the fake"), {}};
     }
 
@@ -131,10 +132,13 @@ private:
 };
 
 Core::BackendCapabilities AllAnalysesWithoutLogicParts() {
-    Core::BackendCapabilities capabilities{
-        .Analyses = {Core::AnalysisKind::OPERATING_POINT, Core::AnalysisKind::TRANSIENT, Core::AnalysisKind::AC_SWEEP,
-                     Core::AnalysisKind::DC_SWEEP, Core::AnalysisKind::NOISE, Core::AnalysisKind::TRANSFER_FUNCTION},
-        .UnsupportedParts = {}};
+    Core::BackendCapabilities capabilities{.Analyses = {Core::AnalysisKind::OPERATING_POINT,
+                                                        Core::AnalysisKind::TRANSIENT,
+                                                        Core::AnalysisKind::AC_SWEEP,
+                                                        Core::AnalysisKind::DC_SWEEP,
+                                                        Core::AnalysisKind::NOISE,
+                                                        Core::AnalysisKind::TRANSFER_FUNCTION},
+                                           .UnsupportedParts = {}};
     capabilities.UnsupportedParts[Core::ComponentType::AND] = NO_LOGIC_REASON;
     return capabilities;
 }
@@ -169,7 +173,8 @@ TEST_CASE("A backend that lacks an analysis or a part says why a circuit cannot 
     digital.Add(gate, {1, 2, 3});
     CHECK(Core::FindUnsupported(Core::GetBackend(), digital, Core::AnalysisKind::TRANSIENT) == NO_LOGIC_REASON);
     // The same parts, listed by type, as the editor asks before it has a circuit
-    CHECK(Core::FindUnsupported(Core::GetBackend(), {Core::ComponentType::RESISTOR, Core::ComponentType::AND},
+    CHECK(Core::FindUnsupported(Core::GetBackend(),
+                                {Core::ComponentType::RESISTOR, Core::ComponentType::AND},
                                 Core::AnalysisKind::TRANSIENT) == NO_LOGIC_REASON);
 
     Core::BackendCapabilities only_operating_points{.Analyses = {Core::AnalysisKind::OPERATING_POINT},

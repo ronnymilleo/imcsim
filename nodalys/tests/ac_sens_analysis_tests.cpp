@@ -74,8 +74,11 @@ Complex ReadResponse(const Nodalys::Circuit &circuit, const int node, const doub
  * @details An element the maker does not know by name, such as the parts inside an op-amp, is left out; the count of
  *          the ones checked must be at least the minimum, so a renamed element cannot make the test pass for nothing.
  */
-void CheckAgainstFiniteDifferences(const CircuitMaker &make, const Values &values, const int output,
-                                   const std::string &source, const double frequency,
+void CheckAgainstFiniteDifferences(const CircuitMaker &make,
+                                   const Values &values,
+                                   const int output,
+                                   const std::string &source,
+                                   const double frequency,
                                    const std::size_t minimum_checked) {
     constexpr double RELATIVE_STEP = 1e-4;
     constexpr double PERCENT = 0.01;
@@ -209,8 +212,14 @@ TEST_CASE("AC sensitivity of a biased transistor stage follows the operating poi
         builder.AddBjt("q1", 3, 2, 4, true, model);
         return Finish(builder);
     };
-    const Values values{{"vcc", 12.0},  {"cin", 1e-6}, {"rb1", 47e3}, {"rb2", 10e3},
-                        {"rc", 2200.0}, {"re", 470.0}, {"ce", 10e-6}, {"cl", 2e-9}};
+    const Values values{{"vcc", 12.0},
+                        {"cin", 1e-6},
+                        {"rb1", 47e3},
+                        {"rb2", 10e3},
+                        {"rc", 2200.0},
+                        {"re", 470.0},
+                        {"ce", 10e-6},
+                        {"cl", 2e-9}};
 
     for (const double frequency : {1e3, 1e5, 3e6}) {
         INFO(std::format("frequency {}", frequency));
@@ -245,8 +254,17 @@ TEST_CASE("AC sensitivity of an ideal op-amp stage with controlled sources follo
         builder.AddResistor("rs8", 8, 11, 2000.0);
         return Finish(builder);
     };
-    const Values values{{"vcc", 15.0}, {"rf", 10e3}, {"rg", 1e3},   {"e1", 0.5},  {"g1", 1e-3}, {"r7", 5e3},
-                        {"c7", 1e-9},  {"f1", 2.0},  {"h1", 500.0}, {"ch", 1e-9}, {"lh", 1e-3}};
+    const Values values{{"vcc", 15.0},
+                        {"rf", 10e3},
+                        {"rg", 1e3},
+                        {"e1", 0.5},
+                        {"g1", 1e-3},
+                        {"r7", 5e3},
+                        {"c7", 1e-9},
+                        {"f1", 2.0},
+                        {"h1", 500.0},
+                        {"ch", 1e-9},
+                        {"lh", 1e-3}};
 
     for (const double frequency : {1e3, 3e4, 2e5}) {
         INFO(std::format("frequency {}", frequency));

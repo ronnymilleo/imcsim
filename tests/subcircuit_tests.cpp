@@ -33,8 +33,8 @@
 
 namespace {
 
-std::shared_ptr<Core::SubcircuitDefinition> MakeDivider(std::string name, Core::Resistor &upper,
-                                                        Core::Resistor &lower) {
+std::shared_ptr<Core::SubcircuitDefinition>
+MakeDivider(std::string name, Core::Resistor &upper, Core::Resistor &lower) {
     upper.SetName("R1");
     upper.SetValueExpression("{RTOP}");
     lower.SetName("R2");
@@ -58,7 +58,9 @@ Core::SubcircuitInstance MakeInstance(const std::string &name, const std::string
 /**
  * @brief   A pin marker; unturned, its arrow points right, which puts the pin on the left of the block.
  */
-void AddMarker(GUI::Schematic &schematic, const GUI::GridPoint point, const std::string &name,
+void AddMarker(GUI::Schematic &schematic,
+               const GUI::GridPoint point,
+               const std::string &name,
                const GUI::Rotation rotation = GUI::Rotation::R0) {
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::PIN, point, rotation));
     static_cast<Core::NetLabel &>(schematic.GetElements().back()->GetComponent()).SetNet(name);
@@ -255,7 +257,9 @@ TEST_CASE("Subcircuit definitions and instances round-trip through an imcsim fil
     CHECK(copy.GetParameters().at("RTOP") == 3e3);
 
     GUI::Schematic schematic;
-    schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings),
+    schematic.Replace(std::move(loaded->Elements),
+                      std::move(loaded->Wires),
+                      std::move(loaded->Settings),
                       std::move(loaded->Subcircuits));
     const std::string netlist = schematic.BuildSpiceNetlist();
     INFO(netlist);
@@ -406,7 +410,8 @@ TEST_CASE("Editing a definition propagates pins, parameters and contents to ever
     schematic.AddWire({2, 0}, {6, 0});
     schematic.AddWire({-6, 0}, {-2, 0});
     schematic.SetSelection({0, 3, 4}, {});
-    auto created = schematic.CreateSubcircuitFromSelection("block", {{"IN", {-2, 0}}, {"OUT", {2, 0}}},
+    auto created = schematic.CreateSubcircuitFromSelection("block",
+                                                           {{"IN", {-2, 0}}, {"OUT", {2, 0}}},
                                                            {{"R", 1e3}, {"DROP", 2.0}});
     REQUIRE(created);
     auto &first_instance = static_cast<Core::SubcircuitInstance &>(schematic.GetElement(2).GetComponent());

@@ -66,7 +66,8 @@ std::vector<SweepSource> ListSweepSources(const Core::Circuit &circuit) {
  * @return  The stored name when the circuit still offers it, else the preferred source or the last one if there are
  *          fewer. The stored name is kept in the settings, so the choice comes back with its source.
  */
-const std::string &ResolveSweepSource(const Core::SweepRange &range, const std::vector<SweepSource> &sources,
+const std::string &ResolveSweepSource(const Core::SweepRange &range,
+                                      const std::vector<SweepSource> &sources,
                                       const std::size_t preferred_index) {
     if (std::ranges::contains(sources, range.Source, &SweepSource::Name)) {
         return range.Source;
@@ -94,8 +95,8 @@ std::string ResolveOptionalInput(const std::string &stored, const std::vector<st
  *          most likely the output the user looks at; else the last node that none holds. No value when the circuit
  *          has no node besides ground.
  */
-std::optional<int> ResolveOutputNode(const std::optional<GridPoint> &point, const Core::Circuit &circuit,
-                                     Schematic &schematic) {
+std::optional<int>
+ResolveOutputNode(const std::optional<GridPoint> &point, const Core::Circuit &circuit, Schematic &schematic) {
     if (point) {
         if (const std::optional<int> node = schematic.GetConnectivity().GetNode(*point); node && *node > 0) {
             return node;

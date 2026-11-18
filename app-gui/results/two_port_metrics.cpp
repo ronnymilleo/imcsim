@@ -29,8 +29,10 @@ bool IsFinite(const std::complex<double> value) {
  *          infinite when the numerator is positive, and with no numerator either, the side sits on the edge of the
  *          chart: that reads as 0, the least stable value.
  */
-double ComputeMu(const std::complex<double> near_side, const std::complex<double> far_side,
-                 const std::complex<double> delta, const double product) {
+double ComputeMu(const std::complex<double> near_side,
+                 const std::complex<double> far_side,
+                 const std::complex<double> delta,
+                 const double product) {
     const double numerator = 1.0 - std::norm(near_side);
     const double denominator = std::abs(far_side - delta * std::conj(near_side)) + product;
     if (denominator > 0.0) {

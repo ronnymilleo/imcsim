@@ -153,10 +153,14 @@ TEST_CASE("Seeded transient noise and random sources repeat identically and hold
     Nodalys::CircuitBuilder builder;
     const Nodalys::NodeId n1 = builder.AddNode();
     const Nodalys::NodeId n2 = builder.AddNode();
-    builder.AddVnoise("V1", n1, Nodalys::GROUND_NODE,
+    builder.AddVnoise("V1",
+                      n1,
+                      Nodalys::GROUND_NODE,
                       {.Offset = 2.0, .WhiteAmplitude = 0.4, .TimeStep = 1e-5, .FlickerAmplitude = 0.1});
     builder.AddIrandom(
-        "I1", Nodalys::GROUND_NODE, n2,
+        "I1",
+        Nodalys::GROUND_NODE,
+        n2,
         {.Distribution = Nodalys::RandomDistribution::UNIFORM, .TimeStep = 1e-5, .First = 1e-3, .Second = 2e-3});
     builder.AddResistor("R1", n1, n2, 1e3);
     builder.AddResistor("R2", n2, Nodalys::GROUND_NODE, 1e3);

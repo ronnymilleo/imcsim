@@ -53,8 +53,8 @@ double GetOutputLogicLevel(const Core::TruthTable &table, const int node, const 
  * @param[in] logic_nodes  Nodes the logic parts connect to, with their levels.
  * @return  One state per output node; all unknown for a row without an operating point.
  */
-std::vector<LogicState> ReadTruthTableOutputs(const Core::TruthTable &table, const std::size_t row,
-                                              const std::vector<LogicNode> &logic_nodes) {
+std::vector<LogicState>
+ReadTruthTableOutputs(const Core::TruthTable &table, const std::size_t row, const std::vector<LogicNode> &logic_nodes) {
     const Core::TruthTableRow &entry = table.Rows[row];
     std::vector<LogicState> states;
     states.reserve(table.OutputNodes.size());
@@ -76,7 +76,8 @@ std::vector<LogicState> ReadTruthTableOutputs(const Core::TruthTable &table, con
  * @param[in] logic_nodes    Nodes the logic parts connect to, with their levels.
  * @return  A header with the input names and the output labels, then one line per row with 0, 1 or X.
  */
-std::string FormatTruthTableMarkdown(const Core::TruthTable &table, const std::vector<std::string> &output_labels,
+std::string FormatTruthTableMarkdown(const Core::TruthTable &table,
+                                     const std::vector<std::string> &output_labels,
                                      const std::vector<LogicNode> &logic_nodes) {
     std::vector<std::string> columns = table.InputNames;
     columns.insert(columns.end(), output_labels.begin(), output_labels.end());

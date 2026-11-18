@@ -26,8 +26,10 @@ template <> struct Catch::StringMaker<GUI::UIWire> {
 
 template <> struct Catch::StringMaker<Core::LiveChange> {
     static std::string convert(const Core::LiveChange &change) {
-        return std::format("{} {} = {}", change.Element,
-                           change.Quantity == Core::LiveQuantity::RESISTANCE ? "resistance" : "dc", change.Value);
+        return std::format("{} {} = {}",
+                           change.Element,
+                           change.Quantity == Core::LiveQuantity::RESISTANCE ? "resistance" : "dc",
+                           change.Value);
     }
 };
 

@@ -85,8 +85,9 @@ const std::vector<Core::LibraryModel> &Schematic::GetLibraryModels() const {
  * @return  True when an element has a terminal there.
  */
 bool Schematic::IsTerminal(const GridPoint point) const {
-    return std::ranges::any_of(
-        m_Elements, [point](const auto &element) { return std::ranges::contains(element->GetTerminals(), point); });
+    return std::ranges::any_of(m_Elements, [point](const auto &element) {
+        return std::ranges::contains(element->GetTerminals(), point);
+    });
 }
 
 /**
@@ -244,8 +245,10 @@ void Schematic::Clear() {
  * @param[in] models       New library models.
  * @note    The schematic becomes unmodified and the undo history starts over; the file path is kept.
  */
-void Schematic::Replace(std::vector<std::unique_ptr<UIElement>> elements, std::vector<UIWire> wires,
-                        SimulationSettings settings, std::vector<SavedSubcircuit> subcircuits,
+void Schematic::Replace(std::vector<std::unique_ptr<UIElement>> elements,
+                        std::vector<UIWire> wires,
+                        SimulationSettings settings,
+                        std::vector<SavedSubcircuit> subcircuits,
                         std::vector<Core::LibraryModel> models) {
     ClearSelection();
     m_Elements = std::move(elements);
@@ -325,7 +328,8 @@ bool Schematic::SetPinMarkerSide(const GridPoint point, const Core::PinSide side
  * step.
  */
 std::expected<void, std::string>
-Schematic::CreateSubcircuitFromSelection(std::string name, std::vector<SavedSubcircuitPin> pins,
+Schematic::CreateSubcircuitFromSelection(std::string name,
+                                         std::vector<SavedSubcircuitPin> pins,
                                          std::vector<Core::SubcircuitParameter> parameters) {
     if (!Core::SubcircuitInstance::IsValidIdentifier(name)) {
         return std::unexpected("The subcircuit name must be an identifier");
@@ -398,7 +402,10 @@ std::expected<std::unique_ptr<Schematic>, std::string> Schematic::OpenSubcircuit
     auto content = std::make_unique<Schematic>();
     // The parts inside can use the blocks and library models of the document, as its own parts can; the block itself
     // is left out, so it cannot be placed inside itself
-    content->Replace(std::move(definition.Elements), std::move(definition.Wires), {}, std::move(definitions),
+    content->Replace(std::move(definition.Elements),
+                     std::move(definition.Wires),
+                     {},
+                     std::move(definitions),
                      m_LibraryModels);
     for (const SavedSubcircuitPin &pin : definition.Pins) {
         const bool has_marker = std::ranges::any_of(content->GetElements(), [&](const auto &element) {
@@ -426,7 +433,8 @@ std::expected<std::unique_ptr<Schematic>, std::string> Schematic::OpenSubcircuit
  *          are dropped, in the schematic and inside the other blocks alike. A block that would contain itself,
  *          directly or through another block, is refused. Call CommitUndoStep() after it, so it undoes in one step.
  */
-std::expected<void, std::string> Schematic::UpdateSubcircuit(const std::string &name, const Schematic &content,
+std::expected<void, std::string> Schematic::UpdateSubcircuit(const std::string &name,
+                                                             const Schematic &content,
                                                              const std::vector<SavedSubcircuitPin> &pins,
                                                              const std::vector<Core::SubcircuitParameter> &parameters) {
     const auto found = std::ranges::find(m_Subcircuits, name, &SavedSubcircuit::Name);
@@ -478,7 +486,8 @@ std::expected<void, std::string> Schematic::UpdateSubcircuit(const std::string &
  *          CommitUndoStep() after it, so it undoes in one step.
  */
 std::expected<void, std::string>
-Schematic::UpdateSpiceSubcircuit(const std::string &name, const std::vector<SavedSubcircuitPin> &pins,
+Schematic::UpdateSpiceSubcircuit(const std::string &name,
+                                 const std::vector<SavedSubcircuitPin> &pins,
                                  const std::vector<Core::SubcircuitParameter> &parameters) {
     const auto found = std::ranges::find(m_Subcircuits, name, &SavedSubcircuit::Name);
     if (found == m_Subcircuits.end()) {
@@ -557,15 +566,15 @@ std::vector<std::string> Schematic::MergeSubcircuits(std::vector<SavedSubcircuit
 std::vector<std::string> Schematic::MergeLibraryModels(std::vector<Core::LibraryModel> models,
                                                        std::vector<std::unique_ptr<UIElement>> &elements,
                                                        std::vector<SavedSubcircuit> &definitions) {
-    const auto rename_users = [](std::vector<std::unique_ptr<UIElement>> &users, const std::string &old_name,
-                                 const std::string &new_name) {
-        for (auto &user : users) {
-            Core::Component &component = user->GetComponent();
-            if (component.GetLibraryModel() == old_name) {
-                component.SetLibraryModel(new_name);
+    const auto rename_users =
+        [](std::vector<std::unique_ptr<UIElement>> &users, const std::string &old_name, const std::string &new_name) {
+            for (auto &user : users) {
+                Core::Component &component = user->GetComponent();
+                if (component.GetLibraryModel() == old_name) {
+                    component.SetLibraryModel(new_name);
+                }
             }
-        }
-    };
+        };
     std::vector<std::string> names;
     for (Core::LibraryModel &model : models) {
         const auto existing = std::ranges::find(m_LibraryModels, model.Name, &Core::LibraryModel::Name);
@@ -1094,7 +1103,8 @@ void Schematic::InvalidateDerivedData() {
 /**
  * @brief   Brings every instance of a definition that changed up to date, in the schematic and inside every block.
  */
-void Schematic::RefreshInstances(const SavedSubcircuit &definition, const std::vector<std::string> &old_names,
+void Schematic::RefreshInstances(const SavedSubcircuit &definition,
+                                 const std::vector<std::string> &old_names,
                                  const std::vector<std::optional<std::size_t>> &matches) {
     RefreshInstancesIn(m_Elements, m_Wires, definition, old_names, matches);
     for (SavedSubcircuit &other : m_Subcircuits) {

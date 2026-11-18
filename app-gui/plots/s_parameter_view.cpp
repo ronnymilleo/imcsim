@@ -144,8 +144,8 @@ ExportColor GetEntryColor(const std::size_t index) {
  * @return  The value in decibels and degrees; for a reflection also the impedance, the standing wave ratio and the
  *          return loss.
  */
-SParameterReading ReadEntry(const Core::SParameters &result, const std::size_t frequency,
-                            const SParameterEntry &entry) {
+SParameterReading
+ReadEntry(const Core::SParameters &result, const std::size_t frequency, const SParameterEntry &entry) {
     SParameterReading reading;
     reading.Entry = entry;
     reading.FrequencyHertz = result.Frequencies[frequency];
@@ -169,8 +169,12 @@ SParameterReading ReadEntry(const Core::SParameters &result, const std::size_t f
  */
 std::string FormatImpedance(const std::complex<double> impedance) {
     const double reactance = impedance.imag();
-    return std::format("{:.{}g} {} j{:.{}g}", impedance.real(), READING_DIGITS, reactance < 0.0 ? "-" : "+",
-                       std::abs(reactance), READING_DIGITS);
+    return std::format("{:.{}g} {} j{:.{}g}",
+                       impedance.real(),
+                       READING_DIGITS,
+                       reactance < 0.0 ? "-" : "+",
+                       std::abs(reactance),
+                       READING_DIGITS);
 }
 
 /**
@@ -182,8 +186,11 @@ std::string FormatImpedance(const std::complex<double> impedance) {
 std::vector<std::string> DescribeReading(const SParameterReading &reading) {
     std::vector<std::string> lines;
     lines.push_back(std::format("{} at {}Hz", GetEntryName(reading.Entry), Core::FormatValue(reading.FrequencyHertz)));
-    lines.push_back(std::format("{:.{}g} dB at {:.{}g} deg", reading.MagnitudeDecibels, READING_DIGITS,
-                                reading.AngleDegrees, READING_DIGITS));
+    lines.push_back(std::format("{:.{}g} dB at {:.{}g} deg",
+                                reading.MagnitudeDecibels,
+                                READING_DIGITS,
+                                reading.AngleDegrees,
+                                READING_DIGITS));
     if (!reading.IsReflection) {
         return lines;
     }
@@ -290,7 +297,8 @@ std::vector<std::complex<double>> ListValues(const Core::SParameters &result, co
  * @param[in] view     Frequencies the plots show, or none for the whole sweep.
  * @return  A magnitude panel in decibels over a phase panel in degrees, on a logarithmic frequency axis.
  */
-ExportFigure BuildMagnitudePhaseFigure(const Core::SParameters &result, const std::vector<SParameterEntry> &entries,
+ExportFigure BuildMagnitudePhaseFigure(const Core::SParameters &result,
+                                       const std::vector<SParameterEntry> &entries,
                                        const std::optional<ExportRange> &view) {
     ExportFigure figure;
     figure.XAxis = {.Name = "Frequency", .Unit = "Hz"};

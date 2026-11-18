@@ -88,8 +88,8 @@ std::string EscapeCsvField(const std::string_view text) {
  * @param[in] unit    Display convention: Peak leaves harmonics unscaled; RMS divides AC harmonics by sqrt(2).
  * @return  Scalar non-negative magnitude.
  */
-double ScaleHarmonicMagnitude(const std::complex<double> phasor, const std::size_t order,
-                              const HarmonicAmplitudeUnit unit) {
+double
+ScaleHarmonicMagnitude(const std::complex<double> phasor, const std::size_t order, const HarmonicAmplitudeUnit unit) {
     const double magnitude = std::abs(phasor);
     if (order == 0 || unit == HarmonicAmplitudeUnit::PEAK) {
         return magnitude;
@@ -129,7 +129,8 @@ double ToHarmonicDbc(const std::complex<double> phasor, const double fundamental
  * @return  One scalar value per harmonic bin.
  */
 std::vector<double> ListSpectrumValues(const std::span<const std::complex<double>> phasors,
-                                       const HarmonicAmplitudeUnit unit, const HarmonicScale scale) {
+                                       const HarmonicAmplitudeUnit unit,
+                                       const HarmonicScale scale) {
     std::vector<double> values;
     values.reserve(phasors.size());
     const double fundamental = phasors.size() > 1 ? std::abs(phasors[1]) : 0.0;
@@ -159,8 +160,8 @@ std::vector<double> ListSpectrumValues(const std::span<const std::complex<double
  * @param[in] cycles                 Number of periods to show (clamped to 1..MAX_HARMONIC_WAVEFORM_CYCLES).
  * @return  Monotonic time vector ending at cycles / fundamental_frequency.
  */
-std::vector<double> TilePeriodicTimes(const std::span<const double> times, const double fundamental_frequency,
-                                      const int cycles) {
+std::vector<double>
+TilePeriodicTimes(const std::span<const double> times, const double fundamental_frequency, const int cycles) {
     if (times.empty() || !std::isfinite(fundamental_frequency) || fundamental_frequency <= 0.0) {
         return {};
     }
@@ -205,8 +206,8 @@ std::vector<double> TilePeriodicValues(const std::span<const double> values, con
  * @param[in] cycles     Number of fundamental periods to show (clamped to 1..MAX_HARMONIC_WAVEFORM_CYCLES).
  * @return  Tiled times and all complete measured traces, voltages first then currents.
  */
-HarmonicWaveformSet BuildHarmonicWaveforms(const Core::HarmonicBalance &result, Schematic &schematic,
-                                           const int cycles) {
+HarmonicWaveformSet
+BuildHarmonicWaveforms(const Core::HarmonicBalance &result, Schematic &schematic, const int cycles) {
     HarmonicWaveformSet waveforms;
     waveforms.Times = TilePeriodicTimes(result.Times, result.FundamentalFrequency, cycles);
     if (waveforms.Times.empty()) {
@@ -253,7 +254,9 @@ HarmonicWaveformSet BuildHarmonicWaveforms(const Core::HarmonicBalance &result, 
  * @param[in] unit_kind    Peak or RMS display convention.
  * @return  Summary metrics and per-harmonic table rows.
  */
-HarmonicTraceSummary BuildHarmonicTraceSummary(std::string label, std::string unit, const bool is_current,
+HarmonicTraceSummary BuildHarmonicTraceSummary(std::string label,
+                                               std::string unit,
+                                               const bool is_current,
                                                const std::span<const std::complex<double>> phasors,
                                                const std::span<const double> frequencies,
                                                const HarmonicAmplitudeUnit unit_kind) {
@@ -285,7 +288,8 @@ HarmonicTraceSummary BuildHarmonicTraceSummary(std::string label, std::string un
  * @param[in] unit_kind  Peak or RMS display convention.
  * @return  One summary per measured voltage (first) and measured current.
  */
-std::vector<HarmonicTraceSummary> BuildHarmonicSummaries(const Core::HarmonicBalance &result, Schematic &schematic,
+std::vector<HarmonicTraceSummary> BuildHarmonicSummaries(const Core::HarmonicBalance &result,
+                                                         Schematic &schematic,
                                                          const HarmonicAmplitudeUnit unit_kind) {
     std::vector<HarmonicTraceSummary> summaries;
     for (std::size_t node = 1; node < result.NodePhasors.size(); ++node) {
@@ -293,15 +297,23 @@ std::vector<HarmonicTraceSummary> BuildHarmonicSummaries(const Core::HarmonicBal
             continue;
         }
         summaries.push_back(
-            BuildHarmonicTraceSummary(GetVoltageLabel(schematic.GetConnectivity(), static_cast<int>(node)), "V", false,
-                                      result.NodePhasors[node], result.Frequencies, unit_kind));
+            BuildHarmonicTraceSummary(GetVoltageLabel(schematic.GetConnectivity(), static_cast<int>(node)),
+                                      "V",
+                                      false,
+                                      result.NodePhasors[node],
+                                      result.Frequencies,
+                                      unit_kind));
     }
     for (const Core::ComponentPhasors &current : result.CurrentPhasors) {
         if (!schematic.IsCurrentMeasured(current.Name)) {
             continue;
         }
-        summaries.push_back(BuildHarmonicTraceSummary(std::format("I({})", current.Name), "A", true, current.Phasors,
-                                                      result.Frequencies, unit_kind));
+        summaries.push_back(BuildHarmonicTraceSummary(std::format("I({})", current.Name),
+                                                      "A",
+                                                      true,
+                                                      current.Phasors,
+                                                      result.Frequencies,
+                                                      unit_kind));
     }
     return summaries;
 }
@@ -313,26 +325,39 @@ std::vector<HarmonicTraceSummary> BuildHarmonicSummaries(const Core::HarmonicBal
  * @param[in] unit_kind  Peak or RMS display convention.
  * @return  CSV text ready to write to a file.
  */
-std::string BuildHarmonicBalanceCsv(const Core::HarmonicBalance &result, Schematic &schematic,
+std::string BuildHarmonicBalanceCsv(const Core::HarmonicBalance &result,
+                                    Schematic &schematic,
                                     const HarmonicAmplitudeUnit unit_kind) {
     const std::vector<HarmonicTraceSummary> summaries = BuildHarmonicSummaries(result, schematic, unit_kind);
     const char *amp_name = GetHarmonicAmplitudeUnitName(unit_kind);
     std::ostringstream out;
     out << std::format("# Fundamental Frequency (Hz),{:.9g},Harmonics,{},Samples,{},Strategy,{},Iterations,{}\n",
-                       result.FundamentalFrequency, result.Frequencies.empty() ? 0 : result.Frequencies.size() - 1,
-                       result.Times.size(), EscapeCsvField(result.Strategy), result.Iterations);
+                       result.FundamentalFrequency,
+                       result.Frequencies.empty() ? 0 : result.Frequencies.size() - 1,
+                       result.Times.size(),
+                       EscapeCsvField(result.Strategy),
+                       result.Iterations);
     out << "\nSignal,Unit,DC,THD (%)\n";
     for (const HarmonicTraceSummary &summary : summaries) {
-        out << std::format("{},{},{:.9g},{:.6g}\n", EscapeCsvField(summary.Label), summary.Unit, summary.DcValue,
+        out << std::format("{},{},{:.9g},{:.6g}\n",
+                           EscapeCsvField(summary.Label),
+                           summary.Unit,
+                           summary.DcValue,
                            summary.ThdPercent);
     }
     out << std::format("\nSignal,Unit,Order,Frequency (Hz),Magnitude ({}),Magnitude (dB),Magnitude (dBc),Phase (deg)\n",
                        amp_name);
     for (const HarmonicTraceSummary &summary : summaries) {
         for (const HarmonicTableRow &row : summary.Rows) {
-            out << std::format("{},{},{},{:.9g},{:.9g},{:.6g},{:.6g},{:.6g}\n", EscapeCsvField(summary.Label),
-                               summary.Unit, row.Order, row.FrequencyHertz, row.MagnitudeLinear, row.MagnitudeDecibels,
-                               row.MagnitudeDbc, row.PhaseDegrees);
+            out << std::format("{},{},{},{:.9g},{:.9g},{:.6g},{:.6g},{:.6g}\n",
+                               EscapeCsvField(summary.Label),
+                               summary.Unit,
+                               row.Order,
+                               row.FrequencyHertz,
+                               row.MagnitudeLinear,
+                               row.MagnitudeDecibels,
+                               row.MagnitudeDbc,
+                               row.PhaseDegrees);
         }
     }
 
@@ -379,7 +404,9 @@ std::string BuildHarmonicBalanceCsv(const Core::HarmonicBalance &result, Schemat
  * @param[in] view       Visible time range, or none for the full tiled window.
  * @return  ExportFigure holding measured voltage and current waveforms.
  */
-ExportFigure BuildHarmonicBalanceFigure(const Core::HarmonicBalance &result, Schematic &schematic, const int cycles,
+ExportFigure BuildHarmonicBalanceFigure(const Core::HarmonicBalance &result,
+                                        Schematic &schematic,
+                                        const int cycles,
                                         const std::optional<ExportRange> &view) {
     HarmonicWaveformSet waveforms = BuildHarmonicWaveforms(result, schematic, cycles);
     ExportFigure figure;

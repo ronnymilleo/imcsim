@@ -99,7 +99,8 @@ std::expected<OperatingPointResult, std::string> ComputeOperatingPoint(CompiledC
     return point;
 }
 
-std::expected<DcSweepResult, std::string> ComputeDCSweep(CompiledCircuit &compiled, const DcSweepConfig &settings,
+std::expected<DcSweepResult, std::string> ComputeDCSweep(CompiledCircuit &compiled,
+                                                         const DcSweepConfig &settings,
                                                          const ConvergenceOptions &options,
                                                          std::vector<DiagnosticMessage> *messages) {
     const auto swept = compiled.SourcesByName.find(settings.SweptSource);

@@ -71,7 +71,8 @@ void StopEditing(Schematic &schematic, EditorMode &mode) {
  * @param[in] definitions  The blocks of the document.
  * @return  The part, or null when the block being placed is no longer defined.
  */
-std::unique_ptr<UIElement> MakePlacementPreview(const PlacingMode &mode, const GridPoint position,
+std::unique_ptr<UIElement> MakePlacementPreview(const PlacingMode &mode,
+                                                const GridPoint position,
                                                 const Schematic &schematic,
                                                 const std::vector<SavedSubcircuit> &definitions) {
     auto preview = CreateElement(mode.Type, position, mode.Orientation);

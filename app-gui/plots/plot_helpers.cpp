@@ -115,8 +115,11 @@ std::size_t FindWidestSpread(const std::vector<const std::vector<double> *> &cur
  *          and dashing those whole segments would take all the memory. Segments with a coordinate that is not
  *          finite are skipped.
  */
-std::vector<LineSegment> SplitIntoDashes(const std::span<const ImVec2> points, const float dash_length,
-                                         const float gap_length, const ImVec2 clip_min, const ImVec2 clip_max) {
+std::vector<LineSegment> SplitIntoDashes(const std::span<const ImVec2> points,
+                                         const float dash_length,
+                                         const float gap_length,
+                                         const ImVec2 clip_min,
+                                         const ImVec2 clip_max) {
     std::vector<LineSegment> dashes;
     const double period = static_cast<double>(dash_length) + gap_length;
     // Distance already covered in the current dash-and-gap period

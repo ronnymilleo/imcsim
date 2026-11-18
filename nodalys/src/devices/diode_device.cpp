@@ -34,8 +34,10 @@ void DiodeDevice::ApplyTemperature(const ThermalConditions &thermal) {
         GetSaturationCurrentLogRatio(thermal, m_Given.EnergyGap, m_Given.SaturationCurrentExponent);
     m_Parameters.SaturationCurrent = m_Given.SaturationCurrent * std::exp(log_ratio / m_Given.EmissionCoefficient);
     m_Parameters.JunctionPotential = GetJunctionPotential(thermal, m_Given.JunctionPotential);
-    m_Parameters.JunctionCapacitance = GetJunctionCapacitance(thermal, m_Given.JunctionCapacitance,
-                                                              m_Given.JunctionPotential, m_Given.GradingCoefficient);
+    m_Parameters.JunctionCapacitance = GetJunctionCapacitance(thermal,
+                                                              m_Given.JunctionCapacitance,
+                                                              m_Given.JunctionPotential,
+                                                              m_Given.GradingCoefficient);
     m_Vt = m_Given.EmissionCoefficient * GetThermalVoltage(thermal);
     m_Critical = PnCriticalVoltage(std::max(m_Parameters.SaturationCurrent, 1e-30), m_Vt);
 }
@@ -55,15 +57,21 @@ DiodeDevice::Junction DiodeDevice::Evaluate(const double voltage) const {
 
 double DiodeDevice::Charge(const double voltage) const {
     const DiodeParameters &p = m_Parameters;
-    const DepletionCharge depletion = EvaluateDepletion(voltage, p.JunctionCapacitance, p.JunctionPotential,
-                                                        p.GradingCoefficient, JUNCTION_FORWARD_LIMIT);
+    const DepletionCharge depletion = EvaluateDepletion(voltage,
+                                                        p.JunctionCapacitance,
+                                                        p.JunctionPotential,
+                                                        p.GradingCoefficient,
+                                                        JUNCTION_FORWARD_LIMIT);
     return depletion.Charge + p.TransitTime * Evaluate(voltage).Current;
 }
 
 double DiodeDevice::Capacitance(const double voltage) const {
     const DiodeParameters &p = m_Parameters;
-    const DepletionCharge depletion = EvaluateDepletion(voltage, p.JunctionCapacitance, p.JunctionPotential,
-                                                        p.GradingCoefficient, JUNCTION_FORWARD_LIMIT);
+    const DepletionCharge depletion = EvaluateDepletion(voltage,
+                                                        p.JunctionCapacitance,
+                                                        p.JunctionPotential,
+                                                        p.GradingCoefficient,
+                                                        JUNCTION_FORWARD_LIMIT);
     return depletion.Capacitance + p.TransitTime * Evaluate(voltage).Conductance;
 }
 
@@ -144,7 +152,8 @@ double DiodeDevice::TerminalCharge(const int terminal, const std::vector<double>
     return terminal == 0 ? charge : -charge;
 }
 
-std::complex<double> DiodeDevice::AcTerminalCurrent(const int terminal, const std::vector<double> &x_dc,
+std::complex<double> DiodeDevice::AcTerminalCurrent(const int terminal,
+                                                    const std::vector<double> &x_dc,
                                                     const std::vector<std::complex<double>> &x_ac,
                                                     const double omega) const {
     const double v_dc = VoltageAt(x_dc);

@@ -112,7 +112,8 @@ bool SolveComplexSystemMultiple(const ComplexDenseMatrix &y_orig,
     return true;
 }
 
-bool SolveComplexSystem(const ComplexDenseMatrix &y_orig, const std::vector<std::complex<double>> &b_orig,
+bool SolveComplexSystem(const ComplexDenseMatrix &y_orig,
+                        const std::vector<std::complex<double>> &b_orig,
                         std::vector<std::complex<double>> &x) {
     const std::vector<std::vector<std::complex<double>>> b_list = {b_orig};
     std::vector<std::vector<std::complex<double>>> x_list;
@@ -235,7 +236,8 @@ bool MnaSystem::SolveAc(const MnaSystem &reactive, const double omega, std::vect
     return SolveComplexSystem(y_orig, b_orig, x_ac);
 }
 
-bool MnaSystem::SolveAcMultiple(const MnaSystem &reactive, const double omega,
+bool MnaSystem::SolveAcMultiple(const MnaSystem &reactive,
+                                const double omega,
                                 const std::vector<std::vector<std::complex<double>>> &rhs_list,
                                 std::vector<std::vector<std::complex<double>>> &solutions) const {
     const std::size_t n = m_A.Rows();
@@ -252,7 +254,9 @@ bool MnaSystem::SolveAcMultiple(const MnaSystem &reactive, const double omega,
     return SolveComplexSystemMultiple(y_orig, rhs_list, solutions);
 }
 
-bool MnaSystem::SolveAcTranspose(const MnaSystem &reactive, const double omega, const int output_unknown,
+bool MnaSystem::SolveAcTranspose(const MnaSystem &reactive,
+                                 const double omega,
+                                 const int output_unknown,
                                  std::vector<std::complex<double>> &adjoint) const {
     const std::size_t n = m_A.Rows();
     if (reactive.m_A.Rows() != n || output_unknown < 0 || static_cast<std::size_t>(output_unknown) >= n) {
@@ -271,7 +275,8 @@ bool MnaSystem::SolveAcTranspose(const MnaSystem &reactive, const double omega, 
     return SolveComplexSystem(y_transpose, b_orig, adjoint);
 }
 
-bool MnaSystem::SolveAcTransposeFor(const MnaSystem &reactive, const double omega,
+bool MnaSystem::SolveAcTransposeFor(const MnaSystem &reactive,
+                                    const double omega,
                                     const std::vector<std::complex<double>> &rhs,
                                     std::vector<std::complex<double>> &adjoint) const {
     const std::size_t n = m_A.Rows();
@@ -302,7 +307,9 @@ bool MnaSystem::SolveTransposeComplex(const std::vector<std::complex<double>> &r
     return SolveComplexSystem(a_transpose, rhs, x);
 }
 
-bool MnaSystem::CheckResidual(const std::vector<double> &x, const double voltage_abstol, const double current_abstol,
+bool MnaSystem::CheckResidual(const std::vector<double> &x,
+                              const double voltage_abstol,
+                              const double current_abstol,
                               const double reltol) const {
     const int size = GetSize();
     for (int row = 0; row < size; ++row) {

@@ -178,8 +178,10 @@ int Application::InitSDL() {
 
     m_SDLWindowScale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
     m_SDLWindowFlags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN | SDL_WINDOW_HIGH_PIXEL_DENSITY;
-    m_SDLWindow = SDL_CreateWindow("imcsim", static_cast<int>(1280 * m_SDLWindowScale),
-                                   static_cast<int>(800 * m_SDLWindowScale), m_SDLWindowFlags);
+    m_SDLWindow = SDL_CreateWindow("imcsim",
+                                   static_cast<int>(1280 * m_SDLWindowScale),
+                                   static_cast<int>(800 * m_SDLWindowScale),
+                                   m_SDLWindowFlags);
     if (m_SDLWindow == nullptr) {
         AddError(std::string("SDL_CreateWindow(): ") + SDL_GetError());
         return EXIT_FAILURE;
@@ -195,7 +197,8 @@ int Application::InitSDL() {
 int Application::InitGPU() {
     m_GPUDevice = SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_DXIL |
                                           SDL_GPU_SHADERFORMAT_MSL | SDL_GPU_SHADERFORMAT_METALLIB,
-                                      GPU_DEBUG_MODE, nullptr);
+                                      GPU_DEBUG_MODE,
+                                      nullptr);
     if (m_GPUDevice == nullptr) {
         AddError(std::string("SDL_CreateGPUDevice(): ") + SDL_GetError());
         return EXIT_FAILURE;
@@ -204,7 +207,9 @@ int Application::InitGPU() {
         AddError(std::string("SDL_ClaimWindowForGPUDevice(): ") + SDL_GetError());
         return EXIT_FAILURE;
     }
-    SDL_SetGPUSwapchainParameters(m_GPUDevice, m_SDLWindow, SDL_GPU_SWAPCHAINCOMPOSITION_SDR,
+    SDL_SetGPUSwapchainParameters(m_GPUDevice,
+                                  m_SDLWindow,
+                                  SDL_GPU_SWAPCHAINCOMPOSITION_SDR,
                                   SDL_GPU_PRESENTMODE_VSYNC);
 
     SDL_SetWindowPosition(m_SDLWindow, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
@@ -340,7 +345,8 @@ void Application::Render() {
     m_Playback.Window.SetSpan(m_AnalysisControls.IsLiveResult()
                                   ? std::optional(m_Schematic.GetSimulationSettings().Transient.StopTime)
                                   : std::nullopt);
-    m_Playback.Window.Update(transient ? &*transient : nullptr, m_Results.GetTransientVersion(),
+    m_Playback.Window.Update(transient ? &*transient : nullptr,
+                             m_Results.GetTransientVersion(),
                              m_AnalysisControls.IsRunning());
     ShowNewResults();
 
@@ -450,7 +456,9 @@ void Application::DrawMainMenuBar() {
         m_PreferencesWindow.DrawViewMenuItems();
         ImGui::Separator();
         // The editor cannot be closed, so only the side windows are listed
-        const std::array<AppWindow *, 4> closable_windows = {&m_PropertiesWindow, &m_NetlistWindow, &m_SimulationWindow,
+        const std::array<AppWindow *, 4> closable_windows = {&m_PropertiesWindow,
+                                                             &m_NetlistWindow,
+                                                             &m_SimulationWindow,
                                                              &m_OutputWindow};
         for (AppWindow *window : closable_windows) {
             bool open = window->IsOpen();
@@ -478,7 +486,8 @@ void Application::DrawMainMenuBar() {
  */
 void Application::UpdateWindowTitle() {
     const auto &file_path = m_Schematic.GetFilePath();
-    const std::string title = std::format("{}{} - imcsim", file_path ? file_path->filename().string() : "Untitled",
+    const std::string title = std::format("{}{} - imcsim",
+                                          file_path ? file_path->filename().string() : "Untitled",
                                           m_Schematic.IsModified() ? " *" : "");
     if (title != m_WindowTitle) {
         SDL_SetWindowTitle(m_SDLWindow, title.c_str());
@@ -497,36 +506,57 @@ void Application::ShowNewResults() {
         m_Playback.Reset();
     }
     // A live run is played on the schematic, so its results never take the front from it
-    const auto show_if_new = [this](std::size_t &shown, const std::size_t version, const bool has_result,
-                                    const PlotTab tab) {
-        if (std::exchange(shown, version) != version && has_result) {
-            m_OutputWindow.ShowTab(tab, !m_AnalysisControls.IsLive());
-        }
-    };
-    show_if_new(m_ShownOperatingPointVersion, m_Results.GetOperatingPointVersion(),
-                m_Results.GetOperatingPoint().has_value(), PlotTab::OPERATING_POINT);
-    show_if_new(m_ShownTransientVersion, m_Results.GetTransientVersion(), m_Results.GetTransient().has_value(),
+    const auto show_if_new =
+        [this](std::size_t &shown, const std::size_t version, const bool has_result, const PlotTab tab) {
+            if (std::exchange(shown, version) != version && has_result) {
+                m_OutputWindow.ShowTab(tab, !m_AnalysisControls.IsLive());
+            }
+        };
+    show_if_new(m_ShownOperatingPointVersion,
+                m_Results.GetOperatingPointVersion(),
+                m_Results.GetOperatingPoint().has_value(),
+                PlotTab::OPERATING_POINT);
+    show_if_new(m_ShownTransientVersion,
+                m_Results.GetTransientVersion(),
+                m_Results.GetTransient().has_value(),
                 PlotTab::TRANSIENT);
-    show_if_new(m_ShownACSweepVersion, m_Results.GetACSweepVersion(), m_Results.GetACSweep().has_value(),
+    show_if_new(m_ShownACSweepVersion,
+                m_Results.GetACSweepVersion(),
+                m_Results.GetACSweep().has_value(),
                 PlotTab::AC_SWEEP);
-    show_if_new(m_ShownDCSweepVersion, m_Results.GetDCSweepVersion(), m_Results.GetDCSweep().has_value(),
+    show_if_new(m_ShownDCSweepVersion,
+                m_Results.GetDCSweepVersion(),
+                m_Results.GetDCSweep().has_value(),
                 PlotTab::DC_SWEEP);
     show_if_new(m_ShownNoiseVersion, m_Results.GetNoiseVersion(), m_Results.GetNoise().has_value(), PlotTab::NOISE);
-    show_if_new(m_ShownTransferFunctionVersion, m_Results.GetTransferFunctionVersion(),
-                m_Results.GetTransferFunction().has_value(), PlotTab::TRANSFER_FUNCTION);
-    show_if_new(m_ShownSensitivityVersion, m_Results.GetSensitivityVersion(),
+    show_if_new(m_ShownTransferFunctionVersion,
+                m_Results.GetTransferFunctionVersion(),
+                m_Results.GetTransferFunction().has_value(),
+                PlotTab::TRANSFER_FUNCTION);
+    show_if_new(m_ShownSensitivityVersion,
+                m_Results.GetSensitivityVersion(),
                 m_Results.GetSensitivity().has_value() || m_Results.GetACSensitivity().has_value(),
                 PlotTab::SENSITIVITY);
-    show_if_new(m_ShownPoleZeroVersion, m_Results.GetPoleZeroVersion(), m_Results.GetPoleZero().has_value(),
+    show_if_new(m_ShownPoleZeroVersion,
+                m_Results.GetPoleZeroVersion(),
+                m_Results.GetPoleZero().has_value(),
                 PlotTab::POLE_ZERO);
-    show_if_new(m_ShownSParametersVersion, m_Results.GetSParametersVersion(), m_Results.GetSParameters().has_value(),
+    show_if_new(m_ShownSParametersVersion,
+                m_Results.GetSParametersVersion(),
+                m_Results.GetSParameters().has_value(),
                 PlotTab::S_PARAMETERS);
-    show_if_new(m_ShownTruthTableVersion, m_Results.GetTruthTableVersion(), m_Results.GetTruthTable().has_value(),
+    show_if_new(m_ShownTruthTableVersion,
+                m_Results.GetTruthTableVersion(),
+                m_Results.GetTruthTable().has_value(),
                 PlotTab::TRUTH_TABLE);
-    show_if_new(m_ShownHarmonicBalanceVersion, m_Results.GetHarmonicBalanceVersion(),
-                m_Results.GetHarmonicBalance().has_value(), PlotTab::HARMONIC_BALANCE);
+    show_if_new(m_ShownHarmonicBalanceVersion,
+                m_Results.GetHarmonicBalanceVersion(),
+                m_Results.GetHarmonicBalance().has_value(),
+                PlotTab::HARMONIC_BALANCE);
     // After the analyses, so the table of a Monte Carlo run is what shows in front of the traces it came with
-    show_if_new(m_ShownMonteCarloVersion, m_Results.GetMonteCarloVersion(), m_Results.GetMonteCarlo().has_value(),
+    show_if_new(m_ShownMonteCarloVersion,
+                m_Results.GetMonteCarloVersion(),
+                m_Results.GetMonteCarlo().has_value(),
                 PlotTab::MONTE_CARLO);
     const std::optional<Analysis> last_run = m_AnalysisControls.GetLastRun();
     if (std::exchange(m_ShownRunCount, m_AnalysisControls.GetFinishedRunCount()) !=

@@ -27,13 +27,16 @@ public:
     void Forward(std::vector<std::complex<double>> &data) const;
     void Inverse(std::vector<std::complex<double>> &data) const;
 
-    [[nodiscard]] bool RealToHarmonics(const std::vector<double> &samples, int harmonics, std::vector<double> &coeffs,
+    [[nodiscard]] bool RealToHarmonics(const std::vector<double> &samples,
+                                       int harmonics,
+                                       std::vector<double> &coeffs,
                                        std::vector<std::complex<double>> &scratch) const;
 
     [[nodiscard]] bool RealToNormalizedSpectrum(const std::vector<double> &samples,
                                                 std::vector<std::complex<double>> &spectrum) const;
 
-    [[nodiscard]] bool HarmonicsToReal(const std::vector<double> &coeffs, std::vector<double> &samples,
+    [[nodiscard]] bool HarmonicsToReal(const std::vector<double> &coeffs,
+                                       std::vector<double> &samples,
                                        std::vector<std::complex<double>> &scratch) const;
 
 private:
@@ -55,8 +58,8 @@ private:
 [[nodiscard]] bool RealToHarmonics(const std::vector<double> &samples, int harmonics, std::vector<double> &coeffs);
 [[nodiscard]] bool RealToNormalizedSpectrum(const std::vector<double> &samples,
                                             std::vector<std::complex<double>> &spectrum);
-[[nodiscard]] bool HarmonicsToReal(const std::vector<double> &coeffs, std::size_t sample_count,
-                                   std::vector<double> &samples);
+[[nodiscard]] bool
+HarmonicsToReal(const std::vector<double> &coeffs, std::size_t sample_count, std::vector<double> &samples);
 
 } // namespace Nodalys
 

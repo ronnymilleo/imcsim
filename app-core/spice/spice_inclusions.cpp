@@ -57,8 +57,9 @@ std::string Unquote(const std::string_view name) {
  */
 std::vector<std::string> ReadWords(const std::string_view line) {
     std::vector<std::string> words = SplitWords(line);
-    const auto comment = std::ranges::find_if(
-        words, [](const std::string &word) { return word.starts_with(';') || word.starts_with('$'); });
+    const auto comment = std::ranges::find_if(words, [](const std::string &word) {
+        return word.starts_with(';') || word.starts_with('$');
+    });
     words.erase(comment, words.end());
     return words;
 }
@@ -93,7 +94,10 @@ std::optional<std::pair<std::size_t, std::size_t>> FindSection(const std::vector
     return std::nullopt;
 }
 
-void ExpandLines(Expansion &expansion, const std::vector<std::string> &lines, std::size_t first, std::size_t last,
+void ExpandLines(Expansion &expansion,
+                 const std::vector<std::string> &lines,
+                 std::size_t first,
+                 std::size_t last,
                  const Source &source);
 
 /**
@@ -104,7 +108,10 @@ void ExpandLines(Expansion &expansion, const std::vector<std::string> &lines, st
  * @param[in]     name       The file as the line writes it.
  * @param[in]     section    The section to read, or empty for the whole file.
  */
-void Include(Expansion &expansion, const Source &from, const std::string &origin, const std::string_view name,
+void Include(Expansion &expansion,
+             const Source &from,
+             const std::string &origin,
+             const std::string_view name,
              const std::string &section) {
     const std::filesystem::path written = Unquote(name);
     const Source source = {.Path =
@@ -143,8 +150,11 @@ void Include(Expansion &expansion, const Source &from, const std::string &origin
  * @details A line that includes, or that starts or ends a section, leaves a blank line, so a comment above the next
  *          line still describes only that line.
  */
-void ExpandLines(Expansion &expansion, const std::vector<std::string> &lines, const std::size_t first,
-                 const std::size_t last, const Source &source) {
+void ExpandLines(Expansion &expansion,
+                 const std::vector<std::string> &lines,
+                 const std::size_t first,
+                 const std::size_t last,
+                 const Source &source) {
     for (std::size_t index = first; index < last; ++index) {
         const std::vector<std::string> words = ReadWords(lines[index]);
         const std::string directive = words.empty() ? std::string() : ToLower(words[0]);

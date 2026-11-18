@@ -11,9 +11,17 @@ namespace GUI {
 
 namespace {
 
-constexpr auto ANALYSIS_NAMES =
-    std::to_array<const char *>({"Operating point", "Transient", "AC sweep", "DC sweep", "Noise", "Transfer function",
-                                 "Sensitivity", "Poles and zeros", "S-parameters", "Truth table", "Harmonic balance"});
+constexpr auto ANALYSIS_NAMES = std::to_array<const char *>({"Operating point",
+                                                             "Transient",
+                                                             "AC sweep",
+                                                             "DC sweep",
+                                                             "Noise",
+                                                             "Transfer function",
+                                                             "Sensitivity",
+                                                             "Poles and zeros",
+                                                             "S-parameters",
+                                                             "Truth table",
+                                                             "Harmonic balance"});
 
 } // namespace
 

@@ -67,9 +67,17 @@ nlohmann::json WriteSweepRange(const Core::SweepRange &range) {
 }
 
 /// File names of the analyses, in the order of the Analysis enum.
-constexpr auto ANALYSIS_KEYS = std::to_array<std::string_view>(
-    {"operating_point", "transient", "ac_sweep", "dc_sweep", "noise", "transfer_function", "sensitivity", "pole_zero",
-     "s_parameters", "truth_table", "harmonic_balance"});
+constexpr auto ANALYSIS_KEYS = std::to_array<std::string_view>({"operating_point",
+                                                                "transient",
+                                                                "ac_sweep",
+                                                                "dc_sweep",
+                                                                "noise",
+                                                                "transfer_function",
+                                                                "sensitivity",
+                                                                "pole_zero",
+                                                                "s_parameters",
+                                                                "truth_table",
+                                                                "harmonic_balance"});
 
 const char *ToFileName(const Core::ToleranceDistribution distribution) {
     return distribution == Core::ToleranceDistribution::UNIFORM ? "uniform" : "gaussian";
@@ -544,8 +552,10 @@ nlohmann::json WriteSettings(const SimulationSettings &settings) {
     }
     const nlohmann::json truth_table = {{"inputs", settings.TruthTableInputs}};
     const ParameterStepSettings &step = settings.ParameterStep;
-    nlohmann::json parameter_step = {
-        {"enabled", step.Enabled}, {"part", step.Part}, {"uses_list", step.UsesList}, {"list", step.List}};
+    nlohmann::json parameter_step = {{"enabled", step.Enabled},
+                                     {"part", step.Part},
+                                     {"uses_list", step.UsesList},
+                                     {"list", step.List}};
     WriteParameters(PARAMETER_STEP_KEYS, step, parameter_step);
     const Core::MonteCarloSettings &monte_carlo = settings.MonteCarlo;
     const nlohmann::json monte_carlo_object = {

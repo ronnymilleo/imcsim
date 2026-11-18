@@ -57,10 +57,12 @@ struct BusSegment {
 };
 
 // Resolving
-std::expected<std::vector<int>, std::string> ResolveBusBits(const LogicBus &bus, const NetResolver &find_node,
-                                                            std::size_t node_count);
-std::vector<BusLane> ResolveBusLanes(const std::vector<LogicBus> &buses, const std::vector<LogicNode> &logic_nodes,
-                                     const NetResolver &find_node, std::size_t node_count);
+std::expected<std::vector<int>, std::string>
+ResolveBusBits(const LogicBus &bus, const NetResolver &find_node, std::size_t node_count);
+std::vector<BusLane> ResolveBusLanes(const std::vector<LogicBus> &buses,
+                                     const std::vector<LogicNode> &logic_nodes,
+                                     const NetResolver &find_node,
+                                     std::size_t node_count);
 std::vector<LogicSignal> GetBusSignals(const BusLane &lane, const std::vector<std::vector<double>> &node_voltages);
 
 // Reading

@@ -39,7 +39,8 @@ std::optional<GridPoint> ReadPoint(const nlohmann::json &object, const char *key
  * @brief   Writes every member of a parameter set under its key.
  */
 template <typename Parameters, std::size_t Count>
-void WriteParameters(const std::array<ParameterKey<Parameters>, Count> &keys, const Parameters &parameters,
+void WriteParameters(const std::array<ParameterKey<Parameters>, Count> &keys,
+                     const Parameters &parameters,
                      nlohmann::json &object) {
     for (const ParameterKey<Parameters> &key : keys) {
         object[key.Name] = parameters.*key.Value;
@@ -52,7 +53,8 @@ void WriteParameters(const std::array<ParameterKey<Parameters>, Count> &keys, co
  */
 template <typename Parameters, std::size_t Count>
 std::expected<void, std::string> ReadParameters(const std::array<ParameterKey<Parameters>, Count> &keys,
-                                                const nlohmann::json &object, Parameters &parameters) {
+                                                const nlohmann::json &object,
+                                                Parameters &parameters) {
     for (const ParameterKey<Parameters> &key : keys) {
         if (!object.contains(key.Name)) {
             continue;

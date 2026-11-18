@@ -147,8 +147,9 @@ std::vector<std::size_t> FindMostInfluential(const Core::ACSensitivity &sensitiv
     }
     std::vector<std::size_t> order(peaks.size());
     std::iota(order.begin(), order.end(), std::size_t{0});
-    std::ranges::stable_sort(
-        order, [&peaks](const std::size_t first, const std::size_t second) { return peaks[first] > peaks[second]; });
+    std::ranges::stable_sort(order, [&peaks](const std::size_t first, const std::size_t second) {
+        return peaks[first] > peaks[second];
+    });
     std::erase_if(order, [&peaks](const std::size_t index) { return peaks[index] <= 0.0; });
     order.resize(std::min(order.size(), count));
     return order;
@@ -162,7 +163,8 @@ std::vector<std::size_t> FindMostInfluential(const Core::ACSensitivity &sensitiv
  * @return  1 for the part with the largest influence, 0 for one AC_SENSITIVITY_DECADES below it or with none, linear in
  *          between on a logarithmic scale, or no value for a part the result does not list.
  */
-std::optional<float> FindACSensitivityLevel(const Core::ACSensitivity &sensitivity, const std::string_view part_name,
+std::optional<float> FindACSensitivityLevel(const Core::ACSensitivity &sensitivity,
+                                            const std::string_view part_name,
                                             const std::size_t frequency_index) {
     const auto found = std::ranges::find(sensitivity.Parts, part_name, &Core::ACPartSensitivity::Name);
     if (found == sensitivity.Parts.end()) {

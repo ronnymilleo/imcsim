@@ -163,8 +163,8 @@ std::string FormatNumber(const double value) {
  *          has a transconductance of 2 sqrt(BETA ID). The gate leakage of the two JFET junctions, IS each, is the
  *          bias current.
  */
-std::string FormatInputStage(const OpAmpParameters &parameters, const double tail_current,
-                             const double collector_resistance) {
+std::string
+FormatInputStage(const OpAmpParameters &parameters, const double tail_current, const double collector_resistance) {
     const double collector_current = tail_current / 2.0;
     const bool hangs_from_negative = parameters.InputStage != OpAmpInputStage::NPN;
     const char *load_node = hangs_from_negative ? "4" : "7";
@@ -175,8 +175,10 @@ std::string FormatInputStage(const OpAmpParameters &parameters, const double tai
     if (parameters.InputStage == OpAmpInputStage::JFET) {
         const double beta = 1.0 / (4.0 * collector_current * collector_resistance * collector_resistance);
         return loads + "J1 80 2 12 JM\nJ2 90 30 12 JM\n" + tail +
-               std::format(".model JM PJF(IS={} BETA={} VTO={})\n", FormatNumber(parameters.InputBiasCurrent / 2.0),
-                           FormatNumber(beta), FormatNumber(JFET_PINCH_OFF_VOLTAGE));
+               std::format(".model JM PJF(IS={} BETA={} VTO={})\n",
+                           FormatNumber(parameters.InputBiasCurrent / 2.0),
+                           FormatNumber(beta),
+                           FormatNumber(JFET_PINCH_OFF_VOLTAGE));
     }
     const double beta = collector_current / parameters.InputBiasCurrent;
     // The pair amplifies its input difference by exactly 1 into the collectors
@@ -186,7 +188,9 @@ std::string FormatInputStage(const OpAmpParameters &parameters, const double tai
            std::format("Q1 80 2 10 QM\nQ2 90 30 11 QM\nRE1 10 12 {0}\nRE2 11 12 {0}\n",
                        FormatNumber(emitter_resistance)) +
            tail +
-           std::format(".model QM {}(IS={} BF={})\n", polarity, FormatNumber(INPUT_SATURATION_CURRENT),
+           std::format(".model QM {}(IS={} BF={})\n",
+                       polarity,
+                       FormatNumber(INPUT_SATURATION_CURRENT),
                        FormatNumber(beta));
 }
 
@@ -421,9 +425,17 @@ std::string FormatIdealOpAmp(const OpAmp &op_amp, const std::vector<int> &nodes,
                        "D-{0}-P {1} {7} {8}\n"
                        "D-{0}-N {9} {1} {8}\n"
                        "E-{0} {10} 0 {1} 0 1\n",
-                       name, internal_node, nodes[1], nodes[2], FormatNumber(IDEAL_TRANSCONDUCTANCE),
-                       FormatNumber(IDEAL_RESISTANCE), FormatNumber(capacitance), nodes[3], IDEAL_CLAMP_MODEL_NAME,
-                       nodes[4], nodes[0]);
+                       name,
+                       internal_node,
+                       nodes[1],
+                       nodes[2],
+                       FormatNumber(IDEAL_TRANSCONDUCTANCE),
+                       FormatNumber(IDEAL_RESISTANCE),
+                       FormatNumber(capacitance),
+                       nodes[3],
+                       IDEAL_CLAMP_MODEL_NAME,
+                       nodes[4],
+                       nodes[0]);
 }
 
 /**
@@ -472,7 +484,8 @@ std::string FormatOpAmpSubcircuit(const std::string_view name, const OpAmpParame
     // Pins: output 6, + input 3, - input 2, V+ 7, V- 4, as in the LTC listings
     return std::format(".subckt {0} 6 3 2 7 4\n"
                        "VOS 30 3 {1}\n",
-                       name, FormatNumber(parameters.InputOffsetVoltage)) +
+                       name,
+                       FormatNumber(parameters.InputOffsetVoltage)) +
            FormatInputStage(parameters, tail_current, collector_resistance) +
            std::format("C1 80 90 {0}\n"
                        "REE 12 0 {1}\n"
@@ -487,14 +500,20 @@ std::string FormatOpAmpSubcircuit(const std::string_view name, const OpAmpParame
                        ".model DM1 D(IS=1e-20)\n"
                        ".model DM3 D(IS=1e-16)\n"
                        ".ends {13}\n",
-                       FormatNumber(collector_capacitance), FormatNumber(TAIL_EARLY_VOLTAGE / tail_current),
-                       FormatNumber(common_mode_transconductance), FormatNumber(transconductance),
-                       FormatNumber(GAIN_STAGE_RESISTANCE), FormatNumber(COMPENSATION_CAPACITANCE),
-                       FormatNumber(output_gain), FormatNumber(gain_stage_load), FormatNumber(OUTPUT_SENSE_RESISTANCE),
+                       FormatNumber(collector_capacitance),
+                       FormatNumber(TAIL_EARLY_VOLTAGE / tail_current),
+                       FormatNumber(common_mode_transconductance),
+                       FormatNumber(transconductance),
+                       FormatNumber(GAIN_STAGE_RESISTANCE),
+                       FormatNumber(COMPENSATION_CAPACITANCE),
+                       FormatNumber(output_gain),
+                       FormatNumber(gain_stage_load),
+                       FormatNumber(OUTPUT_SENSE_RESISTANCE),
                        FormatNumber(current_limit_gain),
                        FormatNumber(parameters.PositiveHeadroom + LIMITER_DIODE_DROPS),
                        FormatNumber(parameters.NegativeHeadroom + LIMITER_DIODE_DROPS),
-                       FormatNumber(rest_of_supply_current), name);
+                       FormatNumber(rest_of_supply_current),
+                       name);
 }
 
 } // namespace Core

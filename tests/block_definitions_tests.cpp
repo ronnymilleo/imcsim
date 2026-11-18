@@ -103,11 +103,13 @@ TEST_CASE("Two pin markers on one node are refused", "[block_definitions]") {
 }
 
 TEST_CASE("A new pin continues the old one at its point, or else the one of its name", "[block_definitions]") {
-    const std::vector<GUI::SavedSubcircuitPin> old_pins = {
-        {.Name = "IN", .Point = {0, 0}}, {.Name = "OUT", .Point = {4, 0}}, {.Name = "GND", .Point = {8, 0}}};
+    const std::vector<GUI::SavedSubcircuitPin> old_pins = {{.Name = "IN", .Point = {0, 0}},
+                                                           {.Name = "OUT", .Point = {4, 0}},
+                                                           {.Name = "GND", .Point = {8, 0}}};
     // IN was renamed at the same point, OUT moved but kept its name, and the last pin is new
-    const std::vector<GUI::SavedSubcircuitPin> new_pins = {
-        {.Name = "INPUT", .Point = {0, 0}}, {.Name = "OUT", .Point = {12, 0}}, {.Name = "EXTRA", .Point = {16, 0}}};
+    const std::vector<GUI::SavedSubcircuitPin> new_pins = {{.Name = "INPUT", .Point = {0, 0}},
+                                                           {.Name = "OUT", .Point = {12, 0}},
+                                                           {.Name = "EXTRA", .Point = {16, 0}}};
 
     const auto matches = GUI::MatchPins(old_pins, new_pins);
 

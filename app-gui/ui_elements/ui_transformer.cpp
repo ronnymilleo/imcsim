@@ -50,7 +50,9 @@ void UITransformer::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &
     }
 }
 
-void UITransformer::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
+void UITransformer::DrawSymbol(SchematicCanvas &canvas,
+                               const ViewTransform &view,
+                               const ImU32 color,
                                const SymbolStyle /*style*/) const {
     DrawCoil(canvas, view, color, -COIL_X, 1.0f);
     DrawCoil(canvas, view, color, COIL_X, -1.0f);
@@ -71,7 +73,10 @@ void UITransformer::DrawLabels(SchematicCanvas &canvas, const ViewTransform &vie
     const auto &transformer = static_cast<const Core::Transformer &>(GetComponent());
     DrawLabel(canvas, view, {0.0f, -NAME_OFFSET_Y}, {0.0f, -1.0f}, transformer.GetName(), color);
     DrawLabel(
-        canvas, view, {0.0f, NAME_OFFSET_Y}, {0.0f, 1.0f},
+        canvas,
+        view,
+        {0.0f, NAME_OFFSET_Y},
+        {0.0f, 1.0f},
         std::format("{} {:g}:1", Core::FormatValue(transformer.GetValue()), transformer.GetParameters().TurnsRatio),
         color);
 }
@@ -96,7 +101,10 @@ LocalBounds UITransformer::GetLocalBounds() const {
  * @brief   Each turn is its own polyline, sampled in local coordinates so the arcs follow the rotation, like an
  *          inductor's; bulge is +1 toward +X and -1 toward -X.
  */
-void UITransformer::DrawCoil(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color, const float x,
+void UITransformer::DrawCoil(SchematicCanvas &canvas,
+                             const ViewTransform &view,
+                             const ImU32 color,
+                             const float x,
                              const float bulge) const {
     std::array<ImVec2, SEGMENTS_PER_TURN + 1> points;
     for (int turn = 0; turn < TURN_COUNT; ++turn) {
@@ -105,7 +113,8 @@ void UITransformer::DrawCoil(SchematicCanvas &canvas, const ViewTransform &view,
             // From the top of the turn to its bottom through the side the coil bulges to
             const float angle = std::numbers::pi_v<float> *
                                 (-0.5f + static_cast<float>(segment) / static_cast<float>(SEGMENTS_PER_TURN));
-            points[segment] = LocalToScreen(view, x + bulge * TURN_RADIUS * std::cos(angle),
+            points[segment] = LocalToScreen(view,
+                                            x + bulge * TURN_RADIUS * std::cos(angle),
                                             center_y + TURN_RADIUS * std::sin(angle));
         }
         canvas.AddPolyline(points.data(), static_cast<int>(points.size()), color, ImDrawFlags_None, LINE_THICKNESS);

@@ -50,18 +50,25 @@ enum class TextAnchor {
 class SvgWriter {
 public:
     // Document
-    std::string Finish(SvgPoint corner, double width, double height,
-                       std::optional<ExportColor> background = std::nullopt) const;
+    std::string
+    Finish(SvgPoint corner, double width, double height, std::optional<ExportColor> background = std::nullopt) const;
 
     // Shapes
     void Rectangle(SvgPoint corner, double width, double height, ExportColor fill, double opacity = 1.0);
     void Line(SvgPoint start, SvgPoint end, ExportColor color, double width, double opacity = 1.0);
-    void Polyline(const std::vector<SvgPoint> &points, ExportColor color, double width,
-                  const std::string &dash_pattern = "", bool closed = false);
+    void Polyline(const std::vector<SvgPoint> &points,
+                  ExportColor color,
+                  double width,
+                  const std::string &dash_pattern = "",
+                  bool closed = false);
     void Polygon(const std::vector<SvgPoint> &points, ExportColor fill);
     void Circle(SvgPoint center, double radius, ExportColor color, double width);
     void FilledCircle(SvgPoint center, double radius, ExportColor fill);
-    void Text(SvgPoint baseline, std::string_view text, double font_size, ExportColor color, TextAnchor anchor,
+    void Text(SvgPoint baseline,
+              std::string_view text,
+              double font_size,
+              ExportColor color,
+              TextAnchor anchor,
               bool vertical = false);
 
     // Clipping

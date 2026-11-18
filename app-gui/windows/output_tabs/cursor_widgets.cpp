@@ -41,7 +41,9 @@ constexpr ImU32 CURSOR_B_COLOR = IM_COL32(115, 204, 255, 255);
  * @param[in] logarithmic  Whether the X axis is logarithmic, which changes what is nearest.
  * @param[in] plotted      The traces drawn.
  */
-void DrawCursorReadout(const std::vector<double> &xs, const char *x_unit, const bool logarithmic,
+void DrawCursorReadout(const std::vector<double> &xs,
+                       const char *x_unit,
+                       const bool logarithmic,
                        const std::vector<PlottedTrace> &plotted) {
     if (!ImPlot::IsPlotHovered() || xs.empty() || plotted.empty()) {
         return;
@@ -50,7 +52,8 @@ void DrawCursorReadout(const std::vector<double> &xs, const char *x_unit, const 
     const float x = ImPlot::PlotToPixels(xs[sample], 0.0).x;
     const ImVec2 plot_position = ImPlot::GetPlotPos();
     ImPlot::PushPlotClipRect();
-    ImPlot::GetPlotDrawList()->AddLine({x, plot_position.y}, {x, plot_position.y + ImPlot::GetPlotSize().y},
+    ImPlot::GetPlotDrawList()->AddLine({x, plot_position.y},
+                                       {x, plot_position.y + ImPlot::GetPlotSize().y},
                                        ImGui::GetColorU32(ImGuiCol_Text, 0.35f));
     ImPlot::PopPlotClipRect();
 
@@ -63,9 +66,11 @@ void DrawCursorReadout(const std::vector<double> &xs, const char *x_unit, const 
         const double value = (*trace.Values)[sample];
         std::string text = std::format("{}: {}{}", trace.Label, Core::FormatMeasurement(value), trace.Unit);
         if (trace.LogicLevel) {
-            text =
-                std::format("{}: {} ({}{})", trace.Label, GetLogicStateName(ReadLogicState(value, *trace.LogicLevel)),
-                            Core::FormatMeasurement(value), trace.Unit);
+            text = std::format("{}: {} ({}{})",
+                               trace.Label,
+                               GetLogicStateName(ReadLogicState(value, *trace.LogicLevel)),
+                               Core::FormatMeasurement(value),
+                               trace.Unit);
         }
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(trace.Color), "%s", text.c_str());
     }

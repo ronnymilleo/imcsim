@@ -87,11 +87,14 @@ struct LoadedSchematic {
 
 inline constexpr std::string_view SCHEMATIC_EXTENSION = ".imcsim";
 
-std::string SaveSchematic(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires,
-                          const SimulationSettings &settings, const SavedMeasurements &measurements,
+std::string SaveSchematic(const std::vector<std::unique_ptr<UIElement>> &elements,
+                          const std::vector<UIWire> &wires,
+                          const SimulationSettings &settings,
+                          const SavedMeasurements &measurements,
                           std::span<const SavedSubcircuit> subcircuits = {},
                           std::span<const Core::LibraryModel> models = {});
-std::string SaveParts(std::span<const UIElement *const> elements, const std::vector<UIWire> &wires,
+std::string SaveParts(std::span<const UIElement *const> elements,
+                      const std::vector<UIWire> &wires,
                       std::span<const SavedSubcircuit> subcircuits = {},
                       std::span<const Core::LibraryModel> models = {});
 std::expected<LoadedSchematic, std::string> LoadSchematic(std::string_view text);

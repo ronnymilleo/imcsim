@@ -19,11 +19,12 @@ namespace GUI {
 // Reading
 std::optional<std::size_t> FindTruthTableRow(const Core::TruthTable &table, const std::vector<bool> &inputs_high);
 double GetOutputLogicLevel(const Core::TruthTable &table, int node, const std::vector<LogicNode> &logic_nodes);
-std::vector<LogicState> ReadTruthTableOutputs(const Core::TruthTable &table, std::size_t row,
-                                              const std::vector<LogicNode> &logic_nodes);
+std::vector<LogicState>
+ReadTruthTableOutputs(const Core::TruthTable &table, std::size_t row, const std::vector<LogicNode> &logic_nodes);
 
 // Writing
-std::string FormatTruthTableMarkdown(const Core::TruthTable &table, const std::vector<std::string> &output_labels,
+std::string FormatTruthTableMarkdown(const Core::TruthTable &table,
+                                     const std::vector<std::string> &output_labels,
                                      const std::vector<LogicNode> &logic_nodes);
 
 } // namespace GUI

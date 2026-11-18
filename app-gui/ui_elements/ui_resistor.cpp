@@ -39,11 +39,15 @@ UIResistor::UIResistor(std::unique_ptr<Core::Component> component, const GridPoi
     : UIElement(std::move(component), position, rotation) {
 }
 
-void UIResistor::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
+void UIResistor::DrawSymbol(SchematicCanvas &canvas,
+                            const ViewTransform &view,
+                            const ImU32 color,
                             const SymbolStyle style) const {
     if (style == SymbolStyle::IEC) {
-        const ImVec2 rectangle[4] = {LocalToScreen(view, -1, -0.4f), LocalToScreen(view, 1, -0.4f),
-                                     LocalToScreen(view, 1, 0.4f), LocalToScreen(view, -1, 0.4f)};
+        const ImVec2 rectangle[4] = {LocalToScreen(view, -1, -0.4f),
+                                     LocalToScreen(view, 1, -0.4f),
+                                     LocalToScreen(view, 1, 0.4f),
+                                     LocalToScreen(view, -1, 0.4f)};
         canvas.AddPolyline(rectangle, 4, color, ImDrawFlags_Closed, LINE_THICKNESS);
         return;
     }

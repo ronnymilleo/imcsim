@@ -130,7 +130,8 @@ std::expected<double, std::string> EffectiveValue(const Component &part, const P
         if (value == parameters.end()) {
             return std::unexpected(
                 std::format("{} refers to the parameter {{{}}} of its definition, which the instance does not pass",
-                            part.GetName(), name));
+                            part.GetName(),
+                            name));
         }
         text.replace(open, close - open + 1, std::format("{:.17g}", value->second));
     }
@@ -237,11 +238,14 @@ private:
     /**
      * @brief   Hands a block kept as SPICE text to the engine, which reads it as an instance of its own.
      */
-    std::expected<void, std::string> AddSpiceBlock(const SubcircuitDefinition &definition, const SubcircuitText &spice,
-                                                   const SubcircuitInstance &instance, const std::vector<int> &nodes,
+    std::expected<void, std::string> AddSpiceBlock(const SubcircuitDefinition &definition,
+                                                   const SubcircuitText &spice,
+                                                   const SubcircuitInstance &instance,
+                                                   const std::vector<int> &nodes,
                                                    const std::string &instance_prefix) {
         const auto added = Nodalys::AddSubcircuitText(
-            *m_Builder, MakeSpiceText(definition.Name, spice),
+            *m_Builder,
+            MakeSpiceText(definition.Name, spice),
             {.Prefix = instance_prefix, .PortNodes = nodes, .Parameters = InstanceParameters(instance, definition)});
         if (!added) {
             return std::unexpected(added.error());
@@ -250,8 +254,10 @@ private:
         return {};
     }
 
-    std::expected<void, std::string> AddCircuit(const Circuit &circuit, const std::vector<int> &node_map,
-                                                const Parameters &parameters, const std::string &prefix = "") {
+    std::expected<void, std::string> AddCircuit(const Circuit &circuit,
+                                                const std::vector<int> &node_map,
+                                                const Parameters &parameters,
+                                                const std::string &prefix = "") {
         const auto probes = PlanProbes(circuit);
         if (!probes) {
             return std::unexpected(probes.error());
@@ -269,8 +275,13 @@ private:
         }
 
         for (std::size_t index = 0; index < circuit.GetEntries().size(); ++index) {
-            if (const auto result = AddEntry(circuit.GetEntries()[index], circuit, static_cast<int>(index), node_map,
-                                             parameters, probe_nodes, prefix);
+            if (const auto result = AddEntry(circuit.GetEntries()[index],
+                                             circuit,
+                                             static_cast<int>(index),
+                                             node_map,
+                                             parameters,
+                                             probe_nodes,
+                                             prefix);
                 !result) {
                 return std::unexpected(result.error());
             }
@@ -278,8 +289,11 @@ private:
         return {};
     }
 
-    std::expected<void, std::string> AddEntry(const CircuitEntry &entry, const Circuit &owner, const int entry_index,
-                                              const std::vector<int> &node_map, const Parameters &parameters,
+    std::expected<void, std::string> AddEntry(const CircuitEntry &entry,
+                                              const Circuit &owner,
+                                              const int entry_index,
+                                              const std::vector<int> &node_map,
+                                              const Parameters &parameters,
                                               const std::map<int, std::map<int, int>> &probe_map,
                                               const std::string &prefix = "") {
         const Component &part = *entry.Part;
@@ -507,14 +521,23 @@ private:
                 return std::unexpected(resolved.error());
             }
             const int body = nodes.size() > 3 ? nodes[3] : nodes[2];
-            m_Builder->AddMosfet(name, nodes[0], nodes[1], nodes[2], body, type != ComponentType::PMOS,
+            m_Builder->AddMosfet(name,
+                                 nodes[0],
+                                 nodes[1],
+                                 nodes[2],
+                                 body,
+                                 type != ComponentType::PMOS,
                                  ToNodalys(*resolved));
             return {};
         }
 
         case ComponentType::V_SWITCH: {
             const auto &controlled = static_cast<const VoltageControlledSwitch &>(part);
-            m_Builder->AddVoltageControlledSwitch(name, nodes[0], nodes[1], nodes[2], nodes[3],
+            m_Builder->AddVoltageControlledSwitch(name,
+                                                  nodes[0],
+                                                  nodes[1],
+                                                  nodes[2],
+                                                  nodes[3],
                                                   ToNodalys(controlled.GetParameters()));
             return {};
         }
@@ -527,8 +550,14 @@ private:
         case ComponentType::RELAY: {
             const auto &relay = static_cast<const Relay &>(part);
             const RelayParameters &figures = relay.GetParameters();
-            m_Builder->AddRelay(name, nodes[2], nodes[3], nodes[0], nodes[1], figures.CoilResistance,
-                                figures.CoilInductance, ToNodalys(relay.GetContactParameters()));
+            m_Builder->AddRelay(name,
+                                nodes[2],
+                                nodes[3],
+                                nodes[0],
+                                nodes[1],
+                                figures.CoilResistance,
+                                figures.CoilInductance,
+                                ToNodalys(relay.GetContactParameters()));
             return {};
         }
 
@@ -537,7 +566,14 @@ private:
             const TransformerParameters &figures = transformer.GetParameters();
             const double l1 = transformer.GetValue();
             const double l2 = transformer.GetSecondaryInductance();
-            m_Builder->AddTransformer(name, nodes[0], nodes[1], nodes[2], nodes[3], l1, l2, figures.Coupling,
+            m_Builder->AddTransformer(name,
+                                      nodes[0],
+                                      nodes[1],
+                                      nodes[2],
+                                      nodes[3],
+                                      l1,
+                                      l2,
+                                      figures.Coupling,
                                       figures.WindingResistance);
             return {};
         }
@@ -659,7 +695,13 @@ private:
 
         case ComponentType::D_FLIP_FLOP: {
             const auto &logic = static_cast<const LogicPart &>(part);
-            m_Builder->AddDFlipFlop(name, nodes[4], nodes[5], nodes[0], nodes[1], MakeLogicParams(logic), nodes[2],
+            m_Builder->AddDFlipFlop(name,
+                                    nodes[4],
+                                    nodes[5],
+                                    nodes[0],
+                                    nodes[1],
+                                    MakeLogicParams(logic),
+                                    nodes[2],
                                     nodes[3]);
             return {};
         }
@@ -670,21 +712,36 @@ private:
             const int node_and = m_Builder->AddNode();
             const int node_d = m_Builder->AddNode();
             m_Builder->AddInverter(name + ".NOT_R", node_not_r, nodes[1], MakeLogicParams(logic));
-            m_Builder->AddLogicGate(name + ".AND", Nodalys::LogicGateType::AND, node_and, {node_not_r, nodes[5]},
+            m_Builder->AddLogicGate(name + ".AND",
+                                    Nodalys::LogicGateType::AND,
+                                    node_and,
+                                    {node_not_r, nodes[5]},
                                     MakeLogicParams(logic));
-            m_Builder->AddLogicGate(name + ".OR", Nodalys::LogicGateType::OR, node_d, {nodes[0], node_and},
+            m_Builder->AddLogicGate(name + ".OR",
+                                    Nodalys::LogicGateType::OR,
+                                    node_d,
+                                    {nodes[0], node_and},
                                     MakeLogicParams(logic));
-            m_Builder->AddDFlipFlop(name, nodes[5], nodes[6], node_d, nodes[2], MakeLogicParams(logic), nodes[3],
-                                    nodes[4]);
+            m_Builder
+                ->AddDFlipFlop(name, nodes[5], nodes[6], node_d, nodes[2], MakeLogicParams(logic), nodes[3], nodes[4]);
             return {};
         }
 
         case ComponentType::T_FLIP_FLOP: {
             const auto &logic = static_cast<const LogicPart &>(part);
             const int internal_d = m_Builder->AddNode();
-            m_Builder->AddLogicGate(name + ".XOR", Nodalys::LogicGateType::XOR, internal_d, {nodes[0], nodes[4]},
+            m_Builder->AddLogicGate(name + ".XOR",
+                                    Nodalys::LogicGateType::XOR,
+                                    internal_d,
+                                    {nodes[0], nodes[4]},
                                     MakeLogicParams(logic));
-            m_Builder->AddDFlipFlop(name, nodes[4], nodes[5], internal_d, nodes[1], MakeLogicParams(logic), nodes[2],
+            m_Builder->AddDFlipFlop(name,
+                                    nodes[4],
+                                    nodes[5],
+                                    internal_d,
+                                    nodes[1],
+                                    MakeLogicParams(logic),
+                                    nodes[2],
                                     nodes[3]);
             return {};
         }
@@ -696,24 +753,38 @@ private:
             const int node_and2 = m_Builder->AddNode();
             const int node_d = m_Builder->AddNode();
             m_Builder->AddInverter(name + ".NOT_K", node_not_k, nodes[1], MakeLogicParams(logic));
-            m_Builder->AddLogicGate(name + ".AND1", Nodalys::LogicGateType::AND, node_and1, {nodes[0], nodes[6]},
+            m_Builder->AddLogicGate(name + ".AND1",
+                                    Nodalys::LogicGateType::AND,
+                                    node_and1,
+                                    {nodes[0], nodes[6]},
                                     MakeLogicParams(logic));
-            m_Builder->AddLogicGate(name + ".AND2", Nodalys::LogicGateType::AND, node_and2, {node_not_k, nodes[5]},
+            m_Builder->AddLogicGate(name + ".AND2",
+                                    Nodalys::LogicGateType::AND,
+                                    node_and2,
+                                    {node_not_k, nodes[5]},
                                     MakeLogicParams(logic));
-            m_Builder->AddLogicGate(name + ".OR", Nodalys::LogicGateType::OR, node_d, {node_and1, node_and2},
+            m_Builder->AddLogicGate(name + ".OR",
+                                    Nodalys::LogicGateType::OR,
+                                    node_d,
+                                    {node_and1, node_and2},
                                     MakeLogicParams(logic));
-            m_Builder->AddDFlipFlop(name, nodes[5], nodes[6], node_d, nodes[2], MakeLogicParams(logic), nodes[3],
-                                    nodes[4]);
+            m_Builder
+                ->AddDFlipFlop(name, nodes[5], nodes[6], node_d, nodes[2], MakeLogicParams(logic), nodes[3], nodes[4]);
             return {};
         }
 
         case ComponentType::OP_AMP: {
             const auto &op_amp = static_cast<const OpAmp &>(part);
             if (op_amp.IsIdeal()) {
-                m_Builder->AddIdealOpAmp(name, nodes[0], nodes[1], nodes[2], nodes[3], nodes[4],
-                                         op_amp.GetIdealBandwidth());
+                m_Builder
+                    ->AddIdealOpAmp(name, nodes[0], nodes[1], nodes[2], nodes[3], nodes[4], op_amp.GetIdealBandwidth());
             } else {
-                m_Builder->AddBoyleOpAmp(name, nodes[0], nodes[1], nodes[2], nodes[3], nodes[4],
+                m_Builder->AddBoyleOpAmp(name,
+                                         nodes[0],
+                                         nodes[1],
+                                         nodes[2],
+                                         nodes[3],
+                                         nodes[4],
                                          MakeBoyleParams(op_amp.GetParameters()));
             }
             return {};

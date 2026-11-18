@@ -307,9 +307,15 @@ const DiodeModel *FindDiodeModel(const ComponentType type, const std::string_vie
 std::string FormatDiodeModel(const std::string_view spice_name, const DiodeParameters &parameters) {
     return std::format(".model {} D(IS={:.6g} N={:.6g} RS={:.6g} BV={:.6g} IBV={:.6g} CJO={:.6g} VJ={:.6g} M={:.6g} "
                        "TT={:.6g})\n",
-                       spice_name, parameters.SaturationCurrent, parameters.EmissionCoefficient,
-                       parameters.SeriesResistance, parameters.BreakdownVoltage, parameters.BreakdownCurrent,
-                       parameters.JunctionCapacitance, parameters.JunctionPotential, parameters.GradingCoefficient,
+                       spice_name,
+                       parameters.SaturationCurrent,
+                       parameters.EmissionCoefficient,
+                       parameters.SeriesResistance,
+                       parameters.BreakdownVoltage,
+                       parameters.BreakdownCurrent,
+                       parameters.JunctionCapacitance,
+                       parameters.JunctionPotential,
+                       parameters.GradingCoefficient,
                        parameters.TransitTime);
 }
 

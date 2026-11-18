@@ -31,7 +31,8 @@ void AnalysisControls::RunTransferFunctionAnalysis(const Core::Circuit &circuit)
         return;
     }
     const Core::TransferFunctionSettings run_settings{
-        .OutputNode = *output, .InputSource = ResolveOptionalInput(settings.TransferFunctionSource, sources)};
+        .OutputNode = *output,
+        .InputSource = ResolveOptionalInput(settings.TransferFunctionSource, sources)};
     StartRun(Analysis::TRANSFER_FUNCTION,
              MakeJob<Core::TransferFunctionRun>(
                  circuit,

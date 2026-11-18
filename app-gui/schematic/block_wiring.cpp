@@ -58,8 +58,10 @@ std::vector<GridPoint> ListPointsInside(const UIWire &wire, const WorldBounds &b
  * @brief   Whether the names of a block at its current spot leave the points its wires start from free.
  * @details A name over a pin point, a terminal or a wire would wall in the routes that start there.
  */
-bool AreNamesClear(const UISubcircuit &block, const std::vector<GridPoint> &pin_points,
-                   const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires) {
+bool AreNamesClear(const UISubcircuit &block,
+                   const std::vector<GridPoint> &pin_points,
+                   const std::vector<std::unique_ptr<UIElement>> &elements,
+                   const std::vector<UIWire> &wires) {
     return std::ranges::none_of(block.GetNameLabelPoints(), [&](const GridPoint point) {
         return std::ranges::contains(pin_points, point) ||
                std::ranges::any_of(
@@ -76,8 +78,10 @@ bool AreNamesClear(const UISubcircuit &block, const std::vector<GridPoint> &pin_
  *          markers where the terminals end up: the wire there, and what ends on it, lies over the lead. Its names
  *          keep off the same points.
  */
-bool IsFreeSpot(const UISubcircuit &block, const std::vector<GridPoint> &pin_points,
-                const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires) {
+bool IsFreeSpot(const UISubcircuit &block,
+                const std::vector<GridPoint> &pin_points,
+                const std::vector<std::unique_ptr<UIElement>> &elements,
+                const std::vector<UIWire> &wires) {
     if (!AreNamesClear(block, pin_points, elements, wires)) {
         return false;
     }
@@ -149,7 +153,9 @@ std::optional<GridPoint> FindWayOut(const std::vector<UIWire> &wires, const Grid
  * @brief   The wires with the one that runs from a point into a box cut back to the point, and the pieces inside the
  *          box that reach none of its terminals left out.
  */
-std::vector<UIWire> CutAtBox(const std::vector<UIWire> &wires, const GridPoint point, const WorldBounds &box,
+std::vector<UIWire> CutAtBox(const std::vector<UIWire> &wires,
+                             const GridPoint point,
+                             const WorldBounds &box,
                              const std::vector<GridPoint> &terminals) {
     std::vector<UIWire> kept;
     for (const UIWire &wire : wires) {
@@ -180,8 +186,10 @@ std::vector<UIWire> CutAtBox(const std::vector<UIWire> &wires, const GridPoint p
  *          names none at all; the block
  *          stays where it was when no spot within MAX_BLOCK_SHIFT steps is free.
  */
-void MoveToFreeSpot(UISubcircuit &block, const std::vector<GridPoint> &pin_points,
-                    const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires) {
+void MoveToFreeSpot(UISubcircuit &block,
+                    const std::vector<GridPoint> &pin_points,
+                    const std::vector<std::unique_ptr<UIElement>> &elements,
+                    const std::vector<UIWire> &wires) {
     const GridPoint middle = block.GetPosition();
     const auto is_free = [&](const GridPoint position) {
         block.SetPosition(position);

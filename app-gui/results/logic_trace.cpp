@@ -26,8 +26,8 @@ namespace {
  * @param[in] open_names  Definitions being looked into, so a block that held itself could not recurse forever.
  * @return  The largest logic level on each such node, ground left out.
  */
-std::map<int, double> FindLogicLevels(const Core::Circuit &body, const Core::Circuit &circuit,
-                                      std::vector<std::string> open_names) {
+std::map<int, double>
+FindLogicLevels(const Core::Circuit &body, const Core::Circuit &circuit, std::vector<std::string> open_names) {
     std::map<int, double> levels;
     const auto raise = [&levels](const int node, const double level) {
         if (node != 0) {
@@ -117,7 +117,8 @@ std::vector<LogicNode> FindLogicNodes(const Core::Circuit &circuit) {
  * @return  Segments in time order that follow one another: each starts at the first sample of its state and ends where
  *          the next begins, and the last ends at the last sample. Empty for no samples.
  */
-std::vector<LogicSegment> FindLogicSegments(const std::span<const double> times, const std::span<const double> voltages,
+std::vector<LogicSegment> FindLogicSegments(const std::span<const double> times,
+                                            const std::span<const double> voltages,
                                             const double logic_level) {
     std::vector<LogicSegment> segments;
     const std::size_t count = std::min(times.size(), voltages.size());
@@ -147,8 +148,10 @@ constexpr double MAX_CELLS = 5000.0;
 /**
  * @brief   What the signal reads at the sample nearest a time.
  */
-LogicState ReadStateAt(const std::span<const double> times, const std::span<const double> voltages,
-                       const double logic_level, const double time) {
+LogicState ReadStateAt(const std::span<const double> times,
+                       const std::span<const double> voltages,
+                       const double logic_level,
+                       const double time) {
     const auto after = std::ranges::lower_bound(times, time);
     auto index = static_cast<std::size_t>(after - times.begin());
     if (index >= times.size()) {
@@ -253,7 +256,8 @@ CellGrid FindCellGrid(const std::span<const double> times, const std::span<const
  *          cells would be in view.
  */
 std::vector<std::vector<LogicSegment>> FindBitCells(const std::span<const double> times,
-                                                    const std::span<const LogicSignal> signals, const double from,
+                                                    const std::span<const LogicSignal> signals,
+                                                    const double from,
                                                     const double to) {
     std::vector<std::vector<LogicSegment>> cells(signals.size());
     if (times.size() < 2) {

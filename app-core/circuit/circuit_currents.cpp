@@ -110,9 +110,14 @@ std::string GetCurrentName(const Component &component, const std::string_view la
  */
 bool HasSingleCurrent(const ComponentType type) {
     static constexpr std::array SINGLE_CURRENT_TYPES = {
-        ComponentType::RESISTOR,    ComponentType::CAPACITOR,      ComponentType::INDUCTOR,
-        ComponentType::VCC,         ComponentType::VOLTAGE_SOURCE, ComponentType::CLOCK,
-        ComponentType::LOGIC_INPUT, ComponentType::CURRENT_SOURCE,
+        ComponentType::RESISTOR,
+        ComponentType::CAPACITOR,
+        ComponentType::INDUCTOR,
+        ComponentType::VCC,
+        ComponentType::VOLTAGE_SOURCE,
+        ComponentType::CLOCK,
+        ComponentType::LOGIC_INPUT,
+        ComponentType::CURRENT_SOURCE,
     };
     return std::ranges::contains(SINGLE_CURRENT_TYPES, type);
 }

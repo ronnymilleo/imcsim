@@ -41,8 +41,10 @@ GridPoint FindGroupPivot(const PastedGroup &group) {
  * @return  A schematic of just those items, in the format of the files, so it pastes into another copy of the program
  *          as well as this one.
  */
-std::string CopySelection(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires,
-                          const Selection &selection, const std::span<const SavedSubcircuit> subcircuits,
+std::string CopySelection(const std::vector<std::unique_ptr<UIElement>> &elements,
+                          const std::vector<UIWire> &wires,
+                          const Selection &selection,
+                          const std::span<const SavedSubcircuit> subcircuits,
                           const std::span<const Core::LibraryModel> models) {
     std::vector<const UIElement *> copied_elements;
     std::set<std::string> needed_definitions;

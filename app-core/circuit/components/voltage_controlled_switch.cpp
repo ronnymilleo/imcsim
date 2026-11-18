@@ -57,8 +57,12 @@ bool VoltageControlledSwitch::IsValidParameters(const SwitchParameters &paramete
  * @return  The line, newline included.
  */
 std::string FormatSwitchModel(const std::string_view spice_name, const SwitchParameters &parameters) {
-    return std::format(".model {} SW(VT={:.6g} VH={:.6g} RON={:.6g} ROFF={:.6g})\n", spice_name, parameters.Threshold,
-                       parameters.Hysteresis, parameters.OnResistance, parameters.OffResistance);
+    return std::format(".model {} SW(VT={:.6g} VH={:.6g} RON={:.6g} ROFF={:.6g})\n",
+                       spice_name,
+                       parameters.Threshold,
+                       parameters.Hysteresis,
+                       parameters.OnResistance,
+                       parameters.OffResistance);
 }
 
 } // namespace Core

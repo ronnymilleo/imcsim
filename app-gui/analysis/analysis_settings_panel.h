@@ -79,8 +79,11 @@ private:
     void DrawPoleZeroSettings(SimulationSettings &settings);
     void DrawSParameterSettings(SimulationSettings &settings);
     void DrawPortSummary();
-    void DrawSourceAndOutputPickers(std::string &source, std::optional<GridPoint> &output, const std::string &id,
-                                    const char *empty_text, const char *tooltip);
+    void DrawSourceAndOutputPickers(std::string &source,
+                                    std::optional<GridPoint> &output,
+                                    const std::string &id,
+                                    const char *empty_text,
+                                    const char *tooltip);
     void DrawTruthTableSettings(SimulationSettings &settings);
     void DrawHarmonicBalanceSettings(SimulationSettings &settings);
     void DrawRunModeSettings(SimulationSettings &settings);

@@ -266,7 +266,9 @@ std::optional<SpiceBlockResult> SpiceBlockDialog::DrawSettings() {
     }
     ImGui::SeparatorText("Text");
     ImGui::PushFont(GetMonospaceFont(), 0.0f);
-    ImGui::InputTextMultiline("##text", &m_Text, {font_size * TEXT_WIDTH, font_size * TEXT_HEIGHT},
+    ImGui::InputTextMultiline("##text",
+                              &m_Text,
+                              {font_size * TEXT_WIDTH, font_size * TEXT_HEIGHT},
                               ImGuiInputTextFlags_ReadOnly);
     ImGui::PopFont();
     if (!m_Error.empty()) {
@@ -278,8 +280,10 @@ std::optional<SpiceBlockResult> SpiceBlockDialog::DrawSettings() {
         if (const std::optional<std::string> problem = CheckSpicePins(m_Pins)) {
             m_Error = *problem;
         } else {
-            result = SpiceBlockResult{
-                .Imported = {}, .UpdatedName = m_BlockName, .Pins = m_Pins, .Parameters = m_Parameters};
+            result = SpiceBlockResult{.Imported = {},
+                                      .UpdatedName = m_BlockName,
+                                      .Pins = m_Pins,
+                                      .Parameters = m_Parameters};
             ImGui::CloseCurrentPopup();
         }
     }

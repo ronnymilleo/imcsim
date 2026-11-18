@@ -98,8 +98,11 @@ std::string DescribePoleZeroRoot(const Core::PoleZeroRoot &root) {
     if (root.Imaginary == 0.0) {
         return std::format("{} at {}", kind, FormatHertz(root.NaturalFrequencyHertz));
     }
-    return std::format("{} pair at {}, Q {}, zeta {}", kind, FormatHertz(root.NaturalFrequencyHertz),
-                       FormatQuality(root), FormatDamping(root));
+    return std::format("{} pair at {}, Q {}, zeta {}",
+                       kind,
+                       FormatHertz(root.NaturalFrequencyHertz),
+                       FormatQuality(root),
+                       FormatDamping(root));
 }
 
 /**
@@ -132,8 +135,8 @@ PoleZeroPoints CollectPoleZeroPoints(const Core::PoleZero &result, const bool is
  * @param[in] is_right_half_plane  Which half-plane to take them from.
  * @return  The natural frequency of each, in Hz, leaving out those at 0 Hz, which a logarithmic axis cannot show.
  */
-std::vector<double> ListRootFrequencies(const Core::PoleZero &result, const bool is_pole,
-                                        const bool is_right_half_plane) {
+std::vector<double>
+ListRootFrequencies(const Core::PoleZero &result, const bool is_pole, const bool is_right_half_plane) {
     std::vector<double> frequencies;
     for (const Core::PoleZeroRoot &root : result.Roots) {
         if (root.IsPole == is_pole && root.IsRightHalfPlane == is_right_half_plane &&
@@ -153,8 +156,10 @@ std::string DescribeCancelledPairs(const int cancelled_pairs) {
     if (cancelled_pairs <= 0) {
         return {};
     }
-    return std::format("{} pole-zero {} at the same place cancel and {} left out", cancelled_pairs,
-                       cancelled_pairs == 1 ? "pair" : "pairs", cancelled_pairs == 1 ? "is" : "are");
+    return std::format("{} pole-zero {} at the same place cancel and {} left out",
+                       cancelled_pairs,
+                       cancelled_pairs == 1 ? "pair" : "pairs",
+                       cancelled_pairs == 1 ? "is" : "are");
 }
 
 /**

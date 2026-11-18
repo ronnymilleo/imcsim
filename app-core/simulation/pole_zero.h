@@ -38,7 +38,9 @@ using ComplexRoots = std::vector<std::complex<double>>;
 std::optional<PoleZeroInput> FindPoleZeroInput(const Circuit &circuit, std::string_view source_name);
 
 // Results
-PoleZero BuildPoleZero(const Circuit &circuit, const PoleZeroSettings &settings, const ComplexRoots &poles,
+PoleZero BuildPoleZero(const Circuit &circuit,
+                       const PoleZeroSettings &settings,
+                       const ComplexRoots &poles,
                        const ComplexRoots &zeros);
 
 // Solver messages

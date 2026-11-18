@@ -452,9 +452,13 @@ void Component::ClearValueExpression() {
  * @return  True for diodes, LEDs, Zeners and transistors.
  */
 bool Component::TakesLibraryModel() const {
-    static constexpr auto MODELED_TYPES =
-        std::to_array({ComponentType::DIODE, ComponentType::ZENER_DIODE, ComponentType::LED, ComponentType::NPN,
-                       ComponentType::PNP, ComponentType::NMOS, ComponentType::PMOS});
+    static constexpr auto MODELED_TYPES = std::to_array({ComponentType::DIODE,
+                                                         ComponentType::ZENER_DIODE,
+                                                         ComponentType::LED,
+                                                         ComponentType::NPN,
+                                                         ComponentType::PNP,
+                                                         ComponentType::NMOS,
+                                                         ComponentType::PMOS});
     return std::ranges::contains(MODELED_TYPES, m_Type);
 }
 

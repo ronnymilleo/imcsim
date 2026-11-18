@@ -291,15 +291,24 @@ const BJTModel *FindBJTModel(const ComponentType type, const std::string_view na
  * @param[in] parameters  Model parameters.
  * @return  The line, newline included, with values in exponent notation and six significant digits.
  */
-std::string FormatBJTModel(const ComponentType type, const std::string_view spice_name,
-                           const BJTParameters &parameters) {
+std::string
+FormatBJTModel(const ComponentType type, const std::string_view spice_name, const BJTParameters &parameters) {
     return std::format(".model {} {}(IS={:.6g} BF={:.6g} BR={:.6g} VAF={:.6g} IKF={:.6g} ISE={:.6g} NE={:.6g} "
                        "RB={:.6g} RC={:.6g} RE={:.6g} CJE={:.6g} CJC={:.6g} TF={:.6g})\n",
-                       spice_name, type == ComponentType::PNP ? "PNP" : "NPN", parameters.SaturationCurrent,
-                       parameters.ForwardBeta, parameters.ReverseBeta, parameters.EarlyVoltage,
-                       parameters.ForwardKneeCurrent, parameters.LeakageSaturationCurrent,
-                       parameters.LeakageEmissionCoefficient, parameters.BaseResistance, parameters.CollectorResistance,
-                       parameters.EmitterResistance, parameters.EmitterCapacitance, parameters.CollectorCapacitance,
+                       spice_name,
+                       type == ComponentType::PNP ? "PNP" : "NPN",
+                       parameters.SaturationCurrent,
+                       parameters.ForwardBeta,
+                       parameters.ReverseBeta,
+                       parameters.EarlyVoltage,
+                       parameters.ForwardKneeCurrent,
+                       parameters.LeakageSaturationCurrent,
+                       parameters.LeakageEmissionCoefficient,
+                       parameters.BaseResistance,
+                       parameters.CollectorResistance,
+                       parameters.EmitterResistance,
+                       parameters.EmitterCapacitance,
+                       parameters.CollectorCapacitance,
                        parameters.TransitTime);
 }
 

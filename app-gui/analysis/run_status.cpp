@@ -41,7 +41,8 @@ std::string FormatLiveProgress(const bool is_paused, const std::optional<Core::T
  * @brief   "2000 time steps in 41ms" for a transient, "41ms" for another analysis: how much the last run made and how
  *          long it took, or empty when the run was live and kept pace with the clock.
  */
-std::string DescribeRunCost(const std::optional<double> seconds, const Analysis analysis,
+std::string DescribeRunCost(const std::optional<double> seconds,
+                            const Analysis analysis,
                             const std::optional<Core::Transient> &transient) {
     if (!seconds) {
         return {};

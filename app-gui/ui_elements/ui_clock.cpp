@@ -51,16 +51,21 @@ void UIClock::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, 
     canvas.AddLine(LocalToScreen(view, 0, 0), LocalToScreen(view, 0, BOX_BOTTOM), color, LINE_THICKNESS);
 }
 
-void UIClock::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
+void UIClock::DrawSymbol(SchematicCanvas &canvas,
+                         const ViewTransform &view,
+                         const ImU32 color,
                          const SymbolStyle /*style*/) const {
-    const std::array<ImVec2, 4> box = {
-        LocalToScreen(view, -BOX_HALF_WIDTH, BOX_TOP), LocalToScreen(view, BOX_HALF_WIDTH, BOX_TOP),
-        LocalToScreen(view, BOX_HALF_WIDTH, BOX_BOTTOM), LocalToScreen(view, -BOX_HALF_WIDTH, BOX_BOTTOM)};
+    const std::array<ImVec2, 4> box = {LocalToScreen(view, -BOX_HALF_WIDTH, BOX_TOP),
+                                       LocalToScreen(view, BOX_HALF_WIDTH, BOX_TOP),
+                                       LocalToScreen(view, BOX_HALF_WIDTH, BOX_BOTTOM),
+                                       LocalToScreen(view, -BOX_HALF_WIDTH, BOX_BOTTOM)};
     canvas.AddPolyline(box.data(), static_cast<int>(box.size()), color, ImDrawFlags_Closed, LINE_THICKNESS);
-    const std::array<ImVec2, 6> wave = {
-        LocalToScreen(view, WAVE_LEFT, WAVE_LOW),   LocalToScreen(view, FIRST_RISE, WAVE_LOW),
-        LocalToScreen(view, FIRST_RISE, WAVE_HIGH), LocalToScreen(view, FIRST_FALL, WAVE_HIGH),
-        LocalToScreen(view, FIRST_FALL, WAVE_LOW),  LocalToScreen(view, WAVE_RIGHT, WAVE_LOW)};
+    const std::array<ImVec2, 6> wave = {LocalToScreen(view, WAVE_LEFT, WAVE_LOW),
+                                        LocalToScreen(view, FIRST_RISE, WAVE_LOW),
+                                        LocalToScreen(view, FIRST_RISE, WAVE_HIGH),
+                                        LocalToScreen(view, FIRST_FALL, WAVE_HIGH),
+                                        LocalToScreen(view, FIRST_FALL, WAVE_LOW),
+                                        LocalToScreen(view, WAVE_RIGHT, WAVE_LOW)};
     canvas.AddPolyline(wave.data(), static_cast<int>(wave.size()), color, ImDrawFlags_None, LINE_THICKNESS);
 }
 

@@ -67,8 +67,8 @@ double GetLargestInfluence(const Core::ACSensitivity &sensitivity, std::size_t f
 std::vector<std::size_t> FindMostInfluential(const Core::ACSensitivity &sensitivity, std::size_t count);
 
 // Heat colors
-std::optional<float> FindACSensitivityLevel(const Core::ACSensitivity &sensitivity, std::string_view part_name,
-                                            std::size_t frequency_index);
+std::optional<float>
+FindACSensitivityLevel(const Core::ACSensitivity &sensitivity, std::string_view part_name, std::size_t frequency_index);
 
 // Table and curves
 std::vector<ACSensitivityRow> MakeACSensitivityRows(const Core::ACSensitivity &sensitivity,

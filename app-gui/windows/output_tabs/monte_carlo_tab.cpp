@@ -209,7 +209,9 @@ void MonteCarloTab::DrawHistogram(const MonteCarloTable &table, const std::size_
     if (!ImPlot::BeginPlot("##monte_carlo_histogram", ImVec2(-1.0f, ImGui::GetFontSize() * HISTOGRAM_HEIGHT))) {
         return;
     }
-    ImPlot::SetupAxes(GetMeasureName(table.Columns[column].Kind), "Runs", ImPlotAxisFlags_AutoFit,
+    ImPlot::SetupAxes(GetMeasureName(table.Columns[column].Kind),
+                      "Runs",
+                      ImPlotAxisFlags_AutoFit,
                       ImPlotAxisFlags_AutoFit);
     ImPlot::SetupAxisFormat(ImAxis_X1, FormatAxisValue, const_cast<char *>(unit));
     ImPlot::PlotBars("Runs", centers.data(), counts.data(), static_cast<int>(centers.size()), width * BAR_FILL);
@@ -264,7 +266,9 @@ void MonteCarloTab::DrawRunTable(const MonteCarloTable &table, const std::size_t
     const int column_count = static_cast<int>(table.Parts.size()) + 2;
     const ImGuiTableFlags flags = ImGuiTableFlags_Sortable | ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg |
                                   ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable;
-    if (!ImGui::BeginTable("##monte_carlo_runs", column_count, flags,
+    if (!ImGui::BeginTable("##monte_carlo_runs",
+                           column_count,
+                           flags,
                            ImVec2(0.0f, ImGui::GetFontSize() * RUN_TABLE_HEIGHT))) {
         return;
     }
@@ -295,7 +299,8 @@ void MonteCarloTab::DrawRunTable(const MonteCarloTable &table, const std::size_t
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
             const std::string label = run == 0 ? std::string("Nominal") : std::to_string(run);
-            if (ImGui::Selectable(label.c_str(), shown && *shown == static_cast<double>(run),
+            if (ImGui::Selectable(label.c_str(),
+                                  shown && *shown == static_cast<double>(run),
                                   ImGuiSelectableFlags_SpanAllColumns)) {
                 ShowRun(run);
             }

@@ -181,8 +181,13 @@ TEST_CASE("A pulse source keeps its pulse, and an invalid pulse is skipped", "[s
     auto &source = static_cast<Core::VoltageSource &>(elements.back()->GetComponent());
     source.SetName("Vin1");
     source.SetSourceType(Core::VoltageSource::SourceType::PULSE);
-    const Core::PulseParameters pulse{
-        .Low = -2.0, .High = 3.3, .Delay = 1e-3, .RiseTime = 5e-9, .FallTime = 7e-9, .Width = 2e-3, .Period = 4e-3};
+    const Core::PulseParameters pulse{.Low = -2.0,
+                                      .High = 3.3,
+                                      .Delay = 1e-3,
+                                      .RiseTime = 5e-9,
+                                      .FallTime = 7e-9,
+                                      .Width = 2e-3,
+                                      .Period = 4e-3};
     source.SetPulse(pulse);
 
     const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
@@ -237,10 +242,16 @@ TEST_CASE("The extra source waveforms keep their parameters through a file", "[s
                                   .RiseTimeConstant = 10e-6,
                                   .FallDelay = 5e-3,
                                   .FallTimeConstant = 20e-6};
-    const Core::SFFMParameters sffm{
-        .Offset = 0.5, .Amplitude = 2.0, .CarrierFrequency = 1e3, .ModulationIndex = 5.0, .SignalFrequency = 100.0};
-    const Core::AMParameters am{
-        .Amplitude = 2.0, .Offset = 0.5, .ModulatingFrequency = 200.0, .CarrierFrequency = 10e3, .Delay = 1e-3};
+    const Core::SFFMParameters sffm{.Offset = 0.5,
+                                    .Amplitude = 2.0,
+                                    .CarrierFrequency = 1e3,
+                                    .ModulationIndex = 5.0,
+                                    .SignalFrequency = 100.0};
+    const Core::AMParameters am{.Amplitude = 2.0,
+                                .Offset = 0.5,
+                                .ModulatingFrequency = 200.0,
+                                .CarrierFrequency = 10e3,
+                                .Delay = 1e-3};
     const std::vector<Core::PWLPoint> points = {{0.0, 0.0}, {1e-3, 5.0}, {2e-3, 0.0}, {3e-3, -2.5}};
     source.SetEXP(exp);
     source.SetSFFM(sffm);
@@ -466,10 +477,12 @@ TEST_CASE("Simulation settings load back unchanged", "[schematic_file]") {
     settings.PoleZeroSource = "Vin1";
     settings.PoleZeroOutput = GUI::GridPoint{8, 2};
     settings.TruthTableInputs = {"V1", "V3"};
-    settings.ParameterStep = {
-        .Enabled = true, .Part = "R2", .UsesList = true, .Start = 1e3, .Stop = 4e3, .Step = 1e3, .List = "1k, 2.2k"};
-    settings.MonteCarlo = {
-        .Enabled = true, .Runs = 250, .Distribution = Core::ToleranceDistribution::UNIFORM, .Seed = 4000000000U};
+    settings.ParameterStep =
+        {.Enabled = true, .Part = "R2", .UsesList = true, .Start = 1e3, .Stop = 4e3, .Step = 1e3, .List = "1k, 2.2k"};
+    settings.MonteCarlo = {.Enabled = true,
+                           .Runs = 250,
+                           .Distribution = Core::ToleranceDistribution::UNIFORM,
+                           .Seed = 4000000000U};
     settings.Solver = {.RelativeTolerance = 1e-4,
                        .CurrentToleranceAmperes = 1e-13,
                        .VoltageToleranceVolts = 1e-7,
@@ -1231,7 +1244,8 @@ TEST_CASE("A noise and a random source load back with every parameter", "[schema
 
 TEST_CASE("A source from an older file keeps the default noise and random values", "[schematic_file]") {
     const GUI::LoadedSchematic loaded = LoadOrFail(Document(
-        R"({"type": "VoltageSource", "name": "Vin1", "x": 0, "y": 0, "rotation": 0, "value": 3, "source": "AC"})", ""));
+        R"({"type": "VoltageSource", "name": "Vin1", "x": 0, "y": 0, "rotation": 0, "value": 3, "source": "AC"})",
+        ""));
     REQUIRE(loaded.Elements.size() == 1);
     CAPTURE(loaded.Warnings);
     CHECK(loaded.Warnings.empty());
@@ -1293,8 +1307,10 @@ TEST_CASE("A pin marker that is an S-parameter port saves its number and referen
 
 TEST_CASE("A port without a positive number and a positive impedance leaves the marker out, with a warning",
           "[schematic_file]") {
-    for (const char *port : {R"("port": {"number": 0, "z0": 50})", R"("port": {"number": 1, "z0": 0})",
-                             R"("port": {"number": 1})", R"("port": 3)"}) {
+    for (const char *port : {R"("port": {"number": 0, "z0": 50})",
+                             R"("port": {"number": 1, "z0": 0})",
+                             R"("port": {"number": 1})",
+                             R"("port": 3)"}) {
         const GUI::LoadedSchematic loaded =
             LoadOrFail(Document(std::string(R"({"type":"Pin","x":0,"y":0,"rotation":0,"net":"IN",)") + port + "}", ""));
         CHECK(loaded.Elements.empty());
@@ -1305,8 +1321,11 @@ TEST_CASE("A port without a positive number and a positive impedance leaves the 
 
 TEST_CASE("The S-parameter settings load back unchanged", "[schematic_file]") {
     GUI::SimulationSettings settings;
-    settings.SParameters = {
-        .StartFrequency = 2e6, .StopFrequency = 3e9, .IsLogarithmic = false, .PointsPerDecade = 7, .LinearPoints = 55};
+    settings.SParameters = {.StartFrequency = 2e6,
+                            .StopFrequency = 3e9,
+                            .IsLogarithmic = false,
+                            .PointsPerDecade = 7,
+                            .LinearPoints = 55};
     settings.Selected = GUI::Analysis::S_PARAMETERS;
     const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic({}, {}, settings, {}));
     CHECK(loaded.Warnings.empty());
@@ -1315,8 +1334,10 @@ TEST_CASE("The S-parameter settings load back unchanged", "[schematic_file]") {
 }
 
 TEST_CASE("Invalid S-parameter settings fall back to their defaults with a warning", "[schematic_file]") {
-    for (const char *settings : {R"({"start": -1, "stop": 1e9})", R"({"points_per_decade": 0})",
-                                 R"({"linear_points": 1})", R"({"logarithmic": "yes"})"}) {
+    for (const char *settings : {R"({"start": -1, "stop": 1e9})",
+                                 R"({"points_per_decade": 0})",
+                                 R"({"linear_points": 1})",
+                                 R"({"logarithmic": "yes"})"}) {
         const std::string text = std::string(R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
                                              R"("s_parameters": )") +
                                  settings + "}}";
@@ -1357,9 +1378,13 @@ TEST_CASE("The harmonic balance settings load back unchanged", "[schematic_file]
 }
 
 TEST_CASE("Invalid harmonic balance settings fall back to their defaults with a warning", "[schematic_file]") {
-    for (const char *hb : {R"({"fundamental": 0})", R"({"fundamental": "1k"})", R"({"harmonics": 0})",
-                           R"({"harmonics": 65})", R"({"harmonics": 8, "samples": 16})",
-                           R"({"harmonics": 8, "samples": 30})", R"({"harmonics": 8, "samples": 131072})"}) {
+    for (const char *hb : {R"({"fundamental": 0})",
+                           R"({"fundamental": "1k"})",
+                           R"({"harmonics": 0})",
+                           R"({"harmonics": 65})",
+                           R"({"harmonics": 8, "samples": 16})",
+                           R"({"harmonics": 8, "samples": 30})",
+                           R"({"harmonics": 8, "samples": 131072})"}) {
         const std::string text = std::string(R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
                                              R"("harmonic_balance": )") +
                                  hb + "}}";

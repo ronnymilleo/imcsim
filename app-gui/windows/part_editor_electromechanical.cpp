@@ -50,14 +50,16 @@ constexpr auto TRANSFORMER_FIELDS = std::to_array<ParameterField<Core::Transform
 void LoadElectromechanicalFields(ElectromechanicalFields &fields, const Core::Component &component) {
     const Core::ComponentType type = component.GetType();
     if (type == Core::ComponentType::V_SWITCH) {
-        LoadParameterFields(SWITCH_FIELDS, fields.VoltageSwitch,
+        LoadParameterFields(SWITCH_FIELDS,
+                            fields.VoltageSwitch,
                             static_cast<const Core::VoltageControlledSwitch &>(component).GetParameters());
     } else if (type == Core::ComponentType::RELAY) {
         LoadParameterFields(RELAY_FIELDS, fields.Relay, static_cast<const Core::Relay &>(component).GetParameters());
     } else if (type == Core::ComponentType::FUSE) {
         LoadParameterFields(FUSE_FIELDS, fields.Fuse, static_cast<const Core::Fuse &>(component).GetParameters());
     } else if (type == Core::ComponentType::TRANSFORMER) {
-        LoadParameterFields(TRANSFORMER_FIELDS, fields.Transformer,
+        LoadParameterFields(TRANSFORMER_FIELDS,
+                            fields.Transformer,
                             static_cast<const Core::Transformer &>(component).GetParameters());
     }
 }
@@ -78,7 +80,8 @@ void DrawSwitch(Core::Switch &contact, Schematic &schematic) {
 /**
  * @brief   The switch closes above the threshold plus the hysteresis, and opens below the threshold minus it.
  */
-void DrawControlledSwitch(Core::VoltageControlledSwitch &controlled, ElectromechanicalFields &fields,
+void DrawControlledSwitch(Core::VoltageControlledSwitch &controlled,
+                          ElectromechanicalFields &fields,
                           Schematic &schematic) {
     Core::SwitchParameters parameters = controlled.GetParameters();
     const auto is_valid = [](const Core::SwitchParameters &candidate) {

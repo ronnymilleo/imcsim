@@ -56,11 +56,12 @@ std::optional<ACPartSensitivity> MakePotentiometerPart(const Component &part, co
         }
         return sum;
     };
-    return MakePart(part, {.Value = part.GetValue(),
-                           .MagnitudeDecibelsPerPercent = add(first->second.MagnitudeDecibelsPerPercent,
-                                                              second->second.MagnitudeDecibelsPerPercent),
-                           .PhaseDegreesPerPercent =
-                               add(first->second.PhaseDegreesPerPercent, second->second.PhaseDegreesPerPercent)});
+    return MakePart(
+        part,
+        {.Value = part.GetValue(),
+         .MagnitudeDecibelsPerPercent =
+             add(first->second.MagnitudeDecibelsPerPercent, second->second.MagnitudeDecibelsPerPercent),
+         .PhaseDegreesPerPercent = add(first->second.PhaseDegreesPerPercent, second->second.PhaseDegreesPerPercent)});
 }
 
 const char *InnerUnit(const char type_letter) {

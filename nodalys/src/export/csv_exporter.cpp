@@ -254,7 +254,9 @@ std::string ExportCsv(const AcSensitivityResult &result) {
     }
     ss << "\n";
     for (std::size_t pt = 0; pt < result.Frequencies.size(); ++pt) {
-        ss << std::format("{:.8g},{:.8g},{:.8g}", result.Frequencies[pt], result.Output[pt].real(),
+        ss << std::format("{:.8g},{:.8g},{:.8g}",
+                          result.Frequencies[pt],
+                          result.Output[pt].real(),
                           result.Output[pt].imag());
         for (const AcElementSensitivity &element : result.Elements) {
             // Empty where the output is too small for a relative change to mean anything

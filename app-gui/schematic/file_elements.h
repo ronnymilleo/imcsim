@@ -21,8 +21,10 @@ namespace GUI {
 nlohmann::json WriteElements(std::span<const UIElement *const> elements);
 
 // Reading
-void ReadElements(const nlohmann::json &object, std::span<const SavedSubcircuit> definitions,
-                  std::vector<std::unique_ptr<UIElement>> &elements, std::vector<std::string> &warnings);
+void ReadElements(const nlohmann::json &object,
+                  std::span<const SavedSubcircuit> definitions,
+                  std::vector<std::unique_ptr<UIElement>> &elements,
+                  std::vector<std::string> &warnings);
 
 } // namespace GUI
 

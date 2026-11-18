@@ -15,7 +15,8 @@
 
 namespace Nodalys {
 
-std::expected<AcSweepResult, std::string> ComputeACSweep(CompiledCircuit &compiled, const AcSweepConfig &settings,
+std::expected<AcSweepResult, std::string> ComputeACSweep(CompiledCircuit &compiled,
+                                                         const AcSweepConfig &settings,
                                                          const ConvergenceOptions &options,
                                                          std::vector<DiagnosticMessage> *messages) {
 
@@ -43,7 +44,9 @@ std::expected<AcSweepResult, std::string> ComputeACSweep(CompiledCircuit &compil
     }
 
     AcSweepResult result;
-    result.Frequencies = MakeFrequencySweep(settings.SweepType, settings.StartFrequency, settings.StopFrequency,
+    result.Frequencies = MakeFrequencySweep(settings.SweepType,
+                                            settings.StartFrequency,
+                                            settings.StopFrequency,
                                             settings.PointsPerDecade);
 
     const std::size_t point_count = result.Frequencies.size();

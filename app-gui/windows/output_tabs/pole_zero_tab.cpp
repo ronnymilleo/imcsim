@@ -43,7 +43,9 @@ constexpr float ROOT_MARKER_WEIGHT = 2.0f;
  */
 int FormatSymLogTick(const double value, char *buffer, const int size, void * /*unused*/) {
     const bool is_crowded = value != 0.0 && std::abs(value) < SMALLEST_LABELLED_ROOT;
-    return std::snprintf(buffer, static_cast<std::size_t>(size), "%s",
+    return std::snprintf(buffer,
+                         static_cast<std::size_t>(size),
+                         "%s",
                          is_crowded ? "" : Core::FormatValue(value).c_str());
 }
 
@@ -132,8 +134,10 @@ void PoleZeroTab::Draw() {
  */
 void PoleZeroTab::DrawSummary(const Core::PoleZero &result) {
     const std::string output = GetVoltageLabel(m_Schematic.GetConnectivity(), result.OutputNode);
-    ImGui::TextUnformatted(std::format("Poles and zeros of {} per {}{}", output,
-                                       result.InputUnit == "A" ? "A of " : "V of ", result.InputSource)
+    ImGui::TextUnformatted(std::format("Poles and zeros of {} per {}{}",
+                                       output,
+                                       result.InputUnit == "A" ? "A of " : "V of ",
+                                       result.InputSource)
                                .c_str());
     ImGui::PushTextWrapPos(0.0f);
     for (const std::string &warning : result.Warnings) {
@@ -236,10 +240,12 @@ void PoleZeroTab::DrawTable(const Core::PoleZero &result) {
         ImGui::EndTable();
     }
     ImGui::PushTextWrapPos(0.0f);
-    ImGui::TextDisabled("%s", "A complex pair is one row, named by its natural frequency; Q and the damping ratio "
-                              "belong to complex roots, and a real root shows -.");
+    ImGui::TextDisabled("%s",
+                        "A complex pair is one row, named by its natural frequency; Q and the damping ratio "
+                        "belong to complex roots, and a real root shows -.");
     if (std::ranges::any_of(rows, &PoleZeroRow::IsRightHalfPlane)) {
-        ImGui::TextColored(GetWarningTextColor(), "%s",
+        ImGui::TextColored(GetWarningTextColor(),
+                           "%s",
                            "A root in the right half-plane means the circuit is unstable at its operating point, or "
                            "that the solver got it wrong (ngspice's can; Nodalys checks its roots against the AC "
                            "response and warns); compare it with an AC sweep");

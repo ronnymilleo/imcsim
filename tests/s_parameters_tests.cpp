@@ -277,7 +277,8 @@ TEST_CASE("ngspice does not simulate logic parts in an S-parameter analysis, and
         Core::FindUnsupported(Core::GetBackend(), {Core::ComponentType::AND}, Core::AnalysisKind::S_PARAMETERS);
     REQUIRE(reason.has_value());
     CHECK(reason->contains("digital"));
-    CHECK_FALSE(Core::FindUnsupported(Core::GetBackend(), {Core::ComponentType::RESISTOR, Core::ComponentType::NPN},
+    CHECK_FALSE(Core::FindUnsupported(Core::GetBackend(),
+                                      {Core::ComponentType::RESISTOR, Core::ComponentType::NPN},
                                       Core::AnalysisKind::S_PARAMETERS)
                     .has_value());
     CHECK(Core::GetAnalysisKindName(Core::AnalysisKind::S_PARAMETERS) == "S-parameter");

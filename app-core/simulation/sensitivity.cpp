@@ -145,8 +145,8 @@ bool IsPlacedInside(const std::vector<std::string> &segments) {
     return segments.size() >= 2 && std::ranges::none_of(segments, has_dash);
 }
 
-std::optional<InnerElement> ReadInnerElement(const std::string &vector_name, const std::string &instance,
-                                             const SensitivityVectors &vectors) {
+std::optional<InnerElement>
+ReadInnerElement(const std::string &vector_name, const std::string &instance, const SensitivityVectors &vectors) {
     if (vector_name.ends_with(SCALE_SUFFIX) || vector_name.ends_with(GAIN_SUFFIX)) {
         return std::nullopt;
     }
@@ -171,8 +171,10 @@ std::optional<InnerElement> ReadInnerElement(const std::string &vector_name, con
         type_letter = segments.back().front();
     }
     const std::string path = ToUpper(vector_name.substr(prefix_length + instance.size() + 1));
-    return InnerElement{
-        .Path = path, .Unit = InnerUnit(type_letter), .Absolute = vectors.at(vector_name), .Normalized = *scale};
+    return InnerElement{.Path = path,
+                        .Unit = InnerUnit(type_letter),
+                        .Absolute = vectors.at(vector_name),
+                        .Normalized = *scale};
 }
 
 /**

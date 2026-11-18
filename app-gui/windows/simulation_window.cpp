@@ -15,7 +15,8 @@ namespace GUI {
  * @param[in] controls   Runs of the analyses, shared with the editor toolbar; they must outlive the window.
  * @param[in] settings_panel  Analysis picker and settings, shared with the editor toolbar; it must outlive the window.
  */
-SimulationWindow::SimulationWindow(Schematic &schematic, AnalysisControls &controls,
+SimulationWindow::SimulationWindow(Schematic &schematic,
+                                   AnalysisControls &controls,
                                    AnalysisSettingsPanel &settings_panel)
     : AppWindow("Analysis Settings", true), m_Schematic(schematic), m_Controls(controls),
       m_SettingsPanel(settings_panel) {

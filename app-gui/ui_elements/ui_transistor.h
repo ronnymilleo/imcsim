@@ -36,8 +36,8 @@ protected:
      *          for custom parameters.
      */
     virtual const char *GetModelName() const = 0;
-    void DrawArrowHead(SchematicCanvas &canvas, const ViewTransform &view, ImVec2 tip, ImVec2 direction,
-                       ImU32 color) const;
+    void
+    DrawArrowHead(SchematicCanvas &canvas, const ViewTransform &view, ImVec2 tip, ImVec2 direction, ImU32 color) const;
 };
 
 } // namespace GUI

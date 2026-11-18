@@ -34,8 +34,10 @@ struct NodeAddress {
  * @brief   Where each node of a block body lands: a pin on the outer node of the instance, ground on ground, and any
  *          other node on the node of this instance only.
  */
-std::vector<NodeAddress> AddressBody(const Circuit &root, const SubcircuitDefinition &definition,
-                                     const CircuitEntry &instance, const std::vector<NodeAddress> &outer,
+std::vector<NodeAddress> AddressBody(const Circuit &root,
+                                     const SubcircuitDefinition &definition,
+                                     const CircuitEntry &instance,
+                                     const std::vector<NodeAddress> &outer,
                                      const std::vector<std::string> &path) {
     int node_count = definition.Body.GetNodeCount();
     for (const SubcircuitPin &pin : definition.Pins) {
@@ -53,8 +55,11 @@ std::vector<NodeAddress> AddressBody(const Circuit &root, const SubcircuitDefini
     return addresses;
 }
 
-void Collect(const Circuit &root, const Circuit &level, const NodeVoltageKind kind,
-             const std::vector<std::string> &path, const std::vector<NodeAddress> &addresses,
+void Collect(const Circuit &root,
+             const Circuit &level,
+             const NodeVoltageKind kind,
+             const std::vector<std::string> &path,
+             const std::vector<NodeAddress> &addresses,
              std::vector<NodeVoltageTarget> &targets) {
     for (const CircuitNodeVoltage &marker : level.GetNodeVoltages(kind)) {
         const NodeAddress &address = addresses[static_cast<std::size_t>(marker.Node)];
@@ -79,7 +84,11 @@ void Collect(const Circuit &root, const Circuit &level, const NodeVoltageKind ki
         }
         std::vector<std::string> inner_path = path;
         inner_path.push_back(instance.GetName());
-        Collect(root, definition->Body, kind, inner_path, AddressBody(root, *definition, entry, addresses, inner_path),
+        Collect(root,
+                definition->Body,
+                kind,
+                inner_path,
+                AddressBody(root, *definition, entry, addresses, inner_path),
                 targets);
     }
 }
