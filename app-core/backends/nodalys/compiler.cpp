@@ -378,66 +378,115 @@ private:
             return std::unexpected(resolved.error());
         }
         const EntryContext &entry = *resolved;
+
+        switch (GetFamily(entry.Type)) {
+        case ComponentFamily::MARKER:
+            return {};
+        case ComponentFamily::PASSIVE:
+            return AddPassivePart(entry);
+        case ComponentFamily::SOURCE:
+            return AddSourcePart(entry);
+        case ComponentFamily::CONTROLLED_SOURCE:
+            return AddControlledSource(entry, scope);
+        case ComponentFamily::BEHAVIORAL_SOURCE:
+            return AddBehavioralSource(entry, scope);
+        case ComponentFamily::SEMICONDUCTOR:
+            return AddSemiconductor(entry);
+        case ComponentFamily::SWITCHING:
+            return AddSwitchingPart(entry);
+        case ComponentFamily::TRANSFORMER:
+            AddTransformer(entry);
+            return {};
+        case ComponentFamily::AMPLIFIER:
+            AddOpAmp(entry);
+            return {};
+        case ComponentFamily::BLOCK:
+            return AddSubcircuitInstance(entry, scope);
+        case ComponentFamily::LOGIC_GATE:
+            AddGatePart(entry);
+            return {};
+        case ComponentFamily::FLIP_FLOP:
+            AddFlipFlopPart(entry);
+            return {};
+        case ComponentFamily::LOGIC_DISPLAY:
+        default:
+            return std::unexpected(NoDeviceMessage(entry));
+        }
+    }
+
+    static std::string NoDeviceMessage(const EntryContext &entry) {
+        return std::format("Nodalys has no device for {} (a {} part) yet",
+                           entry.Part.GetName(),
+                           GetTypeName(entry.Type));
+    }
+
+    // Families
+    std::expected<void, std::string> AddPassivePart(const EntryContext &entry) {
         const Component &part = entry.Part;
-        const std::string &name = entry.Name;
         const std::vector<int> &nodes = entry.Nodes;
-
         switch (entry.Type) {
-        case ComponentType::GROUND:
-        case ComponentType::NET_LABEL:
-        case ComponentType::INITIAL_VOLTAGE:
-        case ComponentType::NODESET:
-        case ComponentType::PIN:
-            return {};
-
         case ComponentType::RESISTOR:
-            m_Builder->AddResistor(name, nodes[0], nodes[1], entry.Value);
+            m_Builder->AddResistor(entry.Name, nodes[0], nodes[1], entry.Value);
             return {};
-
         case ComponentType::CAPACITOR:
-            m_Builder->AddCapacitor(name, nodes[0], nodes[1], entry.Value, part.GetInitialCondition().value_or(0.0));
+            m_Builder->AddCapacitor(entry.Name,
+                                    nodes[0],
+                                    nodes[1],
+                                    entry.Value,
+                                    part.GetInitialCondition().value_or(0.0));
             return {};
-
         case ComponentType::INDUCTOR:
-            m_Builder->AddInductor(name, nodes[0], nodes[1], entry.Value, part.GetInitialCondition().value_or(0.0));
+            m_Builder->AddInductor(entry.Name,
+                                   nodes[0],
+                                   nodes[1],
+                                   entry.Value,
+                                   part.GetInitialCondition().value_or(0.0));
             return {};
-
         case ComponentType::SWITCH:
         case ComponentType::PUSH_BUTTON:
-            m_Builder->AddResistor(name, nodes[0], nodes[1], static_cast<const Switch &>(part).GetResistance());
+            m_Builder->AddResistor(entry.Name, nodes[0], nodes[1], static_cast<const Switch &>(part).GetResistance());
             return {};
-
-        case ComponentType::VCC:
-            m_Builder->AddVdc(name, nodes[0], 0, entry.Value);
-            return {};
-
-        case ComponentType::VOLTAGE_SOURCE:
-        case ComponentType::CURRENT_SOURCE:
-            AddSource(entry);
-            return {};
-
-        case ComponentType::CLOCK:
-            m_Builder->AddClock(name, nodes[0], 0, ToNodalys(static_cast<const Clock &>(part).GetParameters()));
-            return {};
-
-        case ComponentType::LOGIC_INPUT: {
-            const auto &input = static_cast<const LogicInput &>(part);
-            m_Builder->AddLogicInput(name, nodes[0], 0, input.IsHigh(), input.GetParameters().LogicLevel, 0.0);
-            return {};
-        }
-
         case ComponentType::POTENTIOMETER:
-            m_Builder->AddPotentiometer(name,
+            m_Builder->AddPotentiometer(entry.Name,
                                         nodes[0],
                                         nodes[2],
                                         nodes[1],
                                         entry.Value,
                                         static_cast<const Potentiometer &>(part).GetWiper());
             return {};
+        default:
+            return std::unexpected(NoDeviceMessage(entry));
+        }
+    }
 
-        case ComponentType::SUBCIRCUIT:
-            return AddSubcircuitInstance(entry, scope);
+    std::expected<void, std::string> AddSourcePart(const EntryContext &entry) {
+        const Component &part = entry.Part;
+        const std::vector<int> &nodes = entry.Nodes;
+        switch (entry.Type) {
+        case ComponentType::VCC:
+            m_Builder->AddVdc(entry.Name, nodes[0], 0, entry.Value);
+            return {};
+        case ComponentType::VOLTAGE_SOURCE:
+        case ComponentType::CURRENT_SOURCE:
+            AddSource(entry);
+            return {};
+        case ComponentType::CLOCK:
+            m_Builder->AddClock(entry.Name, nodes[0], 0, ToNodalys(static_cast<const Clock &>(part).GetParameters()));
+            return {};
+        case ComponentType::LOGIC_INPUT: {
+            const auto &input = static_cast<const LogicInput &>(part);
+            m_Builder->AddLogicInput(entry.Name, nodes[0], 0, input.IsHigh(), input.GetParameters().LogicLevel, 0.0);
+            return {};
+        }
+        default:
+            return std::unexpected(NoDeviceMessage(entry));
+        }
+    }
 
+    std::expected<void, std::string> AddSemiconductor(const EntryContext &entry) {
+        const Component &part = entry.Part;
+        const std::vector<int> &nodes = entry.Nodes;
+        switch (entry.Type) {
         case ComponentType::DIODE:
         case ComponentType::ZENER_DIODE:
         case ComponentType::LED: {
@@ -445,17 +494,16 @@ private:
             if (!resolved_diode) {
                 return std::unexpected(resolved_diode.error());
             }
-            m_Builder->AddDiode(name, nodes[0], nodes[1], ToNodalys(*resolved_diode));
+            m_Builder->AddDiode(entry.Name, nodes[0], nodes[1], ToNodalys(*resolved_diode));
             return {};
         }
-
         case ComponentType::NPN:
         case ComponentType::PNP: {
             const auto resolved_bjt = ResolveParameters(m_Circuit, static_cast<const BJT &>(part));
             if (!resolved_bjt) {
                 return std::unexpected(resolved_bjt.error());
             }
-            m_Builder->AddBjt(name,
+            m_Builder->AddBjt(entry.Name,
                               nodes[0],
                               nodes[1],
                               nodes[2],
@@ -463,7 +511,6 @@ private:
                               ToNodalys(*resolved_bjt));
             return {};
         }
-
         case ComponentType::NMOS:
         case ComponentType::PMOS: {
             const auto resolved_mosfet = ResolveParameters(m_Circuit, static_cast<const MOSFET &>(part));
@@ -471,7 +518,7 @@ private:
                 return std::unexpected(resolved_mosfet.error());
             }
             const int body = nodes.size() > 3 ? nodes[3] : nodes[2];
-            m_Builder->AddMosfet(name,
+            m_Builder->AddMosfet(entry.Name,
                                  nodes[0],
                                  nodes[1],
                                  nodes[2],
@@ -480,25 +527,34 @@ private:
                                  ToNodalys(*resolved_mosfet));
             return {};
         }
+        default:
+            return std::unexpected(NoDeviceMessage(entry));
+        }
+    }
 
+    std::expected<void, std::string> AddSwitchingPart(const EntryContext &entry) {
+        const Component &part = entry.Part;
+        const std::vector<int> &nodes = entry.Nodes;
+        switch (entry.Type) {
         case ComponentType::V_SWITCH:
             m_Builder->AddVoltageControlledSwitch(
-                name,
+                entry.Name,
                 nodes[0],
                 nodes[1],
                 nodes[2],
                 nodes[3],
                 ToNodalys(static_cast<const VoltageControlledSwitch &>(part).GetParameters()));
             return {};
-
         case ComponentType::FUSE:
-            m_Builder->AddFuse(name, nodes[0], nodes[1], ToNodalys(static_cast<const Fuse &>(part).GetParameters()));
+            m_Builder->AddFuse(entry.Name,
+                               nodes[0],
+                               nodes[1],
+                               ToNodalys(static_cast<const Fuse &>(part).GetParameters()));
             return {};
-
         case ComponentType::RELAY: {
             const auto &relay = static_cast<const Relay &>(part);
             const RelayParameters &figures = relay.GetParameters();
-            m_Builder->AddRelay(name,
+            m_Builder->AddRelay(entry.Name,
                                 nodes[2],
                                 nodes[3],
                                 nodes[0],
@@ -508,79 +564,64 @@ private:
                                 ToNodalys(relay.GetContactParameters()));
             return {};
         }
-
-        case ComponentType::TRANSFORMER: {
-            const auto &transformer = static_cast<const Transformer &>(part);
-            const TransformerParameters &figures = transformer.GetParameters();
-            m_Builder->AddTransformer(name,
-                                      nodes[0],
-                                      nodes[1],
-                                      nodes[2],
-                                      nodes[3],
-                                      transformer.GetValue(),
-                                      transformer.GetSecondaryInductance(),
-                                      figures.Coupling,
-                                      figures.WindingResistance);
-            return {};
+        default:
+            return std::unexpected(NoDeviceMessage(entry));
         }
+    }
 
-        case ComponentType::VCVS:
-        case ComponentType::VCCS:
-        case ComponentType::CCCS:
-        case ComponentType::CCVS:
-            return AddControlledSource(entry, scope);
+    void AddTransformer(const EntryContext &entry) {
+        const auto &transformer = static_cast<const Transformer &>(entry.Part);
+        const TransformerParameters &figures = transformer.GetParameters();
+        m_Builder->AddTransformer(entry.Name,
+                                  entry.Nodes[0],
+                                  entry.Nodes[1],
+                                  entry.Nodes[2],
+                                  entry.Nodes[3],
+                                  transformer.GetValue(),
+                                  transformer.GetSecondaryInductance(),
+                                  figures.Coupling,
+                                  figures.WindingResistance);
+    }
 
-        case ComponentType::BEHAVIORAL_VOLTAGE:
-        case ComponentType::BEHAVIORAL_CURRENT:
-            return AddBehavioralSource(entry, scope);
-
+    /// The inverter and the buffer have one input; every other gate is one device that AddLogicGate() builds.
+    void AddGatePart(const EntryContext &entry) {
+        const auto &logic = static_cast<const LogicPart &>(entry.Part);
+        const std::vector<int> &nodes = entry.Nodes;
+        switch (entry.Type) {
         case ComponentType::NOT:
-            m_Builder->AddInverter(name, nodes[1], nodes[0], MakeLogicParams(static_cast<const LogicPart &>(part)));
-            return {};
-
+            m_Builder->AddInverter(entry.Name, nodes[1], nodes[0], MakeLogicParams(logic));
+            break;
         case ComponentType::BUFFER:
-            m_Builder->AddLogicBuffer(name, nodes[1], nodes[0], MakeLogicParams(static_cast<const LogicPart &>(part)));
-            return {};
-
-        case ComponentType::AND:
-        case ComponentType::NAND:
-        case ComponentType::OR:
-        case ComponentType::NOR:
-        case ComponentType::XOR:
-        case ComponentType::XNOR:
+            m_Builder->AddLogicBuffer(entry.Name, nodes[1], nodes[0], MakeLogicParams(logic));
+            break;
+        default:
             AddLogicGate(entry);
-            return {};
+            break;
+        }
+    }
 
-        case ComponentType::D_FLIP_FLOP:
-            m_Builder->AddDFlipFlop(name,
+    void AddFlipFlopPart(const EntryContext &entry) {
+        const std::vector<int> &nodes = entry.Nodes;
+        switch (entry.Type) {
+        case ComponentType::SR_FLIP_FLOP:
+            ExpandSrFlipFlop(entry);
+            break;
+        case ComponentType::T_FLIP_FLOP:
+            ExpandTFlipFlop(entry);
+            break;
+        case ComponentType::JK_FLIP_FLOP:
+            ExpandJkFlipFlop(entry);
+            break;
+        default:
+            m_Builder->AddDFlipFlop(entry.Name,
                                     nodes[4],
                                     nodes[5],
                                     nodes[0],
                                     nodes[1],
-                                    MakeLogicParams(static_cast<const LogicPart &>(part)),
+                                    MakeLogicParams(static_cast<const LogicPart &>(entry.Part)),
                                     nodes[2],
                                     nodes[3]);
-            return {};
-
-        case ComponentType::SR_FLIP_FLOP:
-            ExpandSrFlipFlop(entry);
-            return {};
-
-        case ComponentType::T_FLIP_FLOP:
-            ExpandTFlipFlop(entry);
-            return {};
-
-        case ComponentType::JK_FLIP_FLOP:
-            ExpandJkFlipFlop(entry);
-            return {};
-
-        case ComponentType::OP_AMP:
-            AddOpAmp(entry);
-            return {};
-
-        default:
-            return std::unexpected(
-                std::format("Nodalys has no device for {} (a {} part) yet", part.GetName(), GetTypeName(entry.Type)));
+            break;
         }
     }
 
