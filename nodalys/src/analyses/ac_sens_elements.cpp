@@ -6,8 +6,7 @@
 #include "analyses/ac_sens_elements.h"
 
 #include "devices/devices.h"
-#include <algorithm>
-#include <cctype>
+#include "text/text_case.h"
 #include <optional>
 
 namespace Nodalys {
@@ -15,12 +14,6 @@ namespace Nodalys {
 namespace {
 
 using Complex = std::complex<double>;
-
-std::string ToLower(std::string text) {
-    std::ranges::transform(text, text.begin(),
-                           [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    return text;
-}
 
 /// A value of a vector at an unknown, with ground (-1) reading zero.
 template <typename Value> Value At(const std::vector<Value> &values, const int unknown) {

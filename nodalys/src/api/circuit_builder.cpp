@@ -18,8 +18,8 @@
 #include "devices/transient_noise.h"
 #include "devices/waveforms.h"
 #include "nodalys/expression.h"
+#include "text/text_case.h"
 #include <algorithm>
-#include <cctype>
 #include <charconv>
 #include <cmath>
 #include <format>
@@ -117,9 +117,7 @@ BoyleOpAmpValues ComputeBoyleOpAmpValues(const BoyleOpAmpParameters &parameters)
 
 /// Reads the node of a voltage in an expression: its number, or 0, gnd or ground for the reference.
 std::optional<NodeId> ReadExpressionNode(const std::string &text) {
-    std::string lowered = text;
-    std::ranges::transform(lowered, lowered.begin(),
-                           [](const char character) { return static_cast<char>(std::tolower(character)); });
+    const std::string lowered = ToLower(text);
     if (lowered == "gnd" || lowered == "ground") {
         return GROUND_NODE;
     }
@@ -133,14 +131,9 @@ std::optional<NodeId> ReadExpressionNode(const std::string &text) {
 
 /// Finds the voltage source an expression reads the current of, whatever the case of the name.
 VoltageSourceDevice *FindVoltageSource(const std::map<std::string, Device *> &sources, const std::string &name) {
-    const auto lowered = [](std::string text) {
-        std::ranges::transform(text, text.begin(),
-                               [](const char character) { return static_cast<char>(std::tolower(character)); });
-        return text;
-    };
-    const std::string wanted = lowered(name);
+    const std::string wanted = ToLower(name);
     for (const auto &[source_name, device] : sources) {
-        if (source_name == name || lowered(source_name) == wanted) {
+        if (source_name == name || ToLower(source_name) == wanted) {
             return dynamic_cast<VoltageSourceDevice *>(device);
         }
     }

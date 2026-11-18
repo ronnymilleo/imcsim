@@ -11,6 +11,7 @@
 #include "parser/source_waveforms.h"
 #include "parser/spice_number.h"
 #include "parser/spice_text.h"
+#include "text/text_case.h"
 
 #include <algorithm>
 #include <cctype>
@@ -30,24 +31,6 @@
 namespace Nodalys {
 
 namespace {
-
-std::string ToUpper(std::string_view sv) {
-    std::string s;
-    s.reserve(sv.size());
-    for (const char c : sv) {
-        s.push_back(static_cast<char>(std::toupper(static_cast<unsigned char>(c))));
-    }
-    return s;
-}
-
-std::string ToLower(std::string_view sv) {
-    std::string s;
-    s.reserve(sv.size());
-    for (const char c : sv) {
-        s.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
-    }
-    return s;
-}
 
 std::string_view Trim(std::string_view s) {
     while (!s.empty() && std::isspace(static_cast<unsigned char>(s.front()))) {

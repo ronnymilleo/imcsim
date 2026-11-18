@@ -5,6 +5,8 @@
 
 #include "parser/spice_text.h"
 
+#include "text/text_case.h"
+
 #include <cctype>
 #include <cstddef>
 
@@ -83,18 +85,6 @@ void FlushToken(std::string &token, std::vector<std::string> &tokens) {
 } // namespace
 
 /**
- * @brief   Upper-cases text, since SPICE reads names without regard to case.
- */
-std::string ToUpperCase(const std::string_view text) {
-    std::string upper;
-    upper.reserve(text.size());
-    for (const char character : text) {
-        upper.push_back(static_cast<char>(std::toupper(static_cast<unsigned char>(character))));
-    }
-    return upper;
-}
-
-/**
  * @brief   Removes the spaces at both ends of a text.
  */
 std::string_view TrimSpaces(std::string_view text) {
@@ -171,7 +161,7 @@ std::vector<std::string> SplitTokens(const std::string_view line) {
  * @param[in] token  Token of the line, after its nodes.
  */
 bool IsParameterStart(const std::string &token) {
-    return ToUpperCase(token).starts_with(PARAMETER_LIST_MARK) ||
+    return ToUpper(token).starts_with(PARAMETER_LIST_MARK) ||
            (token.find('=') != std::string::npos && token.front() != '{' && token.front() != '\'');
 }
 

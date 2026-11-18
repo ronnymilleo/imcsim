@@ -9,6 +9,7 @@
 #include "parser/subcircuit_elements.h"
 #include "parser/subcircuit_models.h"
 #include "parser/subcircuit_scope.h"
+#include "text/text_case.h"
 
 #include <algorithm>
 #include <cctype>
@@ -52,14 +53,14 @@ std::vector<std::pair<std::string, std::string>> SplitParameterTokens(const std:
     std::vector<std::pair<std::string, std::string>> parameters;
     for (std::size_t index = first; index < tokens.size(); ++index) {
         std::string token = tokens[index];
-        if (ToUpperCase(token).starts_with(PARAMETER_LIST_MARK)) {
+        if (ToUpper(token).starts_with(PARAMETER_LIST_MARK)) {
             token.erase(0, PARAMETER_LIST_MARK.size());
         }
         if (token.empty()) {
             continue;
         }
         const std::size_t equals = token.find('=');
-        parameters.emplace_back(ToUpperCase(token.substr(0, equals)),
+        parameters.emplace_back(ToUpper(token.substr(0, equals)),
                                 equals == std::string::npos ? std::string() : token.substr(equals + 1));
     }
     return parameters;
@@ -96,7 +97,7 @@ std::optional<std::size_t> FindBodyLength(const std::vector<std::string> &lines,
     int depth = 1;
     for (std::size_t index = first; index < lines.size(); ++index) {
         const std::vector<std::string> tokens = SplitTokens(lines[index]);
-        const std::string directive = tokens.empty() ? std::string() : ToUpperCase(tokens[0]);
+        const std::string directive = tokens.empty() ? std::string() : ToUpper(tokens[0]);
         if (directive == ".SUBCKT") {
             ++depth;
         } else if (directive == ".ENDS" && --depth == 0) {
@@ -116,7 +117,7 @@ std::expected<ClassifiedLines, std::string> ClassifyLines(ExpansionContext &cont
     ClassifiedLines classified;
     for (std::size_t index = 0; index < lines.size(); ++index) {
         const std::vector<std::string> tokens = SplitTokens(lines[index]);
-        const std::string directive = ToUpperCase(tokens[0]);
+        const std::string directive = ToUpper(tokens[0]);
         if (directive == ".SUBCKT") {
             auto subcircuit = ReadSubcircuitHeader(tokens);
             const std::optional<std::size_t> length = FindBodyLength(lines, index + 1);
@@ -129,7 +130,7 @@ std::expected<ClassifiedLines, std::string> ClassifyLines(ExpansionContext &cont
             subcircuit->Lines.assign(lines.begin() + static_cast<std::ptrdiff_t>(index + 1),
                                      lines.begin() + static_cast<std::ptrdiff_t>(index + 1 + *length));
             subcircuit->DefinedIn = &scope;
-            const std::string key = ToUpperCase(subcircuit->Name);
+            const std::string key = ToUpper(subcircuit->Name);
             scope.AddSubcircuit(key, std::move(*subcircuit));
             index += *length + 1;
         } else if (directive == ".PARAM") {
@@ -179,7 +180,7 @@ Result DefineModels(ExpansionContext &context, TextScope &scope,
             return std::unexpected(Refuse(context, std::format(".model {}", tokens.size() > 1 ? tokens[1] : ""),
                                           "is not understood: " + model.error()));
         }
-        scope.AddModel(ToUpperCase(tokens[1]), std::move(*model));
+        scope.AddModel(ToUpper(tokens[1]), std::move(*model));
     }
     return {};
 }
@@ -227,7 +228,7 @@ Result ExpandInstance(ExpansionContext &context, TextScope &scope, const std::st
         return std::unexpected(Refuse(context, line, "is not written X<name> <nodes> <subcircuit>"));
     }
     const std::string &subcircuit_name = tokens[parameters_start - 1];
-    const TextSubcircuit *subcircuit = scope.FindSubcircuit(ToUpperCase(subcircuit_name));
+    const TextSubcircuit *subcircuit = scope.FindSubcircuit(ToUpper(subcircuit_name));
     if (subcircuit == nullptr) {
         return std::unexpected(Refuse(
             context, line, std::format("uses the subcircuit {}, which the text does not define", subcircuit_name)));
@@ -248,7 +249,7 @@ Result ExpandInstance(ExpansionContext &context, TextScope &scope, const std::st
         return set;
     }
     for (std::size_t port = 0; port < node_count; ++port) {
-        instance.MapNode(ToUpperCase(subcircuit->Ports[port]), scope.ResolveNode(context, tokens[1 + port]));
+        instance.MapNode(ToUpper(subcircuit->Ports[port]), scope.ResolveNode(context, tokens[1 + port]));
     }
     return ExpandScope(context, instance, subcircuit->Lines, depth + 1);
 }
@@ -309,10 +310,10 @@ AddSubcircuitText(CircuitBuilder &builder, const SubcircuitText &text, const Sub
                              .OnSource = instance.OnSource};
     TextScope scope(nullptr, instance.Prefix);
     for (const auto &[name, value] : instance.Parameters) {
-        scope.SetParameter(ToUpperCase(name), value);
+        scope.SetParameter(ToUpper(name), value);
     }
     for (std::size_t port = 0; port < text.Ports.size(); ++port) {
-        scope.MapNode(ToUpperCase(text.Ports[port]), instance.PortNodes[port]);
+        scope.MapNode(ToUpper(text.Ports[port]), instance.PortNodes[port]);
     }
     if (const Result expanded = ExpandScope(context, scope, SplitLogicalLines(text.Body), 0); !expanded) {
         return std::unexpected(expanded.error());

@@ -6,6 +6,7 @@
 #include "parser/subcircuit_models.h"
 
 #include "parser/spice_text.h"
+#include "text/text_case.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -49,7 +50,7 @@ std::optional<ParsedModel::ModelKind> FindKind(const std::string &type) {
 std::string_view FindParameterText(const std::string_view after_name, std::string &type) {
     const std::string_view text = TrimSpaces(after_name);
     const std::size_t type_end = text.find_first_of(" \t(");
-    type = ToUpperCase(text.substr(0, type_end));
+    type = ToUpper(text.substr(0, type_end));
     std::string_view parameters = type_end == std::string_view::npos ? std::string_view() : text.substr(type_end);
     parameters = TrimSpaces(parameters);
     if (parameters.size() >= 2 && parameters.front() == '(' && parameters.back() == ')') {
@@ -91,10 +92,10 @@ std::expected<TextModel, std::string> ParseTextModel(const TextScope &scope, con
         }
         const auto value = scope.Evaluate(std::string_view(token).substr(equals + 1));
         if (!value) {
-            return std::unexpected(std::format("the parameter {} of the model {}: {}",
-                                               ToUpperCase(token.substr(0, equals)), model.Name, value.error()));
+            return std::unexpected(std::format("the parameter {} of the model {}: {}", ToUpper(token.substr(0, equals)),
+                                               model.Name, value.error()));
         }
-        model.Card.Params[ToUpperCase(token.substr(0, equals))] = *value;
+        model.Card.Params[ToUpper(token.substr(0, equals))] = *value;
     }
     return model;
 }
@@ -109,7 +110,7 @@ std::expected<TextModel, std::string> ParseTextModel(const TextScope &scope, con
  */
 std::expected<const TextModel *, std::string> UseTextModel(const TextScope &scope, const std::string_view name,
                                                            const std::initializer_list<ParsedModel::ModelKind> kinds) {
-    const TextModel *model = scope.FindModel(ToUpperCase(name));
+    const TextModel *model = scope.FindModel(ToUpper(name));
     if (model == nullptr) {
         return std::unexpected(std::format("it uses the model {}, which the text does not define", name));
     }
@@ -137,7 +138,7 @@ std::expected<const TextModel *, std::string> UseTextModel(const TextScope &scop
  */
 void ReportIgnoredParameters(ExpansionContext &context, const TextModel &model,
                              const std::set<std::string> &read_keys) {
-    if (!context.ReportedModels.insert(ToUpperCase(model.Name)).second) {
+    if (!context.ReportedModels.insert(ToUpper(model.Name)).second) {
         return;
     }
     std::string ignored;

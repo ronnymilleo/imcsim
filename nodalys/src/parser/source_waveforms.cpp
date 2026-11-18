@@ -6,6 +6,7 @@
 #include "parser/source_waveforms.h"
 
 #include "parser/spice_text.h"
+#include "text/text_case.h"
 
 #include <cstddef>
 
@@ -175,7 +176,7 @@ void AddRandom(CircuitBuilder &builder, const std::string &name, const bool is_v
  * @return  The waveform, or NONE when the token is not the name of one followed by an opening parenthesis.
  */
 SourceWaveform FindSourceWaveform(const std::string_view token) {
-    const std::string upper = ToUpperCase(token);
+    const std::string upper = ToUpper(token);
     if (upper.starts_with("PULSE(")) {
         return SourceWaveform::PULSE;
     }

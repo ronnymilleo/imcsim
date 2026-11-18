@@ -7,6 +7,7 @@
 
 #include "nodalys/expression.h"
 #include "parser/spice_text.h"
+#include "text/text_case.h"
 
 #include <cctype>
 #include <cstddef>
@@ -99,14 +100,14 @@ std::string SubstituteParameters(const std::string_view text, const ParameterLoo
             ++after;
         }
         if (after < text.size() && text[after] == '(') {
-            const std::string upper = ToUpperCase(word);
+            const std::string upper = ToUpper(word);
             const bool is_reference = upper == "V" || upper == "I";
             const std::size_t close = is_reference ? FindClosingParenthesis(text, after) : end;
             result.append(text.substr(position, close - position));
             position = close;
             continue;
         }
-        if (const std::optional<double> value = lookup(ToUpperCase(word))) {
+        if (const std::optional<double> value = lookup(ToUpper(word))) {
             result += std::format("({:.{}g})", *value, ROUND_TRIP_DIGITS);
         } else {
             result.append(word);

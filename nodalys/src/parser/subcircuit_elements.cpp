@@ -10,6 +10,7 @@
 #include "parser/spice_text.h"
 #include "parser/spice_values.h"
 #include "parser/subcircuit_models.h"
+#include "text/text_case.h"
 
 #include <algorithm>
 #include <cctype>
@@ -60,7 +61,7 @@ Arguments SplitArguments(const std::vector<std::string> &tokens, const std::size
         const bool is_option = equals != std::string::npos && equals > 0 && tokens[index].front() != '{' &&
                                tokens[index].front() != '\'' && tokens[index].find('(') > equals;
         if (is_option) {
-            arguments.Options[ToUpperCase(tokens[index].substr(0, equals))] = tokens[index].substr(equals + 1);
+            arguments.Options[ToUpper(tokens[index].substr(0, equals))] = tokens[index].substr(equals + 1);
         } else {
             arguments.Positional.push_back(tokens[index]);
         }
@@ -233,7 +234,7 @@ Result ReadWaveformValues(const TextScope &scope, const std::string &token, std:
  */
 Result ReadSourceWord(const TextScope &scope, const std::vector<std::string> &tokens, std::size_t &index,
                       SourceValues &values) {
-    const std::string upper = ToUpperCase(tokens[index]);
+    const std::string upper = ToUpper(tokens[index]);
     const bool has_next = index + 1 < tokens.size();
     if (upper == "DC" && has_next) {
         index += 2;
@@ -320,7 +321,7 @@ std::expected<std::string, std::string> ResolveExpression(ExpansionContext &cont
         resolved.append(substituted, copied, reference.Start - copied);
         copied = reference.Start + reference.Length;
         if (reference.Input.Type == ExpressionInput::Kind::CURRENT) {
-            const std::optional<std::string> source = scope.FindSourceName(ToUpperCase(reference.Input.First));
+            const std::optional<std::string> source = scope.FindSourceName(ToUpper(reference.Input.First));
             if (!source) {
                 return std::unexpected(std::format("it reads the current of {}, which is not a voltage source of "
                                                    "the subcircuit",
@@ -389,7 +390,7 @@ Result AddVoltageControlledLine(ExpansionContext &context, TextScope &scope, con
     if (const Result nodes = CheckNodeCount(element, 3); !nodes) {
         return nodes;
     }
-    const std::string third = ToUpperCase(element.Tokens[FIRST_NODE_INDEX + 2]);
+    const std::string third = ToUpper(element.Tokens[FIRST_NODE_INDEX + 2]);
     if (third.starts_with("VALUE")) {
         return AddExpressionSource(context, scope, element, is_voltage, FindExpressionText(element.Text));
     }
@@ -436,14 +437,14 @@ Result AddCurrentControlledLine(ExpansionContext &context, TextScope &scope, con
     if (const Result nodes = CheckNodeCount(element, 3); !nodes) {
         return nodes;
     }
-    if (ToUpperCase(element.Tokens[FIRST_NODE_INDEX + 2]).starts_with("POLY")) {
+    if (ToUpper(element.Tokens[FIRST_NODE_INDEX + 2]).starts_with("POLY")) {
         return std::unexpected("the form POLY of a controlled source is not simulated, only a gain");
     }
     if (element.Tokens.size() != FIRST_NODE_INDEX + NODES_SOURCE_AND_GAIN) {
         return std::unexpected("it is written <node> <node> <voltage source> <gain>");
     }
     const std::string &controller = element.Tokens[FIRST_NODE_INDEX + 2];
-    const std::optional<std::string> source = scope.FindSourceName(ToUpperCase(controller));
+    const std::optional<std::string> source = scope.FindSourceName(ToUpper(controller));
     if (!source) {
         return std::unexpected(std::format("it reads the current of {}, which is not a voltage source of the "
                                            "subcircuit",
@@ -518,7 +519,7 @@ Result AddBjtLine(ExpansionContext &context, TextScope &scope, const ElementLine
         return nodes;
     }
     // The fourth word is the model, unless the model is the fifth and the fourth is the substrate node
-    const std::size_t model_index = scope.FindModel(ToUpperCase(element.Tokens[FIRST_NODE_INDEX + NODES])) == nullptr &&
+    const std::size_t model_index = scope.FindModel(ToUpper(element.Tokens[FIRST_NODE_INDEX + NODES])) == nullptr &&
                                             element.Tokens.size() > FIRST_NODE_INDEX + NODES + 1
                                         ? FIRST_NODE_INDEX + NODES + 1
                                         : FIRST_NODE_INDEX + NODES;
@@ -647,7 +648,7 @@ const std::map<char, Handler> &GetHandlers() {
  */
 void NoteVoltageSource(TextScope &scope, const std::vector<std::string> &tokens) {
     if (!tokens.empty() && std::toupper(static_cast<unsigned char>(tokens[0].front())) == 'V') {
-        scope.AddSourceName(ToUpperCase(tokens[0]), tokens[0]);
+        scope.AddSourceName(ToUpper(tokens[0]), tokens[0]);
     }
 }
 

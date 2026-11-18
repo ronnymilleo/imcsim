@@ -11,23 +11,14 @@
 #include "analyses/analyses.h"
 
 #include "devices/devices.h"
-#include <algorithm>
-#include <cctype>
+#include "text/text_case.h"
 #include <cmath>
 #include <format>
 #include <string>
 
 namespace Nodalys {
 
-namespace {
-
-std::string ToLower(std::string text) {
-    std::ranges::transform(text, text.begin(),
-                           [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    return text;
-}
-
-} // namespace
+namespace {} // namespace
 
 /**
  * @brief   Calculates small-signal DC sensitivity vectors for all circuit elements using the adjoint method.
