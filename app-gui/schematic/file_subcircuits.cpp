@@ -121,8 +121,8 @@ std::expected<SavedSubcircuit, std::string> ReadSubcircuitText(const nlohmann::j
     }
     Core::SubcircuitText spice{.Ports = {}, .Text = *text};
     for (const nlohmann::json &port : *ports) {
-        if (!port.is_string() || port.get<std::string>().empty() ||
-            port.get<std::string>().find_first_of(" \t\n") != std::string::npos) {
+        if (!port.is_string() || port.get<std::string>().empty()
+            || port.get<std::string>().find_first_of(" \t\n") != std::string::npos) {
             return std::unexpected("has a SPICE port that is not one word");
         }
         spice.Ports.push_back(port.get<std::string>());
@@ -163,8 +163,8 @@ std::expected<SavedSubcircuit, std::string> ReadSubcircuit(const nlohmann::json 
             const std::optional<std::string> parameter_name =
                 parameter.is_object() ? ReadString(parameter, "name") : std::nullopt;
             const std::optional<double> value = parameter.is_object() ? ReadNumber(parameter, "default") : std::nullopt;
-            if (!parameter_name || !Core::SubcircuitInstance::IsValidIdentifier(*parameter_name) || !value ||
-                std::ranges::contains(definition.Parameters, *parameter_name, &Core::SubcircuitParameter::Name)) {
+            if (!parameter_name || !Core::SubcircuitInstance::IsValidIdentifier(*parameter_name) || !value
+                || std::ranges::contains(definition.Parameters, *parameter_name, &Core::SubcircuitParameter::Name)) {
                 return std::unexpected("has an invalid or repeated parameter");
             }
             definition.Parameters.push_back({*parameter_name, *value});

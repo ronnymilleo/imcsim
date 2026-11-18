@@ -224,12 +224,11 @@ void Diode::SetCustomParameters(const DiodeParameters &parameters) {
  *          ratings are positive.
  */
 bool Diode::IsValidParameters(const DiodeParameters &parameters) const {
-    return parameters.SaturationCurrent > 0.0 && parameters.EmissionCoefficient > 0.0 &&
-           parameters.SeriesResistance >= 0.0 && parameters.BreakdownVoltage > 0.0 &&
-           parameters.BreakdownCurrent > 0.0 && parameters.JunctionCapacitance >= 0.0 &&
-           parameters.JunctionPotential > 0.0 && parameters.GradingCoefficient > 0.0 &&
-           parameters.GradingCoefficient <= 0.9 && parameters.TransitTime >= 0.0 &&
-           parameters.MaxForwardCurrent > 0.0 && parameters.MaxPower > 0.0;
+    return parameters.SaturationCurrent > 0.0 && parameters.EmissionCoefficient > 0.0
+        && parameters.SeriesResistance >= 0.0 && parameters.BreakdownVoltage > 0.0 && parameters.BreakdownCurrent > 0.0
+        && parameters.JunctionCapacitance >= 0.0 && parameters.JunctionPotential > 0.0
+        && parameters.GradingCoefficient > 0.0 && parameters.GradingCoefficient <= 0.9 && parameters.TransitTime >= 0.0
+        && parameters.MaxForwardCurrent > 0.0 && parameters.MaxPower > 0.0;
 }
 
 /**

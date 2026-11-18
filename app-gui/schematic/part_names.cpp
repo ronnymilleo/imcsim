@@ -64,8 +64,8 @@ RenameCurrent(const std::string_view current, const std::string_view old_name, c
     if (current == old_name) {
         return std::string(new_name);
     }
-    if (current.starts_with(old_name) && current.size() > old_name.size() &&
-        current[old_name.size()] == TERMINAL_SEPARATOR) {
+    if (current.starts_with(old_name) && current.size() > old_name.size()
+        && current[old_name.size()] == TERMINAL_SEPARATOR) {
         return std::format("{}{}", new_name, current.substr(old_name.size()));
     }
     return std::string(current);
@@ -89,8 +89,8 @@ RenameCurrentsIn(const std::string_view expression, const std::string_view old_n
         }
         const std::size_t start = open + 2;
         // Only the I of a current, not the last letter of a longer name
-        if (open > 0 &&
-            (std::isalnum(static_cast<unsigned char>(expression[open - 1])) != 0 || expression[open - 1] == '_')) {
+        if (open > 0
+            && (std::isalnum(static_cast<unsigned char>(expression[open - 1])) != 0 || expression[open - 1] == '_')) {
             renamed += expression.substr(position, start - position);
             position = start;
             continue;

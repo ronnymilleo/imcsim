@@ -51,6 +51,7 @@ std::vector<std::string> ListWarningsOfResult(const ResultStore &results, const 
 }
 
 } // namespace
+
 /**
  * @brief   Creates the controls for a schematic.
  * @param[in] schematic  Schematic whose analyses are set and run; it must outlive the controls.

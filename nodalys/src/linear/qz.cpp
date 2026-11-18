@@ -680,8 +680,8 @@ ExtractEigenvalues(DenseMatrix &a, DenseMatrix &b, const double epsb, const doub
             double a1i = 0.0;
             double a2 = 0.0;
             double a2i = 0.0;
-            if (std::abs(a11r) + std::abs(a11i) + std::abs(a12r) + std::abs(a12i) <
-                std::abs(a21) + std::abs(a22r) + std::abs(a22i)) {
+            if (std::abs(a11r) + std::abs(a11i) + std::abs(a12r) + std::abs(a12i)
+                < std::abs(a21) + std::abs(a22r) + std::abs(a22i)) {
                 a1 = a22r;
                 a1i = a22i;
                 a2 = -a21;
@@ -776,8 +776,8 @@ ExtractEigenvalues(DenseMatrix &a, DenseMatrix &b, const double epsb, const doub
  * @return  Vector of finite complex generalized eigenvalues in rad/s.
  */
 std::vector<std::complex<double>> ComputeGeneralizedEigenvalues(const DenseMatrix &mat_a, const DenseMatrix &mat_b) {
-    if (mat_a.Rows() == 0 || mat_a.Cols() != mat_a.Rows() || mat_b.Rows() != mat_a.Rows() ||
-        mat_b.Cols() != mat_a.Rows()) {
+    if (mat_a.Rows() == 0 || mat_a.Cols() != mat_a.Rows() || mat_b.Rows() != mat_a.Rows()
+        || mat_b.Cols() != mat_a.Rows()) {
         return {};
     }
 

@@ -37,8 +37,8 @@ std::optional<std::string> CheckPinNodes(const Connectivity &connectivity,
             return "Pin " + pin.Name + " is on a point that connects to nothing in the block";
         }
         if (*node == GROUND_NODE) {
-            return "Pin " + pin.Name +
-                   " is on the ground of the block, which every part shares already; remove the pin or the ground";
+            return "Pin " + pin.Name
+                 + " is on the ground of the block, which every part shares already; remove the pin or the ground";
         }
         if (!nodes.insert(*node).second) {
             return "Pin " + pin.Name + " shares a node with another pin; place only one pin marker on each node";

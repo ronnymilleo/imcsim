@@ -135,10 +135,10 @@ std::vector<LineSegment> SplitIntoDashes(const std::span<const ImVec2> points,
         }
         double first = 0.0;
         double last = 1.0;
-        const bool visible = ClipEdge(delta_x, start.X - clip_min.x, first, last) &&
-                             ClipEdge(-delta_x, clip_max.x - start.X, first, last) &&
-                             ClipEdge(delta_y, start.Y - clip_min.y, first, last) &&
-                             ClipEdge(-delta_y, clip_max.y - start.Y, first, last);
+        const bool visible = ClipEdge(delta_x, start.X - clip_min.x, first, last)
+                          && ClipEdge(-delta_x, clip_max.x - start.X, first, last)
+                          && ClipEdge(delta_y, start.Y - clip_min.y, first, last)
+                          && ClipEdge(-delta_y, clip_max.y - start.Y, first, last);
         if (!visible) {
             phase = std::fmod(phase + length, period);
             continue;

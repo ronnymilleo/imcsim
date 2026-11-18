@@ -366,6 +366,7 @@ TEST_CASE("The derivative of every operation matches a finite difference", "[nod
         std::string Text;
         std::vector<std::vector<double>> Points;
     };
+
     const std::vector<Case> cases{
         {"v(1) * v(2)", {{1.5, -2.0}, {0.3, 0.7}}},
         {"v(1) / v(2)", {{1.5, -2.0}, {0.3, 0.7}}},

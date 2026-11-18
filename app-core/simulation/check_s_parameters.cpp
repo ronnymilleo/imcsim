@@ -20,7 +20,7 @@ namespace Core {
 namespace {
 
 /// Most points a linear S-parameter sweep may take.
-constexpr int MAX_LINEAR_S_POINTS = 100000;
+constexpr int MAX_LINEAR_S_POINTS = 100'000;
 
 std::optional<std::string> CheckSParameterRange(const SParameterSettings &settings, const SParameterLimits &limits) {
     if (!settings.IsLogarithmic) {

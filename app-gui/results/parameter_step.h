@@ -19,7 +19,8 @@ namespace GUI {
  * @details Parameter is the part name, or "T" for the temperature, and Unit the unit of its values, as
  *          FormatStepValue() writes them.
  */
-template <typename Result> struct StepFamily {
+template <typename Result>
+struct StepFamily {
     std::string Parameter;
     std::string Unit;
     std::vector<double> Values;

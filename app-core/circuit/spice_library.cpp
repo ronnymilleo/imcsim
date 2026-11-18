@@ -389,8 +389,8 @@ std::optional<LibrarySubcircuit> BuildSubcircuit(const LibraryScan &scan,
     std::string expressions;
     ReadHeader(tokens, subcircuit, expressions);
     const std::string body = last.FirstLine > first.LastLine + 1
-                                 ? JoinLines(scan.Lines, first.LastLine + 1, last.FirstLine - 1)
-                                 : std::string();
+                               ? JoinLines(scan.Lines, first.LastLine + 1, last.FirstLine - 1)
+                               : std::string();
     if (IsEncrypted(body)) {
         warnings.push_back(std::format("{} is encrypted, so only its vendor's simulator can read it; it was left out",
                                        subcircuit.Name));

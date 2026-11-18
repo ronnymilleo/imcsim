@@ -74,8 +74,8 @@ std::vector<std::complex<double>> ComplexValues(const vector_info &vector) {
     std::vector<std::complex<double>> values(static_cast<std::size_t>(vector.v_length));
     for (std::size_t index = 0; index < values.size(); ++index) {
         values[index] = vector.v_compdata != nullptr
-                            ? std::complex<double>(vector.v_compdata[index].cx_real, vector.v_compdata[index].cx_imag)
-                            : std::complex<double>(vector.v_realdata[index], 0.0);
+                          ? std::complex<double>(vector.v_compdata[index].cx_real, vector.v_compdata[index].cx_imag)
+                          : std::complex<double>(vector.v_realdata[index], 0.0);
     }
     return values;
 }

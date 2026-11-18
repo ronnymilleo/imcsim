@@ -85,8 +85,8 @@ bool SetNextDensityLimits(const TransientSpectra &spectra, const ImAxis axis) {
  */
 bool AreAllBroadband(const TransientSpectra &spectra) {
     const auto has_spectrum = [](const SpectrumTrace &trace) { return trace.Decibels.has_value(); };
-    return std::ranges::any_of(spectra.Traces, has_spectrum) &&
-           std::ranges::all_of(spectra.Traces, [&has_spectrum](const SpectrumTrace &trace) {
+    return std::ranges::any_of(spectra.Traces, has_spectrum)
+        && std::ranges::all_of(spectra.Traces, [&has_spectrum](const SpectrumTrace &trace) {
                return !has_spectrum(trace) || IsBroadband(trace);
            });
 }
@@ -220,8 +220,8 @@ PlotSpan GetSpectrumFitRange(const TransientSpectra &spectra, const bool logarit
     // Without a measured fundamental, as in a stretch of too few periods, the strongest bin past the skirt of the
     // mean stands in for it
     for (const SpectrumTrace &trace : spectra.Traces) {
-        if (trace.Decibels && !IsBroadband(trace) &&
-            trace.Decibels->size() > static_cast<std::size_t>(SPECTRUM_SKIRT_BINS)) {
+        if (trace.Decibels && !IsBroadband(trace)
+            && trace.Decibels->size() > static_cast<std::size_t>(SPECTRUM_SKIRT_BINS)) {
             const auto strongest =
                 std::max_element(trace.Decibels->begin() + SPECTRUM_SKIRT_BINS, trace.Decibels->end());
             const double frequency = spectra.Frequencies[static_cast<std::size_t>(strongest - trace.Decibels->begin())];
@@ -420,8 +420,8 @@ void SpectrumTab::Draw(const FrameResults &frame, const PlotSpan span) {
  * @return  True with a transient and the spectrum of at least one trace.
  */
 bool SpectrumTab::CanExport() const {
-    return m_Results.GetTransient() && m_Spectra &&
-           std::ranges::any_of(m_Spectra->Traces,
+    return m_Results.GetTransient() && m_Spectra
+        && std::ranges::any_of(m_Spectra->Traces,
                                [](const SpectrumTrace &trace) { return trace.Decibels.has_value(); });
 }
 
@@ -448,8 +448,8 @@ void SpectrumTab::Update(const Core::Transient &transient, const std::vector<Mat
         labels.push_back(trace.Label + trace.Unit);
     }
     const std::size_t version = m_Results.GetTransientDataVersion();
-    if (m_Spectra && m_Spectra->TransientVersion == version && m_Spectra->Span.From == span.From &&
-        m_Spectra->Span.To == span.To && m_Spectra->Window == m_Window && m_Spectra->Labels == labels) {
+    if (m_Spectra && m_Spectra->TransientVersion == version && m_Spectra->Span.From == span.From
+        && m_Spectra->Span.To == span.To && m_Spectra->Window == m_Window && m_Spectra->Labels == labels) {
         return;
     }
 

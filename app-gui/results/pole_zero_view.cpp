@@ -139,8 +139,8 @@ std::vector<double>
 ListRootFrequencies(const Core::PoleZero &result, const bool is_pole, const bool is_right_half_plane) {
     std::vector<double> frequencies;
     for (const Core::PoleZeroRoot &root : result.Roots) {
-        if (root.IsPole == is_pole && root.IsRightHalfPlane == is_right_half_plane &&
-            root.NaturalFrequencyHertz > 0.0) {
+        if (root.IsPole == is_pole && root.IsRightHalfPlane == is_right_half_plane
+            && root.NaturalFrequencyHertz > 0.0) {
             frequencies.push_back(root.NaturalFrequencyHertz);
         }
     }

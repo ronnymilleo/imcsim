@@ -187,10 +187,11 @@ TEST_CASE("CSV export lists every sample of every series", "[plot_export]") {
     figure.XRange = GUI::ExportRange{.From = 0.0, .To = 1e-4};
     figure.Panels.front().Series.front().Values[1] = std::numeric_limits<double>::quiet_NaN();
     const std::string csv = GUI::RenderCsv(figure);
-    CHECK(csv == "Time (s),V(1) (V),I(R1) (A)\n"
-                 "0,0,0\n"
-                 "5e-04,,0.001\n"
-                 "0.001,5,0.002\n");
+    CHECK(csv
+          == "Time (s),V(1) (V),I(R1) (A)\n"
+             "0,0,0\n"
+             "5e-04,,0.001\n"
+             "0.001,5,0.002\n");
 }
 
 TEST_CASE("CSV headers name the panel when there are several and quote separators", "[plot_export]") {

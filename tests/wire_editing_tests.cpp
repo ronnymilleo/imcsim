@@ -13,8 +13,8 @@ namespace {
 
 bool HasWire(const std::vector<GUI::UIWire> &wires, const GUI::GridPoint first, const GUI::GridPoint second) {
     return std::ranges::any_of(wires, [first, second](const GUI::UIWire &wire) {
-        return (wire.GetStart() == first && wire.GetEnd() == second) ||
-               (wire.GetStart() == second && wire.GetEnd() == first);
+        return (wire.GetStart() == first && wire.GetEnd() == second)
+            || (wire.GetStart() == second && wire.GetEnd() == first);
     });
 }
 
@@ -116,8 +116,8 @@ GUI::PointTransform Translation(const int x, const int y) {
 bool IsSelected(const GUI::MovedWires &moved, const GUI::GridPoint first, const GUI::GridPoint second) {
     for (const std::size_t index : moved.Selected) {
         const GUI::UIWire &wire = moved.Wires[index];
-        if ((wire.GetStart() == first && wire.GetEnd() == second) ||
-            (wire.GetStart() == second && wire.GetEnd() == first)) {
+        if ((wire.GetStart() == first && wire.GetEnd() == second)
+            || (wire.GetStart() == second && wire.GetEnd() == first)) {
             return true;
         }
     }

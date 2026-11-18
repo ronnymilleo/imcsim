@@ -83,8 +83,8 @@ TEST_CASE("A bus keeps a value while all its bits do, and is unknown while any i
 }
 
 TEST_CASE("A bus is described by its bits and format", "[logic_bus]") {
-    CHECK(GUI::DescribeBus({.Name = "B", .Bits = {"V(Q1)", "V(Q0)"}, .Format = GUI::BusFormat::BINARY}) ==
-          "V(Q1) V(Q0), bin");
+    CHECK(GUI::DescribeBus({.Name = "B", .Bits = {"V(Q1)", "V(Q0)"}, .Format = GUI::BusFormat::BINARY})
+          == "V(Q1) V(Q0), bin");
     CHECK(GUI::DescribeBus({.Name = "E"}) == "no bits, hex");
 }
 

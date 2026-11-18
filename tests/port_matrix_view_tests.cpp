@@ -111,8 +111,8 @@ TEST_CASE("The missing frequencies are counted and worded", "[port_matrix_view]"
     CHECK(GUI::DescribeAbsentFrequencies(MakeResult(false), GUI::SParameterQuantity::Z).empty());
     const Core::SParameters partly = MakeResult(true);
     CHECK(GUI::CountAbsentFrequencies(partly, GUI::SParameterQuantity::Z) == 1);
-    CHECK(GUI::DescribeAbsentFrequencies(partly, GUI::SParameterQuantity::Z) ==
-          "Z has no finite value at 1 of 3 frequencies, so its curves have gaps there.");
+    CHECK(GUI::DescribeAbsentFrequencies(partly, GUI::SParameterQuantity::Z)
+          == "Z has no finite value at 1 of 3 frequencies, so its curves have gaps there.");
     // Without matrices nothing is counted, since the quantity is not offered
     CHECK(GUI::CountAbsentFrequencies(MakeResult(false, false), GUI::SParameterQuantity::Z) == 0);
     CHECK(GUI::CountAbsentFrequencies(partly, GUI::SParameterQuantity::S) == 0);
@@ -168,10 +168,11 @@ TEST_CASE("The table of Z lists the real and imaginary parts and leaves the abse
     const Core::SParameters result = MakeResult(true);
     const GUI::ExportFigure figure = GUI::BuildMatrixTableFigure(result, {{1, 1}}, GUI::SParameterQuantity::Z);
     const std::string csv = GUI::RenderCsv(figure);
-    CHECK(csv == "Frequency (Hz),Z11 real (Ohm),Z11 imaginary (Ohm)\n"
-                 "1e+06,10,5\n"
-                 "1e+07,,\n"
-                 "1e+08,30,5\n");
+    CHECK(csv
+          == "Frequency (Hz),Z11 real (Ohm),Z11 imaginary (Ohm)\n"
+             "1e+06,10,5\n"
+             "1e+07,,\n"
+             "1e+08,30,5\n");
     const std::string admittance =
         GUI::RenderCsv(GUI::BuildMatrixTableFigure(result, {{2, 1}}, GUI::SParameterQuantity::Y));
     CHECK_THAT(admittance, ContainsSubstring("Y21 real (S),Y21 imaginary (S)"));

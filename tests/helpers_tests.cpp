@@ -93,7 +93,7 @@ TEST_CASE("FrameBounds centers an area between grid points", "[helpers]") {
 TEST_CASE("FramePoints keeps the zoom between its limits", "[helpers]") {
     const std::vector<GUI::GridPoint> small = {{3, 3}};
     CHECK(GUI::FramePoints(small, {800.0f, 600.0f}, 4.0f, 20.0f).Zoom == 20.0f);
-    const std::vector<GUI::GridPoint> huge = {{0, 0}, {10000, 0}};
+    const std::vector<GUI::GridPoint> huge = {{0, 0}, {10'000, 0}};
     CHECK(GUI::FramePoints(huge, {800.0f, 600.0f}, 4.0f, 20.0f).Zoom == 4.0f);
     CHECK(GUI::FramePoints({}, {800.0f, 600.0f}, 4.0f, 20.0f).Zoom == 20.0f);
 }

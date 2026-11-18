@@ -69,8 +69,8 @@ MosfetDevice::Channel MosfetDevice::Evaluate(const double vgs_eff, const double 
         // Linear (triode) region: I = Beta * (vov * vds - vds^2 / 2) * (1 + lambda * vds)
         result.Current = m_Beta * (vov * vds_eff - vds_eff * vds_eff / 2.0) * (1.0 + lambda * vds_eff);
         result.Gm = m_Beta * vds_eff * (1.0 + lambda * vds_eff);
-        result.Gds = m_Beta * (vov - vds_eff) * (1.0 + lambda * vds_eff) +
-                     m_Beta * (vov * vds_eff - vds_eff * vds_eff / 2.0) * lambda;
+        result.Gds = m_Beta * (vov - vds_eff) * (1.0 + lambda * vds_eff)
+                   + m_Beta * (vov * vds_eff - vds_eff * vds_eff / 2.0) * lambda;
     } else {
         // Saturation region: I = (Beta / 2) * vov^2 * (1 + lambda * vds)
         result.Current = (m_Beta / 2.0) * vov * vov * (1.0 + lambda * vds_eff);

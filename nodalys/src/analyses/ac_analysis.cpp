@@ -20,8 +20,8 @@ std::expected<AcSweepResult, std::string> ComputeACSweep(CompiledCircuit &compil
                                                          const ConvergenceOptions &options,
                                                          std::vector<DiagnosticMessage> *messages) {
 
-    if (settings.StartFrequency <= 0.0 || settings.StopFrequency < settings.StartFrequency ||
-        settings.PointsPerDecade <= 0) {
+    if (settings.StartFrequency <= 0.0 || settings.StopFrequency < settings.StartFrequency
+        || settings.PointsPerDecade <= 0) {
         return std::unexpected("The AC sweep has invalid frequency settings; check start, stop and points per decade");
     }
 

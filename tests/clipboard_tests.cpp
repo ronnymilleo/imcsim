@@ -180,8 +180,8 @@ TEST_CASE("A copied net label keeps its name and joins the net it is pasted into
     CHECK(static_cast<const Core::NetLabel &>(schematic.GetElements()[1]->GetComponent()).GetNet() == "OUT");
     // The pasted label is a second point of the same net
     const GUI::Connectivity &nodes = schematic.GetConnectivity();
-    CHECK(nodes.GetNode(schematic.GetElements()[0]->GetTerminals()[0]) ==
-          nodes.GetNode(schematic.GetElements()[1]->GetTerminals()[0]));
+    CHECK(nodes.GetNode(schematic.GetElements()[0]->GetTerminals()[0])
+          == nodes.GetNode(schematic.GetElements()[1]->GetTerminals()[0]));
 }
 
 TEST_CASE("Copied blocks carry their definitions without transforming their contents", "[clipboard][subcircuit]") {
@@ -253,6 +253,6 @@ TEST_CASE("A pasted block that differs from one of the same name joins under a n
     CHECK(target->GetSubcircuits()[0].Parameters[0].DefaultValue == 1e3);
     CHECK(target->GetSubcircuits()[1].Name == "block_2");
     CHECK(target->GetSubcircuits()[1].Parameters[0].DefaultValue == 2e3);
-    CHECK(static_cast<const Core::SubcircuitInstance &>(group->Elements[0]->GetComponent()).GetDefinitionName() ==
-          "block_2");
+    CHECK(static_cast<const Core::SubcircuitInstance &>(group->Elements[0]->GetComponent()).GetDefinitionName()
+          == "block_2");
 }

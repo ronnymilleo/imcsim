@@ -57,8 +57,8 @@ std::expected<NoiseResult, std::string> ComputeNoise(CompiledCircuit &compiled,
     if (out_node <= 0 || out_node >= compiled.CircuitNodeCount) {
         return std::unexpected(std::format("The circuit has no output node {}", out_node));
     }
-    if (settings.StartFrequency <= 0.0 || settings.StopFrequency < settings.StartFrequency ||
-        settings.PointsPerDecade <= 0) {
+    if (settings.StartFrequency <= 0.0 || settings.StopFrequency < settings.StartFrequency
+        || settings.PointsPerDecade <= 0) {
         return std::unexpected(
             "The noise analysis has invalid frequency settings; check start, stop and points per decade");
     }
@@ -136,11 +136,11 @@ std::expected<NoiseResult, std::string> ComputeNoise(CompiledCircuit &compiled,
             gain = adjoint[static_cast<std::size_t>(voltage_source->GetBranch())];
         } else {
             const std::complex<double> la = current_source->GetNodeA() < 0
-                                                ? std::complex<double>{0.0, 0.0}
-                                                : adjoint[static_cast<std::size_t>(current_source->GetNodeA())];
+                                              ? std::complex<double>{0.0, 0.0}
+                                              : adjoint[static_cast<std::size_t>(current_source->GetNodeA())];
             const std::complex<double> lb = current_source->GetNodeB() < 0
-                                                ? std::complex<double>{0.0, 0.0}
-                                                : adjoint[static_cast<std::size_t>(current_source->GetNodeB())];
+                                              ? std::complex<double>{0.0, 0.0}
+                                              : adjoint[static_cast<std::size_t>(current_source->GetNodeB())];
             gain = lb - la;
         }
         const double inv_gain_sq = 1.0 / std::max(std::norm(gain), MIN_GAIN_SQUARED);

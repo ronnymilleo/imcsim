@@ -315,8 +315,8 @@ std::string ExportRaw(const AcSensitivityResult &result, std::string_view title)
 
     // The output is named as the user writes it in the directive, v(out) or v(out,ref)
     const std::string output_name = result.OutputNegativeNode == 0
-                                        ? std::format("v({})", result.OutputPositiveNode)
-                                        : std::format("v({},{})", result.OutputPositiveNode, result.OutputNegativeNode);
+                                      ? std::format("v({})", result.OutputPositiveNode)
+                                      : std::format("v({},{})", result.OutputPositiveNode, result.OutputNegativeNode);
     std::size_t var_idx = 0;
     ss << "\t" << var_idx++ << "\tfrequency\tfrequency\n";
     ss << "\t" << var_idx++ << "\t" << output_name << "\tvoltage\n";

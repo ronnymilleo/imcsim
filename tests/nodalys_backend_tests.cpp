@@ -168,10 +168,13 @@ TEST_CASE("Nodalys runs at a stepped temperature and its capabilities allow it")
     // Restores the default backend even when a check throws
     struct NodalysInUse {
         NodalysInUse() { Core::SetBackend(std::make_unique<Core::NodalysBackend>()); }
+
         ~NodalysInUse() { Core::SetBackend(nullptr); }
+
         NodalysInUse(const NodalysInUse &) = delete;
         NodalysInUse &operator=(const NodalysInUse &) = delete;
     };
+
     const NodalysInUse in_use;
     REQUIRE_FALSE(Core::GetBackend().GetCapabilities().TemperatureUnsupported.has_value());
 
@@ -918,8 +921,8 @@ TEST_CASE("A run on Nodalys stops with that reason before it reaches the engine"
     const BehavioralStage stage("limit(V(IN), -1, 1)");
     const Core::OperatingPointRun run = Core::RunOperatingPoint(stage.Circuit);
     REQUIRE_FALSE(run.Result.has_value());
-    CHECK(run.Result.error() ==
-          Core::FindUnsupported(Core::GetBackend(), stage.Circuit, Core::AnalysisKind::OPERATING_POINT).value());
+    CHECK(run.Result.error()
+          == Core::FindUnsupported(Core::GetBackend(), stage.Circuit, Core::AnalysisKind::OPERATING_POINT).value());
 }
 
 TEST_CASE("A behavioral source whose expression has no value says which one and why", "[nodalys][behavioral]") {

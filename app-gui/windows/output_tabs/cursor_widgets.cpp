@@ -175,8 +175,8 @@ void DrawPlaybackBar(TransientPlayback &playback, const double from, const doubl
     ImGui::SameLine();
     const std::string readout = std::format("t = {}s / {}s", Core::FormatValue(playback.Time), Core::FormatValue(to));
     const float readout_width =
-        std::max(ImGui::CalcTextSize(readout.c_str()).x, ImGui::CalcTextSize(WIDEST_TIME_READOUT).x) +
-        style.ItemSpacing.x;
+        std::max(ImGui::CalcTextSize(readout.c_str()).x, ImGui::CalcTextSize(WIDEST_TIME_READOUT).x)
+        + style.ItemSpacing.x;
     ImGui::SetNextItemWidth(
         std::max(ImGui::GetContentRegionAvail().x - readout_width, ImGui::GetFontSize() * MIN_TIME_SLIDER_WIDTH));
     ImGui::SliderScalar("##time", ImGuiDataType_Double, &playback.Time, &from, &to, "");

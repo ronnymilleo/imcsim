@@ -170,8 +170,8 @@ std::expected<Noise, std::string> ReadNoise(const Circuit &circuit, const NoiseS
     const std::optional<std::vector<double>> frequencies = ReadRealVector("frequency");
     const std::optional<std::vector<double>> output = ReadRealVector("onoise_spectrum");
     const std::optional<std::vector<double>> input = ReadRealVector("inoise_spectrum");
-    if (!frequencies || !output || !input || output->size() != frequencies->size() ||
-        input->size() != frequencies->size()) {
+    if (!frequencies || !output || !input || output->size() != frequencies->size()
+        || input->size() != frequencies->size()) {
         return std::unexpected("ngspice returned no noise densities");
     }
     result.Frequencies = *frequencies;

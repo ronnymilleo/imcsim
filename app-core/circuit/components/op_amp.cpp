@@ -174,8 +174,8 @@ FormatInputStage(const OpAmpParameters &parameters, const double tail_current, c
         std::format("RC1 {0} 80 {1}\nRC2 {0} 90 {1}\n", load_node, FormatNumber(collector_resistance));
     if (parameters.InputStage == OpAmpInputStage::JFET) {
         const double beta = 1.0 / (4.0 * collector_current * collector_resistance * collector_resistance);
-        return loads + "J1 80 2 12 JM\nJ2 90 30 12 JM\n" + tail +
-               std::format(".model JM PJF(IS={} BETA={} VTO={})\n",
+        return loads + "J1 80 2 12 JM\nJ2 90 30 12 JM\n" + tail
+             + std::format(".model JM PJF(IS={} BETA={} VTO={})\n",
                            FormatNumber(parameters.InputBiasCurrent / 2.0),
                            FormatNumber(beta),
                            FormatNumber(JFET_PINCH_OFF_VOLTAGE));
@@ -184,11 +184,11 @@ FormatInputStage(const OpAmpParameters &parameters, const double tail_current, c
     // The pair amplifies its input difference by exactly 1 into the collectors
     const double emitter_resistance = beta / (beta + 1.0) * collector_resistance - THERMAL_VOLTAGE / collector_current;
     const char *polarity = hangs_from_negative ? "PNP" : "NPN";
-    return loads +
-           std::format("Q1 80 2 10 QM\nQ2 90 30 11 QM\nRE1 10 12 {0}\nRE2 11 12 {0}\n",
-                       FormatNumber(emitter_resistance)) +
-           tail +
-           std::format(".model QM {}(IS={} BF={})\n",
+    return loads
+         + std::format("Q1 80 2 10 QM\nQ2 90 30 11 QM\nRE1 10 12 {0}\nRE2 11 12 {0}\n",
+                       FormatNumber(emitter_resistance))
+         + tail
+         + std::format(".model QM {}(IS={} BF={})\n",
                        polarity,
                        FormatNumber(INPUT_SATURATION_CURRENT),
                        FormatNumber(beta));
@@ -290,12 +290,12 @@ void OpAmp::SetCustomParameters(const OpAmpParameters &parameters) {
  *          resistance, the headrooms and supply current are not negative and the input offset voltage is finite.
  */
 bool OpAmp::IsValidParameters(const OpAmpParameters &parameters) const {
-    return parameters.OpenLoopGainDecibels > 0.0 && parameters.GainBandwidth > 0.0 && parameters.SlewRate > 0.0 &&
-           parameters.PhaseMarginDegrees > 0.0 && parameters.PhaseMarginDegrees < 90.0 &&
-           parameters.InputBiasCurrent > 0.0 && parameters.CommonModeRejectionDecibels > 0.0 &&
-           parameters.OutputResistance > OUTPUT_SENSE_RESISTANCE && parameters.ShortCircuitCurrent > 0.0 &&
-           parameters.PositiveHeadroom >= 0.0 && parameters.NegativeHeadroom >= 0.0 &&
-           parameters.SupplyCurrent >= 0.0 && std::isfinite(parameters.InputOffsetVoltage);
+    return parameters.OpenLoopGainDecibels > 0.0 && parameters.GainBandwidth > 0.0 && parameters.SlewRate > 0.0
+        && parameters.PhaseMarginDegrees > 0.0 && parameters.PhaseMarginDegrees < 90.0
+        && parameters.InputBiasCurrent > 0.0 && parameters.CommonModeRejectionDecibels > 0.0
+        && parameters.OutputResistance > OUTPUT_SENSE_RESISTANCE && parameters.ShortCircuitCurrent > 0.0
+        && parameters.PositiveHeadroom >= 0.0 && parameters.NegativeHeadroom >= 0.0 && parameters.SupplyCurrent >= 0.0
+        && std::isfinite(parameters.InputOffsetVoltage);
 }
 
 /**
@@ -475,8 +475,8 @@ std::string FormatOpAmpSubcircuit(const std::string_view name, const OpAmpParame
     const double common_mode_transconductance =
         transconductance / std::pow(10.0, parameters.CommonModeRejectionDecibels / 20.0);
     const double gain_stage_load = parameters.OutputResistance - OUTPUT_SENSE_RESISTANCE;
-    const double output_gain = std::pow(10.0, parameters.OpenLoopGainDecibels / 20.0) /
-                               (transconductance * GAIN_STAGE_RESISTANCE * gain_stage_load);
+    const double output_gain = std::pow(10.0, parameters.OpenLoopGainDecibels / 20.0)
+                             / (transconductance * GAIN_STAGE_RESISTANCE * gain_stage_load);
     const double current_limit_gain =
         CURRENT_LIMIT_THRESHOLD / (parameters.ShortCircuitCurrent * OUTPUT_SENSE_RESISTANCE);
     const double rest_of_supply_current = std::max(parameters.SupplyCurrent - tail_current, 0.0);
@@ -485,9 +485,9 @@ std::string FormatOpAmpSubcircuit(const std::string_view name, const OpAmpParame
     return std::format(".subckt {0} 6 3 2 7 4\n"
                        "VOS 30 3 {1}\n",
                        name,
-                       FormatNumber(parameters.InputOffsetVoltage)) +
-           FormatInputStage(parameters, tail_current, collector_resistance) +
-           std::format("C1 80 90 {0}\n"
+                       FormatNumber(parameters.InputOffsetVoltage))
+         + FormatInputStage(parameters, tail_current, collector_resistance)
+         + std::format("C1 80 90 {0}\n"
                        "REE 12 0 {1}\n"
                        "GCM 0 8 12 0 {2}\nGA 8 0 80 90 {3}\n"
                        "R2 8 0 {4}\nC2 1 8 {5}\n"

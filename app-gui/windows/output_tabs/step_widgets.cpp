@@ -110,8 +110,8 @@ void PlotOtherSteps(const std::vector<StepTraces> &steps,
         const StepTraces &traces = steps[step];
         const int count = static_cast<int>(traces.Xs->size());
         for (std::size_t node = 1; node < traces.Nodes->size(); ++node) {
-            if (!schematic.IsVoltageMeasured(static_cast<int>(node)) ||
-                std::ranges::contains(lane_nodes, static_cast<int>(node))) {
+            if (!schematic.IsVoltageMeasured(static_cast<int>(node))
+                || std::ranges::contains(lane_nodes, static_cast<int>(node))) {
                 continue;
             }
             ImPlotSpec spec;
@@ -200,8 +200,8 @@ void LabelSteps(const std::vector<StepTraces> &steps,
     };
     const StepTraces &first = steps.front();
     for (std::size_t node = 1; node < first.Nodes->size(); ++node) {
-        if (!schematic.IsVoltageMeasured(static_cast<int>(node)) ||
-            std::ranges::contains(lane_nodes, static_cast<int>(node))) {
+        if (!schematic.IsVoltageMeasured(static_cast<int>(node))
+            || std::ranges::contains(lane_nodes, static_cast<int>(node))) {
             continue;
         }
         std::vector<const std::vector<double> *> curves;

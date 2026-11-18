@@ -30,7 +30,9 @@ public:
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     void StampAc(MnaSystem &reactive, const std::vector<double> &x_dc) const override;
+
     bool IsLinear() const override { return false; }
+
     void StampCharge(MnaSystem &sys, const std::vector<double> &x) const override;
     bool Limit(std::vector<double> &x_new, const std::vector<double> &x_old) const override;
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
@@ -53,6 +55,7 @@ private:
         double Gm;      ///< Transconductance $\partial I / \partial v_{gs,\text{eff}} \ge 0$.
         double Gds;     ///< Output conductance $\partial I / \partial v_{ds,\text{eff}} \ge 0$.
     };
+
     /// The channel in the frame where the drain sits at the higher potential, after the source and drain swap.
     struct ChannelState {
         int Drain;          ///< Node acting as the drain; the intrinsic source when the channel is reversed.
@@ -61,11 +64,13 @@ private:
         double Polarity;    ///< $+1$ for NMOS and $-1$ for PMOS.
         Channel Conduction; ///< Current and conductances in the effective frame.
     };
+
     /// The two terminals of the body-drain diode, in the direction it conducts.
     struct BodyDiodeNodes {
         int Anode;
         int Cathode;
     };
+
     /// Recomputes the parameters at the temperature, from the ones given at the nominal temperature.
     void ApplyTemperature(const ThermalConditions &thermal);
     /// Evaluates the level-1 channel equations for nonnegative effective $v_{ds} \ge 0$.

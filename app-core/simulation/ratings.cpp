@@ -85,8 +85,8 @@ double AverageForwardCurrent(const std::vector<double> &times, const std::vector
     }
     double charge = 0.0;
     for (std::size_t index = 1; index < times.size(); ++index) {
-        charge += (std::max(currents[index], 0.0) + std::max(currents[index - 1], 0.0)) / 2.0 *
-                  (times[index] - times[index - 1]);
+        charge += (std::max(currents[index], 0.0) + std::max(currents[index - 1], 0.0)) / 2.0
+                * (times[index] - times[index - 1]);
     }
     return charge / (times.back() - times.front());
 }
@@ -268,8 +268,8 @@ void AddRatingWarnings(const Circuit &circuit, OperatingPoint &result) {
         }
         std::ranges::move(RatingWarnings(*entry.Part, {0.0}, OperatingPointTerminals(entry, result)),
                           std::back_inserter(result.Warnings));
-        const double reverse_voltage = result.NodeVoltages[static_cast<std::size_t>(entry.Nodes[1])] -
-                                       result.NodeVoltages[static_cast<std::size_t>(entry.Nodes[0])];
+        const double reverse_voltage = result.NodeVoltages[static_cast<std::size_t>(entry.Nodes[1])]
+                                     - result.NodeVoltages[static_cast<std::size_t>(entry.Nodes[0])];
         if (std::optional<std::string> warning = BreakdownWarning(entry, reverse_voltage)) {
             result.Warnings.push_back(std::move(*warning));
         }

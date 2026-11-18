@@ -111,8 +111,8 @@ void UITransformer::DrawCoil(SchematicCanvas &canvas,
         const float center_y = -1.0f + TURN_RADIUS + TURN_HEIGHT * static_cast<float>(turn);
         for (int segment = 0; segment <= SEGMENTS_PER_TURN; ++segment) {
             // From the top of the turn to its bottom through the side the coil bulges to
-            const float angle = std::numbers::pi_v<float> *
-                                (-0.5f + static_cast<float>(segment) / static_cast<float>(SEGMENTS_PER_TURN));
+            const float angle = std::numbers::pi_v<float>
+                              * (-0.5f + static_cast<float>(segment) / static_cast<float>(SEGMENTS_PER_TURN));
             points[segment] = LocalToScreen(view,
                                             x + bulge * TURN_RADIUS * std::cos(angle),
                                             center_y + TURN_RADIUS * std::sin(angle));

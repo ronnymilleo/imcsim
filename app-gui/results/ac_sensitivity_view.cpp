@@ -110,8 +110,8 @@ double GetInfluence(const Core::ACPartSensitivity &part, const std::size_t frequ
     }
     const double nepers = part.MagnitudeDecibelsPerPercent[frequency_index].value_or(0.0) / DECIBELS_PER_NEPER;
     const double radians = frequency_index < part.PhaseDegreesPerPercent.size()
-                               ? part.PhaseDegreesPerPercent[frequency_index].value_or(0.0) / DEGREES_PER_RADIAN
-                               : 0.0;
+                             ? part.PhaseDegreesPerPercent[frequency_index].value_or(0.0) / DEGREES_PER_RADIAN
+                             : 0.0;
     return std::hypot(nepers, radians);
 }
 

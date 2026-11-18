@@ -168,8 +168,8 @@ struct SParameterResult {
 
     std::complex<double> Get(const std::size_t frequency_idx, const int row, const int column) const {
         const auto ports = static_cast<std::size_t>(GetPortCount());
-        return Values[(frequency_idx * ports + static_cast<std::size_t>(row - 1)) * ports +
-                      static_cast<std::size_t>(column - 1)];
+        return Values[(frequency_idx * ports + static_cast<std::size_t>(row - 1)) * ports
+                      + static_cast<std::size_t>(column - 1)];
     }
 
     /// Z(row, column) at a frequency; none when the result has no impedance matrices or the circuit has no finite Z.

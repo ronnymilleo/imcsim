@@ -80,8 +80,8 @@ int RunNewton(MnaSystem &sys,
             const bool is_node = sys.IsNodeUnknown(index);
             const double abs_tol = is_node ? options.VoltageAbsTol : options.CurrentAbsTol;
             const double tolerance = options.RelTol * std::fabs(candidate[static_cast<std::size_t>(index)]) + abs_tol;
-            if (std::fabs(candidate[static_cast<std::size_t>(index)] - x[static_cast<std::size_t>(index)]) >
-                tolerance) {
+            if (std::fabs(candidate[static_cast<std::size_t>(index)] - x[static_cast<std::size_t>(index)])
+                > tolerance) {
                 converged = false;
             }
         }

@@ -142,7 +142,8 @@ bool UpdateUntilIdle(GUI::AnalysisControls &controls) {
 }
 
 // Calls Update() as the frame loop does until a condition holds
-template <typename Condition> bool UpdateUntil(GUI::AnalysisControls &controls, const Condition &condition) {
+template <typename Condition>
+bool UpdateUntil(GUI::AnalysisControls &controls, const Condition &condition) {
     const auto deadline = std::chrono::steady_clock::now() + WAIT_LIMIT;
     while (std::chrono::steady_clock::now() < deadline) {
         controls.Update();
@@ -206,10 +207,13 @@ public:
                          .UnsupportedPartsByAnalysis = {}} {}
 
     std::string_view GetName() const override { return "failing"; }
+
     const Core::BackendCapabilities &GetCapabilities() const override { return m_Capabilities; }
+
     Core::OperatingPointRun RunOperatingPoint(const Core::Circuit &, const std::optional<double> &) override {
         return {std::unexpected("no"), {}};
     }
+
     Core::TransientRun RunTransient(const Core::Circuit &circuit,
                                     const Core::TransientSettings &,
                                     const std::optional<double> &,
@@ -221,27 +225,34 @@ public:
         }
         return {Core::Transient{.Times = {0.0, 1.0}, .NodeVoltages = {{0.0, 0.0}, {1.0, 1.0}, {2.0, 2.0}}}, {}};
     }
+
     Core::ACSweepRun
     RunACSweep(const Core::Circuit &, const Core::ACSweepSettings &, const std::optional<double> &) override {
         return {std::unexpected("no"), {}};
     }
+
     Core::DCSweepRun
     RunDCSweep(const Core::Circuit &, const Core::DCSweepSettings &, const std::optional<double> &) override {
         return {std::unexpected("no"), {}};
     }
+
     Core::NoiseRun RunNoise(const Core::Circuit &, const Core::NoiseSettings &) override {
         return {std::unexpected("no"), {}};
     }
+
     Core::TransferFunctionRun RunTransferFunction(const Core::Circuit &,
                                                   const Core::TransferFunctionSettings &) override {
         return {std::unexpected("no"), {}};
     }
+
     Core::SensitivityRun RunSensitivity(const Core::Circuit &, const Core::SensitivitySettings &) override {
         return {std::unexpected("no"), {}};
     }
+
     Core::PoleZeroRun RunPoleZero(const Core::Circuit &, const Core::PoleZeroSettings &) override {
         return {std::unexpected("no"), {}};
     }
+
     Core::SParametersRun RunSParameters(const Core::Circuit &, const Core::SParameterSettings &) override {
         return {std::unexpected("no"), {}};
     }
@@ -253,7 +264,9 @@ private:
 /// Puts the failing backend in use for one test and goes back to ngspice at the end, even when a check throws.
 struct FailingBackendInUse {
     FailingBackendInUse() { Core::SetBackend(std::make_unique<FailingAboveBackend>()); }
+
     ~FailingBackendInUse() { Core::SetBackend(nullptr); }
+
     FailingBackendInUse(const FailingBackendInUse &) = delete;
     FailingBackendInUse &operator=(const FailingBackendInUse &) = delete;
 };
@@ -271,10 +284,12 @@ public:
         m_Changed.notify_all();
         m_Changed.wait(lock, [this] { return m_IsReleased; });
     }
+
     [[nodiscard]] bool WaitUntilHolding() {
         std::unique_lock lock(m_Mutex);
         return m_Changed.wait_for(lock, WAIT_LIMIT, [this] { return m_IsHolding; });
     }
+
     void Release() {
         const std::lock_guard lock(m_Mutex);
         m_IsReleased = true;
@@ -310,7 +325,9 @@ struct HeldBackendInUse {
     explicit HeldBackendInUse(const std::shared_ptr<TransientHold> &hold) {
         Core::SetBackend(std::make_unique<HeldBackend>(hold));
     }
+
     ~HeldBackendInUse() { Core::SetBackend(nullptr); }
+
     HeldBackendInUse(const HeldBackendInUse &) = delete;
     HeldBackendInUse &operator=(const HeldBackendInUse &) = delete;
 };
@@ -318,6 +335,7 @@ struct HeldBackendInUse {
 /// Lets a held run go when the test ends, before the worker it holds is joined, even when a check throws.
 struct ReleaseAtEnd {
     std::shared_ptr<TransientHold> Hold;
+
     ~ReleaseAtEnd() { Hold->Release(); }
 };
 

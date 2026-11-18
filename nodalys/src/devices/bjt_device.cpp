@@ -326,8 +326,8 @@ std::complex<double> BjtDevice::AcTerminalCurrent(const int terminal,
     std::complex<double> iqbc_ac{0.0, 0.0};
     if (HasTransientState()) {
         const JunctionCharges charges = EvaluateCharges(state);
-        iqbe_ac = std::complex<double>(0.0, omega) *
-                  (charges.BaseEmitterCapacitance * vbe_ac + charges.Transcapacitance * vbc_ac);
+        iqbe_ac = std::complex<double>(0.0, omega)
+                * (charges.BaseEmitterCapacitance * vbe_ac + charges.Transcapacitance * vbc_ac);
         iqbc_ac = std::complex<double>(0.0, omega * charges.BaseCollectorCapacitance) * vbc_ac;
     }
 
@@ -405,8 +405,8 @@ double BjtDevice::OutputNoiseVariance(const std::vector<double> &x_dc,
 }
 
 bool BjtDevice::HasTransientState() const {
-    return m_Parameters.TransitTime > 0.0 || m_Parameters.EmitterCapacitance > 0.0 ||
-           m_Parameters.CollectorCapacitance > 0.0;
+    return m_Parameters.TransitTime > 0.0 || m_Parameters.EmitterCapacitance > 0.0
+        || m_Parameters.CollectorCapacitance > 0.0;
 }
 
 void BjtDevice::AcceptStep(const std::vector<double> &x) {

@@ -30,9 +30,9 @@ bool IsInside(const WorldBounds &bounds, const GridPoint point) {
 bool IsOnWire(const UIWire &wire, const GridPoint point) {
     const GridPoint start = wire.GetStart();
     const GridPoint end = wire.GetEnd();
-    return point.X >= std::min(start.X, end.X) && point.X <= std::max(start.X, end.X) &&
-           point.Y >= std::min(start.Y, end.Y) && point.Y <= std::max(start.Y, end.Y) &&
-           (start.X == end.X || start.Y == end.Y);
+    return point.X >= std::min(start.X, end.X) && point.X <= std::max(start.X, end.X)
+        && point.Y >= std::min(start.Y, end.Y) && point.Y <= std::max(start.Y, end.Y)
+        && (start.X == end.X || start.Y == end.Y);
 }
 
 /**
@@ -63,11 +63,11 @@ bool AreNamesClear(const UISubcircuit &block,
                    const std::vector<std::unique_ptr<UIElement>> &elements,
                    const std::vector<UIWire> &wires) {
     return std::ranges::none_of(block.GetNameLabelPoints(), [&](const GridPoint point) {
-        return std::ranges::contains(pin_points, point) ||
-               std::ranges::any_of(
+        return std::ranges::contains(pin_points, point)
+            || std::ranges::any_of(
                    elements,
-                   [&](const auto &element) { return std::ranges::contains(element->GetTerminals(), point); }) ||
-               std::ranges::any_of(wires, [&](const UIWire &wire) { return IsOnWire(wire, point); });
+                   [&](const auto &element) { return std::ranges::contains(element->GetTerminals(), point); })
+            || std::ranges::any_of(wires, [&](const UIWire &wire) { return IsOnWire(wire, point); });
     });
 }
 
@@ -110,8 +110,8 @@ bool IsFreeSpot(const UISubcircuit &block,
     };
     for (const auto &element : elements) {
         for (const GridPoint terminal : element->GetTerminals()) {
-            if (IsInside(bounds, terminal) &&
-                !is_on_own_lead(terminal, [&](const GridPoint pin_point) { return pin_point == terminal; })) {
+            if (IsInside(bounds, terminal)
+                && !is_on_own_lead(terminal, [&](const GridPoint pin_point) { return pin_point == terminal; })) {
                 return false;
             }
         }
@@ -199,8 +199,8 @@ void MoveToFreeSpot(UISubcircuit &block,
         // The spots this many steps away along the grid
         for (int x_shift = -distance; x_shift <= distance; ++x_shift) {
             const int y_shift = distance - std::abs(x_shift);
-            if (is_free({middle.X + x_shift, middle.Y - y_shift}) ||
-                (y_shift != 0 && is_free({middle.X + x_shift, middle.Y + y_shift}))) {
+            if (is_free({middle.X + x_shift, middle.Y - y_shift})
+                || (y_shift != 0 && is_free({middle.X + x_shift, middle.Y + y_shift}))) {
                 return;
             }
         }

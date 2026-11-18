@@ -77,8 +77,8 @@ std::expected<void, std::string> ReadSubcircuitInstance(const nlohmann::json &ob
             return std::unexpected("has subcircuit parameters that are not an object");
         }
         for (const auto &[parameter, value] : parameters->items()) {
-            if (!value.is_number() ||
-                !std::ranges::contains(definition->Parameters, parameter, &Core::SubcircuitParameter::Name)) {
+            if (!value.is_number()
+                || !std::ranges::contains(definition->Parameters, parameter, &Core::SubcircuitParameter::Name)) {
                 return std::unexpected(std::format("has no valid value for subcircuit parameter {}", parameter));
             }
             instance.SetParameter(parameter, value.get<double>());

@@ -104,8 +104,8 @@ struct PulsedFuseLoop {
 /// ngspice falls back to slower ways of finding an operating point when the first one fails, and says so
 bool HasConvergenceTrouble(const std::vector<Core::SimulatorMessage> &messages) {
     return std::ranges::any_of(messages, [](const Core::SimulatorMessage &message) {
-        return message.Text.contains("failed") || message.Text.contains("singular") ||
-               message.Text.contains("Transient op");
+        return message.Text.contains("failed") || message.Text.contains("singular")
+            || message.Text.contains("Transient op");
     });
 }
 
@@ -574,8 +574,8 @@ TEST_CASE("A fuse keeps its figures in the file, and one with figures out of ran
     const auto defaults = GUI::LoadSchematic(plain);
     REQUIRE(defaults.has_value());
     REQUIRE(defaults->Elements.size() == 1);
-    CHECK(static_cast<const Core::Fuse &>(defaults->Elements[0]->GetComponent()).GetParameters() ==
-          Core::FuseParameters{});
+    CHECK(static_cast<const Core::Fuse &>(defaults->Elements[0]->GetComponent()).GetParameters()
+          == Core::FuseParameters{});
 }
 
 TEST_CASE("The fuse flash is on for a new user, and the other effects are not", "[fuse][preferences]") {

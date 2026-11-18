@@ -102,8 +102,8 @@ bool DiodeDevice::Limit(std::vector<double> &x_new, const std::vector<double> &x
     const double voltage_old = VoltageAt(x_old);
     const DiodeParameters &p = m_Parameters;
     // SPICE effective breakdown knee where I_rev(-bv_eff) == IS, so PNJLIM uses m_Critical symmetrically:
-    const double bv_eff = p.BreakdownVoltage -
-                          m_Vt * std::log(std::max(p.BreakdownCurrent, 1e-30) / std::max(p.SaturationCurrent, 1e-30));
+    const double bv_eff = p.BreakdownVoltage
+                        - m_Vt * std::log(std::max(p.BreakdownCurrent, 1e-30) / std::max(p.SaturationCurrent, 1e-30));
     double limited;
     if (voltage_new >= -0.5 * bv_eff && voltage_old >= -0.5 * bv_eff) {
         limited = PnLimit(voltage_new, voltage_old, m_Critical, m_Vt);

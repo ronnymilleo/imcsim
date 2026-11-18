@@ -45,6 +45,7 @@ public:
     }
 
     const MnaSystem &GetConductance() const { return m_Conductance; }
+
     const MnaSystem &GetReactive() const { return m_Reactive; }
 
 private:

@@ -286,8 +286,8 @@ using Differences = std::vector<std::string>;
 
 /// Two values of one quantity, as the engines gave them.
 bool Agree(const double expected, const double actual, const Tolerance tolerance) {
-    return std::fabs(expected - actual) <=
-           tolerance.Relative * std::max(std::fabs(expected), std::fabs(actual)) + tolerance.Absolute;
+    return std::fabs(expected - actual)
+        <= tolerance.Relative * std::max(std::fabs(expected), std::fabs(actual)) + tolerance.Absolute;
 }
 
 /**
@@ -409,8 +409,8 @@ RangeBetween(const std::vector<double> &times, const std::vector<double> &values
 
 double PeakOf(const std::vector<double> &values) {
     return values.empty()
-               ? 0.0
-               : std::fabs(*std::ranges::max_element(values, {}, [](const double v) { return std::fabs(v); }));
+             ? 0.0
+             : std::fabs(*std::ranges::max_element(values, {}, [](const double v) { return std::fabs(v); }));
 }
 
 /**
@@ -560,8 +560,8 @@ void CompareDecibelSeries(DifferenceLog &log,
                                 expected_db[point],
                                 actual_db[point]));
         }
-        if (point < expected_deg.size() &&
-            PhaseDistance(expected_deg[point], actual_deg[point]) > AC_PHASE_TOLERANCE_DEGREES) {
+        if (point < expected_deg.size()
+            && PhaseDistance(expected_deg[point], actual_deg[point]) > AC_PHASE_TOLERANCE_DEGREES) {
             log.Add(quantity + " phase",
                     std::format("at point {} ngspice {:.4g} deg, Nodalys {:.4g} deg",
                                 point,
@@ -717,8 +717,8 @@ void CompareSParameters(DifferenceLog &log, const Core::SParameters &expected, c
     for (std::size_t index = 0; index < expected.Values.size(); ++index) {
         const std::complex<double> want = expected.Values[index];
         const std::complex<double> got = actual.Values[index];
-        if (std::abs(want - got) >
-            S_PARAMETER.Relative * std::max(std::abs(want), std::abs(got)) + S_PARAMETER.Absolute) {
+        if (std::abs(want - got)
+            > S_PARAMETER.Relative * std::max(std::abs(want), std::abs(got)) + S_PARAMETER.Absolute) {
             log.Add("S",
                     std::format("entry {} ngspice {:.5g}{:+.5g}j, Nodalys {:.5g}{:+.5g}j",
                                 index,
@@ -986,8 +986,8 @@ TEST_CASE("The precision rectifier, whose op-amp is SPICE text, gives the same w
     const Differences found = log.Take();
     INFO(Indented(found));
     CHECK(found.empty());
-    CHECK(std::fabs(std::ranges::max(expected.NodeVoltages[output]) - std::ranges::max(actual.NodeVoltages[output])) <
-          1e-3);
+    CHECK(std::fabs(std::ranges::max(expected.NodeVoltages[output]) - std::ranges::max(actual.NodeVoltages[output]))
+          < 1e-3);
 
     // After each negative edge of the input the output of ngspice rings, with alternating signs from one step to the
     // next, 0.027 V at the largest at the step of the example (24 mV from Nodalys, which decays smoothly); the

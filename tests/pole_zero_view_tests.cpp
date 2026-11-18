@@ -102,8 +102,8 @@ TEST_CASE("The Bode plot marks the natural frequency of each root, but not one a
 
 TEST_CASE("A hovered root is described by kind, frequency and, for a pair, quality and damping", "[pole_zero_view]") {
     CHECK(GUI::DescribePoleZeroRoot(MakeReal(true, -1e4, 1591.5)) == "pole at 1.591kHz");
-    CHECK(GUI::DescribePoleZeroRoot(MakePair(false, -4500.0, 5000.0, 1070.0, 0.74)) ==
-          "zero pair at 1.07kHz, Q 0.74, zeta 0.676");
+    CHECK(GUI::DescribePoleZeroRoot(MakePair(false, -4500.0, 5000.0, 1070.0, 0.74))
+          == "zero pair at 1.07kHz, Q 0.74, zeta 0.676");
 }
 
 TEST_CASE("The note about cancelled pairs is empty when none cancelled", "[pole_zero_view]") {

@@ -215,8 +215,8 @@ std::vector<Core::ComponentType> FindParts(const std::string_view query) {
     const std::string normalized_query = NormalizeSearchText(query);
     std::vector<Core::ComponentType> found;
     for (const PartInfo &part : PARTS) {
-        if (NormalizeSearchText(part.Name).contains(normalized_query) ||
-            NormalizeSearchText(Core::GetTypeName(part.Type)).contains(normalized_query)) {
+        if (NormalizeSearchText(part.Name).contains(normalized_query)
+            || NormalizeSearchText(Core::GetTypeName(part.Type)).contains(normalized_query)) {
             found.push_back(part.Type);
         }
     }

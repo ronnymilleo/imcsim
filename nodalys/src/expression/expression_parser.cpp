@@ -119,8 +119,8 @@ std::string_view Trim(std::string_view text) {
 }
 
 bool IsSameInput(const ExpressionInput &first, const ExpressionInput &second) {
-    return first.Type == second.Type && ToLower(first.First) == ToLower(second.First) &&
-           ToLower(first.Second) == ToLower(second.Second);
+    return first.Type == second.Type && ToLower(first.First) == ToLower(second.First)
+        && ToLower(first.Second) == ToLower(second.Second);
 }
 
 /**
@@ -498,9 +498,9 @@ private:
             input.Second = std::string(Trim(arguments.substr(comma + 1)));
         }
         const auto has_space = [](const std::string &name) { return std::ranges::any_of(name, IsSpace); };
-        const bool is_malformed = input.First.empty() || has_space(input.First) || has_space(input.Second) ||
-                                  (comma != std::string_view::npos && input.Second.empty()) ||
-                                  input.Second.contains(',') || (!is_voltage && comma != std::string_view::npos);
+        const bool is_malformed = input.First.empty() || has_space(input.First) || has_space(input.Second)
+                               || (comma != std::string_view::npos && input.Second.empty())
+                               || input.Second.contains(',') || (!is_voltage && comma != std::string_view::npos);
         if (is_malformed) {
             return Fail(is_voltage ? "v() takes one or two node names, such as v(out) or v(in, out)"
                                    : "i() takes the name of one source, such as i(vsense)");

@@ -95,8 +95,8 @@ void CheckAgainstFiniteDifferences(const CircuitMaker &make,
         Values below = values;
         above[element.Name] *= 1.0 + RELATIVE_STEP;
         below[element.Name] *= 1.0 - RELATIVE_STEP;
-        const Complex change = std::log(ReadResponse(make(above), output, frequency)) -
-                               std::log(ReadResponse(make(below), output, frequency));
+        const Complex change = std::log(ReadResponse(make(above), output, frequency))
+                             - std::log(ReadResponse(make(below), output, frequency));
         // log of the response is ln|H| + j arg H, so its change per relative step is both figures at once
         const double expected_decibels = DECIBELS_PER_NEPER * change.real() / (2.0 * RELATIVE_STEP) * PERCENT;
         const double expected_degrees = DEGREES_PER_RADIAN * change.imag() / (2.0 * RELATIVE_STEP) * PERCENT;

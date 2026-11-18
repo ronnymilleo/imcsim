@@ -123,8 +123,9 @@ std::optional<std::string> CheckHarmonicBalanceGrid(const HarmonicBalanceSetting
     if (settings.Harmonics < 1 || settings.Harmonics > MAX_HARMONIC_BALANCE_HARMONICS) {
         return std::format("The number of harmonics must be between 1 and {}", MAX_HARMONIC_BALANCE_HARMONICS);
     }
-    if (settings.Samples != 0 && (!IsPowerOfTwo(settings.Samples) || settings.Samples <= 2 * settings.Harmonics ||
-                                  settings.Samples > MAX_HARMONIC_BALANCE_SAMPLES)) {
+    if (settings.Samples != 0
+        && (!IsPowerOfTwo(settings.Samples) || settings.Samples <= 2 * settings.Harmonics
+            || settings.Samples > MAX_HARMONIC_BALANCE_SAMPLES)) {
         return std::format("The sample count must be 0 (automatic) or a power of two greater than {} (up to {})",
                            2 * settings.Harmonics,
                            MAX_HARMONIC_BALANCE_SAMPLES);

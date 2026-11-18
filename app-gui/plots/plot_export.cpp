@@ -318,8 +318,8 @@ BuildRuns(const ExportFigure &figure, const ExportSeries &series, const Frame &f
         const SvgPoint point = {frame.ToPixelX(x), frame.ToPixelY(y, y_axis)};
         std::vector<SvgPoint> &run = runs.back();
         const bool is_last = index + 1 == count;
-        if (run.size() >= 2 && !is_last && std::abs(point.X - run.back().X) < MIN_POINT_DISTANCE &&
-            std::abs(point.Y - run.back().Y) < MIN_POINT_DISTANCE) {
+        if (run.size() >= 2 && !is_last && std::abs(point.X - run.back().X) < MIN_POINT_DISTANCE
+            && std::abs(point.Y - run.back().Y) < MIN_POINT_DISTANCE) {
             continue;
         }
         run.push_back(point);
@@ -578,8 +578,8 @@ void DrawPanel(SvgWriter &svg,
  *          samples (NaN) break the lines, and dense ones closer than half a pixel are merged.
  */
 std::expected<std::string, std::string> RenderSvg(const ExportFigure &figure, const ExportStyle &style) {
-    if (style.Width < MIN_EXPORT_SIZE || style.Height < MIN_EXPORT_SIZE || style.Width > MAX_EXPORT_SIZE ||
-        style.Height > MAX_EXPORT_SIZE) {
+    if (style.Width < MIN_EXPORT_SIZE || style.Height < MIN_EXPORT_SIZE || style.Width > MAX_EXPORT_SIZE
+        || style.Height > MAX_EXPORT_SIZE) {
         return std::unexpected(
             std::format("Width and height must be between {} and {} pixels", MIN_EXPORT_SIZE, MAX_EXPORT_SIZE));
     }

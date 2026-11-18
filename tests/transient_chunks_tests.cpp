@@ -172,7 +172,9 @@ struct BackendInUse {
             Core::SetBackend(std::make_unique<Core::NodalysBackend>());
         }
     }
+
     ~BackendInUse() { Core::SetBackend(nullptr); }
+
     BackendInUse(const BackendInUse &) = delete;
     BackendInUse &operator=(const BackendInUse &) = delete;
 };

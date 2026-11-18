@@ -44,6 +44,7 @@ TEST_CASE("A voltage-controlled switch opens and closes with its control voltage
         Core::Ground Ground;
         Core::Circuit Circuit;
     };
+
     auto build = [](const double control_voltage) {
         auto bundle = std::make_unique<Bundle>();
         bundle->Supply.SetName("V1");

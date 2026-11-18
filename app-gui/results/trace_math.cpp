@@ -199,9 +199,9 @@ private:
         const std::size_t start = m_Position;
         while (m_Position < m_Text.size()) {
             const char character = m_Text[m_Position];
-            const bool exponent_sign = (character == '+' || character == '-') && m_Position > start &&
-                                       (m_Text[m_Position - 1] == 'e' || m_Text[m_Position - 1] == 'E') &&
-                                       std::isdigit(static_cast<unsigned char>(m_Text[m_Position - 2])) != 0;
+            const bool exponent_sign = (character == '+' || character == '-') && m_Position > start
+                                    && (m_Text[m_Position - 1] == 'e' || m_Text[m_Position - 1] == 'E')
+                                    && std::isdigit(static_cast<unsigned char>(m_Text[m_Position - 2])) != 0;
             if (std::isalnum(static_cast<unsigned char>(character)) == 0 && character != '.' && !exponent_sign) {
                 break;
             }
@@ -242,8 +242,8 @@ private:
     Step ParseNode() {
         SkipSpaces();
         const std::size_t start = m_Position;
-        while (m_Position < m_Text.size() && m_Text[m_Position] != ',' && m_Text[m_Position] != ')' &&
-               std::isspace(static_cast<unsigned char>(m_Text[m_Position])) == 0) {
+        while (m_Position < m_Text.size() && m_Text[m_Position] != ',' && m_Text[m_Position] != ')'
+               && std::isspace(static_cast<unsigned char>(m_Text[m_Position])) == 0) {
             ++m_Position;
         }
         const std::string_view text = m_Text.substr(start, m_Position - start);
@@ -273,8 +273,8 @@ private:
         }
         SkipSpaces();
         const std::size_t start = m_Position;
-        while (m_Position < m_Text.size() && m_Text[m_Position] != ')' &&
-               std::isspace(static_cast<unsigned char>(m_Text[m_Position])) == 0) {
+        while (m_Position < m_Text.size() && m_Text[m_Position] != ')'
+               && std::isspace(static_cast<unsigned char>(m_Text[m_Position])) == 0) {
             ++m_Position;
         }
         if (m_Position == start) {
@@ -347,7 +347,8 @@ std::vector<double> Integrate(const std::span<const double> xs, const std::vecto
  * @struct  StackEntry
  * @brief   A value on the evaluation stack: a trace or a number spread over every sample, and its unit.
  */
-template <typename Value> struct StackEntry {
+template <typename Value>
+struct StackEntry {
     std::vector<Value> Values;
     Dimension Unit;
     bool IsNumber = false;

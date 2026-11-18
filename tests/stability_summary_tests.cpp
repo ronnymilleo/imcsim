@@ -64,20 +64,20 @@ TEST_CASE("The default frequency of the circles is where mu is lowest, the first
 }
 
 TEST_CASE("A sweep that is stable everywhere says so with its smallest margin", "[stability_summary]") {
-    CHECK(GUI::DescribeStability(MakeSweep({{3, 3}, {1.4, 1.07}, {2, 2}})) ==
-          "Unconditionally stable over the whole sweep; the smallest margin is mu = 1.07 at 200MHz.");
+    CHECK(GUI::DescribeStability(MakeSweep({{3, 3}, {1.4, 1.07}, {2, 2}}))
+          == "Unconditionally stable over the whole sweep; the smallest margin is mu = 1.07 at 200MHz.");
 }
 
 TEST_CASE("A sweep that is unstable in one band names its ends and its lowest K", "[stability_summary]") {
     const std::string text = GUI::DescribeStability(MakeSweep({{3, 3}, {0.8, 0.9}, {0.42, 0.5}, {0.9, 0.95}, {3, 3}}));
-    CHECK(text ==
-          "Potentially unstable from 200MHz to 400MHz (K < 1); lowest K is 0.42 at 300MHz. Unconditionally stable "
-          "elsewhere in the sweep.");
+    CHECK(text
+          == "Potentially unstable from 200MHz to 400MHz (K < 1); lowest K is 0.42 at 300MHz. Unconditionally stable "
+             "elsewhere in the sweep.");
 }
 
 TEST_CASE("A sweep that is unstable everywhere says so", "[stability_summary]") {
-    CHECK(GUI::DescribeStability(MakeSweep({{0.8, 0.9}, {0.42, 0.5}, {0.9, 0.95}})) ==
-          "Potentially unstable over the whole sweep (K < 1); lowest K is 0.42 at 200MHz.");
+    CHECK(GUI::DescribeStability(MakeSweep({{0.8, 0.9}, {0.42, 0.5}, {0.9, 0.95}}))
+          == "Potentially unstable over the whole sweep (K < 1); lowest K is 0.42 at 200MHz.");
 }
 
 TEST_CASE("A sweep unstable at its edges only tells the two bands", "[stability_summary]") {
@@ -146,12 +146,13 @@ TEST_CASE("The circles note says nothing when both cross the chart and names eac
     circles.Load.Coverage = GUI::ChartCoverage::PARTLY;
     CHECK(GUI::DescribeCircles(circles, 180e6).empty());
     circles.Load.Coverage = GUI::ChartCoverage::ENTIRELY_STABLE;
-    CHECK(GUI::DescribeCircles(circles, 180e6) ==
-          "Load circle: the whole chart is stable at 180MHz, so no circle shows.");
+    CHECK(GUI::DescribeCircles(circles, 180e6)
+          == "Load circle: the whole chart is stable at 180MHz, so no circle shows.");
     circles.Source.Coverage = GUI::ChartCoverage::ENTIRELY_UNSTABLE;
-    CHECK(GUI::DescribeCircles(circles, 180e6) ==
-          "Source circle: the whole chart is unstable at 180MHz, so no circle shows. Load circle: the whole chart is "
-          "stable at 180MHz, so no circle shows.");
+    CHECK(
+        GUI::DescribeCircles(circles, 180e6)
+        == "Source circle: the whole chart is unstable at 180MHz, so no circle shows. Load circle: the whole chart is "
+           "stable at 180MHz, so no circle shows.");
 }
 
 TEST_CASE("The metrics of a point read as lines for a tooltip", "[stability_summary]") {

@@ -166,8 +166,8 @@ bool HarmonicBalanceTab::CanExport() const {
     if (!result || result->Times.empty()) {
         return false;
     }
-    return HasMeasuredVoltage(result->NodeWaveforms.size(), m_Schematic) ||
-           HasMeasuredCurrent(result->CurrentWaveforms, m_Schematic);
+    return HasMeasuredVoltage(result->NodeWaveforms.size(), m_Schematic)
+        || HasMeasuredCurrent(result->CurrentWaveforms, m_Schematic);
 }
 
 /**

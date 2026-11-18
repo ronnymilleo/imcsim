@@ -90,8 +90,8 @@ TEST_CASE("A 7-segment display reads every input against its level, in segment o
     }
     const GUI::LogicState high = GUI::LogicState::HIGH;
     const GUI::LogicState low = GUI::LogicState::LOW;
-    CHECK(GUI::ReadLogicDisplay(*schematic.GetElements().front(), schematic.GetConnectivity(), *run.Result) ==
-          std::vector<std::optional<GUI::LogicState>>{high, high, low, high, high, low, high});
+    CHECK(GUI::ReadLogicDisplay(*schematic.GetElements().front(), schematic.GetConnectivity(), *run.Result)
+          == std::vector<std::optional<GUI::LogicState>>{high, high, low, high, high, low, high});
 
     // Against a 10 V level, the 5 V inputs are between the levels
     static_cast<Core::SevenSegmentDisplay &>(schematic.GetElement(0).GetComponent())

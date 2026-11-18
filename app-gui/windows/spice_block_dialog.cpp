@@ -154,8 +154,8 @@ std::optional<SpiceBlockResult> SpiceBlockDialog::DrawImport() {
     }
 
     std::optional<SpiceBlockResult> result;
-    const bool is_any_chosen = std::ranges::any_of(m_Choices, &Choice::IsChosen) ||
-                               std::ranges::any_of(m_AreModelsChosen, [](const char chosen) { return chosen != 0; });
+    const bool is_any_chosen = std::ranges::any_of(m_Choices, &Choice::IsChosen)
+                            || std::ranges::any_of(m_AreModelsChosen, [](const char chosen) { return chosen != 0; });
     ImGui::BeginDisabled(!is_any_chosen);
     if (ImGui::Button("Import")) {
         result = TakeChosen();

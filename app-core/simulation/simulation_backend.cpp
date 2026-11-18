@@ -32,37 +32,47 @@ std::mutex g_backend_mutex;
 class NoBackend : public SimulationBackend {
 public:
     std::string_view GetName() const override { return "The missing simulation engine"; }
+
     const BackendCapabilities &GetCapabilities() const override { return m_Capabilities; }
 
     OperatingPointRun RunOperatingPoint(const Circuit &, const std::optional<double> &) override {
         return Fail<OperatingPointRun>();
     }
+
     TransientRun RunTransient(const Circuit &,
                               const TransientSettings &,
                               const std::optional<double> &,
                               const RunMonitor &) override {
         return Fail<TransientRun>();
     }
+
     ACSweepRun RunACSweep(const Circuit &, const ACSweepSettings &, const std::optional<double> &) override {
         return Fail<ACSweepRun>();
     }
+
     DCSweepRun RunDCSweep(const Circuit &, const DCSweepSettings &, const std::optional<double> &) override {
         return Fail<DCSweepRun>();
     }
+
     NoiseRun RunNoise(const Circuit &, const NoiseSettings &) override { return Fail<NoiseRun>(); }
+
     TransferFunctionRun RunTransferFunction(const Circuit &, const TransferFunctionSettings &) override {
         return Fail<TransferFunctionRun>();
     }
+
     SensitivityRun RunSensitivity(const Circuit &, const SensitivitySettings &) override {
         return Fail<SensitivityRun>();
     }
+
     PoleZeroRun RunPoleZero(const Circuit &, const PoleZeroSettings &) override { return Fail<PoleZeroRun>(); }
+
     SParametersRun RunSParameters(const Circuit &, const SParameterSettings &) override {
         return Fail<SParametersRun>();
     }
 
 private:
-    template <typename Run> static Run Fail() {
+    template <typename Run>
+    static Run Fail() {
         Run run;
         run.Result = std::unexpected(std::string(NO_BACKEND_REASON));
         return run;
@@ -236,8 +246,8 @@ FindUnsupported(const SimulationBackend &backend, const Circuit &circuit, const 
         return reason;
     }
     const auto with_nodesets = backend.GetCapabilities().UnsupportedWithNodesets.find(kind);
-    if (with_nodesets != backend.GetCapabilities().UnsupportedWithNodesets.end() &&
-        !ResolveNodeVoltages(circuit, NodeVoltageKind::NODESET).empty()) {
+    if (with_nodesets != backend.GetCapabilities().UnsupportedWithNodesets.end()
+        && !ResolveNodeVoltages(circuit, NodeVoltageKind::NODESET).empty()) {
         return with_nodesets->second;
     }
     const auto &find_problem = backend.GetCapabilities().FindPartProblem;

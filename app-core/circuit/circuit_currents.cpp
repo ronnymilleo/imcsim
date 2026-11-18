@@ -32,8 +32,8 @@ namespace Core {
  * @return  True for supplies, voltage sources, clocks and logic inputs.
  */
 bool HasBranchCurrent(const ComponentType type) {
-    return type == ComponentType::VCC || type == ComponentType::VOLTAGE_SOURCE || type == ComponentType::CLOCK ||
-           type == ComponentType::LOGIC_INPUT;
+    return type == ComponentType::VCC || type == ComponentType::VOLTAGE_SOURCE || type == ComponentType::CLOCK
+        || type == ComponentType::LOGIC_INPUT;
 }
 
 /**
@@ -46,8 +46,8 @@ bool HasBranchCurrent(const ComponentType type) {
  */
 std::vector<CurrentProbe> GetCurrentProbes(const Component &component) {
     const ComponentType type = component.GetType();
-    if (IsDiode(type) || IsControlledSource(type) || IsBehavioralSource(type) || IsSwitch(type) ||
-        type == ComponentType::V_SWITCH || type == ComponentType::FUSE || type == ComponentType::OP_AMP) {
+    if (IsDiode(type) || IsControlledSource(type) || IsBehavioralSource(type) || IsSwitch(type)
+        || type == ComponentType::V_SWITCH || type == ComponentType::FUSE || type == ComponentType::OP_AMP) {
         return {{0, ""}};
     }
     if (IsLogicGate(type)) {

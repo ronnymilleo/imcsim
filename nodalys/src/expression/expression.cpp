@@ -46,8 +46,8 @@ public:
         ExpressionResult result{.Value = m_Values[root], .Partials = {}};
         const auto partials = PartialsOf(root);
         result.Partials.assign(partials.begin(), partials.end());
-        const bool is_finite = std::isfinite(result.Value) &&
-                               std::ranges::all_of(result.Partials, [](const double p) { return std::isfinite(p); });
+        const bool is_finite = std::isfinite(result.Value)
+                            && std::ranges::all_of(result.Partials, [](const double p) { return std::isfinite(p); });
         if (!is_finite) {
             return std::unexpected("The expression is out of range: its value or a derivative is not finite");
         }
@@ -124,8 +124,8 @@ private:
         if (!applied) {
             return std::unexpected(applied.error());
         }
-        const bool is_finite = std::isfinite(applied->Value) && std::isfinite(applied->PartialFirst) &&
-                               std::isfinite(applied->PartialSecond);
+        const bool is_finite = std::isfinite(applied->Value) && std::isfinite(applied->PartialFirst)
+                            && std::isfinite(applied->PartialSecond);
         if (!is_finite) {
             return std::unexpected(std::format("{} gives a value out of range", GetOperationName(node.Kind)));
         }

@@ -111,6 +111,7 @@ constexpr double TARGET_CHUNK_SECONDS = 0.03;
 constexpr double FIRST_CHUNK_SHARE = 0.01;
 /// A run has ended when its last point is this close to the stop time, which ngspice lands on exactly.
 constexpr double COMPLETE_SHARE = 1.0 - 1e-9;
+
 /**
  * @brief   How much simulated time the first chunk covers: a fixed stretch of the clock for a live run, the length the
  *          monitor asks for, or else a small share of the stop time.
@@ -154,9 +155,9 @@ double GetNextChunkDuration(const RunMonitor &monitor,
 void RemoveChunkMessages(std::vector<SimulatorMessage> &messages) {
     bool has_analysis_line = false;
     std::erase_if(messages, [&has_analysis_line](const SimulatorMessage &message) {
-        if (message.Text.contains("condition met: stop  when time >") ||
-            message.Text.starts_with("doAnalyses: pause requested") || message.Text == "run simulation interrupted" ||
-            message.Text == "simulation interrupted") {
+        if (message.Text.contains("condition met: stop  when time >")
+            || message.Text.starts_with("doAnalyses: pause requested") || message.Text == "run simulation interrupted"
+            || message.Text == "simulation interrupted") {
             return true;
         }
         return message.Text.starts_with("Doing analysis at TEMP") && std::exchange(has_analysis_line, true);
@@ -314,8 +315,8 @@ SimulationRun<Data> Simulate(const Circuit &circuit,
     const char *plot = ngSpice_CurPlot();
     if (failure) {
         run.Result = std::unexpected(*failure);
-    } else if (plot == nullptr || !std::string_view(plot).starts_with(plot_prefix) || HasErrorLine(run.Messages) ||
-               NeverSettled(run.Messages)) {
+    } else if (plot == nullptr || !std::string_view(plot).starts_with(plot_prefix) || HasErrorLine(run.Messages)
+               || NeverSettled(run.Messages)) {
         run.Result = std::unexpected(DescribeFailure(circuit, run.Messages));
     } else {
         run.Result = read_result();

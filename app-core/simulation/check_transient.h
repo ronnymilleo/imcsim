@@ -14,7 +14,7 @@
 namespace Core {
 
 /// Most time steps a transient may span, which keeps a mistyped setting from running for minutes or exhausting memory.
-constexpr int MAX_TRANSIENT_POINTS = 1000000;
+constexpr int MAX_TRANSIENT_POINTS = 1'000'000;
 
 std::optional<std::string> CheckTransientSettings(const TransientSettings &settings);
 std::optional<double> FindFinestSignalStep(const Circuit &circuit);

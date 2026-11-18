@@ -72,8 +72,8 @@ std::vector<std::string> ListControllingCurrents(const std::vector<CircuitEntry>
 bool CarriesCurrent(const Component &component, const std::vector<std::string> &currents) {
     const std::string &name = component.GetName();
     return !name.empty() && std::ranges::any_of(currents, [&name](const std::string &current) {
-        return current == name ||
-               (current.starts_with(name) && current.size() > name.size() && current[name.size()] == '.');
+        return current == name
+            || (current.starts_with(name) && current.size() > name.size() && current[name.size()] == '.');
     });
 }
 
@@ -353,8 +353,8 @@ std::string FormatPotentiometer(const Potentiometer &pot, const std::vector<int>
                        pot.GetName(),
                        nodes[0],
                        nodes[2],
-                       FormatSpiceValue(pot.GetFirstTrackResistance())) +
-           std::format("R-{}b {} {} {}\n",
+                       FormatSpiceValue(pot.GetFirstTrackResistance()))
+         + std::format("R-{}b {} {} {}\n",
                        pot.GetName(),
                        nodes[2],
                        nodes[1],
@@ -389,8 +389,8 @@ std::string FormatRelay(const Relay &relay, const std::vector<int> &nodes, Netli
                        coil_middle,
                        FormatSpiceValue(figures.CoilResistance),
                        nodes[3],
-                       FormatSpiceValue(figures.CoilInductance)) +
-           std::format("S-{} {} {} {} {} {}\n", relay.GetName(), nodes[0], nodes[1], nodes[2], coil_middle, model_name);
+                       FormatSpiceValue(figures.CoilInductance))
+         + std::format("S-{} {} {} {} {} {}\n", relay.GetName(), nodes[0], nodes[1], nodes[2], coil_middle, model_name);
 }
 
 /**
@@ -424,15 +424,15 @@ std::string FormatTransformer(const Transformer &transformer, const std::vector<
                        primary_middle,
                        resistance,
                        nodes[1],
-                       FormatSpiceValue(transformer.GetValue())) +
-           std::format("R-{0}s {1} {2} {3}\nL-{0}s {2} {4} {5}\n",
+                       FormatSpiceValue(transformer.GetValue()))
+         + std::format("R-{0}s {1} {2} {3}\nL-{0}s {2} {4} {5}\n",
                        name,
                        nodes[2],
                        secondary_middle,
                        resistance,
                        nodes[3],
-                       FormatSpiceValue(transformer.GetSecondaryInductance())) +
-           std::format("K-{0} L-{0}p L-{0}s {1}\n", name, FormatSpiceValue(transformer.GetParameters().Coupling));
+                       FormatSpiceValue(transformer.GetSecondaryInductance()))
+         + std::format("K-{0} L-{0}p L-{0}s {1}\n", name, FormatSpiceValue(transformer.GetParameters().Coupling));
 }
 
 /**
@@ -535,9 +535,8 @@ FormatPart(const Circuit &circuit, const Component &component, const std::vector
 
 /// Whether a part only marks or reads its node, so the netlist has no element for it.
 bool WritesNoElement(const ComponentType type) {
-    return type == ComponentType::GROUND || type == ComponentType::NET_LABEL ||
-           type == ComponentType::INITIAL_VOLTAGE || type == ComponentType::NODESET || IsLogicDisplay(type) ||
-           IsSubcircuitPin(type);
+    return type == ComponentType::GROUND || type == ComponentType::NET_LABEL || type == ComponentType::INITIAL_VOLTAGE
+        || type == ComponentType::NODESET || IsLogicDisplay(type) || IsSubcircuitPin(type);
 }
 
 } // namespace

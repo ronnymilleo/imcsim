@@ -83,8 +83,8 @@ void DrawLogicPart(Core::LogicPart &part, LogicFields &fields, Schematic &schema
         DrawFieldLabel("Inputs");
         if (ImGui::BeginCombo("##inputs", std::to_string(input_count).c_str())) {
             for (int candidate = Core::MIN_LOGIC_INPUTS; candidate <= Core::MAX_LOGIC_INPUTS; ++candidate) {
-                if (ImGui::Selectable(std::to_string(candidate).c_str(), candidate == input_count) &&
-                    candidate != input_count) {
+                if (ImGui::Selectable(std::to_string(candidate).c_str(), candidate == input_count)
+                    && candidate != input_count) {
                     part.SetInputCount(candidate);
                     schematic.MarkModified();
                 }

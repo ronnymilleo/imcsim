@@ -112,8 +112,8 @@ TEST_CASE("Real cosine/sine harmonic transforms preserve exact trigonometric sig
 
     for (std::size_t m = 0; m < M; ++m) {
         const double theta = 2.0 * std::numbers::pi * static_cast<double>(m) / static_cast<double>(M);
-        const double direct = 1.25 + 2.0 * std::cos(theta) - 1.5 * std::sin(theta) + 0.7 * std::cos(3.0 * theta) +
-                              0.4 * std::sin(7.0 * theta);
+        const double direct = 1.25 + 2.0 * std::cos(theta) - 1.5 * std::sin(theta) + 0.7 * std::cos(3.0 * theta)
+                            + 0.4 * std::sin(7.0 * theta);
         CHECK_THAT(samples[m], WithinAbs(direct, 1e-12));
     }
 

@@ -93,8 +93,8 @@ std::vector<const ReadyBlock *> FindReadyBlocks(const std::string_view query) {
     const std::string normalized_query = NormalizeSearchText(query);
     std::vector<const ReadyBlock *> found;
     for (const ReadyBlock &block : READY_BLOCKS) {
-        if (NormalizeSearchText(block.Title).contains(normalized_query) ||
-            NormalizeSearchText(block.Name).contains(normalized_query)) {
+        if (NormalizeSearchText(block.Title).contains(normalized_query)
+            || NormalizeSearchText(block.Name).contains(normalized_query)) {
             found.push_back(&block);
         }
     }

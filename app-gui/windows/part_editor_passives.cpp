@@ -76,8 +76,8 @@ void DrawValue(Core::Component &component,
     const auto is_valid = [&component](const double value) { return component.IsValidValue(value); };
     // Standard values are for the passive parts; the value of a source or a gain is whatever the circuit needs
     const Core::ComponentType type = component.GetType();
-    const bool passive = type == Core::ComponentType::RESISTOR || type == Core::ComponentType::CAPACITOR ||
-                         type == Core::ComponentType::INDUCTOR;
+    const bool passive = type == Core::ComponentType::RESISTOR || type == Core::ComponentType::CAPACITOR
+                      || type == Core::ComponentType::INDUCTOR;
     const Core::ValueSeries series = passive ? preferences.ValueSeries : Core::ValueSeries::FREE;
     if (const std::optional<double> value = main_value.Draw("Value", component.GetUnit(), is_valid, series)) {
         component.SetValue(*value);
@@ -135,8 +135,8 @@ void DrawTolerance(Core::Component &component,
         schematic.MarkModified();
     }
     const double series_percent = Core::GetSeriesTolerancePercent(preferences.ValueSeries);
-    if (!is_source && !component.HasTolerance() && series_percent > 0.0 &&
-        ImGui::SmallButton(
+    if (!is_source && !component.HasTolerance() && series_percent > 0.0
+        && ImGui::SmallButton(
             std::format("Use {} ({:g}%)", Core::GetSeriesName(preferences.ValueSeries), series_percent).c_str())) {
         component.SetTolerance(series_percent);
         fields.Tolerance.LoadOptional(component.GetTolerance());

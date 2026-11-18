@@ -33,28 +33,28 @@ std::map<std::string, std::string> ParameterList(const std::string &text) {
     }
     std::size_t position = open + 1;
     while (position < text.size() && text[position] != ')') {
-        while (position < text.size() &&
-               (std::isspace(static_cast<unsigned char>(text[position])) != 0 || text[position] == '+')) {
+        while (position < text.size()
+               && (std::isspace(static_cast<unsigned char>(text[position])) != 0 || text[position] == '+')) {
             ++position;
         }
         const std::size_t key_start = position;
-        while (position < text.size() &&
-               (std::isalnum(static_cast<unsigned char>(text[position])) != 0 || text[position] == '_')) {
+        while (position < text.size()
+               && (std::isalnum(static_cast<unsigned char>(text[position])) != 0 || text[position] == '_')) {
             ++position;
         }
         const std::string key = text.substr(key_start, position - key_start);
         if (key.empty() || position >= text.size() || text[position] != '=') {
             // Not a KEY=VALUE pair; skip whatever token this is
-            while (position < text.size() && std::isspace(static_cast<unsigned char>(text[position])) == 0 &&
-                   text[position] != ')') {
+            while (position < text.size() && std::isspace(static_cast<unsigned char>(text[position])) == 0
+                   && text[position] != ')') {
                 ++position;
             }
             continue;
         }
         ++position;
         const std::size_t value_start = position;
-        while (position < text.size() && std::isspace(static_cast<unsigned char>(text[position])) == 0 &&
-               text[position] != ')') {
+        while (position < text.size() && std::isspace(static_cast<unsigned char>(text[position])) == 0
+               && text[position] != ')') {
             ++position;
         }
         values[ToUpper(key)] = text.substr(value_start, position - value_start);

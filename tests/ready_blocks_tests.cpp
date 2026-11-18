@@ -280,11 +280,13 @@ TEST_CASE("RESET clears the counter and the shift register", "[ready_blocks][dig
 
 TEST_CASE("The adder adds two numbers and a carry, carrying out past 15", "[ready_blocks][digital]") {
     SKIP_WITHOUT_DIGITAL_MODELS();
+
     struct Sum {
         int A;
         int B;
         bool HasCarryIn;
     };
+
     // The last two carry out, and the carry in of 7 + 8 + 1 runs through every stage
     for (const Sum sum : {Sum{5, 9, false}, Sum{3, 4, true}, Sum{15, 1, false}, Sum{7, 8, true}}) {
         CAPTURE(sum.A, sum.B, sum.HasCarryIn);

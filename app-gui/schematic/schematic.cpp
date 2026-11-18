@@ -409,8 +409,8 @@ std::expected<std::unique_ptr<Schematic>, std::string> Schematic::OpenSubcircuit
                      m_LibraryModels);
     for (const SavedSubcircuitPin &pin : definition.Pins) {
         const bool has_marker = std::ranges::any_of(content->GetElements(), [&](const auto &element) {
-            return Core::IsSubcircuitPin(element->GetComponent().GetType()) &&
-                   element->GetTerminals().front() == pin.Point;
+            return Core::IsSubcircuitPin(element->GetComponent().GetType())
+                && element->GetTerminals().front() == pin.Point;
         });
         if (!has_marker) {
             auto marker = CreateElement(Core::ComponentType::PIN, pin.Point, Rotation::R0);
@@ -554,6 +554,7 @@ std::vector<std::string> Schematic::MergeSubcircuits(std::vector<SavedSubcircuit
     }
     return names;
 }
+
 /**
  * @brief   Adds device models from a library or a paste, so the parts that name them have them.
  * @param[in]     models       Models to add.
@@ -1113,6 +1114,7 @@ void Schematic::RefreshInstances(const SavedSubcircuit &definition,
         }
     }
 }
+
 /**
  * @brief   Wires the terminals of a block just made, the last element, to the points where its pin markers were.
  * @details Each wire goes around the box from the edge its pin is on, clear of the other wires and terminals; one

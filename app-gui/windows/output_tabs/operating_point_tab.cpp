@@ -116,8 +116,8 @@ void MarkSteps(const std::vector<double> &xs, const std::span<const PlottedTrace
  *          keeps the zoom of the plot.
  */
 bool HaveSameValues(const Core::DCSweep &first, const Core::DCSweep &second) {
-    if (first.SweptSource != second.SweptSource || first.SweptValues != second.SweptValues ||
-        first.Curves.size() != second.Curves.size()) {
+    if (first.SweptSource != second.SweptSource || first.SweptValues != second.SweptValues
+        || first.Curves.size() != second.Curves.size()) {
         return false;
     }
     for (std::size_t curve = 0; curve < first.Curves.size(); ++curve) {
@@ -127,8 +127,8 @@ bool HaveSameValues(const Core::DCSweep &first, const Core::DCSweep &second) {
             return false;
         }
         for (std::size_t current = 0; current < one.Currents.size(); ++current) {
-            if (one.Currents[current].Name != other.Currents[current].Name ||
-                one.Currents[current].Values != other.Currents[current].Values) {
+            if (one.Currents[current].Name != other.Currents[current].Name
+                || one.Currents[current].Values != other.Currents[current].Values) {
                 return false;
             }
         }

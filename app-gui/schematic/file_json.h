@@ -21,7 +21,8 @@ namespace GUI {
  * @struct  ParameterKey
  * @brief   JSON key of one member of a parameter set, such as Core::PulseParameters, and the member itself.
  */
-template <typename Parameters> struct ParameterKey {
+template <typename Parameters>
+struct ParameterKey {
     const char *Name;
     double Parameters::*Value;
 };

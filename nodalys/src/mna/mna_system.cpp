@@ -164,8 +164,8 @@ const std::vector<double> &MnaSystem::Rhs() const {
 }
 
 bool MnaSystem::IsNodeUnknown(const int index) const {
-    return index >= 0 && static_cast<std::size_t>(index) < m_IsNodeUnknown.size() &&
-           m_IsNodeUnknown[static_cast<std::size_t>(index)];
+    return index >= 0 && static_cast<std::size_t>(index) < m_IsNodeUnknown.size()
+        && m_IsNodeUnknown[static_cast<std::size_t>(index)];
 }
 
 void MnaSystem::AddA(const int row, const int col, const double value) {

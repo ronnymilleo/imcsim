@@ -114,10 +114,10 @@ bool PartPicker::TakeEditorFocus() {
  */
 std::optional<EditorMode> PartPicker::DrawList(const PartMatches &matches, const ImVec2 position, const bool moved) {
     ImGui::SetNextWindowPos(position);
-    constexpr ImGuiWindowFlags LIST_FLAGS = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
-                                            ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
-                                            ImGuiWindowFlags_NoNav | ImGuiWindowFlags_AlwaysAutoResize |
-                                            ImGuiWindowFlags_NoDocking;
+    constexpr ImGuiWindowFlags LIST_FLAGS = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove
+                                          | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing
+                                          | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_AlwaysAutoResize
+                                          | ImGuiWindowFlags_NoDocking;
     std::optional<EditorMode> clicked;
     if (ImGui::Begin("##part_matches", nullptr, LIST_FLAGS)) {
         ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());

@@ -57,8 +57,8 @@ std::expected<TransferFunction, std::string> ReadTransferFunction(const Circuit 
     result.OutputImpedance = *output_impedance;
     // An infinite value would format as nan or inf, which reads as a broken number; an open path is instead reported
     // around 1e20 ohm, which stays finite and the views turn into an open circuit
-    if (!std::isfinite(result.Gain) || !std::isfinite(result.InputImpedance) ||
-        !std::isfinite(result.OutputImpedance)) {
+    if (!std::isfinite(result.Gain) || !std::isfinite(result.InputImpedance)
+        || !std::isfinite(result.OutputImpedance)) {
         return std::unexpected("ngspice returned a transfer function that is not a number");
     }
     return result;

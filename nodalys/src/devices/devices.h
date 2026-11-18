@@ -121,8 +121,10 @@ public:
 
     /// True when the device carries state between time points (companion models of C, L and junction charges).
     virtual bool HasTransientState() const { return false; }
+
     /// Saves the state of the accepted point x (called after each converged transient step).
     virtual void AcceptStep(const std::vector<double> &x) { (void)x; }
+
     /// Restores the state saved before a step that the LTE control rejected.
     virtual void RejectStep() {}
 
@@ -193,7 +195,9 @@ public:
 
     double GetResistance() const;
     void SetResistance(double resistance);
+
     int GetNodeA() const { return m_NodeA; }
+
     int GetNodeB() const { return m_NodeB; }
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
@@ -229,7 +233,9 @@ public:
     CapacitorDevice(int node_a, int node_b, double capacitance, double initial_voltage, bool has_initial);
 
     int GetNodeA() const { return m_NodeA; }
+
     int GetNodeB() const { return m_NodeB; }
+
     double GetCapacitance() const { return m_Capacitance; }
 
     /// A capacitor with no IC= of its own starts at the difference of the initial voltages of its nodes, as in SPICE.
@@ -272,8 +278,11 @@ public:
     InductorDevice(int node_a, int node_b, int branch, double inductance, double initial_current, bool has_initial);
 
     int GetNodeA() const { return m_NodeA; }
+
     int GetNodeB() const { return m_NodeB; }
+
     int GetBranch() const { return m_Branch; }
+
     double GetInductance() const { return m_Inductance; }
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
@@ -347,11 +356,17 @@ public:
 
     double GetDcValue() const;
     void SetDcValue(double value);
+
     double GetAcMagnitude() const { return m_AcMagnitude; }
+
     int GetNodeA() const { return m_NodeA; }
+
     int GetNodeB() const { return m_NodeB; }
+
     int GetBranch() const { return m_Branch; }
+
     const SourcePeriodicity &GetPeriodicity() const { return m_Periodicity; }
+
     void SetBreakpoints(Breakpoints breakpoints);
     void SetSeedCallback(std::function<void(std::uint64_t)> set_seed);
 
@@ -395,10 +410,15 @@ public:
 
     double GetDcValue() const;
     void SetDcValue(double value);
+
     double GetAcMagnitude() const { return m_AcMagnitude; }
+
     int GetNodeA() const { return m_NodeA; }
+
     int GetNodeB() const { return m_NodeB; }
+
     const SourcePeriodicity &GetPeriodicity() const { return m_Periodicity; }
+
     double SamplePeriodicCurrent(int terminal, double time_seconds) const;
     void SetBreakpoints(VoltageSourceDevice::Breakpoints breakpoints);
     void SetSeedCallback(std::function<void(std::uint64_t)> set_seed);
@@ -437,10 +457,15 @@ public:
     VcvsDevice(int node_a, int node_b, int control_positive, int control_negative, int branch, double gain);
 
     int GetNodeA() const { return m_NodeA; }
+
     int GetNodeB() const { return m_NodeB; }
+
     int GetControlPositive() const { return m_ControlPositive; }
+
     int GetControlNegative() const { return m_ControlNegative; }
+
     int GetBranch() const { return m_Branch; }
+
     double GetGain() const { return m_Gain; }
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
@@ -468,9 +493,13 @@ public:
     VccsDevice(int node_a, int node_b, int control_positive, int control_negative, double gain);
 
     int GetNodeA() const { return m_NodeA; }
+
     int GetNodeB() const { return m_NodeB; }
+
     int GetControlPositive() const { return m_ControlPositive; }
+
     int GetControlNegative() const { return m_ControlNegative; }
+
     double GetGain() const { return m_Gain; }
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
@@ -498,8 +527,11 @@ public:
     CccsDevice(int node_a, int node_b, int control_branch, double gain);
 
     int GetNodeA() const { return m_NodeA; }
+
     int GetNodeB() const { return m_NodeB; }
+
     int ControlBranch() const { return m_ControlBranch; }
+
     double GetGain() const { return m_Gain; }
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
@@ -525,9 +557,13 @@ public:
     CcvsDevice(int node_a, int node_b, int branch, int control_branch, double gain);
 
     int GetNodeA() const { return m_NodeA; }
+
     int GetNodeB() const { return m_NodeB; }
+
     int GetBranch() const { return m_Branch; }
+
     int ControlBranch() const { return m_ControlBranch; }
+
     double GetGain() const { return m_Gain; }
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
@@ -557,8 +593,11 @@ public:
     SwitchDevice(int node_a, int node_b, int control_positive, int control_negative, SwitchParameters parameters);
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
+
     bool IsLinear() const override { return false; }
+
     bool SupportsHarmonicBalance() const override { return false; }
+
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
     std::complex<double> AcTerminalCurrent(int terminal,
                                            const std::vector<double> &x_dc,

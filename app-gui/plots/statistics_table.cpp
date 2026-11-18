@@ -151,12 +151,12 @@ std::vector<StatisticsRow> BuildBodeStatistics(const std::span<const double> fre
         std::size_t row = 0;
         const auto add = [&rows, &row](StatisticsCell cell) { rows[row++].Cells.push_back(std::move(cell)); };
         const std::optional<BodeStatistics> statistics = frequencies.empty()
-                                                             ? std::nullopt
-                                                             : ComputeBodeStatistics(frequencies,
-                                                                                     trace.MagnitudesDecibels,
-                                                                                     trace.PhasesDegrees,
-                                                                                     frequencies.front(),
-                                                                                     frequencies.back());
+                                                           ? std::nullopt
+                                                           : ComputeBodeStatistics(frequencies,
+                                                                                   trace.MagnitudesDecibels,
+                                                                                   trace.PhasesDegrees,
+                                                                                   frequencies.front(),
+                                                                                   frequencies.back());
         if (statistics) {
             add(FixedCell(statistics->PeakGain, "dB"));
             add(PlainCell(statistics->PeakFrequency, "Hz"));

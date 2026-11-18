@@ -51,8 +51,8 @@ std::optional<std::string> CheckConfig(const CompiledCircuit &compiled, const Ac
     if (settings.OutputPositiveNode == settings.OutputNegativeNode) {
         return "Pick an output node; ground has no sensitivity";
     }
-    if (settings.StartFrequency <= 0.0 || settings.StopFrequency < settings.StartFrequency ||
-        settings.PointsPerDecade <= 0) {
+    if (settings.StartFrequency <= 0.0 || settings.StopFrequency < settings.StartFrequency
+        || settings.PointsPerDecade <= 0) {
         return "The AC sensitivity analysis has invalid frequency settings; check start, stop and points per decade";
     }
     return std::nullopt;
@@ -160,8 +160,8 @@ std::expected<FrequencySolution, std::string> SolveFrequency(const SweepContext 
     const double omega = 2.0 * std::numbers::pi * frequency;
     const MnaSystem &system = *context.Compiled.System;
     FrequencySolution solution;
-    if (!system.SolveAc(context.Reactive, omega, solution.AcSolution) ||
-        !system.SolveAcTransposeFor(context.Reactive, omega, context.Selector, solution.Adjoint)) {
+    if (!system.SolveAc(context.Reactive, omega, solution.AcSolution)
+        || !system.SolveAcTransposeFor(context.Reactive, omega, context.Selector, solution.Adjoint)) {
         return std::unexpected(
             std::format("The Nodalys AC sensitivity solver encountered a singular matrix at f = {} Hz", frequency));
     }

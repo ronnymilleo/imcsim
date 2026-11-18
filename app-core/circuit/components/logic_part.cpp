@@ -111,8 +111,8 @@ bool IsLogicGate(const ComponentType type) {
  * @return  True for the D, JK, T and SR flip-flops.
  */
 bool IsFlipFlop(const ComponentType type) {
-    return type == ComponentType::D_FLIP_FLOP || type == ComponentType::JK_FLIP_FLOP ||
-           type == ComponentType::T_FLIP_FLOP || type == ComponentType::SR_FLIP_FLOP;
+    return type == ComponentType::D_FLIP_FLOP || type == ComponentType::JK_FLIP_FLOP
+        || type == ComponentType::T_FLIP_FLOP || type == ComponentType::SR_FLIP_FLOP;
 }
 
 /**
@@ -130,8 +130,8 @@ bool IsLogicPart(const ComponentType type) {
  * @return  True for AND, OR, NAND, NOR, XOR and XNOR.
  */
 bool HasVariableInputs(const ComponentType type) {
-    return type == ComponentType::AND || type == ComponentType::OR || type == ComponentType::NAND ||
-           type == ComponentType::NOR || type == ComponentType::XOR || type == ComponentType::XNOR;
+    return type == ComponentType::AND || type == ComponentType::OR || type == ComponentType::NAND
+        || type == ComponentType::NOR || type == ComponentType::XOR || type == ComponentType::XNOR;
 }
 
 /**

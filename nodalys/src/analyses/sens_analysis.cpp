@@ -71,14 +71,14 @@ std::expected<SensitivityResult, std::string> ComputeSensitivity(CompiledCircuit
 
     auto voltage_at = [&](const int unknown) -> double {
         return (unknown >= 0 && static_cast<std::size_t>(unknown) < x_dc.size())
-                   ? x_dc[static_cast<std::size_t>(unknown)]
-                   : 0.0;
+                 ? x_dc[static_cast<std::size_t>(unknown)]
+                 : 0.0;
     };
 
     auto adjoint_at = [&](const int unknown) -> double {
         return (unknown >= 0 && static_cast<std::size_t>(unknown) < adjoint.size())
-                   ? adjoint[static_cast<std::size_t>(unknown)]
-                   : 0.0;
+                 ? adjoint[static_cast<std::size_t>(unknown)]
+                 : 0.0;
     };
 
     SensitivityResult result;

@@ -84,8 +84,8 @@ bool AreWiresClearOf(const GUI::Schematic &schematic, const GUI::UIElement &bloc
         const GUI::GridPoint step = {(end.X > point.X) - (end.X < point.X), (end.Y > point.Y) - (end.Y < point.Y)};
         for (;; point = {point.X + step.X, point.Y + step.Y}) {
             const bool is_inside =
-                static_cast<float>(point.X) >= bounds.Min.x && static_cast<float>(point.X) <= bounds.Max.x &&
-                static_cast<float>(point.Y) >= bounds.Min.y && static_cast<float>(point.Y) <= bounds.Max.y;
+                static_cast<float>(point.X) >= bounds.Min.x && static_cast<float>(point.X) <= bounds.Max.x
+                && static_cast<float>(point.Y) >= bounds.Min.y && static_cast<float>(point.Y) <= bounds.Max.y;
             if ((is_inside && !std::ranges::contains(leads, point)) || std::ranges::contains(names, point)) {
                 return false;
             }
@@ -333,10 +333,10 @@ TEST_CASE("A selection becomes a reusable block and its creation is undoable", "
     REQUIRE(schematic.GetSubcircuits().size() == 1);
     CHECK(schematic.GetSubcircuits()[0].Elements.size() == 3);
     CHECK(schematic.GetSubcircuits()[0].Pins[0].Name == "INPUT");
-    CHECK(static_cast<const Core::NetLabel &>(schematic.GetSubcircuits()[0].Elements[1]->GetComponent()).GetNet() ==
-          "INPUT");
-    CHECK(static_cast<const Core::NetLabel &>(schematic.GetSubcircuits()[0].Elements[2]->GetComponent()).GetNet() ==
-          "OUTPUT");
+    CHECK(static_cast<const Core::NetLabel &>(schematic.GetSubcircuits()[0].Elements[1]->GetComponent()).GetNet()
+          == "INPUT");
+    CHECK(static_cast<const Core::NetLabel &>(schematic.GetSubcircuits()[0].Elements[2]->GetComponent()).GetNet()
+          == "OUTPUT");
     REQUIRE(schematic.GetElements().size() == 3);
     const auto &instance = static_cast<const Core::SubcircuitInstance &>(schematic.GetElement(2).GetComponent());
     CHECK(instance.GetDefinitionName() == "block");
@@ -373,8 +373,8 @@ TEST_CASE("Only selected pin markers become block connections", "[subcircuit]") 
     CHECK((*candidates)[1].SuggestedName == "P2");
     REQUIRE(schematic.CreateSubcircuitFromSelection("amplifier", {{"IN", {-2, 0}}, {"OUT", {2, 0}}}));
     CHECK(schematic.GetSubcircuits()[0].Pins.size() == 2);
-    CHECK(static_cast<const Core::SubcircuitInstance &>(schematic.GetElements().back()->GetComponent()).GetPins() ==
-          std::vector<std::string>{"IN", "OUT"});
+    CHECK(static_cast<const Core::SubcircuitInstance &>(schematic.GetElements().back()->GetComponent()).GetPins()
+          == std::vector<std::string>{"IN", "OUT"});
 }
 
 TEST_CASE("Block creation requires unique markers on separate nodes", "[subcircuit]") {
@@ -623,8 +623,8 @@ TEST_CASE("Renaming a pin keeps the wires of every instance on it", "[subcircuit
     REQUIRE(schematic.UpdateSubcircuit("block", **content, {{"SIGNAL", {-2, 0}}, {"OUT", {2, 0}}}, {}));
     CHECK(schematic.GetWires().size() == wire_count);
     const GUI::UIElement &block = schematic.GetElement(2);
-    CHECK(static_cast<const Core::SubcircuitInstance &>(block.GetComponent()).GetPins() ==
-          std::vector<std::string>{"SIGNAL", "OUT"});
+    CHECK(static_cast<const Core::SubcircuitInstance &>(block.GetComponent()).GetPins()
+          == std::vector<std::string>{"SIGNAL", "OUT"});
     const GUI::Connectivity &nodes = schematic.GetConnectivity();
     const std::vector<GUI::GridPoint> terminals = block.GetTerminals();
     CHECK(nodes.GetNode({-6, 0}) == nodes.GetNode(terminals[0]));

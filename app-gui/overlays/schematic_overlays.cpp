@@ -117,9 +117,9 @@ std::optional<ComponentPower> FindPower(const std::vector<ComponentPower> &power
  *          nodesets, logic displays and subcircuit pin markers have none.
  */
 bool CarriesHeat(const Core::ComponentType type) {
-    return type != Core::ComponentType::GROUND && type != Core::ComponentType::NET_LABEL &&
-           type != Core::ComponentType::INITIAL_VOLTAGE && type != Core::ComponentType::NODESET &&
-           !Core::IsLogicDisplay(type) && !Core::IsSubcircuitPin(type);
+    return type != Core::ComponentType::GROUND && type != Core::ComponentType::NET_LABEL
+        && type != Core::ComponentType::INITIAL_VOLTAGE && type != Core::ComponentType::NODESET
+        && !Core::IsLogicDisplay(type) && !Core::IsSubcircuitPin(type);
 }
 
 } // namespace
@@ -151,8 +151,8 @@ void SchematicOverlays::Update(Schematic &schematic, const ResultStore &results,
     m_Results = &results;
     const auto &operating_point = results.GetOperatingPoint();
     const auto &transient = results.GetTransient();
-    const bool show_transient = transient && !transient->Times.empty() &&
-                                (!operating_point || controls.GetLastRun() != Analysis::OPERATING_POINT);
+    const bool show_transient = transient && !transient->Times.empty()
+                             && (!operating_point || controls.GetLastRun() != Analysis::OPERATING_POINT);
     UpdateFuses(schematic,
                 show_transient ? &*transient : nullptr,
                 show_transient ? std::optional(m_Playback.Time) : std::nullopt);
@@ -166,10 +166,10 @@ void SchematicOverlays::Update(Schematic &schematic, const ResultStore &results,
         // The scale goes over the window that plays, so a window of any size costs the same; while chunks keep arriving
         // it is refreshed a few times a second only
         const PointWindow window = m_Playback.Window.GetWindow();
-        const bool is_stale = m_ScaledTransientVersion != results.GetTransientDataVersion() ||
-                              m_ScaledWindow.First != window.First || m_ScaledWindow.Count != window.Count;
-        const bool may_refresh = transient->IsComplete || !m_ScaledTransientVersion.has_value() ||
-                                 ImGui::GetTime() - m_LastScaleTime >= SCALE_REFRESH_SECONDS;
+        const bool is_stale = m_ScaledTransientVersion != results.GetTransientDataVersion()
+                           || m_ScaledWindow.First != window.First || m_ScaledWindow.Count != window.Count;
+        const bool may_refresh = transient->IsComplete || !m_ScaledTransientVersion.has_value()
+                              || ImGui::GetTime() - m_LastScaleTime >= SCALE_REFRESH_SECONDS;
         if (is_stale && may_refresh) {
             m_TransientScale = ScaleOf(SliceTransient(*transient, window), elements, connectivity);
             m_ScaledTransientVersion = results.GetTransientDataVersion();
@@ -209,8 +209,8 @@ void SchematicOverlays::UpdateFuses(Schematic &schematic,
     if (shown == nullptr) {
         m_FuseBlowTimes.clear();
         m_FuseBlowTimesVersion.reset();
-    } else if (m_FuseBlowTimesVersion != m_Results->GetTransientDataVersion() ||
-               m_FuseBlowTimes.size() != elements.size()) {
+    } else if (m_FuseBlowTimesVersion != m_Results->GetTransientDataVersion()
+               || m_FuseBlowTimes.size() != elements.size()) {
         m_FuseBlowTimes = FindFuseBlowTimes(elements, schematic.GetConnectivity(), *shown);
         m_FuseBlowTimesVersion = m_Results->GetTransientDataVersion();
     }
@@ -458,8 +458,8 @@ void SchematicOverlays::DrawHoveredValue(const MeasurementTarget &target, Schema
         const auto &elements = schematic.GetElements();
         for (std::size_t index = 0; index < elements.size() && index < m_Displayed->FuseBlowTimes.size(); ++index) {
             const std::optional<double> blow_time = m_Displayed->FuseBlowTimes[index];
-            if (blow_time && elements[index]->GetComponent().GetName() == target.Current &&
-                IsFuseBlownAt(blow_time, m_Displayed->Time)) {
+            if (blow_time && elements[index]->GetComponent().GetName() == target.Current
+                && IsFuseBlownAt(blow_time, m_Displayed->Time)) {
                 text += std::format("\n{} blew at t = {}s", target.Current, Core::FormatValue(*blow_time));
             }
         }
@@ -481,8 +481,8 @@ void SchematicOverlays::DrawColorLegend(ImDrawList *draw_list,
                                         const ImVec2 origin,
                                         const ImVec2 size,
                                         Schematic &schematic) const {
-    if (m_Preferences.WireColors != WireColoring::VOLTAGE && m_Preferences.WireColors != WireColoring::CURRENT &&
-        m_Preferences.WireColors != WireColoring::POWER && m_Preferences.WireColors != WireColoring::SENSITIVITY) {
+    if (m_Preferences.WireColors != WireColoring::VOLTAGE && m_Preferences.WireColors != WireColoring::CURRENT
+        && m_Preferences.WireColors != WireColoring::POWER && m_Preferences.WireColors != WireColoring::SENSITIVITY) {
         return;
     }
     const float font_size = ImGui::GetFontSize();
@@ -720,8 +720,8 @@ std::optional<SchematicOverlays::LegendLabels> SchematicOverlays::GetLegendLabel
  * @brief   Voltage and Current color the wires with the heat scale, once there is a result to color them by.
  */
 bool SchematicOverlays::AreWiresHeatColored() const {
-    return m_Displayed &&
-           (m_Preferences.WireColors == WireColoring::VOLTAGE || m_Preferences.WireColors == WireColoring::CURRENT);
+    return m_Displayed
+        && (m_Preferences.WireColors == WireColoring::VOLTAGE || m_Preferences.WireColors == WireColoring::CURRENT);
 }
 
 /**
@@ -732,8 +732,8 @@ bool SchematicOverlays::ArePartsHeatColored(const Schematic &schematic) const {
     if (m_Preferences.WireColors == WireColoring::SENSITIVITY) {
         return m_Results->GetSensitivity().has_value() || m_Results->GetACSensitivity().has_value();
     }
-    return m_Displayed &&
-           (m_Preferences.WireColors == WireColoring::CURRENT || m_Preferences.WireColors == WireColoring::POWER);
+    return m_Displayed
+        && (m_Preferences.WireColors == WireColoring::CURRENT || m_Preferences.WireColors == WireColoring::POWER);
 }
 
 } // namespace GUI

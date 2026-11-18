@@ -23,8 +23,8 @@ namespace Core {
 namespace {
 
 bool IsACSource(const Component &component) {
-    return IsSource(component.GetType()) &&
-           static_cast<const Source &>(component).GetSourceType() == Source::SourceType::AC;
+    return IsSource(component.GetType())
+        && static_cast<const Source &>(component).GetSourceType() == Source::SourceType::AC;
 }
 
 } // namespace

@@ -224,14 +224,14 @@ std::string DescribeStability(const TwoPortSweep &sweep) {
         const TwoPortMetrics &metrics = sweep.Metrics[index];
         const std::string frequency = FormatFrequency(sweep.Frequencies[index]);
         text = IsUnstable(metrics)
-                   ? std::format("Potentially unstable at {} ({} = {}).",
-                                 frequency,
-                                 std::isfinite(metrics.K) && metrics.K < 1.0 ? "K" : "mu",
-                                 FormatFactor(std::isfinite(metrics.K) && metrics.K < 1.0 ? metrics.K : metrics.Mu))
-                   : std::format("Unconditionally stable at {} (K = {}, mu = {}).",
-                                 frequency,
-                                 FormatFactor(metrics.K),
-                                 FormatFactor(metrics.Mu));
+                 ? std::format("Potentially unstable at {} ({} = {}).",
+                               frequency,
+                               std::isfinite(metrics.K) && metrics.K < 1.0 ? "K" : "mu",
+                               FormatFactor(std::isfinite(metrics.K) && metrics.K < 1.0 ? metrics.K : metrics.Mu))
+                 : std::format("Unconditionally stable at {} (K = {}, mu = {}).",
+                               frequency,
+                               FormatFactor(metrics.K),
+                               FormatFactor(metrics.Mu));
     } else if (regions.empty()) {
         text = "Unconditionally stable over the whole sweep" + DescribeStabilityMargin(sweep) + ".";
     } else {

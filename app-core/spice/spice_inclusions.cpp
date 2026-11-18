@@ -160,8 +160,8 @@ void ExpandLines(Expansion &expansion,
         const std::string directive = words.empty() ? std::string() : ToLower(words[0]);
         const std::string origin = DescribeLine(source, index);
         const bool is_inclusion =
-            ((directive == ".include" || directive == ".inc") && words.size() >= 2) ||
-            (directive == ".lib" && (words.size() >= 3 || (words.size() == 2 && IsFileName(Unquote(words[1])))));
+            ((directive == ".include" || directive == ".inc") && words.size() >= 2)
+            || (directive == ".lib" && (words.size() >= 3 || (words.size() == 2 && IsFileName(Unquote(words[1])))));
         if (!is_inclusion && directive != ".lib" && directive != ".endl") {
             expansion.Result.Lines.push_back(lines[index]);
             expansion.Result.Origins.push_back(origin);

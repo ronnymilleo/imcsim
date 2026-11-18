@@ -109,8 +109,8 @@ void DCSweepTab::Draw(const FrameResults &frame) {
  * @return  True with a DC sweep and a measured trace or a math channel.
  */
 bool DCSweepTab::CanExport(const FrameResults &frame) const {
-    return m_Results.GetDCSweep() &&
-           (frame.AnythingMeasured || (!frame.DCSweepMath.empty() && !frame.DCSweepMath.front().empty()));
+    return m_Results.GetDCSweep()
+        && (frame.AnythingMeasured || (!frame.DCSweepMath.empty() && !frame.DCSweepMath.front().empty()));
 }
 
 /**

@@ -80,8 +80,8 @@ bool BeginTracePlot(const char *id, const ImVec2 size, const bool has_legend) {
  */
 float PlotHeight(const int plot_count) {
     return std::max(ImGui::GetFontSize() * MIN_PLOT_HEIGHT,
-                    ImGui::GetContentRegionAvail().y / static_cast<float>(plot_count) -
-                        ImGui::GetStyle().ItemSpacing.y);
+                    ImGui::GetContentRegionAvail().y / static_cast<float>(plot_count)
+                        - ImGui::GetStyle().ItemSpacing.y);
 }
 
 /**
@@ -138,8 +138,8 @@ void PlotNodes(const std::vector<double> &xs,
                std::vector<PlottedTrace> &plotted,
                const std::vector<int> &excluded) {
     for (std::size_t node = 1; node < node_values.size(); ++node) {
-        if (!schematic.IsVoltageMeasured(static_cast<int>(node)) ||
-            std::ranges::contains(excluded, static_cast<int>(node))) {
+        if (!schematic.IsVoltageMeasured(static_cast<int>(node))
+            || std::ranges::contains(excluded, static_cast<int>(node))) {
             continue;
         }
         const ImU32 color = GetNodeColor(static_cast<int>(node));
@@ -174,8 +174,8 @@ void PlotDashedLine(const std::string &label,
     std::vector<ImVec2> points;
     for (std::size_t index = 0; index < xs.size(); ++index) {
         const ImVec2 point = ImPlot::PlotToPixels(xs[index], ys[index]);
-        if (points.empty() || std::abs(point.x - points.back().x) >= 1.0f ||
-            std::abs(point.y - points.back().y) >= 1.0f || index + 1 == xs.size()) {
+        if (points.empty() || std::abs(point.x - points.back().x) >= 1.0f || std::abs(point.y - points.back().y) >= 1.0f
+            || index + 1 == xs.size()) {
             points.push_back(point);
         }
     }
@@ -246,8 +246,8 @@ std::vector<int>
 ListMeasuredNodes(const std::size_t node_count, const Schematic &schematic, const std::vector<int> &excluded) {
     std::vector<int> nodes;
     for (std::size_t node = 1; node < node_count; ++node) {
-        if (schematic.IsVoltageMeasured(static_cast<int>(node)) &&
-            !std::ranges::contains(excluded, static_cast<int>(node))) {
+        if (schematic.IsVoltageMeasured(static_cast<int>(node))
+            && !std::ranges::contains(excluded, static_cast<int>(node))) {
             nodes.push_back(static_cast<int>(node));
         }
     }

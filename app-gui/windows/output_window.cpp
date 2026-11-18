@@ -267,8 +267,8 @@ void OutputWindow::UpdateFullMath() {
         return;
     }
     const std::string signature = m_MathChannels.GetSignature();
-    if (m_FullMath && m_FullMath->DataVersion == m_Results.GetTransientDataVersion() &&
-        m_FullMath->Signature == signature) {
+    if (m_FullMath && m_FullMath->DataVersion == m_Results.GetTransientDataVersion()
+        && m_FullMath->Signature == signature) {
         return;
     }
     FullMath math{.DataVersion = m_Results.GetTransientDataVersion(),
@@ -665,8 +665,8 @@ bool OutputWindow::CanExport(const FrameResults &frame) const {
  */
 bool OutputWindow::HasLongerRun() const {
     const auto &transient = m_Results.GetTransient();
-    return m_ShownTab == PlotTab::TRANSIENT && transient &&
-           transient->Times.size() > m_Playback.Window.GetWindow().Count && !m_Controls.IsRunning();
+    return m_ShownTab == PlotTab::TRANSIENT && transient
+        && transient->Times.size() > m_Playback.Window.GetWindow().Count && !m_Controls.IsRunning();
 }
 
 /**

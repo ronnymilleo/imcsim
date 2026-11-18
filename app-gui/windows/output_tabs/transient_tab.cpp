@@ -39,9 +39,10 @@ constexpr const char *WINDOW_SIZE_LABEL = "Plot points";
  * @brief   The width of the labeled field for the size of the window, at the right end of the plot header.
  */
 float GetWindowSizeWidth() {
-    return ImGui::CalcTextSize(WINDOW_SIZE_LABEL).x + ImGui::GetStyle().ItemSpacing.x +
-           ImGui::GetFontSize() * WINDOW_SIZE_WIDTH;
+    return ImGui::CalcTextSize(WINDOW_SIZE_LABEL).x + ImGui::GetStyle().ItemSpacing.x
+         + ImGui::GetFontSize() * WINDOW_SIZE_WIDTH;
 }
+
 /// How many points a pixel of dragging adds to the size of the window.
 constexpr float WINDOW_SIZE_DRAG_SPEED = 20.0f;
 /// The instant of the transient shown on the schematic.
@@ -371,8 +372,8 @@ void TransientTab::DrawWindowControls(const Core::Transient &shown) {
         return;
     }
     // A run too short to cut into windows has no window size or scroll bar, only its range and the cursors
-    const bool has_window = !((!has_span && total_points <= static_cast<std::size_t>(MIN_WINDOW_POINTS)) ||
-                              (has_span && window.GetWindow().Count >= total_points));
+    const bool has_window = !((!has_span && total_points <= static_cast<std::size_t>(MIN_WINDOW_POINTS))
+                              || (has_span && window.GetWindow().Count >= total_points));
     const float width = ImGui::GetContentRegionAvail().x;
     const std::string span =
         std::format("{}s to {}s", Core::FormatValue(shown.Times.front()), Core::FormatValue(shown.Times.back()));
@@ -491,8 +492,8 @@ void TransientTab::DrawPlots(const Core::Transient &transient,
     // A transient that is still being made fits its axes as the chunks arrive, so the plot follows the run; once the
     // run ends, whether whole or stopped, the axes are the user's again
     const bool has_grown =
-        std::exchange(m_DrawnDataVersion, m_Results.GetTransientDataVersion()) != m_Results.GetTransientDataVersion() &&
-        !transient.IsComplete;
+        std::exchange(m_DrawnDataVersion, m_Results.GetTransientDataVersion()) != m_Results.GetTransientDataVersion()
+        && !transient.IsComplete;
     // The window that moved is the one this frame's points come from, so the fit sees the points it moved to
     const PointWindow window = m_Playback.Window.GetWindow();
     const PointWindow previous = std::exchange(m_DrawnWindow, window);

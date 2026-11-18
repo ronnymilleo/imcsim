@@ -173,8 +173,8 @@ std::vector<Complex> SampleCircle(const StabilityBoundary &boundary) {
     if (distance > 0.0) {
         // The point of the circle nearest to the origin is the middle of the part inside the view; the angle is
         // measured from there, where cos(angle) >= q keeps the points within the view radius
-        const double q = (distance * distance + radius * radius - BOUNDARY_VIEW_RADIUS * BOUNDARY_VIEW_RADIUS) /
-                         (2.0 * distance * radius);
+        const double q = (distance * distance + radius * radius - BOUNDARY_VIEW_RADIUS * BOUNDARY_VIEW_RADIUS)
+                       / (2.0 * distance * radius);
         if (q > 1.0) {
             return {};
         }

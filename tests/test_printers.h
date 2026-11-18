@@ -14,17 +14,20 @@
 #include <string>
 
 // Catch2 looks for these specializations in its own namespace
-template <> struct Catch::StringMaker<GUI::GridPoint> {
+template <>
+struct Catch::StringMaker<GUI::GridPoint> {
     static std::string convert(const GUI::GridPoint &point) { return std::format("({}, {})", point.X, point.Y); }
 };
 
-template <> struct Catch::StringMaker<GUI::UIWire> {
+template <>
+struct Catch::StringMaker<GUI::UIWire> {
     static std::string convert(const GUI::UIWire &wire) {
         return std::format("({}, {})-({}, {})", wire.GetStart().X, wire.GetStart().Y, wire.GetEnd().X, wire.GetEnd().Y);
     }
 };
 
-template <> struct Catch::StringMaker<Core::LiveChange> {
+template <>
+struct Catch::StringMaker<Core::LiveChange> {
     static std::string convert(const Core::LiveChange &change) {
         return std::format("{} {} = {}",
                            change.Element,

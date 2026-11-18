@@ -76,8 +76,8 @@ double GetFourKt(const ThermalConditions &thermal) {
  * @return  Electron-volts, from the Varshni law $E_g = 1.16 - 7.02\cdot10^{-4} T^2 / (T + 1108)$.
  */
 double GetBandGap(const double temperature_kelvin) {
-    return BAND_GAP_AT_ZERO_KELVIN -
-           (BAND_GAP_SLOPE * temperature_kelvin * temperature_kelvin) / (temperature_kelvin + BAND_GAP_OFFSET_KELVIN);
+    return BAND_GAP_AT_ZERO_KELVIN
+         - (BAND_GAP_SLOPE * temperature_kelvin * temperature_kelvin) / (temperature_kelvin + BAND_GAP_OFFSET_KELVIN);
 }
 
 /**
@@ -106,8 +106,8 @@ double GetJunctionPotential(const ThermalConditions &thermal, const double poten
         return potential_at_nominal;
     }
     const double reference_ratio = thermal.TemperatureKelvin / REFERENCE_TEMPERATURE_KELVIN;
-    return reference_ratio * GetReferencePotential(thermal, potential_at_nominal) +
-           GetPotentialShift(thermal.TemperatureKelvin);
+    return reference_ratio * GetReferencePotential(thermal, potential_at_nominal)
+         + GetPotentialShift(thermal.TemperatureKelvin);
 }
 
 /**
@@ -128,15 +128,18 @@ double GetJunctionCapacitance(const ThermalConditions &thermal,
     const double reference_potential = GetReferencePotential(thermal, potential_at_nominal);
     const double old_ratio = (potential_at_nominal - reference_potential) / reference_potential;
     const double at_reference =
-        capacitance_at_nominal /
-        (1.0 + grading_coefficient *
-                   (CAPACITANCE_TEMPERATURE_COEFFICIENT * (thermal.NominalKelvin - REFERENCE_TEMPERATURE_KELVIN) -
-                    old_ratio));
+        capacitance_at_nominal
+        / (1.0
+           + grading_coefficient
+                 * (CAPACITANCE_TEMPERATURE_COEFFICIENT * (thermal.NominalKelvin - REFERENCE_TEMPERATURE_KELVIN)
+                    - old_ratio));
     const double potential = GetJunctionPotential(thermal, potential_at_nominal);
     const double new_ratio = (potential - reference_potential) / reference_potential;
-    return at_reference * (1.0 + grading_coefficient * (CAPACITANCE_TEMPERATURE_COEFFICIENT *
-                                                            (thermal.TemperatureKelvin - REFERENCE_TEMPERATURE_KELVIN) -
-                                                        new_ratio));
+    return at_reference
+         * (1.0
+            + grading_coefficient
+                  * (CAPACITANCE_TEMPERATURE_COEFFICIENT * (thermal.TemperatureKelvin - REFERENCE_TEMPERATURE_KELVIN)
+                     - new_ratio));
 }
 
 } // namespace Nodalys

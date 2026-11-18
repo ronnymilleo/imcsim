@@ -41,8 +41,8 @@ namespace {
 bool IsDigitalOnly(const Circuit &circuit) {
     return std::ranges::all_of(CollectParts(circuit), [](const Component *part) {
         const ComponentType type = part->GetType();
-        return type == ComponentType::CLOCK || type == ComponentType::LOGIC_INPUT || type == ComponentType::VCC ||
-               type == ComponentType::SUBCIRCUIT || IsLogicPart(type);
+        return type == ComponentType::CLOCK || type == ComponentType::LOGIC_INPUT || type == ComponentType::VCC
+            || type == ComponentType::SUBCIRCUIT || IsLogicPart(type);
     });
 }
 
@@ -253,8 +253,8 @@ struct NodeVoltageWords {
 
 NodeVoltageWords DescribeKind(const NodeVoltageKind kind) {
     return kind == NodeVoltageKind::INITIAL
-               ? NodeVoltageWords{.WithArticle = "an initial voltage", .Plural = "initial voltages"}
-               : NodeVoltageWords{.WithArticle = "a nodeset", .Plural = "nodesets"};
+             ? NodeVoltageWords{.WithArticle = "an initial voltage", .Plural = "initial voltages"}
+             : NodeVoltageWords{.WithArticle = "a nodeset", .Plural = "nodesets"};
 }
 
 /// The words of a message that starts with the marker, such as "An initial voltage".
@@ -322,8 +322,8 @@ std::optional<std::string> CheckNodeVoltageTargets(const Circuit &circuit, const
         const auto [known, is_new] = known_by_node.try_emplace({target.Path, target.Node}, &target);
         if (!is_new && known->second->Volts != target.Volts) {
             const std::string known_where = known->second->MarkerPath.empty()
-                                                ? ""
-                                                : std::format(" in {}", FormatInstancePath(known->second->MarkerPath));
+                                              ? ""
+                                              : std::format(" in {}", FormatInstancePath(known->second->MarkerPath));
             return std::format("{} has two {}, {} V{} and {} V{}; keep one",
                                DescribeTarget(target),
                                words.Plural,

@@ -127,8 +127,8 @@ void Source::SetPulse(const PulseParameters &pulse) {
  *          then never reaches its full shape.
  */
 bool Source::IsValidPulse(const PulseParameters &pulse) const {
-    return pulse.Delay >= 0.0 && pulse.RiseTime >= 0.0 && pulse.FallTime >= 0.0 && pulse.Width >= 0.0 &&
-           pulse.Period > 0.0;
+    return pulse.Delay >= 0.0 && pulse.RiseTime >= 0.0 && pulse.FallTime >= 0.0 && pulse.Width >= 0.0
+        && pulse.Period > 0.0;
 }
 
 /**
@@ -154,8 +154,8 @@ void Source::SetEXP(const EXPParameters &exp) {
  *          are positive. Levels can be any value.
  */
 bool Source::IsValidEXP(const EXPParameters &exp) const {
-    return exp.RiseDelay >= 0.0 && exp.FallDelay >= exp.RiseDelay && exp.RiseTimeConstant > 0.0 &&
-           exp.FallTimeConstant > 0.0;
+    return exp.RiseDelay >= 0.0 && exp.FallDelay >= exp.RiseDelay && exp.RiseTimeConstant > 0.0
+        && exp.FallTimeConstant > 0.0;
 }
 
 /**

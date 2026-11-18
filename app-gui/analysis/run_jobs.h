@@ -46,7 +46,8 @@ std::optional<std::string> StoreResult(std::expected<Result, std::string> result
  * @struct  SteppedRuns
  * @brief   The results of an analysis run once per step, or why a step failed, and what ngspice printed in all.
  */
-template <typename Result> struct SteppedRuns {
+template <typename Result>
+struct SteppedRuns {
     std::expected<StepFamily<Result>, std::string> Family;
     std::vector<Core::SimulatorMessage> Messages;
 };
@@ -85,7 +86,8 @@ SteppedRuns<Result> RunSteps(const ParameterStepSettings &step,
  * @brief   The traces kept from the runs of a Monte Carlo analysis, or why it could not run, what every run measured
  *          and what ngspice printed in all.
  */
-template <typename Result> struct MonteCarloRuns {
+template <typename Result>
+struct MonteCarloRuns {
     std::expected<StepFamily<Result>, std::string> Family;
     MonteCarloTable Table;
     std::vector<Core::SimulatorMessage> Messages;

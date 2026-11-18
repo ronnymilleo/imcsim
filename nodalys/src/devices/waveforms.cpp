@@ -140,9 +140,9 @@ double EvaluateExp(const ExpParameters &exp, const double time) {
     if (time < exp.FallDelay) {
         return exp.InitialValue + rise;
     }
-    const double peak =
-        exp.InitialValue +
-        (exp.PeakValue - exp.InitialValue) * (1.0 - std::exp(-(exp.FallDelay - exp.RiseDelay) / exp.RiseTimeConstant));
+    const double peak = exp.InitialValue
+                      + (exp.PeakValue - exp.InitialValue)
+                            * (1.0 - std::exp(-(exp.FallDelay - exp.RiseDelay) / exp.RiseTimeConstant));
     return exp.InitialValue + (peak - exp.InitialValue) * std::exp(-(time - exp.FallDelay) / exp.FallTimeConstant);
 }
 
@@ -172,8 +172,8 @@ double EvaluatePwl(const PwlParameters &pwl, const double time) {
 }
 
 double EvaluateSffm(const SffmParameters &sffm, const double time) {
-    const double phase = 2.0 * std::numbers::pi * sffm.CarrierFrequency * time +
-                         sffm.ModulationIndex * std::sin(2.0 * std::numbers::pi * sffm.SignalFrequency * time);
+    const double phase = 2.0 * std::numbers::pi * sffm.CarrierFrequency * time
+                       + sffm.ModulationIndex * std::sin(2.0 * std::numbers::pi * sffm.SignalFrequency * time);
     return sffm.Offset + sffm.Amplitude * std::sin(phase);
 }
 
@@ -182,8 +182,9 @@ double EvaluateAm(const AmParameters &am, const double time) {
         return 0.0;
     }
     const double local = time - am.Delay;
-    return am.Offset + am.Amplitude * std::sin(2.0 * std::numbers::pi * am.ModulatingFrequency * local) *
-                           std::sin(2.0 * std::numbers::pi * am.CarrierFrequency * local);
+    return am.Offset
+         + am.Amplitude * std::sin(2.0 * std::numbers::pi * am.ModulatingFrequency * local)
+               * std::sin(2.0 * std::numbers::pi * am.CarrierFrequency * local);
 }
 
 VoltageSourceDevice::Waveform MakeDcWaveform(const double) {

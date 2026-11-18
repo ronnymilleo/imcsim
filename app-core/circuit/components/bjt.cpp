@@ -209,14 +209,14 @@ void BJT::SetCustomParameters(const BJTParameters &parameters) {
  * @return  True when IS, BF, BR, NE and the ratings are positive and everything else is not negative.
  */
 bool BJT::IsValidParameters(const BJTParameters &parameters) const {
-    return parameters.SaturationCurrent > 0.0 && parameters.ForwardBeta > 0.0 && parameters.ReverseBeta > 0.0 &&
-           parameters.EarlyVoltage >= 0.0 && parameters.ForwardKneeCurrent >= 0.0 &&
-           parameters.LeakageSaturationCurrent >= 0.0 && parameters.LeakageEmissionCoefficient > 0.0 &&
-           parameters.BaseResistance >= 0.0 && parameters.CollectorResistance >= 0.0 &&
-           parameters.EmitterResistance >= 0.0 && parameters.EmitterCapacitance >= 0.0 &&
-           parameters.CollectorCapacitance >= 0.0 && parameters.TransitTime >= 0.0 &&
-           parameters.MaxCollectorEmitterVoltage > 0.0 && parameters.MaxCollectorCurrent > 0.0 &&
-           parameters.MaxPower > 0.0;
+    return parameters.SaturationCurrent > 0.0 && parameters.ForwardBeta > 0.0 && parameters.ReverseBeta > 0.0
+        && parameters.EarlyVoltage >= 0.0 && parameters.ForwardKneeCurrent >= 0.0
+        && parameters.LeakageSaturationCurrent >= 0.0 && parameters.LeakageEmissionCoefficient > 0.0
+        && parameters.BaseResistance >= 0.0 && parameters.CollectorResistance >= 0.0
+        && parameters.EmitterResistance >= 0.0 && parameters.EmitterCapacitance >= 0.0
+        && parameters.CollectorCapacitance >= 0.0 && parameters.TransitTime >= 0.0
+        && parameters.MaxCollectorEmitterVoltage > 0.0 && parameters.MaxCollectorCurrent > 0.0
+        && parameters.MaxPower > 0.0;
 }
 
 /**

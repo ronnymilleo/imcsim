@@ -59,8 +59,8 @@ PassiveACCurrent(const CircuitEntry &entry,
     const Component &component = *entry.Part;
     std::vector<std::complex<double>> currents(frequencies.size());
     for (std::size_t index = 0; index < frequencies.size(); ++index) {
-        const std::complex<double> voltage = node_voltages[static_cast<std::size_t>(entry.Nodes[0])][index] -
-                                             node_voltages[static_cast<std::size_t>(entry.Nodes[1])][index];
+        const std::complex<double> voltage = node_voltages[static_cast<std::size_t>(entry.Nodes[0])][index]
+                                           - node_voltages[static_cast<std::size_t>(entry.Nodes[1])][index];
         const std::complex<double> admittance =
             component.GetType() == ComponentType::RESISTOR
                 ? std::complex<double>(1.0 / component.GetValue(), 0.0)

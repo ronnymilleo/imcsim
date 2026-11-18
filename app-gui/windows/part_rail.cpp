@@ -66,8 +66,8 @@ void DrawSectionSeparator() {
  * @brief   Whether the last button asks for its list: a right click, or the left button held on it.
  */
 bool IsListAsked() {
-    return ImGui::IsItemClicked(ImGuiMouseButton_Right) ||
-           (ImGui::IsItemActive() && ImGui::GetIO().MouseDownDuration[ImGuiMouseButton_Left] >= HOLD_TO_LIST_SECONDS);
+    return ImGui::IsItemClicked(ImGuiMouseButton_Right)
+        || (ImGui::IsItemActive() && ImGui::GetIO().MouseDownDuration[ImGuiMouseButton_Left] >= HOLD_TO_LIST_SECONDS);
 }
 
 /**

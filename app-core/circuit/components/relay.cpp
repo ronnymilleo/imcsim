@@ -51,8 +51,8 @@ void Relay::SetParameters(const RelayParameters &parameters) {
  *          is above the drop-out voltage, which is not negative.
  */
 bool Relay::IsValidParameters(const RelayParameters &parameters) {
-    return parameters.CoilResistance > 0.0 && parameters.CoilInductance > 0.0 && parameters.ContactResistance > 0.0 &&
-           parameters.DropOutVoltage >= 0.0 && parameters.PullInVoltage > parameters.DropOutVoltage;
+    return parameters.CoilResistance > 0.0 && parameters.CoilInductance > 0.0 && parameters.ContactResistance > 0.0
+        && parameters.DropOutVoltage >= 0.0 && parameters.PullInVoltage > parameters.DropOutVoltage;
 }
 
 /**

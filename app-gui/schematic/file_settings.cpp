@@ -457,8 +457,8 @@ std::expected<void, std::string> ReadMonteCarloSettings(const nlohmann::json &ob
     }
     if (object.contains("seed")) {
         const std::optional<double> seed = ReadNumber(object, "seed");
-        if (!seed || *seed < 0.0 || *seed > static_cast<double>(std::numeric_limits<unsigned int>::max()) ||
-            *seed != std::floor(*seed)) {
+        if (!seed || *seed < 0.0 || *seed > static_cast<double>(std::numeric_limits<unsigned int>::max())
+            || *seed != std::floor(*seed)) {
             return std::unexpected("have no valid seed");
         }
         monte_carlo.Seed = static_cast<unsigned int>(*seed);

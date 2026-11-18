@@ -22,8 +22,8 @@ constexpr float POPOVER_TOP_MARGIN_FONT_SIZES = 1.0f;
  */
 std::optional<char> FindTypedValueStart() {
     for (int digit = 0; digit <= 9; ++digit) {
-        if (ImGui::IsKeyPressed(static_cast<ImGuiKey>(ImGuiKey_0 + digit), false) ||
-            ImGui::IsKeyPressed(static_cast<ImGuiKey>(ImGuiKey_Keypad0 + digit), false)) {
+        if (ImGui::IsKeyPressed(static_cast<ImGuiKey>(ImGuiKey_0 + digit), false)
+            || ImGui::IsKeyPressed(static_cast<ImGuiKey>(ImGuiKey_Keypad0 + digit), false)) {
             return static_cast<char>('0' + digit);
         }
     }
@@ -79,8 +79,8 @@ void PartPopover::Open() {
  */
 void PartPopover::HandleValueTyping(PartEditor &part_editor) {
     const ImGuiIO &io = ImGui::GetIO();
-    if (!ImGui::IsWindowFocused() || ImGui::IsAnyItemActive() || io.KeyCtrl || io.KeyAlt || io.KeyShift ||
-        !part_editor.CanTypeValue()) {
+    if (!ImGui::IsWindowFocused() || ImGui::IsAnyItemActive() || io.KeyCtrl || io.KeyAlt || io.KeyShift
+        || !part_editor.CanTypeValue()) {
         return;
     }
     const std::optional<char> first = FindTypedValueStart();

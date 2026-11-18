@@ -81,8 +81,8 @@ void ClassifyElement(const UIElement &element, PointClasses &classes) {
     const std::string net = is_label ? static_cast<const Core::NetLabel &>(component).GetNet() : std::string();
     const std::string compared = Core::NetLabel::NormalizeNet(net);
     // A label named 0, as in SPICE, or GND is ground
-    const bool is_ground = component.GetType() == Core::ComponentType::GROUND ||
-                           (is_label && std::ranges::contains(GROUND_NETS, compared));
+    const bool is_ground = component.GetType() == Core::ComponentType::GROUND
+                        || (is_label && std::ranges::contains(GROUND_NETS, compared));
     const bool is_supply = component.GetType() == Core::ComponentType::VCC;
     for (const GridPoint terminal : element.GetTerminals()) {
         ++classes.ConnectionCount[terminal];

@@ -153,8 +153,8 @@ ReadInnerElement(const std::string &vector_name, const std::string &instance, co
     std::size_t prefix_length = 0;
     char type_letter = '\0';
     // ngspice prefixes subcircuit element vectors with "<type>." (e.g. "r.x1.r1"); Nodalys uses "<instance>.<part>"
-    if (vector_name.size() > 2 && vector_name[1] == '.' &&
-        std::string_view("rcl").find(vector_name[0]) != std::string_view::npos) {
+    if (vector_name.size() > 2 && vector_name[1] == '.'
+        && std::string_view("rcl").find(vector_name[0]) != std::string_view::npos) {
         prefix_length = 2;
         type_letter = vector_name[0];
     }
@@ -164,8 +164,8 @@ ReadInnerElement(const std::string &vector_name, const std::string &instance, co
         return std::nullopt;
     }
     if (type_letter == '\0') {
-        if (segments.back().empty() ||
-            std::string_view("rcl").find(segments.back().front()) == std::string_view::npos) {
+        if (segments.back().empty()
+            || std::string_view("rcl").find(segments.back().front()) == std::string_view::npos) {
             return std::nullopt;
         }
         type_letter = segments.back().front();
@@ -189,9 +189,9 @@ std::optional<PartSensitivity> MakeBlockPart(const Component &part, const Sensit
         if (!element) {
             continue;
         }
-        const bool is_better = !largest || std::abs(element->Normalized) > std::abs(largest->Normalized) ||
-                               (std::abs(element->Normalized) == std::abs(largest->Normalized) &&
-                                element->Unit == "Ohm" && largest->Unit != "Ohm");
+        const bool is_better = !largest || std::abs(element->Normalized) > std::abs(largest->Normalized)
+                            || (std::abs(element->Normalized) == std::abs(largest->Normalized) && element->Unit == "Ohm"
+                                && largest->Unit != "Ohm");
         if (is_better) {
             largest = element;
         }
@@ -237,9 +237,9 @@ std::optional<PartSensitivity> MakePartSensitivity(const Component &part, const 
  *          elements, so they are not in this set.
  */
 bool HasSensitivity(const ComponentType type) {
-    return type == ComponentType::RESISTOR || type == ComponentType::CAPACITOR || type == ComponentType::INDUCTOR ||
-           type == ComponentType::VOLTAGE_SOURCE || type == ComponentType::VCC ||
-           type == ComponentType::CURRENT_SOURCE || IsControlledSource(type);
+    return type == ComponentType::RESISTOR || type == ComponentType::CAPACITOR || type == ComponentType::INDUCTOR
+        || type == ComponentType::VOLTAGE_SOURCE || type == ComponentType::VCC || type == ComponentType::CURRENT_SOURCE
+        || IsControlledSource(type);
 }
 
 /**

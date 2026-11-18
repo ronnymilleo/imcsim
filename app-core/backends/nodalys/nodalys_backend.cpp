@@ -44,7 +44,8 @@ constexpr auto NODALYS_ANALYSES = {AnalysisKind::OPERATING_POINT,
  *          for each node inside a block. ngspice gives the nodes of the circuit only, and what reads a result by node
  *          number, such as the table of the operating point, must not meet nodes that are not in the schematic.
  */
-template <typename Row> void KeepCircuitNodes(std::vector<Row> &rows, const int node_count) {
+template <typename Row>
+void KeepCircuitNodes(std::vector<Row> &rows, const int node_count) {
     if (rows.size() > static_cast<std::size_t>(node_count)) {
         rows.resize(static_cast<std::size_t>(node_count));
     }
@@ -104,8 +105,8 @@ ToNodalysMonitor(const RunMonitor &monitor, std::chrono::steady_clock::time_poin
             std::vector<Nodalys::LiveChange> changes;
             for (const LiveChange &change : monitor.Control->TakeChanges()) {
                 const Nodalys::LiveQuantity quantity = change.Quantity == LiveQuantity::RESISTANCE
-                                                           ? Nodalys::LiveQuantity::RESISTANCE
-                                                           : Nodalys::LiveQuantity::DC_VOLTAGE;
+                                                         ? Nodalys::LiveQuantity::RESISTANCE
+                                                         : Nodalys::LiveQuantity::DC_VOLTAGE;
                 std::string element = change.Element;
                 if (switch_elements.contains(element)) {
                     element.erase(0, SWITCH_RESISTOR_PREFIX.size());

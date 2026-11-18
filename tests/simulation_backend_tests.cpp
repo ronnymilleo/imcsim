@@ -32,6 +32,7 @@ public:
     explicit FakeBackend(Core::BackendCapabilities capabilities) : m_Capabilities(std::move(capabilities)) {}
 
     std::string_view GetName() const override { return "fake"; }
+
     const Core::BackendCapabilities &GetCapabilities() const override { return m_Capabilities; }
 
     Core::OperatingPointRun RunOperatingPoint(const Core::Circuit &circuit,
@@ -121,7 +122,9 @@ public:
         m_Fake = fake.get();
         Core::SetBackend(std::move(fake));
     }
+
     ~BackendInUse() { Core::SetBackend(nullptr); }
+
     BackendInUse(const BackendInUse &) = delete;
     BackendInUse &operator=(const BackendInUse &) = delete;
 
@@ -175,7 +178,8 @@ TEST_CASE("A backend that lacks an analysis or a part says why a circuit cannot 
     // The same parts, listed by type, as the editor asks before it has a circuit
     CHECK(Core::FindUnsupported(Core::GetBackend(),
                                 {Core::ComponentType::RESISTOR, Core::ComponentType::AND},
-                                Core::AnalysisKind::TRANSIENT) == NO_LOGIC_REASON);
+                                Core::AnalysisKind::TRANSIENT)
+          == NO_LOGIC_REASON);
 
     Core::BackendCapabilities only_operating_points{.Analyses = {Core::AnalysisKind::OPERATING_POINT},
                                                     .UnsupportedParts = {}};

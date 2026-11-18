@@ -56,8 +56,8 @@ void FillGain(TwoPortMetrics &metrics, const TwoPortMatrix &matrix) {
         // reflections are below 1, that is, when it is stable
         if (metrics.IsUnconditionallyStable) {
             metrics.Gain = GainKind::UNILATERAL;
-            metrics.GainDecibels = PowerToDecibels(std::norm(matrix.S21) /
-                                                   ((1.0 - std::norm(matrix.S11)) * (1.0 - std::norm(matrix.S22))));
+            metrics.GainDecibels = PowerToDecibels(std::norm(matrix.S21)
+                                                   / ((1.0 - std::norm(matrix.S11)) * (1.0 - std::norm(matrix.S22))));
         }
         return;
     }
@@ -118,8 +118,8 @@ TwoPortMetrics ComputeTwoPortMetrics(const TwoPortMatrix &matrix) {
     metrics.DeltaMagnitude = std::abs(delta);
     metrics.IsUnilateral = product <= UNILATERAL_PRODUCT_FLOOR;
     metrics.K = metrics.IsUnilateral
-                    ? std::numeric_limits<double>::infinity()
-                    : (1.0 - std::norm(matrix.S11) - std::norm(matrix.S22) + std::norm(delta)) / (2.0 * product);
+                  ? std::numeric_limits<double>::infinity()
+                  : (1.0 - std::norm(matrix.S11) - std::norm(matrix.S22) + std::norm(delta)) / (2.0 * product);
     metrics.Mu = ComputeMu(matrix.S11, matrix.S22, delta, product);
     metrics.MuPrime = ComputeMu(matrix.S22, matrix.S11, delta, product);
     metrics.IsUnconditionallyStable = metrics.Mu > 1.0 - STABILITY_TOLERANCE;

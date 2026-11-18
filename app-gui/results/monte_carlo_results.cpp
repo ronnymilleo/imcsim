@@ -120,8 +120,8 @@ Measurement MeasureACSweep(const Core::ACSweep &sweep) {
     for (std::size_t node = 1; node < sweep.NodeMagnitudesDecibels.size(); ++node) {
         const std::vector<double> &magnitudes = sweep.NodeMagnitudesDecibels[node];
         std::optional<BodeStatistics> statistics;
-        if (magnitudes.size() == sweep.Frequencies.size() && node < sweep.NodePhasesDegrees.size() &&
-            sweep.NodePhasesDegrees[node].size() == magnitudes.size() && magnitudes.size() >= 2) {
+        if (magnitudes.size() == sweep.Frequencies.size() && node < sweep.NodePhasesDegrees.size()
+            && sweep.NodePhasesDegrees[node].size() == magnitudes.size() && magnitudes.size() >= 2) {
             statistics = ComputeBodeStatistics(sweep.Frequencies,
                                                magnitudes,
                                                sweep.NodePhasesDegrees[node],

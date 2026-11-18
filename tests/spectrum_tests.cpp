@@ -117,10 +117,10 @@ TEST_CASE("ChooseSpectrumSampleCount follows the samples in the span", "[spectru
     CHECK(GUI::ChooseSpectrumSampleCount(xs, 1e-4, 0.0) == 1024);
     CHECK(GUI::ChooseSpectrumSampleCount({}, 0.0, 1.0) == 1024);
     std::vector<double> long_run;
-    for (int index = 0; index <= 200000; ++index) {
+    for (int index = 0; index <= 200'000; ++index) {
         long_run.push_back(index * 1e-6);
     }
-    CHECK(GUI::ChooseSpectrumSampleCount(long_run, 0.0, 1.0) == 65536);
+    CHECK(GUI::ChooseSpectrumSampleCount(long_run, 0.0, 1.0) == 65'536);
 }
 
 TEST_CASE("ComputeSpectrum reads the peak amplitude and the mean of a sine", "[spectrum]") {
@@ -151,12 +151,12 @@ TEST_CASE("AnalyzeHarmonics measures the distortion of a clipped-like signal", "
     const auto signal = [](const double time) {
         return Sine(1.0, 1e3, time) + Sine(0.1, 2e3, time) + Sine(0.05, 3e3, time);
     };
-    const Trace trace = Sample(signal, 20e-3, 20000);
+    const Trace trace = Sample(signal, 20e-3, 20'000);
     const double expected = std::sqrt(0.01 + 0.0025);
 
     SECTION("with a whole number of periods and a rectangular window") {
         const auto spectrum =
-            GUI::ComputeSpectrum(trace.Xs, trace.Ys, 0.0, 20e-3, 32768, GUI::SpectrumWindow::RECTANGULAR);
+            GUI::ComputeSpectrum(trace.Xs, trace.Ys, 0.0, 20e-3, 32'768, GUI::SpectrumWindow::RECTANGULAR);
         REQUIRE(spectrum);
         const GUI::HarmonicAnalysis analysis = GUI::AnalyzeHarmonics(*spectrum, 10);
         REQUIRE(analysis.Harmonics.size() == 10);
@@ -171,7 +171,7 @@ TEST_CASE("AnalyzeHarmonics measures the distortion of a clipped-like signal", "
     }
     SECTION("with a span that cuts a period and a Hann window") {
         const auto spectrum =
-            GUI::ComputeSpectrum(trace.Xs, trace.Ys, 0.3e-3, 17.55e-3, 32768, GUI::SpectrumWindow::HANN);
+            GUI::ComputeSpectrum(trace.Xs, trace.Ys, 0.3e-3, 17.55e-3, 32'768, GUI::SpectrumWindow::HANN);
         REQUIRE(spectrum);
         const GUI::HarmonicAnalysis analysis = GUI::AnalyzeHarmonics(*spectrum, 10);
         REQUIRE(analysis.Harmonics.size() >= 3);
@@ -195,7 +195,7 @@ TEST_CASE("AnalyzeHarmonics finds no fundamental in a constant trace", "[spectru
 
 TEST_CASE("AnalyzeHarmonics stops at half the sampling rate", "[spectrum]") {
     // 1024 samples over 1 ms put half the sampling rate at 512 kHz, past the third harmonic of 150 kHz only
-    const Trace trace = Sample([](const double time) { return Sine(1.0, 150e3, time); }, 1e-3, 20000);
+    const Trace trace = Sample([](const double time) { return Sine(1.0, 150e3, time); }, 1e-3, 20'000);
     const auto spectrum = GUI::ComputeSpectrum(trace.Xs, trace.Ys, 0.0, 1e-3, 1024, GUI::SpectrumWindow::HANN);
     REQUIRE(spectrum);
     const GUI::HarmonicAnalysis analysis = GUI::AnalyzeHarmonics(*spectrum, 10);
@@ -255,7 +255,7 @@ TEST_CASE("AnalyzeHarmonics sees a tone in a sine, with or without noise", "[spe
 
 TEST_CASE("AnalyzeHarmonics sees a tone in a square wave", "[spectrum]") {
     const Trace trace =
-        Sample([](const double time) { return Sine(1.0, 100.0, time) >= 0.0 ? 1.0 : -1.0; }, 4.0, 40000);
+        Sample([](const double time) { return Sine(1.0, 100.0, time) >= 0.0 ? 1.0 : -1.0; }, 4.0, 40'000);
     const GUI::HarmonicAnalysis analysis = AnalyzeTrace(trace);
     CHECK_FALSE(analysis.IsBroadband);
     REQUIRE_FALSE(analysis.Harmonics.empty());

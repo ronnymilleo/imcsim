@@ -713,14 +713,14 @@ TEST_CASE("The terminals of a gate or flip-flop are its inputs, then its outputs
     CHECK(Core::GetLogicInputLabels(Core::ComponentType::OR) == std::vector<std::string>{"A", "B"});
     CHECK(Core::GetLogicInputLabels(Core::ComponentType::BUFFER) == std::vector<std::string>{"A"});
     CHECK(Core::GetLogicOutputLabels(Core::ComponentType::NOR) == std::vector<std::string>{"Y"});
-    CHECK(Core::GetLogicInputLabels(Core::ComponentType::D_FLIP_FLOP) ==
-          std::vector<std::string>{"D", "CLK", "SET", "RESET"});
-    CHECK(Core::GetLogicInputLabels(Core::ComponentType::JK_FLIP_FLOP) ==
-          std::vector<std::string>{"J", "K", "CLK", "SET", "RESET"});
-    CHECK(Core::GetLogicInputLabels(Core::ComponentType::T_FLIP_FLOP) ==
-          std::vector<std::string>{"T", "CLK", "SET", "RESET"});
-    CHECK(Core::GetLogicInputLabels(Core::ComponentType::SR_FLIP_FLOP) ==
-          std::vector<std::string>{"S", "R", "CLK", "SET", "RESET"});
+    CHECK(Core::GetLogicInputLabels(Core::ComponentType::D_FLIP_FLOP)
+          == std::vector<std::string>{"D", "CLK", "SET", "RESET"});
+    CHECK(Core::GetLogicInputLabels(Core::ComponentType::JK_FLIP_FLOP)
+          == std::vector<std::string>{"J", "K", "CLK", "SET", "RESET"});
+    CHECK(Core::GetLogicInputLabels(Core::ComponentType::T_FLIP_FLOP)
+          == std::vector<std::string>{"T", "CLK", "SET", "RESET"});
+    CHECK(Core::GetLogicInputLabels(Core::ComponentType::SR_FLIP_FLOP)
+          == std::vector<std::string>{"S", "R", "CLK", "SET", "RESET"});
     CHECK(Core::GetLogicOutputLabels(Core::ComponentType::SR_FLIP_FLOP) == std::vector<std::string>{"Q", "QN"});
 }
 

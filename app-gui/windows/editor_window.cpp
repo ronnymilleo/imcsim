@@ -218,8 +218,8 @@ void EditorWindow::Draw() {
     }
     ImGui::InvisibleButton("canvas",
                            size,
-                           ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight |
-                               ImGuiButtonFlags_MouseButtonMiddle);
+                           ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight
+                               | ImGuiButtonFlags_MouseButtonMiddle);
     const bool hovered = ImGui::IsItemHovered();
     const bool active = ImGui::IsItemActive();
     // During a live run the wheel over a potentiometer turns it instead of zooming, and a click on a part the user sets
@@ -229,8 +229,8 @@ void EditorWindow::Draw() {
         hovered ? m_Live.FindLivePart(*m_Schematic, m_View.GetTransform(origin), is_live_part_pickable)
                 : std::optional<std::size_t>();
     const bool turns_part =
-        live_part &&
-        GetLiveAction(m_Schematic->GetElements()[*live_part]->GetComponent().GetType()) == LiveAction::TURN;
+        live_part
+        && GetLiveAction(m_Schematic->GetElements()[*live_part]->GetComponent().GetType()) == LiveAction::TURN;
     m_View.HandlePanAndZoom(origin, hovered && !turns_part, active);
 
     const ViewTransform view = m_View.GetTransform(origin);
@@ -779,8 +779,8 @@ void EditorWindow::HandleGlobalShortcuts() {
     if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Z, ImGuiInputFlags_RouteGlobal)) {
         Undo();
     }
-    if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Y, ImGuiInputFlags_RouteGlobal) ||
-        ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_Z, ImGuiInputFlags_RouteGlobal)) {
+    if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Y, ImGuiInputFlags_RouteGlobal)
+        || ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_Z, ImGuiInputFlags_RouteGlobal)) {
         Redo();
     }
 }

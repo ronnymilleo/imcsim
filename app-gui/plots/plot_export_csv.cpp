@@ -55,8 +55,8 @@ std::string RenderSmithCsv(const ExportSmith &smith) {
         text += FormatCsvValue(smith.Traces.front().Frequencies[row]);
         for (const ExportSmithTrace &trace : smith.Traces) {
             const bool has_value = row < trace.Values.size();
-            text += "," + (has_value ? FormatCsvValue(trace.Values[row].real()) : "") + "," +
-                    (has_value ? FormatCsvValue(trace.Values[row].imag()) : "");
+            text += "," + (has_value ? FormatCsvValue(trace.Values[row].real()) : "") + ","
+                  + (has_value ? FormatCsvValue(trace.Values[row].imag()) : "");
         }
         text += "\n";
     }
@@ -70,18 +70,18 @@ std::string RenderCirclesCsv(const ExportSmith &smith) {
     if (smith.Circles.empty()) {
         return "";
     }
-    std::string text = "\n" + CsvHeader("Stability circle", "") + "," + CsvHeader("Frequency", "Hz") + "," +
-                       CsvHeader("Shape", "") + "," + CsvHeader("Center real", "") + "," +
-                       CsvHeader("Center imaginary", "") + "," + CsvHeader("Radius", "") + "," +
-                       CsvHeader("Stable terminations", "") + "\n";
+    std::string text = "\n" + CsvHeader("Stability circle", "") + "," + CsvHeader("Frequency", "Hz") + ","
+                     + CsvHeader("Shape", "") + "," + CsvHeader("Center real", "") + ","
+                     + CsvHeader("Center imaginary", "") + "," + CsvHeader("Radius", "") + ","
+                     + CsvHeader("Stable terminations", "") + "\n";
     for (const ExportSmithCircle &circle : smith.Circles) {
         const bool has_center = circle.Shape != "none";
         // Adding zero turns a negative zero, which a circle around the origin can hold, into a plain 0
         const std::complex<double> center = circle.Center + std::complex<double>(0.0, 0.0);
-        text += QuoteCsvField(circle.Name) + "," + FormatCsvValue(circle.FrequencyHertz) + "," + circle.Shape + "," +
-                (has_center ? FormatCsvValue(center.real()) : "") + "," +
-                (has_center ? FormatCsvValue(center.imag()) : "") + "," + FormatCsvValue(circle.Radius) + "," +
-                QuoteCsvField(circle.StableRegion) + "\n";
+        text += QuoteCsvField(circle.Name) + "," + FormatCsvValue(circle.FrequencyHertz) + "," + circle.Shape + ","
+              + (has_center ? FormatCsvValue(center.real()) : "") + ","
+              + (has_center ? FormatCsvValue(center.imag()) : "") + "," + FormatCsvValue(circle.Radius) + ","
+              + QuoteCsvField(circle.StableRegion) + "\n";
     }
     return text;
 }
@@ -109,8 +109,8 @@ std::string RenderCsv(const ExportFigure &figure) {
                 continue;
             }
             const std::string name = figure.Panels.size() > 1 && !panel.Title.empty()
-                                         ? std::format("{} {}", panel.Title, series.Name)
-                                         : series.Name;
+                                       ? std::format("{} {}", panel.Title, series.Name)
+                                       : series.Name;
             const std::string unit =
                 series.TableUnit.value_or(series.Axis < panel.YAxes.size() ? panel.YAxes[series.Axis].Unit : "");
             text += "," + CsvHeader(name, unit);

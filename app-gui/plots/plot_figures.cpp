@@ -111,8 +111,8 @@ void AddExportTraces(PanelBuilder &builder,
                      const bool in_legend,
                      const std::vector<int> &excluded = {}) {
     for (std::size_t node = 1; node < node_values.size(); ++node) {
-        if (!schematic.IsVoltageMeasured(static_cast<int>(node)) ||
-            std::ranges::contains(excluded, static_cast<int>(node))) {
+        if (!schematic.IsVoltageMeasured(static_cast<int>(node))
+            || std::ranges::contains(excluded, static_cast<int>(node))) {
             continue;
         }
         const std::string label = GetVoltageLabel(schematic.GetConnectivity(), static_cast<int>(node));

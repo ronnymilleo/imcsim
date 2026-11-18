@@ -479,9 +479,9 @@ private:
                 body_map[static_cast<std::size_t>(definition->Pins[pin].Node)] = nodes[pin];
             }
             for (const int body_node : used) {
-                if (body_map[static_cast<std::size_t>(body_node)] == 0 &&
-                    std::ranges::none_of(definition->Pins,
-                                         [body_node](const SubcircuitPin &p) { return p.Node == body_node; })) {
+                if (body_map[static_cast<std::size_t>(body_node)] == 0
+                    && std::ranges::none_of(definition->Pins,
+                                            [body_node](const SubcircuitPin &p) { return p.Node == body_node; })) {
                     body_map[static_cast<std::size_t>(body_node)] = m_Builder->AddNode();
                 }
             }

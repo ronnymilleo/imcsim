@@ -382,7 +382,8 @@ struct HarmonicBalance {
  * @struct  SimulationRun
  * @brief   Outcome of a simulation, with everything the simulator printed.
  */
-template <typename Data> struct SimulationRun {
+template <typename Data>
+struct SimulationRun {
     std::expected<Data, std::string> Result;
     std::vector<SimulatorMessage> Messages;
 };

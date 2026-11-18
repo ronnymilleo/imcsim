@@ -65,8 +65,9 @@ bool KeepLivePace(std::chrono::steady_clock::time_point &start,
                   const double reached,
                   const double pace,
                   const RunControl *control) {
-    const auto due = start + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
-                                 std::chrono::duration<double>(reached / pace));
+    const auto due = start
+                   + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                         std::chrono::duration<double>(reached / pace));
     WaitForClock(due, control);
     if (const auto late = std::chrono::steady_clock::now() - due; late > LIVE_CATCH_UP_LIMIT) {
         start += late;

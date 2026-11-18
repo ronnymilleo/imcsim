@@ -101,8 +101,8 @@ BoyleOpAmpValues ComputeBoyleOpAmpValues(const BoyleOpAmpParameters &parameters)
             .CommonModeTransconductance =
                 transconductance / std::pow(10.0, parameters.CommonModeRejectionDecibels / 20.0),
             .Transconductance = transconductance,
-            .OutputGain = std::pow(10.0, parameters.OpenLoopGainDecibels / 20.0) /
-                          (transconductance * GAIN_STAGE_RESISTANCE * gain_stage_load),
+            .OutputGain = std::pow(10.0, parameters.OpenLoopGainDecibels / 20.0)
+                        / (transconductance * GAIN_STAGE_RESISTANCE * gain_stage_load),
             .GainStageLoad = gain_stage_load,
             .CurrentLimitGain = CURRENT_LIMIT_THRESHOLD / (parameters.ShortCircuitCurrent * OUTPUT_SENSE_RESISTANCE),
             .PositiveSwing = parameters.PositiveHeadroom + LIMITER_DIODE_DROPS,
@@ -208,7 +208,10 @@ public:
         }
     }
 
-    template <typename F> void Defer(F &&func) { m_Actions.push_back(std::forward<F>(func)); }
+    template <typename F>
+    void Defer(F &&func) {
+        m_Actions.push_back(std::forward<F>(func));
+    }
 
     int MapNode(NodeId node) const { return node <= 0 ? -1 : node - 1; }
 
@@ -1113,9 +1116,11 @@ CircuitBuilder &CircuitBuilder::operator=(CircuitBuilder &&) noexcept = default;
 void CircuitBuilder::SetCircuitNodeCount(int count) {
     m_Impl->SetCircuitNodeCount(count);
 }
+
 void CircuitBuilder::SetTemperature(const double temperature_celsius, const double nominal_celsius) {
     m_Impl->SetTemperature(temperature_celsius, nominal_celsius);
 }
+
 NodeId CircuitBuilder::AddNode() {
     return m_Impl->AddNode();
 }

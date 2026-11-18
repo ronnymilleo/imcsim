@@ -101,7 +101,7 @@ std::optional<std::size_t> MonteCarloTab::ResolveColumn(const MonteCarloTable &t
         return std::nullopt;
     }
     const std::vector<std::size_t> picked = m_Current ? ListCurrentColumns(table, *m_Current)
-                                            : m_Node  ? ListNodeColumns(table, *m_Node)
+                                          : m_Node    ? ListNodeColumns(table, *m_Node)
                                                       : std::vector<std::size_t>{};
     for (const std::size_t column : picked) {
         if (table.Columns[column].Kind == m_Kind) {
@@ -264,8 +264,8 @@ void MonteCarloTab::ShowRun(const std::size_t run) {
  */
 void MonteCarloTab::DrawRunTable(const MonteCarloTable &table, const std::size_t column) {
     const int column_count = static_cast<int>(table.Parts.size()) + 2;
-    const ImGuiTableFlags flags = ImGuiTableFlags_Sortable | ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg |
-                                  ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable;
+    const ImGuiTableFlags flags = ImGuiTableFlags_Sortable | ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg
+                                | ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable;
     if (!ImGui::BeginTable("##monte_carlo_runs",
                            column_count,
                            flags,
@@ -282,9 +282,9 @@ void MonteCarloTab::DrawRunTable(const MonteCarloTable &table, const std::size_t
     if (ImGuiTableSortSpecs *specs = ImGui::TableGetSortSpecs(); specs != nullptr && specs->SpecsCount > 0) {
         const auto index = static_cast<std::size_t>(specs->Specs[0].ColumnIndex);
         const std::size_t measure_index = table.Parts.size() + 1;
-        m_Sort.By = index == 0               ? RunSort::Key::RUN
-                    : index == measure_index ? RunSort::Key::MEASURE
-                                             : RunSort::Key::PART;
+        m_Sort.By = index == 0             ? RunSort::Key::RUN
+                  : index == measure_index ? RunSort::Key::MEASURE
+                                           : RunSort::Key::PART;
         m_Sort.Index = index == measure_index ? column : index - 1;
         m_Sort.IsAscending = specs->Specs[0].SortDirection == ImGuiSortDirection_Ascending;
     }

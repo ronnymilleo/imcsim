@@ -27,8 +27,8 @@ bool DrawPartItems(const ContextMenuServices &services) {
     if (ImGui::MenuItem("Properties...", "Enter")) {
         services.Popover.Request();
     }
-    if (services.Shown.GetSelectedElement()->GetComponent().GetType() == Core::ComponentType::SUBCIRCUIT &&
-        ImGui::MenuItem("Edit Block Contents")) {
+    if (services.Shown.GetSelectedElement()->GetComponent().GetType() == Core::ComponentType::SUBCIRCUIT
+        && ImGui::MenuItem("Edit Block Contents")) {
         is_block_edit_asked = true;
     }
     ImGui::Separator();

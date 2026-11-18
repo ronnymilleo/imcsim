@@ -194,7 +194,8 @@ std::complex<double> FromDecibels(const double decibels, const double degrees) {
 }
 
 // Finds a current by component name, failing the test when it is missing
-template <typename Current> const Current &FindCurrent(const std::vector<Current> &currents, const std::string &name) {
+template <typename Current>
+const Current &FindCurrent(const std::vector<Current> &currents, const std::string &name) {
     const auto found = std::ranges::find_if(currents, [&name](const Current &current) { return current.Name == name; });
     REQUIRE(found != currents.end());
     return *found;
@@ -744,9 +745,10 @@ TEST_CASE("A transient run follows the single-frequency FM of an SFFM source", "
         const double t = transient.Times[index];
         // The carrier phase is swung by the modulation index times the signal sine
         const double expected =
-            sffm.Offset + sffm.Amplitude * std::sin(2.0 * std::numbers::pi * sffm.CarrierFrequency * t +
-                                                    sffm.ModulationIndex *
-                                                        std::sin(2.0 * std::numbers::pi * sffm.SignalFrequency * t));
+            sffm.Offset
+            + sffm.Amplitude
+                  * std::sin(2.0 * std::numbers::pi * sffm.CarrierFrequency * t
+                             + sffm.ModulationIndex * std::sin(2.0 * std::numbers::pi * sffm.SignalFrequency * t));
         CHECK_THAT(transient.NodeVoltages[1][index], Catch::Matchers::WithinAbs(expected, 1e-3));
     }
 }
@@ -779,10 +781,10 @@ TEST_CASE("A transient run follows the amplitude modulation of an AM source", "[
     for (std::size_t index = 0; index < transient.Times.size(); ++index) {
         const double shifted = transient.Times[index] - am.Delay;
         const double expected =
-            shifted <= 0.0
-                ? 0.0
-                : am.Offset + am.Amplitude * std::sin(2.0 * std::numbers::pi * am.ModulatingFrequency * shifted) *
-                                  std::sin(2.0 * std::numbers::pi * am.CarrierFrequency * shifted);
+            shifted <= 0.0 ? 0.0
+                           : am.Offset
+                                 + am.Amplitude * std::sin(2.0 * std::numbers::pi * am.ModulatingFrequency * shifted)
+                                       * std::sin(2.0 * std::numbers::pi * am.CarrierFrequency * shifted);
         CHECK_THAT(transient.NodeVoltages[1][index], Catch::Matchers::WithinAbs(expected, 1e-3));
     }
 }
@@ -1082,6 +1084,7 @@ TEST_CASE("Each LED model drops its rated forward voltage at 20 mA", "[simulator
         const char *Model;
         double ForwardVoltage;
     };
+
     const Rating rating = GENERATE(Rating{"Red", 1.85}, Rating{"Green", 2.2}, Rating{"Blue", 3.3});
     CAPTURE(rating.Model);
     // The resistor sets 20 mA when the LED drops its rated voltage
@@ -1381,6 +1384,7 @@ TEST_CASE("Each bipolar model has its datasheet gain", "[simulator]") {
         double MinimumGain;
         double MaximumGain;
     };
+
     const Rating rating = GENERATE(Rating{Core::ComponentType::NPN, "2N3904", 100.0, 300.0},
                                    Rating{Core::ComponentType::NPN, "2N2222A", 100.0, 300.0},
                                    Rating{Core::ComponentType::NPN, "BC547B", 200.0, 450.0},
@@ -1431,6 +1435,7 @@ TEST_CASE("Each MOSFET model has its datasheet on-resistance at 10 V of gate dri
         const char *Model;
         double OnResistance;
     };
+
     const Rating rating = GENERATE(Rating{Core::ComponentType::NMOS, "2N7000", 1.8},
                                    Rating{Core::ComponentType::NMOS, "BS170", 1.2},
                                    Rating{Core::ComponentType::NMOS, "IRF540N", 0.044},
@@ -3148,8 +3153,8 @@ TEST_CASE("A clock start delay holds it low until the first rising edge", "[simu
     const Core::Transient &transient = *run.Result;
     const std::vector<double> &voltage = transient.NodeVoltages[1];
     const auto at = [&transient, &voltage](const double time) {
-        return voltage[static_cast<std::size_t>(std::ranges::lower_bound(transient.Times, time) -
-                                                transient.Times.begin())];
+        return voltage[static_cast<std::size_t>(std::ranges::lower_bound(transient.Times, time)
+                                                - transient.Times.begin())];
     };
     // Low through the delay, high in the first pulse at 2.25 ms, low again at 2.75 ms
     CHECK_THAT(at(1.0e-3), Catch::Matchers::WithinAbs(0.0, 0.05));
@@ -3372,11 +3377,13 @@ TEST_CASE("RunTruthTable rejects inputs and outputs it cannot use", "[simulator]
 
 TEST_CASE("Gates with three inputs follow their truth tables, an XOR giving odd parity", "[simulator][digital]") {
     SKIP_WITHOUT_DIGITAL_MODELS();
+
     struct GateCase {
         Core::ComponentType Type;
         /// Whether the output is high for 0, 1, 2 and 3 high inputs.
         std::array<bool, 4> HighForCount;
     };
+
     constexpr std::array<GateCase, 6> CASES = {{{Core::ComponentType::AND, {false, false, false, true}},
                                                 {Core::ComponentType::OR, {false, true, true, true}},
                                                 {Core::ComponentType::NAND, {true, true, true, false}},

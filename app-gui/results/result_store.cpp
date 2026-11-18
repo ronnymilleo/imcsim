@@ -89,8 +89,8 @@ const std::optional<StepFamily<Core::OperatingPoint>> &ResultStore::GetOperating
  * @param[in] step  Index of the step; ignored when out of range or without steps.
  */
 void ResultStore::SelectOperatingPointStep(const std::size_t step) {
-    if (!m_OperatingPointSteps || step >= m_OperatingPointSteps->Results.size() ||
-        step == m_OperatingPointSteps->Selected) {
+    if (!m_OperatingPointSteps || step >= m_OperatingPointSteps->Results.size()
+        || step == m_OperatingPointSteps->Selected) {
         return;
     }
     m_OperatingPointSteps->Selected = step;
@@ -132,12 +132,12 @@ void ResultStore::AppendTransient(Core::Transient chunk) {
         return;
     }
     Core::Transient &whole = *m_Transient;
-    const bool fits =
-        whole.NodeVoltages.size() == chunk.NodeVoltages.size() && std::ranges::equal(whole.Currents,
-                                                                                     chunk.Currents,
-                                                                                     {},
-                                                                                     &Core::ComponentTrace::Name,
-                                                                                     &Core::ComponentTrace::Name);
+    const bool fits = whole.NodeVoltages.size() == chunk.NodeVoltages.size()
+                   && std::ranges::equal(whole.Currents,
+                                         chunk.Currents,
+                                         {},
+                                         &Core::ComponentTrace::Name,
+                                         &Core::ComponentTrace::Name);
     if (!fits) {
         return;
     }

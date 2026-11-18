@@ -366,6 +366,7 @@ std::string BuildHarmonicBalanceCsv(const Core::HarmonicBalance &result,
         std::string Label;
         const std::vector<double> *Values = nullptr;
     };
+
     std::vector<WaveformColumn> columns;
     for (std::size_t node = 1; node < result.NodeWaveforms.size(); ++node) {
         if (schematic.IsVoltageMeasured(static_cast<int>(node))) {

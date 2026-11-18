@@ -58,8 +58,8 @@ Arguments SplitArguments(const std::vector<std::string> &tokens, const std::size
     Arguments arguments;
     for (std::size_t index = first; index < tokens.size(); ++index) {
         const std::size_t equals = tokens[index].find('=');
-        const bool is_option = equals != std::string::npos && equals > 0 && tokens[index].front() != '{' &&
-                               tokens[index].front() != '\'' && tokens[index].find('(') > equals;
+        const bool is_option = equals != std::string::npos && equals > 0 && tokens[index].front() != '{'
+                            && tokens[index].front() != '\'' && tokens[index].find('(') > equals;
         if (is_option) {
             arguments.Options[ToUpper(tokens[index].substr(0, equals))] = tokens[index].substr(equals + 1);
         } else {
@@ -125,7 +125,7 @@ std::expected<PassiveValues, std::string> ReadPassive(const TextScope &scope,
     }
     const auto option = arguments.Options.find(std::string(value_option));
     const std::string *text = option != arguments.Options.end() ? &option->second
-                              : !arguments.Positional.empty()   ? &arguments.Positional.front()
+                            : !arguments.Positional.empty()     ? &arguments.Positional.front()
                                                                 : nullptr;
     if (text == nullptr) {
         return std::unexpected("it has no value");
@@ -396,9 +396,9 @@ Result AddBehavioralLine(ExpansionContext &context, TextScope &scope, const Elem
     const std::size_t equals = element.Text.find('=');
     const std::string_view before = equals == std::string_view::npos ? element.Text : element.Text.substr(0, equals);
     const std::string_view kind = TrimSpaces(before);
-    if (equals == std::string_view::npos || kind.empty() ||
-        (std::toupper(static_cast<unsigned char>(kind.back())) != 'V' &&
-         std::toupper(static_cast<unsigned char>(kind.back())) != 'I')) {
+    if (equals == std::string_view::npos || kind.empty()
+        || (std::toupper(static_cast<unsigned char>(kind.back())) != 'V'
+            && std::toupper(static_cast<unsigned char>(kind.back())) != 'I')) {
         return std::unexpected("a behavioral source is written B<name> <node> <node> V=<expression> or I=<expression>");
     }
     const bool is_voltage = std::toupper(static_cast<unsigned char>(kind.back())) == 'V';
@@ -419,8 +419,8 @@ Result AddVoltageControlledLine(ExpansionContext &context,
     if (third.starts_with("VALUE")) {
         return AddExpressionSource(context, scope, element, is_voltage, FindExpressionText(element.Text));
     }
-    if (third.starts_with("POLY") || third.starts_with("TABLE") || third.starts_with("LAPLACE") ||
-        third.starts_with("FREQ") || third.starts_with("CUR")) {
+    if (third.starts_with("POLY") || third.starts_with("TABLE") || third.starts_with("LAPLACE")
+        || third.starts_with("FREQ") || third.starts_with("CUR")) {
         return std::unexpected(std::format("the form '{}' of a controlled source is not simulated, only a gain and "
                                            "VALUE={{expression}}",
                                            element.Tokens[FIRST_NODE_INDEX + 2].substr(0, third.find('('))));
@@ -549,10 +549,10 @@ Result AddBjtLine(ExpansionContext &context, TextScope &scope, const ElementLine
         return nodes;
     }
     // The fourth word is the model, unless the model is the fifth and the fourth is the substrate node
-    const std::size_t model_index = scope.FindModel(ToUpper(element.Tokens[FIRST_NODE_INDEX + NODES])) == nullptr &&
-                                            element.Tokens.size() > FIRST_NODE_INDEX + NODES + 1
-                                        ? FIRST_NODE_INDEX + NODES + 1
-                                        : FIRST_NODE_INDEX + NODES;
+    const std::size_t model_index = scope.FindModel(ToUpper(element.Tokens[FIRST_NODE_INDEX + NODES])) == nullptr
+                                         && element.Tokens.size() > FIRST_NODE_INDEX + NODES + 1
+                                      ? FIRST_NODE_INDEX + NODES + 1
+                                      : FIRST_NODE_INDEX + NODES;
     const auto model = UseTextModel(scope,
                                     element.Tokens[model_index],
                                     {ParsedModel::ModelKind::BJT_NPN, ParsedModel::ModelKind::BJT_PNP});

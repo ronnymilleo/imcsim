@@ -49,7 +49,7 @@ TEST_CASE("A result that fits the plot is shown whole, and a long one by a windo
 }
 
 TEST_CASE("A window never runs past the end of the result", "[point_window]") {
-    const GUI::PointWindow late = GUI::ClampWindow(10'000, 9'999, 2000);
+    const GUI::PointWindow late = GUI::ClampWindow(10'000, 9999, 2000);
     CHECK(late.First == 8000);
     CHECK(late.Count == 2000);
 

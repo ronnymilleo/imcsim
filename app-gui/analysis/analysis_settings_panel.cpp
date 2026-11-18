@@ -324,8 +324,8 @@ void AnalysisSettingsPanel::DrawTransientSettings(SimulationSettings &settings) 
     const auto suggested = Core::SuggestTransientSettings(m_Schematic.BuildCircuit());
     if (DrawSuggestButton(suggested.has_value(),
                           "Five periods of the slowest source, or the whole span of a one-shot one",
-                          "Needs a source with a waveform") &&
-        suggested) {
+                          "Needs a source with a waveform")
+        && suggested) {
         settings.Transient.StopTime = suggested->StopTime;
         settings.Transient.TimeStep = suggested->TimeStep;
         m_StopTime.Load(suggested->StopTime);
@@ -365,8 +365,8 @@ void AnalysisSettingsPanel::DrawACSweepSettings(SimulationSettings &settings) {
     const auto suggested = Core::SuggestACSweepSettings(m_Schematic.BuildCircuit());
     if (DrawSuggestButton(suggested.has_value(),
                           "Two decades past the RC, RL and LC corners and the op-amp bandwidths",
-                          "Needs a capacitor, an inductor or an op-amp") &&
-        suggested) {
+                          "Needs a capacitor, an inductor or an op-amp")
+        && suggested) {
         settings.ACSweep.StartFrequency = suggested->StartFrequency;
         settings.ACSweep.StopFrequency = suggested->StopFrequency;
         m_StartFrequency.Load(suggested->StartFrequency);
@@ -442,8 +442,8 @@ void AnalysisSettingsPanel::DrawNoiseSettings(SimulationSettings &settings) {
     const auto suggested = Core::SuggestACSweepSettings(circuit);
     if (DrawSuggestButton(suggested.has_value(),
                           "Two decades past the RC, RL and LC corners and the op-amp bandwidths",
-                          "Needs a capacitor, an inductor or an op-amp") &&
-        suggested) {
+                          "Needs a capacitor, an inductor or an op-amp")
+        && suggested) {
         settings.NoiseRange.StartFrequency = suggested->StartFrequency;
         settings.NoiseRange.StopFrequency = suggested->StopFrequency;
         m_NoiseStartFrequency.Load(suggested->StartFrequency);
@@ -652,8 +652,8 @@ void AnalysisSettingsPanel::DrawACSensitivityInputs(SimulationSettings &settings
     const auto suggested = Core::SuggestACSweepSettings(circuit);
     if (DrawSuggestButton(suggested.has_value(),
                           "Two decades past the RC, RL and LC corners and the op-amp bandwidths",
-                          "Needs a capacitor, an inductor or an op-amp") &&
-        suggested) {
+                          "Needs a capacitor, an inductor or an op-amp")
+        && suggested) {
         range.StartFrequency = suggested->StartFrequency;
         range.StopFrequency = suggested->StopFrequency;
         m_ACSensitivityStartFrequency.Load(suggested->StartFrequency);
@@ -730,8 +730,8 @@ void AnalysisSettingsPanel::DrawHarmonicBalanceSettings(SimulationSettings &sett
     }
     ImGui::SetItemTooltip("Number of harmonics above DC (1 to %d)", Core::MAX_HARMONIC_BALANCE_HARMONICS);
     // An explicit sample count stays above twice the harmonics, the Nyquist limit
-    if (settings.HarmonicBalance.Samples != 0 &&
-        settings.HarmonicBalance.Samples <= 2 * settings.HarmonicBalance.Harmonics) {
+    if (settings.HarmonicBalance.Samples != 0
+        && settings.HarmonicBalance.Samples <= 2 * settings.HarmonicBalance.Harmonics) {
         int next_power = MIN_EXPLICIT_SAMPLES;
         while (next_power <= 2 * settings.HarmonicBalance.Harmonics && next_power < MAX_EXPLICIT_SAMPLES) {
             next_power *= 2;
@@ -951,10 +951,12 @@ void AnalysisSettingsPanel::DrawToleranceButtons() {
         })) {
         m_ToleranceAllPercent = *percent;
     }
+
     struct Button {
         const char *Label;
         Core::ComponentType Type;
     };
+
     const std::array<Button, 3> buttons = {{{"Resistors", Core::ComponentType::RESISTOR},
                                             {"Capacitors", Core::ComponentType::CAPACITOR},
                                             {"Inductors", Core::ComponentType::INDUCTOR}}};

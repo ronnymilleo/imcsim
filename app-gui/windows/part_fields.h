@@ -17,7 +17,8 @@ namespace GUI {
  * @struct  ParameterField
  * @brief   One member of a parameter set, such as Core::PulseParameters, as a field of the part editor.
  */
-template <typename Parameters> struct ParameterField {
+template <typename Parameters>
+struct ParameterField {
     const char *Label;
     double Parameters::*Value;
     // No unit means the unit of the source, volts or amperes

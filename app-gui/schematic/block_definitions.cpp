@@ -138,9 +138,10 @@ std::expected<void, std::string> ValidateExpressions(const std::vector<std::uniq
     for (const auto &element : elements) {
         const Core::Component &component = element->GetComponent();
         const std::optional<std::string> &expression = component.GetValueExpression();
-        if (expression && !std::ranges::contains(parameters,
-                                                 Core::SubcircuitInstance::GetExpressionParameter(*expression),
-                                                 &Core::SubcircuitParameter::Name)) {
+        if (expression
+            && !std::ranges::contains(parameters,
+                                      Core::SubcircuitInstance::GetExpressionParameter(*expression),
+                                      &Core::SubcircuitParameter::Name)) {
             return std::unexpected(
                 std::format("{} follows {}, which is not a parameter of the block", component.GetName(), *expression));
         }
@@ -158,8 +159,8 @@ std::expected<void, std::string> CheckPinChoice(const std::vector<SubcircuitPinC
                                                 const std::vector<SavedSubcircuitPin> &pins) {
     std::set<GridPoint> pin_points;
     for (const SavedSubcircuitPin &pin : pins) {
-        if (!std::ranges::contains(candidates, pin.Point, &SubcircuitPinCandidate::Point) ||
-            !pin_points.insert(pin.Point).second) {
+        if (!std::ranges::contains(candidates, pin.Point, &SubcircuitPinCandidate::Point)
+            || !pin_points.insert(pin.Point).second) {
             return std::unexpected("Choose one name for every pin marker");
         }
     }
@@ -343,15 +344,15 @@ void RefreshInstancesIn(std::vector<std::unique_ptr<UIElement>> &elements,
                         const std::vector<std::optional<std::size_t>> &matches) {
     TerminalMoves moves;
     for (auto &element : elements) {
-        if (element->GetComponent().GetType() == Core::ComponentType::SUBCIRCUIT &&
-            static_cast<const Core::SubcircuitInstance &>(element->GetComponent()).GetDefinitionName() ==
-                definition.Name) {
+        if (element->GetComponent().GetType() == Core::ComponentType::SUBCIRCUIT
+            && static_cast<const Core::SubcircuitInstance &>(element->GetComponent()).GetDefinitionName()
+                   == definition.Name) {
             RefreshInstance(*element, definition, old_names, matches, moves);
         }
     }
     std::erase_if(wires, [&](const UIWire &wire) {
-        return std::ranges::contains(moves.Removed, wire.GetStart()) ||
-               std::ranges::contains(moves.Removed, wire.GetEnd());
+        return std::ranges::contains(moves.Removed, wire.GetStart())
+            || std::ranges::contains(moves.Removed, wire.GetEnd());
     });
     wires = FollowTerminals(wires, moves.OldPoints, moves.NewPoints);
     if (moves.Rerouted.empty()) {

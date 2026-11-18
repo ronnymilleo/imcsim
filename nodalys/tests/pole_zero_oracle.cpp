@@ -116,8 +116,8 @@ CheckPoleZero(const Nodalys::Circuit &circuit, const Nodalys::PoleZeroConfig &co
  * @return  True when the run gave a result, with no warning, and the rebuilt response is as close as required.
  */
 bool IsMatch(const PoleZeroReport &report) {
-    return report.Error.empty() && report.Warnings.empty() && report.MaxMagnitudeErrorDecibels <= MATCH_DECIBELS &&
-           report.MaxPhaseErrorDegrees <= MATCH_DEGREES;
+    return report.Error.empty() && report.Warnings.empty() && report.MaxMagnitudeErrorDecibels <= MATCH_DECIBELS
+        && report.MaxPhaseErrorDegrees <= MATCH_DEGREES;
 }
 
 /**

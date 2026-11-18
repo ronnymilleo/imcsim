@@ -32,7 +32,9 @@ public:
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     void StampAc(MnaSystem &reactive, const std::vector<double> &x_dc) const override;
+
     bool IsLinear() const override { return false; }
+
     void StampCharge(MnaSystem &sys, const std::vector<double> &x) const override;
     bool Limit(std::vector<double> &x_new, const std::vector<double> &x_old) const override;
     void SeedOperatingPoint(std::vector<double> &x) const override;
@@ -66,6 +68,7 @@ private:
         double DIfwdQbDvbc; ///< $\partial (I_{\text{fwd}} / q_b) / \partial v_{bc}$ for SPICE `geqcb` base-width
                             ///< modulation transcapacitance.
     };
+
     /// Operating point of the intrinsic transistor at one solution vector, in the polarity of the circuit.
     struct JunctionState {
         double Vbe;       ///< Base-emitter voltage as the circuit sees it.
@@ -74,6 +77,7 @@ private:
         double VbcSigned; ///< $v_{bc}$ flipped for a PNP, so it is forward-positive in both polarities.
         Intrinsic Dc;     ///< Currents and conductances in the polarity of the circuit.
     };
+
     /// Charges and capacitances of the two junctions in forward-positive polarity, depletion plus transit time.
     struct JunctionCharges {
         double BaseEmitterCharge;        ///< $Q_{BE}$, depletion charge plus $\tau_F I_{\text{fwd}} / q_b$.
@@ -83,6 +87,7 @@ private:
         /// SPICE `geqcb`, $\partial Q_{BE} / \partial v_{bc}$: the base-width modulation transcapacitance.
         double Transcapacitance;
     };
+
     /// Recomputes the parameters at the temperature, from the ones given at the nominal temperature.
     void ApplyTemperature(const ThermalConditions &thermal);
     /// Evaluates the intrinsic transport equations in NPN polarity ($v_{be}, v_{bc}$ forward-positive).

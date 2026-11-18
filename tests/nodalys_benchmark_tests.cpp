@@ -49,7 +49,8 @@ Core::NgspiceBackend &Ngspice() {
     return backend;
 }
 
-template <typename Func> double MeasureMs(Func &&func, const int repetitions = 3) {
+template <typename Func>
+double MeasureMs(Func &&func, const int repetitions = 3) {
     func(); // Warmup
     const auto start = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < repetitions; ++i) {
@@ -89,7 +90,8 @@ struct OwnedCircuit {
     std::vector<std::unique_ptr<Core::Component>> Parts;
     Core::Circuit Instance;
 
-    template <typename T, typename... Args> T &AddPart(std::vector<int> nodes, Args &&...args) {
+    template <typename T, typename... Args>
+    T &AddPart(std::vector<int> nodes, Args &&...args) {
         auto part = std::make_unique<T>(std::forward<Args>(args)...);
         T &ref = *part;
         Instance.Add(ref, std::move(nodes));

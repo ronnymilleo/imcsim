@@ -315,8 +315,8 @@ TEST_CASE("Gear-2 follows an underdamped RLC step with the adaptive step", "[nod
 
     for (const double time : {0.31e-3, 1.0e-3, 2.0e-3}) {
         const double expected =
-            10.0 *
-            (1.0 - std::exp(-ALPHA * time) * (std::cos(omega_d * time) + ALPHA / omega_d * std::sin(omega_d * time)));
+            10.0
+            * (1.0 - std::exp(-ALPHA * time) * (std::cos(omega_d * time) + ALPHA / omega_d * std::sin(omega_d * time)));
         CAPTURE(time);
         // Gear-2 loses a little amplitude at this step, a few tenths of a volt of a 17 V peak
         CHECK_THAT(ReadNodeAt(gear, 3, time), WithinAbs(expected, 0.4));

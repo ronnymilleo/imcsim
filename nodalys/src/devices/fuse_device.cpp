@@ -152,8 +152,8 @@ double FuseDevice::NextBreakpoint(const double time) const {
     if (m_Accepted.IsBlown) {
         next = m_Accepted.BlowTime + OPENING_TIME_SHARE * m_CoolingTimeConstant;
     } else if (m_Accepted.Power > BLOW_HEAT && m_Accepted.Heat < BLOW_HEAT) {
-        next = m_Accepted.Time -
-               m_CoolingTimeConstant * std::log((m_Accepted.Power - BLOW_HEAT) / (m_Accepted.Power - m_Accepted.Heat));
+        next = m_Accepted.Time
+             - m_CoolingTimeConstant * std::log((m_Accepted.Power - BLOW_HEAT) / (m_Accepted.Power - m_Accepted.Heat));
     }
     return next - time >= min_gap ? next : std::numeric_limits<double>::infinity();
 }

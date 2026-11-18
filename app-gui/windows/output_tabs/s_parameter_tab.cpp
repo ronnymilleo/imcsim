@@ -216,8 +216,8 @@ void SParameterTab::Draw(PlotExporter &exporter) {
     }
     const SParameterView view = GetDisplayedView(*result);
     DrawControls(*result, exporter, view);
-    if (m_Quantity != SParameterQuantity::S &&
-        CountAbsentFrequencies(*result, m_Quantity) == result->Frequencies.size()) {
+    if (m_Quantity != SParameterQuantity::S
+        && CountAbsentFrequencies(*result, m_Quantity) == result->Frequencies.size()) {
         ShowWrapped(DescribeAbsentFrequencies(*result, m_Quantity));
         return;
     }
@@ -246,8 +246,8 @@ bool SParameterTab::CanExport() const {
     if (!result) {
         return false;
     }
-    if (m_Quantity != SParameterQuantity::S &&
-        CountAbsentFrequencies(*result, m_Quantity) == result->Frequencies.size()) {
+    if (m_Quantity != SParameterQuantity::S
+        && CountAbsentFrequencies(*result, m_Quantity) == result->Frequencies.size()) {
         return false;
     }
     const SParameterView view = GetDisplayedView(*result);
@@ -677,8 +677,8 @@ void SParameterTab::PlotStabilityCircles(const Core::SParameters &result) {
         ImPlotSpec hatch_spec;
         hatch_spec.LineColor = ToImVec4(color, HATCH_ALPHA);
         hatch_spec.LineWeight = HATCH_WEIGHT;
-        hatch_spec.Flags = static_cast<int>(ImPlotItemFlags_NoLegend) | static_cast<int>(ImPlotItemFlags_NoFit) |
-                           static_cast<int>(ImPlotLineFlags_Segments);
+        hatch_spec.Flags = static_cast<int>(ImPlotItemFlags_NoLegend) | static_cast<int>(ImPlotItemFlags_NoFit)
+                         | static_cast<int>(ImPlotLineFlags_Segments);
         ImPlot::PlotLine(std::format("##hatch_{}", index).c_str(),
                          hatch_xs.data(),
                          hatch_ys.data(),
@@ -942,8 +942,8 @@ void SParameterTab::MarkCircleFrequency() {
     // A press also starts a pan, so only a release that did not drag counts as a click
     const ImGuiIO &io = ImGui::GetIO();
     const bool is_click =
-        ImGui::IsMouseReleased(ImGuiMouseButton_Left) &&
-        io.MouseDragMaxDistanceSqr[ImGuiMouseButton_Left] <= io.MouseDragThreshold * io.MouseDragThreshold;
+        ImGui::IsMouseReleased(ImGuiMouseButton_Left)
+        && io.MouseDragMaxDistanceSqr[ImGuiMouseButton_Left] <= io.MouseDragThreshold * io.MouseDragThreshold;
     if (ImPlot::IsPlotHovered() && is_click) {
         m_CircleFrequency = FindNearestFrequency(m_Curves.Frequencies, ImPlot::GetPlotMousePos().x);
     }

@@ -546,8 +546,8 @@ void Component::ClearInitialCondition() {
  * @return  True for a resistor, capacitor, inductor and voltage source; a source only varies while it is a DC one.
  */
 bool Component::SupportsTolerance() const {
-    return m_Type == ComponentType::RESISTOR || m_Type == ComponentType::CAPACITOR ||
-           m_Type == ComponentType::INDUCTOR || m_Type == ComponentType::VOLTAGE_SOURCE;
+    return m_Type == ComponentType::RESISTOR || m_Type == ComponentType::CAPACITOR || m_Type == ComponentType::INDUCTOR
+        || m_Type == ComponentType::VOLTAGE_SOURCE;
 }
 
 /**

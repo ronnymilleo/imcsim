@@ -182,8 +182,8 @@ TEST_CASE("The sensitivity analysis refuses ground as its output and a circuit w
     REQUIRE(reason.has_value());
     CHECK(reason->contains("logic"));
     // Any other analysis of those parts is the backend's business as before: refused only without the digital models
-    CHECK(Core::FindUnsupported(Core::GetBackend(), parts, Core::AnalysisKind::OPERATING_POINT).has_value() ==
-          !Core::AreDigitalModelsAvailable());
+    CHECK(Core::FindUnsupported(Core::GetBackend(), parts, Core::AnalysisKind::OPERATING_POINT).has_value()
+          == !Core::AreDigitalModelsAvailable());
     CHECK_FALSE(
         Core::FindUnsupported(Core::GetBackend(), {Core::ComponentType::RESISTOR}, Core::AnalysisKind::SENSITIVITY)
             .has_value());

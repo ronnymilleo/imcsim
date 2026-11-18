@@ -50,8 +50,8 @@ int SParameters::GetPortCount() const {
  */
 std::complex<double> SParameters::Get(const std::size_t frequency, const int row, const int column) const {
     const auto ports = static_cast<std::size_t>(GetPortCount());
-    return Values[(frequency * ports + static_cast<std::size_t>(row - 1)) * ports +
-                  static_cast<std::size_t>(column - 1)];
+    return Values[(frequency * ports + static_cast<std::size_t>(row - 1)) * ports
+                  + static_cast<std::size_t>(column - 1)];
 }
 
 /**
@@ -59,8 +59,8 @@ std::complex<double> SParameters::Get(const std::size_t frequency, const int row
  * @return  True when there is one entry per frequency of each, absent or not; false for a result without them.
  */
 bool SParameters::HasPortMatrices() const {
-    return !Frequencies.empty() && ImpedanceMatrices.size() == Frequencies.size() &&
-           AdmittanceMatrices.size() == Frequencies.size();
+    return !Frequencies.empty() && ImpedanceMatrices.size() == Frequencies.size()
+        && AdmittanceMatrices.size() == Frequencies.size();
 }
 
 /**

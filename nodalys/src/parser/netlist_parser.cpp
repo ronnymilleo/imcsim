@@ -82,8 +82,8 @@ std::vector<std::string> TokenizeLine(std::string_view line) {
         }
 
         std::size_t start = i;
-        while (i < n && !std::isspace(static_cast<unsigned char>(line[i])) && line[i] != ',' && line[i] != ';' &&
-               line[i] != '$') {
+        while (i < n && !std::isspace(static_cast<unsigned char>(line[i])) && line[i] != ',' && line[i] != ';'
+               && line[i] != '$') {
             if (line[i] == '(') {
                 // e.g. SIN(...) attached to name
                 int depth = 0;
@@ -123,7 +123,7 @@ public:
 
         int num = 0;
         const auto [end, err] = std::from_chars(upper.data(), upper.data() + upper.size(), num);
-        if (err == std::errc() && end == upper.data() + upper.size() && num > 0 && num <= 10000) {
+        if (err == std::errc() && end == upper.data() + upper.size() && num > 0 && num <= 10'000) {
             m_NumericNodes.push_back({upper, num});
             m_MaxNumeric = std::max(m_MaxNumeric, num);
         } else {
@@ -363,8 +363,8 @@ std::expected<FrequencySweepWords, std::string> ReadFrequencySweep(const std::ve
         return std::unexpected(std::format("Malformed {} directive: '{}'", directive, line));
     }
     const std::optional<double> points = ParseSpiceNumber(tokens[number_token]);
-    if (!points || *points < 1.0 || std::floor(*points) != *points ||
-        *points > static_cast<double>(std::numeric_limits<int>::max())) {
+    if (!points || *points < 1.0 || std::floor(*points) != *points
+        || *points > static_cast<double>(std::numeric_limits<int>::max())) {
         return std::unexpected(
             std::format("Invalid number of points in {}, it must be a whole number of at least 1: '{}'",
                         directive,
@@ -461,8 +461,9 @@ std::optional<BehavioralLine> SplitBehavioralLine(std::string_view line) {
         rest = rest.substr(0, comment);
     }
     rest = Trim(rest);
-    if (rest.size() < 2 || (std::toupper(static_cast<unsigned char>(rest.front())) != 'V' &&
-                            std::toupper(static_cast<unsigned char>(rest.front())) != 'I')) {
+    if (rest.size() < 2
+        || (std::toupper(static_cast<unsigned char>(rest.front())) != 'V'
+            && std::toupper(static_cast<unsigned char>(rest.front())) != 'I')) {
         return std::nullopt;
     }
     const bool is_voltage = std::toupper(static_cast<unsigned char>(rest.front())) == 'V';
@@ -617,16 +618,17 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
             std::size_t pos = 0;
             const std::size_t plen = all_params.size();
             while (pos < plen) {
-                while (pos < plen && (std::isspace(static_cast<unsigned char>(all_params[pos])) ||
-                                      all_params[pos] == '(' || all_params[pos] == ')' || all_params[pos] == ',')) {
+                while (pos < plen
+                       && (std::isspace(static_cast<unsigned char>(all_params[pos])) || all_params[pos] == '('
+                           || all_params[pos] == ')' || all_params[pos] == ',')) {
                     ++pos;
                 }
                 if (pos >= plen) {
                     break;
                 }
                 const std::size_t kstart = pos;
-                while (pos < plen &&
-                       (std::isalnum(static_cast<unsigned char>(all_params[pos])) || all_params[pos] == '_')) {
+                while (pos < plen
+                       && (std::isalnum(static_cast<unsigned char>(all_params[pos])) || all_params[pos] == '_')) {
                     ++pos;
                 }
                 const std::string key = ToUpper(all_params.substr(kstart, pos - kstart));
@@ -639,8 +641,8 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                         ++pos;
                     }
                     const std::size_t vstart = pos;
-                    while (pos < plen && !std::isspace(static_cast<unsigned char>(all_params[pos])) &&
-                           all_params[pos] != ')' && all_params[pos] != ',') {
+                    while (pos < plen && !std::isspace(static_cast<unsigned char>(all_params[pos]))
+                           && all_params[pos] != ')' && all_params[pos] != ',') {
                         ++pos;
                     }
                     const std::string val_str = all_params.substr(vstart, pos - vstart);
@@ -781,9 +783,9 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                     break;
                 }
                 const std::string upper = ToUpper(tokens[i]);
-                if (upper == "AND" || upper == "NAND" || upper == "OR" || upper == "NOR" || upper == "XOR" ||
-                    upper == "XNOR" || upper == "NOT" || upper == "INV" || upper == "BUF" || upper == "BUFFER" ||
-                    upper == "SCHMITT") {
+                if (upper == "AND" || upper == "NAND" || upper == "OR" || upper == "NOR" || upper == "XOR"
+                    || upper == "XNOR" || upper == "NOT" || upper == "INV" || upper == "BUF" || upper == "BUFFER"
+                    || upper == "SCHMITT") {
                     break;
                 }
                 nodes.Register(tokens[i]);
@@ -805,6 +807,7 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
         NodeId Positive;
         NodeId Negative;
     };
+
     std::vector<BlockSource> block_sources;
     const InstanceObservers observers{
         .OnInternalNode = [&nodes](const std::string &name, const NodeId node) { nodes.Bind(name, node); },
@@ -976,8 +979,8 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                             const char fc =
                                 static_cast<char>(std::toupper(static_cast<unsigned char>(cand_toks[0].front())));
                             if (fc == 'V' || fc == 'I') {
-                                if ((cand_toks[1] == in_pos && cand_toks[2] == in_neg) ||
-                                    (cand_toks[1] == in_neg && cand_toks[2] == in_pos)) {
+                                if ((cand_toks[1] == in_pos && cand_toks[2] == in_neg)
+                                    || (cand_toks[1] == in_neg && cand_toks[2] == in_pos)) {
                                     cfg.InputSource = cand_toks[0];
                                     break;
                                 }
@@ -990,8 +993,8 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                         }
                         const NodeId in_positive = nodes.Resolve(in_pos);
                         const NodeId in_negative = nodes.Resolve(in_neg);
-                        if ((source.Positive == in_positive && source.Negative == in_negative) ||
-                            (source.Positive == in_negative && source.Negative == in_positive)) {
+                        if ((source.Positive == in_positive && source.Negative == in_negative)
+                            || (source.Positive == in_negative && source.Negative == in_positive)) {
                             cfg.InputSource = source.Name;
                         }
                     }

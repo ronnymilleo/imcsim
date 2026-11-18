@@ -17,8 +17,8 @@ TEST_CASE("Only the selecting mode selects, and only the placing mode names a pa
     CHECK_FALSE(GUI::IsSelecting(GUI::ProbingMode{}));
     CHECK_FALSE(GUI::IsSelecting(GUI::PlacingMode{.Type = Core::ComponentType::CAPACITOR}));
 
-    CHECK(GUI::GetPlacingType(GUI::PlacingMode{.Type = Core::ComponentType::CAPACITOR}) ==
-          Core::ComponentType::CAPACITOR);
+    CHECK(GUI::GetPlacingType(GUI::PlacingMode{.Type = Core::ComponentType::CAPACITOR})
+          == Core::ComponentType::CAPACITOR);
     CHECK_FALSE(GUI::GetPlacingType(GUI::SelectingMode{}));
     CHECK_FALSE(GUI::GetPlacingType(GUI::WiringMode{}));
 }

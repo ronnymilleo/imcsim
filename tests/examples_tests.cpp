@@ -353,8 +353,8 @@ TEST_CASE("The hybrid-pi model has the gain of its transistor in the middle band
     const std::vector<double> &real = sweep.NodeMagnitudesDecibels[NodeAt(schematic, {13, 6})];
     const std::vector<double> &model = sweep.NodeMagnitudesDecibels[NodeAt(schematic, {21, 18})];
     const auto at = [&sweep](const double frequency) {
-        return static_cast<std::size_t>(std::ranges::lower_bound(sweep.Frequencies, frequency) -
-                                        sweep.Frequencies.begin());
+        return static_cast<std::size_t>(std::ranges::lower_bound(sweep.Frequencies, frequency)
+                                        - sweep.Frequencies.begin());
     };
     // gm (RC || ro) = 227, or 47 dB, for both at 1 kHz
     CHECK_THAT(real[at(1e3)], Catch::Matchers::WithinAbs(47.1, 0.2));
@@ -411,8 +411,8 @@ TEST_CASE("The Zener holds the output near its breakdown voltage once the supply
     REQUIRE(sweep.Curves.size() == 1);
     const std::vector<double> &output = sweep.Curves.front().NodeVoltages[NodeAt(schematic, {12, 6})];
     const auto at = [&sweep](const double supply) {
-        return static_cast<std::size_t>(std::ranges::lower_bound(sweep.SweptValues, supply - 1e-6) -
-                                        sweep.SweptValues.begin());
+        return static_cast<std::size_t>(std::ranges::lower_bound(sweep.SweptValues, supply - 1e-6)
+                                        - sweep.SweptValues.begin());
     };
     // Below breakdown the 330 Ohm and the 1k load divide the supply
     CHECK_THAT(output[at(3.0)], Catch::Matchers::WithinRel(3.0 * 1000.0 / 1330.0, 2e-2));
@@ -431,8 +431,8 @@ TEST_CASE("The Schottky conducts first, then the 1N4007, then the 1N4148", "[exa
     const auto current_at = [&sweep](const std::string &name, const double volts) {
         const auto trace = std::ranges::find(sweep.Curves.front().Currents, name, &Core::ComponentTrace::Name);
         REQUIRE(trace != sweep.Curves.front().Currents.end());
-        const auto index = static_cast<std::size_t>(std::ranges::lower_bound(sweep.SweptValues, volts - 1e-6) -
-                                                    sweep.SweptValues.begin());
+        const auto index = static_cast<std::size_t>(std::ranges::lower_bound(sweep.SweptValues, volts - 1e-6)
+                                                    - sweep.SweptValues.begin());
         return trace->Values[index];
     };
     for (const double volts : {0.3, 0.5}) {
@@ -559,8 +559,8 @@ namespace {
  * @brief   Gain in dB of a node at the sweep point nearest to a frequency.
  */
 double GainAt(const Core::ACSweep &sweep, const std::size_t node, const double frequency) {
-    const auto index = static_cast<std::size_t>(std::ranges::lower_bound(sweep.Frequencies, frequency * 0.999) -
-                                                sweep.Frequencies.begin());
+    const auto index = static_cast<std::size_t>(std::ranges::lower_bound(sweep.Frequencies, frequency * 0.999)
+                                                - sweep.Frequencies.begin());
     return sweep.NodeMagnitudesDecibels[node][index];
 }
 
@@ -759,8 +759,8 @@ TEST_CASE("The current mirror copies the reference current while Q2 is out of sa
     const Core::DCSweep &sweep = *run.Result;
     REQUIRE(sweep.Curves.size() == 5);
     const auto index_of = [&sweep](const double volts) {
-        return static_cast<std::size_t>(std::ranges::lower_bound(sweep.SweptValues, volts - 1e-6) -
-                                        sweep.SweptValues.begin());
+        return static_cast<std::size_t>(std::ranges::lower_bound(sweep.SweptValues, volts - 1e-6)
+                                        - sweep.SweptValues.begin());
     };
     for (const Core::DCSweepCurve &curve : sweep.Curves) {
         const auto trace = std::ranges::find(curve.Currents, "Q2.C", &Core::ComponentTrace::Name);
@@ -1042,8 +1042,8 @@ TEST_CASE("The SR latch is set at the start, and with both inputs idle has no op
     const std::vector<double> &q = transient.NodeVoltages[NodeAt(schematic, {24, 17})];
     const std::vector<double> &qn = transient.NodeVoltages[NodeAt(schematic, {24, 7})];
     const auto at = [&transient](const std::vector<double> &values, const double time) {
-        return values[static_cast<std::size_t>(std::ranges::lower_bound(transient.Times, time) -
-                                               transient.Times.begin())];
+        return values[static_cast<std::size_t>(std::ranges::lower_bound(transient.Times, time)
+                                               - transient.Times.begin())];
     };
     // S_BAR low from 0 to 1 ms sets Q, which holds with both inputs high; R_BAR low from 3 to 4 ms resets it
     CHECK(at(q, 0.5e-3) > 4.0);
@@ -1734,14 +1734,13 @@ TEST_CASE("The Sallen-Key sensitivity example ranks the four filter parts at the
         if (part.Name == "R1" || part.Name == "R2" || part.Name == "C1" || part.Name == "C2") {
             const double decibels = part.MagnitudeDecibelsPerPercent[corner].value();
             const double degrees = part.PhaseDegreesPerPercent[corner].value();
-            total +=
-                std::complex<double>(decibels / (20.0 / std::numbers::ln10), degrees / (180.0 / std::numbers::pi)) /
-                0.01;
+            total += std::complex<double>(decibels / (20.0 / std::numbers::ln10), degrees / (180.0 / std::numbers::pi))
+                   / 0.01;
         }
     }
     const std::complex<double> slope =
-        (std::log(sensitivity.Output[corner + 1]) - std::log(sensitivity.Output[corner - 1])) /
-        std::log(sensitivity.Frequencies[corner + 1] / sensitivity.Frequencies[corner - 1]);
+        (std::log(sensitivity.Output[corner + 1]) - std::log(sensitivity.Output[corner - 1]))
+        / std::log(sensitivity.Frequencies[corner + 1] / sensitivity.Frequencies[corner - 1]);
     CHECK_THAT(total.real(), Catch::Matchers::WithinRel(2.0 * slope.real(), 0.02));
     CHECK_THAT(total.imag(), Catch::Matchers::WithinRel(2.0 * slope.imag(), 0.02));
 }

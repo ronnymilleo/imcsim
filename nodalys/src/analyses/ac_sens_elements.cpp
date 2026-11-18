@@ -16,12 +16,14 @@ namespace {
 using Complex = std::complex<double>;
 
 /// A value of a vector at an unknown, with ground (-1) reading zero.
-template <typename Value> Value At(const std::vector<Value> &values, const int unknown) {
+template <typename Value>
+Value At(const std::vector<Value> &values, const int unknown) {
     return unknown < 0 ? Value{} : values[static_cast<std::size_t>(unknown)];
 }
 
 /// The difference of a vector between two unknowns.
-template <typename Value> Value Across(const std::vector<Value> &values, const int first, const int second) {
+template <typename Value>
+Value Across(const std::vector<Value> &values, const int first, const int second) {
     return At(values, first) - At(values, second);
 }
 
@@ -109,10 +111,10 @@ Complex FindSourceDerivative(const AcSensitivityElement &element, const AcSensit
 Complex FindControlledDerivative(const AcSensitivityElement &element, const AcSensitivityPoint &point) {
     if (const auto *vcvs = dynamic_cast<const VcvsDevice *>(element.Instance)) {
         const int branch = vcvs->GetBranch();
-        const Complex direct = At(point.Adjoint, branch) *
-                               Across(point.AcSolution, vcvs->GetControlPositive(), vcvs->GetControlNegative());
-        const Complex bias = At(point.BiasAdjoint, branch) *
-                             Across(point.DcSolution, vcvs->GetControlPositive(), vcvs->GetControlNegative());
+        const Complex direct = At(point.Adjoint, branch)
+                             * Across(point.AcSolution, vcvs->GetControlPositive(), vcvs->GetControlNegative());
+        const Complex bias = At(point.BiasAdjoint, branch)
+                           * Across(point.DcSolution, vcvs->GetControlPositive(), vcvs->GetControlNegative());
         return direct + bias;
     }
     if (const auto *vccs = dynamic_cast<const VccsDevice *>(element.Instance)) {
@@ -120,21 +122,21 @@ Complex FindControlledDerivative(const AcSensitivityElement &element, const AcSe
         const int b = vccs->GetNodeB();
         const int positive = vccs->GetControlPositive();
         const int negative = vccs->GetControlNegative();
-        return -Across(point.Adjoint, a, b) * Across(point.AcSolution, positive, negative) -
-               Across(point.BiasAdjoint, a, b) * Across(point.DcSolution, positive, negative);
+        return -Across(point.Adjoint, a, b) * Across(point.AcSolution, positive, negative)
+             - Across(point.BiasAdjoint, a, b) * Across(point.DcSolution, positive, negative);
     }
     if (const auto *cccs = dynamic_cast<const CccsDevice *>(element.Instance)) {
         const int a = cccs->GetNodeA();
         const int b = cccs->GetNodeB();
         const int control = cccs->ControlBranch();
-        return -Across(point.Adjoint, a, b) * At(point.AcSolution, control) -
-               Across(point.BiasAdjoint, a, b) * At(point.DcSolution, control);
+        return -Across(point.Adjoint, a, b) * At(point.AcSolution, control)
+             - Across(point.BiasAdjoint, a, b) * At(point.DcSolution, control);
     }
     const auto &ccvs = static_cast<const CcvsDevice &>(*element.Instance);
     const int branch = ccvs.GetBranch();
     const int control = ccvs.ControlBranch();
-    return At(point.Adjoint, branch) * At(point.AcSolution, control) +
-           At(point.BiasAdjoint, branch) * At(point.DcSolution, control);
+    return At(point.Adjoint, branch) * At(point.AcSolution, control)
+         + At(point.BiasAdjoint, branch) * At(point.DcSolution, control);
 }
 
 } // namespace

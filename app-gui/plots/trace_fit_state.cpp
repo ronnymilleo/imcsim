@@ -11,7 +11,8 @@ namespace GUI {
 
 namespace {
 
-template <typename Key> bool TakeChanged(std::vector<Key> &shown, std::vector<Key> measured) {
+template <typename Key>
+bool TakeChanged(std::vector<Key> &shown, std::vector<Key> measured) {
     const bool changed = measured != shown;
     shown = std::move(measured);
     return changed && !shown.empty();

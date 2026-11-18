@@ -37,8 +37,8 @@ std::vector<bool> ReadCurrentInputs(const Core::TruthTable &table, const Core::C
         const auto entry = std::ranges::find_if(circuit.GetEntries(), [&name](const Core::CircuitEntry &candidate) {
             return candidate.Part->GetType() == Core::ComponentType::LOGIC_INPUT && candidate.Part->GetName() == name;
         });
-        inputs_high.push_back(entry != circuit.GetEntries().end() &&
-                              static_cast<const Core::LogicInput &>(*entry->Part).IsHigh());
+        inputs_high.push_back(entry != circuit.GetEntries().end()
+                              && static_cast<const Core::LogicInput &>(*entry->Part).IsHigh());
     }
     return inputs_high;
 }

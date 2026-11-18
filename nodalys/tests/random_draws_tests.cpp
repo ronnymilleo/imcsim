@@ -14,11 +14,11 @@
 namespace {
 
 /// Seed of the pinned sequences.
-constexpr std::uint64_t PINNED_SEED = 12345;
+constexpr std::uint64_t PINNED_SEED = 12'345;
 /// The transcendental functions may differ in the last bit between C libraries, so pinned values get this much room.
 constexpr double PINNED_RELATIVE_TOLERANCE = 1e-12;
 /// Draws taken for the statistical checks.
-constexpr int STATISTICS_DRAWS = 200000;
+constexpr int STATISTICS_DRAWS = 200'000;
 
 /// Mean and variance of a sequence of draws.
 struct Moments {
@@ -26,7 +26,8 @@ struct Moments {
     double Variance = 0.0;
 };
 
-template <typename Draw> Moments MeasureMoments(const Draw &draw) {
+template <typename Draw>
+Moments MeasureMoments(const Draw &draw) {
     std::mt19937_64 engine(PINNED_SEED);
     double sum = 0.0;
     double sum_squares = 0.0;

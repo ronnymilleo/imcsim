@@ -140,8 +140,8 @@ TEST_CASE("The preview of a block takes its pins, and none is made once the bloc
     const GUI::PlacingMode placing = {.Type = Core::ComponentType::SUBCIRCUIT, .Block = "inner"};
     const auto preview = GUI::MakePlacementPreview(placing, {0, 0}, schematic, schematic.GetSubcircuits());
     REQUIRE(preview);
-    CHECK(static_cast<const Core::SubcircuitInstance &>(preview->GetComponent()).GetPins() ==
-          std::vector<std::string>{"IN", "OUT"});
+    CHECK(static_cast<const Core::SubcircuitInstance &>(preview->GetComponent()).GetPins()
+          == std::vector<std::string>{"IN", "OUT"});
     CHECK_FALSE(GUI::MakePlacementPreview(placing, {0, 0}, schematic, {}));
 }
 

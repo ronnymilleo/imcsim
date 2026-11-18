@@ -109,8 +109,8 @@ void BlockSession::RequestCreate() {
     }
     auto candidates = m_Root.GetSubcircuitPinCandidates();
     m_Name = "block";
-    while (std::ranges::find(m_Root.GetSubcircuits(), m_Name, &SavedSubcircuit::Name) !=
-           m_Root.GetSubcircuits().end()) {
+    while (std::ranges::find(m_Root.GetSubcircuits(), m_Name, &SavedSubcircuit::Name)
+           != m_Root.GetSubcircuits().end()) {
         m_Name += "_2";
     }
     m_Pins.clear();
@@ -171,8 +171,8 @@ bool BlockSession::Close(const bool apply) {
         }
         // A block opened and closed without a change leaves the document unmodified
         const auto definition = std::ranges::find(m_Root.GetSubcircuits(), block.Name, &SavedSubcircuit::Name);
-        const bool is_changed = block.Content->IsModified() || definition == m_Root.GetSubcircuits().end() ||
-                                definition->Pins != m_Pins || definition->Parameters != m_Parameters;
+        const bool is_changed = block.Content->IsModified() || definition == m_Root.GetSubcircuits().end()
+                             || definition->Pins != m_Pins || definition->Parameters != m_Parameters;
         if (is_changed) {
             auto updated = m_Root.UpdateSubcircuit(block.Name, *block.Content, m_Pins, m_Parameters);
             if (!updated) {

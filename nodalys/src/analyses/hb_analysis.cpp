@@ -148,8 +148,8 @@ struct HbWorkspace {
           SampleC(std::move(is_node_unknown)) {}
 
     std::size_t Index(const int unknown, const int coeff_slot) const {
-        return static_cast<std::size_t>(unknown) * static_cast<std::size_t>(CoeffsPerUnknown) +
-               static_cast<std::size_t>(coeff_slot);
+        return static_cast<std::size_t>(unknown) * static_cast<std::size_t>(CoeffsPerUnknown)
+             + static_cast<std::size_t>(coeff_slot);
     }
 };
 
@@ -213,8 +213,8 @@ std::expected<PartitionedCircuit, std::string> ValidateAndPartitionDevices(const
                                                static_cast<int>(harmonic_nearest),
                                                config.Harmonics));
         }
-        if ((periodicity.Kind == SourceWaveformKind::PULSE || periodicity.Kind == SourceWaveformKind::CLOCK) &&
-            !warned_sharp_edge && periodicity.MinEdgeTime < sample_dt) {
+        if ((periodicity.Kind == SourceWaveformKind::PULSE || periodicity.Kind == SourceWaveformKind::CLOCK)
+            && !warned_sharp_edge && periodicity.MinEdgeTime < sample_dt) {
             warnings.push_back(std::format(
                 "A periodic pulse/clock edge ({:.3g} s) is faster than the time grid ({:.3g} s); increase Samples or "
                 "Harmonics to reduce Gibbs/aliasing distortion",
@@ -435,8 +435,8 @@ bool RunDcNewtonWithB0(const HbWorkspace &ws,
             }
             StampNodesets(ws, is_nodeset_pass, x, sys);
             sys.AddGminToNodes(gmin);
-            if (FindFault(ws.NonlinearDevices).empty() &&
-                sys.CheckResidual(x, options.VoltageAbsTol, options.CurrentAbsTol, options.RelTol)) {
+            if (FindFault(ws.NonlinearDevices).empty()
+                && sys.CheckResidual(x, options.VoltageAbsTol, options.CurrentAbsTol, options.RelTol)) {
                 return true;
             }
         }
@@ -653,8 +653,8 @@ void EvaluateResidualAndJacobian(HbWorkspace &ws,
         }
 
         for (int col = 0; col < n; ++col) {
-            const double g_val = g_lin.At(static_cast<std::size_t>(r), static_cast<std::size_t>(col)) +
-                                 ((r == col && ws.IsNodeUnknown[static_cast<std::size_t>(r)]) ? gmin : 0.0);
+            const double g_val = g_lin.At(static_cast<std::size_t>(r), static_cast<std::size_t>(col))
+                               + ((r == col && ws.IsNodeUnknown[static_cast<std::size_t>(r)]) ? gmin : 0.0);
             const double c_val = c_lin.At(static_cast<std::size_t>(r), static_cast<std::size_t>(col));
 
             if (g_val != 0.0) {

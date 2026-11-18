@@ -43,8 +43,8 @@ std::string WriteDocument(const std::span<const UIElement *const> elements,
     if (!models.empty()) {
         document["models"] = WriteLibraryModels(models);
     }
-    if (!measurements.Voltages.empty() || !measurements.Currents.empty() || !measurements.MathChannels.empty() ||
-        !measurements.Buses.empty()) {
+    if (!measurements.Voltages.empty() || !measurements.Currents.empty() || !measurements.MathChannels.empty()
+        || !measurements.Buses.empty()) {
         document["measurements"] = WriteMeasurements(measurements);
     }
     return document.dump(2) + "\n";

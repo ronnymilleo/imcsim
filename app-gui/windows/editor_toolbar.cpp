@@ -89,8 +89,8 @@ float AnalysisButtonWidth() {
  * @brief   The Live toggle beside the analysis button, which becomes Discard while a live run goes on.
  */
 float LiveButtonWidth() {
-    return std::max(ImGui::CalcTextSize("Live").x, ImGui::CalcTextSize("Discard").x) +
-           ImGui::GetStyle().FramePadding.x * 2.0f + ImGui::GetFontSize();
+    return std::max(ImGui::CalcTextSize("Live").x, ImGui::CalcTextSize("Discard").x)
+         + ImGui::GetStyle().FramePadding.x * 2.0f + ImGui::GetFontSize();
 }
 
 /**
@@ -281,8 +281,8 @@ void EditorToolbar::DrawAnalysisButton() {
         ImGui::Separator();
         // The popup has the focus, so F5 is checked here too; like the shortcut, it never stops a run
         const RunAction action = m_Controls.GetRunAction();
-        if (PrimaryButton(GetRunButtonLabel(action)) ||
-            (action != RunAction::STOP && ImGui::IsKeyPressed(ImGuiKey_F5, false))) {
+        if (PrimaryButton(GetRunButtonLabel(action))
+            || (action != RunAction::STOP && ImGui::IsKeyPressed(ImGuiKey_F5, false))) {
             m_Controls.PressRun();
             ImGui::CloseCurrentPopup();
         }

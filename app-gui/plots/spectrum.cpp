@@ -21,7 +21,7 @@ namespace {
 /// Powers of two, so the transform halves at every stage.
 constexpr std::size_t MIN_SAMPLE_COUNT = 1024;
 /// Keeps the transform well under a millisecond per trace.
-constexpr std::size_t MAX_SAMPLE_COUNT = 65536;
+constexpr std::size_t MAX_SAMPLE_COUNT = 65'536;
 /// Floor of a spectrum relative to its strongest bin, -200 dB.
 constexpr double DECIBEL_FLOOR = 1e-10;
 /// Floor of a trace of zeros, 1e-15 (-300 dB), as in the AC sweep.

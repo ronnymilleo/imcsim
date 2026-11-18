@@ -164,11 +164,11 @@ void MOSFET::SetCustomParameters(const MOSFETParameters &parameters) {
  *          may have either sign, so depletion parts can be modeled too.
  */
 bool MOSFET::IsValidParameters(const MOSFETParameters &parameters) const {
-    return parameters.Transconductance > 0.0 && parameters.ChannelModulation >= 0.0 &&
-           parameters.DrainResistance >= 0.0 && parameters.SourceResistance >= 0.0 &&
-           parameters.GateSourceOverlap >= 0.0 && parameters.GateDrainOverlap >= 0.0 && parameters.Width > 0.0 &&
-           parameters.Length > 0.0 && parameters.MaxDrainSourceVoltage > 0.0 && parameters.MaxGateSourceVoltage > 0.0 &&
-           parameters.MaxDrainCurrent > 0.0 && parameters.MaxPower > 0.0;
+    return parameters.Transconductance > 0.0 && parameters.ChannelModulation >= 0.0 && parameters.DrainResistance >= 0.0
+        && parameters.SourceResistance >= 0.0 && parameters.GateSourceOverlap >= 0.0
+        && parameters.GateDrainOverlap >= 0.0 && parameters.Width > 0.0 && parameters.Length > 0.0
+        && parameters.MaxDrainSourceVoltage > 0.0 && parameters.MaxGateSourceVoltage > 0.0
+        && parameters.MaxDrainCurrent > 0.0 && parameters.MaxPower > 0.0;
 }
 
 /**

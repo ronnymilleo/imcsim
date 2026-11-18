@@ -46,8 +46,8 @@ void VoltageControlledSwitch::SetParameters(const SwitchParameters &parameters) 
  * @return  True when the hysteresis is not negative and the closed resistance is positive and below the open one.
  */
 bool VoltageControlledSwitch::IsValidParameters(const SwitchParameters &parameters) {
-    return parameters.Hysteresis >= 0.0 && parameters.OnResistance > 0.0 &&
-           parameters.OnResistance < parameters.OffResistance;
+    return parameters.Hysteresis >= 0.0 && parameters.OnResistance > 0.0
+        && parameters.OnResistance < parameters.OffResistance;
 }
 
 /**

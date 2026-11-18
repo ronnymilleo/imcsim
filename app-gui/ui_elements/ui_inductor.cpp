@@ -47,8 +47,8 @@ void UIInductor::DrawSymbol(SchematicCanvas &canvas,
         const float center_x = SYMBOL_START + TURN_RADIUS + TURN_WIDTH * static_cast<float>(turn);
         for (int segment = 0; segment <= SEGMENTS_PER_TURN; ++segment) {
             // Sweep from the left end of the turn (angle pi) to the right end (angle 0), bulging toward -Y
-            const float angle = std::numbers::pi_v<float> *
-                                (1.0f - static_cast<float>(segment) / static_cast<float>(SEGMENTS_PER_TURN));
+            const float angle = std::numbers::pi_v<float>
+                              * (1.0f - static_cast<float>(segment) / static_cast<float>(SEGMENTS_PER_TURN));
             const float x = center_x + TURN_RADIUS * std::cos(angle);
             const float y = -TURN_RADIUS * std::sin(angle);
             points[segment] = LocalToScreen(view, x, y);

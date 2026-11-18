@@ -67,10 +67,12 @@ public:
         m_Path = std::filesystem::temp_directory_path() / std::format("nodalys-cli-{:08x}", seed());
         std::filesystem::create_directories(m_Path);
     }
+
     ~CliFolder() {
         std::error_code ignored;
         std::filesystem::remove_all(m_Path, ignored);
     }
+
     CliFolder(const CliFolder &) = delete;
     CliFolder &operator=(const CliFolder &) = delete;
 
@@ -815,9 +817,9 @@ TEST_CASE("The .options method line picks the integration method of the transien
 
     CHECK(method_of(std::format("* t\n{}.end\n", body)) == Nodalys::IntegrationMethod::TRAPEZOIDAL);
     CHECK(method_of(std::format("* t\n{}.options method=gear\n.end\n", body)) == Nodalys::IntegrationMethod::GEAR2);
-    CHECK(method_of(std::format("* t\n.OPTIONS METHOD=GEAR reltol=1e-4\n{}.end\n", body)) ==
-          Nodalys::IntegrationMethod::GEAR2);
-    CHECK(method_of(std::format("* t\n.options method=gear\n.options method=trap\n{}.end\n", body)) ==
-          Nodalys::IntegrationMethod::TRAPEZOIDAL);
+    CHECK(method_of(std::format("* t\n.OPTIONS METHOD=GEAR reltol=1e-4\n{}.end\n", body))
+          == Nodalys::IntegrationMethod::GEAR2);
+    CHECK(method_of(std::format("* t\n.options method=gear\n.options method=trap\n{}.end\n", body))
+          == Nodalys::IntegrationMethod::TRAPEZOIDAL);
     CHECK_FALSE(Nodalys::ParseNetlist(std::format("* t\n.options method=euler\n{}.end\n", body)).has_value());
 }

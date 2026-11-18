@@ -86,8 +86,8 @@ bool CanMergeAt(const std::vector<UIWire> &wires,
 }
 
 bool IsSameWire(const UIWire &first, const UIWire &second) {
-    return (first.GetStart() == second.GetStart() && first.GetEnd() == second.GetEnd()) ||
-           (first.GetStart() == second.GetEnd() && first.GetEnd() == second.GetStart());
+    return (first.GetStart() == second.GetStart() && first.GetEnd() == second.GetEnd())
+        || (first.GetStart() == second.GetEnd() && first.GetEnd() == second.GetStart());
 }
 
 /**

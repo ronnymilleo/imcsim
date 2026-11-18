@@ -51,8 +51,8 @@ void Transformer::SetParameters(const TransformerParameters &parameters) {
  *          rejects a coupling of 1.
  */
 bool Transformer::IsValidParameters(const TransformerParameters &parameters) {
-    return parameters.TurnsRatio > 0.0 && parameters.WindingResistance > 0.0 && parameters.Coupling > 0.0 &&
-           parameters.Coupling < 1.0;
+    return parameters.TurnsRatio > 0.0 && parameters.WindingResistance > 0.0 && parameters.Coupling > 0.0
+        && parameters.Coupling < 1.0;
 }
 
 /**

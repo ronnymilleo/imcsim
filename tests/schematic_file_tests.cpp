@@ -43,8 +43,8 @@ GUI::LoadedSchematic LoadOrFail(const std::string &text) {
 }
 
 std::string Document(const std::string &elements, const std::string &wires) {
-    return R"({"format": "imcsim-schematic", "version": 1, "elements": [)" + elements + R"(], "wires": [)" + wires +
-           "]}";
+    return R"({"format": "imcsim-schematic", "version": 1, "elements": [)" + elements + R"(], "wires": [)" + wires
+         + "]}";
 }
 
 } // namespace
@@ -482,7 +482,7 @@ TEST_CASE("Simulation settings load back unchanged", "[schematic_file]") {
     settings.MonteCarlo = {.Enabled = true,
                            .Runs = 250,
                            .Distribution = Core::ToleranceDistribution::UNIFORM,
-                           .Seed = 4000000000U};
+                           .Seed = 4'000'000'000U};
     settings.Solver = {.RelativeTolerance = 1e-4,
                        .CurrentToleranceAmperes = 1e-13,
                        .VoltageToleranceVolts = 1e-7,
@@ -628,8 +628,8 @@ TEST_CASE("Invalid settings of one analysis fall back to its defaults with a war
     const GUI::LoadedSchematic loaded = LoadOrFail(text);
     CHECK(loaded.Warnings.size() == 2);
     CHECK(loaded.Settings.Transient == Core::TransientSettings{});
-    CHECK(loaded.Settings.ACSweep ==
-          Core::ACSweepSettings{.StartFrequency = 10.0, .StopFrequency = 1e3, .PointsPerDecade = 5});
+    CHECK(loaded.Settings.ACSweep
+          == Core::ACSweepSettings{.StartFrequency = 10.0, .StopFrequency = 1e3, .PointsPerDecade = 5});
     CHECK(loaded.Settings.SweptRange == Core::SweepRange{});
 }
 
@@ -747,8 +747,8 @@ TEST_CASE("Op-amps keep their model, the bandwidth of an ideal one and custom sp
     const auto &ideal_copy = static_cast<const Core::OpAmp &>(loaded.Elements[0]->GetComponent());
     CHECK(ideal_copy.IsIdeal());
     CHECK(ideal_copy.GetIdealBandwidth() == 10e6);
-    CHECK(std::string_view(static_cast<const Core::OpAmp &>(loaded.Elements[1]->GetComponent()).GetModelName()) ==
-          "uA741");
+    CHECK(std::string_view(static_cast<const Core::OpAmp &>(loaded.Elements[1]->GetComponent()).GetModelName())
+          == "uA741");
     const auto &custom_copy = static_cast<const Core::OpAmp &>(loaded.Elements[2]->GetComponent());
     CHECK(custom_copy.IsCustom());
     CHECK(custom_copy.GetParameters().SlewRate == 13.0);
@@ -1016,7 +1016,8 @@ TEST_CASE("A voltage-controlled switch keeps its parameters, and loads with the 
     REQUIRE(defaults.Elements.size() == 1);
     CHECK(static_cast<const Core::VoltageControlledSwitch &>(defaults.Elements[0]->GetComponent())
               .GetParameters()
-              .Threshold == 2.5);
+              .Threshold
+          == 2.5);
 
     const std::string backwards =
         R"({"type": "VSwitch", "x": 1, "y": 1, "rotation": 0, "name": "S1", "parameters": {"on_resistance": 5.0, "off_resistance": 1.0}})";
@@ -1339,8 +1340,8 @@ TEST_CASE("Invalid S-parameter settings fall back to their defaults with a warni
                                  R"({"linear_points": 1})",
                                  R"({"logarithmic": "yes"})"}) {
         const std::string text = std::string(R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
-                                             R"("s_parameters": )") +
-                                 settings + "}}";
+                                             R"("s_parameters": )")
+                               + settings + "}}";
         const GUI::LoadedSchematic loaded = LoadOrFail(text);
         CHECK(loaded.Warnings.size() == 1);
         CHECK(loaded.Settings.SParameters == Core::SParameterSettings{});
@@ -1386,8 +1387,8 @@ TEST_CASE("Invalid harmonic balance settings fall back to their defaults with a 
                            R"({"harmonics": 8, "samples": 30})",
                            R"({"harmonics": 8, "samples": 131072})"}) {
         const std::string text = std::string(R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
-                                             R"("harmonic_balance": )") +
-                                 hb + "}}";
+                                             R"("harmonic_balance": )")
+                               + hb + "}}";
         const GUI::LoadedSchematic loaded = LoadOrFail(text);
         REQUIRE(loaded.Warnings.size() == 1);
         CHECK(loaded.Warnings.front().starts_with("The harmonic balance settings"));
@@ -1407,8 +1408,8 @@ TEST_CASE("A behavioral source keeps its expression as written, and loads with t
     CHECK(loaded.Warnings.empty());
     REQUIRE(loaded.Elements.size() == 1);
     CHECK(loaded.Elements[0]->GetComponent().GetType() == Core::ComponentType::BEHAVIORAL_CURRENT);
-    CHECK(static_cast<const Core::BehavioralSource &>(loaded.Elements[0]->GetComponent()).GetExpression() ==
-          "1m*tanh(V(IN, REF)/26m)");
+    CHECK(static_cast<const Core::BehavioralSource &>(loaded.Elements[0]->GetComponent()).GetExpression()
+          == "1m*tanh(V(IN, REF)/26m)");
 
     const std::string plain = R"({"type": "BehavioralVoltage", "x": 1, "y": 1, "rotation": 0, "name": "B1"})";
     const GUI::LoadedSchematic defaults = LoadOrFail(Document(plain, ""));

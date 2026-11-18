@@ -45,13 +45,13 @@ bool HasOneInput(const Core::ComponentType type) {
 }
 
 bool IsInverting(const Core::ComponentType type) {
-    return type == Core::ComponentType::NOT || type == Core::ComponentType::NAND || type == Core::ComponentType::NOR ||
-           type == Core::ComponentType::XNOR;
+    return type == Core::ComponentType::NOT || type == Core::ComponentType::NAND || type == Core::ComponentType::NOR
+        || type == Core::ComponentType::XNOR;
 }
 
 bool IsOrFamily(const Core::ComponentType type) {
-    return type == Core::ComponentType::OR || type == Core::ComponentType::NOR || type == Core::ComponentType::XOR ||
-           type == Core::ComponentType::XNOR;
+    return type == Core::ComponentType::OR || type == Core::ComponentType::NOR || type == Core::ComponentType::XOR
+        || type == Core::ComponentType::XNOR;
 }
 
 bool HasTwoDataInputs(const Core::ComponentType type) {

@@ -13,3 +13,10 @@ BinPackParameters: false
 BinPackArguments: false
 AllowAllParametersOfDeclarationOnNextLine: false
 AllowAllArgumentsOnNextLine: false
+BreakBeforeBinaryOperators: NonAssignment
+AlignOperands: AlignAfterOperator
+BreakTemplateDeclarations: Yes
+IntegerLiteralSeparator:
+  Decimal: 3
+  DecimalMinDigits: 5
+SeparateDefinitionBlocks: Always

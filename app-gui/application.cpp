@@ -195,8 +195,8 @@ int Application::InitSDL() {
  *          the Dear ImGui backend ships.
  */
 int Application::InitGPU() {
-    m_GPUDevice = SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_DXIL |
-                                          SDL_GPU_SHADERFORMAT_MSL | SDL_GPU_SHADERFORMAT_METALLIB,
+    m_GPUDevice = SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_DXIL | SDL_GPU_SHADERFORMAT_MSL
+                                          | SDL_GPU_SHADERFORMAT_METALLIB,
                                       GPU_DEBUG_MODE,
                                       nullptr);
     if (m_GPUDevice == nullptr) {
@@ -475,8 +475,8 @@ void Application::DrawMainMenuBar() {
     }
     // The version sits at the right end of the bar, out of the way
     const std::string version = std::format("imcsim {}", IMCSIM_VERSION);
-    ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize(version.c_str()).x -
-                    ImGui::GetStyle().ItemSpacing.x * 2.0f);
+    ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize(version.c_str()).x
+                    - ImGui::GetStyle().ItemSpacing.x * 2.0f);
     ImGui::TextDisabled("%s", version.c_str());
     ImGui::EndMainMenuBar();
 }
@@ -559,9 +559,9 @@ void Application::ShowNewResults() {
                 m_Results.GetMonteCarlo().has_value(),
                 PlotTab::MONTE_CARLO);
     const std::optional<Analysis> last_run = m_AnalysisControls.GetLastRun();
-    if (std::exchange(m_ShownRunCount, m_AnalysisControls.GetFinishedRunCount()) !=
-            m_AnalysisControls.GetFinishedRunCount() &&
-        last_run && m_AnalysisControls.GetOutcome(*last_run) == RunOutcome::FAILED) {
+    if (std::exchange(m_ShownRunCount, m_AnalysisControls.GetFinishedRunCount())
+            != m_AnalysisControls.GetFinishedRunCount()
+        && last_run && m_AnalysisControls.GetOutcome(*last_run) == RunOutcome::FAILED) {
         m_OutputWindow.ShowTab(GetAnalysisTab(*last_run));
     }
 }
@@ -663,9 +663,9 @@ void Application::EndFrame() {
     ImDrawData *draw_data = ImGui::GetDrawData();
     SDL_GPUTexture *swapchain_texture = nullptr;
     const bool is_minimized = draw_data->DisplaySize.x <= 0.0f || draw_data->DisplaySize.y <= 0.0f;
-    if (!is_minimized &&
-        SDL_WaitAndAcquireGPUSwapchainTexture(command_buffer, m_SDLWindow, &swapchain_texture, nullptr, nullptr) &&
-        swapchain_texture != nullptr) {
+    if (!is_minimized
+        && SDL_WaitAndAcquireGPUSwapchainTexture(command_buffer, m_SDLWindow, &swapchain_texture, nullptr, nullptr)
+        && swapchain_texture != nullptr) {
         // Uploads the vertex and index buffers, which cannot happen inside a render pass
         ImGui_ImplSDLGPU3_PrepareDrawData(draw_data, command_buffer);
 

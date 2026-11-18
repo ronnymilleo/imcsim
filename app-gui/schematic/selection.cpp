@@ -17,10 +17,10 @@ namespace {
 bool WireIntersects(const UIWire &wire, const ImVec2 min, const ImVec2 max) {
     const GridPoint start = wire.GetStart();
     const GridPoint end = wire.GetEnd();
-    return static_cast<float>(std::min(start.X, end.X)) <= max.x &&
-           static_cast<float>(std::max(start.X, end.X)) >= min.x &&
-           static_cast<float>(std::min(start.Y, end.Y)) <= max.y &&
-           static_cast<float>(std::max(start.Y, end.Y)) >= min.y;
+    return static_cast<float>(std::min(start.X, end.X)) <= max.x
+        && static_cast<float>(std::max(start.X, end.X)) >= min.x
+        && static_cast<float>(std::min(start.Y, end.Y)) <= max.y
+        && static_cast<float>(std::max(start.Y, end.Y)) >= min.y;
 }
 
 } // namespace

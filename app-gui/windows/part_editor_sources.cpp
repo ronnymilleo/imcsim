@@ -117,8 +117,8 @@ void DrawSourceTypes(Core::Source &source, Schematic &schematic) {
             ImGui::SameLine();
         }
         is_first = false;
-        if (ImGui::RadioButton(Core::GetSourceTypeName(type), source.GetSourceType() == type) &&
-            source.GetSourceType() != type) {
+        if (ImGui::RadioButton(Core::GetSourceTypeName(type), source.GetSourceType() == type)
+            && source.GetSourceType() != type) {
             source.SetSourceType(type);
             schematic.MarkModified();
         }
