@@ -15,11 +15,11 @@ namespace GUI {
 
 /// How many points the transient plot shows at once at first, however long the run is: the plot, its axes fit and its
 /// statistics all go over the points in view, and a scroll bar moves the window along the run.
-constexpr int DEFAULT_WINDOW_POINTS = 10000;
+constexpr int DEFAULT_WINDOW_POINTS = 10'000;
 /// Fewest points the user may set the window to.
 constexpr int MIN_WINDOW_POINTS = 1000;
 /// Most points the user may set the window to.
-constexpr int MAX_WINDOW_POINTS = 10000;
+constexpr int MAX_WINDOW_POINTS = 10'000;
 
 /**
  * @struct  PointWindow

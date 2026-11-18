@@ -199,9 +199,9 @@ private:
         const std::size_t start = m_Position;
         while (m_Position < m_Text.size()) {
             const char character = m_Text[m_Position];
-            const bool exponent_sign = (character == '+' || character == '-') && m_Position > start &&
-                                       (m_Text[m_Position - 1] == 'e' || m_Text[m_Position - 1] == 'E') &&
-                                       std::isdigit(static_cast<unsigned char>(m_Text[m_Position - 2])) != 0;
+            const bool exponent_sign = (character == '+' || character == '-') && m_Position > start
+                                    && (m_Text[m_Position - 1] == 'e' || m_Text[m_Position - 1] == 'E')
+                                    && std::isdigit(static_cast<unsigned char>(m_Text[m_Position - 2])) != 0;
             if (std::isalnum(static_cast<unsigned char>(character)) == 0 && character != '.' && !exponent_sign) {
                 break;
             }
@@ -242,16 +242,17 @@ private:
     Step ParseNode() {
         SkipSpaces();
         const std::size_t start = m_Position;
-        while (m_Position < m_Text.size() && m_Text[m_Position] != ',' && m_Text[m_Position] != ')' &&
-               std::isspace(static_cast<unsigned char>(m_Text[m_Position])) == 0) {
+        while (m_Position < m_Text.size() && m_Text[m_Position] != ',' && m_Text[m_Position] != ')'
+               && std::isspace(static_cast<unsigned char>(m_Text[m_Position])) == 0) {
             ++m_Position;
         }
         const std::string_view text = m_Text.substr(start, m_Position - start);
         if (text.empty()) {
             return std::unexpected("V() takes a node number or a net name, such as V(2) or V(OUT)");
         }
-        if (std::ranges::all_of(
-                text, [](const char character) { return std::isdigit(static_cast<unsigned char>(character)) != 0; })) {
+        if (std::ranges::all_of(text, [](const char character) {
+                return std::isdigit(static_cast<unsigned char>(character)) != 0;
+            })) {
             int node = 0;
             if (std::from_chars(text.data(), text.data() + text.size(), node).ec != std::errc()) {
                 return std::unexpected(std::format("The circuit has no node {}", text));
@@ -272,8 +273,8 @@ private:
         }
         SkipSpaces();
         const std::size_t start = m_Position;
-        while (m_Position < m_Text.size() && m_Text[m_Position] != ')' &&
-               std::isspace(static_cast<unsigned char>(m_Text[m_Position])) == 0) {
+        while (m_Position < m_Text.size() && m_Text[m_Position] != ')'
+               && std::isspace(static_cast<unsigned char>(m_Text[m_Position])) == 0) {
             ++m_Position;
         }
         if (m_Position == start) {
@@ -304,8 +305,8 @@ Dimension Combine(const Dimension first, const Dimension second, const int sign)
 /**
  * @brief   Adding a number to a trace, such as V(1)+1, keeps the unit of the trace.
  */
-Dimension AddUnits(const Dimension first, const bool first_is_number, const Dimension second,
-                   const bool second_is_number) {
+Dimension
+AddUnits(const Dimension first, const bool first_is_number, const Dimension second, const bool second_is_number) {
     if (first_is_number) {
         return second;
     }
@@ -346,14 +347,17 @@ std::vector<double> Integrate(const std::span<const double> xs, const std::vecto
  * @struct  StackEntry
  * @brief   A value on the evaluation stack: a trace or a number spread over every sample, and its unit.
  */
-template <typename Value> struct StackEntry {
+template <typename Value>
+struct StackEntry {
     std::vector<Value> Values;
     Dimension Unit;
     bool IsNumber = false;
 };
 
 template <typename Value, typename Operation>
-StackEntry<Value> ApplyBinary(StackEntry<Value> first, const StackEntry<Value> &second, const Operation &operation,
+StackEntry<Value> ApplyBinary(StackEntry<Value> first,
+                              const StackEntry<Value> &second,
+                              const Operation &operation,
                               const Dimension unit) {
     for (std::size_t index = 0; index < first.Values.size(); ++index) {
         first.Values[index] = operation(first.Values[index], second.Values[index]);
@@ -371,7 +375,8 @@ class RealSamples {
 public:
     using Value = double;
 
-    RealSamples(const std::span<const double> xs, const Dimension x_unit,
+    RealSamples(const std::span<const double> xs,
+                const Dimension x_unit,
                 const std::vector<std::vector<double>> &node_voltages,
                 const std::vector<Core::ComponentTrace> &currents)
         : m_Xs(xs), m_XUnit(x_unit), m_NodeVoltages(node_voltages), m_Currents(currents) {}
@@ -522,12 +527,14 @@ std::expected<StackEntry<typename Samples::Value>, std::string> RunProgram(const
             std::ranges::transform(operand.Values, operand.Values.begin(), [](const Value value) { return -value; });
             break;
         case Kind::ABS:
-            std::ranges::transform(operand.Values, operand.Values.begin(),
-                                   [](const Value value) { return Value(std::abs(value)); });
+            std::ranges::transform(operand.Values, operand.Values.begin(), [](const Value value) {
+                return Value(std::abs(value));
+            });
             break;
         case Kind::SQUARE_ROOT:
-            std::ranges::transform(operand.Values, operand.Values.begin(),
-                                   [](const Value value) { return std::sqrt(value); });
+            std::ranges::transform(operand.Values, operand.Values.begin(), [](const Value value) {
+                return std::sqrt(value);
+            });
             operand.Unit = {.Known = operand.Unit == Dimension{}};
             break;
         case Kind::DERIVATIVE:
@@ -547,11 +554,15 @@ std::expected<StackEntry<typename Samples::Value>, std::string> RunProgram(const
             const bool first_is_number = first.IsNumber;
             switch (instruction.Type) {
             case Kind::ADD:
-                operand = ApplyBinary(std::move(first), operand, std::plus<>(),
+                operand = ApplyBinary(std::move(first),
+                                      operand,
+                                      std::plus<>(),
                                       AddUnits(first_unit, first_is_number, operand.Unit, operand.IsNumber));
                 break;
             case Kind::SUBTRACT:
-                operand = ApplyBinary(std::move(first), operand, std::minus<>(),
+                operand = ApplyBinary(std::move(first),
+                                      operand,
+                                      std::minus<>(),
                                       AddUnits(first_unit, first_is_number, operand.Unit, operand.IsNumber));
                 break;
             case Kind::MULTIPLY:
@@ -615,7 +626,8 @@ std::expected<MathProgram, std::string> ResolveNetNames(MathProgram program, con
  * @return  One value per sample and their unit, or an error naming a node or part the result does not have.
  * @note    Dividing by zero gives infinite or NaN values, which plots skip.
  */
-std::expected<MathResult, std::string> EvaluateExpression(const MathProgram &program, const std::span<const double> xs,
+std::expected<MathResult, std::string> EvaluateExpression(const MathProgram &program,
+                                                          const std::span<const double> xs,
                                                           const Dimension x_unit,
                                                           const std::vector<std::vector<double>> &node_voltages,
                                                           const std::vector<Core::ComponentTrace> &currents) {
@@ -662,8 +674,8 @@ std::expected<ACMathResult, std::string> EvaluateACExpression(const MathProgram 
  * @param[in] second         Second trace.
  * @return  The expression, which compiles like a typed one.
  */
-std::string BuildOperatorExpression(const std::string_view first, const MathOperator math_operator,
-                                    const std::string_view second) {
+std::string
+BuildOperatorExpression(const std::string_view first, const MathOperator math_operator, const std::string_view second) {
     return std::format("{}{}{}", first, GetOperatorSymbol(math_operator), second);
 }
 

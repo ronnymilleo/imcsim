@@ -139,7 +139,8 @@ State StartOfTransientState(const Core::Circuit &circuit) {
 }
 
 /// Runs a check on ngspice and then on Nodalys.
-template <typename Check> void OnBothEngines(Check check) {
+template <typename Check>
+void OnBothEngines(Check check) {
     check();
     const TestSupport::NodalysInUse nodalys_in_use;
     check();
@@ -365,8 +366,10 @@ TEST_CASE("The circuit copies carry the nodesets", "[nodeset]") {
 
 TEST_CASE("A saved schematic keeps its nodesets and copying a marker keeps its voltage", "[nodeset]") {
     MarkedResistor setup(-1.25);
-    const std::string text = GUI::SaveSchematic(setup.Schematic.GetElements(), setup.Schematic.GetWires(),
-                                                setup.Schematic.GetSimulationSettings(), {});
+    const std::string text = GUI::SaveSchematic(setup.Schematic.GetElements(),
+                                                setup.Schematic.GetWires(),
+                                                setup.Schematic.GetSimulationSettings(),
+                                                {});
     const auto loaded = GUI::LoadSchematic(text);
     REQUIRE(loaded.has_value());
     REQUIRE(loaded->Elements.size() == 3);
@@ -421,8 +424,11 @@ TEST_CASE("A nodeset inside a block picks the state through the pins of each ins
 }
 
 TEST_CASE("A nodeset on a circuit with one operating point changes nothing on both engines", "[nodeset]") {
-    const auto make = [](Core::Circuit &circuit, Core::VCC &supply, std::vector<Core::Resistor> &resistors,
-                         Core::Capacitor &capacitor, Core::Ground &ground) {
+    const auto make = [](Core::Circuit &circuit,
+                         Core::VCC &supply,
+                         std::vector<Core::Resistor> &resistors,
+                         Core::Capacitor &capacitor,
+                         Core::Ground &ground) {
         supply.SetName("V1");
         supply.SetValue(5.0);
         for (std::size_t index = 0; index < resistors.size(); ++index) {
@@ -502,9 +508,12 @@ TEST_CASE("A transfer function is refused on ngspice when the circuit has a node
     }
 
     SECTION("The other analyses still run on ngspice with the nodeset") {
-        for (const Core::AnalysisKind kind :
-             {Core::AnalysisKind::OPERATING_POINT, Core::AnalysisKind::TRANSIENT, Core::AnalysisKind::AC_SWEEP,
-              Core::AnalysisKind::DC_SWEEP, Core::AnalysisKind::NOISE, Core::AnalysisKind::SENSITIVITY}) {
+        for (const Core::AnalysisKind kind : {Core::AnalysisKind::OPERATING_POINT,
+                                              Core::AnalysisKind::TRANSIENT,
+                                              Core::AnalysisKind::AC_SWEEP,
+                                              Core::AnalysisKind::DC_SWEEP,
+                                              Core::AnalysisKind::NOISE,
+                                              Core::AnalysisKind::SENSITIVITY}) {
             CHECK_FALSE(Core::FindUnsupported(Core::GetBackend(), setup.Circuit, kind).has_value());
         }
     }

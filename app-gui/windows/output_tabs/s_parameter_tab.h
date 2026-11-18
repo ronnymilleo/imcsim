@@ -116,7 +116,9 @@ private:
 
     // Magnitude and phase
     void DrawMagnitudePhase(const Core::SParameters &result, SParameterView view);
-    void DrawBodePlot(const Core::SParameters &result, const std::vector<SParameterEntry> &entries, bool is_phase,
+    void DrawBodePlot(const Core::SParameters &result,
+                      const std::vector<SParameterEntry> &entries,
+                      bool is_phase,
                       float height);
 
     // Stability

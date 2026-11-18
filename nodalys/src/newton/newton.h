@@ -41,8 +41,11 @@ struct NewtonOutcome {
  * @param[in]     options  Convergence tolerances and limits.
  * @return  Outcome with iteration count and whether it converged.
  */
-NewtonOutcome SolveNewton(MnaSystem &sys, const std::vector<std::unique_ptr<Device>> &devices, std::vector<double> &x,
-                          const TimeContext &time, const ConvergenceOptions &options);
+NewtonOutcome SolveNewton(MnaSystem &sys,
+                          const std::vector<std::unique_ptr<Device>> &devices,
+                          std::vector<double> &x,
+                          const TimeContext &time,
+                          const ConvergenceOptions &options);
 
 /**
  * @enum    NodesetPass

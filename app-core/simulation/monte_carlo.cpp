@@ -42,7 +42,9 @@ std::uint64_t MixSeed(const unsigned int seed, const int run) {
  * @brief   Adds the toleranced parts of the body of a block and of the blocks it places, which Monte Carlo does not
  *          vary yet.
  */
-void CollectBlockTolerances(const Circuit &circuit, const Circuit &body, std::vector<std::string> &names,
+void CollectBlockTolerances(const Circuit &circuit,
+                            const Circuit &body,
+                            std::vector<std::string> &names,
                             const int depth) {
     // A block that contains itself is refused elsewhere; the depth keeps a damaged file from looping here
     constexpr int MAX_NESTING = 32;
@@ -110,8 +112,8 @@ double DrawStandardNormal(std::mt19937_64 &engine) {
  * @param[in] tolerance_percent     Tolerance in percent.
  * @return  A factor from 1 - tolerance to 1 + tolerance.
  */
-double DrawToleranceFactor(std::mt19937_64 &engine, const ToleranceDistribution distribution,
-                           const double tolerance_percent) {
+double
+DrawToleranceFactor(std::mt19937_64 &engine, const ToleranceDistribution distribution, const double tolerance_percent) {
     const double fraction = tolerance_percent / PERCENT;
     if (distribution == ToleranceDistribution::UNIFORM) {
         return 1.0 + fraction * (2.0 * DrawUniform(engine) - 1.0);
@@ -176,7 +178,8 @@ std::optional<std::string> FindBlockTolerance(const Circuit &circuit) {
         }
         return std::format("The block {} holds parts with a tolerance ({}), which Monte Carlo does not vary yet; clear "
                            "their tolerance or take the parts out of the block",
-                           entry.Part->GetName(), list);
+                           entry.Part->GetName(),
+                           list);
     }
     return std::nullopt;
 }
@@ -188,8 +191,8 @@ std::optional<std::string> FindBlockTolerance(const Circuit &circuit) {
  * @param[in] percent  The tolerance, or no value to clear it.
  * @return  How many parts were set, which are those of that kind.
  */
-std::size_t SetTolerances(const std::span<Component *const> parts, const ComponentType type,
-                          const std::optional<double> percent) {
+std::size_t
+SetTolerances(const std::span<Component *const> parts, const ComponentType type, const std::optional<double> percent) {
     std::size_t changed = 0;
     for (Component *part : parts) {
         if (part->GetType() != type || !part->SupportsTolerance()) {

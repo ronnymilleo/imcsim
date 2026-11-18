@@ -18,8 +18,8 @@
 
 namespace Nodalys {
 
-inline void DescribeOutcome(const NewtonOutcome &outcome, const char *analysis,
-                            std::vector<DiagnosticMessage> *messages) {
+inline void
+DescribeOutcome(const NewtonOutcome &outcome, const char *analysis, std::vector<DiagnosticMessage> *messages) {
     if (!messages) {
         return;
     }
@@ -34,16 +34,20 @@ std::expected<OperatingPointResult, std::string> ComputeOperatingPoint(CompiledC
                                                                        const ConvergenceOptions &options,
                                                                        std::vector<DiagnosticMessage> *messages);
 
-std::expected<DcSweepResult, std::string> ComputeDCSweep(CompiledCircuit &compiled, const DcSweepConfig &settings,
+std::expected<DcSweepResult, std::string> ComputeDCSweep(CompiledCircuit &compiled,
+                                                         const DcSweepConfig &settings,
                                                          const ConvergenceOptions &options,
                                                          std::vector<DiagnosticMessage> *messages);
 
-std::expected<TransientResult, std::string> ComputeTransient(CompiledCircuit &compiled, const TransientConfig &settings,
-                                                             bool has_initial_conditions, const RunMonitor &monitor,
+std::expected<TransientResult, std::string> ComputeTransient(CompiledCircuit &compiled,
+                                                             const TransientConfig &settings,
+                                                             bool has_initial_conditions,
+                                                             const RunMonitor &monitor,
                                                              const ConvergenceOptions &options,
                                                              std::vector<DiagnosticMessage> *messages);
 
-std::expected<AcSweepResult, std::string> ComputeACSweep(CompiledCircuit &compiled, const AcSweepConfig &settings,
+std::expected<AcSweepResult, std::string> ComputeACSweep(CompiledCircuit &compiled,
+                                                         const AcSweepConfig &settings,
                                                          const ConvergenceOptions &options,
                                                          std::vector<DiagnosticMessage> *messages);
 
@@ -52,7 +56,8 @@ std::expected<TransferFunctionResult, std::string> ComputeTransferFunction(Compi
                                                                            const ConvergenceOptions &options,
                                                                            std::vector<DiagnosticMessage> *messages);
 
-std::expected<NoiseResult, std::string> ComputeNoise(CompiledCircuit &compiled, const NoiseConfig &settings,
+std::expected<NoiseResult, std::string> ComputeNoise(CompiledCircuit &compiled,
+                                                     const NoiseConfig &settings,
                                                      const ConvergenceOptions &options,
                                                      std::vector<DiagnosticMessage> *messages);
 
@@ -61,7 +66,8 @@ std::expected<SParameterResult, std::string> ComputeSParameters(CompiledCircuit 
                                                                 const ConvergenceOptions &options,
                                                                 std::vector<DiagnosticMessage> *messages);
 
-std::expected<PoleZeroResult, std::string> ComputePoleZero(CompiledCircuit &compiled, const PoleZeroConfig &settings,
+std::expected<PoleZeroResult, std::string> ComputePoleZero(CompiledCircuit &compiled,
+                                                           const PoleZeroConfig &settings,
                                                            const ConvergenceOptions &options,
                                                            std::vector<DiagnosticMessage> *messages);
 

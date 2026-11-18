@@ -93,8 +93,8 @@ std::vector<ComponentPower> ComputePowers(const std::vector<std::unique_ptr<UIEl
         for (std::size_t index = 0; index < terminals.size(); ++index) {
             const std::optional<double> current = GetTerminalCurrent(component, index, operating_point.Currents);
             const std::optional<int> node = connectivity.GetNode(terminals[index]);
-            if (!current || !node || *node < 0 ||
-                static_cast<std::size_t>(*node) >= operating_point.NodeVoltages.size()) {
+            if (!current || !node || *node < 0
+                || static_cast<std::size_t>(*node) >= operating_point.NodeVoltages.size()) {
                 continue;
             }
             has_current = true;
@@ -114,7 +114,8 @@ std::vector<ComponentPower> ComputePowers(const std::vector<std::unique_ptr<UIEl
  * @param[in] connectivity      Nodes of the schematic.
  * @return  The lowest and highest node voltage, ground included, and the largest current and power in absolute value.
  */
-HeatScale ScaleOf(const Core::OperatingPoint &operating_point, const std::vector<std::unique_ptr<UIElement>> &elements,
+HeatScale ScaleOf(const Core::OperatingPoint &operating_point,
+                  const std::vector<std::unique_ptr<UIElement>> &elements,
                   const Connectivity &connectivity) {
     HeatScale scale;
     if (!operating_point.NodeVoltages.empty()) {
@@ -139,7 +140,8 @@ HeatScale ScaleOf(const Core::OperatingPoint &operating_point, const std::vector
  * many evenly spread samples, the last one included, in a longer transient. An empty scale for a transient without
  *          samples.
  */
-HeatScale ScaleOf(const Core::Transient &transient, const std::vector<std::unique_ptr<UIElement>> &elements,
+HeatScale ScaleOf(const Core::Transient &transient,
+                  const std::vector<std::unique_ptr<UIElement>> &elements,
                   const Connectivity &connectivity) {
     HeatScale scale;
     if (transient.Times.empty()) {
@@ -185,8 +187,8 @@ HeatScale ScaleOf(const Core::Transient &transient, const std::vector<std::uniqu
  */
 float VoltageLevel(const double voltage, const HeatScale &scale) {
     return scale.HighestVoltage > scale.LowestVoltage
-               ? static_cast<float>((voltage - scale.LowestVoltage) / (scale.HighestVoltage - scale.LowestVoltage))
-               : 0.5f;
+             ? static_cast<float>((voltage - scale.LowestVoltage) / (scale.HighestVoltage - scale.LowestVoltage))
+             : 0.5f;
 }
 
 /**

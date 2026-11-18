@@ -82,8 +82,8 @@ std::vector<std::string> TokenizeLine(std::string_view line) {
         }
 
         std::size_t start = i;
-        while (i < n && !std::isspace(static_cast<unsigned char>(line[i])) && line[i] != ',' && line[i] != ';' &&
-               line[i] != '$') {
+        while (i < n && !std::isspace(static_cast<unsigned char>(line[i])) && line[i] != ',' && line[i] != ';'
+               && line[i] != '$') {
             if (line[i] == '(') {
                 // e.g. SIN(...) attached to name
                 int depth = 0;
@@ -123,7 +123,7 @@ public:
 
         int num = 0;
         const auto [end, err] = std::from_chars(upper.data(), upper.data() + upper.size(), num);
-        if (err == std::errc() && end == upper.data() + upper.size() && num > 0 && num <= 10000) {
+        if (err == std::errc() && end == upper.data() + upper.size() && num > 0 && num <= 10'000) {
             m_NumericNodes.push_back({upper, num});
             m_MaxNumeric = std::max(m_MaxNumeric, num);
         } else {
@@ -180,8 +180,8 @@ struct IcAssignment {
     std::string_view Rhs;
 };
 
-std::expected<IcAssignment, std::string> NextIcAssignment(const std::vector<std::string> &tokens, std::size_t &index,
-                                                          std::string_view line) {
+std::expected<IcAssignment, std::string>
+NextIcAssignment(const std::vector<std::string> &tokens, std::size_t &index, std::string_view line) {
     const std::size_t eq = tokens[index].find('=');
     if (eq != std::string::npos) {
         const std::string_view lhs = std::string_view(tokens[index]).substr(0, eq);
@@ -212,8 +212,10 @@ std::expected<IcAssignment, std::string> NextIcAssignment(const std::vector<std:
 /// Parses a `.ic` or `.nodeset` directive such as `.ic v(1)=5 v(out) = 0` and records each node voltage, as the
 /// initial voltage of the node or as its nodeset.
 std::expected<void, std::string> ParseNodeVoltageDirective(const std::vector<std::string> &tokens,
-                                                           std::string_view line, const NodeManager &nodes,
-                                                           CircuitBuilder &builder, const bool is_nodeset) {
+                                                           std::string_view line,
+                                                           const NodeManager &nodes,
+                                                           CircuitBuilder &builder,
+                                                           const bool is_nodeset) {
     for (std::size_t i = 1; i < tokens.size(); ++i) {
         const auto assignment = NextIcAssignment(tokens, i, line);
         if (!assignment) {
@@ -337,9 +339,11 @@ std::optional<FrequencySweepType> FindSweepType(const std::string &word) {
  * @param[in] line               Text of the directive, quoted in the messages.
  * @return  The sweep, or the message that tells what is wrong with it.
  */
-std::expected<FrequencySweepWords, std::string>
-ReadFrequencySweep(const std::vector<std::string> &tokens, const std::size_t first_token, const bool is_type_required,
-                   const std::string_view directive, const std::string_view line) {
+std::expected<FrequencySweepWords, std::string> ReadFrequencySweep(const std::vector<std::string> &tokens,
+                                                                   const std::size_t first_token,
+                                                                   const bool is_type_required,
+                                                                   const std::string_view directive,
+                                                                   const std::string_view line) {
     FrequencySweepWords sweep;
     std::size_t number_token = first_token;
     if (first_token >= tokens.size()) {
@@ -351,16 +355,20 @@ ReadFrequencySweep(const std::vector<std::string> &tokens, const std::size_t fir
         ++number_token;
     } else if (is_type_required) {
         return std::unexpected(std::format("Unknown sweep type '{}' in {}, use dec, oct or lin: '{}'",
-                                           tokens[first_token], directive, line));
+                                           tokens[first_token],
+                                           directive,
+                                           line));
     }
     if (tokens.size() < number_token + SWEEP_NUMBER_COUNT) {
         return std::unexpected(std::format("Malformed {} directive: '{}'", directive, line));
     }
     const std::optional<double> points = ParseSpiceNumber(tokens[number_token]);
-    if (!points || *points < 1.0 || std::floor(*points) != *points ||
-        *points > static_cast<double>(std::numeric_limits<int>::max())) {
-        return std::unexpected(std::format(
-            "Invalid number of points in {}, it must be a whole number of at least 1: '{}'", directive, line));
+    if (!points || *points < 1.0 || std::floor(*points) != *points
+        || *points > static_cast<double>(std::numeric_limits<int>::max())) {
+        return std::unexpected(
+            std::format("Invalid number of points in {}, it must be a whole number of at least 1: '{}'",
+                        directive,
+                        line));
     }
     sweep.Points = static_cast<int>(*points);
     const std::optional<double> start = ParseSpiceNumber(tokens[number_token + 1]);
@@ -395,7 +403,8 @@ std::expected<std::string, std::string> FindAcSensitivityInput(const std::vector
 /// Reads the rest of `.sens <out_var> AC [DEC|OCT|LIN] <np> <fstart> <fstop>` after the output nodes, and picks the
 /// input source.
 std::expected<AcSensitivityConfig, std::string> ParseAcSensitivity(const std::vector<std::string> &tokens,
-                                                                   const NodeId positive, const NodeId negative,
+                                                                   const NodeId positive,
+                                                                   const NodeId negative,
                                                                    const std::vector<std::string> &circuit_lines,
                                                                    const std::string_view line) {
     constexpr std::size_t TOKENS_WITH_SWEEP_TYPE = 7;
@@ -452,8 +461,9 @@ std::optional<BehavioralLine> SplitBehavioralLine(std::string_view line) {
         rest = rest.substr(0, comment);
     }
     rest = Trim(rest);
-    if (rest.size() < 2 || (std::toupper(static_cast<unsigned char>(rest.front())) != 'V' &&
-                            std::toupper(static_cast<unsigned char>(rest.front())) != 'I')) {
+    if (rest.size() < 2
+        || (std::toupper(static_cast<unsigned char>(rest.front())) != 'V'
+            && std::toupper(static_cast<unsigned char>(rest.front())) != 'I')) {
         return std::nullopt;
     }
     const bool is_voltage = std::toupper(static_cast<unsigned char>(rest.front())) == 'V';
@@ -608,16 +618,17 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
             std::size_t pos = 0;
             const std::size_t plen = all_params.size();
             while (pos < plen) {
-                while (pos < plen && (std::isspace(static_cast<unsigned char>(all_params[pos])) ||
-                                      all_params[pos] == '(' || all_params[pos] == ')' || all_params[pos] == ',')) {
+                while (pos < plen
+                       && (std::isspace(static_cast<unsigned char>(all_params[pos])) || all_params[pos] == '('
+                           || all_params[pos] == ')' || all_params[pos] == ',')) {
                     ++pos;
                 }
                 if (pos >= plen) {
                     break;
                 }
                 const std::size_t kstart = pos;
-                while (pos < plen &&
-                       (std::isalnum(static_cast<unsigned char>(all_params[pos])) || all_params[pos] == '_')) {
+                while (pos < plen
+                       && (std::isalnum(static_cast<unsigned char>(all_params[pos])) || all_params[pos] == '_')) {
                     ++pos;
                 }
                 const std::string key = ToUpper(all_params.substr(kstart, pos - kstart));
@@ -630,8 +641,8 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                         ++pos;
                     }
                     const std::size_t vstart = pos;
-                    while (pos < plen && !std::isspace(static_cast<unsigned char>(all_params[pos])) &&
-                           all_params[pos] != ')' && all_params[pos] != ',') {
+                    while (pos < plen && !std::isspace(static_cast<unsigned char>(all_params[pos]))
+                           && all_params[pos] != ')' && all_params[pos] != ',') {
                         ++pos;
                     }
                     const std::string val_str = all_params.substr(vstart, pos - vstart);
@@ -772,9 +783,9 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                     break;
                 }
                 const std::string upper = ToUpper(tokens[i]);
-                if (upper == "AND" || upper == "NAND" || upper == "OR" || upper == "NOR" || upper == "XOR" ||
-                    upper == "XNOR" || upper == "NOT" || upper == "INV" || upper == "BUF" || upper == "BUFFER" ||
-                    upper == "SCHMITT") {
+                if (upper == "AND" || upper == "NAND" || upper == "OR" || upper == "NOR" || upper == "XOR"
+                    || upper == "XNOR" || upper == "NOT" || upper == "INV" || upper == "BUF" || upper == "BUFFER"
+                    || upper == "SCHMITT") {
                     break;
                 }
                 nodes.Register(tokens[i]);
@@ -796,10 +807,12 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
         NodeId Positive;
         NodeId Negative;
     };
+
     std::vector<BlockSource> block_sources;
     const InstanceObservers observers{
         .OnInternalNode = [&nodes](const std::string &name, const NodeId node) { nodes.Bind(name, node); },
-        .OnSource = [&block_sources](const std::string &name, const NodeId positive,
+        .OnSource = [&block_sources](const std::string &name,
+                                     const NodeId positive,
                                      const NodeId negative) { block_sources.push_back({name, positive, negative}); }};
     for (const auto &line : circuit_lines) {
         const auto tokens = TokenizeLine(line);
@@ -807,14 +820,18 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
             continue;
         }
         const auto added = AddNetlistInstance(
-            builder, definition_lines, line, [&nodes](const std::string_view name) { return nodes.Resolve(name); },
+            builder,
+            definition_lines,
+            line,
+            [&nodes](const std::string_view name) { return nodes.Resolve(name); },
             observers);
         if (!added) {
             return std::unexpected(added.error());
         }
         for (const std::string &warning : *added) {
-            const bool is_reported = std::ranges::any_of(
-                result.Diagnostics, [&warning](const DiagnosticMessage &message) { return message.Text == warning; });
+            const bool is_reported =
+                std::ranges::any_of(result.Diagnostics,
+                                    [&warning](const DiagnosticMessage &message) { return message.Text == warning; });
             if (!is_reported) {
                 result.Diagnostics.push_back({warning});
             }
@@ -962,8 +979,8 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                             const char fc =
                                 static_cast<char>(std::toupper(static_cast<unsigned char>(cand_toks[0].front())));
                             if (fc == 'V' || fc == 'I') {
-                                if ((cand_toks[1] == in_pos && cand_toks[2] == in_neg) ||
-                                    (cand_toks[1] == in_neg && cand_toks[2] == in_pos)) {
+                                if ((cand_toks[1] == in_pos && cand_toks[2] == in_neg)
+                                    || (cand_toks[1] == in_neg && cand_toks[2] == in_pos)) {
                                     cfg.InputSource = cand_toks[0];
                                     break;
                                 }
@@ -976,8 +993,8 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                         }
                         const NodeId in_positive = nodes.Resolve(in_pos);
                         const NodeId in_negative = nodes.Resolve(in_neg);
-                        if ((source.Positive == in_positive && source.Negative == in_negative) ||
-                            (source.Positive == in_negative && source.Negative == in_positive)) {
+                        if ((source.Positive == in_positive && source.Negative == in_negative)
+                            || (source.Positive == in_negative && source.Negative == in_positive)) {
                             cfg.InputSource = source.Name;
                         }
                     }
@@ -1073,7 +1090,8 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                                 integration_method = IntegrationMethod::TRAPEZOIDAL;
                             } else {
                                 return std::unexpected(std::format("Unknown integration method '{}' in .options: '{}'",
-                                                                   method_name, line));
+                                                                   method_name,
+                                                                   line));
                             }
                             continue;
                         }
@@ -1272,7 +1290,12 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
 
             const bool is_voltage = (first_char == 'V');
 
-            AddWaveformSource(builder, name, is_voltage, n_pos, n_neg, wtype,
+            AddWaveformSource(builder,
+                              name,
+                              is_voltage,
+                              n_pos,
+                              n_neg,
+                              wtype,
                               ExtractParenthesizedValues(waveform_token),
                               {.Dc = dc_val, .AcMagnitude = ac_mag, .AcPhaseDegrees = ac_phase});
             break;
@@ -1389,7 +1412,8 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                 } else if (reference.Input.Second.empty()) {
                     resolved.append(std::format("v({})", nodes.Resolve(reference.Input.First)));
                 } else {
-                    resolved.append(std::format("v({},{})", nodes.Resolve(reference.Input.First),
+                    resolved.append(std::format("v({},{})",
+                                                nodes.Resolve(reference.Input.First),
                                                 nodes.Resolve(reference.Input.Second)));
                 }
             }

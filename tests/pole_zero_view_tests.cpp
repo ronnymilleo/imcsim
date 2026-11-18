@@ -23,7 +23,10 @@ Core::PoleZeroRoot MakeReal(const bool is_pole, const double real, const double 
             .IsRightHalfPlane = real > 0.0};
 }
 
-Core::PoleZeroRoot MakePair(const bool is_pole, const double real, const double imaginary, const double frequency_hertz,
+Core::PoleZeroRoot MakePair(const bool is_pole,
+                            const double real,
+                            const double imaginary,
+                            const double frequency_hertz,
                             const double quality) {
     return {.IsPole = is_pole,
             .Real = real,
@@ -38,7 +41,8 @@ Core::PoleZeroRoot MakePair(const bool is_pole, const double real, const double 
 
 TEST_CASE("The table has one row per root, with a pair on one row", "[pole_zero_view]") {
     Core::PoleZero result;
-    result.Roots = {MakePair(true, -4500.0, 5000.0, 1070.0, 0.74), MakeReal(true, -6e6, 9.5e5),
+    result.Roots = {MakePair(true, -4500.0, 5000.0, 1070.0, 0.74),
+                    MakeReal(true, -6e6, 9.5e5),
                     MakeReal(false, 0.0, 0.0)};
     const std::vector<GUI::PoleZeroRow> rows = GUI::MakePoleZeroRows(result);
 
@@ -71,8 +75,10 @@ TEST_CASE("A pair on the imaginary axis reads an infinite quality factor, and a 
 
 TEST_CASE("The points of the s-plane hold both members of a pair, split by kind and half-plane", "[pole_zero_view]") {
     Core::PoleZero result;
-    result.Roots = {MakePair(true, -4500.0, 5000.0, 1070.0, 0.74), MakeReal(true, -6e6, 9.5e5),
-                    MakeReal(true, 3e3, 480.0), MakeReal(false, -1e5, 1.6e4)};
+    result.Roots = {MakePair(true, -4500.0, 5000.0, 1070.0, 0.74),
+                    MakeReal(true, -6e6, 9.5e5),
+                    MakeReal(true, 3e3, 480.0),
+                    MakeReal(false, -1e5, 1.6e4)};
 
     const GUI::PoleZeroPoints poles = GUI::CollectPoleZeroPoints(result, true, false);
     REQUIRE(poles.Real.size() == 3);
@@ -85,8 +91,10 @@ TEST_CASE("The points of the s-plane hold both members of a pair, split by kind 
 
 TEST_CASE("The Bode plot marks the natural frequency of each root, but not one at 0 Hz", "[pole_zero_view]") {
     Core::PoleZero result;
-    result.Roots = {MakeReal(true, -1e4, 1591.5), MakePair(true, -4500.0, 5000.0, 1070.0, 0.74),
-                    MakeReal(false, 0.0, 0.0), MakeReal(false, -1e5, 1.6e4)};
+    result.Roots = {MakeReal(true, -1e4, 1591.5),
+                    MakePair(true, -4500.0, 5000.0, 1070.0, 0.74),
+                    MakeReal(false, 0.0, 0.0),
+                    MakeReal(false, -1e5, 1.6e4)};
     CHECK(GUI::ListRootFrequencies(result, true, false) == std::vector<double>{1591.5, 1070.0});
     CHECK(GUI::ListRootFrequencies(result, false, false) == std::vector<double>{1.6e4});
     CHECK(GUI::ListRootFrequencies(result, true, true).empty());
@@ -94,8 +102,8 @@ TEST_CASE("The Bode plot marks the natural frequency of each root, but not one a
 
 TEST_CASE("A hovered root is described by kind, frequency and, for a pair, quality and damping", "[pole_zero_view]") {
     CHECK(GUI::DescribePoleZeroRoot(MakeReal(true, -1e4, 1591.5)) == "pole at 1.591kHz");
-    CHECK(GUI::DescribePoleZeroRoot(MakePair(false, -4500.0, 5000.0, 1070.0, 0.74)) ==
-          "zero pair at 1.07kHz, Q 0.74, zeta 0.676");
+    CHECK(GUI::DescribePoleZeroRoot(MakePair(false, -4500.0, 5000.0, 1070.0, 0.74))
+          == "zero pair at 1.07kHz, Q 0.74, zeta 0.676");
 }
 
 TEST_CASE("The note about cancelled pairs is empty when none cancelled", "[pole_zero_view]") {
@@ -107,7 +115,8 @@ TEST_CASE("The note about cancelled pairs is empty when none cancelled", "[pole_
 TEST_CASE("The s-plane limits keep half a decade past the outermost roots on a symmetric logarithmic axis",
           "[pole_zero_view]") {
     Core::PoleZero result;
-    result.Roots = {MakePair(true, -4500.0, 5000.0, 1070.0, 0.74), MakeReal(true, -6e6, 9.5e5),
+    result.Roots = {MakePair(true, -4500.0, 5000.0, 1070.0, 0.74),
+                    MakeReal(true, -6e6, 9.5e5),
                     MakeReal(false, 2e6, 3e5)};
     const GUI::PlaneLimits limits = GUI::ComputePlaneLimits(result, true);
     CHECK_THAT(limits.RealMin, Catch::Matchers::WithinRel(-6e6 * std::sqrt(10.0), 1e-9));

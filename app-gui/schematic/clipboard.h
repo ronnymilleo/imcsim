@@ -38,8 +38,10 @@ struct PastedGroup {
     std::vector<std::string> Warnings;
 };
 
-std::string CopySelection(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires,
-                          const Selection &selection, std::span<const SavedSubcircuit> subcircuits = {},
+std::string CopySelection(const std::vector<std::unique_ptr<UIElement>> &elements,
+                          const std::vector<UIWire> &wires,
+                          const Selection &selection,
+                          std::span<const SavedSubcircuit> subcircuits = {},
                           std::span<const Core::LibraryModel> models = {});
 bool LooksLikeCopiedSchematic(std::string_view text);
 std::expected<PastedGroup, std::string> ParseCopiedSchematic(std::string_view text);

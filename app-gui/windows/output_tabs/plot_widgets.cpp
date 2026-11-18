@@ -80,8 +80,8 @@ bool BeginTracePlot(const char *id, const ImVec2 size, const bool has_legend) {
  */
 float PlotHeight(const int plot_count) {
     return std::max(ImGui::GetFontSize() * MIN_PLOT_HEIGHT,
-                    ImGui::GetContentRegionAvail().y / static_cast<float>(plot_count) -
-                        ImGui::GetStyle().ItemSpacing.y);
+                    ImGui::GetContentRegionAvail().y / static_cast<float>(plot_count)
+                        - ImGui::GetStyle().ItemSpacing.y);
 }
 
 /**
@@ -130,12 +130,16 @@ void SetNextFits(const bool new_result, const bool voltages_changed, const bool 
  * @param[in]     excluded     Nodes drawn elsewhere, such as logic lanes.
  * @note    Each node keeps its color whichever nodes are measured.
  */
-void PlotNodes(const std::vector<double> &xs, const std::vector<std::vector<double>> &node_values, Schematic &schematic,
-               const char *unit, const std::string &suffix, std::vector<PlottedTrace> &plotted,
+void PlotNodes(const std::vector<double> &xs,
+               const std::vector<std::vector<double>> &node_values,
+               Schematic &schematic,
+               const char *unit,
+               const std::string &suffix,
+               std::vector<PlottedTrace> &plotted,
                const std::vector<int> &excluded) {
     for (std::size_t node = 1; node < node_values.size(); ++node) {
-        if (!schematic.IsVoltageMeasured(static_cast<int>(node)) ||
-            std::ranges::contains(excluded, static_cast<int>(node))) {
+        if (!schematic.IsVoltageMeasured(static_cast<int>(node))
+            || std::ranges::contains(excluded, static_cast<int>(node))) {
             continue;
         }
         const ImU32 color = GetNodeColor(static_cast<int>(node));
@@ -155,7 +159,9 @@ void PlotNodes(const std::vector<double> &xs, const std::vector<std::vector<doub
  * @param[in] ys     Y values of the samples.
  * @param[in] color  Color of the line.
  */
-void PlotDashedLine(const std::string &label, const std::vector<double> &xs, const std::vector<double> &ys,
+void PlotDashedLine(const std::string &label,
+                    const std::vector<double> &xs,
+                    const std::vector<double> &ys,
                     const ImU32 color) {
     ImPlotSpec legend_spec;
     legend_spec.LineColor = ImGui::ColorConvertU32ToFloat4(color);
@@ -168,8 +174,8 @@ void PlotDashedLine(const std::string &label, const std::vector<double> &xs, con
     std::vector<ImVec2> points;
     for (std::size_t index = 0; index < xs.size(); ++index) {
         const ImVec2 point = ImPlot::PlotToPixels(xs[index], ys[index]);
-        if (points.empty() || std::abs(point.x - points.back().x) >= 1.0f ||
-            std::abs(point.y - points.back().y) >= 1.0f || index + 1 == xs.size()) {
+        if (points.empty() || std::abs(point.x - points.back().x) >= 1.0f || std::abs(point.y - points.back().y) >= 1.0f
+            || index + 1 == xs.size()) {
             points.push_back(point);
         }
     }
@@ -196,8 +202,11 @@ void PlotDashedLine(const std::string &label, const std::vector<double> &xs, con
  * @param[in,out] plotted    The traces drawn, for the cursor readout.
  * @note    Each keeps the color of its position in the circuit, as in the editor.
  */
-void PlotCurrents(const std::vector<double> &xs, const std::vector<Core::ComponentTrace> &currents,
-                  const Schematic &schematic, const char *unit, const std::string &suffix,
+void PlotCurrents(const std::vector<double> &xs,
+                  const std::vector<Core::ComponentTrace> &currents,
+                  const Schematic &schematic,
+                  const char *unit,
+                  const std::string &suffix,
                   std::vector<PlottedTrace> &plotted) {
     ImPlot::SetAxes(ImAxis_X1, ImAxis_Y2);
     for (std::size_t index = 0; index < currents.size(); ++index) {
@@ -233,12 +242,12 @@ bool HasMeasuredVoltage(const std::size_t node_count, const Schematic &schematic
  * @param[in] excluded    Nodes left out, such as logic lanes.
  * @return  The node numbers; empty when the plot shows no voltage.
  */
-std::vector<int> ListMeasuredNodes(const std::size_t node_count, const Schematic &schematic,
-                                   const std::vector<int> &excluded) {
+std::vector<int>
+ListMeasuredNodes(const std::size_t node_count, const Schematic &schematic, const std::vector<int> &excluded) {
     std::vector<int> nodes;
     for (std::size_t node = 1; node < node_count; ++node) {
-        if (schematic.IsVoltageMeasured(static_cast<int>(node)) &&
-            !std::ranges::contains(excluded, static_cast<int>(node))) {
+        if (schematic.IsVoltageMeasured(static_cast<int>(node))
+            && !std::ranges::contains(excluded, static_cast<int>(node))) {
             nodes.push_back(static_cast<int>(node));
         }
     }
@@ -272,18 +281,24 @@ std::vector<std::string> ListMeasuredCurrents(const std::vector<Core::ComponentT
  * @return  The traces, pointing into the result, which must outlive them.
  */
 std::vector<PlottedTrace> ListTraces(const std::vector<std::vector<double>> &node_values,
-                                     const std::vector<Core::ComponentTrace> &currents, Schematic &schematic,
-                                     const char *voltage_unit, const char *current_unit) {
+                                     const std::vector<Core::ComponentTrace> &currents,
+                                     Schematic &schematic,
+                                     const char *voltage_unit,
+                                     const char *current_unit) {
     std::vector<PlottedTrace> traces;
     for (std::size_t node = 1; node < node_values.size(); ++node) {
         if (schematic.IsVoltageMeasured(static_cast<int>(node))) {
-            traces.push_back({GetVoltageLabel(schematic.GetConnectivity(), static_cast<int>(node)), &node_values[node],
-                              voltage_unit, GetNodeColor(static_cast<int>(node))});
+            traces.push_back({GetVoltageLabel(schematic.GetConnectivity(), static_cast<int>(node)),
+                              &node_values[node],
+                              voltage_unit,
+                              GetNodeColor(static_cast<int>(node))});
         }
     }
     for (std::size_t index = 0; index < currents.size(); ++index) {
         if (schematic.IsCurrentMeasured(currents[index].Name)) {
-            traces.push_back({std::format("I({})", currents[index].Name), &currents[index].Values, current_unit,
+            traces.push_back({std::format("I({})", currents[index].Name),
+                              &currents[index].Values,
+                              current_unit,
                               GetCurrentColor(index)});
         }
     }
@@ -330,8 +345,11 @@ void FitMathAxes(const std::vector<MathTrace> &math) {
  * @param[in]     readout_unit  Unit the cursor readout gives the values, such as " dB" for the magnitudes of an AC
  *                              sweep, or null for the unit of each channel.
  */
-void PlotMath(const std::vector<double> &xs, const std::vector<MathTrace> &math, const std::string &suffix,
-              std::vector<PlottedTrace> &plotted, const char *readout_unit) {
+void PlotMath(const std::vector<double> &xs,
+              const std::vector<MathTrace> &math,
+              const std::string &suffix,
+              std::vector<PlottedTrace> &plotted,
+              const char *readout_unit) {
     for (const MathTrace &trace : math) {
         ImPlot::SetAxes(ImAxis_X1, trace.Axis);
         ImPlotSpec spec;
@@ -339,8 +357,10 @@ void PlotMath(const std::vector<double> &xs, const std::vector<MathTrace> &math,
         spec.LineWeight = MATH_LINE_WEIGHT;
         spec.Flags = ImPlotLineFlags_SkipNaN;
         ImPlot::PlotLine(trace.Label.c_str(), xs.data(), trace.Values.data(), static_cast<int>(xs.size()), spec);
-        plotted.push_back({trace.Label + suffix, &trace.Values,
-                           readout_unit != nullptr ? readout_unit : trace.Unit.c_str(), trace.Color});
+        plotted.push_back({trace.Label + suffix,
+                           &trace.Values,
+                           readout_unit != nullptr ? readout_unit : trace.Unit.c_str(),
+                           trace.Color});
     }
     ImPlot::SetAxes(ImAxis_X1, ImAxis_Y1);
 }
@@ -396,7 +416,9 @@ void DrawRootMarkers(const Core::PoleZero &result, const bool has_labels) {
                 const int dash_count = static_cast<int>(size.y / (ROOT_MARKER_DASH + ROOT_MARKER_GAP)) + 1;
                 for (int dash = 0; dash < dash_count; ++dash) {
                     const float y = corner.y + static_cast<float>(dash) * (ROOT_MARKER_DASH + ROOT_MARKER_GAP);
-                    draw_list->AddLine({x, y}, {x, std::min(y + ROOT_MARKER_DASH, corner.y + size.y)}, line_color,
+                    draw_list->AddLine({x, y},
+                                       {x, std::min(y + ROOT_MARKER_DASH, corner.y + size.y)},
+                                       line_color,
                                        ROOT_MARKER_WEIGHT);
                 }
                 if (has_labels) {

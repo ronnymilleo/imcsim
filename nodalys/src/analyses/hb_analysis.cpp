@@ -70,7 +70,9 @@ struct ActiveMatrixTraces {
         (void)sample_count;
     }
 
-    void RecordMatrix(const DenseMatrix &mat, const int unknown_count, const std::size_t sample_idx,
+    void RecordMatrix(const DenseMatrix &mat,
+                      const int unknown_count,
+                      const std::size_t sample_idx,
                       const std::size_t sample_count) {
         for (int r = 0; r < unknown_count; ++r) {
             for (int c = 0; c < unknown_count; ++c) {
@@ -131,7 +133,10 @@ struct HbWorkspace {
     MnaSystem SampleG;
     MnaSystem SampleC;
 
-    HbWorkspace(const int unknown_count, const int harmonics, const std::size_t sample_count, const double f0,
+    HbWorkspace(const int unknown_count,
+                const int harmonics,
+                const std::size_t sample_count,
+                const double f0,
                 std::vector<bool> is_node_unknown)
         : UnknownCount(unknown_count), Harmonics(harmonics), CoeffsPerUnknown(2 * harmonics + 1),
           SampleCount(sample_count), Omega0(2.0 * std::numbers::pi * f0), Plan(sample_count),
@@ -143,8 +148,8 @@ struct HbWorkspace {
           SampleC(std::move(is_node_unknown)) {}
 
     std::size_t Index(const int unknown, const int coeff_slot) const {
-        return static_cast<std::size_t>(unknown) * static_cast<std::size_t>(CoeffsPerUnknown) +
-               static_cast<std::size_t>(coeff_slot);
+        return static_cast<std::size_t>(unknown) * static_cast<std::size_t>(CoeffsPerUnknown)
+             + static_cast<std::size_t>(coeff_slot);
     }
 };
 
@@ -167,7 +172,8 @@ std::expected<std::size_t, std::string> ValidateAndResolveSampleCount(const Harm
     if (sample_count <= static_cast<std::size_t>(2) * static_cast<std::size_t>(config.Harmonics)) {
         return std::unexpected(std::format(
             "Harmonic Balance sample count ({}) must exceed twice the harmonic count ({}) to prevent aliasing",
-            sample_count, config.Harmonics));
+            sample_count,
+            config.Harmonics));
     }
     return sample_count;
 }
@@ -198,19 +204,22 @@ std::expected<PartitionedCircuit, std::string> ValidateAndPartitionDevices(const
         if (harmonic_nearest < 1.0 || std::abs(ratio - harmonic_nearest) > FREQ_RATIO_RELTOL * harmonic_nearest) {
             return std::unexpected(std::format("Source frequency {} Hz is not an integer multiple of fundamental {} Hz "
                                                "for single-tone Harmonic Balance",
-                                               periodicity.Frequency, config.FundamentalFrequency));
+                                               periodicity.Frequency,
+                                               config.FundamentalFrequency));
         }
         if (static_cast<int>(harmonic_nearest) > config.Harmonics) {
             return std::unexpected(std::format("Source frequency {} Hz (harmonic {}) exceeds configured Harmonics = {}",
-                                               periodicity.Frequency, static_cast<int>(harmonic_nearest),
+                                               periodicity.Frequency,
+                                               static_cast<int>(harmonic_nearest),
                                                config.Harmonics));
         }
-        if ((periodicity.Kind == SourceWaveformKind::PULSE || periodicity.Kind == SourceWaveformKind::CLOCK) &&
-            !warned_sharp_edge && periodicity.MinEdgeTime < sample_dt) {
+        if ((periodicity.Kind == SourceWaveformKind::PULSE || periodicity.Kind == SourceWaveformKind::CLOCK)
+            && !warned_sharp_edge && periodicity.MinEdgeTime < sample_dt) {
             warnings.push_back(std::format(
                 "A periodic pulse/clock edge ({:.3g} s) is faster than the time grid ({:.3g} s); increase Samples or "
                 "Harmonics to reduce Gibbs/aliasing distortion",
-                periodicity.MinEdgeTime, sample_dt));
+                periodicity.MinEdgeTime,
+                sample_dt));
             warned_sharp_edge = true;
         }
         return {};
@@ -369,8 +378,13 @@ void StampNodesets(const HbWorkspace &ws, const bool is_nodeset_pass, const std:
     }
 }
 
-bool RunDcNewtonWithB0(const HbWorkspace &ws, const std::vector<double> &b0, const double b0_scale, const double gmin,
-                       const ConvergenceOptions &options, const bool is_nodeset_pass, std::vector<double> &x) {
+bool RunDcNewtonWithB0(const HbWorkspace &ws,
+                       const std::vector<double> &b0,
+                       const double b0_scale,
+                       const double gmin,
+                       const ConvergenceOptions &options,
+                       const bool is_nodeset_pass,
+                       std::vector<double> &x) {
     const int n = ws.UnknownCount;
     MnaSystem sys(ws.IsNodeUnknown);
     std::vector<double> candidate(static_cast<std::size_t>(n), 0.0);
@@ -421,8 +435,8 @@ bool RunDcNewtonWithB0(const HbWorkspace &ws, const std::vector<double> &b0, con
             }
             StampNodesets(ws, is_nodeset_pass, x, sys);
             sys.AddGminToNodes(gmin);
-            if (FindFault(ws.NonlinearDevices).empty() &&
-                sys.CheckResidual(x, options.VoltageAbsTol, options.CurrentAbsTol, options.RelTol)) {
+            if (FindFault(ws.NonlinearDevices).empty()
+                && sys.CheckResidual(x, options.VoltageAbsTol, options.CurrentAbsTol, options.RelTol)) {
                 return true;
             }
         }
@@ -433,7 +447,9 @@ bool RunDcNewtonWithB0(const HbWorkspace &ws, const std::vector<double> &b0, con
 /// One pass of the DC bias: the direct Newton and its two fallbacks. The released pass of the nodesets starts from the
 /// point the pulled one found, so it applies no seed and tries the direct Newton only; the solve then falls back to a
 /// plain one.
-bool SolveDcBiasPass(const HbWorkspace &ws, const ConvergenceOptions &options, const NodesetPass pass,
+bool SolveDcBiasPass(const HbWorkspace &ws,
+                     const ConvergenceOptions &options,
+                     const NodesetPass pass,
                      std::vector<double> &x_dc) {
     const int n = ws.UnknownCount;
     std::vector<double> b0(static_cast<std::size_t>(n), 0.0);
@@ -502,8 +518,12 @@ bool SolveDcBiasForB0(const HbWorkspace &ws, const ConvergenceOptions &options, 
  *          1/M-normalized time-domain entry spectrum $\hat{g}_n$.
  * @details When `apply_omega` is true, pre-multiplies by the time-derivative operator $\Omega$ for nonlinear charges.
  */
-void StampConversionBlock(DenseMatrix &jacobian, const std::size_t row_offset, const std::size_t col_offset,
-                          const int harmonics, const double omega0, const std::vector<std::complex<double>> &spectrum,
+void StampConversionBlock(DenseMatrix &jacobian,
+                          const std::size_t row_offset,
+                          const std::size_t col_offset,
+                          const int harmonics,
+                          const double omega0,
+                          const std::vector<std::complex<double>> &spectrum,
                           const bool apply_omega) {
     if (!apply_omega) {
         jacobian.Add(row_offset, col_offset, spectrum[0].real());
@@ -564,7 +584,8 @@ void StampConversionBlock(DenseMatrix &jacobian, const std::size_t row_offset, c
     }
 }
 
-void UnpackCoefficientsToSamples(HbWorkspace &ws, const std::vector<double> &coeffs,
+void UnpackCoefficientsToSamples(HbWorkspace &ws,
+                                 const std::vector<double> &coeffs,
                                  std::vector<std::vector<double>> &samples) {
     ws.CoeffsScratch.resize(static_cast<std::size_t>(ws.CoeffsPerUnknown));
     for (int u = 0; u < ws.UnknownCount; ++u) {
@@ -577,7 +598,8 @@ void UnpackCoefficientsToSamples(HbWorkspace &ws, const std::vector<double> &coe
     }
 }
 
-void PackSamplesToCoefficients(HbWorkspace &ws, const std::vector<std::vector<double>> &samples,
+void PackSamplesToCoefficients(HbWorkspace &ws,
+                               const std::vector<std::vector<double>> &samples,
                                std::vector<double> &coeffs) {
     coeffs.resize(static_cast<std::size_t>(ws.UnknownCount) * static_cast<std::size_t>(ws.CoeffsPerUnknown));
     ws.TimeSeriesScratch.resize(ws.SampleCount);
@@ -591,9 +613,14 @@ void PackSamplesToCoefficients(HbWorkspace &ws, const std::vector<std::vector<do
     }
 }
 
-void EvaluateResidualAndJacobian(HbWorkspace &ws, const std::vector<double> &x_hb, const double ac_scale,
-                                 const double gmin, const bool build_jacobian, std::vector<double> &residual,
-                                 std::vector<double> &row_scale, DenseMatrix *jacobian) {
+void EvaluateResidualAndJacobian(HbWorkspace &ws,
+                                 const std::vector<double> &x_hb,
+                                 const double ac_scale,
+                                 const double gmin,
+                                 const bool build_jacobian,
+                                 std::vector<double> &residual,
+                                 std::vector<double> &row_scale,
+                                 DenseMatrix *jacobian) {
     const int n = ws.UnknownCount;
     const int c_count = ws.CoeffsPerUnknown;
     const std::size_t total = x_hb.size();
@@ -626,8 +653,8 @@ void EvaluateResidualAndJacobian(HbWorkspace &ws, const std::vector<double> &x_h
         }
 
         for (int col = 0; col < n; ++col) {
-            const double g_val = g_lin.At(static_cast<std::size_t>(r), static_cast<std::size_t>(col)) +
-                                 ((r == col && ws.IsNodeUnknown[static_cast<std::size_t>(r)]) ? gmin : 0.0);
+            const double g_val = g_lin.At(static_cast<std::size_t>(r), static_cast<std::size_t>(col))
+                               + ((r == col && ws.IsNodeUnknown[static_cast<std::size_t>(r)]) ? gmin : 0.0);
             const double c_val = c_lin.At(static_cast<std::size_t>(r), static_cast<std::size_t>(col));
 
             if (g_val != 0.0) {
@@ -752,9 +779,13 @@ void EvaluateResidualAndJacobian(HbWorkspace &ws, const std::vector<double> &x_h
                 const auto [r, c] = traces.Pairs[idx];
                 std::copy_n(traces.Traces.data() + idx * ws.SampleCount, ws.SampleCount, ws.TimeSeriesScratch.data());
                 (void)ws.Plan.RealToNormalizedSpectrum(ws.TimeSeriesScratch, ws.SpectrumScratch);
-                StampConversionBlock(*jacobian, static_cast<std::size_t>(r) * static_cast<std::size_t>(c_count),
-                                     static_cast<std::size_t>(c) * static_cast<std::size_t>(c_count), ws.Harmonics,
-                                     ws.Omega0, ws.SpectrumScratch, apply_omega);
+                StampConversionBlock(*jacobian,
+                                     static_cast<std::size_t>(r) * static_cast<std::size_t>(c_count),
+                                     static_cast<std::size_t>(c) * static_cast<std::size_t>(c_count),
+                                     ws.Harmonics,
+                                     ws.Omega0,
+                                     ws.SpectrumScratch,
+                                     apply_omega);
             }
         };
         stamp_blocks(ws.GTraces, false);
@@ -762,7 +793,9 @@ void EvaluateResidualAndJacobian(HbWorkspace &ws, const std::vector<double> &x_h
     }
 }
 
-bool CheckHbResidual(const HbWorkspace &ws, const std::vector<double> &residual, const std::vector<double> &row_scale,
+bool CheckHbResidual(const HbWorkspace &ws,
+                     const std::vector<double> &residual,
+                     const std::vector<double> &row_scale,
                      const ConvergenceOptions &options) {
     for (int u = 0; u < ws.UnknownCount; ++u) {
         const double abstol =
@@ -790,7 +823,10 @@ double ResidualNormSq(const HbWorkspace &ws, const std::vector<double> &residual
     return sum;
 }
 
-int RunHbNewton(HbWorkspace &ws, const double ac_scale, const double gmin, const ConvergenceOptions &options,
+int RunHbNewton(HbWorkspace &ws,
+                const double ac_scale,
+                const double gmin,
+                const ConvergenceOptions &options,
                 std::vector<double> &x_hb) {
     const std::size_t total = x_hb.size();
     DenseMatrix jacobian(total, total);
@@ -890,8 +926,10 @@ struct HbSolveOutcome {
     std::string Strategy;
 };
 
-HbSolveOutcome SolveHarmonicBalanceNonlinear(HbWorkspace &ws, const HarmonicBalanceConfig &config,
-                                             const ConvergenceOptions &options, std::vector<double> &x_hb) {
+HbSolveOutcome SolveHarmonicBalanceNonlinear(HbWorkspace &ws,
+                                             const HarmonicBalanceConfig &config,
+                                             const ConvergenceOptions &options,
+                                             std::vector<double> &x_hb) {
     HbSolveOutcome outcome;
     std::vector<double> x_dc;
     if (!SolveDcBiasForB0(ws, options, x_dc)) {
@@ -978,9 +1016,12 @@ HbSolveOutcome SolveHarmonicBalanceNonlinear(HbWorkspace &ws, const HarmonicBala
     return outcome;
 }
 
-HarmonicBalanceResult BuildHarmonicBalanceResult(HbWorkspace &ws, const CompiledCircuit &compiled,
-                                                 const HarmonicBalanceConfig &config, const std::vector<double> &x_hb,
-                                                 const HbSolveOutcome &outcome, std::vector<std::string> warnings) {
+HarmonicBalanceResult BuildHarmonicBalanceResult(HbWorkspace &ws,
+                                                 const CompiledCircuit &compiled,
+                                                 const HarmonicBalanceConfig &config,
+                                                 const std::vector<double> &x_hb,
+                                                 const HbSolveOutcome &outcome,
+                                                 std::vector<std::string> warnings) {
     HarmonicBalanceResult result;
     const int harmonics = ws.Harmonics;
     const std::size_t h_count = static_cast<std::size_t>(harmonics + 1);
@@ -1018,14 +1059,16 @@ HarmonicBalanceResult BuildHarmonicBalanceResult(HbWorkspace &ws, const Compiled
             ws.CoeffsScratch[static_cast<std::size_t>(2 * k - 1)] = ak;
             ws.CoeffsScratch[static_cast<std::size_t>(2 * k)] = bk;
         }
-        (void)ws.Plan.HarmonicsToReal(ws.CoeffsScratch, result.NodeWaveforms[static_cast<std::size_t>(node)],
+        (void)ws.Plan.HarmonicsToReal(ws.CoeffsScratch,
+                                      result.NodeWaveforms[static_cast<std::size_t>(node)],
                                       ws.FftScratch);
     }
 
     // Precompute DC and complex harmonic vectors of all MNA unknowns for linear current extraction
     std::vector<double> x_dc_part(static_cast<std::size_t>(ws.UnknownCount), 0.0);
     std::vector<std::vector<std::complex<double>>> x_harmonics(
-        h_count, std::vector<std::complex<double>>(static_cast<std::size_t>(ws.UnknownCount), {0.0, 0.0}));
+        h_count,
+        std::vector<std::complex<double>>(static_cast<std::size_t>(ws.UnknownCount), {0.0, 0.0}));
     for (int u = 0; u < ws.UnknownCount; ++u) {
         x_dc_part[static_cast<std::size_t>(u)] = x_hb[ws.Index(u, 0)];
         x_harmonics[0][static_cast<std::size_t>(u)] = std::complex<double>(x_hb[ws.Index(u, 0)], 0.0);
@@ -1077,8 +1120,11 @@ HarmonicBalanceResult BuildHarmonicBalanceResult(HbWorkspace &ws, const Compiled
                         std::complex<double>(contrib.Element->TerminalCurrent(contrib.Terminal, x_dc_part), 0.0);
                     for (int k = 1; k <= harmonics; ++k) {
                         const double kw = static_cast<double>(k) * ws.Omega0;
-                        total_phasors[static_cast<std::size_t>(k)] += contrib.Element->AcTerminalCurrent(
-                            contrib.Terminal, x_dc_part, x_harmonics[static_cast<std::size_t>(k)], kw);
+                        total_phasors[static_cast<std::size_t>(k)] +=
+                            contrib.Element->AcTerminalCurrent(contrib.Terminal,
+                                                               x_dc_part,
+                                                               x_harmonics[static_cast<std::size_t>(k)],
+                                                               kw);
                     }
                 }
             } else {
@@ -1118,7 +1164,9 @@ HarmonicBalanceResult BuildHarmonicBalanceResult(HbWorkspace &ws, const Compiled
             if (v1 > 1e-6 && vh > 0.01 * v1) {
                 warnings.push_back(std::format(
                     "Harmonic {} still carries {:.2f}% of the fundamental at node {}; consider increasing Harmonics",
-                    harmonics, 100.0 * vh / v1, node));
+                    harmonics,
+                    100.0 * vh / v1,
+                    node));
                 break;
             }
         }
@@ -1183,12 +1231,17 @@ std::expected<HarmonicBalanceResult, std::string> ComputeHarmonicBalance(Compile
         return std::unexpected(std::format(
             "Harmonic balance would solve {} unknowns ({} per harmonic x {}), more than the {} it can hold; use fewer "
             "harmonics",
-            total_unknowns, unknown_count, 2 * settings.Harmonics + 1, MAX_DENSE_UNKNOWNS));
+            total_unknowns,
+            unknown_count,
+            2 * settings.Harmonics + 1,
+            MAX_DENSE_UNKNOWNS));
     }
     if (total_unknowns > MAX_DENSE_UNKNOWNS_WARNING) {
         warnings.push_back(std::format(
             "Harmonic Balance system has {} unknowns ({} MNA x {}); solving dense Jacobian may take noticeable time",
-            total_unknowns, unknown_count, 2 * settings.Harmonics + 1));
+            total_unknowns,
+            unknown_count,
+            2 * settings.Harmonics + 1));
     }
 
     std::vector<bool> node_flags(static_cast<std::size_t>(unknown_count), false);
@@ -1196,7 +1249,10 @@ std::expected<HarmonicBalanceResult, std::string> ComputeHarmonicBalance(Compile
         node_flags[static_cast<std::size_t>(i)] = compiled.System->IsNodeUnknown(i);
     }
 
-    HbWorkspace ws(unknown_count, settings.Harmonics, *sample_count, settings.FundamentalFrequency,
+    HbWorkspace ws(unknown_count,
+                   settings.Harmonics,
+                   *sample_count,
+                   settings.FundamentalFrequency,
                    std::move(node_flags));
     ws.ShouldStop = settings.ShouldStop;
     const double period = 1.0 / settings.FundamentalFrequency;
@@ -1234,7 +1290,9 @@ std::expected<HarmonicBalanceResult, std::string> ComputeHarmonicBalance(Compile
     if (messages) {
         std::string summary =
             std::format("nodalys: harmonic balance ({} harmonics, {} samples) converged in {} iterations",
-                        settings.Harmonics, *sample_count, outcome.Iterations);
+                        settings.Harmonics,
+                        *sample_count,
+                        outcome.Iterations);
         if (!outcome.Strategy.empty()) {
             summary += std::format(" (with {})", outcome.Strategy);
         }

@@ -64,9 +64,14 @@ namespace GUI {
  */
 class EditorWindow : public AppWindow {
 public:
-    EditorWindow(Schematic &schematic, const ResultStore &results, AnalysisControls &controls,
-                 AnalysisSettingsPanel &settings_panel, PartEditor &part_editor, GlowRenderer &glow_renderer,
-                 TransientPlayback &playback, const Preferences &preferences);
+    EditorWindow(Schematic &schematic,
+                 const ResultStore &results,
+                 AnalysisControls &controls,
+                 AnalysisSettingsPanel &settings_panel,
+                 PartEditor &part_editor,
+                 GlowRenderer &glow_renderer,
+                 TransientPlayback &playback,
+                 const Preferences &preferences);
     ~EditorWindow() override = default;
 
     // Requests, global shortcuts and file popups, whichever window is in front

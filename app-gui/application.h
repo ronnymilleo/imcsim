@@ -95,8 +95,14 @@ private:
     AnalysisSettingsPanel m_AnalysisSettings{m_Schematic};
     PartEditor m_PartEditor{m_Schematic, m_Preferences};
     TransientPlayback m_Playback;
-    EditorWindow m_EditorWindow{m_Schematic,  m_Results,      m_AnalysisControls, m_AnalysisSettings,
-                                m_PartEditor, m_GlowRenderer, m_Playback,         m_Preferences};
+    EditorWindow m_EditorWindow{m_Schematic,
+                                m_Results,
+                                m_AnalysisControls,
+                                m_AnalysisSettings,
+                                m_PartEditor,
+                                m_GlowRenderer,
+                                m_Playback,
+                                m_Preferences};
     PropertiesWindow m_PropertiesWindow{m_PartEditor};
     NetlistWindow m_NetlistWindow{m_Schematic};
     SimulationWindow m_SimulationWindow{m_Schematic, m_AnalysisControls, m_AnalysisSettings};

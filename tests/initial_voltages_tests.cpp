@@ -140,8 +140,8 @@ std::vector<Core::Transient> RunOnBothEngines(const Core::Circuit &circuit, cons
  * @details The link carries no current in an open circuit, so the pin reads the voltage of the RC: the engines give
  *          the results of the circuit nodes only, and this is how a test sees inside a block.
  */
-std::shared_ptr<Core::SubcircuitDefinition> MakeTank(const std::string &name, const double volts,
-                                                     const bool is_marker_on_pin) {
+std::shared_ptr<Core::SubcircuitDefinition>
+MakeTank(const std::string &name, const double volts, const bool is_marker_on_pin) {
     static Core::Resistor link;
     static Core::Resistor resistor;
     static Core::Capacitor capacitor;
@@ -459,8 +459,10 @@ TEST_CASE("The netlist writes the initial voltage of a node as .ic and no elemen
 
 TEST_CASE("A saved schematic keeps its initial voltages and a file without them loads as before", "[initial_voltage]") {
     MarkedResistor setup(-1.25);
-    const std::string text = GUI::SaveSchematic(setup.Schematic.GetElements(), setup.Schematic.GetWires(),
-                                                setup.Schematic.GetSimulationSettings(), {});
+    const std::string text = GUI::SaveSchematic(setup.Schematic.GetElements(),
+                                                setup.Schematic.GetWires(),
+                                                setup.Schematic.GetSimulationSettings(),
+                                                {});
     const auto loaded = GUI::LoadSchematic(text);
     REQUIRE(loaded.has_value());
     REQUIRE(loaded->Elements.size() == 3);
@@ -596,14 +598,18 @@ TEST_CASE("The operating point, the DC sweep and the AC sweep ignore initial vol
 
 TEST_CASE("The astable multivibrator example needs its initial voltage to start and runs on its own with it",
           "[initial_voltage]") {
-    const auto example = std::ranges::find(GUI::GetExamples(), std::string_view("astable_multivibrator.imcsim"),
+    const auto example = std::ranges::find(GUI::GetExamples(),
+                                           std::string_view("astable_multivibrator.imcsim"),
                                            &GUI::Example::FileName);
     REQUIRE(example != GUI::GetExamples().end());
     auto loaded = GUI::LoadExample(*example);
     REQUIRE(loaded.has_value());
     GUI::Schematic schematic;
-    schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings),
-                      std::move(loaded->Subcircuits), std::move(loaded->Models));
+    schematic.Replace(std::move(loaded->Elements),
+                      std::move(loaded->Wires),
+                      std::move(loaded->Settings),
+                      std::move(loaded->Subcircuits),
+                      std::move(loaded->Models));
     const Core::Circuit circuit = schematic.BuildCircuit();
     REQUIRE(circuit.GetInitialVoltages().size() == 1);
     CHECK(circuit.GetInitialVoltages()[0].Volts == 5.0);

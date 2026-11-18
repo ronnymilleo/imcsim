@@ -31,8 +31,8 @@ Companion MakeCompanion(const ChargeHistory &history, const TimeContext &time) {
         const double ratio = step / time.PreviousTimeStep;
         const double scale = 1.0 / ((1.0 + ratio) * step);
         return {.Coefficient = (1.0 + 2.0 * ratio) * scale,
-                .Offset = -(1.0 + ratio) * (1.0 + ratio) * scale * history.Charge +
-                          ratio * ratio * scale * history.PreviousCharge};
+                .Offset = -(1.0 + ratio) * (1.0 + ratio) * scale * history.Charge
+                        + ratio * ratio * scale * history.PreviousCharge};
     }
     return {.Coefficient = 2.0 / step, .Offset = -2.0 * history.Charge / step - history.Current};
 }

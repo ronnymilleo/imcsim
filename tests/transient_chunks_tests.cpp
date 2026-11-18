@@ -100,8 +100,10 @@ constexpr auto THRESHOLD_SENSITIVE_EXAMPLES =
 /**
  * @brief   Lowest and highest value of a trace within a window of time around an instant.
  */
-std::pair<double, double> RangeAround(const std::vector<double> &times, const std::vector<double> &values,
-                                      const double time, const double half_window) {
+std::pair<double, double> RangeAround(const std::vector<double> &times,
+                                      const std::vector<double> &values,
+                                      const double time,
+                                      const double half_window) {
     double lowest = ValueAt(times, values, time - half_window);
     double highest = lowest;
     for (const double edge : {time, time + half_window}) {
@@ -110,7 +112,8 @@ std::pair<double, double> RangeAround(const std::vector<double> &times, const st
     }
     const auto first = std::ranges::lower_bound(times, time - half_window);
     for (std::size_t index = static_cast<std::size_t>(first - times.begin());
-         index < times.size() && times[index] <= time + half_window; ++index) {
+         index < times.size() && times[index] <= time + half_window;
+         ++index) {
         lowest = std::min(lowest, values[index]);
         highest = std::max(highest, values[index]);
     }
@@ -169,7 +172,9 @@ struct BackendInUse {
             Core::SetBackend(std::make_unique<Core::NodalysBackend>());
         }
     }
+
     ~BackendInUse() { Core::SetBackend(nullptr); }
+
     BackendInUse(const BackendInUse &) = delete;
     BackendInUse &operator=(const BackendInUse &) = delete;
 };
@@ -235,8 +240,11 @@ TEST_CASE("A chunked transient matches the one-piece run on every example", "[tr
         auto loaded = GUI::LoadExample(example);
         REQUIRE(loaded.has_value());
         GUI::Schematic schematic;
-        schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings),
-                          std::move(loaded->Subcircuits), std::move(loaded->Models));
+        schematic.Replace(std::move(loaded->Elements),
+                          std::move(loaded->Wires),
+                          std::move(loaded->Settings),
+                          std::move(loaded->Subcircuits),
+                          std::move(loaded->Models));
         const Core::Circuit circuit = schematic.BuildCircuit();
         // The examples with logic parts, loose or inside blocks, run only where ngspice has the digital models
         if (Core::FindUnsupported(Core::GetBackend(), circuit, Core::AnalysisKind::TRANSIENT)) {
@@ -279,9 +287,10 @@ TEST_CASE("A chunked transient matches the one-piece run on every example", "[tr
             std::optional<double> first_time;
             for (std::size_t index = 0; index < chunked.Result->Times.size(); ++index) {
                 const double value = chunked.Result->NodeVoltages[node][index];
-                const auto [lowest, highest] =
-                    RangeAround(one_piece.Result->Times, one_piece.Result->NodeVoltages[node],
-                                chunked.Result->Times[index], half_window);
+                const auto [lowest, highest] = RangeAround(one_piece.Result->Times,
+                                                           one_piece.Result->NodeVoltages[node],
+                                                           chunked.Result->Times[index],
+                                                           half_window);
                 if (value < lowest - tolerance || value > highest + tolerance) {
                     ++outside;
                     first_time = first_time.value_or(chunked.Result->Times[index]);
@@ -320,8 +329,11 @@ TEST_CASE("A cut in the middle of a ringing edge leaves the buck converter withi
     auto loaded = GUI::LoadExample(*buck);
     REQUIRE(loaded.has_value());
     GUI::Schematic schematic;
-    schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings),
-                      std::move(loaded->Subcircuits), std::move(loaded->Models));
+    schematic.Replace(std::move(loaded->Elements),
+                      std::move(loaded->Wires),
+                      std::move(loaded->Settings),
+                      std::move(loaded->Subcircuits),
+                      std::move(loaded->Models));
     const Core::Circuit circuit = schematic.BuildCircuit();
 
     // The first 2 ms hold the cuts that failed in CI (1.49 ms) and others that make the switch node ring. The
@@ -398,8 +410,10 @@ TEST_CASE("A run with a stepped value can be monitored, and a run without a moni
           "[transient_chunks]") {
     ChargingCapacitor setup;
     Received received;
-    const Core::TransientRun stepped = Core::RunTransient(
-        setup.Circuit, setup.Settings, Core::ParameterValue{.Part = "R1", .Value = 2e3}, received.Monitor);
+    const Core::TransientRun stepped = Core::RunTransient(setup.Circuit,
+                                                          setup.Settings,
+                                                          Core::ParameterValue{.Part = "R1", .Value = 2e3},
+                                                          received.Monitor);
     REQUIRE(stepped.Result.has_value());
     CHECK(received.Chunks.size() > 1);
 
@@ -416,8 +430,9 @@ TEST_CASE("The lines ngspice prints at each chunk are left out of the messages, 
     REQUIRE(run.Result.has_value());
     CHECK(std::ranges::none_of(run.Messages,
                                [](const Core::SimulatorMessage &message) { return message.FromErrorStream; }));
-    const auto analysis_lines = std::ranges::count_if(
-        run.Messages, [](const Core::SimulatorMessage &message) { return message.Text.starts_with("Doing analysis"); });
+    const auto analysis_lines = std::ranges::count_if(run.Messages, [](const Core::SimulatorMessage &message) {
+        return message.Text.starts_with("Doing analysis");
+    });
     CHECK(analysis_lines == 1);
 }
 

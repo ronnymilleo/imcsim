@@ -32,8 +32,8 @@ std::string_view StripInlineComment(const std::string_view line) {
             ++depth;
         } else if (!is_quoted && character == '}') {
             --depth;
-        } else if (!is_quoted && depth <= 0 &&
-                   (character == ';' || (character == '$' && (index == 0 || IsSpace(line[index - 1]))))) {
+        } else if (!is_quoted && depth <= 0
+                   && (character == ';' || (character == '$' && (index == 0 || IsSpace(line[index - 1]))))) {
             return line.substr(0, index);
         }
     }
@@ -161,8 +161,8 @@ std::vector<std::string> SplitTokens(const std::string_view line) {
  * @param[in] token  Token of the line, after its nodes.
  */
 bool IsParameterStart(const std::string &token) {
-    return ToUpper(token).starts_with(PARAMETER_LIST_MARK) ||
-           (token.find('=') != std::string::npos && token.front() != '{' && token.front() != '\'');
+    return ToUpper(token).starts_with(PARAMETER_LIST_MARK)
+        || (token.find('=') != std::string::npos && token.front() != '{' && token.front() != '\'');
 }
 
 } // namespace Nodalys

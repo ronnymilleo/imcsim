@@ -24,8 +24,10 @@ namespace {
 constexpr std::string_view FORMAT_NAME = "imcsim-schematic";
 constexpr int FORMAT_VERSION = 1;
 
-std::string WriteDocument(const std::span<const UIElement *const> elements, const std::vector<UIWire> &wires,
-                          const SimulationSettings &settings, const SavedMeasurements &measurements,
+std::string WriteDocument(const std::span<const UIElement *const> elements,
+                          const std::vector<UIWire> &wires,
+                          const SimulationSettings &settings,
+                          const SavedMeasurements &measurements,
                           const std::span<const SavedSubcircuit> subcircuits,
                           const std::span<const Core::LibraryModel> models) {
     nlohmann::json document = {
@@ -41,8 +43,8 @@ std::string WriteDocument(const std::span<const UIElement *const> elements, cons
     if (!models.empty()) {
         document["models"] = WriteLibraryModels(models);
     }
-    if (!measurements.Voltages.empty() || !measurements.Currents.empty() || !measurements.MathChannels.empty() ||
-        !measurements.Buses.empty()) {
+    if (!measurements.Voltages.empty() || !measurements.Currents.empty() || !measurements.MathChannels.empty()
+        || !measurements.Buses.empty()) {
         document["measurements"] = WriteMeasurements(measurements);
     }
     return document.dump(2) + "\n";
@@ -61,8 +63,10 @@ std::string WriteDocument(const std::span<const UIElement *const> elements, cons
  * @return  The file contents, indented for reading and diffing. Values are plain numbers, never suffixed text, except
  *          for subcircuit parameter references saved as strings such as "{RESISTANCE}".
  */
-std::string SaveSchematic(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires,
-                          const SimulationSettings &settings, const SavedMeasurements &measurements,
+std::string SaveSchematic(const std::vector<std::unique_ptr<UIElement>> &elements,
+                          const std::vector<UIWire> &wires,
+                          const SimulationSettings &settings,
+                          const SavedMeasurements &measurements,
                           const std::span<const SavedSubcircuit> subcircuits,
                           const std::span<const Core::LibraryModel> models) {
     std::vector<const UIElement *> pointers;
@@ -81,7 +85,8 @@ std::string SaveSchematic(const std::vector<std::unique_ptr<UIElement>> &element
  * @return  The same JSON a file holds, with the default settings and no measurements, so it loads back with
  *          LoadSchematic().
  */
-std::string SaveParts(const std::span<const UIElement *const> elements, const std::vector<UIWire> &wires,
+std::string SaveParts(const std::span<const UIElement *const> elements,
+                      const std::vector<UIWire> &wires,
                       const std::span<const SavedSubcircuit> subcircuits,
                       const std::span<const Core::LibraryModel> models) {
     return WriteDocument(elements, wires, {}, {}, subcircuits, models);
@@ -109,7 +114,8 @@ std::expected<LoadedSchematic, std::string> LoadSchematic(const std::string_view
     }
     if (*version > FORMAT_VERSION) {
         return std::unexpected(std::format("The file uses format version {}, but this build only reads up to {}",
-                                           *version, FORMAT_VERSION));
+                                           *version,
+                                           FORMAT_VERSION));
     }
 
     LoadedSchematic schematic;

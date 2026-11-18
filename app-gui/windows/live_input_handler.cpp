@@ -19,7 +19,8 @@ namespace GUI {
  * @param[in] is_live_part_pickable  Whether parts can be set by hand now: a live run goes on, on the document, while
  *                                   the editor is selecting.
  */
-std::optional<std::size_t> LiveInputHandler::FindLivePart(const Schematic &schematic, const ViewTransform &view,
+std::optional<std::size_t> LiveInputHandler::FindLivePart(const Schematic &schematic,
+                                                          const ViewTransform &view,
                                                           const bool is_live_part_pickable) const {
     if (!is_live_part_pickable) {
         return std::nullopt;

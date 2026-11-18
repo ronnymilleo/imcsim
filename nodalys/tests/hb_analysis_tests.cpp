@@ -25,8 +25,11 @@ using Catch::Matchers::WithinRel;
 
 namespace {
 
-std::vector<double> InterpolateUniformPeriod(const std::vector<double> &times, const std::vector<double> &values,
-                                             const double t_start, const double period, const std::size_t num_samples) {
+std::vector<double> InterpolateUniformPeriod(const std::vector<double> &times,
+                                             const std::vector<double> &values,
+                                             const double t_start,
+                                             const double period,
+                                             const std::size_t num_samples) {
     REQUIRE(times.size() == values.size());
     REQUIRE(times.size() >= 2);
 
@@ -52,8 +55,10 @@ std::vector<double> InterpolateUniformPeriod(const std::vector<double> &times, c
 }
 
 std::vector<std::complex<double>> ExtractTransientHarmonics(const std::vector<double> &times,
-                                                            const std::vector<double> &values, const double t_start,
-                                                            const double period, const std::size_t fft_samples,
+                                                            const std::vector<double> &values,
+                                                            const double t_start,
+                                                            const double period,
+                                                            const std::size_t fft_samples,
                                                             const std::size_t max_harmonic) {
     const auto uniform = InterpolateUniformPeriod(times, values, t_start, period, fft_samples);
     std::vector<double> coeffs;
@@ -233,7 +238,9 @@ TEST_CASE("Harmonic Balance matches AC analysis and closed-form phasors on linea
                                                    "C1 2 0 1u\n"
                                                    ".ac lin 1 {:.12g} {:.12g}\n"
                                                    ".end\n",
-                                                   VIN_PEAK, F0, F0);
+                                                   VIN_PEAK,
+                                                   F0,
+                                                   F0);
         const auto parsed_ac = Nodalys::ParseNetlist(ac_netlist);
         REQUIRE(parsed_ac.has_value());
         const auto &ac_cfg = std::get<Nodalys::AcSweepConfig>(parsed_ac->Analyses[0].Config);
@@ -386,8 +393,10 @@ TEST_CASE("Harmonic Balance matches steady-state transient FFT on nonlinear diod
         REQUIRE(hb.has_value());
 
         // tau = R*C = 2 ms = 2*T0 -> 26 ms = 13*tau decays initial transient well below 1e-5
-        Nodalys::TransientConfig tran_cfg{
-            .StopTime = 26.0 * T0, .TimeStep = T0 / 2048.0, .MaxStep = T0 / 2048.0, .UseInitialConditions = false};
+        Nodalys::TransientConfig tran_cfg{.StopTime = 26.0 * T0,
+                                          .TimeStep = T0 / 2048.0,
+                                          .MaxStep = T0 / 2048.0,
+                                          .UseInitialConditions = false};
         const auto tran = Nodalys::ComputeTransient(parsed->CircuitInstance, tran_cfg);
         REQUIRE(tran.has_value());
 
@@ -440,8 +449,9 @@ TEST_CASE("Harmonic Balance matches steady-state transient FFT on nonlinear diod
         CHECK(std::abs(hb->NodePhasors[2][3]) > 0.15);
         CHECK(std::abs(hb->NodePhasors[2][5]) > 0.05);
 
-        const auto tran = Nodalys::ComputeTransient(
-            parsed->CircuitInstance, {.StopTime = 4.0 * T0, .TimeStep = T0 / 1024.0, .MaxStep = T0 / 1024.0});
+        const auto tran =
+            Nodalys::ComputeTransient(parsed->CircuitInstance,
+                                      {.StopTime = 4.0 * T0, .TimeStep = T0 / 1024.0, .MaxStep = T0 / 1024.0});
         REQUIRE(tran.has_value());
         const auto tran_v2 = ExtractTransientHarmonics(tran->Times, tran->NodeVoltages[2], 3.0 * T0, T0, 512, 25);
 
@@ -468,8 +478,9 @@ TEST_CASE("Harmonic Balance matches steady-state transient FFT on nonlinear diod
                                                         {.FundamentalFrequency = F0, .Harmonics = 24, .Samples = 256});
         REQUIRE(hb.has_value());
 
-        const auto tran = Nodalys::ComputeTransient(
-            parsed->CircuitInstance, {.StopTime = 12.0 * T0, .TimeStep = T0 / 1024.0, .MaxStep = T0 / 1024.0});
+        const auto tran =
+            Nodalys::ComputeTransient(parsed->CircuitInstance,
+                                      {.StopTime = 12.0 * T0, .TimeStep = T0 / 1024.0, .MaxStep = T0 / 1024.0});
         REQUIRE(tran.has_value());
         const auto tran_v1 = ExtractTransientHarmonics(tran->Times, tran->NodeVoltages[1], 11.0 * T0, T0, 512, 24);
 
@@ -498,8 +509,9 @@ TEST_CASE("Harmonic Balance matches steady-state transient FFT on nonlinear diod
         REQUIRE(hb.has_value());
 
         // Run past 1.25*T0 + several RC time constants so steady state is reached
-        const auto tran = Nodalys::ComputeTransient(
-            parsed->CircuitInstance, {.StopTime = 8.0 * T0, .TimeStep = T0 / 1024.0, .MaxStep = T0 / 1024.0});
+        const auto tran =
+            Nodalys::ComputeTransient(parsed->CircuitInstance,
+                                      {.StopTime = 8.0 * T0, .TimeStep = T0 / 1024.0, .MaxStep = T0 / 1024.0});
         REQUIRE(tran.has_value());
         const auto tran_v2 = ExtractTransientHarmonics(tran->Times, tran->NodeVoltages[2], 7.0 * T0, T0, 512, 24);
 
@@ -530,8 +542,9 @@ TEST_CASE("Harmonic Balance matches steady-state transient FFT on BJT and MOSFET
                                                         {.FundamentalFrequency = F0, .Harmonics = 16, .Samples = 128});
         REQUIRE(hb.has_value());
 
-        const auto tran = Nodalys::ComputeTransient(
-            parsed->CircuitInstance, {.StopTime = 5.0 * T0, .TimeStep = T0 / 1024.0, .MaxStep = T0 / 1024.0});
+        const auto tran =
+            Nodalys::ComputeTransient(parsed->CircuitInstance,
+                                      {.StopTime = 5.0 * T0, .TimeStep = T0 / 1024.0, .MaxStep = T0 / 1024.0});
         REQUIRE(tran.has_value());
         const auto tran_v4 = ExtractTransientHarmonics(tran->Times, tran->NodeVoltages[4], 4.0 * T0, T0, 512, 16);
 
@@ -565,8 +578,9 @@ TEST_CASE("Harmonic Balance matches steady-state transient FFT on BJT and MOSFET
                                                         {.FundamentalFrequency = F0, .Harmonics = 16, .Samples = 128});
         REQUIRE(hb.has_value());
 
-        const auto tran = Nodalys::ComputeTransient(
-            parsed->CircuitInstance, {.StopTime = 6.0 * T0, .TimeStep = T0 / 1024.0, .MaxStep = T0 / 1024.0});
+        const auto tran =
+            Nodalys::ComputeTransient(parsed->CircuitInstance,
+                                      {.StopTime = 6.0 * T0, .TimeStep = T0 / 1024.0, .MaxStep = T0 / 1024.0});
         REQUIRE(tran.has_value());
         const auto tran_v4 = ExtractTransientHarmonics(tran->Times, tran->NodeVoltages[4], 5.0 * T0, T0, 512, 16);
 
@@ -643,8 +657,9 @@ TEST_CASE("Harmonic Balance vs steady-state transient benchmark metrics", "[.ben
         REQUIRE(hb.has_value());
 
         const auto tran_start = std::chrono::steady_clock::now();
-        const auto tran = Nodalys::ComputeTransient(
-            parsed->CircuitInstance, {.StopTime = 400.0 * T0, .TimeStep = T0 / 256.0, .MaxStep = T0 / 256.0});
+        const auto tran =
+            Nodalys::ComputeTransient(parsed->CircuitInstance,
+                                      {.StopTime = 400.0 * T0, .TimeStep = T0 / 256.0, .MaxStep = T0 / 256.0});
         const auto tran_end = std::chrono::steady_clock::now();
         REQUIRE(tran.has_value());
         const auto tran_v3 = ExtractTransientHarmonics(tran->Times, tran->NodeVoltages[3], 399.0 * T0, T0, 256, 5);
@@ -657,8 +672,14 @@ TEST_CASE("Harmonic Balance vs steady-state transient benchmark metrics", "[.ben
         std::cout << std::format(
             "[BENCHMARK High-Q RLC+Diode] HB={:.3f} ms (iters={}, strategy={}), Tran+FFT={:.3f} ms, "
             "Speedup={:.1f}x, |V3(f0)| HB={:.4f} V Tran={:.4f} V (err={:.4e} V)\n",
-            hb_ms, hb->Iterations, hb->Strategy, tran_ms, tran_ms / std::max(hb_ms, 1e-6),
-            std::abs(hb->NodePhasors[3][1]), std::abs(tran_v3[1]), v1_err);
+            hb_ms,
+            hb->Iterations,
+            hb->Strategy,
+            tran_ms,
+            tran_ms / std::max(hb_ms, 1e-6),
+            std::abs(hb->NodePhasors[3][1]),
+            std::abs(tran_v3[1]),
+            v1_err);
 
         CHECK(v1_err < 0.05);
     }
@@ -684,8 +705,9 @@ TEST_CASE("Harmonic Balance vs steady-state transient benchmark metrics", "[.ben
         REQUIRE(hb.has_value());
 
         const auto tran_start = std::chrono::steady_clock::now();
-        const auto tran = Nodalys::ComputeTransient(
-            parsed->CircuitInstance, {.StopTime = 500.0 * T0, .TimeStep = T0 / 256.0, .MaxStep = T0 / 256.0});
+        const auto tran =
+            Nodalys::ComputeTransient(parsed->CircuitInstance,
+                                      {.StopTime = 500.0 * T0, .TimeStep = T0 / 256.0, .MaxStep = T0 / 256.0});
         const auto fft_end = std::chrono::steady_clock::now();
         REQUIRE(tran.has_value());
         const auto tran_v2 = ExtractTransientHarmonics(tran->Times, tran->NodeVoltages[2], 499.0 * T0, T0, 256, 5);
@@ -697,8 +719,14 @@ TEST_CASE("Harmonic Balance vs steady-state transient benchmark metrics", "[.ben
         std::cout << std::format(
             "[BENCHMARK Long-Tau Rectifier] HB={:.3f} ms (iters={}, strategy={}), Tran+FFT={:.3f} ms, "
             "Speedup={:.1f}x, Vdc HB={:.4f} V Tran={:.4f} V (err={:.4e} V)\n",
-            hb_ms, hb->Iterations, hb->Strategy, tran_ms, tran_ms / std::max(hb_ms, 1e-6), hb->NodePhasors[2][0].real(),
-            tran_v2[0].real(), dc_err);
+            hb_ms,
+            hb->Iterations,
+            hb->Strategy,
+            tran_ms,
+            tran_ms / std::max(hb_ms, 1e-6),
+            hb->NodePhasors[2][0].real(),
+            tran_v2[0].real(),
+            dc_err);
 
         CHECK(dc_err < 0.05);
     }
@@ -715,8 +743,9 @@ TEST_CASE("A harmonic balance asked to stop ends with an error before it converg
     auto circuit = builder.Build();
     REQUIRE(circuit.has_value());
     int asked = 0;
-    const Nodalys::HarmonicBalanceConfig config{
-        .FundamentalFrequency = 1e3, .Harmonics = 8, .ShouldStop = [&asked]() { return ++asked > 1; }};
+    const Nodalys::HarmonicBalanceConfig config{.FundamentalFrequency = 1e3, .Harmonics = 8, .ShouldStop = [&asked]() {
+                                                    return ++asked > 1;
+                                                }};
 
     const auto result = Nodalys::ComputeHarmonicBalance(*circuit, config);
 

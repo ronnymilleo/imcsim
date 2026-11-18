@@ -56,9 +56,11 @@ const GUI::StatisticsRow &FindRow(const std::vector<GUI::StatisticsRow> &rows, c
 
 TEST_CASE("The statistics read across: a row per quantity, a column per trace", "[statistics_table]") {
     const Waves waves = MakeWaves();
-    const std::vector<GUI::StatisticsRow> rows = GUI::BuildTransientStatistics(
-        waves.Times, {{.Values = waves.Input, .Unit = "V"}, {.Values = waves.Output, .Unit = "V"}},
-        {.From = 0.0, .To = STOP_TIME}, std::nullopt);
+    const std::vector<GUI::StatisticsRow> rows =
+        GUI::BuildTransientStatistics(waves.Times,
+                                      {{.Values = waves.Input, .Unit = "V"}, {.Values = waves.Output, .Unit = "V"}},
+                                      {.From = 0.0, .To = STOP_TIME},
+                                      std::nullopt);
     REQUIRE(rows.size() == 7);
     for (const GUI::StatisticsRow &row : rows) {
         CHECK(row.Cells.size() == 2);
@@ -73,8 +75,10 @@ TEST_CASE("The statistics read across: a row per quantity, a column per trace", 
 
 TEST_CASE("A mean that is residue reads ~0 with the exact value as its tooltip", "[statistics_table]") {
     const Waves waves = MakeWaves();
-    const std::vector<GUI::StatisticsRow> rows = GUI::BuildTransientStatistics(
-        waves.Times, {{.Values = waves.Input, .Unit = "V"}}, {.From = 0.0, .To = STOP_TIME}, std::nullopt);
+    const std::vector<GUI::StatisticsRow> rows = GUI::BuildTransientStatistics(waves.Times,
+                                                                               {{.Values = waves.Input, .Unit = "V"}},
+                                                                               {.From = 0.0, .To = STOP_TIME},
+                                                                               std::nullopt);
     const GUI::StatisticsCell &mean = FindRow(rows, "Mean").Cells[0];
     CHECK(mean.Text == "~0V");
     CHECK_FALSE(mean.Tooltip.empty());
@@ -84,8 +88,10 @@ TEST_CASE("Shown cursors add the value of each trace at both and their differenc
     const Waves waves = MakeWaves();
     // A quarter period and three quarters: the crest and the trough of the input
     const GUI::PlotCursors cursors = {.Shown = true, .Placed = true, .A = 0.25e-3, .B = 0.75e-3};
-    const std::vector<GUI::StatisticsRow> rows = GUI::BuildTransientStatistics(
-        waves.Times, {{.Values = waves.Input, .Unit = "V"}}, {.From = cursors.A, .To = cursors.B}, cursors);
+    const std::vector<GUI::StatisticsRow> rows = GUI::BuildTransientStatistics(waves.Times,
+                                                                               {{.Values = waves.Input, .Unit = "V"}},
+                                                                               {.From = cursors.A, .To = cursors.B},
+                                                                               cursors);
     REQUIRE(rows.size() == 10);
     CHECK(FindRow(rows, "At A").Cells[0].Text == "1.000V");
     CHECK(FindRow(rows, "At B").Cells[0].Text == "-1.000V");
@@ -94,8 +100,10 @@ TEST_CASE("Shown cursors add the value of each trace at both and their differenc
 
 TEST_CASE("A trace with no points in the span reads a dash in every measured row", "[statistics_table]") {
     const Waves waves = MakeWaves();
-    const std::vector<GUI::StatisticsRow> rows = GUI::BuildTransientStatistics(
-        waves.Times, {{.Values = waves.Input, .Unit = "V"}}, {.From = 1.0, .To = 2.0}, std::nullopt);
+    const std::vector<GUI::StatisticsRow> rows = GUI::BuildTransientStatistics(waves.Times,
+                                                                               {{.Values = waves.Input, .Unit = "V"}},
+                                                                               {.From = 1.0, .To = 2.0},
+                                                                               std::nullopt);
     for (const GUI::StatisticsRow &row : rows) {
         REQUIRE(row.Cells.size() == 1);
         CHECK(row.Cells[0].Text == GUI::NO_VALUE);
@@ -150,8 +158,11 @@ TEST_CASE("A swept current reads its slope as a resistance, other curves read -"
     }
     const GUI::PlotCursors cursors = {.Shown = true, .Placed = true, .A = 2.0, .B = 8.0};
     const std::vector<GUI::StatisticsRow> rows =
-        GUI::BuildSweepStatistics(swept, "V", {{.Values = currents, .Unit = "A"}, {.Values = voltages, .Unit = "V"}},
-                                  {.From = 2.0, .To = 8.0}, cursors);
+        GUI::BuildSweepStatistics(swept,
+                                  "V",
+                                  {{.Values = currents, .Unit = "A"}, {.Values = voltages, .Unit = "V"}},
+                                  {.From = 2.0, .To = 8.0},
+                                  cursors);
     REQUIRE(rows.size() == 8);
     CHECK(FindRow(rows, "At A").Cells[0].Text == "2.000mA");
     CHECK(FindRow(rows, "Slope").Cells[0].Text == "1.000mA/V");
@@ -163,8 +174,11 @@ TEST_CASE("A swept current reads its slope as a resistance, other curves read -"
 TEST_CASE("Without cursors a DC sweep reads only its extremes and mean", "[statistics_table]") {
     const std::vector<double> swept = {0.0, 1.0, 2.0};
     const std::vector<double> values = {0.0, 0.5, 1.0};
-    const std::vector<GUI::StatisticsRow> rows = GUI::BuildSweepStatistics(
-        swept, "V", {{.Values = values, .Unit = "V"}}, {.From = 0.0, .To = 2.0}, std::nullopt);
+    const std::vector<GUI::StatisticsRow> rows = GUI::BuildSweepStatistics(swept,
+                                                                           "V",
+                                                                           {{.Values = values, .Unit = "V"}},
+                                                                           {.From = 0.0, .To = 2.0},
+                                                                           std::nullopt);
     REQUIRE(rows.size() == 3);
     CHECK(rows[0].Name == "Min");
     CHECK(rows[2].Name == "Mean");

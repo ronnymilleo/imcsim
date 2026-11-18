@@ -44,7 +44,8 @@ std::expected<SParameters, std::string> ReadSParameters(const Circuit &circuit) 
     std::vector<std::vector<std::complex<double>>> entries;
     for (int row = 1; row <= port_count; ++row) {
         for (int column = 1; column <= port_count; ++column) {
-            auto values = ReadComplexVectorOfLength(std::format("s_{}_{}", row, column), point_count,
+            auto values = ReadComplexVectorOfLength(std::format("s_{}_{}", row, column),
+                                                    point_count,
                                                     std::format("S({}, {})", row, column));
             if (!values) {
                 return std::unexpected(values.error());

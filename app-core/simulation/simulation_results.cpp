@@ -16,7 +16,10 @@ namespace {
 
 std::optional<std::complex<double>>
 ReadPortMatrix(const std::vector<std::optional<std::vector<std::complex<double>>>> &matrices,
-               const std::size_t frequency, const int ports, const int row, const int column) {
+               const std::size_t frequency,
+               const int ports,
+               const int row,
+               const int column) {
     if (frequency >= matrices.size()) {
         return std::nullopt;
     }
@@ -47,8 +50,8 @@ int SParameters::GetPortCount() const {
  */
 std::complex<double> SParameters::Get(const std::size_t frequency, const int row, const int column) const {
     const auto ports = static_cast<std::size_t>(GetPortCount());
-    return Values[(frequency * ports + static_cast<std::size_t>(row - 1)) * ports +
-                  static_cast<std::size_t>(column - 1)];
+    return Values[(frequency * ports + static_cast<std::size_t>(row - 1)) * ports
+                  + static_cast<std::size_t>(column - 1)];
 }
 
 /**
@@ -56,8 +59,8 @@ std::complex<double> SParameters::Get(const std::size_t frequency, const int row
  * @return  True when there is one entry per frequency of each, absent or not; false for a result without them.
  */
 bool SParameters::HasPortMatrices() const {
-    return !Frequencies.empty() && ImpedanceMatrices.size() == Frequencies.size() &&
-           AdmittanceMatrices.size() == Frequencies.size();
+    return !Frequencies.empty() && ImpedanceMatrices.size() == Frequencies.size()
+        && AdmittanceMatrices.size() == Frequencies.size();
 }
 
 /**
@@ -68,8 +71,8 @@ bool SParameters::HasPortMatrices() const {
  * @return  Z(row, column) in ohms; no value when the backend gave no impedance matrices, or the circuit has no finite
  *          one at this frequency.
  */
-std::optional<std::complex<double>> SParameters::GetImpedance(const std::size_t frequency, const int row,
-                                                              const int column) const {
+std::optional<std::complex<double>>
+SParameters::GetImpedance(const std::size_t frequency, const int row, const int column) const {
     return ReadPortMatrix(ImpedanceMatrices, frequency, GetPortCount(), row, column);
 }
 
@@ -81,8 +84,8 @@ std::optional<std::complex<double>> SParameters::GetImpedance(const std::size_t 
  * @return  Y(row, column) in siemens; no value when the backend gave no admittance matrices, or the circuit has no
  *          finite one at this frequency.
  */
-std::optional<std::complex<double>> SParameters::GetAdmittance(const std::size_t frequency, const int row,
-                                                               const int column) const {
+std::optional<std::complex<double>>
+SParameters::GetAdmittance(const std::size_t frequency, const int row, const int column) const {
     return ReadPortMatrix(AdmittanceMatrices, frequency, GetPortCount(), row, column);
 }
 

@@ -118,7 +118,8 @@ int RunCli(const int argc, const char *const *argv, std::istream &input, std::os
     app.add_option("-o,--output", output_file, "Destination output file (default: stdout)");
     app.add_option("-f,--format", format_str, "Output format: raw (Nutmeg ASCII), csv, json, touchstone (default: raw)")
         ->check(CLI::IsMember({"raw", "raw-ascii", "csv", "json", "touchstone", "s2p"}, CLI::ignore_case));
-    app.add_option("-a,--analysis", analysis_override,
+    app.add_option("-a,--analysis",
+                   analysis_override,
                    "Override analysis: op, tran, dc, ac, tf, noise, sp, pz, sens (DC and AC), hb")
         ->check(CLI::IsMember({"op", "tran", "dc", "ac", "tf", "noise", "sp", "pz", "sens", "hb"}, CLI::ignore_case));
     app.add_option("-s,--step", step_override, "Override transient step time / sweep step");
@@ -171,8 +172,10 @@ int RunCli(const int argc, const char *const *argv, std::istream &input, std::os
 
     if (verbose && !batch_mode) {
         const auto parse_ms = std::chrono::duration<double, std::milli>(parse_end - parse_start).count();
-        output << std::format("Netlist parsed in {:.2f} ms: {} nodes, {} MNA unknowns\n", parse_ms,
-                              parsed.CircuitInstance.GetNodeCount(), parsed.CircuitInstance.GetUnknownCount());
+        output << std::format("Netlist parsed in {:.2f} ms: {} nodes, {} MNA unknowns\n",
+                              parse_ms,
+                              parsed.CircuitInstance.GetNodeCount(),
+                              parsed.CircuitInstance.GetUnknownCount());
     }
 
     // Apply tolerance overrides if provided
@@ -200,8 +203,9 @@ int RunCli(const int argc, const char *const *argv, std::istream &input, std::os
 
         if (it != parsed.Analyses.end()) {
             std::vector<Nodalys::ParsedAnalysis> matches;
-            std::ranges::copy_if(parsed.Analyses, std::back_inserter(matches),
-                                 [&](const auto &an) { return IsOverrideMatch(a_lower, an.Kind); });
+            std::ranges::copy_if(parsed.Analyses, std::back_inserter(matches), [&](const auto &an) {
+                return IsOverrideMatch(a_lower, an.Kind);
+            });
             // Only a sensitivity keeps every match, since a netlist may ask for both of its forms
             if (a_lower != "sens") {
                 matches.resize(1);
@@ -250,7 +254,8 @@ int RunCli(const int argc, const char *const *argv, std::istream &input, std::os
             if (verbose && !batch_mode) {
                 output << "Running Operating Point (.op) analysis...\n";
             }
-            auto res = Nodalys::ComputeOperatingPoint(parsed.CircuitInstance, parsed.Options,
+            auto res = Nodalys::ComputeOperatingPoint(parsed.CircuitInstance,
+                                                      parsed.Options,
                                                       verbose ? &diagnostics : nullptr);
             if (!res) {
                 errors << std::format("Simulation Error: {}\n", res.error());
@@ -272,11 +277,16 @@ int RunCli(const int argc, const char *const *argv, std::istream &input, std::os
                 cfg.MaxStep = cfg.TimeStep;
             }
             if (verbose && !batch_mode) {
-                output << std::format("Running Transient (.tran) analysis: tstep={}, tstop={}\n", cfg.TimeStep,
+                output << std::format("Running Transient (.tran) analysis: tstep={}, tstop={}\n",
+                                      cfg.TimeStep,
                                       cfg.StopTime);
             }
-            auto res = Nodalys::ComputeTransient(parsed.CircuitInstance, cfg, cfg.UseInitialConditions, {},
-                                                 parsed.Options, verbose ? &diagnostics : nullptr);
+            auto res = Nodalys::ComputeTransient(parsed.CircuitInstance,
+                                                 cfg,
+                                                 cfg.UseInitialConditions,
+                                                 {},
+                                                 parsed.Options,
+                                                 verbose ? &diagnostics : nullptr);
             if (!res) {
                 errors << std::format("Simulation Error: {}\n", res.error());
                 return EXIT_FAILURE;
@@ -303,7 +313,8 @@ int RunCli(const int argc, const char *const *argv, std::istream &input, std::os
         case Nodalys::AnalysisKind::AC_SWEEP: {
             const auto &cfg = std::get<Nodalys::AcSweepConfig>(analysis.Config);
             if (verbose && !batch_mode) {
-                output << std::format("Running AC Sweep (.ac) analysis: {} Hz to {} Hz\n", cfg.StartFrequency,
+                output << std::format("Running AC Sweep (.ac) analysis: {} Hz to {} Hz\n",
+                                      cfg.StartFrequency,
                                       cfg.StopFrequency);
             }
             auto res =
@@ -321,7 +332,9 @@ int RunCli(const int argc, const char *const *argv, std::istream &input, std::os
             if (verbose && !batch_mode) {
                 output << std::format("Running Transfer Function (.tf) analysis for source {}\n", cfg.InputSource);
             }
-            auto res = Nodalys::ComputeTransferFunction(parsed.CircuitInstance, cfg, parsed.Options,
+            auto res = Nodalys::ComputeTransferFunction(parsed.CircuitInstance,
+                                                        cfg,
+                                                        parsed.Options,
                                                         verbose ? &diagnostics : nullptr);
             if (!res) {
                 errors << std::format("Simulation Error: {}\n", res.error());
@@ -349,10 +362,13 @@ int RunCli(const int argc, const char *const *argv, std::istream &input, std::os
         case Nodalys::AnalysisKind::S_PARAMETERS: {
             const auto &cfg = std::get<Nodalys::SParameterConfig>(analysis.Config);
             if (verbose && !batch_mode) {
-                output << std::format("Running S-Parameter (.sp) analysis: {} Hz to {} Hz\n", cfg.StartFrequency,
+                output << std::format("Running S-Parameter (.sp) analysis: {} Hz to {} Hz\n",
+                                      cfg.StartFrequency,
                                       cfg.StopFrequency);
             }
-            auto res = Nodalys::ComputeSParameters(parsed.CircuitInstance, cfg, parsed.Options,
+            auto res = Nodalys::ComputeSParameters(parsed.CircuitInstance,
+                                                   cfg,
+                                                   parsed.Options,
                                                    verbose ? &diagnostics : nullptr);
             if (!res) {
                 errors << std::format("Simulation Error: {}\n", res.error());
@@ -365,7 +381,8 @@ int RunCli(const int argc, const char *const *argv, std::istream &input, std::os
         case Nodalys::AnalysisKind::POLE_ZERO: {
             const auto &cfg = std::get<Nodalys::PoleZeroConfig>(analysis.Config);
             if (verbose && !batch_mode) {
-                output << std::format("Running Pole-Zero (.pz) analysis: output={}, input={}\n", cfg.OutputNode,
+                output << std::format("Running Pole-Zero (.pz) analysis: output={}, input={}\n",
+                                      cfg.OutputNode,
                                       cfg.InputSource);
             }
             auto res =
@@ -382,9 +399,12 @@ int RunCli(const int argc, const char *const *argv, std::istream &input, std::os
             const auto &cfg = std::get<Nodalys::SensitivityConfig>(analysis.Config);
             if (verbose && !batch_mode) {
                 output << std::format("Running DC Sensitivity (.sens) analysis: pos={}, neg={}\n",
-                                      cfg.OutputPositiveNode, cfg.OutputNegativeNode);
+                                      cfg.OutputPositiveNode,
+                                      cfg.OutputNegativeNode);
             }
-            auto res = Nodalys::ComputeSensitivity(parsed.CircuitInstance, cfg, parsed.Options,
+            auto res = Nodalys::ComputeSensitivity(parsed.CircuitInstance,
+                                                   cfg,
+                                                   parsed.Options,
                                                    verbose ? &diagnostics : nullptr);
             if (!res) {
                 errors << std::format("Simulation Error: {}\n", res.error());
@@ -398,9 +418,13 @@ int RunCli(const int argc, const char *const *argv, std::istream &input, std::os
             const auto &cfg = std::get<Nodalys::AcSensitivityConfig>(analysis.Config);
             if (verbose && !batch_mode) {
                 output << std::format("Running AC Sensitivity (.sens ... ac) analysis: pos={}, neg={}, input={}\n",
-                                      cfg.OutputPositiveNode, cfg.OutputNegativeNode, cfg.InputSource);
+                                      cfg.OutputPositiveNode,
+                                      cfg.OutputNegativeNode,
+                                      cfg.InputSource);
             }
-            auto res = Nodalys::ComputeAcSensitivity(parsed.CircuitInstance, cfg, parsed.Options,
+            auto res = Nodalys::ComputeAcSensitivity(parsed.CircuitInstance,
+                                                     cfg,
+                                                     parsed.Options,
                                                      verbose ? &diagnostics : nullptr);
             if (!res) {
                 errors << std::format("Simulation Error: {}\n", res.error());
@@ -414,9 +438,12 @@ int RunCli(const int argc, const char *const *argv, std::istream &input, std::os
             const auto &cfg = std::get<Nodalys::HarmonicBalanceConfig>(analysis.Config);
             if (verbose && !batch_mode) {
                 output << std::format("Running Harmonic Balance (.hb) analysis: f0={} Hz, H={}\n",
-                                      cfg.FundamentalFrequency, cfg.Harmonics);
+                                      cfg.FundamentalFrequency,
+                                      cfg.Harmonics);
             }
-            auto res = Nodalys::ComputeHarmonicBalance(parsed.CircuitInstance, cfg, parsed.Options,
+            auto res = Nodalys::ComputeHarmonicBalance(parsed.CircuitInstance,
+                                                       cfg,
+                                                       parsed.Options,
                                                        verbose ? &diagnostics : nullptr);
             if (!res) {
                 errors << std::format("Simulation Error: {}\n", res.error());

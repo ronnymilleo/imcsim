@@ -198,18 +198,18 @@ TEST_CASE("The engine says in words what is wrong with the ports and the sweep",
     };
     const std::string sweep = ".sp lin 3 1Meg 3Meg";
 
-    CHECK(error_of("Vsport1 1 0 dc 0 portnum 1 z0 0\nR1 1 0 50\n", sweep) ==
-          "The reference impedance of port 1 must be positive");
-    CHECK(error_of("Vsport1 1 0 dc 0 portnum 1 z0 -50\nR1 1 0 50\n", sweep) ==
-          "The reference impedance of port 1 must be positive");
-    CHECK(error_of("Vsport1 0 0 dc 0 portnum 1 z0 50\nR1 1 0 50\n", sweep) ==
-          "Port 1 is on ground; an S-parameter port needs a node of its own");
-    CHECK(error_of("Vsport1 1 0 dc 0 portnum 1 z0 50\nVsport2 1 0 dc 0 portnum 2 z0 50\nR1 1 0 50\n", sweep) ==
-          "Ports 1 and 2 are on the same node; each port needs a node of its own");
-    CHECK(error_of("Vsport1 1 0 dc 0 portnum 1 z0 50\nVsport2 2 0 dc 0 portnum 1 z0 50\nR1 1 2 50\n", sweep) ==
-          "Two S-parameter ports are numbered 1; give each port its own number");
-    CHECK(error_of("Vsport1 1 0 dc 0 portnum 1 z0 50\nVsport2 2 0 dc 0 portnum 3 z0 50\nR1 1 2 50\n", sweep) ==
-          "The S-parameter ports must be numbered 1 to 2 with no gap; port 2 is missing");
+    CHECK(error_of("Vsport1 1 0 dc 0 portnum 1 z0 0\nR1 1 0 50\n", sweep)
+          == "The reference impedance of port 1 must be positive");
+    CHECK(error_of("Vsport1 1 0 dc 0 portnum 1 z0 -50\nR1 1 0 50\n", sweep)
+          == "The reference impedance of port 1 must be positive");
+    CHECK(error_of("Vsport1 0 0 dc 0 portnum 1 z0 50\nR1 1 0 50\n", sweep)
+          == "Port 1 is on ground; an S-parameter port needs a node of its own");
+    CHECK(error_of("Vsport1 1 0 dc 0 portnum 1 z0 50\nVsport2 1 0 dc 0 portnum 2 z0 50\nR1 1 0 50\n", sweep)
+          == "Ports 1 and 2 are on the same node; each port needs a node of its own");
+    CHECK(error_of("Vsport1 1 0 dc 0 portnum 1 z0 50\nVsport2 2 0 dc 0 portnum 1 z0 50\nR1 1 2 50\n", sweep)
+          == "Two S-parameter ports are numbered 1; give each port its own number");
+    CHECK(error_of("Vsport1 1 0 dc 0 portnum 1 z0 50\nVsport2 2 0 dc 0 portnum 3 z0 50\nR1 1 2 50\n", sweep)
+          == "The S-parameter ports must be numbered 1 to 2 with no gap; port 2 is missing");
     CHECK(error_of("R1 1 0 50\n", sweep) == "The circuit has no S-parameter port");
 
     const std::string one_port = "Vsport1 1 0 dc 0 portnum 1 z0 50\nR1 1 0 50\n";

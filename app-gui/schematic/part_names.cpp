@@ -35,7 +35,8 @@ bool AreSameIgnoringCase(const std::string_view first, const std::string_view se
  *          since SPICE ignores case; none when it may.
  */
 std::optional<std::string> CheckPartName(const std::vector<std::unique_ptr<UIElement>> &elements,
-                                         const std::size_t index, const std::string_view name) {
+                                         const std::size_t index,
+                                         const std::string_view name) {
     const std::string_view prefix = elements[index]->GetComponent().GetNamePrefix();
     if (prefix.empty()) {
         return "This part has no name";
@@ -58,13 +59,13 @@ std::optional<std::string> CheckPartName(const std::vector<std::unique_ptr<UIEle
  * @param[in] new_name  The name it has now.
  * @return  The current with the part's new name, its terminal kept; the current as it was when it is not the part's.
  */
-std::string RenameCurrent(const std::string_view current, const std::string_view old_name,
-                          const std::string_view new_name) {
+std::string
+RenameCurrent(const std::string_view current, const std::string_view old_name, const std::string_view new_name) {
     if (current == old_name) {
         return std::string(new_name);
     }
-    if (current.starts_with(old_name) && current.size() > old_name.size() &&
-        current[old_name.size()] == TERMINAL_SEPARATOR) {
+    if (current.starts_with(old_name) && current.size() > old_name.size()
+        && current[old_name.size()] == TERMINAL_SEPARATOR) {
         return std::format("{}{}", new_name, current.substr(old_name.size()));
     }
     return std::string(current);
@@ -77,8 +78,8 @@ std::string RenameCurrent(const std::string_view current, const std::string_view
  * @param[in] new_name    The name it has now.
  * @return  The expression with each current of the part, I(name) or I(name.terminal), under the new name.
  */
-std::string RenameCurrentsIn(const std::string_view expression, const std::string_view old_name,
-                             const std::string_view new_name) {
+std::string
+RenameCurrentsIn(const std::string_view expression, const std::string_view old_name, const std::string_view new_name) {
     std::string renamed;
     std::size_t position = 0;
     while (position < expression.size()) {
@@ -88,8 +89,8 @@ std::string RenameCurrentsIn(const std::string_view expression, const std::strin
         }
         const std::size_t start = open + 2;
         // Only the I of a current, not the last letter of a longer name
-        if (open > 0 &&
-            (std::isalnum(static_cast<unsigned char>(expression[open - 1])) != 0 || expression[open - 1] == '_')) {
+        if (open > 0
+            && (std::isalnum(static_cast<unsigned char>(expression[open - 1])) != 0 || expression[open - 1] == '_')) {
             renamed += expression.substr(position, start - position);
             position = start;
             continue;

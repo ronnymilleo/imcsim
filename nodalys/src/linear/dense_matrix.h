@@ -21,7 +21,8 @@ namespace Nodalys {
  * @brief   A dense matrix of real (`double`) or complex (`std::complex<double>`) scalars that factorizes itself in
  *          place and solves linear systems.
  */
-template <typename Scalar> class BasicDenseMatrix {
+template <typename Scalar>
+class BasicDenseMatrix {
 public:
     BasicDenseMatrix(std::size_t rows, std::size_t cols);
 

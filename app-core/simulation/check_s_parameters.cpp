@@ -20,7 +20,7 @@ namespace Core {
 namespace {
 
 /// Most points a linear S-parameter sweep may take.
-constexpr int MAX_LINEAR_S_POINTS = 100000;
+constexpr int MAX_LINEAR_S_POINTS = 100'000;
 
 std::optional<std::string> CheckSParameterRange(const SParameterSettings &settings, const SParameterLimits &limits) {
     if (!settings.IsLogarithmic) {
@@ -32,8 +32,10 @@ std::optional<std::string> CheckSParameterRange(const SParameterSettings &settin
         }
         if (settings.LinearPoints < limits.MinLinearPoints || settings.LinearPoints > MAX_LINEAR_S_POINTS) {
             const std::string reason = limits.MinLinearPointsReason.empty() ? "" : "; " + limits.MinLinearPointsReason;
-            return std::format("The number of points must be between {} and {}{}", limits.MinLinearPoints,
-                               MAX_LINEAR_S_POINTS, reason);
+            return std::format("The number of points must be between {} and {}{}",
+                               limits.MinLinearPoints,
+                               MAX_LINEAR_S_POINTS,
+                               reason);
         }
         return std::nullopt;
     }
@@ -55,7 +57,8 @@ std::optional<std::string> CheckSParameterPortNumbers(const std::vector<CircuitP
     for (int number = 1; number <= static_cast<int>(ports.size()); ++number) {
         if (!numbers.contains(number)) {
             return std::format("The S-parameter ports must be numbered 1 to {} with no gap; port {} is missing",
-                               ports.size(), number);
+                               ports.size(),
+                               number);
         }
     }
     return std::nullopt;
@@ -73,7 +76,8 @@ std::optional<std::string> CheckSParameterPortNodes(const std::vector<CircuitPor
         for (std::size_t second = first + 1; second < ports.size(); ++second) {
             if (ports[second].Node == port.Node) {
                 return std::format("Ports {} and {} are on the same node; each port needs a node of its own",
-                                   port.Number, ports[second].Number);
+                                   port.Number,
+                                   ports[second].Number);
             }
         }
     }
@@ -111,8 +115,8 @@ std::optional<std::string> CheckSParameterPortCount(const std::size_t port_count
  *          value when it can.
  * @note    ngspice stops for good when it finds fewer than two ports, so this must run before any backend.
  */
-std::optional<std::string> CheckSParameterSettings(const Circuit &circuit, const SParameterSettings &settings,
-                                                   const SParameterLimits &limits) {
+std::optional<std::string>
+CheckSParameterSettings(const Circuit &circuit, const SParameterSettings &settings, const SParameterLimits &limits) {
     if (std::optional<std::string> error = CheckSParameterRange(settings, limits)) {
         return error;
     }

@@ -46,7 +46,8 @@ void TransformElement(UIElement &element, const PointTransform &transform) {
  *          of the box around the positions of the selected parts and the ends of the selected wires, on the grid.
  */
 GridPoint FindPivot(const std::vector<std::unique_ptr<UIElement>> &elements,
-                    const std::set<std::size_t> &selected_elements, const std::vector<UIWire> &wires,
+                    const std::set<std::size_t> &selected_elements,
+                    const std::vector<UIWire> &wires,
                     const std::set<std::size_t> &selected_wires) {
     if (selected_elements.size() == 1 && selected_wires.empty()) {
         return elements[*selected_elements.begin()]->GetPosition();

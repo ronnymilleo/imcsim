@@ -34,8 +34,11 @@ UILogicOutput::UILogicOutput(const GridPoint position, const Rotation rotation)
  * @param[in]     color   Color of the digit when the box is not lit.
  * @param[in]     is_lit  Whether to light the box, for an output that reads 1 with the Logic Lights effect on.
  */
-void UILogicOutput::DrawReading(SchematicCanvas &canvas, const ViewTransform &view, const LogicState state,
-                                const ImU32 color, const bool is_lit) const {
+void UILogicOutput::DrawReading(SchematicCanvas &canvas,
+                                const ViewTransform &view,
+                                const LogicState state,
+                                const ImU32 color,
+                                const bool is_lit) const {
     const char *digit = GetLogicStateName(state);
     if (is_lit) {
         DrawLit(canvas, view, digit);
@@ -51,13 +54,16 @@ void UILogicOutput::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &
     DrawLead(canvas, view, color);
     canvas.AddTriangleFilled(LocalToScreen(view, -ARROW_HALF_WIDTH, BOX_BOTTOM + ARROW_HALF_WIDTH * 2.0f),
                              LocalToScreen(view, ARROW_HALF_WIDTH, BOX_BOTTOM + ARROW_HALF_WIDTH * 2.0f),
-                             LocalToScreen(view, 0.0f, BOX_BOTTOM), color);
+                             LocalToScreen(view, 0.0f, BOX_BOTTOM),
+                             color);
 }
 
 /**
  * @brief   The empty box; the reading goes in it through DrawReading().
  */
-void UILogicOutput::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
+void UILogicOutput::DrawSymbol(SchematicCanvas &canvas,
+                               const ViewTransform &view,
+                               const ImU32 color,
                                const SymbolStyle /*style*/) const {
     DrawBox(canvas, view, color);
 }

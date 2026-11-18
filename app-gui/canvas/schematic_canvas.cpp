@@ -43,12 +43,18 @@ void DrawListCanvas::AddLine(const ImVec2 start, const ImVec2 end, const ImU32 c
     m_DrawList->AddLine(start, end, color, thickness);
 }
 
-void DrawListCanvas::AddPolyline(const ImVec2 *points, const int count, const ImU32 color, const ImDrawFlags flags,
+void DrawListCanvas::AddPolyline(const ImVec2 *points,
+                                 const int count,
+                                 const ImU32 color,
+                                 const ImDrawFlags flags,
                                  const float thickness) {
     m_DrawList->AddPolyline(points, count, color, flags, thickness);
 }
 
-void DrawListCanvas::AddTriangle(const ImVec2 first, const ImVec2 second, const ImVec2 third, const ImU32 color,
+void DrawListCanvas::AddTriangle(const ImVec2 first,
+                                 const ImVec2 second,
+                                 const ImVec2 third,
+                                 const ImU32 color,
                                  const float thickness) {
     m_DrawList->AddTriangle(first, second, third, color, thickness);
 }
@@ -61,7 +67,10 @@ void DrawListCanvas::AddRectFilled(const ImVec2 min, const ImVec2 max, const ImU
     m_DrawList->AddRectFilled(min, max, color);
 }
 
-void DrawListCanvas::AddCircle(const ImVec2 center, const float radius, const ImU32 color, const int segments,
+void DrawListCanvas::AddCircle(const ImVec2 center,
+                               const float radius,
+                               const ImU32 color,
+                               const int segments,
                                const float thickness) {
     m_DrawList->AddCircle(center, radius, color, segments, thickness);
 }
@@ -70,7 +79,10 @@ void DrawListCanvas::AddCircleFilled(const ImVec2 center, const float radius, co
     m_DrawList->AddCircleFilled(center, radius, color);
 }
 
-void DrawListCanvas::AddText(ImFont *font, const float font_size, const ImVec2 position, const ImU32 color,
+void DrawListCanvas::AddText(ImFont *font,
+                             const float font_size,
+                             const ImVec2 position,
+                             const ImU32 color,
                              const char *text) {
     m_DrawList->AddText(font, font_size, position, color, text);
 }
@@ -93,7 +105,10 @@ void SvgCanvas::AddLine(const ImVec2 start, const ImVec2 end, const ImU32 color,
     Cover(end, thickness);
 }
 
-void SvgCanvas::AddPolyline(const ImVec2 *points, const int count, const ImU32 color, const ImDrawFlags flags,
+void SvgCanvas::AddPolyline(const ImVec2 *points,
+                            const int count,
+                            const ImU32 color,
+                            const ImDrawFlags flags,
                             const float thickness) {
     m_Svg.Polyline(ToSvg(points, count), Convert(color), thickness, "", (flags & ImDrawFlags_Closed) != 0);
     for (int index = 0; index < count; ++index) {
@@ -101,7 +116,10 @@ void SvgCanvas::AddPolyline(const ImVec2 *points, const int count, const ImU32 c
     }
 }
 
-void SvgCanvas::AddTriangle(const ImVec2 first, const ImVec2 second, const ImVec2 third, const ImU32 color,
+void SvgCanvas::AddTriangle(const ImVec2 first,
+                            const ImVec2 second,
+                            const ImVec2 third,
+                            const ImU32 color,
                             const float thickness) {
     AddPolyline(std::vector<ImVec2>{first, second, third}.data(), 3, color, ImDrawFlags_Closed, thickness);
 }
@@ -119,7 +137,10 @@ void SvgCanvas::AddRectFilled(const ImVec2 min, const ImVec2 max, const ImU32 co
     Cover(max, 0.0f);
 }
 
-void SvgCanvas::AddCircle(const ImVec2 center, const float radius, const ImU32 color, const int /*segments*/,
+void SvgCanvas::AddCircle(const ImVec2 center,
+                          const float radius,
+                          const ImU32 color,
+                          const int /*segments*/,
                           const float thickness) {
     m_Svg.Circle(ToSvg(center), radius, Convert(color), thickness);
     Cover(center, radius + thickness);
@@ -134,12 +155,18 @@ void SvgCanvas::AddCircleFilled(const ImVec2 center, const float radius, const I
  * @brief   ImGui places text by its top left corner; SVG by a point on the baseline.
  * @details The ascent of the ImGui font puts the baseline where the screen has it.
  */
-void SvgCanvas::AddText(ImFont *font, const float font_size, const ImVec2 position, const ImU32 color,
+void SvgCanvas::AddText(ImFont *font,
+                        const float font_size,
+                        const ImVec2 position,
+                        const ImU32 color,
                         const char *text) {
     const ImVec2 size = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, text);
     const float ascent = font->GetFontBaked(font_size)->Ascent;
-    m_Svg.Text({position.x + size.x / 2.0f, position.y + ascent}, text, font_size * IM_GUI_TO_SVG_FONT_SIZE,
-               Convert(color), TextAnchor::MIDDLE);
+    m_Svg.Text({position.x + size.x / 2.0f, position.y + ascent},
+               text,
+               font_size * IM_GUI_TO_SVG_FONT_SIZE,
+               Convert(color),
+               TextAnchor::MIDDLE);
     Cover(position, 0.0f);
     Cover(position + size, 0.0f);
 }

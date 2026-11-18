@@ -12,8 +12,8 @@
 namespace Nodalys {
 
 // Grid
-std::vector<double> MakeFrequencySweep(FrequencySweepType sweep_type, double start_frequency, double stop_frequency,
-                                       int points);
+std::vector<double>
+MakeFrequencySweep(FrequencySweepType sweep_type, double start_frequency, double stop_frequency, int points);
 
 } // namespace Nodalys
 

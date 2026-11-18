@@ -33,28 +33,28 @@ std::map<std::string, std::string> ParameterList(const std::string &text) {
     }
     std::size_t position = open + 1;
     while (position < text.size() && text[position] != ')') {
-        while (position < text.size() &&
-               (std::isspace(static_cast<unsigned char>(text[position])) != 0 || text[position] == '+')) {
+        while (position < text.size()
+               && (std::isspace(static_cast<unsigned char>(text[position])) != 0 || text[position] == '+')) {
             ++position;
         }
         const std::size_t key_start = position;
-        while (position < text.size() &&
-               (std::isalnum(static_cast<unsigned char>(text[position])) != 0 || text[position] == '_')) {
+        while (position < text.size()
+               && (std::isalnum(static_cast<unsigned char>(text[position])) != 0 || text[position] == '_')) {
             ++position;
         }
         const std::string key = text.substr(key_start, position - key_start);
         if (key.empty() || position >= text.size() || text[position] != '=') {
             // Not a KEY=VALUE pair; skip whatever token this is
-            while (position < text.size() && std::isspace(static_cast<unsigned char>(text[position])) == 0 &&
-                   text[position] != ')') {
+            while (position < text.size() && std::isspace(static_cast<unsigned char>(text[position])) == 0
+                   && text[position] != ')') {
                 ++position;
             }
             continue;
         }
         ++position;
         const std::size_t value_start = position;
-        while (position < text.size() && std::isspace(static_cast<unsigned char>(text[position])) == 0 &&
-               text[position] != ')') {
+        while (position < text.size() && std::isspace(static_cast<unsigned char>(text[position])) == 0
+               && text[position] != ')') {
             ++position;
         }
         values[ToUpper(key)] = text.substr(value_start, position - value_start);
@@ -73,7 +73,9 @@ std::expected<double, std::string> Number(const LibraryModel &model, const std::
     if (text.starts_with('{')) {
         return std::unexpected(std::format("Nodalys cannot evaluate the expression {} of the parameter {} "
                                            "in the model {}",
-                                           text, key, model.Name));
+                                           text,
+                                           key,
+                                           model.Name));
     }
     if (const std::optional<double> parsed = ParseSpiceNumber(text)) {
         return *parsed;
@@ -91,7 +93,8 @@ std::expected<double, std::string> Number(const LibraryModel &model, const std::
 std::expected<const LibraryModel *, std::string> FindModel(const Circuit &circuit, const Component &part) {
     const LibraryModel *model = circuit.FindLibraryModel(part.GetLibraryModel());
     if (model == nullptr) {
-        return std::unexpected(std::format("{} uses the model {}, which the circuit does not have", part.GetName(),
+        return std::unexpected(std::format("{} uses the model {}, which the circuit does not have",
+                                           part.GetName(),
                                            part.GetLibraryModel()));
     }
     if (!CanUseLibraryModel(part.GetType(), model->Kind)) {
@@ -222,7 +225,8 @@ std::expected<MOSFETParameters, std::string> ResolveParameters(const Circuit &ci
         if (*number != 1.0) {
             return std::unexpected(std::format("Nodalys simulates MOSFETs with the level 1 model only, and "
                                                "the model {} is level {}",
-                                               (*model)->Name, *number));
+                                               (*model)->Name,
+                                               *number));
         }
     }
     for (const auto &[key, target] :

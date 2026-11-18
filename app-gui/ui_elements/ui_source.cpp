@@ -64,9 +64,12 @@ std::vector<ImVec2> SampleCurve(const std::function<float(float)> &height) {
 }
 
 std::vector<ImVec2> PulseShape() {
-    return {{-WAVE_HALF_WIDTH, WAVE_AMPLITUDE},   {-PULSE_HALF_WIDTH, WAVE_AMPLITUDE},
-            {-PULSE_HALF_WIDTH, -WAVE_AMPLITUDE}, {PULSE_HALF_WIDTH, -WAVE_AMPLITUDE},
-            {PULSE_HALF_WIDTH, WAVE_AMPLITUDE},   {WAVE_HALF_WIDTH, WAVE_AMPLITUDE}};
+    return {{-WAVE_HALF_WIDTH, WAVE_AMPLITUDE},
+            {-PULSE_HALF_WIDTH, WAVE_AMPLITUDE},
+            {-PULSE_HALF_WIDTH, -WAVE_AMPLITUDE},
+            {PULSE_HALF_WIDTH, -WAVE_AMPLITUDE},
+            {PULSE_HALF_WIDTH, WAVE_AMPLITUDE},
+            {WAVE_HALF_WIDTH, WAVE_AMPLITUDE}};
 }
 
 /**
@@ -153,24 +156,34 @@ void UISource::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, co
         UIElement::DrawLabels(canvas, view, color);
         return;
     case Core::Source::SourceType::AC:
-        waveform = std::format("{}{} {}Hz", Core::FormatValue(source.GetAC().Amplitude), unit,
+        waveform = std::format("{}{} {}Hz",
+                               Core::FormatValue(source.GetAC().Amplitude),
+                               unit,
                                Core::FormatValue(source.GetAC().Frequency));
         break;
     case Core::Source::SourceType::PULSE: {
         const Core::PulseParameters &pulse = source.GetPulse();
-        waveform = std::format("{}{}/{}{} {}Hz", Core::FormatValue(pulse.Low), unit, Core::FormatValue(pulse.High),
-                               unit, Core::FormatValue(1.0 / pulse.Period));
+        waveform = std::format("{}{}/{}{} {}Hz",
+                               Core::FormatValue(pulse.Low),
+                               unit,
+                               Core::FormatValue(pulse.High),
+                               unit,
+                               Core::FormatValue(1.0 / pulse.Period));
         break;
     }
     case Core::Source::SourceType::EXP:
         waveform = std::format("{}{}", Core::FormatValue(source.GetEXP().PeakValue), unit);
         break;
     case Core::Source::SourceType::SFFM:
-        waveform = std::format("{}{} {}Hz", Core::FormatValue(source.GetSFFM().Amplitude), unit,
+        waveform = std::format("{}{} {}Hz",
+                               Core::FormatValue(source.GetSFFM().Amplitude),
+                               unit,
                                Core::FormatValue(source.GetSFFM().CarrierFrequency));
         break;
     case Core::Source::SourceType::AM:
-        waveform = std::format("{}{} {}Hz", Core::FormatValue(source.GetAM().Amplitude), unit,
+        waveform = std::format("{}{} {}Hz",
+                               Core::FormatValue(source.GetAM().Amplitude),
+                               unit,
                                Core::FormatValue(source.GetAM().CarrierFrequency));
         break;
     case Core::Source::SourceType::PWL:

@@ -31,8 +31,10 @@ std::optional<std::size_t> FindDefinition(const std::span<const SavedSubcircuit>
  * @brief   Whether a block, or a block it uses on the way down, is the one named; each block is looked into once, so a
  *          cycle in a damaged file ends the walk instead of looping.
  */
-bool ReachesBlock(const std::span<const SavedSubcircuit> definitions, const std::string_view from,
-                  const std::string_view name, std::set<std::string, std::less<>> &visited) {
+bool ReachesBlock(const std::span<const SavedSubcircuit> definitions,
+                  const std::string_view from,
+                  const std::string_view name,
+                  std::set<std::string, std::less<>> &visited) {
     if (from == name) {
         return true;
     }
@@ -72,7 +74,8 @@ std::set<std::string> ListUsedBlocks(const std::vector<std::unique_ptr<UIElement
  * @return  True when an instance among the parts is that block, or a block that contains it at any depth.
  */
 bool UsesBlock(const std::vector<std::unique_ptr<UIElement>> &elements,
-               const std::span<const SavedSubcircuit> definitions, const std::string_view name) {
+               const std::span<const SavedSubcircuit> definitions,
+               const std::string_view name) {
     std::set<std::string, std::less<>> visited;
     return std::ranges::any_of(ListUsedBlocks(elements),
                                [&](const std::string &used) { return ReachesBlock(definitions, used, name, visited); });
@@ -86,7 +89,8 @@ bool UsesBlock(const std::vector<std::unique_ptr<UIElement>> &elements,
  * @param[in] inner        The block looked for.
  * @return  True when outer is inner, or one of its parts, or a part of a block it places, is inner.
  */
-bool ContainsBlock(const std::span<const SavedSubcircuit> definitions, const std::string_view outer,
+bool ContainsBlock(const std::span<const SavedSubcircuit> definitions,
+                   const std::string_view outer,
                    const std::string_view inner) {
     std::set<std::string, std::less<>> visited;
     return ReachesBlock(definitions, outer, inner, visited);
@@ -128,7 +132,8 @@ std::vector<std::size_t> OrderByUse(const std::span<const SavedSubcircuit> defin
  * @param[in]     old_name  The name the block had.
  * @param[in]     new_name  The name it has now.
  */
-void RenameBlockInstances(std::vector<std::unique_ptr<UIElement>> &elements, const std::string_view old_name,
+void RenameBlockInstances(std::vector<std::unique_ptr<UIElement>> &elements,
+                          const std::string_view old_name,
                           const std::string &new_name) {
     for (auto &element : elements) {
         if (element->GetComponent().GetType() != Core::ComponentType::SUBCIRCUIT) {

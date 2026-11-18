@@ -16,8 +16,8 @@
 namespace Core {
 
 std::optional<std::string> CheckSParameterPortCount(std::size_t port_count, const SParameterLimits &limits);
-std::optional<std::string> CheckSParameterSettings(const Circuit &circuit, const SParameterSettings &settings,
-                                                   const SParameterLimits &limits);
+std::optional<std::string>
+CheckSParameterSettings(const Circuit &circuit, const SParameterSettings &settings, const SParameterLimits &limits);
 
 } // namespace Core
 

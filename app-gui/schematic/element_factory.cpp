@@ -111,8 +111,8 @@ constexpr auto PARTS = std::to_array<PartInfo>({
  * @param[in] rotation  Orientation on the grid.
  * @return  The new element; its component starts unnamed and with the default value.
  */
-std::unique_ptr<UIElement> CreateElement(const Core::ComponentType type, const GridPoint position,
-                                         const Rotation rotation) {
+std::unique_ptr<UIElement>
+CreateElement(const Core::ComponentType type, const GridPoint position, const Rotation rotation) {
     switch (type) {
     case Core::ComponentType::RESISTOR:
         return std::make_unique<UIResistor>(position, rotation);
@@ -215,8 +215,8 @@ std::vector<Core::ComponentType> FindParts(const std::string_view query) {
     const std::string normalized_query = NormalizeSearchText(query);
     std::vector<Core::ComponentType> found;
     for (const PartInfo &part : PARTS) {
-        if (NormalizeSearchText(part.Name).contains(normalized_query) ||
-            NormalizeSearchText(Core::GetTypeName(part.Type)).contains(normalized_query)) {
+        if (NormalizeSearchText(part.Name).contains(normalized_query)
+            || NormalizeSearchText(Core::GetTypeName(part.Type)).contains(normalized_query)) {
             found.push_back(part.Type);
         }
     }

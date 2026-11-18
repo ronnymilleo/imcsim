@@ -43,8 +43,11 @@ std::optional<InstanceLine> SplitInstanceLine(const std::vector<std::string> &to
 
 // Placing
 std::expected<std::vector<std::string>, std::string>
-AddNetlistInstance(CircuitBuilder &builder, const std::vector<std::string> &definition_lines, std::string_view line,
-                   const std::function<NodeId(std::string_view)> &resolve_node, const InstanceObservers &observers);
+AddNetlistInstance(CircuitBuilder &builder,
+                   const std::vector<std::string> &definition_lines,
+                   std::string_view line,
+                   const std::function<NodeId(std::string_view)> &resolve_node,
+                   const InstanceObservers &observers);
 
 } // namespace Nodalys
 

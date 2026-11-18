@@ -28,7 +28,8 @@ struct HeatGlow {
 
 float HeatBrightness(double power, double largest_power);
 std::vector<HeatGlow> ComputeHeatGlows(const std::vector<std::unique_ptr<UIElement>> &elements,
-                                       const std::vector<ComponentPower> &powers, const HeatScale &scale);
+                                       const std::vector<ComponentPower> &powers,
+                                       const HeatScale &scale);
 
 } // namespace GUI
 

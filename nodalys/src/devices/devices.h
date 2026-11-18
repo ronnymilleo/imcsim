@@ -76,7 +76,8 @@ public:
     virtual double TerminalCurrent(int terminal, const std::vector<double> &x) const = 0;
 
     /// Small-signal complex current entering the device at the given terminal at angular frequency `omega`.
-    virtual std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
+    virtual std::complex<double> AcTerminalCurrent(int terminal,
+                                                   const std::vector<double> &x_dc,
                                                    const std::vector<std::complex<double>> &x_ac,
                                                    double omega) const = 0;
 
@@ -86,7 +87,8 @@ public:
      *          $Y(j\omega)^T \cdot \lambda = e_{\text{out}}$).
      */
     virtual double OutputNoiseVariance(const std::vector<double> &x_dc,
-                                       const std::vector<std::complex<double>> &adjoint, double frequency_hz) const {
+                                       const std::vector<std::complex<double>> &adjoint,
+                                       double frequency_hz) const {
         (void)x_dc;
         (void)adjoint;
         (void)frequency_hz;
@@ -119,8 +121,10 @@ public:
 
     /// True when the device carries state between time points (companion models of C, L and junction charges).
     virtual bool HasTransientState() const { return false; }
+
     /// Saves the state of the accepted point x (called after each converged transient step).
     virtual void AcceptStep(const std::vector<double> &x) { (void)x; }
+
     /// Restores the state saved before a step that the LTE control rejected.
     virtual void RejectStep() {}
 
@@ -191,14 +195,19 @@ public:
 
     double GetResistance() const;
     void SetResistance(double resistance);
+
     int GetNodeA() const { return m_NodeA; }
+
     int GetNodeB() const { return m_NodeB; }
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
-    std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
-                                           const std::vector<std::complex<double>> &x_ac, double omega) const override;
-    double OutputNoiseVariance(const std::vector<double> &x_dc, const std::vector<std::complex<double>> &adjoint,
+    std::complex<double> AcTerminalCurrent(int terminal,
+                                           const std::vector<double> &x_dc,
+                                           const std::vector<std::complex<double>> &x_ac,
+                                           double omega) const override;
+    double OutputNoiseVariance(const std::vector<double> &x_dc,
+                               const std::vector<std::complex<double>> &adjoint,
                                double frequency_hz) const override;
     void SetTemperature(const ThermalConditions &thermal) override;
 
@@ -224,7 +233,9 @@ public:
     CapacitorDevice(int node_a, int node_b, double capacitance, double initial_voltage, bool has_initial);
 
     int GetNodeA() const { return m_NodeA; }
+
     int GetNodeB() const { return m_NodeB; }
+
     double GetCapacitance() const { return m_Capacitance; }
 
     /// A capacitor with no IC= of its own starts at the difference of the initial voltages of its nodes, as in SPICE.
@@ -233,8 +244,10 @@ public:
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     void StampAc(MnaSystem &reactive, const std::vector<double> &x_dc) const override;
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
-    std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
-                                           const std::vector<std::complex<double>> &x_ac, double omega) const override;
+    std::complex<double> AcTerminalCurrent(int terminal,
+                                           const std::vector<double> &x_dc,
+                                           const std::vector<std::complex<double>> &x_ac,
+                                           double omega) const override;
     bool HasTransientState() const override;
     void AcceptStep(const std::vector<double> &x) override;
     void RejectStep() override;
@@ -265,15 +278,20 @@ public:
     InductorDevice(int node_a, int node_b, int branch, double inductance, double initial_current, bool has_initial);
 
     int GetNodeA() const { return m_NodeA; }
+
     int GetNodeB() const { return m_NodeB; }
+
     int GetBranch() const { return m_Branch; }
+
     double GetInductance() const { return m_Inductance; }
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     void StampAc(MnaSystem &reactive, const std::vector<double> &x_dc) const override;
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
-    std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
-                                           const std::vector<std::complex<double>> &x_ac, double omega) const override;
+    std::complex<double> AcTerminalCurrent(int terminal,
+                                           const std::vector<double> &x_dc,
+                                           const std::vector<std::complex<double>> &x_ac,
+                                           double omega) const override;
     bool HasTransientState() const override;
     void AcceptStep(const std::vector<double> &x) override;
     void RejectStep() override;
@@ -328,16 +346,27 @@ public:
     /// Next corner of the waveform strictly after an instant, or infinity; see Device::NextBreakpoint().
     using Breakpoints = std::function<double(double time)>;
 
-    VoltageSourceDevice(int node_a, int node_b, int branch, double dc_value, Waveform waveform,
-                        double ac_magnitude = 0.0, SourcePeriodicity periodicity = {});
+    VoltageSourceDevice(int node_a,
+                        int node_b,
+                        int branch,
+                        double dc_value,
+                        Waveform waveform,
+                        double ac_magnitude = 0.0,
+                        SourcePeriodicity periodicity = {});
 
     double GetDcValue() const;
     void SetDcValue(double value);
+
     double GetAcMagnitude() const { return m_AcMagnitude; }
+
     int GetNodeA() const { return m_NodeA; }
+
     int GetNodeB() const { return m_NodeB; }
+
     int GetBranch() const { return m_Branch; }
+
     const SourcePeriodicity &GetPeriodicity() const { return m_Periodicity; }
+
     void SetBreakpoints(Breakpoints breakpoints);
     void SetSeedCallback(std::function<void(std::uint64_t)> set_seed);
 
@@ -345,8 +374,10 @@ public:
     void StampAc(MnaSystem &reactive, const std::vector<double> &x_dc) const override;
     bool SupportsHarmonicBalance() const override;
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
-    std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
-                                           const std::vector<std::complex<double>> &x_ac, double omega) const override;
+    std::complex<double> AcTerminalCurrent(int terminal,
+                                           const std::vector<double> &x_dc,
+                                           const std::vector<std::complex<double>> &x_ac,
+                                           double omega) const override;
     void SetSourceScale(double scale) override;
     double NextBreakpoint(double time) const override;
     void SetRandomSeed(std::uint64_t seed) override;
@@ -370,15 +401,24 @@ private:
  */
 class CurrentSourceDevice : public Device {
 public:
-    CurrentSourceDevice(int node_a, int node_b, double dc_value, VoltageSourceDevice::Waveform waveform,
-                        double ac_magnitude = 0.0, SourcePeriodicity periodicity = {});
+    CurrentSourceDevice(int node_a,
+                        int node_b,
+                        double dc_value,
+                        VoltageSourceDevice::Waveform waveform,
+                        double ac_magnitude = 0.0,
+                        SourcePeriodicity periodicity = {});
 
     double GetDcValue() const;
     void SetDcValue(double value);
+
     double GetAcMagnitude() const { return m_AcMagnitude; }
+
     int GetNodeA() const { return m_NodeA; }
+
     int GetNodeB() const { return m_NodeB; }
+
     const SourcePeriodicity &GetPeriodicity() const { return m_Periodicity; }
+
     double SamplePeriodicCurrent(int terminal, double time_seconds) const;
     void SetBreakpoints(VoltageSourceDevice::Breakpoints breakpoints);
     void SetSeedCallback(std::function<void(std::uint64_t)> set_seed);
@@ -387,8 +427,10 @@ public:
     void StampAc(MnaSystem &reactive, const std::vector<double> &x_dc) const override;
     bool SupportsHarmonicBalance() const override;
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
-    std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
-                                           const std::vector<std::complex<double>> &x_ac, double omega) const override;
+    std::complex<double> AcTerminalCurrent(int terminal,
+                                           const std::vector<double> &x_dc,
+                                           const std::vector<std::complex<double>> &x_ac,
+                                           double omega) const override;
     void SetSourceScale(double scale) override;
     double NextBreakpoint(double time) const override;
     void SetRandomSeed(std::uint64_t seed) override;
@@ -415,16 +457,23 @@ public:
     VcvsDevice(int node_a, int node_b, int control_positive, int control_negative, int branch, double gain);
 
     int GetNodeA() const { return m_NodeA; }
+
     int GetNodeB() const { return m_NodeB; }
+
     int GetControlPositive() const { return m_ControlPositive; }
+
     int GetControlNegative() const { return m_ControlNegative; }
+
     int GetBranch() const { return m_Branch; }
+
     double GetGain() const { return m_Gain; }
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
-    std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
-                                           const std::vector<std::complex<double>> &x_ac, double omega) const override;
+    std::complex<double> AcTerminalCurrent(int terminal,
+                                           const std::vector<double> &x_dc,
+                                           const std::vector<std::complex<double>> &x_ac,
+                                           double omega) const override;
 
 private:
     int m_NodeA;
@@ -444,15 +493,21 @@ public:
     VccsDevice(int node_a, int node_b, int control_positive, int control_negative, double gain);
 
     int GetNodeA() const { return m_NodeA; }
+
     int GetNodeB() const { return m_NodeB; }
+
     int GetControlPositive() const { return m_ControlPositive; }
+
     int GetControlNegative() const { return m_ControlNegative; }
+
     double GetGain() const { return m_Gain; }
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
-    std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
-                                           const std::vector<std::complex<double>> &x_ac, double omega) const override;
+    std::complex<double> AcTerminalCurrent(int terminal,
+                                           const std::vector<double> &x_dc,
+                                           const std::vector<std::complex<double>> &x_ac,
+                                           double omega) const override;
 
 private:
     int m_NodeA;
@@ -472,14 +527,19 @@ public:
     CccsDevice(int node_a, int node_b, int control_branch, double gain);
 
     int GetNodeA() const { return m_NodeA; }
+
     int GetNodeB() const { return m_NodeB; }
+
     int ControlBranch() const { return m_ControlBranch; }
+
     double GetGain() const { return m_Gain; }
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
-    std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
-                                           const std::vector<std::complex<double>> &x_ac, double omega) const override;
+    std::complex<double> AcTerminalCurrent(int terminal,
+                                           const std::vector<double> &x_dc,
+                                           const std::vector<std::complex<double>> &x_ac,
+                                           double omega) const override;
 
 private:
     int m_NodeA;
@@ -497,15 +557,21 @@ public:
     CcvsDevice(int node_a, int node_b, int branch, int control_branch, double gain);
 
     int GetNodeA() const { return m_NodeA; }
+
     int GetNodeB() const { return m_NodeB; }
+
     int GetBranch() const { return m_Branch; }
+
     int ControlBranch() const { return m_ControlBranch; }
+
     double GetGain() const { return m_Gain; }
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
-    std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
-                                           const std::vector<std::complex<double>> &x_ac, double omega) const override;
+    std::complex<double> AcTerminalCurrent(int terminal,
+                                           const std::vector<double> &x_dc,
+                                           const std::vector<std::complex<double>> &x_ac,
+                                           double omega) const override;
 
 private:
     int m_NodeA;
@@ -527,11 +593,16 @@ public:
     SwitchDevice(int node_a, int node_b, int control_positive, int control_negative, SwitchParameters parameters);
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
+
     bool IsLinear() const override { return false; }
+
     bool SupportsHarmonicBalance() const override { return false; }
+
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
-    std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
-                                           const std::vector<std::complex<double>> &x_ac, double omega) const override;
+    std::complex<double> AcTerminalCurrent(int terminal,
+                                           const std::vector<double> &x_dc,
+                                           const std::vector<std::complex<double>> &x_ac,
+                                           double omega) const override;
     void AcceptStep(const std::vector<double> &x) override;
     void RejectStep() override;
     bool HasSwitched() const override;
@@ -557,14 +628,23 @@ class CoupledInductorDevice : public Device {
 public:
     /// primary_a/primary_b are the nodes of the primary branch, secondary_a/secondary_b of the secondary, with the
     /// branch currents flowing from the first node to the second; branch1 and branch2 are the branch unknowns.
-    CoupledInductorDevice(int primary_a, int primary_b, int secondary_a, int secondary_b, int branch1, int branch2,
-                          double primary_inductance, double secondary_inductance, double mutual);
+    CoupledInductorDevice(int primary_a,
+                          int primary_b,
+                          int secondary_a,
+                          int secondary_b,
+                          int branch1,
+                          int branch2,
+                          double primary_inductance,
+                          double secondary_inductance,
+                          double mutual);
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     void StampAc(MnaSystem &reactive, const std::vector<double> &x_dc) const override;
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
-    std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
-                                           const std::vector<std::complex<double>> &x_ac, double omega) const override;
+    std::complex<double> AcTerminalCurrent(int terminal,
+                                           const std::vector<double> &x_dc,
+                                           const std::vector<std::complex<double>> &x_ac,
+                                           double omega) const override;
     bool HasTransientState() const override;
     void AcceptStep(const std::vector<double> &x) override;
     void RejectStep() override;
@@ -602,8 +682,10 @@ public:
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
-    std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
-                                           const std::vector<std::complex<double>> &x_ac, double omega) const override;
+    std::complex<double> AcTerminalCurrent(int terminal,
+                                           const std::vector<double> &x_dc,
+                                           const std::vector<std::complex<double>> &x_ac,
+                                           double omega) const override;
 
 private:
     int m_Node;
@@ -627,8 +709,10 @@ public:
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
-    std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
-                                           const std::vector<std::complex<double>> &x_ac, double omega) const override;
+    std::complex<double> AcTerminalCurrent(int terminal,
+                                           const std::vector<double> &x_dc,
+                                           const std::vector<std::complex<double>> &x_ac,
+                                           double omega) const override;
 
 private:
     int m_Node;
@@ -655,8 +739,10 @@ public:
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     void SeedOperatingPoint(std::vector<double> &x) const override;
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
-    std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
-                                           const std::vector<std::complex<double>> &x_ac, double omega) const override;
+    std::complex<double> AcTerminalCurrent(int terminal,
+                                           const std::vector<double> &x_dc,
+                                           const std::vector<std::complex<double>> &x_ac,
+                                           double omega) const override;
 
 private:
     std::vector<NodeSeed> m_Seeds;

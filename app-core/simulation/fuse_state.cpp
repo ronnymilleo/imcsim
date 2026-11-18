@@ -31,8 +31,8 @@ constexpr double MIN_CURRENT = 1e-15;
  *          for blown; no value when the fuse stays whole, is not a fuse or the results do not carry its current.
  * @note    A fuse cannot close again, so the first such point is the instant it blew, to the resolution of the points.
  */
-std::optional<double> FindFuseBlowTime(const Component &part, const std::span<const int> nodes,
-                                       const Transient &result) {
+std::optional<double>
+FindFuseBlowTime(const Component &part, const std::span<const int> nodes, const Transient &result) {
     if (part.GetType() != ComponentType::FUSE) {
         return std::nullopt;
     }

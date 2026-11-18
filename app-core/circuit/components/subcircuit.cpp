@@ -128,8 +128,8 @@ bool SubcircuitInstance::IsValidIdentifier(const std::string_view name) {
  * @return  True for a parameter name in braces, such as "{R}".
  */
 bool SubcircuitInstance::IsValidValueExpression(const std::string_view expression) {
-    return expression.size() > 2 && expression.front() == '{' && expression.back() == '}' &&
-           IsValidIdentifier(expression.substr(1, expression.size() - 2));
+    return expression.size() > 2 && expression.front() == '{' && expression.back() == '}'
+        && IsValidIdentifier(expression.substr(1, expression.size() - 2));
 }
 
 /**

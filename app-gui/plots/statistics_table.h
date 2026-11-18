@@ -66,13 +66,16 @@ struct SweptTrace {
 };
 
 std::vector<StatisticsRow> BuildTransientStatistics(std::span<const double> times,
-                                                    const std::vector<MeasuredTrace> &traces, PlotSpan span,
+                                                    const std::vector<MeasuredTrace> &traces,
+                                                    PlotSpan span,
                                                     const std::optional<PlotCursors> &cursors);
 std::vector<StatisticsRow> BuildBodeStatistics(std::span<const double> frequencies,
                                                const std::vector<BodeTrace> &traces,
                                                const std::optional<PlotCursors> &cursors);
-std::vector<StatisticsRow> BuildSweepStatistics(std::span<const double> swept, std::string_view swept_unit,
-                                                const std::vector<SweptTrace> &traces, PlotSpan span,
+std::vector<StatisticsRow> BuildSweepStatistics(std::span<const double> swept,
+                                                std::string_view swept_unit,
+                                                const std::vector<SweptTrace> &traces,
+                                                PlotSpan span,
                                                 const std::optional<PlotCursors> &cursors);
 
 } // namespace GUI

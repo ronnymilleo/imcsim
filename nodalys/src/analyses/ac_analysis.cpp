@@ -15,12 +15,13 @@
 
 namespace Nodalys {
 
-std::expected<AcSweepResult, std::string> ComputeACSweep(CompiledCircuit &compiled, const AcSweepConfig &settings,
+std::expected<AcSweepResult, std::string> ComputeACSweep(CompiledCircuit &compiled,
+                                                         const AcSweepConfig &settings,
                                                          const ConvergenceOptions &options,
                                                          std::vector<DiagnosticMessage> *messages) {
 
-    if (settings.StartFrequency <= 0.0 || settings.StopFrequency < settings.StartFrequency ||
-        settings.PointsPerDecade <= 0) {
+    if (settings.StartFrequency <= 0.0 || settings.StopFrequency < settings.StartFrequency
+        || settings.PointsPerDecade <= 0) {
         return std::unexpected("The AC sweep has invalid frequency settings; check start, stop and points per decade");
     }
 
@@ -43,7 +44,9 @@ std::expected<AcSweepResult, std::string> ComputeACSweep(CompiledCircuit &compil
     }
 
     AcSweepResult result;
-    result.Frequencies = MakeFrequencySweep(settings.SweepType, settings.StartFrequency, settings.StopFrequency,
+    result.Frequencies = MakeFrequencySweep(settings.SweepType,
+                                            settings.StartFrequency,
+                                            settings.StopFrequency,
                                             settings.PointsPerDecade);
 
     const std::size_t point_count = result.Frequencies.size();

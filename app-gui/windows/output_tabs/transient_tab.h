@@ -73,13 +73,21 @@ private:
     void DrawWindowSize();
 
     // Plots
-    void DrawPlots(const Core::Transient &transient, const std::vector<MathTrace> &math,
+    void DrawPlots(const Core::Transient &transient,
+                   const std::vector<MathTrace> &math,
                    const std::optional<StepFamily<Core::Transient>> &steps);
-    void DrawAnalog(const Core::Transient &transient, const std::vector<MathTrace> &math,
-                    const std::optional<StepFamily<Core::Transient>> &steps, const std::vector<int> &lane_nodes,
-                    bool show_currents, bool has_voltages, bool has_lanes, float height);
-    void DrawLogicLanes(const Core::Transient &transient, const std::vector<BusLane> &buses,
-                        const std::vector<LogicNode> &lanes, float height);
+    void DrawAnalog(const Core::Transient &transient,
+                    const std::vector<MathTrace> &math,
+                    const std::optional<StepFamily<Core::Transient>> &steps,
+                    const std::vector<int> &lane_nodes,
+                    bool show_currents,
+                    bool has_voltages,
+                    bool has_lanes,
+                    float height);
+    void DrawLogicLanes(const Core::Transient &transient,
+                        const std::vector<BusLane> &buses,
+                        const std::vector<LogicNode> &lanes,
+                        float height);
     std::vector<LogicNode> FindMeasuredLanes(std::size_t node_count) const;
     std::vector<BusLane> FindShownBuses(std::size_t node_count) const;
 

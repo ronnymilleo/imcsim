@@ -452,9 +452,13 @@ void Component::ClearValueExpression() {
  * @return  True for diodes, LEDs, Zeners and transistors.
  */
 bool Component::TakesLibraryModel() const {
-    static constexpr auto MODELED_TYPES =
-        std::to_array({ComponentType::DIODE, ComponentType::ZENER_DIODE, ComponentType::LED, ComponentType::NPN,
-                       ComponentType::PNP, ComponentType::NMOS, ComponentType::PMOS});
+    static constexpr auto MODELED_TYPES = std::to_array({ComponentType::DIODE,
+                                                         ComponentType::ZENER_DIODE,
+                                                         ComponentType::LED,
+                                                         ComponentType::NPN,
+                                                         ComponentType::PNP,
+                                                         ComponentType::NMOS,
+                                                         ComponentType::PMOS});
     return std::ranges::contains(MODELED_TYPES, m_Type);
 }
 
@@ -542,8 +546,8 @@ void Component::ClearInitialCondition() {
  * @return  True for a resistor, capacitor, inductor and voltage source; a source only varies while it is a DC one.
  */
 bool Component::SupportsTolerance() const {
-    return m_Type == ComponentType::RESISTOR || m_Type == ComponentType::CAPACITOR ||
-           m_Type == ComponentType::INDUCTOR || m_Type == ComponentType::VOLTAGE_SOURCE;
+    return m_Type == ComponentType::RESISTOR || m_Type == ComponentType::CAPACITOR || m_Type == ComponentType::INDUCTOR
+        || m_Type == ComponentType::VOLTAGE_SOURCE;
 }
 
 /**

@@ -48,11 +48,13 @@ struct TouchstoneOptions {
 };
 
 /// Every unit and format, in the order the export popup lists them.
-inline constexpr std::array<TouchstoneFrequencyUnit, 4> TOUCHSTONE_UNITS = {
-    TouchstoneFrequencyUnit::HZ, TouchstoneFrequencyUnit::KHZ, TouchstoneFrequencyUnit::MHZ,
-    TouchstoneFrequencyUnit::GHZ};
-inline constexpr std::array<TouchstoneFormat, 3> TOUCHSTONE_FORMATS = {
-    TouchstoneFormat::REAL_IMAGINARY, TouchstoneFormat::MAGNITUDE_ANGLE, TouchstoneFormat::DECIBEL_ANGLE};
+inline constexpr std::array<TouchstoneFrequencyUnit, 4> TOUCHSTONE_UNITS = {TouchstoneFrequencyUnit::HZ,
+                                                                            TouchstoneFrequencyUnit::KHZ,
+                                                                            TouchstoneFrequencyUnit::MHZ,
+                                                                            TouchstoneFrequencyUnit::GHZ};
+inline constexpr std::array<TouchstoneFormat, 3> TOUCHSTONE_FORMATS = {TouchstoneFormat::REAL_IMAGINARY,
+                                                                       TouchstoneFormat::MAGNITUDE_ANGLE,
+                                                                       TouchstoneFormat::DECIBEL_ANGLE};
 
 // Names
 const char *GetTouchstoneUnitName(TouchstoneFrequencyUnit unit);

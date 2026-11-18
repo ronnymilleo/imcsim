@@ -191,36 +191,45 @@ struct RunMonitor {
 
 // Top-level analysis entry points
 std::expected<OperatingPointResult, std::string>
-ComputeOperatingPoint(const Circuit &circuit, const ConvergenceOptions &options = {},
+ComputeOperatingPoint(const Circuit &circuit,
+                      const ConvergenceOptions &options = {},
                       std::vector<DiagnosticMessage> *messages = nullptr);
 
-std::expected<DcSweepResult, std::string> ComputeDCSweep(const Circuit &circuit, const DcSweepConfig &config,
+std::expected<DcSweepResult, std::string> ComputeDCSweep(const Circuit &circuit,
+                                                         const DcSweepConfig &config,
                                                          const ConvergenceOptions &options = {},
                                                          std::vector<DiagnosticMessage> *messages = nullptr);
 
-std::expected<TransientResult, std::string> ComputeTransient(const Circuit &circuit, const TransientConfig &config,
+std::expected<TransientResult, std::string> ComputeTransient(const Circuit &circuit,
+                                                             const TransientConfig &config,
                                                              bool has_initial_conditions = false,
                                                              const RunMonitor &monitor = {},
                                                              const ConvergenceOptions &options = {},
                                                              std::vector<DiagnosticMessage> *messages = nullptr);
 
-std::expected<AcSweepResult, std::string> ComputeACSweep(const Circuit &circuit, const AcSweepConfig &config,
+std::expected<AcSweepResult, std::string> ComputeACSweep(const Circuit &circuit,
+                                                         const AcSweepConfig &config,
                                                          const ConvergenceOptions &options = {},
                                                          std::vector<DiagnosticMessage> *messages = nullptr);
 
 std::expected<TransferFunctionResult, std::string>
-ComputeTransferFunction(const Circuit &circuit, const TransferFunctionConfig &config,
-                        const ConvergenceOptions &options = {}, std::vector<DiagnosticMessage> *messages = nullptr);
+ComputeTransferFunction(const Circuit &circuit,
+                        const TransferFunctionConfig &config,
+                        const ConvergenceOptions &options = {},
+                        std::vector<DiagnosticMessage> *messages = nullptr);
 
-std::expected<NoiseResult, std::string> ComputeNoise(const Circuit &circuit, const NoiseConfig &config,
+std::expected<NoiseResult, std::string> ComputeNoise(const Circuit &circuit,
+                                                     const NoiseConfig &config,
                                                      const ConvergenceOptions &options = {},
                                                      std::vector<DiagnosticMessage> *messages = nullptr);
 
-std::expected<SParameterResult, std::string> ComputeSParameters(const Circuit &circuit, const SParameterConfig &config,
+std::expected<SParameterResult, std::string> ComputeSParameters(const Circuit &circuit,
+                                                                const SParameterConfig &config,
                                                                 const ConvergenceOptions &options = {},
                                                                 std::vector<DiagnosticMessage> *messages = nullptr);
 
-std::expected<PoleZeroResult, std::string> ComputePoleZero(const Circuit &circuit, const PoleZeroConfig &config,
+std::expected<PoleZeroResult, std::string> ComputePoleZero(const Circuit &circuit,
+                                                           const PoleZeroConfig &config,
                                                            const ConvergenceOptions &options = {},
                                                            std::vector<DiagnosticMessage> *messages = nullptr);
 
@@ -230,12 +239,16 @@ std::expected<SensitivityResult, std::string> ComputeSensitivity(const Circuit &
                                                                  std::vector<DiagnosticMessage> *messages = nullptr);
 
 std::expected<AcSensitivityResult, std::string>
-ComputeAcSensitivity(const Circuit &circuit, const AcSensitivityConfig &config, const ConvergenceOptions &options = {},
+ComputeAcSensitivity(const Circuit &circuit,
+                     const AcSensitivityConfig &config,
+                     const ConvergenceOptions &options = {},
                      std::vector<DiagnosticMessage> *messages = nullptr);
 
 std::expected<HarmonicBalanceResult, std::string>
-ComputeHarmonicBalance(const Circuit &circuit, const HarmonicBalanceConfig &config,
-                       const ConvergenceOptions &options = {}, std::vector<DiagnosticMessage> *messages = nullptr);
+ComputeHarmonicBalance(const Circuit &circuit,
+                       const HarmonicBalanceConfig &config,
+                       const ConvergenceOptions &options = {},
+                       std::vector<DiagnosticMessage> *messages = nullptr);
 
 } // namespace Nodalys
 

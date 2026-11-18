@@ -27,7 +27,8 @@ constexpr float ARROW_HEAD_HALF_WIDTH = 0.15f;
  * @param[in] position   Grid position in world units.
  * @param[in] rotation   Orientation on the grid.
  */
-UITransistor::UITransistor(std::unique_ptr<Core::Component> component, const GridPoint position,
+UITransistor::UITransistor(std::unique_ptr<Core::Component> component,
+                           const GridPoint position,
                            const Rotation rotation)
     : UIElement(std::move(component), position, rotation) {
 }
@@ -79,8 +80,11 @@ LocalBounds UITransistor::GetLocalBounds() const {
  * @param[in] direction  Direction the arrow points to, in local grid units; it does not need to be normalized.
  * @param[in] color      Fill color.
  */
-void UITransistor::DrawArrowHead(SchematicCanvas &canvas, const ViewTransform &view, const ImVec2 tip,
-                                 const ImVec2 direction, const ImU32 color) const {
+void UITransistor::DrawArrowHead(SchematicCanvas &canvas,
+                                 const ViewTransform &view,
+                                 const ImVec2 tip,
+                                 const ImVec2 direction,
+                                 const ImU32 color) const {
     const float length = std::hypot(direction.x, direction.y);
     const ImVec2 along = {direction.x / length, direction.y / length};
     const ImVec2 across = {-along.y, along.x};

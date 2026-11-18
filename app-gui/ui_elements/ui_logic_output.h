@@ -23,8 +23,8 @@ public:
     UILogicOutput(GridPoint position, Rotation rotation);
     ~UILogicOutput() override = default;
 
-    void DrawReading(SchematicCanvas &canvas, const ViewTransform &view, LogicState state, ImU32 color,
-                     bool is_lit) const;
+    void
+    DrawReading(SchematicCanvas &canvas, const ViewTransform &view, LogicState state, ImU32 color, bool is_lit) const;
 
 protected:
     void DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const override;

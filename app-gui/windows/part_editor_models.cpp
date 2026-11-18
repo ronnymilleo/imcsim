@@ -95,7 +95,9 @@ constexpr auto OP_AMP_FIELDS = std::to_array<ParameterField<Core::OpAmpParameter
  * @details Custom starts from the parameters of the model it replaces, so a ready part can be tweaked.
  */
 template <typename Part, typename Model, typename Parameters, std::size_t Count>
-bool DrawModelChoice(Part &part, const std::span<const Model> models, const char *custom_name,
+bool DrawModelChoice(Part &part,
+                     const std::span<const Model> models,
+                     const char *custom_name,
                      const std::array<ParameterField<Parameters>, Count> &fields,
                      std::array<ValueField, Count> &value_fields,
                      const std::span<const Core::LibraryModel> library_models = {}) {
@@ -199,19 +201,28 @@ void LoadModelFields(ModelFields &fields, const Core::Component &component, Valu
 }
 
 void DrawDiode(Core::Diode &diode, ModelFields &fields, Schematic &schematic) {
-    if (DrawModelChoice(diode, Core::GetDiodeModels(diode.GetType()), Core::CUSTOM_DIODE_MODEL_NAME, DIODE_FIELDS,
-                        fields.Diode, std::span(schematic.GetLibraryModels()))) {
+    if (DrawModelChoice(diode,
+                        Core::GetDiodeModels(diode.GetType()),
+                        Core::CUSTOM_DIODE_MODEL_NAME,
+                        DIODE_FIELDS,
+                        fields.Diode,
+                        std::span(schematic.GetLibraryModels()))) {
         schematic.MarkModified();
     }
     if (diode.IsCustom()) {
-        ImGui::TextDisabled("%s", diode.GetType() == Core::ComponentType::ZENER_DIODE
-                                      ? "BV is the voltage the Zener regulates at"
-                                      : "BV is the reverse voltage the diode is rated for");
+        ImGui::TextDisabled("%s",
+                            diode.GetType() == Core::ComponentType::ZENER_DIODE
+                                ? "BV is the voltage the Zener regulates at"
+                                : "BV is the reverse voltage the diode is rated for");
     }
 }
 
 void DrawBJT(Core::BJT &bjt, ModelFields &fields, Schematic &schematic) {
-    if (DrawModelChoice(bjt, Core::GetBJTModels(bjt.GetType()), Core::CUSTOM_BJT_MODEL_NAME, BJT_FIELDS, fields.BJT,
+    if (DrawModelChoice(bjt,
+                        Core::GetBJTModels(bjt.GetType()),
+                        Core::CUSTOM_BJT_MODEL_NAME,
+                        BJT_FIELDS,
+                        fields.BJT,
                         std::span(schematic.GetLibraryModels()))) {
         schematic.MarkModified();
     }
@@ -222,8 +233,12 @@ void DrawBJT(Core::BJT &bjt, ModelFields &fields, Schematic &schematic) {
 }
 
 void DrawMOSFET(Core::MOSFET &mosfet, ModelFields &fields, Schematic &schematic) {
-    if (DrawModelChoice(mosfet, Core::GetMOSFETModels(mosfet.GetType()), Core::CUSTOM_MOSFET_MODEL_NAME, MOSFET_FIELDS,
-                        fields.MOSFET, std::span(schematic.GetLibraryModels()))) {
+    if (DrawModelChoice(mosfet,
+                        Core::GetMOSFETModels(mosfet.GetType()),
+                        Core::CUSTOM_MOSFET_MODEL_NAME,
+                        MOSFET_FIELDS,
+                        fields.MOSFET,
+                        std::span(schematic.GetLibraryModels()))) {
         schematic.MarkModified();
     }
     if (mosfet.IsCustom()) {
@@ -237,7 +252,10 @@ void DrawMOSFET(Core::MOSFET &mosfet, ModelFields &fields, Schematic &schematic)
  *          custom.
  */
 void DrawOpAmp(Core::OpAmp &op_amp, ModelFields &fields, ValueField &main_value, Schematic &schematic) {
-    if (DrawModelChoice(op_amp, Core::GetOpAmpModels(op_amp.GetType()), Core::CUSTOM_OP_AMP_MODEL_NAME, OP_AMP_FIELDS,
+    if (DrawModelChoice(op_amp,
+                        Core::GetOpAmpModels(op_amp.GetType()),
+                        Core::CUSTOM_OP_AMP_MODEL_NAME,
+                        OP_AMP_FIELDS,
                         fields.OpAmp)) {
         schematic.MarkModified();
     }

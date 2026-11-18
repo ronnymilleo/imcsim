@@ -36,7 +36,8 @@ public:
 
     // Evaluation
     std::string GetSignature() const;
-    std::vector<MathTrace> Evaluate(std::span<const double> xs, Dimension x_unit,
+    std::vector<MathTrace> Evaluate(std::span<const double> xs,
+                                    Dimension x_unit,
                                     const std::vector<std::vector<double>> &node_voltages,
                                     const std::vector<Core::ComponentTrace> &currents,
                                     std::vector<std::string> &errors) const;
@@ -46,10 +47,13 @@ private:
     Schematic &m_Schematic;
 
     NetResolver GetNetResolver() const;
-    std::optional<MathProgram> GetShownProgram(const MathChannel &channel, const NetResolver &find_node,
-                                               std::vector<std::string> &errors) const;
-    bool DrawChannel(MathChannel &channel, std::size_t index, const std::vector<std::string> &operands,
-                     const NetResolver &find_node, bool opens_editor) const;
+    std::optional<MathProgram>
+    GetShownProgram(const MathChannel &channel, const NetResolver &find_node, std::vector<std::string> &errors) const;
+    bool DrawChannel(MathChannel &channel,
+                     std::size_t index,
+                     const std::vector<std::string> &operands,
+                     const NetResolver &find_node,
+                     bool opens_editor) const;
     bool DrawEditor(MathChannel &channel, const std::vector<std::string> &operands) const;
 };
 

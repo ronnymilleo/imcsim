@@ -84,8 +84,11 @@ LoadedExample LoadExample(const std::string_view file_name, const std::optional<
         }
     }
     result.Schematic = std::make_unique<GUI::Schematic>();
-    result.Schematic->Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings),
-                              std::move(loaded->Subcircuits), std::move(loaded->Models));
+    result.Schematic->Replace(std::move(loaded->Elements),
+                              std::move(loaded->Wires),
+                              std::move(loaded->Settings),
+                              std::move(loaded->Subcircuits),
+                              std::move(loaded->Models));
     result.Schematic->RestoreMeasurements(loaded->Measurements);
     result.Circuit = result.Schematic->BuildCircuit();
     const auto output = GUI::ResolveOutputNode(std::nullopt, result.Circuit, *result.Schematic);
@@ -169,7 +172,9 @@ TEST_CASE("The Sallen-Key filter keeps all three poles at every gain-bandwidth p
         const double q2 = FEEDBACK_CAPACITANCE * GROUND_CAPACITANCE;
         const double q1 = 2.0 * CONDUCTANCE * GROUND_CAPACITANCE + FEEDBACK_CAPACITANCE * CONDUCTANCE;
         const double q0 = CONDUCTANCE * CONDUCTANCE;
-        const std::vector<double> denominator{q2, q1 + q2 * p1, q0 + q1 * p1 - FEEDBACK_CAPACITANCE * g * CONDUCTANCE,
+        const std::vector<double> denominator{q2,
+                                              q1 + q2 * p1,
+                                              q0 + q1 * p1 - FEEDBACK_CAPACITANCE * g * CONDUCTANCE,
                                               q0 * p1};
         for (const std::complex<double> &expected : PolynomialRoots(denominator)) {
             CHECK(Testing::HasRootNear(report.Poles, expected, 1e-4));
@@ -278,8 +283,9 @@ TEST_CASE("The Nodalys backend says in plain words why a circuit has no poles or
     }
     SECTION("An output the source does not reach") {
         const LoadedExample example = LoadExample("full_bridge_rectifier.imcsim", std::nullopt);
-        const Core::PoleZeroRun run = backend.RunPoleZero(
-            example.Circuit, {.OutputNode = example.Config.OutputNode, .InputSource = example.Config.InputSource});
+        const Core::PoleZeroRun run =
+            backend.RunPoleZero(example.Circuit,
+                                {.OutputNode = example.Config.OutputNode, .InputSource = example.Config.InputSource});
         REQUIRE_FALSE(run.Result.has_value());
         CHECK(run.Result.error().contains("does not respond"));
         CHECK_FALSE(run.Result.error().contains("ngspice"));

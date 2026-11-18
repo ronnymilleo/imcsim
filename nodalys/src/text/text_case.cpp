@@ -17,8 +17,9 @@ namespace Nodalys {
  */
 std::string ToLower(const std::string_view text) {
     std::string lower(text);
-    std::ranges::transform(lower, lower.begin(),
-                           [](const unsigned char character) { return static_cast<char>(std::tolower(character)); });
+    std::ranges::transform(lower, lower.begin(), [](const unsigned char character) {
+        return static_cast<char>(std::tolower(character));
+    });
     return lower;
 }
 
@@ -29,8 +30,9 @@ std::string ToLower(const std::string_view text) {
  */
 std::string ToUpper(const std::string_view text) {
     std::string upper(text);
-    std::ranges::transform(upper, upper.begin(),
-                           [](const unsigned char character) { return static_cast<char>(std::toupper(character)); });
+    std::ranges::transform(upper, upper.begin(), [](const unsigned char character) {
+        return static_cast<char>(std::toupper(character));
+    });
     return upper;
 }
 

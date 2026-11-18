@@ -313,20 +313,27 @@ TEST_CASE("A flip-flop has its data and clock on the left, SET and RESET above a
     CHECK(d_type.GetTerminalInward(3) == GUI::GridPoint{0, -1});
 
     const GUI::UILogicPart jk(Core::ComponentType::JK_FLIP_FLOP, {0, 0}, GUI::Rotation::R0);
-    CHECK(jk.GetTerminals() ==
-          std::vector<GUI::GridPoint>{{-3, -2}, {-3, 2}, {-3, 0}, {0, -4}, {0, 4}, {3, -2}, {3, 2}});
+    CHECK(jk.GetTerminals()
+          == std::vector<GUI::GridPoint>{{-3, -2}, {-3, 2}, {-3, 0}, {0, -4}, {0, 4}, {3, -2}, {3, 2}});
 }
 
 TEST_CASE("Every gate and flip-flop has one terminal for each input and each output", "[ui_element]") {
-    for (const Core::ComponentType type :
-         {Core::ComponentType::AND, Core::ComponentType::OR, Core::ComponentType::NOT, Core::ComponentType::NAND,
-          Core::ComponentType::NOR, Core::ComponentType::XOR, Core::ComponentType::XNOR, Core::ComponentType::BUFFER,
-          Core::ComponentType::D_FLIP_FLOP, Core::ComponentType::JK_FLIP_FLOP, Core::ComponentType::T_FLIP_FLOP,
-          Core::ComponentType::SR_FLIP_FLOP}) {
+    for (const Core::ComponentType type : {Core::ComponentType::AND,
+                                           Core::ComponentType::OR,
+                                           Core::ComponentType::NOT,
+                                           Core::ComponentType::NAND,
+                                           Core::ComponentType::NOR,
+                                           Core::ComponentType::XOR,
+                                           Core::ComponentType::XNOR,
+                                           Core::ComponentType::BUFFER,
+                                           Core::ComponentType::D_FLIP_FLOP,
+                                           Core::ComponentType::JK_FLIP_FLOP,
+                                           Core::ComponentType::T_FLIP_FLOP,
+                                           Core::ComponentType::SR_FLIP_FLOP}) {
         const GUI::UILogicPart part(type, {0, 0}, GUI::Rotation::R0);
         INFO(part.GetComponent().GetTypeName());
-        CHECK(part.GetTerminals().size() ==
-              Core::GetLogicInputLabels(type).size() + Core::GetLogicOutputLabels(type).size());
+        CHECK(part.GetTerminals().size()
+              == Core::GetLogicInputLabels(type).size() + Core::GetLogicOutputLabels(type).size());
     }
 }
 

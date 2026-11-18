@@ -246,7 +246,8 @@ bool PartEditor::DrawSettingPart(Core::Component &component) {
     if (Core::IsSwitch(type)) {
         DrawSwitch(static_cast<Core::Switch &>(component), *m_Schematic);
     } else if (type == Core::ComponentType::V_SWITCH) {
-        DrawControlledSwitch(static_cast<Core::VoltageControlledSwitch &>(component), m_Electromechanical,
+        DrawControlledSwitch(static_cast<Core::VoltageControlledSwitch &>(component),
+                             m_Electromechanical,
                              *m_Schematic);
     } else if (type == Core::ComponentType::RELAY) {
         DrawRelay(static_cast<Core::Relay &>(component), m_Electromechanical, *m_Schematic);

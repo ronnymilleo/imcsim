@@ -40,7 +40,8 @@ void LoadElectromechanicalFields(ElectromechanicalFields &fields, const Core::Co
 
 // Drawing
 void DrawSwitch(Core::Switch &contact, Schematic &schematic);
-void DrawControlledSwitch(Core::VoltageControlledSwitch &controlled, ElectromechanicalFields &fields,
+void DrawControlledSwitch(Core::VoltageControlledSwitch &controlled,
+                          ElectromechanicalFields &fields,
                           Schematic &schematic);
 void DrawRelay(Core::Relay &relay, ElectromechanicalFields &fields, Schematic &schematic);
 void DrawFuse(Core::Fuse &fuse, ElectromechanicalFields &fields, Schematic &schematic);

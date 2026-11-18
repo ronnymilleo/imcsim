@@ -37,7 +37,9 @@ void UINetLabel::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &vie
     canvas.AddLine(LocalToScreen(view, 0, 0), LocalToScreen(view, 0, -LEAD_LENGTH), color, LINE_THICKNESS);
 }
 
-void UINetLabel::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
+void UINetLabel::DrawSymbol(SchematicCanvas &canvas,
+                            const ViewTransform &view,
+                            const ImU32 color,
                             SymbolStyle /*style*/) const {
     const ImVec2 center = LocalToScreen(view, 0, -(LEAD_LENGTH + CIRCLE_RADIUS));
     const ImVec2 radius_offset = LocalToScreen(view, CIRCLE_RADIUS, -(LEAD_LENGTH + CIRCLE_RADIUS)) - center;

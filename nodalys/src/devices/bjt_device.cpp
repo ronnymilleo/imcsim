@@ -22,8 +22,14 @@ constexpr double BJT_GRADING_COEFFICIENT = 0.33;
 
 } // namespace
 
-BjtDevice::BjtDevice(const int collector, const int base, const int emitter, const int internal_collector,
-                     const int internal_base, const int internal_emitter, BjtParameters parameters, const bool pnp)
+BjtDevice::BjtDevice(const int collector,
+                     const int base,
+                     const int emitter,
+                     const int internal_collector,
+                     const int internal_base,
+                     const int internal_emitter,
+                     BjtParameters parameters,
+                     const bool pnp)
     : m_Collector(collector), m_Base(base), m_Emitter(emitter),
       m_C(internal_collector >= 0 ? internal_collector : collector), m_B(internal_base >= 0 ? internal_base : base),
       m_E(internal_emitter >= 0 ? internal_emitter : emitter), m_Given(parameters), m_Parameters(parameters),
@@ -154,10 +160,16 @@ BjtDevice::JunctionState BjtDevice::EvaluateState(const std::vector<double> &x) 
  */
 BjtDevice::JunctionCharges BjtDevice::EvaluateCharges(const JunctionState &state) const {
     const BjtParameters &p = m_Parameters;
-    const DepletionCharge qbe = EvaluateDepletion(state.VbeSigned, p.EmitterCapacitance, m_JunctionPotential,
-                                                  BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT);
-    const DepletionCharge qbc = EvaluateDepletion(state.VbcSigned, p.CollectorCapacitance, m_JunctionPotential,
-                                                  BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT);
+    const DepletionCharge qbe = EvaluateDepletion(state.VbeSigned,
+                                                  p.EmitterCapacitance,
+                                                  m_JunctionPotential,
+                                                  BJT_GRADING_COEFFICIENT,
+                                                  JUNCTION_FORWARD_LIMIT);
+    const DepletionCharge qbc = EvaluateDepletion(state.VbcSigned,
+                                                  p.CollectorCapacitance,
+                                                  m_JunctionPotential,
+                                                  BJT_GRADING_COEFFICIENT,
+                                                  JUNCTION_FORWARD_LIMIT);
     return {.BaseEmitterCharge = qbe.Charge + p.TransitTime * state.Dc.IfwdQb,
             .BaseEmitterCapacitance = qbe.Capacitance + p.TransitTime * state.Dc.DIfwdQbDvbe,
             .BaseCollectorCharge = qbc.Charge,
@@ -207,8 +219,11 @@ void BjtDevice::Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeCo
         const JunctionCharges charges = EvaluateCharges(state);
         const ChargeCompanion cap_be =
             ChargeModel(charges.BaseEmitterCapacitance, charges.BaseEmitterCharge, state.VbeSigned, m_HistoryBe, time);
-        const ChargeCompanion cap_bc = ChargeModel(charges.BaseCollectorCapacitance, charges.BaseCollectorCharge,
-                                                   state.VbcSigned, m_HistoryBc, time);
+        const ChargeCompanion cap_bc = ChargeModel(charges.BaseCollectorCapacitance,
+                                                   charges.BaseCollectorCharge,
+                                                   state.VbcSigned,
+                                                   m_HistoryBc,
+                                                   time);
         m_Gqbe = cap_be.Conductance;
         m_Ieqbe = cap_be.EquivalentCurrent;
         m_Gqbc = cap_bc.Conductance;
@@ -296,7 +311,8 @@ double BjtDevice::TerminalCharge(const int terminal, const std::vector<double> &
     }
 }
 
-std::complex<double> BjtDevice::AcTerminalCurrent(const int terminal, const std::vector<double> &x_dc,
+std::complex<double> BjtDevice::AcTerminalCurrent(const int terminal,
+                                                  const std::vector<double> &x_dc,
                                                   const std::vector<std::complex<double>> &x_ac,
                                                   const double omega) const {
     const JunctionState state = EvaluateState(x_dc);
@@ -310,8 +326,8 @@ std::complex<double> BjtDevice::AcTerminalCurrent(const int terminal, const std:
     std::complex<double> iqbc_ac{0.0, 0.0};
     if (HasTransientState()) {
         const JunctionCharges charges = EvaluateCharges(state);
-        iqbe_ac = std::complex<double>(0.0, omega) *
-                  (charges.BaseEmitterCapacitance * vbe_ac + charges.Transcapacitance * vbc_ac);
+        iqbe_ac = std::complex<double>(0.0, omega)
+                * (charges.BaseEmitterCapacitance * vbe_ac + charges.Transcapacitance * vbc_ac);
         iqbc_ac = std::complex<double>(0.0, omega * charges.BaseCollectorCapacitance) * vbc_ac;
     }
 
@@ -363,7 +379,8 @@ void BjtDevice::SeedOperatingPoint(std::vector<double> &x) const {
     }
 }
 
-double BjtDevice::OutputNoiseVariance(const std::vector<double> &x_dc, const std::vector<std::complex<double>> &adjoint,
+double BjtDevice::OutputNoiseVariance(const std::vector<double> &x_dc,
+                                      const std::vector<std::complex<double>> &adjoint,
                                       const double /*frequency_hz*/) const {
     const BjtParameters &p = m_Parameters;
     double variance = 0.0;
@@ -388,8 +405,8 @@ double BjtDevice::OutputNoiseVariance(const std::vector<double> &x_dc, const std
 }
 
 bool BjtDevice::HasTransientState() const {
-    return m_Parameters.TransitTime > 0.0 || m_Parameters.EmitterCapacitance > 0.0 ||
-           m_Parameters.CollectorCapacitance > 0.0;
+    return m_Parameters.TransitTime > 0.0 || m_Parameters.EmitterCapacitance > 0.0
+        || m_Parameters.CollectorCapacitance > 0.0;
 }
 
 void BjtDevice::AcceptStep(const std::vector<double> &x) {

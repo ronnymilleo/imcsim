@@ -19,7 +19,8 @@ namespace GUI {
 
 void TransformElement(UIElement &element, const PointTransform &transform);
 GridPoint FindPivot(const std::vector<std::unique_ptr<UIElement>> &elements,
-                    const std::set<std::size_t> &selected_elements, const std::vector<UIWire> &wires,
+                    const std::set<std::size_t> &selected_elements,
+                    const std::vector<UIWire> &wires,
                     const std::set<std::size_t> &selected_wires);
 
 } // namespace GUI

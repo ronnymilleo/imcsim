@@ -37,7 +37,9 @@ nlohmann::json WriteWires(const std::vector<UIWire> &wires) {
  * @param[out]    wires    Receives the wires that were read.
  * @param[in,out] warnings Receives one message for each wire skipped.
  */
-void ReadWires(const nlohmann::json &object, const WireWording wording, std::vector<UIWire> &wires,
+void ReadWires(const nlohmann::json &object,
+               const WireWording wording,
+               std::vector<UIWire> &wires,
                std::vector<std::string> &warnings) {
     const auto list = object.find("wires");
     if (list == object.end() || !list->is_array()) {
@@ -59,7 +61,11 @@ void ReadWires(const nlohmann::json &object, const WireWording wording, std::vec
             warnings.push_back(wording == WireWording::SPECIFIC
                                    ? std::format("Wire {} from ({}, {}) to ({}, {}) is diagonal and was skipped; "
                                                  "redraw it",
-                                                 index + 1, start->X, start->Y, end->X, end->Y)
+                                                 index + 1,
+                                                 start->X,
+                                                 start->Y,
+                                                 end->X,
+                                                 end->Y)
                                    : std::format("Wire {} is invalid and was skipped", index + 1));
         } else {
             wires.emplace_back(*start, *end);

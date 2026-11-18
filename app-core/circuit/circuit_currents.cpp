@@ -32,8 +32,8 @@ namespace Core {
  * @return  True for supplies, voltage sources, clocks and logic inputs.
  */
 bool HasBranchCurrent(const ComponentType type) {
-    return type == ComponentType::VCC || type == ComponentType::VOLTAGE_SOURCE || type == ComponentType::CLOCK ||
-           type == ComponentType::LOGIC_INPUT;
+    return type == ComponentType::VCC || type == ComponentType::VOLTAGE_SOURCE || type == ComponentType::CLOCK
+        || type == ComponentType::LOGIC_INPUT;
 }
 
 /**
@@ -46,8 +46,8 @@ bool HasBranchCurrent(const ComponentType type) {
  */
 std::vector<CurrentProbe> GetCurrentProbes(const Component &component) {
     const ComponentType type = component.GetType();
-    if (IsDiode(type) || IsControlledSource(type) || IsBehavioralSource(type) || IsSwitch(type) ||
-        type == ComponentType::V_SWITCH || type == ComponentType::FUSE || type == ComponentType::OP_AMP) {
+    if (IsDiode(type) || IsControlledSource(type) || IsBehavioralSource(type) || IsSwitch(type)
+        || type == ComponentType::V_SWITCH || type == ComponentType::FUSE || type == ComponentType::OP_AMP) {
         return {{0, ""}};
     }
     if (IsLogicGate(type)) {
@@ -110,9 +110,14 @@ std::string GetCurrentName(const Component &component, const std::string_view la
  */
 bool HasSingleCurrent(const ComponentType type) {
     static constexpr std::array SINGLE_CURRENT_TYPES = {
-        ComponentType::RESISTOR,    ComponentType::CAPACITOR,      ComponentType::INDUCTOR,
-        ComponentType::VCC,         ComponentType::VOLTAGE_SOURCE, ComponentType::CLOCK,
-        ComponentType::LOGIC_INPUT, ComponentType::CURRENT_SOURCE,
+        ComponentType::RESISTOR,
+        ComponentType::CAPACITOR,
+        ComponentType::INDUCTOR,
+        ComponentType::VCC,
+        ComponentType::VOLTAGE_SOURCE,
+        ComponentType::CLOCK,
+        ComponentType::LOGIC_INPUT,
+        ComponentType::CURRENT_SOURCE,
     };
     return std::ranges::contains(SINGLE_CURRENT_TYPES, type);
 }

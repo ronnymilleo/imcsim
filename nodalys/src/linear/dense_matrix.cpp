@@ -17,19 +17,23 @@ BasicDenseMatrix<Scalar>::BasicDenseMatrix(const std::size_t rows, const std::si
     : m_Rows(rows), m_Cols(cols), m_Data(rows * cols, Scalar{0.0}), m_Pivot(rows) {
 }
 
-template <typename Scalar> std::size_t BasicDenseMatrix<Scalar>::Rows() const {
+template <typename Scalar>
+std::size_t BasicDenseMatrix<Scalar>::Rows() const {
     return m_Rows;
 }
 
-template <typename Scalar> std::size_t BasicDenseMatrix<Scalar>::Cols() const {
+template <typename Scalar>
+std::size_t BasicDenseMatrix<Scalar>::Cols() const {
     return m_Cols;
 }
 
-template <typename Scalar> Scalar &BasicDenseMatrix<Scalar>::At(const std::size_t row, const std::size_t col) {
+template <typename Scalar>
+Scalar &BasicDenseMatrix<Scalar>::At(const std::size_t row, const std::size_t col) {
     return m_Data[row * m_Cols + col];
 }
 
-template <typename Scalar> Scalar BasicDenseMatrix<Scalar>::At(const std::size_t row, const std::size_t col) const {
+template <typename Scalar>
+Scalar BasicDenseMatrix<Scalar>::At(const std::size_t row, const std::size_t col) const {
     return m_Data[row * m_Cols + col];
 }
 
@@ -38,7 +42,8 @@ void BasicDenseMatrix<Scalar>::Add(const std::size_t row, const std::size_t col,
     At(row, col) += value;
 }
 
-template <typename Scalar> void BasicDenseMatrix<Scalar>::Reset() {
+template <typename Scalar>
+void BasicDenseMatrix<Scalar>::Reset() {
     std::ranges::fill(m_Data, Scalar{0.0});
     m_Factored = false;
 }
@@ -50,7 +55,8 @@ template <typename Scalar> void BasicDenseMatrix<Scalar>::Reset() {
  * @note    A zero pivot is tested against a floor scaled by the largest matrix entry, so tiny but usable
  *          conductances keep working while exact singularities are caught.
  */
-template <typename Scalar> bool BasicDenseMatrix<Scalar>::FactorizeLU() {
+template <typename Scalar>
+bool BasicDenseMatrix<Scalar>::FactorizeLU() {
     const std::size_t n = std::min(m_Rows, m_Cols);
     const double largest = std::ranges::max(m_Data | std::views::transform([](const Scalar v) { return std::abs(v); }));
     const double pivot_floor = largest * 1e-30;

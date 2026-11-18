@@ -27,8 +27,10 @@ namespace {
  * @param[in] voltage_source  The input when it is a voltage source, or null.
  * @param[in] current_source  The input when it is a current source, or null.
  */
-SmallSignalSystem BuildSmallSignalSystem(CompiledCircuit &compiled, const std::vector<double> &x_dc,
-                                         const int output_node, const VoltageSourceDevice *voltage_source,
+SmallSignalSystem BuildSmallSignalSystem(CompiledCircuit &compiled,
+                                         const std::vector<double> &x_dc,
+                                         const int output_node,
+                                         const VoltageSourceDevice *voltage_source,
                                          const CurrentSourceDevice *current_source) {
     const int size = compiled.System->GetSize();
     std::vector<bool> node_flags(static_cast<std::size_t>(size), false);
@@ -111,7 +113,8 @@ std::vector<std::complex<double>> FindZeros(const SmallSignalSystem &system) {
  * @param[in,out] messages  Optional list receiving diagnostic lines.
  * @return  Result containing the complex poles and zeros in rad/s, or an error description.
  */
-std::expected<PoleZeroResult, std::string> ComputePoleZero(CompiledCircuit &compiled, const PoleZeroConfig &settings,
+std::expected<PoleZeroResult, std::string> ComputePoleZero(CompiledCircuit &compiled,
+                                                           const PoleZeroConfig &settings,
                                                            const ConvergenceOptions &options,
                                                            std::vector<DiagnosticMessage> *messages) {
 

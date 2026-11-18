@@ -41,7 +41,9 @@ struct ClassifiedLines {
  * @brief   The message of a line the engine cannot simulate, with the subcircuit it is in.
  */
 std::string Refuse(const ExpansionContext &context, const std::string_view line, const std::string_view reason) {
-    return std::format("Nodalys cannot simulate the subcircuit {}: the line '{}' {}", context.SubcircuitName, line,
+    return std::format("Nodalys cannot simulate the subcircuit {}: the line '{}' {}",
+                       context.SubcircuitName,
+                       line,
                        reason);
 }
 
@@ -112,8 +114,8 @@ Result ExpandScope(ExpansionContext &context, TextScope &scope, const std::vecto
 /**
  * @brief   Sorts the lines of a text and registers its nested subcircuits.
  */
-std::expected<ClassifiedLines, std::string> ClassifyLines(ExpansionContext &context, TextScope &scope,
-                                                          const std::vector<std::string> &lines) {
+std::expected<ClassifiedLines, std::string>
+ClassifyLines(ExpansionContext &context, TextScope &scope, const std::vector<std::string> &lines) {
     ClassifiedLines classified;
     for (std::size_t index = 0; index < lines.size(); ++index) {
         const std::vector<std::string> tokens = SplitTokens(lines[index]);
@@ -152,7 +154,8 @@ std::expected<ClassifiedLines, std::string> ClassifyLines(ExpansionContext &cont
  * @brief   Evaluates the .param lines in order. A value the instance passed is kept, since it overrides the default
  *          the text gives.
  */
-Result DefineParameters(ExpansionContext &context, TextScope &scope,
+Result DefineParameters(ExpansionContext &context,
+                        TextScope &scope,
                         const std::vector<std::vector<std::string>> &parameter_lines) {
     for (const std::vector<std::string> &tokens : parameter_lines) {
         for (const auto &[name, text] : SplitParameterTokens(tokens, 1)) {
@@ -172,12 +175,13 @@ Result DefineParameters(ExpansionContext &context, TextScope &scope,
     return {};
 }
 
-Result DefineModels(ExpansionContext &context, TextScope &scope,
-                    const std::vector<std::vector<std::string>> &model_lines) {
+Result
+DefineModels(ExpansionContext &context, TextScope &scope, const std::vector<std::vector<std::string>> &model_lines) {
     for (const std::vector<std::string> &tokens : model_lines) {
         auto model = ParseTextModel(scope, tokens);
         if (!model) {
-            return std::unexpected(Refuse(context, std::format(".model {}", tokens.size() > 1 ? tokens[1] : ""),
+            return std::unexpected(Refuse(context,
+                                          std::format(".model {}", tokens.size() > 1 ? tokens[1] : ""),
                                           "is not understood: " + model.error()));
         }
         scope.AddModel(ToUpper(tokens[1]), std::move(*model));
@@ -188,17 +192,22 @@ Result DefineModels(ExpansionContext &context, TextScope &scope,
 /**
  * @brief   Gives each parameter of a called subcircuit its value: what the X line passes, or else its default.
  */
-Result SetInstanceParameters(ExpansionContext &context, const TextScope &caller, TextScope &instance,
-                             const TextSubcircuit &subcircuit, const std::string_view line,
+Result SetInstanceParameters(ExpansionContext &context,
+                             const TextScope &caller,
+                             TextScope &instance,
+                             const TextSubcircuit &subcircuit,
+                             const std::string_view line,
                              const std::vector<std::pair<std::string, std::string>> &arguments) {
     for (const auto &[name, text] : arguments) {
         const bool is_known =
             std::ranges::any_of(subcircuit.Parameters, [&name](const auto &formal) { return formal.first == name; });
         if (!is_known) {
-            return std::unexpected(Refuse(context, line,
+            return std::unexpected(Refuse(context,
+                                          line,
                                           std::format("passes the parameter {}, which {} does not "
                                                       "have",
-                                                      name, subcircuit.Name)));
+                                                      name,
+                                                      subcircuit.Name)));
         }
     }
     for (const auto &[name, default_text] : subcircuit.Parameters) {
@@ -217,8 +226,11 @@ Result SetInstanceParameters(ExpansionContext &context, const TextScope &caller,
 /**
  * @brief   Expands an X line: a nested subcircuit of the text, with its own nodes, parameters and models.
  */
-Result ExpandInstance(ExpansionContext &context, TextScope &scope, const std::string &line,
-                      const std::vector<std::string> &tokens, const int depth) {
+Result ExpandInstance(ExpansionContext &context,
+                      TextScope &scope,
+                      const std::string &line,
+                      const std::vector<std::string> &tokens,
+                      const int depth) {
     constexpr std::size_t FIRST_AFTER_NAME = 2;
     std::size_t parameters_start = FIRST_AFTER_NAME;
     while (parameters_start < tokens.size() && !IsParameterStart(tokens[parameters_start])) {
@@ -230,20 +242,29 @@ Result ExpandInstance(ExpansionContext &context, TextScope &scope, const std::st
     const std::string &subcircuit_name = tokens[parameters_start - 1];
     const TextSubcircuit *subcircuit = scope.FindSubcircuit(ToUpper(subcircuit_name));
     if (subcircuit == nullptr) {
-        return std::unexpected(Refuse(
-            context, line, std::format("uses the subcircuit {}, which the text does not define", subcircuit_name)));
+        return std::unexpected(
+            Refuse(context,
+                   line,
+                   std::format("uses the subcircuit {}, which the text does not define", subcircuit_name)));
     }
     const std::size_t node_count = parameters_start - 1 - 1;
     if (node_count != subcircuit->Ports.size()) {
-        return std::unexpected(Refuse(context, line,
-                                      std::format("gives {} nodes to {}, which has {} ports", node_count,
-                                                  subcircuit->Name, subcircuit->Ports.size())));
+        return std::unexpected(Refuse(context,
+                                      line,
+                                      std::format("gives {} nodes to {}, which has {} ports",
+                                                  node_count,
+                                                  subcircuit->Name,
+                                                  subcircuit->Ports.size())));
     }
     if (depth >= MAX_NESTING_DEPTH) {
         return std::unexpected(Refuse(context, line, "nests subcircuits too deeply; one of them places itself"));
     }
     TextScope instance(subcircuit->DefinedIn, scope.MakeName(tokens[0]));
-    if (const Result set = SetInstanceParameters(context, scope, instance, *subcircuit, line,
+    if (const Result set = SetInstanceParameters(context,
+                                                 scope,
+                                                 instance,
+                                                 *subcircuit,
+                                                 line,
                                                  SplitParameterTokens(tokens, parameters_start));
         !set) {
         return set;
@@ -257,8 +278,8 @@ Result ExpandInstance(ExpansionContext &context, TextScope &scope, const std::st
 /**
  * @brief   Adds everything a text holds to the circuit, as one instance in a scope.
  */
-Result ExpandScope(ExpansionContext &context, TextScope &scope, const std::vector<std::string> &lines,
-                   const int depth) {
+Result
+ExpandScope(ExpansionContext &context, TextScope &scope, const std::vector<std::string> &lines, const int depth) {
     const auto classified = ClassifyLines(context, scope, lines);
     if (!classified) {
         return std::unexpected(classified.error());
@@ -300,7 +321,9 @@ AddSubcircuitText(CircuitBuilder &builder, const SubcircuitText &text, const Sub
     if (instance.PortNodes.size() != text.Ports.size()) {
         return std::unexpected(std::format("Nodalys cannot simulate the subcircuit {}: it has {} ports and the "
                                            "instance connects {}",
-                                           text.Name, text.Ports.size(), instance.PortNodes.size()));
+                                           text.Name,
+                                           text.Ports.size(),
+                                           instance.PortNodes.size()));
     }
     ExpansionContext context{.Builder = builder,
                              .SubcircuitName = text.Name,

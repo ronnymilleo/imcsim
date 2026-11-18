@@ -35,9 +35,9 @@ std::size_t FindNumberEnd(const std::string_view text, const std::size_t start) 
     std::size_t position = start;
     while (position < text.size()) {
         const char character = text[position];
-        const bool is_exponent_sign = (character == '+' || character == '-') && position > start &&
-                                      (text[position - 1] == 'e' || text[position - 1] == 'E') &&
-                                      position + 1 < text.size() && IsDigit(text[position + 1]);
+        const bool is_exponent_sign = (character == '+' || character == '-') && position > start
+                                   && (text[position - 1] == 'e' || text[position - 1] == 'E')
+                                   && position + 1 < text.size() && IsDigit(text[position + 1]);
         if (!IsWordCharacter(character) && character != '.' && !is_exponent_sign) {
             break;
         }

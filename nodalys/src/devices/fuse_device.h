@@ -32,8 +32,10 @@ public:
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
-    std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
-                                           const std::vector<std::complex<double>> &x_ac, double omega) const override;
+    std::complex<double> AcTerminalCurrent(int terminal,
+                                           const std::vector<double> &x_dc,
+                                           const std::vector<std::complex<double>> &x_ac,
+                                           double omega) const override;
     void AcceptStep(const std::vector<double> &x) override;
     void RejectStep() override;
     bool HasSwitched() const override;

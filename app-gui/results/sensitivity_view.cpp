@@ -30,8 +30,10 @@ std::string FormatUnit(const std::string &unit, const std::string &prefix) {
  * @param[in] value    Value of the part, or none when the results do not carry it.
  * @return  Such as "R1", "VCC 12V" or "X2.R1".
  */
-std::string FormatSensitivityPartLabel(const Core::ComponentType type, const std::string &name,
-                                       const std::string &element, const std::optional<double> value) {
+std::string FormatSensitivityPartLabel(const Core::ComponentType type,
+                                       const std::string &name,
+                                       const std::string &element,
+                                       const std::optional<double> value) {
     if (type == Core::ComponentType::VCC && value) {
         return std::format("VCC {}V", Core::FormatValue(*value));
     }

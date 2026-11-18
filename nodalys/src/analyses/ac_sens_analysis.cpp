@@ -51,8 +51,8 @@ std::optional<std::string> CheckConfig(const CompiledCircuit &compiled, const Ac
     if (settings.OutputPositiveNode == settings.OutputNegativeNode) {
         return "Pick an output node; ground has no sensitivity";
     }
-    if (settings.StartFrequency <= 0.0 || settings.StopFrequency < settings.StartFrequency ||
-        settings.PointsPerDecade <= 0) {
+    if (settings.StartFrequency <= 0.0 || settings.StopFrequency < settings.StartFrequency
+        || settings.PointsPerDecade <= 0) {
         return "The AC sensitivity analysis has invalid frequency settings; check start, stop and points per decade";
     }
     return std::nullopt;
@@ -133,7 +133,10 @@ std::optional<std::string> DescribeSmallOutput(const AcSensitivityResult &result
     }
     return std::format("The output is almost zero at {} of {} frequencies, between {:.4g} Hz and {:.4g} Hz, so a "
                        "relative change of it means nothing there and those points have no value",
-                       frequencies.size(), result.Frequencies.size(), frequencies.front(), frequencies.back());
+                       frequencies.size(),
+                       result.Frequencies.size(),
+                       frequencies.front(),
+                       frequencies.back());
 }
 
 /// Everything the loop over the frequencies reads and does not change.
@@ -157,8 +160,8 @@ std::expected<FrequencySolution, std::string> SolveFrequency(const SweepContext 
     const double omega = 2.0 * std::numbers::pi * frequency;
     const MnaSystem &system = *context.Compiled.System;
     FrequencySolution solution;
-    if (!system.SolveAc(context.Reactive, omega, solution.AcSolution) ||
-        !system.SolveAcTransposeFor(context.Reactive, omega, context.Selector, solution.Adjoint)) {
+    if (!system.SolveAc(context.Reactive, omega, solution.AcSolution)
+        || !system.SolveAcTransposeFor(context.Reactive, omega, context.Selector, solution.Adjoint)) {
         return std::unexpected(
             std::format("The Nodalys AC sensitivity solver encountered a singular matrix at f = {} Hz", frequency));
     }
@@ -170,8 +173,9 @@ std::expected<FrequencySolution, std::string> SolveFrequency(const SweepContext 
     const std::vector<Complex> weights =
         FindBiasWeights(context.Derivatives, size, solution.Adjoint, solution.AcSolution, omega);
     if (!system.SolveTransposeComplex(weights, solution.BiasAdjoint)) {
-        return std::unexpected(std::format(
-            "The Nodalys AC sensitivity solver found no operating point derivative at f = {} Hz", frequency));
+        return std::unexpected(
+            std::format("The Nodalys AC sensitivity solver found no operating point derivative at f = {} Hz",
+                        frequency));
     }
     return solution;
 }
@@ -224,7 +228,9 @@ std::expected<AcSensitivityResult, std::string> ComputeAcSensitivity(CompiledCir
     result.OutputPositiveNode = settings.OutputPositiveNode;
     result.OutputNegativeNode = settings.OutputNegativeNode;
     result.InputSource = settings.InputSource;
-    result.Frequencies = MakeFrequencySweep(settings.SweepType, settings.StartFrequency, settings.StopFrequency,
+    result.Frequencies = MakeFrequencySweep(settings.SweepType,
+                                            settings.StartFrequency,
+                                            settings.StopFrequency,
                                             settings.PointsPerDecade);
     for (const AcSensitivityElement &element : elements) {
         result.Elements.push_back({.Name = element.Name, .Parameter = element.Parameter, .Value = element.Value});
@@ -248,8 +254,9 @@ std::expected<AcSensitivityResult, std::string> ComputeAcSensitivity(CompiledCir
         }
     }
     if (const std::optional<std::string> warning = DescribeSmallOutput(result, minimum_output)) {
-        const bool is_everywhere = std::ranges::all_of(
-            result.Output, [minimum_output](const Complex &output) { return std::abs(output) <= minimum_output; });
+        const bool is_everywhere = std::ranges::all_of(result.Output, [minimum_output](const Complex &output) {
+            return std::abs(output) <= minimum_output;
+        });
         if (is_everywhere) {
             return std::unexpected(
                 std::format("The output is zero at every frequency: {} does not drive it", settings.InputSource));

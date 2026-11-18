@@ -51,18 +51,30 @@ std::string FormatLogicModels(const LogicPart &part) {
     const LogicParameters &family = part.GetParameters();
     const std::string name = part.GetName();
     const std::string delay = FormatSpiceValue(family.PropagationDelay);
-    std::string models = std::format(".model ADC-{} adc_bridge(in_low={} in_high={})\n", name,
+    std::string models = std::format(".model ADC-{} adc_bridge(in_low={} in_high={})\n",
+                                     name,
                                      FormatSpiceValue(family.LogicLevel * LOGIC_LOW_FRACTION),
                                      FormatSpiceValue(family.LogicLevel * LOGIC_HIGH_FRACTION));
-    models += std::format(".model DAC-{} dac_bridge(out_low=0 out_high={} out_undef={})\n", name,
-                          FormatSpiceValue(family.LogicLevel), FormatSpiceValue(family.LogicLevel / 2.0));
+    models += std::format(".model DAC-{} dac_bridge(out_low=0 out_high={} out_undef={})\n",
+                          name,
+                          FormatSpiceValue(family.LogicLevel),
+                          FormatSpiceValue(family.LogicLevel / 2.0));
     if (IsFlipFlop(part.GetType())) {
         models +=
             std::format(".model LOGIC-{} {}(clk_delay={} set_delay={} reset_delay={} rise_delay={} fall_delay={})\n",
-                        name, GetLogicModelKind(part.GetType()), delay, delay, delay, delay, delay);
+                        name,
+                        GetLogicModelKind(part.GetType()),
+                        delay,
+                        delay,
+                        delay,
+                        delay,
+                        delay);
     } else {
-        models += std::format(".model LOGIC-{} {}(rise_delay={} fall_delay={})\n", name,
-                              GetLogicModelKind(part.GetType()), delay, delay);
+        models += std::format(".model LOGIC-{} {}(rise_delay={} fall_delay={})\n",
+                              name,
+                              GetLogicModelKind(part.GetType()),
+                              delay,
+                              delay);
     }
     return models;
 }
@@ -87,7 +99,10 @@ std::string FormatLogicPart(const LogicPart &part, const std::vector<int> &nodes
         const int digital = next_extra_node++;
         digital_inputs.push_back(digital);
         lines += std::format("A-{0}-{1} [{2}] [{3}] ADC-{0}\n", name, inputs[input], nodes[input], digital);
-        lines += std::format("R-{}-{} {} 0 {}\n", name, inputs[input], nodes[input],
+        lines += std::format("R-{}-{} {} 0 {}\n",
+                             name,
+                             inputs[input],
+                             nodes[input],
                              FormatSpiceValue(LOGIC_INPUT_PULL_DOWN));
     }
     std::vector<int> digital_outputs;
@@ -117,7 +132,11 @@ std::string FormatLogicPart(const LogicPart &part, const std::vector<int> &nodes
     for (std::size_t output = 0; output < outputs.size(); ++output) {
         const int analog = next_extra_node++;
         lines += std::format("A-{0}-{1} [{2}] [{3}] DAC-{0}\n", name, outputs[output], digital_outputs[output], analog);
-        lines += std::format("R-{}-{} {} {} {}\n", name, outputs[output], analog, nodes[inputs.size() + output],
+        lines += std::format("R-{}-{} {} {} {}\n",
+                             name,
+                             outputs[output],
+                             analog,
+                             nodes[inputs.size() + output],
                              FormatSpiceValue(LOGIC_OUTPUT_RESISTANCE));
     }
     return lines;

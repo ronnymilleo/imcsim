@@ -33,10 +33,14 @@ UIBJT::UIBJT(const Core::ComponentType type, const GridPoint position, const Rot
     : UITransistor(std::make_unique<Core::BJT>(type), position, rotation) {
 }
 
-void UIBJT::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
+void UIBJT::DrawSymbol(SchematicCanvas &canvas,
+                       const ViewTransform &view,
+                       const ImU32 color,
                        SymbolStyle /*style*/) const {
     canvas.AddLine(LocalToScreen(view, -1, 0), LocalToScreen(view, BAR_X, 0), color, LINE_THICKNESS);
-    canvas.AddLine(LocalToScreen(view, BAR_X, -BAR_HALF_HEIGHT), LocalToScreen(view, BAR_X, BAR_HALF_HEIGHT), color,
+    canvas.AddLine(LocalToScreen(view, BAR_X, -BAR_HALF_HEIGHT),
+                   LocalToScreen(view, BAR_X, BAR_HALF_HEIGHT),
+                   color,
                    LINE_THICKNESS);
     canvas.AddLine(LocalToScreen(view, BAR_X, -JUNCTION_Y), LocalToScreen(view, 1, -1), color, LINE_THICKNESS);
     canvas.AddLine(LocalToScreen(view, BAR_X, JUNCTION_Y), LocalToScreen(view, 1, 1), color, LINE_THICKNESS);

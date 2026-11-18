@@ -41,8 +41,8 @@ namespace {
 bool IsDigitalOnly(const Circuit &circuit) {
     return std::ranges::all_of(CollectParts(circuit), [](const Component *part) {
         const ComponentType type = part->GetType();
-        return type == ComponentType::CLOCK || type == ComponentType::LOGIC_INPUT || type == ComponentType::VCC ||
-               type == ComponentType::SUBCIRCUIT || IsLogicPart(type);
+        return type == ComponentType::CLOCK || type == ComponentType::LOGIC_INPUT || type == ComponentType::VCC
+            || type == ComponentType::SUBCIRCUIT || IsLogicPart(type);
     });
 }
 
@@ -54,8 +54,10 @@ std::optional<std::string> CheckPins(const SubcircuitDefinition &definition) {
     // The ports of a block kept as SPICE text are the vendor's own names, written as they came
     if (definition.Spice) {
         if (definition.Spice->Ports.size() != definition.Pins.size()) {
-            return std::format("{} has {} pins but its SPICE text has {} ports", definition.Name,
-                               definition.Pins.size(), definition.Spice->Ports.size());
+            return std::format("{} has {} pins but its SPICE text has {} ports",
+                               definition.Name,
+                               definition.Pins.size(),
+                               definition.Spice->Ports.size());
         }
         return std::nullopt;
     }
@@ -64,7 +66,8 @@ std::optional<std::string> CheckPins(const SubcircuitDefinition &definition) {
         if (pin.Node == 0) {
             return std::format("Pin {} of {} sits on ground inside it, so it would connect nothing; ground is shared "
                                "by the whole circuit, so remove the pin",
-                               pin.Name, definition.Name);
+                               pin.Name,
+                               definition.Name);
         }
         if (!nodes.insert(pin.Node).second) {
             return std::format("Pins of {} share a node inside it; give each pin a node of its own", definition.Name);
@@ -88,8 +91,10 @@ std::optional<std::string> CheckExpressions(const Circuit &body, const Subcircui
                                entry.Part->GetName());
         }
         if (!std::ranges::contains(definition->Parameters, parameter, &SubcircuitParameter::Name)) {
-            return std::format("{} in {} follows {}, which is not a parameter of it", entry.Part->GetName(),
-                               definition->Name, *expression);
+            return std::format("{} in {} follows {}, which is not a parameter of it",
+                               entry.Part->GetName(),
+                               definition->Name,
+                               *expression);
         }
     }
     return std::nullopt;
@@ -102,7 +107,8 @@ std::optional<std::string> CheckExpressions(const Circuit &body, const Subcircui
  * @details open holds the blocks being looked into on the way down, so one that places itself, directly or through
  *          another, is caught instead of looped through.
  */
-std::optional<std::string> CheckInstances(const Circuit &circuit, const Circuit &body,
+std::optional<std::string> CheckInstances(const Circuit &circuit,
+                                          const Circuit &body,
                                           std::set<std::string, std::less<>> &checked,
                                           std::set<std::string, std::less<>> &open) {
     for (const CircuitEntry &entry : body.GetEntries()) {
@@ -112,7 +118,8 @@ std::optional<std::string> CheckInstances(const Circuit &circuit, const Circuit 
         const auto &instance = static_cast<const SubcircuitInstance &>(*entry.Part);
         const auto definition = circuit.FindSubcircuit(instance.GetDefinitionName());
         if (!definition) {
-            return std::format("{} refers to the unknown subcircuit {}", entry.Part->GetName(),
+            return std::format("{} refers to the unknown subcircuit {}",
+                               entry.Part->GetName(),
                                instance.GetDefinitionName());
         }
         if (entry.Nodes.size() != definition->Pins.size()) {
@@ -120,7 +127,9 @@ std::optional<std::string> CheckInstances(const Circuit &circuit, const Circuit 
         }
         for (const auto &[name, value] : instance.GetParameters()) {
             if (!std::ranges::contains(definition->Parameters, name, &SubcircuitParameter::Name)) {
-                return std::format("{} sets {}, which is not a parameter of {}", entry.Part->GetName(), name,
+                return std::format("{} sets {}, which is not a parameter of {}",
+                                   entry.Part->GetName(),
+                                   name,
                                    definition->Name);
             }
         }
@@ -172,10 +181,13 @@ std::optional<std::string> CheckLibraryModels(const Circuit &circuit) {
             return std::format(
                 "{} uses the model {}, which the schematic does not have; import it again or pick another "
                 "model",
-                part->GetName(), part->GetLibraryModel());
+                part->GetName(),
+                part->GetLibraryModel());
         }
         if (!CanUseLibraryModel(part->GetType(), model->Kind)) {
-            return std::format("{} uses the model {}, which is a {} model", part->GetName(), model->Name,
+            return std::format("{} uses the model {}, which is a {} model",
+                               part->GetName(),
+                               model->Name,
                                GetModelKindName(model->Kind));
         }
     }
@@ -241,8 +253,8 @@ struct NodeVoltageWords {
 
 NodeVoltageWords DescribeKind(const NodeVoltageKind kind) {
     return kind == NodeVoltageKind::INITIAL
-               ? NodeVoltageWords{.WithArticle = "an initial voltage", .Plural = "initial voltages"}
-               : NodeVoltageWords{.WithArticle = "a nodeset", .Plural = "nodesets"};
+             ? NodeVoltageWords{.WithArticle = "an initial voltage", .Plural = "initial voltages"}
+             : NodeVoltageWords{.WithArticle = "a nodeset", .Plural = "nodesets"};
 }
 
 /// The words of a message that starts with the marker, such as "An initial voltage".
@@ -257,8 +269,8 @@ std::string Capitalized(const std::string_view text) {
  *          its circuit is connected to, since a loose one has no equations to start from.
  * @param[in] where  Where the circuit is, for the message: empty at the top, " in block NAME" inside a definition.
  */
-std::optional<std::string> CheckNodeVoltagePlaces(const Circuit &circuit, const NodeVoltageKind kind,
-                                                  const std::string_view where) {
+std::optional<std::string>
+CheckNodeVoltagePlaces(const Circuit &circuit, const NodeVoltageKind kind, const std::string_view where) {
     const NodeVoltageWords words = DescribeKind(kind);
     std::set<int> used_nodes;
     for (const CircuitEntry &entry : circuit.GetEntries()) {
@@ -267,11 +279,15 @@ std::optional<std::string> CheckNodeVoltagePlaces(const Circuit &circuit, const 
     for (const CircuitNodeVoltage &marker : circuit.GetNodeVoltages(kind)) {
         if (marker.Node == 0) {
             return std::format("{}{} is on ground, which is always 0 V; place it on another node",
-                               Capitalized(words.WithArticle), where);
+                               Capitalized(words.WithArticle),
+                               where);
         }
         if (!used_nodes.contains(marker.Node)) {
-            return std::format("{} of {} V{} is on {}, which no part is connected to", Capitalized(words.WithArticle),
-                               FormatValue(marker.Volts), where, DescribeNode(circuit, marker.Node));
+            return std::format("{} of {} V{} is on {}, which no part is connected to",
+                               Capitalized(words.WithArticle),
+                               FormatValue(marker.Volts),
+                               where,
+                               DescribeNode(circuit, marker.Node));
         }
     }
     return std::nullopt;
@@ -299,15 +315,22 @@ std::optional<std::string> CheckNodeVoltageTargets(const Circuit &circuit, const
         if (target.Node == 0) {
             return std::format("{} of {} V{} reaches ground, which is always 0 V, through a pin that its instance "
                                "connects to ground",
-                               Capitalized(words.WithArticle), FormatValue(target.Volts), where);
+                               Capitalized(words.WithArticle),
+                               FormatValue(target.Volts),
+                               where);
         }
         const auto [known, is_new] = known_by_node.try_emplace({target.Path, target.Node}, &target);
         if (!is_new && known->second->Volts != target.Volts) {
             const std::string known_where = known->second->MarkerPath.empty()
-                                                ? ""
-                                                : std::format(" in {}", FormatInstancePath(known->second->MarkerPath));
-            return std::format("{} has two {}, {} V{} and {} V{}; keep one", DescribeTarget(target), words.Plural,
-                               FormatValue(known->second->Volts), known_where, FormatValue(target.Volts), where);
+                                              ? ""
+                                              : std::format(" in {}", FormatInstancePath(known->second->MarkerPath));
+            return std::format("{} has two {}, {} V{} and {} V{}; keep one",
+                               DescribeTarget(target),
+                               words.Plural,
+                               FormatValue(known->second->Volts),
+                               known_where,
+                               FormatValue(target.Volts),
+                               where);
         }
     }
     return std::nullopt;
@@ -424,7 +447,8 @@ std::optional<std::string> CheckBehavioralExpression(const Circuit &circuit, con
         return std::format("{} cannot read its own current", name);
     }
     const auto written = TranslateBehavioralExpression(
-        expression, [&circuit](const std::string_view net) { return circuit.FindNodeOfNet(net); },
+        expression,
+        [&circuit](const std::string_view net) { return circuit.FindNodeOfNet(net); },
         [&circuit](const std::string_view current) { return FindControllingSource(circuit, current); });
     if (!written) {
         return std::format("{}: {}", name, written.error());

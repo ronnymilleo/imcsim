@@ -32,7 +32,9 @@ void UILogicInput::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &v
 /**
  * @brief   The box shows the level the part drives, 1 when high and 0 when low.
  */
-void UILogicInput::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
+void UILogicInput::DrawSymbol(SchematicCanvas &canvas,
+                              const ViewTransform &view,
+                              const ImU32 color,
                               const SymbolStyle /*style*/) const {
     DrawBox(canvas, view, color);
     DrawDigit(canvas, view, static_cast<const Core::LogicInput &>(GetComponent()).IsHigh() ? "1" : "0", color);

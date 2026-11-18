@@ -36,8 +36,13 @@ double ValueOr(const std::vector<double> &values, const std::size_t index, const
     return values.size() > index ? values[index] : fallback;
 }
 
-void AddPulse(CircuitBuilder &builder, const std::string &name, const bool is_voltage, const NodeId positive,
-              const NodeId negative, const std::vector<double> &values, const SourceLevels &levels) {
+void AddPulse(CircuitBuilder &builder,
+              const std::string &name,
+              const bool is_voltage,
+              const NodeId positive,
+              const NodeId negative,
+              const std::vector<double> &values,
+              const SourceLevels &levels) {
     PulseParameters parameters;
     Assign(parameters.Low, values, 0);
     Assign(parameters.High, values, 1);
@@ -53,8 +58,13 @@ void AddPulse(CircuitBuilder &builder, const std::string &name, const bool is_vo
     }
 }
 
-void AddSine(CircuitBuilder &builder, const std::string &name, const bool is_voltage, const NodeId positive,
-             const NodeId negative, const std::vector<double> &values, const SourceLevels &levels) {
+void AddSine(CircuitBuilder &builder,
+             const std::string &name,
+             const bool is_voltage,
+             const NodeId positive,
+             const NodeId negative,
+             const std::vector<double> &values,
+             const SourceLevels &levels) {
     constexpr std::size_t DAMPING_INDEX = 4;
     SineParameters parameters;
     Assign(parameters.Offset, values, 0);
@@ -70,8 +80,13 @@ void AddSine(CircuitBuilder &builder, const std::string &name, const bool is_vol
     }
 }
 
-void AddExp(CircuitBuilder &builder, const std::string &name, const bool is_voltage, const NodeId positive,
-            const NodeId negative, const std::vector<double> &values, const SourceLevels &levels) {
+void AddExp(CircuitBuilder &builder,
+            const std::string &name,
+            const bool is_voltage,
+            const NodeId positive,
+            const NodeId negative,
+            const std::vector<double> &values,
+            const SourceLevels &levels) {
     ExpParameters parameters;
     Assign(parameters.InitialValue, values, 0);
     Assign(parameters.PeakValue, values, 1);
@@ -86,8 +101,13 @@ void AddExp(CircuitBuilder &builder, const std::string &name, const bool is_volt
     }
 }
 
-void AddPwl(CircuitBuilder &builder, const std::string &name, const bool is_voltage, const NodeId positive,
-            const NodeId negative, const std::vector<double> &values, const SourceLevels &levels) {
+void AddPwl(CircuitBuilder &builder,
+            const std::string &name,
+            const bool is_voltage,
+            const NodeId positive,
+            const NodeId negative,
+            const std::vector<double> &values,
+            const SourceLevels &levels) {
     PwlParameters parameters;
     parameters.Points.clear();
     for (std::size_t index = 0; index + 1 < values.size(); index += 2) {
@@ -100,8 +120,13 @@ void AddPwl(CircuitBuilder &builder, const std::string &name, const bool is_volt
     }
 }
 
-void AddSffm(CircuitBuilder &builder, const std::string &name, const bool is_voltage, const NodeId positive,
-             const NodeId negative, const std::vector<double> &values, const SourceLevels &levels) {
+void AddSffm(CircuitBuilder &builder,
+             const std::string &name,
+             const bool is_voltage,
+             const NodeId positive,
+             const NodeId negative,
+             const std::vector<double> &values,
+             const SourceLevels &levels) {
     SffmParameters parameters;
     Assign(parameters.Offset, values, 0);
     Assign(parameters.Amplitude, values, 1);
@@ -115,8 +140,13 @@ void AddSffm(CircuitBuilder &builder, const std::string &name, const bool is_vol
     }
 }
 
-void AddAm(CircuitBuilder &builder, const std::string &name, const bool is_voltage, const NodeId positive,
-           const NodeId negative, const std::vector<double> &values, const SourceLevels &levels) {
+void AddAm(CircuitBuilder &builder,
+           const std::string &name,
+           const bool is_voltage,
+           const NodeId positive,
+           const NodeId negative,
+           const std::vector<double> &values,
+           const SourceLevels &levels) {
     AmParameters parameters;
     Assign(parameters.Amplitude, values, 0);
     Assign(parameters.Offset, values, 1);
@@ -130,8 +160,13 @@ void AddAm(CircuitBuilder &builder, const std::string &name, const bool is_volta
     }
 }
 
-void AddNoise(CircuitBuilder &builder, const std::string &name, const bool is_voltage, const NodeId positive,
-              const NodeId negative, const std::vector<double> &values, const SourceLevels &levels) {
+void AddNoise(CircuitBuilder &builder,
+              const std::string &name,
+              const bool is_voltage,
+              const NodeId positive,
+              const NodeId negative,
+              const std::vector<double> &values,
+              const SourceLevels &levels) {
     NoiseParameters parameters;
     parameters.Offset = levels.Dc;
     parameters.WhiteAmplitude = ValueOr(values, 0, 0.0);
@@ -148,8 +183,13 @@ void AddNoise(CircuitBuilder &builder, const std::string &name, const bool is_vo
     }
 }
 
-void AddRandom(CircuitBuilder &builder, const std::string &name, const bool is_voltage, const NodeId positive,
-               const NodeId negative, const std::vector<double> &values, const SourceLevels &levels) {
+void AddRandom(CircuitBuilder &builder,
+               const std::string &name,
+               const bool is_voltage,
+               const NodeId positive,
+               const NodeId negative,
+               const std::vector<double> &values,
+               const SourceLevels &levels) {
     RandomParameters parameters;
     if (!values.empty()) {
         const int distribution = static_cast<int>(values[0]);
@@ -216,8 +256,13 @@ SourceWaveform FindSourceWaveform(const std::string_view token) {
  *                            default of the waveform.
  * @param[in]     levels      DC value and small-signal magnitude and phase of the line.
  */
-void AddWaveformSource(CircuitBuilder &builder, const std::string &name, const bool is_voltage, const NodeId positive,
-                       const NodeId negative, const SourceWaveform waveform, const std::vector<double> &values,
+void AddWaveformSource(CircuitBuilder &builder,
+                       const std::string &name,
+                       const bool is_voltage,
+                       const NodeId positive,
+                       const NodeId negative,
+                       const SourceWaveform waveform,
+                       const std::vector<double> &values,
                        const SourceLevels &levels) {
     switch (waveform) {
     case SourceWaveform::PULSE:

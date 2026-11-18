@@ -52,8 +52,8 @@ TEST_CASE("A row without an operating point reads X at every output", "[truth_ta
     table.OutputNodes = {3, 4};
     table.Rows[3].OutputVoltages = {};
     const std::vector<GUI::LogicNode> none;
-    CHECK(GUI::ReadTruthTableOutputs(table, 3, none) ==
-          std::vector{GUI::LogicState::UNKNOWN, GUI::LogicState::UNKNOWN});
+    CHECK(GUI::ReadTruthTableOutputs(table, 3, none)
+          == std::vector{GUI::LogicState::UNKNOWN, GUI::LogicState::UNKNOWN});
 }
 
 TEST_CASE("An output node reads with the level of the logic part on it, else the highest input level",
@@ -72,10 +72,11 @@ TEST_CASE("An output node reads with the level of the logic part on it, else the
 
 TEST_CASE("The table is written as Markdown with its input names and output labels", "[truth_table]") {
     const Core::TruthTable table = MakeTable();
-    CHECK(GUI::FormatTruthTableMarkdown(table, {"V(OUT)"}, {}) == "| V1 | V2 | V(OUT) |\n"
-                                                                  "| --- | --- | --- |\n"
-                                                                  "| 0 | 0 | 0 |\n"
-                                                                  "| 0 | 1 | 0 |\n"
-                                                                  "| 1 | 0 | X |\n"
-                                                                  "| 1 | 1 | X |\n");
+    CHECK(GUI::FormatTruthTableMarkdown(table, {"V(OUT)"}, {})
+          == "| V1 | V2 | V(OUT) |\n"
+             "| --- | --- | --- |\n"
+             "| 0 | 0 | 0 |\n"
+             "| 0 | 1 | 0 |\n"
+             "| 1 | 0 | X |\n"
+             "| 1 | 1 | X |\n");
 }

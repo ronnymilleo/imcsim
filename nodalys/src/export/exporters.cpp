@@ -15,11 +15,11 @@ std::string ExportRaw(const SimulationResult &result, std::string_view title) {
     return std::visit(
         [&](const auto &res) -> std::string {
             using T = std::decay_t<decltype(res)>;
-            if constexpr (std::is_same_v<T, OperatingPointResult> || std::is_same_v<T, TransientResult> ||
-                          std::is_same_v<T, DcSweepResult> || std::is_same_v<T, AcSweepResult> ||
-                          std::is_same_v<T, SParameterResult> || std::is_same_v<T, PoleZeroResult> ||
-                          std::is_same_v<T, SensitivityResult> || std::is_same_v<T, AcSensitivityResult> ||
-                          std::is_same_v<T, HarmonicBalanceResult>) {
+            if constexpr (std::is_same_v<T, OperatingPointResult> || std::is_same_v<T, TransientResult>
+                          || std::is_same_v<T, DcSweepResult> || std::is_same_v<T, AcSweepResult>
+                          || std::is_same_v<T, SParameterResult> || std::is_same_v<T, PoleZeroResult>
+                          || std::is_same_v<T, SensitivityResult> || std::is_same_v<T, AcSensitivityResult>
+                          || std::is_same_v<T, HarmonicBalanceResult>) {
                 return ExportRaw(res, title);
             } else {
                 // SPICE raw files do not standardly represent .TF or .NOISE direct summaries without vectors

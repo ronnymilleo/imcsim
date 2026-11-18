@@ -64,8 +64,11 @@ public:
         }
     }
 
-    void AppendSegment(const double t_start, const std::vector<double> &x_start,
-                       const std::vector<double> &currents_start, const double t_end, const std::vector<double> &x_end,
+    void AppendSegment(const double t_start,
+                       const std::vector<double> &x_start,
+                       const std::vector<double> &currents_start,
+                       const double t_end,
+                       const std::vector<double> &x_end,
                        const std::vector<double> &currents_end) {
         if (m_OutputStep <= 0.0) {
             Append(t_end, x_end, currents_end);
@@ -108,8 +111,11 @@ public:
     }
 
     std::size_t PointCount() const { return m_Result.Times.size(); }
+
     const TransientResult &View() const { return m_Result; }
+
     TransientResult &MutableView() { return m_Result; }
+
     TransientResult Take() { return std::move(m_Result); }
 
 private:
@@ -207,7 +213,8 @@ bool PublishChunk(TransientResult &result, const RunMonitor &monitor, const doub
 
 } // namespace
 
-std::expected<TransientResult, std::string> ComputeTransient(CompiledCircuit &compiled, const TransientConfig &settings,
+std::expected<TransientResult, std::string> ComputeTransient(CompiledCircuit &compiled,
+                                                             const TransientConfig &settings,
                                                              const bool has_initial_conditions,
                                                              const RunMonitor &monitor,
                                                              const ConvergenceOptions &options,
@@ -288,7 +295,8 @@ std::expected<TransientResult, std::string> ComputeTransient(CompiledCircuit &co
             step *= 0.1;
             if (step < MIN_STEP) {
                 failure = DescribeFailure(
-                    std::format("Nodalys could not converge at t = {}; the time step collapsed", time + step), outcome);
+                    std::format("Nodalys could not converge at t = {}; the time step collapsed", time + step),
+                    outcome);
                 break;
             }
             continue;
@@ -331,8 +339,9 @@ std::expected<TransientResult, std::string> ComputeTransient(CompiledCircuit &co
             continue;
         }
 
-        const bool has_switched = std::ranges::any_of(
-            compiled.Devices, [](const std::unique_ptr<Device> &device) { return device->HasSwitched(); });
+        const bool has_switched = std::ranges::any_of(compiled.Devices, [](const std::unique_ptr<Device> &device) {
+            return device->HasSwitched();
+        });
         for (const std::unique_ptr<Device> &device : compiled.Devices) {
             device->AcceptStep(x_new);
         }
@@ -346,8 +355,9 @@ std::expected<TransientResult, std::string> ComputeTransient(CompiledCircuit &co
         time = reaches_corner ? next_corner : time + step;
         older_step = std::exchange(previous_step, step);
         is_restart = false;
-        const double next = step * std::clamp(LTE_SAFETY * std::pow(std::max(ratio, 1e-3), -1.0 / 3.0),
-                                              STEP_SHRINK_LIMIT, STEP_GROW_LIMIT);
+        const double next =
+            step
+            * std::clamp(LTE_SAFETY * std::pow(std::max(ratio, 1e-3), -1.0 / 3.0), STEP_SHRINK_LIMIT, STEP_GROW_LIMIT);
         step = std::clamp(next, MIN_STEP, output_step);
         // A device whose state decides its corners, such as a fuse about to blow, moves its next one at every point
         next_corner = FindNextCorner(compiled, time);
@@ -365,8 +375,8 @@ std::expected<TransientResult, std::string> ComputeTransient(CompiledCircuit &co
         }
 
         const bool spans_chunk = monitor.ChunkSpan > 0.0 && time >= chunk_end;
-        if (spans_chunk || std::chrono::steady_clock::now() - last_send > CHUNK_INTERVAL ||
-            collector.PointCount() - sent > CHUNK_POINT_LIMIT) {
+        if (spans_chunk || std::chrono::steady_clock::now() - last_send > CHUNK_INTERVAL
+            || collector.PointCount() - sent > CHUNK_POINT_LIMIT) {
             PublishChunk(collector.MutableView(), monitor, std::min(1.0, time / settings.StopTime), sent);
             // The caller may hold here, to pace a live run or while it is paused, so the changes come after
             const bool goes_on = !monitor.AfterChunk || monitor.AfterChunk(time);
@@ -380,9 +390,10 @@ std::expected<TransientResult, std::string> ComputeTransient(CompiledCircuit &co
         }
     }
 
-    if (!stopped && failure.empty() &&
-        (collector.View().Times.empty() ||
-         std::fabs(collector.View().Times.back() - settings.StopTime) > 1e-9 * std::max(1.0, settings.StopTime))) {
+    if (!stopped && failure.empty()
+        && (collector.View().Times.empty()
+            || std::fabs(collector.View().Times.back() - settings.StopTime)
+                   > 1e-9 * std::max(1.0, settings.StopTime))) {
         collector.Append(settings.StopTime, x_now, currents_now);
     }
     TransientResult result = collector.Take();

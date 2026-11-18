@@ -54,7 +54,9 @@ void UIFuse::SetDisplayState(const bool is_blown, const float flash_level) {
     m_FlashLevel = flash_level;
 }
 
-void UIFuse::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
+void UIFuse::DrawSymbol(SchematicCanvas &canvas,
+                        const ViewTransform &view,
+                        const ImU32 color,
                         const SymbolStyle /*style*/) const {
     const ImVec2 body[4] = {LocalToScreen(view, -BODY_HALF_LENGTH, -BODY_HALF_HEIGHT),
                             LocalToScreen(view, BODY_HALF_LENGTH, -BODY_HALF_HEIGHT),
@@ -62,16 +64,21 @@ void UIFuse::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, cons
                             LocalToScreen(view, -BODY_HALF_LENGTH, BODY_HALF_HEIGHT)};
     canvas.AddPolyline(body, 4, color, ImDrawFlags_Closed, LINE_THICKNESS);
     if (!m_IsBlown) {
-        canvas.AddLine(LocalToScreen(view, -BODY_HALF_LENGTH, 0), LocalToScreen(view, BODY_HALF_LENGTH, 0), color,
+        canvas.AddLine(LocalToScreen(view, -BODY_HALF_LENGTH, 0),
+                       LocalToScreen(view, BODY_HALF_LENGTH, 0),
+                       color,
                        LINE_THICKNESS);
         return;
     }
     const ImU32 blown_color = GetBlownColor(OPAQUE_ALPHA);
     for (const float side : {-1.0f, 1.0f}) {
-        canvas.AddLine(LocalToScreen(view, side * BODY_HALF_LENGTH, 0), LocalToScreen(view, side * GAP_HALF_LENGTH, 0),
-                       color, LINE_THICKNESS);
+        canvas.AddLine(LocalToScreen(view, side * BODY_HALF_LENGTH, 0),
+                       LocalToScreen(view, side * GAP_HALF_LENGTH, 0),
+                       color,
+                       LINE_THICKNESS);
         canvas.AddLine(LocalToScreen(view, side * GAP_HALF_LENGTH, -BREAK_MARK_HALF_HEIGHT),
-                       LocalToScreen(view, side * GAP_HALF_LENGTH, BREAK_MARK_HALF_HEIGHT), blown_color,
+                       LocalToScreen(view, side * GAP_HALF_LENGTH, BREAK_MARK_HALF_HEIGHT),
+                       blown_color,
                        LINE_THICKNESS);
     }
     DrawFlash(canvas, view);
@@ -102,7 +109,9 @@ void UIFuse::DrawFlash(SchematicCanvas &canvas, const ViewTransform &view) const
         const float angle = 2.0f * std::numbers::pi_v<float> * static_cast<float>(ray) / FLASH_RAY_COUNT;
         const float reach = FLASH_INNER_RADIUS + (FLASH_OUTER_RADIUS - FLASH_INNER_RADIUS) * (1.0f - m_FlashLevel);
         canvas.AddLine(LocalToScreen(view, FLASH_INNER_RADIUS * std::cos(angle), FLASH_INNER_RADIUS * std::sin(angle)),
-                       LocalToScreen(view, reach * std::cos(angle), reach * std::sin(angle)), color, LINE_THICKNESS);
+                       LocalToScreen(view, reach * std::cos(angle), reach * std::sin(angle)),
+                       color,
+                       LINE_THICKNESS);
     }
 }
 

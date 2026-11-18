@@ -51,6 +51,7 @@ std::vector<std::string> ListWarningsOfResult(const ResultStore &results, const 
 }
 
 } // namespace
+
 /**
  * @brief   Creates the controls for a schematic.
  * @param[in] schematic  Schematic whose analyses are set and run; it must outlive the controls.
@@ -339,8 +340,9 @@ RunOutcome AnalysisControls::GetOutcome(const Analysis analysis) const {
     if (analysis == Analysis::TRANSIENT && m_Results.GetTransient() && !m_Results.GetTransient()->IsComplete) {
         return RunOutcome::STOPPED;
     }
-    const bool ngspice_warned = std::ranges::any_of(
-        status.Messages, [](const Core::SimulatorMessage &message) { return message.FromErrorStream; });
+    const bool ngspice_warned = std::ranges::any_of(status.Messages, [](const Core::SimulatorMessage &message) {
+        return message.FromErrorStream;
+    });
     return ngspice_warned || !GetResultWarnings(analysis).empty() ? RunOutcome::SUCCEEDED_WITH_WARNINGS
                                                                   : RunOutcome::SUCCEEDED;
 }
@@ -380,8 +382,9 @@ void AnalysisControls::DrawRunReport(const Analysis analysis) const {
         }
         if (std::ranges::any_of(status.Messages,
                                 [](const Core::SimulatorMessage &message) { return message.FromErrorStream; })) {
-            ImGui::TextColored(GetWarningTextColor(), "ngspice reported warnings; check its output before trusting "
-                                                      "the results");
+            ImGui::TextColored(GetWarningTextColor(),
+                               "ngspice reported warnings; check its output before trusting "
+                               "the results");
         }
     } else {
         ImGui::TextDisabled("No results for the current circuit");
@@ -412,7 +415,8 @@ void AnalysisControls::StartRun(const Analysis analysis, Core::Job job) {
 /**
  * @brief   The analysis picked, on the circuit built from the schematic, run once or once per step.
  */
-void AnalysisControls::StartAnalysis(const Analysis analysis, const Core::Circuit &circuit,
+void AnalysisControls::StartAnalysis(const Analysis analysis,
+                                     const Core::Circuit &circuit,
                                      const std::optional<StepPlan> &steps,
                                      const std::optional<Core::MonteCarloSettings> &monte_carlo) {
     switch (analysis) {
@@ -495,7 +499,8 @@ void AnalysisControls::ClearResult(const Analysis analysis) {
     }
 }
 
-void AnalysisControls::Finish(const Analysis analysis, std::optional<std::string> error,
+void AnalysisControls::Finish(const Analysis analysis,
+                              std::optional<std::string> error,
                               std::vector<Core::SimulatorMessage> messages) {
     const std::chrono::duration<double> elapsed = std::chrono::steady_clock::now() - m_RunStart;
     m_Statuses[ToIndex(analysis)] = {.Error = std::move(error),

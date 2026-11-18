@@ -101,8 +101,8 @@ BoyleOpAmpValues ComputeBoyleOpAmpValues(const BoyleOpAmpParameters &parameters)
             .CommonModeTransconductance =
                 transconductance / std::pow(10.0, parameters.CommonModeRejectionDecibels / 20.0),
             .Transconductance = transconductance,
-            .OutputGain = std::pow(10.0, parameters.OpenLoopGainDecibels / 20.0) /
-                          (transconductance * GAIN_STAGE_RESISTANCE * gain_stage_load),
+            .OutputGain = std::pow(10.0, parameters.OpenLoopGainDecibels / 20.0)
+                        / (transconductance * GAIN_STAGE_RESISTANCE * gain_stage_load),
             .GainStageLoad = gain_stage_load,
             .CurrentLimitGain = CURRENT_LIMIT_THRESHOLD / (parameters.ShortCircuitCurrent * OUTPUT_SENSE_RESISTANCE),
             .PositiveSwing = parameters.PositiveHeadroom + LIMITER_DIODE_DROPS,
@@ -208,7 +208,10 @@ public:
         }
     }
 
-    template <typename F> void Defer(F &&func) { m_Actions.push_back(std::forward<F>(func)); }
+    template <typename F>
+    void Defer(F &&func) {
+        m_Actions.push_back(std::forward<F>(func));
+    }
 
     int MapNode(NodeId node) const { return node <= 0 ? -1 : node - 1; }
 
@@ -287,19 +290,37 @@ public:
         });
     }
 
-    void AddVoltageSourceDevice(std::string name, NodeId pos, NodeId neg, double dc_val,
-                                VoltageSourceDevice::Waveform waveform, double ac_mag,
-                                SourcePeriodicity periodicity = {}, VoltageSourceDevice::Breakpoints breakpoints = {},
+    void AddVoltageSourceDevice(std::string name,
+                                NodeId pos,
+                                NodeId neg,
+                                double dc_val,
+                                VoltageSourceDevice::Waveform waveform,
+                                double ac_mag,
+                                SourcePeriodicity periodicity = {},
+                                VoltageSourceDevice::Breakpoints breakpoints = {},
                                 std::function<void(std::uint64_t)> set_seed = {}) {
         Track(pos);
         Track(neg);
-        Defer([this, name = std::move(name), pos, neg, dc_val, waveform = std::move(waveform), ac_mag, periodicity,
-               breakpoints = std::move(breakpoints), set_seed = std::move(set_seed)]() mutable {
+        Defer([this,
+               name = std::move(name),
+               pos,
+               neg,
+               dc_val,
+               waveform = std::move(waveform),
+               ac_mag,
+               periodicity,
+               breakpoints = std::move(breakpoints),
+               set_seed = std::move(set_seed)]() mutable {
             const int u_pos = MapNode(pos);
             const int u_neg = MapNode(neg);
             const int branch = AllocateBranch();
-            auto source = std::make_unique<VoltageSourceDevice>(u_pos, u_neg, branch, dc_val, std::move(waveform),
-                                                                ac_mag, periodicity);
+            auto source = std::make_unique<VoltageSourceDevice>(u_pos,
+                                                                u_neg,
+                                                                branch,
+                                                                dc_val,
+                                                                std::move(waveform),
+                                                                ac_mag,
+                                                                periodicity);
             source->SetBreakpoints(std::move(breakpoints));
             source->SetSeedCallback(std::move(set_seed));
             Device *dev = AddDevice(std::move(source));
@@ -309,14 +330,27 @@ public:
         });
     }
 
-    void AddCurrentSourceDevice(std::string name, NodeId pos, NodeId neg, double dc_val,
-                                VoltageSourceDevice::Waveform waveform, double ac_mag,
-                                SourcePeriodicity periodicity = {}, VoltageSourceDevice::Breakpoints breakpoints = {},
+    void AddCurrentSourceDevice(std::string name,
+                                NodeId pos,
+                                NodeId neg,
+                                double dc_val,
+                                VoltageSourceDevice::Waveform waveform,
+                                double ac_mag,
+                                SourcePeriodicity periodicity = {},
+                                VoltageSourceDevice::Breakpoints breakpoints = {},
                                 std::function<void(std::uint64_t)> set_seed = {}) {
         Track(pos);
         Track(neg);
-        Defer([this, name = std::move(name), pos, neg, dc_val, waveform = std::move(waveform), ac_mag, periodicity,
-               breakpoints = std::move(breakpoints), set_seed = std::move(set_seed)]() mutable {
+        Defer([this,
+               name = std::move(name),
+               pos,
+               neg,
+               dc_val,
+               waveform = std::move(waveform),
+               ac_mag,
+               periodicity,
+               breakpoints = std::move(breakpoints),
+               set_seed = std::move(set_seed)]() mutable {
             const int u_pos = MapNode(pos);
             const int u_neg = MapNode(neg);
             auto source =
@@ -428,8 +462,11 @@ public:
                 const std::optional<NodeId> reference =
                     input.Second.empty() ? std::optional<NodeId>(GROUND_NODE) : ReadExpressionNode(input.Second);
                 if (!node || !reference) {
-                    m_Errors.push_back(std::format("{}: v({}{}{}) must name nodes by their number", name, input.First,
-                                                   input.Second.empty() ? "" : ", ", input.Second));
+                    m_Errors.push_back(std::format("{}: v({}{}{}) must name nodes by their number",
+                                                   name,
+                                                   input.First,
+                                                   input.Second.empty() ? "" : ", ",
+                                                   input.Second));
                     return;
                 }
                 Track(*node);
@@ -439,18 +476,33 @@ public:
             }
             bindings.push_back(binding);
         }
-        Defer([this, name, pos, neg, is_voltage, expression = std::move(*expression), bindings = std::move(bindings),
+        Defer([this,
+               name,
+               pos,
+               neg,
+               is_voltage,
+               expression = std::move(*expression),
+               bindings = std::move(bindings),
                currents = std::move(currents)]() mutable {
             const int u_pos = MapNode(pos);
             const int u_neg = MapNode(neg);
             BehavioralSourceDevice *device = nullptr;
             if (is_voltage) {
                 const int branch = AllocateBranch();
-                device = static_cast<BehavioralSourceDevice *>(AddDevice(std::make_unique<BehavioralVoltageDevice>(
-                    name, u_pos, u_neg, branch, std::move(expression), std::move(bindings))));
+                device = static_cast<BehavioralSourceDevice *>(
+                    AddDevice(std::make_unique<BehavioralVoltageDevice>(name,
+                                                                        u_pos,
+                                                                        u_neg,
+                                                                        branch,
+                                                                        std::move(expression),
+                                                                        std::move(bindings))));
             } else {
-                device = static_cast<BehavioralSourceDevice *>(AddDevice(std::make_unique<BehavioralCurrentDevice>(
-                    name, u_pos, u_neg, std::move(expression), std::move(bindings))));
+                device = static_cast<BehavioralSourceDevice *>(
+                    AddDevice(std::make_unique<BehavioralCurrentDevice>(name,
+                                                                        u_pos,
+                                                                        u_neg,
+                                                                        std::move(expression),
+                                                                        std::move(bindings))));
             }
             m_Compiled.ElementsByName[name] = device;
             m_Compiled.Currents.push_back({name, {{device, 0}}});
@@ -479,8 +531,8 @@ public:
         });
     }
 
-    void AddBjt(std::string name, NodeId c, NodeId b, NodeId e, bool is_npn, const BjtParameters &unit_params,
-                double area) {
+    void
+    AddBjt(std::string name, NodeId c, NodeId b, NodeId e, bool is_npn, const BjtParameters &unit_params, double area) {
         Track(c);
         Track(b);
         Track(e);
@@ -508,8 +560,8 @@ public:
         });
     }
 
-    void AddMosfet(std::string name, NodeId d, NodeId g, NodeId s, NodeId b, bool is_nmos,
-                   const MosfetParameters &params) {
+    void
+    AddMosfet(std::string name, NodeId d, NodeId g, NodeId s, NodeId b, bool is_nmos, const MosfetParameters &params) {
         (void)b;
         Track(d);
         Track(g);
@@ -565,13 +617,26 @@ public:
         });
     }
 
-    void AddRelay(std::string name, NodeId coil_p, NodeId coil_n, NodeId contact_a, NodeId contact_b, double coil_r,
-                  double coil_l, const SwitchParameters &contact_params) {
+    void AddRelay(std::string name,
+                  NodeId coil_p,
+                  NodeId coil_n,
+                  NodeId contact_a,
+                  NodeId contact_b,
+                  double coil_r,
+                  double coil_l,
+                  const SwitchParameters &contact_params) {
         Track(coil_p);
         Track(coil_n);
         Track(contact_a);
         Track(contact_b);
-        Defer([this, name = std::move(name), coil_p, coil_n, contact_a, contact_b, coil_r, coil_l,
+        Defer([this,
+               name = std::move(name),
+               coil_p,
+               coil_n,
+               contact_a,
+               contact_b,
+               coil_r,
+               coil_l,
                contact_params]() mutable {
             const int u_cp = MapNode(coil_p);
             const int u_cn = MapNode(coil_n);
@@ -588,8 +653,15 @@ public:
         });
     }
 
-    void AddTransformer(std::string name, NodeId p1, NodeId p2, NodeId s1, NodeId s2, double primary_l,
-                        double secondary_l, double k, double winding_r) {
+    void AddTransformer(std::string name,
+                        NodeId p1,
+                        NodeId p2,
+                        NodeId s1,
+                        NodeId s2,
+                        double primary_l,
+                        double secondary_l,
+                        double k,
+                        double winding_r) {
         Track(p1);
         Track(p2);
         Track(s1);
@@ -606,8 +678,8 @@ public:
             const int b1 = AllocateBranch();
             const int b2 = AllocateBranch();
             const double mutual = k * std::sqrt(primary_l * secondary_l);
-            AddDevice(std::make_unique<CoupledInductorDevice>(pri_mid, up2, sec_mid, us2, b1, b2, primary_l,
-                                                              secondary_l, mutual));
+            AddDevice(std::make_unique<
+                      CoupledInductorDevice>(pri_mid, up2, sec_mid, us2, b1, b2, primary_l, secondary_l, mutual));
             m_Compiled.Currents.push_back({name + ".P", {{primary, 0}}});
             m_Compiled.Currents.push_back({name + ".S", {{secondary, 0}}});
         });
@@ -637,7 +709,12 @@ public:
         });
     }
 
-    void AddIdealOpAmp(std::string name, NodeId out, NodeId in_pos, NodeId in_neg, NodeId vcc_pos, NodeId vcc_neg,
+    void AddIdealOpAmp(std::string name,
+                       NodeId out,
+                       NodeId in_pos,
+                       NodeId in_neg,
+                       NodeId vcc_pos,
+                       NodeId vcc_neg,
                        double bandwidth_hz) {
         Track(out);
         Track(in_pos);
@@ -669,7 +746,12 @@ public:
         });
     }
 
-    void AddBoyleOpAmp(std::string name, NodeId out, NodeId in_pos, NodeId in_neg, NodeId vcc_pos, NodeId vcc_neg,
+    void AddBoyleOpAmp(std::string name,
+                       NodeId out,
+                       NodeId in_pos,
+                       NodeId in_neg,
+                       NodeId vcc_pos,
+                       NodeId vcc_neg,
                        const BoyleOpAmpParameters &params) {
         Track(out);
         Track(in_pos);
@@ -712,7 +794,9 @@ public:
             int u_inp_actual = u_inp;
             if (params.InputOffsetVoltage != 0.0) {
                 const int n_vos = AllocateInternalNode();
-                AddDevice(std::make_unique<VoltageSourceDevice>(n_vos, u_inp, AllocateBranch(),
+                AddDevice(std::make_unique<VoltageSourceDevice>(n_vos,
+                                                                u_inp,
+                                                                AllocateBranch(),
                                                                 params.InputOffsetVoltage,
                                                                 MakeDcWaveform(params.InputOffsetVoltage)));
                 u_inp_actual = n_vos;
@@ -749,7 +833,11 @@ public:
             Device *rso = AddDevice(std::make_unique<ResistorDevice>(n_out_int, u_out, v.OutputSenseResistance));
 
             // 4. Short-Circuit Current Limiter
-            AddDevice(std::make_unique<VcvsDevice>(n_cl_sense, GROUND, n_out_int, u_out, AllocateBranch(),
+            AddDevice(std::make_unique<VcvsDevice>(n_cl_sense,
+                                                   GROUND,
+                                                   n_out_int,
+                                                   u_out,
+                                                   AllocateBranch(),
                                                    v.CurrentLimitGain));
             AddDevice(std::make_unique<VccsDevice>(GROUND, n_gain, n_cl_clamp, GROUND, 1.0));
             AddDevice(std::make_unique<ResistorDevice>(n_cl_clamp, GROUND, 10.0));
@@ -760,21 +848,29 @@ public:
             AddDevice(std::make_unique<DiodeDevice>(n_pos_mid, n_pos_sense, -1, dm3));
             AddDevice(std::make_unique<DiodeDevice>(n_pos_ref, n_pos_mid, -1, dm3));
             AddDevice(std::make_unique<VccsDevice>(GROUND, n_gain, n_pos_sense, u_vcc, 1.0));
-            Device *vc = AddDevice(std::make_unique<VoltageSourceDevice>(
-                n_pos_ref, u_out, AllocateBranch(), v.PositiveSwing, MakeDcWaveform(v.PositiveSwing)));
+            Device *vc = AddDevice(std::make_unique<VoltageSourceDevice>(n_pos_ref,
+                                                                         u_out,
+                                                                         AllocateBranch(),
+                                                                         v.PositiveSwing,
+                                                                         MakeDcWaveform(v.PositiveSwing)));
             AddDevice(std::make_unique<ResistorDevice>(u_vcc, n_pos_sense, 10.0));
             AddDevice(std::make_unique<ResistorDevice>(u_vcc, n_pos_mid, 1e3));
 
             AddDevice(std::make_unique<DiodeDevice>(n_neg_sense, n_neg_mid, -1, dm3));
             AddDevice(std::make_unique<DiodeDevice>(n_neg_mid, n_neg_ref, -1, dm3));
             AddDevice(std::make_unique<VccsDevice>(GROUND, n_gain, n_neg_sense, u_vee, 1.0));
-            Device *ve = AddDevice(std::make_unique<VoltageSourceDevice>(
-                u_out, n_neg_ref, AllocateBranch(), v.NegativeSwing, MakeDcWaveform(v.NegativeSwing)));
+            Device *ve = AddDevice(std::make_unique<VoltageSourceDevice>(u_out,
+                                                                         n_neg_ref,
+                                                                         AllocateBranch(),
+                                                                         v.NegativeSwing,
+                                                                         MakeDcWaveform(v.NegativeSwing)));
             AddDevice(std::make_unique<ResistorDevice>(n_neg_sense, u_vee, 10.0));
             AddDevice(std::make_unique<ResistorDevice>(n_neg_mid, u_vee, 1e3));
 
             if (v.RestOfSupplyCurrent > 0.0) {
-                AddDevice(std::make_unique<CurrentSourceDevice>(u_vcc, u_vee, v.RestOfSupplyCurrent,
+                AddDevice(std::make_unique<CurrentSourceDevice>(u_vcc,
+                                                                u_vee,
+                                                                v.RestOfSupplyCurrent,
                                                                 MakeDcWaveform(v.RestOfSupplyCurrent)));
             }
 
@@ -787,7 +883,10 @@ public:
         });
     }
 
-    void AddRawLogicGate(std::string name, LogicGateType type, int u_out, std::vector<int> u_inputs,
+    void AddRawLogicGate(std::string name,
+                         LogicGateType type,
+                         int u_out,
+                         std::vector<int> u_inputs,
                          const SmoothLogicParameters &params) {
         int n_int = -1;
         if (params.PropagationDelay > 0.0) {
@@ -799,7 +898,10 @@ public:
         m_Compiled.NoiseGroups.push_back({name, {gate}});
     }
 
-    void AddLogicGate(std::string name, LogicGateType type, NodeId out, std::vector<NodeId> inputs,
+    void AddLogicGate(std::string name,
+                      LogicGateType type,
+                      NodeId out,
+                      std::vector<NodeId> inputs,
                       const SmoothLogicParameters &params) {
         Track(out);
         for (const NodeId in_id : inputs) {
@@ -828,7 +930,11 @@ public:
         AddLogicGate(std::move(name), LogicGateType::SCHMITT_TRIGGER, out, {in}, params);
     }
 
-    void AddSRLatch(std::string name, NodeId q, NodeId q_bar, NodeId set, NodeId reset,
+    void AddSRLatch(std::string name,
+                    NodeId q,
+                    NodeId q_bar,
+                    NodeId set,
+                    NodeId reset,
                     const SmoothLogicParameters &params) {
         SmoothLogicParameters nor2_params = params;
         nor2_params.VThreshold *= 0.99;
@@ -836,8 +942,13 @@ public:
         AddLogicGate(name + ".NOR2", LogicGateType::NOR, q_bar, {set, q}, nor2_params);
     }
 
-    void AddDFlipFlop(std::string name, NodeId q, NodeId q_bar, NodeId d, NodeId clk,
-                      const SmoothLogicParameters &params, const std::optional<NodeId> set,
+    void AddDFlipFlop(std::string name,
+                      NodeId q,
+                      NodeId q_bar,
+                      NodeId d,
+                      NodeId clk,
+                      const SmoothLogicParameters &params,
+                      const std::optional<NodeId> set,
                       const std::optional<NodeId> reset) {
         Track(q);
         Track(q_bar);
@@ -1005,9 +1116,11 @@ CircuitBuilder &CircuitBuilder::operator=(CircuitBuilder &&) noexcept = default;
 void CircuitBuilder::SetCircuitNodeCount(int count) {
     m_Impl->SetCircuitNodeCount(count);
 }
+
 void CircuitBuilder::SetTemperature(const double temperature_celsius, const double nominal_celsius) {
     m_Impl->SetTemperature(temperature_celsius, nominal_celsius);
 }
+
 NodeId CircuitBuilder::AddNode() {
     return m_Impl->AddNode();
 }
@@ -1040,136 +1153,286 @@ void CircuitBuilder::AddIdc(std::string name, NodeId pos, NodeId neg, double dc_
     m_Impl->AddCurrentSourceDevice(std::move(name), pos, neg, dc_amps, MakeDcWaveform(dc_amps), ac_mag);
 }
 
-void CircuitBuilder::AddVpulse(std::string name, NodeId pos, NodeId neg, const PulseParameters &params, double ac_mag,
+void CircuitBuilder::AddVpulse(std::string name,
+                               NodeId pos,
+                               NodeId neg,
+                               const PulseParameters &params,
+                               double ac_mag,
                                double) {
     const SourcePeriodicity periodicity{.Kind = SourceWaveformKind::PULSE,
                                         .Frequency = params.Period > 0.0 ? 1.0 / params.Period : 0.0,
                                         .MinEdgeTime = std::min(params.RiseTime, params.FallTime),
                                         .IsSupportedInHb = params.High == params.Low || params.Period > 0.0};
-    m_Impl->AddVoltageSourceDevice(std::move(name), pos, neg, params.Low, MakePulseWaveform(params.Low, params), ac_mag,
-                                   periodicity, MakePulseBreakpoints(params));
+    m_Impl->AddVoltageSourceDevice(std::move(name),
+                                   pos,
+                                   neg,
+                                   params.Low,
+                                   MakePulseWaveform(params.Low, params),
+                                   ac_mag,
+                                   periodicity,
+                                   MakePulseBreakpoints(params));
 }
 
-void CircuitBuilder::AddIpulse(std::string name, NodeId pos, NodeId neg, const PulseParameters &params, double ac_mag,
+void CircuitBuilder::AddIpulse(std::string name,
+                               NodeId pos,
+                               NodeId neg,
+                               const PulseParameters &params,
+                               double ac_mag,
                                double) {
     const SourcePeriodicity periodicity{.Kind = SourceWaveformKind::PULSE,
                                         .Frequency = params.Period > 0.0 ? 1.0 / params.Period : 0.0,
                                         .MinEdgeTime = std::min(params.RiseTime, params.FallTime),
                                         .IsSupportedInHb = params.High == params.Low || params.Period > 0.0};
-    m_Impl->AddCurrentSourceDevice(std::move(name), pos, neg, params.Low, MakePulseWaveform(params.Low, params), ac_mag,
-                                   periodicity, MakePulseBreakpoints(params));
+    m_Impl->AddCurrentSourceDevice(std::move(name),
+                                   pos,
+                                   neg,
+                                   params.Low,
+                                   MakePulseWaveform(params.Low, params),
+                                   ac_mag,
+                                   periodicity,
+                                   MakePulseBreakpoints(params));
 }
 
-void CircuitBuilder::AddVsine(std::string name, NodeId pos, NodeId neg, const SineParameters &params, double ac_mag,
-                              double, const bool damped) {
+void CircuitBuilder::AddVsine(std::string name,
+                              NodeId pos,
+                              NodeId neg,
+                              const SineParameters &params,
+                              double ac_mag,
+                              double,
+                              const bool damped) {
     const SourcePeriodicity periodicity{.Kind = SourceWaveformKind::SINE,
                                         .Frequency = params.Frequency,
                                         .MinEdgeTime = 0.0,
                                         .IsSupportedInHb =
                                             !damped && (params.Amplitude == 0.0 || params.Frequency > 0.0)};
-    m_Impl->AddVoltageSourceDevice(std::move(name), pos, neg, params.Offset, MakeSineWaveform(params.Offset, params),
-                                   ac_mag, periodicity);
+    m_Impl->AddVoltageSourceDevice(std::move(name),
+                                   pos,
+                                   neg,
+                                   params.Offset,
+                                   MakeSineWaveform(params.Offset, params),
+                                   ac_mag,
+                                   periodicity);
 }
 
-void CircuitBuilder::AddIsine(std::string name, NodeId pos, NodeId neg, const SineParameters &params, double ac_mag,
-                              double, const bool damped) {
+void CircuitBuilder::AddIsine(std::string name,
+                              NodeId pos,
+                              NodeId neg,
+                              const SineParameters &params,
+                              double ac_mag,
+                              double,
+                              const bool damped) {
     const SourcePeriodicity periodicity{.Kind = SourceWaveformKind::SINE,
                                         .Frequency = params.Frequency,
                                         .MinEdgeTime = 0.0,
                                         .IsSupportedInHb =
                                             !damped && (params.Amplitude == 0.0 || params.Frequency > 0.0)};
-    m_Impl->AddCurrentSourceDevice(std::move(name), pos, neg, params.Offset, MakeSineWaveform(params.Offset, params),
-                                   ac_mag, periodicity);
+    m_Impl->AddCurrentSourceDevice(std::move(name),
+                                   pos,
+                                   neg,
+                                   params.Offset,
+                                   MakeSineWaveform(params.Offset, params),
+                                   ac_mag,
+                                   periodicity);
 }
 
-void CircuitBuilder::AddVexp(std::string name, NodeId pos, NodeId neg, const ExpParameters &params, double ac_mag,
+void CircuitBuilder::AddVexp(std::string name,
+                             NodeId pos,
+                             NodeId neg,
+                             const ExpParameters &params,
+                             double ac_mag,
                              double) {
     const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NON_PERIODIC, .IsSupportedInHb = false};
-    m_Impl->AddVoltageSourceDevice(std::move(name), pos, neg, params.InitialValue,
-                                   MakeExpWaveform(params.InitialValue, params), ac_mag, non_periodic,
+    m_Impl->AddVoltageSourceDevice(std::move(name),
+                                   pos,
+                                   neg,
+                                   params.InitialValue,
+                                   MakeExpWaveform(params.InitialValue, params),
+                                   ac_mag,
+                                   non_periodic,
                                    MakeExpBreakpoints(params));
 }
 
-void CircuitBuilder::AddIexp(std::string name, NodeId pos, NodeId neg, const ExpParameters &params, double ac_mag,
+void CircuitBuilder::AddIexp(std::string name,
+                             NodeId pos,
+                             NodeId neg,
+                             const ExpParameters &params,
+                             double ac_mag,
                              double) {
     const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NON_PERIODIC, .IsSupportedInHb = false};
-    m_Impl->AddCurrentSourceDevice(std::move(name), pos, neg, params.InitialValue,
-                                   MakeExpWaveform(params.InitialValue, params), ac_mag, non_periodic,
+    m_Impl->AddCurrentSourceDevice(std::move(name),
+                                   pos,
+                                   neg,
+                                   params.InitialValue,
+                                   MakeExpWaveform(params.InitialValue, params),
+                                   ac_mag,
+                                   non_periodic,
                                    MakeExpBreakpoints(params));
 }
 
-void CircuitBuilder::AddVpwl(std::string name, NodeId pos, NodeId neg, const PwlParameters &params, double ac_mag,
+void CircuitBuilder::AddVpwl(std::string name,
+                             NodeId pos,
+                             NodeId neg,
+                             const PwlParameters &params,
+                             double ac_mag,
                              double) {
     const double dc = params.Points.empty() ? 0.0 : params.Points.front().Value;
     const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NON_PERIODIC, .IsSupportedInHb = false};
-    m_Impl->AddVoltageSourceDevice(std::move(name), pos, neg, dc, MakePwlWaveform(dc, params), ac_mag, non_periodic,
+    m_Impl->AddVoltageSourceDevice(std::move(name),
+                                   pos,
+                                   neg,
+                                   dc,
+                                   MakePwlWaveform(dc, params),
+                                   ac_mag,
+                                   non_periodic,
                                    MakePwlBreakpoints(params));
 }
 
-void CircuitBuilder::AddIpwl(std::string name, NodeId pos, NodeId neg, const PwlParameters &params, double ac_mag,
+void CircuitBuilder::AddIpwl(std::string name,
+                             NodeId pos,
+                             NodeId neg,
+                             const PwlParameters &params,
+                             double ac_mag,
                              double) {
     const double dc = params.Points.empty() ? 0.0 : params.Points.front().Value;
     const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NON_PERIODIC, .IsSupportedInHb = false};
-    m_Impl->AddCurrentSourceDevice(std::move(name), pos, neg, dc, MakePwlWaveform(dc, params), ac_mag, non_periodic,
+    m_Impl->AddCurrentSourceDevice(std::move(name),
+                                   pos,
+                                   neg,
+                                   dc,
+                                   MakePwlWaveform(dc, params),
+                                   ac_mag,
+                                   non_periodic,
                                    MakePwlBreakpoints(params));
 }
 
-void CircuitBuilder::AddVsffm(std::string name, NodeId pos, NodeId neg, const SffmParameters &params, double ac_mag,
+void CircuitBuilder::AddVsffm(std::string name,
+                              NodeId pos,
+                              NodeId neg,
+                              const SffmParameters &params,
+                              double ac_mag,
                               double) {
     const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NON_PERIODIC, .IsSupportedInHb = false};
-    m_Impl->AddVoltageSourceDevice(std::move(name), pos, neg, params.Offset, MakeSffmWaveform(params.Offset, params),
-                                   ac_mag, non_periodic);
+    m_Impl->AddVoltageSourceDevice(std::move(name),
+                                   pos,
+                                   neg,
+                                   params.Offset,
+                                   MakeSffmWaveform(params.Offset, params),
+                                   ac_mag,
+                                   non_periodic);
 }
 
-void CircuitBuilder::AddIsffm(std::string name, NodeId pos, NodeId neg, const SffmParameters &params, double ac_mag,
+void CircuitBuilder::AddIsffm(std::string name,
+                              NodeId pos,
+                              NodeId neg,
+                              const SffmParameters &params,
+                              double ac_mag,
                               double) {
     const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NON_PERIODIC, .IsSupportedInHb = false};
-    m_Impl->AddCurrentSourceDevice(std::move(name), pos, neg, params.Offset, MakeSffmWaveform(params.Offset, params),
-                                   ac_mag, non_periodic);
+    m_Impl->AddCurrentSourceDevice(std::move(name),
+                                   pos,
+                                   neg,
+                                   params.Offset,
+                                   MakeSffmWaveform(params.Offset, params),
+                                   ac_mag,
+                                   non_periodic);
 }
 
-void CircuitBuilder::AddVam(std::string name, NodeId pos, NodeId neg, const AmParameters &params, double ac_mag,
+void CircuitBuilder::AddVam(std::string name,
+                            NodeId pos,
+                            NodeId neg,
+                            const AmParameters &params,
+                            double ac_mag,
                             double) {
     const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NON_PERIODIC, .IsSupportedInHb = false};
-    m_Impl->AddVoltageSourceDevice(std::move(name), pos, neg, params.Offset, MakeAmWaveform(params.Offset, params),
-                                   ac_mag, non_periodic, MakeAmBreakpoints(params));
+    m_Impl->AddVoltageSourceDevice(std::move(name),
+                                   pos,
+                                   neg,
+                                   params.Offset,
+                                   MakeAmWaveform(params.Offset, params),
+                                   ac_mag,
+                                   non_periodic,
+                                   MakeAmBreakpoints(params));
 }
 
-void CircuitBuilder::AddIam(std::string name, NodeId pos, NodeId neg, const AmParameters &params, double ac_mag,
+void CircuitBuilder::AddIam(std::string name,
+                            NodeId pos,
+                            NodeId neg,
+                            const AmParameters &params,
+                            double ac_mag,
                             double) {
     const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NON_PERIODIC, .IsSupportedInHb = false};
-    m_Impl->AddCurrentSourceDevice(std::move(name), pos, neg, params.Offset, MakeAmWaveform(params.Offset, params),
-                                   ac_mag, non_periodic, MakeAmBreakpoints(params));
+    m_Impl->AddCurrentSourceDevice(std::move(name),
+                                   pos,
+                                   neg,
+                                   params.Offset,
+                                   MakeAmWaveform(params.Offset, params),
+                                   ac_mag,
+                                   non_periodic,
+                                   MakeAmBreakpoints(params));
 }
 
 void CircuitBuilder::AddVnoise(std::string name, NodeId pos, NodeId neg, const NoiseParameters &params, double ac_mag) {
     const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NON_PERIODIC, .IsSupportedInHb = false};
     TransientNoiseSource noise = MakeNoiseSource(params);
-    m_Impl->AddVoltageSourceDevice(std::move(name), pos, neg, params.Offset, std::move(noise.Evaluate), ac_mag,
-                                   non_periodic, std::move(noise.NextBreakpoint), std::move(noise.ResetSeed));
+    m_Impl->AddVoltageSourceDevice(std::move(name),
+                                   pos,
+                                   neg,
+                                   params.Offset,
+                                   std::move(noise.Evaluate),
+                                   ac_mag,
+                                   non_periodic,
+                                   std::move(noise.NextBreakpoint),
+                                   std::move(noise.ResetSeed));
 }
 
 void CircuitBuilder::AddInoise(std::string name, NodeId pos, NodeId neg, const NoiseParameters &params, double ac_mag) {
     const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NON_PERIODIC, .IsSupportedInHb = false};
     TransientNoiseSource noise = MakeNoiseSource(params);
-    m_Impl->AddCurrentSourceDevice(std::move(name), pos, neg, params.Offset, std::move(noise.Evaluate), ac_mag,
-                                   non_periodic, std::move(noise.NextBreakpoint), std::move(noise.ResetSeed));
+    m_Impl->AddCurrentSourceDevice(std::move(name),
+                                   pos,
+                                   neg,
+                                   params.Offset,
+                                   std::move(noise.Evaluate),
+                                   ac_mag,
+                                   non_periodic,
+                                   std::move(noise.NextBreakpoint),
+                                   std::move(noise.ResetSeed));
 }
 
-void CircuitBuilder::AddVrandom(std::string name, NodeId pos, NodeId neg, const RandomParameters &params,
+void CircuitBuilder::AddVrandom(std::string name,
+                                NodeId pos,
+                                NodeId neg,
+                                const RandomParameters &params,
                                 double ac_mag) {
     const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NON_PERIODIC, .IsSupportedInHb = false};
     TransientNoiseSource random = MakeRandomSource(params);
-    m_Impl->AddVoltageSourceDevice(std::move(name), pos, neg, params.Second, std::move(random.Evaluate), ac_mag,
-                                   non_periodic, std::move(random.NextBreakpoint), std::move(random.ResetSeed));
+    m_Impl->AddVoltageSourceDevice(std::move(name),
+                                   pos,
+                                   neg,
+                                   params.Second,
+                                   std::move(random.Evaluate),
+                                   ac_mag,
+                                   non_periodic,
+                                   std::move(random.NextBreakpoint),
+                                   std::move(random.ResetSeed));
 }
 
-void CircuitBuilder::AddIrandom(std::string name, NodeId pos, NodeId neg, const RandomParameters &params,
+void CircuitBuilder::AddIrandom(std::string name,
+                                NodeId pos,
+                                NodeId neg,
+                                const RandomParameters &params,
                                 double ac_mag) {
     const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NON_PERIODIC, .IsSupportedInHb = false};
     TransientNoiseSource random = MakeRandomSource(params);
-    m_Impl->AddCurrentSourceDevice(std::move(name), pos, neg, params.Second, std::move(random.Evaluate), ac_mag,
-                                   non_periodic, std::move(random.NextBreakpoint), std::move(random.ResetSeed));
+    m_Impl->AddCurrentSourceDevice(std::move(name),
+                                   pos,
+                                   neg,
+                                   params.Second,
+                                   std::move(random.Evaluate),
+                                   ac_mag,
+                                   non_periodic,
+                                   std::move(random.NextBreakpoint),
+                                   std::move(random.ResetSeed));
 }
 
 void CircuitBuilder::AddClock(std::string name, NodeId pos, NodeId neg, const ClockParameters &params) {
@@ -1179,11 +1442,21 @@ void CircuitBuilder::AddClock(std::string name, NodeId pos, NodeId neg, const Cl
                                         .Frequency = params.Frequency,
                                         .MinEdgeTime = CLOCK_EDGE_FRACTION * period,
                                         .IsSupportedInHb = params.Frequency > 0.0};
-    m_Impl->AddVoltageSourceDevice(std::move(name), pos, neg, 0.0, MakeClockWaveform(params), 0.0, periodicity,
+    m_Impl->AddVoltageSourceDevice(std::move(name),
+                                   pos,
+                                   neg,
+                                   0.0,
+                                   MakeClockWaveform(params),
+                                   0.0,
+                                   periodicity,
                                    MakeClockBreakpoints(params));
 }
 
-void CircuitBuilder::AddLogicInput(std::string name, NodeId pos, NodeId neg, bool high_state, double high_volts,
+void CircuitBuilder::AddLogicInput(std::string name,
+                                   NodeId pos,
+                                   NodeId neg,
+                                   bool high_state,
+                                   double high_volts,
                                    double low_volts) {
     const double v = high_state ? high_volts : low_volts;
     m_Impl->AddVoltageSourceDevice(std::move(name), pos, neg, v, MakeDcWaveform(v), 0.0);
@@ -1217,27 +1490,48 @@ void CircuitBuilder::AddBehavioralCurrent(std::string name, NodeId pos, NodeId n
     m_Impl->AddBehavioral(std::move(name), pos, neg, expression, false);
 }
 
-void CircuitBuilder::AddDiode(std::string name, NodeId anode, NodeId cathode, const DiodeParameters &params,
+void CircuitBuilder::AddDiode(std::string name,
+                              NodeId anode,
+                              NodeId cathode,
+                              const DiodeParameters &params,
                               double area) {
     m_Impl->AddDiode(std::move(name), anode, cathode, params, area);
 }
 
-void CircuitBuilder::AddBjt(std::string name, NodeId c, NodeId b, NodeId e, bool is_npn, const BjtParameters &params,
+void CircuitBuilder::AddBjt(std::string name,
+                            NodeId c,
+                            NodeId b,
+                            NodeId e,
+                            bool is_npn,
+                            const BjtParameters &params,
                             double area) {
     m_Impl->AddBjt(std::move(name), c, b, e, is_npn, params, area);
 }
 
-void CircuitBuilder::AddMosfet(std::string name, NodeId d, NodeId g, NodeId s, NodeId b, bool is_nmos,
+void CircuitBuilder::AddMosfet(std::string name,
+                               NodeId d,
+                               NodeId g,
+                               NodeId s,
+                               NodeId b,
+                               bool is_nmos,
                                const MosfetParameters &params) {
     m_Impl->AddMosfet(std::move(name), d, g, s, b, is_nmos, params);
 }
 
-void CircuitBuilder::AddSwitch(std::string name, NodeId a, NodeId b, NodeId cp, NodeId cn,
+void CircuitBuilder::AddSwitch(std::string name,
+                               NodeId a,
+                               NodeId b,
+                               NodeId cp,
+                               NodeId cn,
                                const SwitchParameters &params) {
     m_Impl->AddSwitch(std::move(name), a, b, cp, cn, params);
 }
 
-void CircuitBuilder::AddVoltageControlledSwitch(std::string name, NodeId a, NodeId b, NodeId cp, NodeId cn,
+void CircuitBuilder::AddVoltageControlledSwitch(std::string name,
+                                                NodeId a,
+                                                NodeId b,
+                                                NodeId cp,
+                                                NodeId cn,
                                                 const SwitchParameters &params) {
     m_Impl->AddSwitch(std::move(name), a, b, cp, cn, params);
 }
@@ -1246,28 +1540,55 @@ void CircuitBuilder::AddFuse(std::string name, NodeId a, NodeId b, const FusePar
     m_Impl->AddFuse(std::move(name), a, b, params);
 }
 
-void CircuitBuilder::AddRelay(std::string name, NodeId coil_p, NodeId coil_n, NodeId contact_a, NodeId contact_b,
-                              double coil_r, double coil_l, const SwitchParameters &contact_params) {
+void CircuitBuilder::AddRelay(std::string name,
+                              NodeId coil_p,
+                              NodeId coil_n,
+                              NodeId contact_a,
+                              NodeId contact_b,
+                              double coil_r,
+                              double coil_l,
+                              const SwitchParameters &contact_params) {
     m_Impl->AddRelay(std::move(name), coil_p, coil_n, contact_a, contact_b, coil_r, coil_l, contact_params);
 }
 
-void CircuitBuilder::AddTransformer(std::string name, NodeId p1, NodeId p2, NodeId s1, NodeId s2, double primary_l,
-                                    double secondary_l, double k, double winding_r) {
+void CircuitBuilder::AddTransformer(std::string name,
+                                    NodeId p1,
+                                    NodeId p2,
+                                    NodeId s1,
+                                    NodeId s2,
+                                    double primary_l,
+                                    double secondary_l,
+                                    double k,
+                                    double winding_r) {
     m_Impl->AddTransformer(std::move(name), p1, p2, s1, s2, primary_l, secondary_l, k, winding_r);
 }
 
-void CircuitBuilder::AddPotentiometer(std::string name, NodeId a, NodeId wiper, NodeId b, double total_r,
+void CircuitBuilder::AddPotentiometer(std::string name,
+                                      NodeId a,
+                                      NodeId wiper,
+                                      NodeId b,
+                                      double total_r,
                                       double fraction) {
     m_Impl->AddPotentiometer(std::move(name), a, wiper, b, total_r, fraction);
 }
 
-void CircuitBuilder::AddIdealOpAmp(std::string name, NodeId out, NodeId in_pos, NodeId in_neg, NodeId vcc_pos,
-                                   NodeId vcc_neg, double bandwidth_hz) {
+void CircuitBuilder::AddIdealOpAmp(std::string name,
+                                   NodeId out,
+                                   NodeId in_pos,
+                                   NodeId in_neg,
+                                   NodeId vcc_pos,
+                                   NodeId vcc_neg,
+                                   double bandwidth_hz) {
     m_Impl->AddIdealOpAmp(std::move(name), out, in_pos, in_neg, vcc_pos, vcc_neg, bandwidth_hz);
 }
 
-void CircuitBuilder::AddBoyleOpAmp(std::string name, NodeId out, NodeId in_pos, NodeId in_neg, NodeId vcc_pos,
-                                   NodeId vcc_neg, const BoyleOpAmpParameters &params) {
+void CircuitBuilder::AddBoyleOpAmp(std::string name,
+                                   NodeId out,
+                                   NodeId in_pos,
+                                   NodeId in_neg,
+                                   NodeId vcc_pos,
+                                   NodeId vcc_neg,
+                                   const BoyleOpAmpParameters &params) {
     m_Impl->AddBoyleOpAmp(std::move(name), out, in_pos, in_neg, vcc_pos, vcc_neg, params);
 }
 
@@ -1279,8 +1600,11 @@ void CircuitBuilder::AddBoyleOpAmp(std::string name, NodeId out, NodeId in_pos, 
  * @param[in] inputs  Input nodes.
  * @param[in] params  Physical logic parameters.
  */
-void CircuitBuilder::AddLogicGate(std::string name, const LogicGateType type, const NodeId out,
-                                  std::vector<NodeId> inputs, const SmoothLogicParameters &params) {
+void CircuitBuilder::AddLogicGate(std::string name,
+                                  const LogicGateType type,
+                                  const NodeId out,
+                                  std::vector<NodeId> inputs,
+                                  const SmoothLogicParameters &params) {
     m_Impl->AddLogicGate(std::move(name), type, out, std::move(inputs), params);
 }
 
@@ -1291,7 +1615,9 @@ void CircuitBuilder::AddLogicGate(std::string name, const LogicGateType type, co
  * @param[in] in      Input node.
  * @param[in] params  Physical logic parameters.
  */
-void CircuitBuilder::AddInverter(std::string name, const NodeId out, const NodeId in,
+void CircuitBuilder::AddInverter(std::string name,
+                                 const NodeId out,
+                                 const NodeId in,
                                  const SmoothLogicParameters &params) {
     m_Impl->AddInverter(std::move(name), out, in, params);
 }
@@ -1303,7 +1629,9 @@ void CircuitBuilder::AddInverter(std::string name, const NodeId out, const NodeI
  * @param[in] in      Input node.
  * @param[in] params  Physical logic parameters.
  */
-void CircuitBuilder::AddLogicBuffer(std::string name, const NodeId out, const NodeId in,
+void CircuitBuilder::AddLogicBuffer(std::string name,
+                                    const NodeId out,
+                                    const NodeId in,
                                     const SmoothLogicParameters &params) {
     m_Impl->AddLogicBuffer(std::move(name), out, in, params);
 }
@@ -1315,7 +1643,9 @@ void CircuitBuilder::AddLogicBuffer(std::string name, const NodeId out, const No
  * @param[in] in      Input node.
  * @param[in] params  Physical logic parameters.
  */
-void CircuitBuilder::AddSchmittTrigger(std::string name, const NodeId out, const NodeId in,
+void CircuitBuilder::AddSchmittTrigger(std::string name,
+                                       const NodeId out,
+                                       const NodeId in,
                                        const SmoothLogicParameters &params) {
     m_Impl->AddSchmittTrigger(std::move(name), out, in, params);
 }
@@ -1329,8 +1659,12 @@ void CircuitBuilder::AddSchmittTrigger(std::string name, const NodeId out, const
  * @param[in] reset   Reset input node.
  * @param[in] params  Physical logic parameters.
  */
-void CircuitBuilder::AddSRLatch(std::string name, const NodeId q, const NodeId q_bar, const NodeId set,
-                                const NodeId reset, const SmoothLogicParameters &params) {
+void CircuitBuilder::AddSRLatch(std::string name,
+                                const NodeId q,
+                                const NodeId q_bar,
+                                const NodeId set,
+                                const NodeId reset,
+                                const SmoothLogicParameters &params) {
     m_Impl->AddSRLatch(std::move(name), q, q_bar, set, reset, params);
 }
 
@@ -1345,9 +1679,14 @@ void CircuitBuilder::AddSRLatch(std::string name, const NodeId q, const NodeId q
  * @param[in] set     Asynchronous set node, active high, or empty when the flip-flop has none.
  * @param[in] reset   Asynchronous reset node, active high, or empty when the flip-flop has none.
  */
-void CircuitBuilder::AddDFlipFlop(std::string name, const NodeId q, const NodeId q_bar, const NodeId d,
-                                  const NodeId clk, const SmoothLogicParameters &params,
-                                  const std::optional<NodeId> set, const std::optional<NodeId> reset) {
+void CircuitBuilder::AddDFlipFlop(std::string name,
+                                  const NodeId q,
+                                  const NodeId q_bar,
+                                  const NodeId d,
+                                  const NodeId clk,
+                                  const SmoothLogicParameters &params,
+                                  const std::optional<NodeId> set,
+                                  const std::optional<NodeId> reset) {
     m_Impl->AddDFlipFlop(std::move(name), q, q_bar, d, clk, params, set, reset);
 }
 

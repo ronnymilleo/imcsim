@@ -50,8 +50,9 @@ const Schematic &BlockSession::GetShown() const {
  *          any depth.
  */
 bool BlockSession::CanPlaceBlock(const std::string_view name) const {
-    return std::ranges::none_of(
-        m_OpenBlocks, [&](const OpenBlock &block) { return ContainsBlock(m_Root.GetSubcircuits(), name, block.Name); });
+    return std::ranges::none_of(m_OpenBlocks, [&](const OpenBlock &block) {
+        return ContainsBlock(m_Root.GetSubcircuits(), name, block.Name);
+    });
 }
 
 /**
@@ -108,8 +109,8 @@ void BlockSession::RequestCreate() {
     }
     auto candidates = m_Root.GetSubcircuitPinCandidates();
     m_Name = "block";
-    while (std::ranges::find(m_Root.GetSubcircuits(), m_Name, &SavedSubcircuit::Name) !=
-           m_Root.GetSubcircuits().end()) {
+    while (std::ranges::find(m_Root.GetSubcircuits(), m_Name, &SavedSubcircuit::Name)
+           != m_Root.GetSubcircuits().end()) {
         m_Name += "_2";
     }
     m_Pins.clear();
@@ -170,8 +171,8 @@ bool BlockSession::Close(const bool apply) {
         }
         // A block opened and closed without a change leaves the document unmodified
         const auto definition = std::ranges::find(m_Root.GetSubcircuits(), block.Name, &SavedSubcircuit::Name);
-        const bool is_changed = block.Content->IsModified() || definition == m_Root.GetSubcircuits().end() ||
-                                definition->Pins != m_Pins || definition->Parameters != m_Parameters;
+        const bool is_changed = block.Content->IsModified() || definition == m_Root.GetSubcircuits().end()
+                             || definition->Pins != m_Pins || definition->Parameters != m_Parameters;
         if (is_changed) {
             auto updated = m_Root.UpdateSubcircuit(block.Name, *block.Content, m_Pins, m_Parameters);
             if (!updated) {
@@ -205,7 +206,8 @@ bool BlockSession::Close(const bool apply) {
  * @return  Nothing, or why the settings were refused; the document is left as it was then.
  */
 std::expected<void, std::string>
-BlockSession::ApplySpiceUpdate(const std::string &name, const std::vector<SavedSubcircuitPin> &pins,
+BlockSession::ApplySpiceUpdate(const std::string &name,
+                               const std::vector<SavedSubcircuitPin> &pins,
                                const std::vector<Core::SubcircuitParameter> &parameters) {
     const auto updated = m_Root.UpdateSpiceSubcircuit(name, pins, parameters);
     if (!updated) {

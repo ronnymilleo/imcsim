@@ -17,8 +17,8 @@ namespace {
 
 using Catch::Matchers::WithinAbs;
 
-std::unique_ptr<GUI::UIElement> Part(const Core::ComponentType type, const GUI::GridPoint position,
-                                     const std::string &name) {
+std::unique_ptr<GUI::UIElement>
+Part(const Core::ComponentType type, const GUI::GridPoint position, const std::string &name) {
     auto element = GUI::CreateElement(type, position, GUI::Rotation::R0);
     element->GetComponent().SetName(name);
     return element;
@@ -110,8 +110,10 @@ TEST_CASE("The scale of a transient covers every sample", "[circuit_snapshot]") 
 }
 
 TEST_CASE("Levels place voltage linearly and power logarithmically", "[circuit_snapshot]") {
-    const GUI::HeatScale scale = {
-        .LowestVoltage = -2.0, .HighestVoltage = 2.0, .LargestCurrent = 1e-3, .LargestPower = 1.0};
+    const GUI::HeatScale scale = {.LowestVoltage = -2.0,
+                                  .HighestVoltage = 2.0,
+                                  .LargestCurrent = 1e-3,
+                                  .LargestPower = 1.0};
     CHECK(GUI::VoltageLevel(-2.0, scale) == 0.0f);
     CHECK(GUI::VoltageLevel(0.0, scale) == 0.5f);
     CHECK(GUI::VoltageLevel(2.0, scale) == 1.0f);

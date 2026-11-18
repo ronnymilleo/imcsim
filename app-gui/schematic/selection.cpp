@@ -17,10 +17,10 @@ namespace {
 bool WireIntersects(const UIWire &wire, const ImVec2 min, const ImVec2 max) {
     const GridPoint start = wire.GetStart();
     const GridPoint end = wire.GetEnd();
-    return static_cast<float>(std::min(start.X, end.X)) <= max.x &&
-           static_cast<float>(std::max(start.X, end.X)) >= min.x &&
-           static_cast<float>(std::min(start.Y, end.Y)) <= max.y &&
-           static_cast<float>(std::max(start.Y, end.Y)) >= min.y;
+    return static_cast<float>(std::min(start.X, end.X)) <= max.x
+        && static_cast<float>(std::max(start.X, end.X)) >= min.x
+        && static_cast<float>(std::min(start.Y, end.Y)) <= max.y
+        && static_cast<float>(std::max(start.Y, end.Y)) >= min.y;
 }
 
 } // namespace
@@ -42,8 +42,10 @@ bool Selection::Empty() const {
  * @return  Elements win over wires, and the most recently added item wins because it is drawn on top. Empty when
  *          nothing is there.
  */
-Selection PickAt(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires,
-                 const ImVec2 world_pos, const float wire_tolerance) {
+Selection PickAt(const std::vector<std::unique_ptr<UIElement>> &elements,
+                 const std::vector<UIWire> &wires,
+                 const ImVec2 world_pos,
+                 const float wire_tolerance) {
     for (std::size_t index = elements.size(); index-- > 0;) {
         if (elements[index]->Contains(world_pos)) {
             return {.Elements = {index}, .Wires = {}};
@@ -65,8 +67,10 @@ Selection PickAt(const std::vector<std::unique_ptr<UIElement>> &elements, const 
  * @param[in] opposite_corner  The other corner, in any position relative to the first.
  * @return  Every element whose symbol bounds and every wire that overlaps the box.
  */
-Selection PickInRectangle(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires,
-                          const ImVec2 corner, const ImVec2 opposite_corner) {
+Selection PickInRectangle(const std::vector<std::unique_ptr<UIElement>> &elements,
+                          const std::vector<UIWire> &wires,
+                          const ImVec2 corner,
+                          const ImVec2 opposite_corner) {
     const ImVec2 min = {std::min(corner.x, opposite_corner.x), std::min(corner.y, opposite_corner.y)};
     const ImVec2 max = {std::max(corner.x, opposite_corner.x), std::max(corner.y, opposite_corner.y)};
     Selection picked;

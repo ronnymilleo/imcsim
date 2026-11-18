@@ -38,11 +38,14 @@ void UINodeset::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view
     canvas.AddLine(LocalToScreen(view, 0, 0), LocalToScreen(view, 0, -LEAD_LENGTH), color, LINE_THICKNESS);
 }
 
-void UINodeset::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
+void UINodeset::DrawSymbol(SchematicCanvas &canvas,
+                           const ViewTransform &view,
+                           const ImU32 color,
                            SymbolStyle /*style*/) const {
-    const std::array<ImVec2, 4> diamond = {
-        LocalToScreen(view, 0.0f, BOX_TOP), LocalToScreen(view, BOX_HALF_WIDTH, BOX_CENTER),
-        LocalToScreen(view, 0.0f, -LEAD_LENGTH), LocalToScreen(view, -BOX_HALF_WIDTH, BOX_CENTER)};
+    const std::array<ImVec2, 4> diamond = {LocalToScreen(view, 0.0f, BOX_TOP),
+                                           LocalToScreen(view, BOX_HALF_WIDTH, BOX_CENTER),
+                                           LocalToScreen(view, 0.0f, -LEAD_LENGTH),
+                                           LocalToScreen(view, -BOX_HALF_WIDTH, BOX_CENTER)};
     canvas.AddPolyline(diamond.data(), static_cast<int>(diamond.size()), color, ImDrawFlags_Closed, LINE_THICKNESS);
 }
 

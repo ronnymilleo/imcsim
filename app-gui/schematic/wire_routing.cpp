@@ -21,7 +21,7 @@ namespace {
 constexpr int ROUTE_MARGIN = 4;
 /// The most grid points a search looks at, so a route between far ends of a huge schematic gives up instead of
 /// stalling the editor.
-constexpr std::size_t MAX_ROUTING_POINTS = 250000;
+constexpr std::size_t MAX_ROUTING_POINTS = 250'000;
 /// What one bend costs, in grid units of length: a route takes a detour this long to save a bend.
 constexpr int BEND_COST = 4;
 
@@ -49,16 +49,20 @@ struct Region {
     GridPoint Max;
 
     int GetWidth() const { return Max.X - Min.X + 1; }
+
     std::size_t GetSize() const {
         return static_cast<std::size_t>(GetWidth()) * static_cast<std::size_t>(Max.Y - Min.Y + 1);
     }
+
     bool Contains(const GridPoint point) const {
         return point.X >= Min.X && point.X <= Max.X && point.Y >= Min.Y && point.Y <= Max.Y;
     }
+
     std::size_t GetIndex(const GridPoint point) const {
-        return static_cast<std::size_t>(point.Y - Min.Y) * static_cast<std::size_t>(GetWidth()) +
-               static_cast<std::size_t>(point.X - Min.X);
+        return static_cast<std::size_t>(point.Y - Min.Y) * static_cast<std::size_t>(GetWidth())
+             + static_cast<std::size_t>(point.X - Min.X);
     }
+
     GridPoint GetPoint(const std::size_t index) const {
         const auto width = static_cast<std::size_t>(GetWidth());
         return {Min.X + static_cast<int>(index % width), Min.Y + static_cast<int>(index / width)};
@@ -116,8 +120,8 @@ bool CanTurn(const std::size_t direction, const std::size_t next_direction, cons
 /**
  * @brief   The corners of the path that ends in a search state, followed back through the state before each.
  */
-std::vector<GridPoint> TracePath(const Region &region, const std::vector<std::size_t> &previous,
-                                 const std::size_t end) {
+std::vector<GridPoint>
+TracePath(const Region &region, const std::vector<std::size_t> &previous, const std::size_t end) {
     std::vector<GridPoint> path;
     for (std::size_t step = end; step != previous.size(); step = previous[step]) {
         path.push_back(region.GetPoint(step / STATES_PER_POINT));
@@ -218,8 +222,8 @@ std::optional<std::vector<GridPoint>> RoutingGrid::Route(const GridPoint from, c
         const bool is_crossing = point != from && m_Uses.contains(point);
         for (std::size_t next_direction = 0; next_direction < DIRECTIONS.size(); ++next_direction) {
             const GridPoint next = {point.X + DIRECTIONS[next_direction].X, point.Y + DIRECTIONS[next_direction].Y};
-            if (!CanTurn(direction, next_direction, is_crossing) || !region.Contains(next) ||
-                (next != to && !CanEnter(next, next_direction))) {
+            if (!CanTurn(direction, next_direction, is_crossing) || !region.Contains(next)
+                || (next != to && !CanEnter(next, next_direction))) {
                 continue;
             }
             const int next_cost = cost + 1 + (direction != NO_DIRECTION && next_direction != direction ? BEND_COST : 0);

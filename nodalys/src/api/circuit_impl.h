@@ -17,11 +17,15 @@ public:
     explicit CircuitImpl(CompiledCircuit compiled) : m_Compiled(std::move(compiled)) {}
 
     CompiledCircuit &Compiled() { return m_Compiled; }
+
     const CompiledCircuit &Compiled() const { return m_Compiled; }
 
     int GetNodeCount() const { return m_Compiled.CircuitNodeCount; }
+
     int GetUnknownCount() const { return m_Compiled.System ? m_Compiled.System->GetSize() : 0; }
+
     bool HasInitialConditions() const { return m_Compiled.HasInitialConditions; }
+
     const std::vector<CircuitPort> &GetPorts() const { return m_Compiled.Ports; }
 
 private:

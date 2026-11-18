@@ -79,15 +79,19 @@ struct NoiseBand {
 };
 
 std::size_t ChooseSpectrumSampleCount(std::span<const double> xs, double from, double to);
-std::optional<Spectrum> ComputeSpectrum(std::span<const double> xs, std::span<const double> ys, double from, double to,
-                                        std::size_t sample_count, SpectrumWindow window);
+std::optional<Spectrum> ComputeSpectrum(std::span<const double> xs,
+                                        std::span<const double> ys,
+                                        double from,
+                                        double to,
+                                        std::size_t sample_count,
+                                        SpectrumWindow window);
 HarmonicAnalysis AnalyzeHarmonics(const Spectrum &spectrum, int highest_order);
 std::vector<double> ToDecibels(std::span<const double> amplitudes);
 
 // Noise
 std::vector<double> ComputeNoiseDensities(const Spectrum &spectrum);
-std::optional<NoiseBand> MeasureNoiseBand(std::span<const double> frequencies, std::span<const double> densities,
-                                          double from, double to);
+std::optional<NoiseBand>
+MeasureNoiseBand(std::span<const double> frequencies, std::span<const double> densities, double from, double to);
 std::optional<std::pair<double, double>> FindDensityRange(std::span<const double> densities);
 
 } // namespace GUI

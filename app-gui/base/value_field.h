@@ -38,16 +38,18 @@ public:
     void Load(double value);
     void LoadOptional(const std::optional<double> &value);
     void StartTyping(char first);
-    std::optional<double> Draw(const char *label, const std::string &unit, const std::function<bool(double)> &is_valid,
+    std::optional<double> Draw(const char *label,
+                               const std::string &unit,
+                               const std::function<bool(double)> &is_valid,
                                Core::ValueSeries series = Core::ValueSeries::FREE);
-    OptionalValueEdit DrawOptional(const char *label, const std::string &unit,
-                                   const std::function<bool(double)> &is_valid);
+    OptionalValueEdit
+    DrawOptional(const char *label, const std::string &unit, const std::function<bool(double)> &is_valid);
 
 private:
     std::optional<char> FocusInput();
     bool DrawInput();
-    std::optional<double> ApplyStep(const std::string &unit, const std::function<bool(double)> &is_valid,
-                                    Core::ValueSeries series, int step);
+    std::optional<double>
+    ApplyStep(const std::string &unit, const std::function<bool(double)> &is_valid, Core::ValueSeries series, int step);
 
     std::array<char, 32> m_Text{};
     bool m_Invalid = false;

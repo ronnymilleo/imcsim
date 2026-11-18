@@ -45,6 +45,7 @@ public:
     }
 
     const MnaSystem &GetConductance() const { return m_Conductance; }
+
     const MnaSystem &GetReactive() const { return m_Reactive; }
 
 private:
@@ -86,7 +87,11 @@ DeviceStamp CopyStamp(const StampProbe &probe) {
 /**
  * @brief   Central difference of the stamps of a device with respect to one DC unknown.
  */
-void ProbeUnknown(StampProbe &probe, Device &device, const std::vector<double> &x_dc, const int unknown, const int size,
+void ProbeUnknown(StampProbe &probe,
+                  Device &device,
+                  const std::vector<double> &x_dc,
+                  const int unknown,
+                  const int size,
                   std::vector<JacobianDerivative> &derivatives) {
     const auto index = static_cast<std::size_t>(unknown);
     const double step = DERIVATIVE_STEP * std::max(MIN_STEP_SCALE, std::fabs(x_dc[index]));
@@ -185,7 +190,8 @@ std::vector<JacobianDerivative> FindJacobianDerivatives(const CompiledCircuit &c
 std::vector<std::complex<double>> FindBiasWeights(const std::vector<JacobianDerivative> &derivatives,
                                                   const std::size_t size,
                                                   const std::vector<std::complex<double>> &adjoint,
-                                                  const std::vector<std::complex<double>> &x_ac, const double omega) {
+                                                  const std::vector<std::complex<double>> &x_ac,
+                                                  const double omega) {
     std::vector<std::complex<double>> weights(size, std::complex<double>{0.0, 0.0});
     for (const JacobianDerivative &derivative : derivatives) {
         std::complex<double> sum{0.0, 0.0};

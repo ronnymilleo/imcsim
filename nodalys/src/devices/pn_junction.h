@@ -42,8 +42,8 @@ inline double PnCriticalVoltage(const double saturation_current, const double th
  * @param[in] thermal_voltage n·Vt of the junction.
  * @return  The candidate, folded back towards the previous iterate when it jumps too far.
  */
-inline double PnLimit(const double voltage_new, const double voltage_old, const double critical,
-                      const double thermal_voltage) {
+inline double
+PnLimit(const double voltage_new, const double voltage_old, const double critical, const double thermal_voltage) {
     if (voltage_new > critical && std::fabs(voltage_new - voltage_old) > 2.0 * thermal_voltage) {
         if (voltage_old > 0.0) {
             const double argument = 1.0 + (voltage_new - voltage_old) / thermal_voltage;

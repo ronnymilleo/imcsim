@@ -33,7 +33,13 @@ Nodalys::BjtParameters MakeFullParameters() {
 }
 
 Nodalys::BjtDevice MakeTransistor(const bool is_pnp) {
-    return {COLLECTOR, BASE, EMITTER, NO_INTERNAL_NODE, NO_INTERNAL_NODE, NO_INTERNAL_NODE, MakeFullParameters(),
+    return {COLLECTOR,
+            BASE,
+            EMITTER,
+            NO_INTERNAL_NODE,
+            NO_INTERNAL_NODE,
+            NO_INTERNAL_NODE,
+            MakeFullParameters(),
             is_pnp};
 }
 
@@ -71,7 +77,7 @@ TEST_CASE("A PNP has the same small-signal currents as an NPN at mirrored bias",
     constexpr double OMEGA = 2.0e7;
 
     for (int terminal = 0; terminal < TERMINAL_COUNT; ++terminal) {
-        CHECK(pnp.AcTerminalCurrent(terminal, pnp_bias, perturbation, OMEGA) ==
-              npn.AcTerminalCurrent(terminal, npn_bias, perturbation, OMEGA));
+        CHECK(pnp.AcTerminalCurrent(terminal, pnp_bias, perturbation, OMEGA)
+              == npn.AcTerminalCurrent(terminal, npn_bias, perturbation, OMEGA));
     }
 }

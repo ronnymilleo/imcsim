@@ -28,14 +28,23 @@ struct StepTraces {
 };
 
 // Steps of a stepped run
-void PlotOtherSteps(const std::vector<StepTraces> &steps, std::size_t selected, const Schematic &schematic,
-                    bool show_currents, const std::vector<int> &lane_nodes);
-void LabelSteps(const std::vector<StepTraces> &steps, std::size_t selected, const std::vector<std::string> &labels,
-                const Schematic &schematic, bool show_currents, const std::vector<int> &lane_nodes);
-std::optional<std::size_t> DrawStepSelector(const std::string &parameter, const std::string &unit,
-                                            std::span<const double> values, std::size_t selected);
-std::vector<std::string> ListStepLabels(const std::string &parameter, const std::string &unit,
-                                        std::span<const double> values);
+void PlotOtherSteps(const std::vector<StepTraces> &steps,
+                    std::size_t selected,
+                    const Schematic &schematic,
+                    bool show_currents,
+                    const std::vector<int> &lane_nodes);
+void LabelSteps(const std::vector<StepTraces> &steps,
+                std::size_t selected,
+                const std::vector<std::string> &labels,
+                const Schematic &schematic,
+                bool show_currents,
+                const std::vector<int> &lane_nodes);
+std::optional<std::size_t> DrawStepSelector(const std::string &parameter,
+                                            const std::string &unit,
+                                            std::span<const double> values,
+                                            std::size_t selected);
+std::vector<std::string>
+ListStepLabels(const std::string &parameter, const std::string &unit, std::span<const double> values);
 
 } // namespace GUI
 

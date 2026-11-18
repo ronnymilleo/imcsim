@@ -51,7 +51,8 @@ std::vector<WireCurrent> SplitWires(const std::vector<UIWire> &wires, const std:
  * @brief   A part with several currents, each at the terminal it was probed on; the other end of a winding or of a
  *          contact takes what the probed end gives out.
  */
-std::optional<double> GetProbedTerminalCurrent(const Core::Component &component, const std::vector<std::string> &names,
+std::optional<double> GetProbedTerminalCurrent(const Core::Component &component,
+                                               const std::vector<std::string> &names,
                                                const std::size_t terminal,
                                                const std::vector<Core::ComponentCurrent> &currents) {
     const std::vector<std::size_t> probed = Core::GetCurrentTerminals(component);
@@ -104,7 +105,8 @@ double GetSingleCurrentAt(const Core::Component &component, const double current
  *          No value for ground, whose current is whatever its node leaves over, or for a current missing from the
  *          results.
  */
-std::optional<double> GetTerminalCurrent(const Core::Component &component, const std::size_t terminal,
+std::optional<double> GetTerminalCurrent(const Core::Component &component,
+                                         const std::size_t terminal,
                                          const std::vector<Core::ComponentCurrent> &currents) {
     const std::vector<std::string> names = Core::GetCurrentNames(component);
     if (names.empty()) {

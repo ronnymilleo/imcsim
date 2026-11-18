@@ -32,7 +32,9 @@ namespace {
  * @details The labels of a trace go where its curves are furthest apart, which is the end for most traces but the peak
  *          for a derivative, whose curves all end near zero. Each label sits on the axis of its curve.
  */
-void LabelCurves(const Core::DCSweep &sweep, Schematic &schematic, const bool show_currents,
+void LabelCurves(const Core::DCSweep &sweep,
+                 Schematic &schematic,
+                 const bool show_currents,
                  const std::vector<std::vector<MathTrace>> &math) {
     const ImVec4 color = ImGui::GetStyleColorVec4(ImGuiCol_PopupBg);
     for (const CurveFamily &family : ListCurveFamilies(sweep, schematic, show_currents, math)) {
@@ -49,12 +51,18 @@ void LabelCurves(const Core::DCSweep &sweep, Schematic &schematic, const bool sh
                 continue;
             }
             const float pixel_y = ImPlot::PlotToPixels(sweep.SweptValues[sample], y).y;
-            if (std::ranges::any_of(
-                    drawn, [pixel_y](const float other) { return std::abs(other - pixel_y) < ImGui::GetFontSize(); })) {
+            if (std::ranges::any_of(drawn, [pixel_y](const float other) {
+                    return std::abs(other - pixel_y) < ImGui::GetFontSize();
+                })) {
                 continue;
             }
             drawn.push_back(pixel_y);
-            ImPlot::Annotation(sweep.SweptValues[sample], y, color, ImVec2(4.0f, 0.0f), true, "%s",
+            ImPlot::Annotation(sweep.SweptValues[sample],
+                               y,
+                               color,
+                               ImVec2(4.0f, 0.0f),
+                               true,
+                               "%s",
                                FormatStepLabel(sweep, sweep.Curves[curve]).c_str());
         }
     }
@@ -101,8 +109,8 @@ void DCSweepTab::Draw(const FrameResults &frame) {
  * @return  True with a DC sweep and a measured trace or a math channel.
  */
 bool DCSweepTab::CanExport(const FrameResults &frame) const {
-    return m_Results.GetDCSweep() &&
-           (frame.AnythingMeasured || (!frame.DCSweepMath.empty() && !frame.DCSweepMath.front().empty()));
+    return m_Results.GetDCSweep()
+        && (frame.AnythingMeasured || (!frame.DCSweepMath.empty() && !frame.DCSweepMath.front().empty()));
 }
 
 /**
@@ -147,7 +155,9 @@ void DCSweepTab::DrawPlot(const Core::DCSweep &sweep, const std::vector<std::vec
     }
     const bool has_voltages =
         HasMeasuredVoltage(first_curve.NodeVoltages.size(), m_Schematic) || UsesAxis(first_math, ImAxis_Y1);
-    ImPlot::SetupAxes(sweep.SweptSource.c_str(), "Voltage", ImPlotAxisFlags_None,
+    ImPlot::SetupAxes(sweep.SweptSource.c_str(),
+                      "Voltage",
+                      ImPlotAxisFlags_None,
                       VoltageAxisFlags(has_voltages, show_currents || !first_math.empty()));
     ImPlot::SetupAxisFormat(ImAxis_X1, FormatAxisValue, const_cast<char *>(sweep.SweptUnit.c_str()));
     ImPlot::SetupAxisFormat(ImAxis_Y1, FormatAxisValue, const_cast<char *>("V"));
@@ -210,9 +220,11 @@ void DCSweepTab::DrawStatistics(const Core::DCSweep &sweep, const std::vector<st
             traces.push_back({.Values = *family.Curves[curve], .Unit = family.Unit});
         }
     }
-    const std::vector<StatisticsRow> rows =
-        BuildSweepStatistics(sweep.SweptValues, sweep.SweptUnit, traces, MeasuredSpan(cursors, m_View),
-                             cursors.Shown ? std::optional(cursors) : std::nullopt);
+    const std::vector<StatisticsRow> rows = BuildSweepStatistics(sweep.SweptValues,
+                                                                 sweep.SweptUnit,
+                                                                 traces,
+                                                                 MeasuredSpan(cursors, m_View),
+                                                                 cursors.Shown ? std::optional(cursors) : std::nullopt);
     DrawTraceTable("sweep_statistics", columns, rows, cursors.Shown ? cursor_readings : CursorReadings{});
 }
 

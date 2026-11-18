@@ -134,7 +134,8 @@ std::string MathChannels::GetSignature() const {
  * @param[out] errors         Gets a line for each channel that names a net, node or part the result lacks.
  * @return  The traces of the shown channels that compile and evaluate; the others are left out.
  */
-std::vector<MathTrace> MathChannels::Evaluate(const std::span<const double> xs, const Dimension x_unit,
+std::vector<MathTrace> MathChannels::Evaluate(const std::span<const double> xs,
+                                              const Dimension x_unit,
                                               const std::vector<std::vector<double>> &node_voltages,
                                               const std::vector<Core::ComponentTrace> &currents,
                                               std::vector<std::string> &errors) const {
@@ -209,7 +210,8 @@ NetResolver MathChannels::GetNetResolver() const {
  * @details A channel that does not compile has its mark in the panel and nothing to add to the errors; one that names
  *          a net the circuit lacks adds a line. Returns no program for a hidden channel or either failure.
  */
-std::optional<MathProgram> MathChannels::GetShownProgram(const MathChannel &channel, const NetResolver &find_node,
+std::optional<MathProgram> MathChannels::GetShownProgram(const MathChannel &channel,
+                                                         const NetResolver &find_node,
                                                          std::vector<std::string> &errors) const {
     const std::expected<MathProgram, std::string> compiled = CompileExpression(GetChannelExpression(channel));
     if (!channel.Shown || !compiled) {
@@ -233,8 +235,11 @@ std::optional<MathProgram> MathChannels::GetShownProgram(const MathChannel &chan
  * @param[in]     opens_editor  Whether its editor opens now, as for a channel just added.
  * @return  False when the user removed the channel in its editor.
  */
-bool MathChannels::DrawChannel(MathChannel &channel, const std::size_t index, const std::vector<std::string> &operands,
-                               const NetResolver &find_node, const bool opens_editor) const {
+bool MathChannels::DrawChannel(MathChannel &channel,
+                               const std::size_t index,
+                               const std::vector<std::string> &operands,
+                               const NetResolver &find_node,
+                               const bool opens_editor) const {
     // The list is as narrow as the trace names, so a mark after the Edit button would be cut off; the name of a
     // channel in error takes the error color instead
     const auto program = CompileChannel(channel, find_node);
@@ -245,7 +250,9 @@ bool MathChannels::DrawChannel(MathChannel &channel, const std::size_t index, co
     if (!program) {
         ImGui::PushStyleColor(ImGuiCol_Text, GetErrorTextColor());
     }
-    DrawTraceCheckbox(channel.Name.c_str(), &channel.Shown, AdaptToBackground(MATH_COLORS[index % MATH_COLORS.size()]),
+    DrawTraceCheckbox(channel.Name.c_str(),
+                      &channel.Shown,
+                      AdaptToBackground(MATH_COLORS[index % MATH_COLORS.size()]),
                       TraceStyle::HEAVY);
     if (!program) {
         ImGui::PopStyleColor();

@@ -20,8 +20,8 @@ namespace GUI {
 class LiveInputHandler {
 public:
     // Picking
-    std::optional<std::size_t> FindLivePart(const Schematic &schematic, const ViewTransform &view,
-                                            bool is_live_part_pickable) const;
+    std::optional<std::size_t>
+    FindLivePart(const Schematic &schematic, const ViewTransform &view, bool is_live_part_pickable) const;
 
     // Input
     bool HandleInput(Schematic &schematic, std::optional<std::size_t> live_part);

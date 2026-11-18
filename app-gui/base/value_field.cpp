@@ -128,7 +128,11 @@ bool ValueField::DrawInput() {
         }
         return 0;
     };
-    return ImGui::InputText("##value", m_Text.data(), m_Text.size(), ImGuiInputTextFlags_CallbackAlways, place_cursor,
+    return ImGui::InputText("##value",
+                            m_Text.data(),
+                            m_Text.size(),
+                            ImGuiInputTextFlags_CallbackAlways,
+                            place_cursor,
                             &m_CursorToEnd);
 }
 
@@ -140,8 +144,10 @@ bool ValueField::DrawInput() {
  * @param[in] step      Number of steps, negative for down.
  * @return  The new value, or no value when the text cannot be read or the stepped value is not valid.
  */
-std::optional<double> ValueField::ApplyStep(const std::string &unit, const std::function<bool(double)> &is_valid,
-                                            const Core::ValueSeries series, const int step) {
+std::optional<double> ValueField::ApplyStep(const std::string &unit,
+                                            const std::function<bool(double)> &is_valid,
+                                            const Core::ValueSeries series,
+                                            const int step) {
     const std::optional<double> current = Core::ParseValue(m_Text.data(), unit);
     if (!current) {
         return std::nullopt;
@@ -168,8 +174,10 @@ std::optional<double> ValueField::ApplyStep(const std::string &unit, const std::
  *                      the series, and two buttons, the arrow keys and the mouse wheel step through the series.
  * @return  The new value when the text was changed this frame and is valid, so the caller can apply it.
  */
-std::optional<double> ValueField::Draw(const char *label, const std::string &unit,
-                                       const std::function<bool(double)> &is_valid, const Core::ValueSeries series) {
+std::optional<double> ValueField::Draw(const char *label,
+                                       const std::string &unit,
+                                       const std::function<bool(double)> &is_valid,
+                                       const Core::ValueSeries series) {
     DrawFieldLabel(label);
     ImGui::PushID(label);
     std::optional<double> edited;
@@ -228,8 +236,8 @@ std::optional<double> ValueField::Draw(const char *label, const std::string &uni
  * @return  The edit of this frame: Changed tells whether the user edited the field, and Value holds the new value,
  *          or is empty when the field was cleared. An empty field is not an error; the value is simply not set.
  */
-OptionalValueEdit ValueField::DrawOptional(const char *label, const std::string &unit,
-                                           const std::function<bool(double)> &is_valid) {
+OptionalValueEdit
+ValueField::DrawOptional(const char *label, const std::string &unit, const std::function<bool(double)> &is_valid) {
     DrawFieldLabel(label);
     ImGui::PushID(label);
     OptionalValueEdit edit;

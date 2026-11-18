@@ -102,15 +102,20 @@ UISevenSegment::UISevenSegment(const GridPoint position, const Rotation rotation
  * @param[in]     color          Color of a lit segment with the effect off.
  * @param[in]     are_lights_on  Whether the Logic Lights effect is on.
  */
-void UISevenSegment::DrawReading(SchematicCanvas &canvas, const ViewTransform &view,
-                                 const std::span<const std::optional<LogicState>> segments, const ImU32 color,
+void UISevenSegment::DrawReading(SchematicCanvas &canvas,
+                                 const ViewTransform &view,
+                                 const std::span<const std::optional<LogicState>> segments,
+                                 const ImU32 color,
                                  const bool are_lights_on) const {
     const ImU32 lit = are_lights_on ? ImGui::ColorConvertFloat4ToU32(GetPalette().Accent) : color;
     for (std::size_t segment = 0; segment < std::min(segments.size(), SEGMENTS.size()); ++segment) {
         if (segments[segment] == LogicState::HIGH) {
             FillSegment(canvas, view, segment, lit);
             if (are_lights_on) {
-                OutlineSegment(canvas, view, segment, ImGui::ColorConvertFloat4ToU32(GetPalette().AccentHot),
+                OutlineSegment(canvas,
+                               view,
+                               segment,
+                               ImGui::ColorConvertFloat4ToU32(GetPalette().AccentHot),
                                OUTLINE_THICKNESS);
             }
         } else if (segments[segment] == LogicState::UNKNOWN) {
@@ -125,7 +130,9 @@ void UISevenSegment::DrawReading(SchematicCanvas &canvas, const ViewTransform &v
 void UISevenSegment::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     for (const GridPoint terminal : GetLocalTerminals()) {
         const auto y = static_cast<float>(terminal.Y);
-        canvas.AddLine(LocalToScreen(view, static_cast<float>(terminal.X), y), LocalToScreen(view, BOX_LEFT, y), color,
+        canvas.AddLine(LocalToScreen(view, static_cast<float>(terminal.X), y),
+                       LocalToScreen(view, BOX_LEFT, y),
+                       color,
                        LINE_THICKNESS);
     }
 }
@@ -133,9 +140,12 @@ void UISevenSegment::DrawTerminals(SchematicCanvas &canvas, const ViewTransform 
 /**
  * @brief   The box and the outline of every segment; the result fills them through DrawReading().
  */
-void UISevenSegment::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
+void UISevenSegment::DrawSymbol(SchematicCanvas &canvas,
+                                const ViewTransform &view,
+                                const ImU32 color,
                                 const SymbolStyle /*style*/) const {
-    const std::array<ImVec2, 4> box = {LocalToScreen(view, BOX_LEFT, BOX_TOP), LocalToScreen(view, BOX_RIGHT, BOX_TOP),
+    const std::array<ImVec2, 4> box = {LocalToScreen(view, BOX_LEFT, BOX_TOP),
+                                       LocalToScreen(view, BOX_RIGHT, BOX_TOP),
                                        LocalToScreen(view, BOX_RIGHT, BOX_BOTTOM),
                                        LocalToScreen(view, BOX_LEFT, BOX_BOTTOM)};
     canvas.AddPolyline(box.data(), static_cast<int>(box.size()), color, ImDrawFlags_Closed, LINE_THICKNESS);
@@ -150,8 +160,12 @@ void UISevenSegment::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &vi
 void UISevenSegment::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const std::vector<GridPoint> terminals = GetLocalTerminals();
     for (std::size_t input = 0; input < terminals.size(); ++input) {
-        DrawLabel(canvas, view, {BOX_LEFT + INPUT_LABEL_INSET, static_cast<float>(terminals[input].Y)}, {1.0f, 0.0f},
-                  Core::SEGMENT_NAMES[input], color);
+        DrawLabel(canvas,
+                  view,
+                  {BOX_LEFT + INPUT_LABEL_INSET, static_cast<float>(terminals[input].Y)},
+                  {1.0f, 0.0f},
+                  Core::SEGMENT_NAMES[input],
+                  color);
     }
 }
 
@@ -177,7 +191,9 @@ LocalBounds UISevenSegment::GetLocalBounds() const {
     return {{static_cast<float>(TERMINAL_X), BOX_TOP}, {BOX_RIGHT, BOX_BOTTOM}};
 }
 
-void UISevenSegment::FillSegment(SchematicCanvas &canvas, const ViewTransform &view, const std::size_t segment,
+void UISevenSegment::FillSegment(SchematicCanvas &canvas,
+                                 const ViewTransform &view,
+                                 const std::size_t segment,
                                  const ImU32 color) const {
     const std::array<ImVec2, 6> screen = GetSegmentOnScreen(view, segment);
     // A fan from the first corner covers the convex outline
@@ -186,8 +202,11 @@ void UISevenSegment::FillSegment(SchematicCanvas &canvas, const ViewTransform &v
     }
 }
 
-void UISevenSegment::OutlineSegment(SchematicCanvas &canvas, const ViewTransform &view, const std::size_t segment,
-                                    const ImU32 color, const float thickness) const {
+void UISevenSegment::OutlineSegment(SchematicCanvas &canvas,
+                                    const ViewTransform &view,
+                                    const std::size_t segment,
+                                    const ImU32 color,
+                                    const float thickness) const {
     const std::array<ImVec2, 6> screen = GetSegmentOnScreen(view, segment);
     canvas.AddPolyline(screen.data(), static_cast<int>(screen.size()), color, ImDrawFlags_Closed, thickness);
 }

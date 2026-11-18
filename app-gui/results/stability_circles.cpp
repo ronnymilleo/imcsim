@@ -74,8 +74,8 @@ ChartCoverage CoverageOfLine(const StabilityBoundary &boundary) {
  *          an infinite wave, so it is always on the unstable side, which tells the sides apart without a test point
  *          that could lie on the boundary.
  */
-StabilityBoundary FindBoundary(const Complex near_side, const Complex far_side, const Complex delta,
-                               const double product) {
+StabilityBoundary
+FindBoundary(const Complex near_side, const Complex far_side, const Complex delta, const double product) {
     StabilityBoundary boundary;
     if (product <= UNILATERAL_PRODUCT_FLOOR) {
         boundary.Coverage =
@@ -150,8 +150,8 @@ std::vector<Interval> CutByLine(const StabilityBoundary &boundary, const double 
     return shared.To > shared.From ? std::vector<Interval>{shared} : std::vector<Interval>{};
 }
 
-std::vector<Interval> FindUnstableStretches(const StabilityBoundary &boundary, const double across,
-                                            const Interval chart) {
+std::vector<Interval>
+FindUnstableStretches(const StabilityBoundary &boundary, const double across, const Interval chart) {
     switch (boundary.Shape) {
     case BoundaryShape::CIRCLE:
         return CutByCircle(boundary, across, chart);
@@ -173,8 +173,8 @@ std::vector<Complex> SampleCircle(const StabilityBoundary &boundary) {
     if (distance > 0.0) {
         // The point of the circle nearest to the origin is the middle of the part inside the view; the angle is
         // measured from there, where cos(angle) >= q keeps the points within the view radius
-        const double q = (distance * distance + radius * radius - BOUNDARY_VIEW_RADIUS * BOUNDARY_VIEW_RADIUS) /
-                         (2.0 * distance * radius);
+        const double q = (distance * distance + radius * radius - BOUNDARY_VIEW_RADIUS * BOUNDARY_VIEW_RADIUS)
+                       / (2.0 * distance * radius);
         if (q > 1.0) {
             return {};
         }
@@ -183,8 +183,9 @@ std::vector<Complex> SampleCircle(const StabilityBoundary &boundary) {
     } else if (radius > BOUNDARY_VIEW_RADIUS) {
         return {};
     }
-    const int points = std::max(
-        MIN_ARC_POINTS, static_cast<int>(std::ceil(BOUNDARY_FULL_CIRCLE_POINTS * (2.0 * half_angle) / FULL_TURN)));
+    const int points =
+        std::max(MIN_ARC_POINTS,
+                 static_cast<int>(std::ceil(BOUNDARY_FULL_CIRCLE_POINTS * (2.0 * half_angle) / FULL_TURN)));
     std::vector<Complex> samples;
     samples.reserve(static_cast<std::size_t>(points) + 1);
     for (int index = 0; index <= points; ++index) {

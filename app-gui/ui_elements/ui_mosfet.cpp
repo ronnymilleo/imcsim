@@ -35,18 +35,26 @@ UIMOSFET::UIMOSFET(const Core::ComponentType type, const GridPoint position, con
     : UITransistor(std::make_unique<Core::MOSFET>(type), position, rotation) {
 }
 
-void UIMOSFET::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
+void UIMOSFET::DrawSymbol(SchematicCanvas &canvas,
+                          const ViewTransform &view,
+                          const ImU32 color,
                           SymbolStyle /*style*/) const {
     canvas.AddLine(LocalToScreen(view, -1, 0), LocalToScreen(view, GATE_X, 0), color, LINE_THICKNESS);
-    canvas.AddLine(LocalToScreen(view, GATE_X, -PLATE_HALF_HEIGHT), LocalToScreen(view, GATE_X, PLATE_HALF_HEIGHT),
-                   color, LINE_THICKNESS);
+    canvas.AddLine(LocalToScreen(view, GATE_X, -PLATE_HALF_HEIGHT),
+                   LocalToScreen(view, GATE_X, PLATE_HALF_HEIGHT),
+                   color,
+                   LINE_THICKNESS);
     for (const auto &[top, bottom] : CHANNEL_SEGMENTS) {
-        canvas.AddLine(LocalToScreen(view, CHANNEL_X, top), LocalToScreen(view, CHANNEL_X, bottom), color,
+        canvas.AddLine(LocalToScreen(view, CHANNEL_X, top),
+                       LocalToScreen(view, CHANNEL_X, bottom),
+                       color,
                        LINE_THICKNESS);
     }
 
     // Drain on top, source below, and the body joining the source
-    canvas.AddLine(LocalToScreen(view, CHANNEL_X, -CONTACT_Y), LocalToScreen(view, 1, -CONTACT_Y), color,
+    canvas.AddLine(LocalToScreen(view, CHANNEL_X, -CONTACT_Y),
+                   LocalToScreen(view, 1, -CONTACT_Y),
+                   color,
                    LINE_THICKNESS);
     canvas.AddLine(LocalToScreen(view, 1, -CONTACT_Y), LocalToScreen(view, 1, -1), color, LINE_THICKNESS);
     canvas.AddLine(LocalToScreen(view, CHANNEL_X, CONTACT_Y), LocalToScreen(view, 1, CONTACT_Y), color, LINE_THICKNESS);

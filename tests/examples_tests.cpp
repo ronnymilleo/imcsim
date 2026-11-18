@@ -61,8 +61,11 @@ void OpenOrFail(const GUI::Example &example, GUI::Schematic &schematic) {
         FAIL(loaded.error());
     }
     CHECK(loaded->Warnings.empty());
-    schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings),
-                      std::move(loaded->Subcircuits), std::move(loaded->Models));
+    schematic.Replace(std::move(loaded->Elements),
+                      std::move(loaded->Wires),
+                      std::move(loaded->Settings),
+                      std::move(loaded->Subcircuits),
+                      std::move(loaded->Models));
     schematic.RestoreMeasurements(loaded->Measurements);
     // Every saved voltage lands on a node, so none is dropped on the way in
     CHECK(schematic.SaveMeasurements() == loaded->Measurements);
@@ -177,7 +180,8 @@ TEST_CASE("Every example either runs on Nodalys or is flagged unsupported", "[ex
 }
 
 TEST_CASE("The BJT example draws one collector curve per base current", "[examples]") {
-    const auto example = std::ranges::find(GUI::GetExamples(), std::string_view("bjt_output_characteristics.imcsim"),
+    const auto example = std::ranges::find(GUI::GetExamples(),
+                                           std::string_view("bjt_output_characteristics.imcsim"),
                                            &GUI::Example::FileName);
     REQUIRE(example != GUI::GetExamples().end());
     GUI::Schematic schematic;
@@ -211,9 +215,13 @@ TEST_CASE("The noise example shows a flat floor at the input that the low-pass c
     const std::size_t output = NodeAt(schematic, {11, 4});
 
     const auto band_rms = [&transient](const std::size_t node, const double from_hertz, const double to_hertz) {
-        const auto spectrum = GUI::ComputeSpectrum(
-            transient.Times, transient.NodeVoltages[node], 0.0, transient.Times.back(),
-            GUI::ChooseSpectrumSampleCount(transient.Times, 0.0, transient.Times.back()), GUI::SpectrumWindow::HANN);
+        const auto spectrum =
+            GUI::ComputeSpectrum(transient.Times,
+                                 transient.NodeVoltages[node],
+                                 0.0,
+                                 transient.Times.back(),
+                                 GUI::ChooseSpectrumSampleCount(transient.Times, 0.0, transient.Times.back()),
+                                 GUI::SpectrumWindow::HANN);
         REQUIRE(spectrum.has_value());
         double sum = 0.0;
         int count = 0;
@@ -252,9 +260,12 @@ TEST_CASE("The noise example reads as broadband noise of 1 mV/sqrt(Hz) at its in
     const std::size_t input = NodeAt(schematic, {4, 4});
 
     const double end = transient.Times.back();
-    const auto spectrum =
-        GUI::ComputeSpectrum(transient.Times, transient.NodeVoltages[input], 0.0, end,
-                             GUI::ChooseSpectrumSampleCount(transient.Times, 0.0, end), GUI::SpectrumWindow::HANN);
+    const auto spectrum = GUI::ComputeSpectrum(transient.Times,
+                                               transient.NodeVoltages[input],
+                                               0.0,
+                                               end,
+                                               GUI::ChooseSpectrumSampleCount(transient.Times, 0.0, end),
+                                               GUI::SpectrumWindow::HANN);
     REQUIRE(spectrum.has_value());
     CHECK(GUI::AnalyzeHarmonics(*spectrum, 10).IsBroadband);
 
@@ -286,9 +297,11 @@ TEST_CASE("The RC example measures its corner frequency over the whole sweep", "
     const Core::ACSweep &sweep = *run.Result;
     // Node 2 is the capacitor, the output of the filter
     REQUIRE(sweep.NodeMagnitudesDecibels.size() > 2);
-    const auto statistics =
-        GUI::ComputeBodeStatistics(sweep.Frequencies, sweep.NodeMagnitudesDecibels[2], sweep.NodePhasesDegrees[2],
-                                   sweep.Frequencies.front(), sweep.Frequencies.back());
+    const auto statistics = GUI::ComputeBodeStatistics(sweep.Frequencies,
+                                                       sweep.NodeMagnitudesDecibels[2],
+                                                       sweep.NodePhasesDegrees[2],
+                                                       sweep.Frequencies.front(),
+                                                       sweep.Frequencies.back());
     REQUIRE(statistics);
     REQUIRE(statistics->UpperCutoff);
     const double corner = 1.0 / (2.0 * std::numbers::pi * 1e3 * 100e-9);
@@ -297,7 +310,8 @@ TEST_CASE("The RC example measures its corner frequency over the whole sweep", "
 }
 
 TEST_CASE("The Monte Carlo example opens with its tolerances and runs as Monte Carlo", "[examples]") {
-    const auto example = std::ranges::find(GUI::GetExamples(), std::string_view("monte_carlo_rc_low_pass.imcsim"),
+    const auto example = std::ranges::find(GUI::GetExamples(),
+                                           std::string_view("monte_carlo_rc_low_pass.imcsim"),
                                            &GUI::Example::FileName);
     REQUIRE(example != GUI::GetExamples().end());
     GUI::Schematic schematic;
@@ -339,8 +353,8 @@ TEST_CASE("The hybrid-pi model has the gain of its transistor in the middle band
     const std::vector<double> &real = sweep.NodeMagnitudesDecibels[NodeAt(schematic, {13, 6})];
     const std::vector<double> &model = sweep.NodeMagnitudesDecibels[NodeAt(schematic, {21, 18})];
     const auto at = [&sweep](const double frequency) {
-        return static_cast<std::size_t>(std::ranges::lower_bound(sweep.Frequencies, frequency) -
-                                        sweep.Frequencies.begin());
+        return static_cast<std::size_t>(std::ranges::lower_bound(sweep.Frequencies, frequency)
+                                        - sweep.Frequencies.begin());
     };
     // gm (RC || ro) = 227, or 47 dB, for both at 1 kHz
     CHECK_THAT(real[at(1e3)], Catch::Matchers::WithinAbs(47.1, 0.2));
@@ -397,8 +411,8 @@ TEST_CASE("The Zener holds the output near its breakdown voltage once the supply
     REQUIRE(sweep.Curves.size() == 1);
     const std::vector<double> &output = sweep.Curves.front().NodeVoltages[NodeAt(schematic, {12, 6})];
     const auto at = [&sweep](const double supply) {
-        return static_cast<std::size_t>(std::ranges::lower_bound(sweep.SweptValues, supply - 1e-6) -
-                                        sweep.SweptValues.begin());
+        return static_cast<std::size_t>(std::ranges::lower_bound(sweep.SweptValues, supply - 1e-6)
+                                        - sweep.SweptValues.begin());
     };
     // Below breakdown the 330 Ohm and the 1k load divide the supply
     CHECK_THAT(output[at(3.0)], Catch::Matchers::WithinRel(3.0 * 1000.0 / 1330.0, 2e-2));
@@ -417,13 +431,16 @@ TEST_CASE("The Schottky conducts first, then the 1N4007, then the 1N4148", "[exa
     const auto current_at = [&sweep](const std::string &name, const double volts) {
         const auto trace = std::ranges::find(sweep.Curves.front().Currents, name, &Core::ComponentTrace::Name);
         REQUIRE(trace != sweep.Curves.front().Currents.end());
-        const auto index = static_cast<std::size_t>(std::ranges::lower_bound(sweep.SweptValues, volts - 1e-6) -
-                                                    sweep.SweptValues.begin());
+        const auto index = static_cast<std::size_t>(std::ranges::lower_bound(sweep.SweptValues, volts - 1e-6)
+                                                    - sweep.SweptValues.begin());
         return trace->Values[index];
     };
     for (const double volts : {0.3, 0.5}) {
-        INFO(std::format("At {} V: 1N4148 {} A, 1N4007 {} A, 1N5819 {} A", volts, current_at("D1", volts),
-                         current_at("D2", volts), current_at("D3", volts)));
+        INFO(std::format("At {} V: 1N4148 {} A, 1N4007 {} A, 1N5819 {} A",
+                         volts,
+                         current_at("D1", volts),
+                         current_at("D2", volts),
+                         current_at("D3", volts)));
         CHECK(current_at("D3", volts) > current_at("D1", volts));
         CHECK(current_at("D2", volts) > current_at("D1", volts));
     }
@@ -438,8 +455,10 @@ TEST_CASE("The series RLC peaks at its resonance with the bandwidth its quality 
     }
     const Core::ACSweep &sweep = *run.Result;
     const std::size_t output = NodeAt(schematic, {17, 4});
-    const auto statistics = GUI::ComputeBodeStatistics(sweep.Frequencies, sweep.NodeMagnitudesDecibels[output],
-                                                       sweep.NodePhasesDegrees[output], sweep.Frequencies.front(),
+    const auto statistics = GUI::ComputeBodeStatistics(sweep.Frequencies,
+                                                       sweep.NodeMagnitudesDecibels[output],
+                                                       sweep.NodePhasesDegrees[output],
+                                                       sweep.Frequencies.front(),
                                                        sweep.Frequencies.back());
     REQUIRE(statistics);
     const double resonance = 1.0 / (2.0 * std::numbers::pi * std::sqrt(10e-3 * 100e-9));
@@ -540,8 +559,8 @@ namespace {
  * @brief   Gain in dB of a node at the sweep point nearest to a frequency.
  */
 double GainAt(const Core::ACSweep &sweep, const std::size_t node, const double frequency) {
-    const auto index = static_cast<std::size_t>(std::ranges::lower_bound(sweep.Frequencies, frequency * 0.999) -
-                                                sweep.Frequencies.begin());
+    const auto index = static_cast<std::size_t>(std::ranges::lower_bound(sweep.Frequencies, frequency * 0.999)
+                                                - sweep.Frequencies.begin());
     return sweep.NodeMagnitudesDecibels[node][index];
 }
 
@@ -557,9 +576,11 @@ Core::ACSweep SweepOf(GUI::Schematic &schematic) {
 }
 
 GUI::BodeStatistics BodeOf(const Core::ACSweep &sweep, const std::size_t node) {
-    const auto statistics =
-        GUI::ComputeBodeStatistics(sweep.Frequencies, sweep.NodeMagnitudesDecibels[node], sweep.NodePhasesDegrees[node],
-                                   sweep.Frequencies.front(), sweep.Frequencies.back());
+    const auto statistics = GUI::ComputeBodeStatistics(sweep.Frequencies,
+                                                       sweep.NodeMagnitudesDecibels[node],
+                                                       sweep.NodePhasesDegrees[node],
+                                                       sweep.Frequencies.front(),
+                                                       sweep.Frequencies.back());
     REQUIRE(statistics);
     return *statistics;
 }
@@ -738,16 +759,19 @@ TEST_CASE("The current mirror copies the reference current while Q2 is out of sa
     const Core::DCSweep &sweep = *run.Result;
     REQUIRE(sweep.Curves.size() == 5);
     const auto index_of = [&sweep](const double volts) {
-        return static_cast<std::size_t>(std::ranges::lower_bound(sweep.SweptValues, volts - 1e-6) -
-                                        sweep.SweptValues.begin());
+        return static_cast<std::size_t>(std::ranges::lower_bound(sweep.SweptValues, volts - 1e-6)
+                                        - sweep.SweptValues.begin());
     };
     for (const Core::DCSweepCurve &curve : sweep.Curves) {
         const auto trace = std::ranges::find(curve.Currents, "Q2.C", &Core::ComponentTrace::Name);
         REQUIRE(trace != curve.Currents.end());
         // The reference branch is the supply less one Vbe over 10k
         const double reference = (curve.StepValue - 0.7) / 10e3;
-        INFO(std::format("Supply {} V: reference {} A, mirrored {} A at 5 V and {} A at 0.3 V", curve.StepValue,
-                         reference, trace->Values[index_of(5.0)], trace->Values[index_of(0.3)]));
+        INFO(std::format("Supply {} V: reference {} A, mirrored {} A at 5 V and {} A at 0.3 V",
+                         curve.StepValue,
+                         reference,
+                         trace->Values[index_of(5.0)],
+                         trace->Values[index_of(0.3)]));
         CHECK_THAT(trace->Values[index_of(5.0)], Catch::Matchers::WithinRel(reference, 0.15));
         // No current with 0 V across Q2, and the full copy once it is out of saturation
         CHECK(trace->Values[index_of(0.0)] < 0.1 * reference);
@@ -826,8 +850,9 @@ TEST_CASE("Every example is in a group, and the examples of a group are listed t
     std::size_t current = 0;
     for (const GUI::Example &example : GUI::GetExamples()) {
         INFO(example.Title);
-        const auto group = std::ranges::find_if(
-            groups, [&example](const char *name) { return std::string_view(name) == example.Group; });
+        const auto group = std::ranges::find_if(groups, [&example](const char *name) {
+            return std::string_view(name) == example.Group;
+        });
         REQUIRE(group != groups.end());
         const auto index = static_cast<std::size_t>(group - groups.begin());
         CHECK(index >= current);
@@ -864,8 +889,9 @@ TEST_CASE("The series switches light their LED only when both are closed, and th
     GUI::Schematic schematic;
     OpenExample("switches_and_or.imcsim", schematic);
     const auto set_closed = [&schematic](const std::string &name, const bool closed) {
-        const auto element = std::ranges::find_if(
-            schematic.GetElements(), [&name](const auto &part) { return part->GetComponent().GetName() == name; });
+        const auto element = std::ranges::find_if(schematic.GetElements(), [&name](const auto &part) {
+            return part->GetComponent().GetName() == name;
+        });
         REQUIRE(element != schematic.GetElements().end());
         static_cast<Core::Switch &>((*element)->GetComponent()).SetClosed(closed);
     };
@@ -1016,8 +1042,8 @@ TEST_CASE("The SR latch is set at the start, and with both inputs idle has no op
     const std::vector<double> &q = transient.NodeVoltages[NodeAt(schematic, {24, 17})];
     const std::vector<double> &qn = transient.NodeVoltages[NodeAt(schematic, {24, 7})];
     const auto at = [&transient](const std::vector<double> &values, const double time) {
-        return values[static_cast<std::size_t>(std::ranges::lower_bound(transient.Times, time) -
-                                               transient.Times.begin())];
+        return values[static_cast<std::size_t>(std::ranges::lower_bound(transient.Times, time)
+                                               - transient.Times.begin())];
     };
     // S_BAR low from 0 to 1 ms sets Q, which holds with both inputs high; R_BAR low from 3 to 4 ms resets it
     CHECK(at(q, 0.5e-3) > 4.0);
@@ -1155,7 +1181,8 @@ TEST_CASE("The ripple counter counts the edges of its clock in binary", "[exampl
     OpenExample("ripple_counter.imcsim", schematic);
     const Core::TransientRun run = RunExampleTransient(schematic);
     const Core::Transient &transient = *run.Result;
-    const std::array<std::size_t, 3> bits = {NodeAt(schematic, {21, 9}), NodeAt(schematic, {35, 9}),
+    const std::array<std::size_t, 3> bits = {NodeAt(schematic, {21, 9}),
+                                             NodeAt(schematic, {35, 9}),
                                              NodeAt(schematic, {49, 9})};
     // The clock rises at 0.5 ms and every millisecond after, so after n edges the count is n modulo 8
     for (int edges = 0; edges <= 8; ++edges) {
@@ -1244,8 +1271,10 @@ TEST_CASE("The two RC blocks have their corners a decade apart, as their paramet
     const Core::ACSweep &sweep = *run.Result;
     const auto corner_at = [&](const GUI::GridPoint point) {
         const std::size_t node = NodeAt(schematic, point);
-        const auto statistics = GUI::ComputeBodeStatistics(sweep.Frequencies, sweep.NodeMagnitudesDecibels[node],
-                                                           sweep.NodePhasesDegrees[node], sweep.Frequencies.front(),
+        const auto statistics = GUI::ComputeBodeStatistics(sweep.Frequencies,
+                                                           sweep.NodeMagnitudesDecibels[node],
+                                                           sweep.NodePhasesDegrees[node],
+                                                           sweep.Frequencies.front(),
                                                            sweep.Frequencies.back());
         REQUIRE(statistics);
         REQUIRE(statistics->UpperCutoff);
@@ -1318,15 +1347,17 @@ TEST_CASE("The decade counter counts 0 to 9 and over again, and its display show
     const Core::TransientRun run = RunExampleTransient(schematic);
     const Core::Transient &transient = *run.Result;
     // Q0 to Q3, at the points the example measures
-    const std::array<std::size_t, 4> bits = {NodeAt(schematic, {15, -3}), NodeAt(schematic, {8, 13}),
-                                             NodeAt(schematic, {15, 1}), NodeAt(schematic, {8, 11})};
+    const std::array<std::size_t, 4> bits = {NodeAt(schematic, {15, -3}),
+                                             NodeAt(schematic, {8, 13}),
+                                             NodeAt(schematic, {15, 1}),
+                                             NodeAt(schematic, {8, 11})};
     const auto display = std::ranges::find_if(schematic.GetElements(), [](const auto &element) {
         return element->GetComponent().GetType() == Core::ComponentType::SEVEN_SEGMENT;
     });
     REQUIRE(display != schematic.GetElements().end());
     // Segments a to g of each digit, as the decoder lights them
-    constexpr std::array<std::string_view, 10> DIGITS = {"abcdef", "bc",     "abdeg", "abcdg",   "bcfg",
-                                                         "acdfg",  "acdefg", "abc",   "abcdefg", "abcdfg"};
+    constexpr std::array<std::string_view, 10> DIGITS =
+        {"abcdef", "bc", "abdeg", "abcdg", "bcfg", "acdfg", "acdefg", "abc", "abcdefg", "abcdfg"};
     // The clock rises at 0.5 ms and every millisecond after; eleven edges go past nine and back to 0
     for (int edges = 1; edges <= 11; ++edges) {
         const double time = 0.5e-3 + static_cast<double>(edges - 1) * 1e-3 + 0.3e-3;
@@ -1451,8 +1482,9 @@ TEST_CASE("The series RLC example plots its impedance, resistive at resonance", 
     REQUIRE(schematic.GetMathChannels().size() == 1);
     const auto compiled = GUI::CompileExpression(schematic.GetMathChannels().front().Expression);
     REQUIRE(compiled.has_value());
-    const auto program = GUI::ResolveNetNames(
-        *compiled, [&schematic](const std::string_view net) { return schematic.GetConnectivity().FindNodeOfNet(net); });
+    const auto program = GUI::ResolveNetNames(*compiled, [&schematic](const std::string_view net) {
+        return schematic.GetConnectivity().FindNodeOfNet(net);
+    });
     REQUIRE(program.has_value());
     const Core::ACSweepRun run = Core::RunACSweep(schematic.BuildCircuit(), schematic.GetSimulationSettings().ACSweep);
     REQUIRE(run.Result.has_value());
@@ -1570,8 +1602,9 @@ TEST_CASE("The transfer function example reads a gain of 0.5 and impedances of 2
     REQUIRE(settings.Selected == GUI::Analysis::TRANSFER_FUNCTION);
     REQUIRE(settings.TransferFunctionOutput.has_value());
 
-    const Core::TransferFunctionRun run = Core::RunTransferFunction(
-        schematic.BuildCircuit(), {.OutputNode = static_cast<int>(NodeAt(schematic, *settings.TransferFunctionOutput)),
+    const Core::TransferFunctionRun run =
+        Core::RunTransferFunction(schematic.BuildCircuit(),
+                                  {.OutputNode = static_cast<int>(NodeAt(schematic, *settings.TransferFunctionOutput)),
                                    .InputSource = settings.TransferFunctionSource});
     REQUIRE(run.Result.has_value());
     // R2 and R3 in parallel make 10k, so R1 and they halve the input; the source sees 10k + 10k and the output node
@@ -1701,14 +1734,13 @@ TEST_CASE("The Sallen-Key sensitivity example ranks the four filter parts at the
         if (part.Name == "R1" || part.Name == "R2" || part.Name == "C1" || part.Name == "C2") {
             const double decibels = part.MagnitudeDecibelsPerPercent[corner].value();
             const double degrees = part.PhaseDegreesPerPercent[corner].value();
-            total +=
-                std::complex<double>(decibels / (20.0 / std::numbers::ln10), degrees / (180.0 / std::numbers::pi)) /
-                0.01;
+            total += std::complex<double>(decibels / (20.0 / std::numbers::ln10), degrees / (180.0 / std::numbers::pi))
+                   / 0.01;
         }
     }
     const std::complex<double> slope =
-        (std::log(sensitivity.Output[corner + 1]) - std::log(sensitivity.Output[corner - 1])) /
-        std::log(sensitivity.Frequencies[corner + 1] / sensitivity.Frequencies[corner - 1]);
+        (std::log(sensitivity.Output[corner + 1]) - std::log(sensitivity.Output[corner - 1]))
+        / std::log(sensitivity.Frequencies[corner + 1] / sensitivity.Frequencies[corner - 1]);
     CHECK_THAT(total.real(), Catch::Matchers::WithinRel(2.0 * slope.real(), 0.02));
     CHECK_THAT(total.imag(), Catch::Matchers::WithinRel(2.0 * slope.imag(), 0.02));
 }

@@ -46,7 +46,9 @@ bool BeginTabBarBefore(const char *id, const float reserved_width) {
     const ImGuiID tab_bar_id = window->GetID(id);
     ImGuiTabBar *tab_bar = context.TabBars.GetOrAddByKey(tab_bar_id);
     const ImVec2 start = window->DC.CursorPos;
-    const ImRect bounds(start.x, start.y, window->WorkRect.Max.x - reserved_width,
+    const ImRect bounds(start.x,
+                        start.y,
+                        window->WorkRect.Max.x - reserved_width,
                         start.y + context.FontSize + context.Style.FramePadding.y * 2.0f);
     tab_bar->ID = tab_bar_id;
     tab_bar->SeparatorMinX = bounds.Min.x - IM_TRUNC(window->WindowPadding.x * 0.5f);
@@ -131,8 +133,11 @@ const char *GetTabTitle(const PlotTab tab) {
  * @param[in] preferences  Whether a new result brings the window to the front, and the wire coloring the Sensitivity
  * tab sets; they must outlive the window.
  */
-OutputWindow::OutputWindow(Schematic &schematic, ResultStore &results, AnalysisControls &controls,
-                           TransientPlayback &playback, Preferences &preferences)
+OutputWindow::OutputWindow(Schematic &schematic,
+                           ResultStore &results,
+                           AnalysisControls &controls,
+                           TransientPlayback &playback,
+                           Preferences &preferences)
     : AppWindow("Output", true), m_Schematic(schematic), m_Results(results), m_Controls(controls), m_Playback(playback),
       m_Preferences(preferences), m_MathChannels(schematic), m_Buses(schematic),
       m_OperatingPointTab(schematic, results), m_TransientTab(schematic, results, controls, playback),
@@ -242,7 +247,8 @@ std::size_t OutputWindow::GetListedNodeCount() const {
     const auto &dc_sweep = m_Results.GetDCSweep();
     const Core::DCSweep *point_steps = m_OperatingPointTab.GetStepSweep();
     const auto &hb = m_Results.GetHarmonicBalance();
-    return std::max({transient ? transient->NodeVoltages.size() : 0, sweep ? sweep->NodeMagnitudesDecibels.size() : 0,
+    return std::max({transient ? transient->NodeVoltages.size() : 0,
+                     sweep ? sweep->NodeMagnitudesDecibels.size() : 0,
                      dc_sweep ? dc_sweep->Curves.front().NodeVoltages.size() : 0,
                      point_steps ? point_steps->Curves.front().NodeVoltages.size() : 0,
                      hb ? hb->NodeWaveforms.size() : 0});
@@ -261,14 +267,19 @@ void OutputWindow::UpdateFullMath() {
         return;
     }
     const std::string signature = m_MathChannels.GetSignature();
-    if (m_FullMath && m_FullMath->DataVersion == m_Results.GetTransientDataVersion() &&
-        m_FullMath->Signature == signature) {
+    if (m_FullMath && m_FullMath->DataVersion == m_Results.GetTransientDataVersion()
+        && m_FullMath->Signature == signature) {
         return;
     }
-    FullMath math{
-        .DataVersion = m_Results.GetTransientDataVersion(), .Signature = signature, .Traces = {}, .Errors = {}};
-    math.Traces = m_MathChannels.Evaluate(transient->Times, {.Seconds = 1}, transient->NodeVoltages,
-                                          transient->Currents, math.Errors);
+    FullMath math{.DataVersion = m_Results.GetTransientDataVersion(),
+                  .Signature = signature,
+                  .Traces = {},
+                  .Errors = {}};
+    math.Traces = m_MathChannels.Evaluate(transient->Times,
+                                          {.Seconds = 1},
+                                          transient->NodeVoltages,
+                                          transient->Currents,
+                                          math.Errors);
     m_FullMath = std::move(math);
 }
 
@@ -306,8 +317,11 @@ FrameResults OutputWindow::EvaluateFrame(const std::size_t node_count,
         const Dimension swept_unit = dc_sweep->SweptUnit == "A" ? Dimension{.Amperes = 1} : Dimension{.Volts = 1};
         for (const Core::DCSweepCurve &curve : dc_sweep->Curves) {
             std::vector<std::string> curve_errors;
-            frame.DCSweepMath.push_back(m_MathChannels.Evaluate(dc_sweep->SweptValues, swept_unit, curve.NodeVoltages,
-                                                                curve.Currents, curve_errors));
+            frame.DCSweepMath.push_back(m_MathChannels.Evaluate(dc_sweep->SweptValues,
+                                                                swept_unit,
+                                                                curve.NodeVoltages,
+                                                                curve.Currents,
+                                                                curve_errors));
             if (frame.DCSweepMath.size() == 1) {
                 frame.DCSweepErrors = std::move(curve_errors);
             }
@@ -334,8 +348,10 @@ void OutputWindow::DrawTraceList(const std::size_t node_count, const std::vector
                 m_Schematic.SetVoltageMeasured(node, *measure_all);
             }
             bool measured = m_Schematic.IsVoltageMeasured(node);
-            if (DrawTraceCheckbox(GetVoltageLabel(m_Schematic.GetConnectivity(), node).c_str(), &measured,
-                                  GetNodeColor(node), TraceStyle::SOLID)) {
+            if (DrawTraceCheckbox(GetVoltageLabel(m_Schematic.GetConnectivity(), node).c_str(),
+                                  &measured,
+                                  GetNodeColor(node),
+                                  TraceStyle::SOLID)) {
                 m_Schematic.SetVoltageMeasured(node, measured);
             }
         }
@@ -350,7 +366,9 @@ void OutputWindow::DrawTraceList(const std::size_t node_count, const std::vector
                 m_Schematic.SetCurrentMeasured(name, *measure_all);
             }
             bool measured = m_Schematic.IsCurrentMeasured(name);
-            if (DrawTraceCheckbox(std::format("I({})", name).c_str(), &measured, GetCurrentColor(index),
+            if (DrawTraceCheckbox(std::format("I({})", name).c_str(),
+                                  &measured,
+                                  GetCurrentColor(index),
                                   TraceStyle::DASHED)) {
                 m_Schematic.SetCurrentMeasured(name, measured);
             }
@@ -422,7 +440,8 @@ bool OutputWindow::DrawTabs(const FrameResults &frame) {
     }
     const TabListing listing = ListTabs(has_content, m_KeptTab);
     for (const PlotTab tab : listing.Shown) {
-        if (!ImGui::BeginTabItem(GetTabLabel(tab), nullptr,
+        if (!ImGui::BeginTabItem(GetTabLabel(tab),
+                                 nullptr,
                                  tab_to_show == tab ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None)) {
             continue;
         }
@@ -544,7 +563,8 @@ void OutputWindow::DrawTab(const PlotTab tab, const FrameResults &frame) {
         break;
     case PlotTab::MONTE_CARLO:
         if (m_MonteCarloTab.Draw()) {
-            m_Exporter.StartText(m_MonteCarloTab.BuildCsv(), m_Schematic.GetFilePath(),
+            m_Exporter.StartText(m_MonteCarloTab.BuildCsv(),
+                                 m_Schematic.GetFilePath(),
                                  GetTabFileSuffix(PlotTab::MONTE_CARLO));
         }
         break;
@@ -563,8 +583,9 @@ void OutputWindow::DrawOtherAnalyses(const float width) {
     const bool is_pressed = ImGui::Button(MORE_LABEL, {width, 0.0f});
     ImGui::EndDisabled();
     ImGui::SetItemTooltip(
-        "%s", std::format("{} other analyses, without a result yet; pick one to see how to run it", m_OtherTabs.size())
-                  .c_str());
+        "%s",
+        std::format("{} other analyses, without a result yet; pick one to see how to run it", m_OtherTabs.size())
+            .c_str());
     if (is_pressed) {
         ImGui::SetNextWindowPos({ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().y});
         ImGui::OpenPopup("other_analyses");
@@ -584,21 +605,26 @@ void OutputWindow::DrawOtherAnalyses(const float width) {
  * @brief   A plain button apart from the tabs, so it does not read as another page; its popup hangs below it, aligned
  *          to its right edge, so it stays inside the window.
  */
-void OutputWindow::DrawExportButton(const ImVec2 tab_row, const float tab_row_width, const float export_width,
+void OutputWindow::DrawExportButton(const ImVec2 tab_row,
+                                    const float tab_row_width,
+                                    const float export_width,
                                     const FrameResults &frame) {
     ImGui::SetCursorScreenPos({tab_row.x + tab_row_width - export_width, tab_row.y});
     if (ImGui::Button(EXPORT_LABEL)) {
         m_Exporter.OpenPopup();
     }
     ImGui::SetItemTooltip("Save the plot of this tab as an SVG image or a CSV table");
-    ImGui::SetNextWindowPos({ImGui::GetItemRectMax().x, ImGui::GetItemRectMax().y}, ImGuiCond_Appearing,
+    ImGui::SetNextWindowPos({ImGui::GetItemRectMax().x, ImGui::GetItemRectMax().y},
+                            ImGuiCond_Appearing,
                             ImVec2(1.0f, 0.0f));
     if (const std::optional<ExportChoice> choice =
             m_Exporter.DrawPopup(GetTabTitle(m_ShownTab), CanExport(frame), HasLongerRun())) {
         const std::string suffix =
             std::format("{}{}", GetTabFileSuffix(m_ShownTab), choice->IsWholeRun ? "-whole-run" : "");
         m_Exporter.Start(BuildShownFigure(frame, choice->IsWholeRun, choice->Format == ExportFormat::CSV),
-                         choice->Format, m_Schematic.GetFilePath(), suffix);
+                         choice->Format,
+                         m_Schematic.GetFilePath(),
+                         suffix);
     }
 }
 
@@ -639,15 +665,15 @@ bool OutputWindow::CanExport(const FrameResults &frame) const {
  */
 bool OutputWindow::HasLongerRun() const {
     const auto &transient = m_Results.GetTransient();
-    return m_ShownTab == PlotTab::TRANSIENT && transient &&
-           transient->Times.size() > m_Playback.Window.GetWindow().Count && !m_Controls.IsRunning();
+    return m_ShownTab == PlotTab::TRANSIENT && transient
+        && transient->Times.size() > m_Playback.Window.GetWindow().Count && !m_Controls.IsRunning();
 }
 
 /**
  * @brief   The figure of the shown tab, which CanExport() has found something to export in.
  */
-ExportFigure OutputWindow::BuildShownFigure(const FrameResults &frame, const bool is_whole_run,
-                                            const bool is_table) const {
+ExportFigure
+OutputWindow::BuildShownFigure(const FrameResults &frame, const bool is_whole_run, const bool is_table) const {
     switch (m_ShownTab) {
     case PlotTab::TRANSIENT:
         return m_TransientTab.BuildFigure(frame, is_whole_run);

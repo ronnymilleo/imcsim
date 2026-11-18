@@ -279,7 +279,8 @@ TEST_CASE("The command line runs the AC sensitivity and writes it in each format
     SECTION("--analysis sens runs both forms when the netlist has both") {
         int code = EXIT_FAILURE;
         const std::string csv = RunCommandLine({"-b", "-f", "csv", "-a", "sens"},
-                                               RcNetlist(".sens v(out)\n.sens v(out) ac dec 1 10 10k"), code);
+                                               RcNetlist(".sens v(out)\n.sens v(out) ac dec 1 10 10k"),
+                                               code);
         REQUIRE(code == EXIT_SUCCESS);
         CHECK(csv.contains("Frequency,Output_re"));
         CHECK(csv.contains("Vector,Value"));
@@ -309,7 +310,8 @@ TEST_CASE("A frequency where the output is zero has no figure: null in the JSON,
                                             "R4 4 0 1k\n"
                                             ".sens v(3,4) ac dec 1 {:.15g} {:.15g}\n"
                                             ".end\n",
-                                            null_frequency / 10.0, null_frequency);
+                                            null_frequency / 10.0,
+                                            null_frequency);
 
     int code = EXIT_FAILURE;
     const std::string csv = RunCommandLine({"-b", "-f", "csv"}, netlist, code);

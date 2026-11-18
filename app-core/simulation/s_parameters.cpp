@@ -35,7 +35,9 @@ constexpr std::string_view ERROR_PREFIX = "ERROR:";
 std::string FormatPortSources(const std::vector<CircuitPort> &ports) {
     std::string lines;
     for (const CircuitPort &port : ports) {
-        lines += std::format("Vsport{0} {1} 0 dc 0 portnum {0} z0 {2}\n", port.Number, port.Node,
+        lines += std::format("Vsport{0} {1} 0 dc 0 portnum {0} z0 {2}\n",
+                             port.Number,
+                             port.Node,
                              FormatSpiceValue(port.ReferenceOhms));
     }
     return lines;
@@ -47,9 +49,11 @@ std::string FormatPortSources(const std::vector<CircuitPort> &ports) {
  * @return  The card, such as ".sp dec 20 1meg 1g" or ".sp lin 101 1meg 1g".
  */
 std::string FormatSParameterAnalysis(const SParameterSettings &settings) {
-    return std::format(".sp {} {} {} {}", settings.IsLogarithmic ? "dec" : "lin",
+    return std::format(".sp {} {} {} {}",
+                       settings.IsLogarithmic ? "dec" : "lin",
                        settings.IsLogarithmic ? settings.PointsPerDecade : settings.LinearPoints,
-                       FormatSpiceValue(settings.StartFrequency), FormatSpiceValue(settings.StopFrequency));
+                       FormatSpiceValue(settings.StartFrequency),
+                       FormatSpiceValue(settings.StopFrequency));
 }
 
 /**

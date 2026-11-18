@@ -90,8 +90,8 @@ protected:
      * @param[in] color      Line color, so the same element can be drawn as a placement preview.
      * @param[in] style      Drawing standard for the symbol; parts drawn alike in both ignore it.
      */
-    virtual void DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color,
-                            SymbolStyle style) const = 0;
+    virtual void
+    DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color, SymbolStyle style) const = 0;
     virtual void DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const;
 
     // Geometry in local grid units, before rotation and translation
@@ -100,8 +100,12 @@ protected:
     virtual LocalBounds GetLocalBounds() const;
 
     // Helpers for derived classes
-    void DrawLabel(SchematicCanvas &canvas, const ViewTransform &view, ImVec2 local_anchor, ImVec2 local_direction,
-                   const std::string &text, ImU32 color) const;
+    void DrawLabel(SchematicCanvas &canvas,
+                   const ViewTransform &view,
+                   ImVec2 local_anchor,
+                   ImVec2 local_direction,
+                   const std::string &text,
+                   ImU32 color) const;
     ImVec2 LocalToScreen(const ViewTransform &view, float x, float y) const;
 
 private:

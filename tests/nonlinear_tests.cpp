@@ -173,7 +173,9 @@ TEST_CASE("An NMOS common-source stage follows the level-1 saturation current") 
 
     Core::NodalysBackend backend;
     const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit, std::nullopt);
-    INFO(std::format("v1={} v2={} v3={}", run.Result->NodeVoltages[1], run.Result->NodeVoltages[2],
+    INFO(std::format("v1={} v2={} v3={}",
+                     run.Result->NodeVoltages[1],
+                     run.Result->NodeVoltages[2],
                      run.Result->NodeVoltages[3]));
     REQUIRE(run.Result.has_value());
     // Theory (mosfet.h): saturation current KP/2 · W/L · (VGS − VTO)² = 1e-5·10·9 = 0.9 mA, so the drain sits

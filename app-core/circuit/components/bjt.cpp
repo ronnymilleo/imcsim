@@ -209,14 +209,14 @@ void BJT::SetCustomParameters(const BJTParameters &parameters) {
  * @return  True when IS, BF, BR, NE and the ratings are positive and everything else is not negative.
  */
 bool BJT::IsValidParameters(const BJTParameters &parameters) const {
-    return parameters.SaturationCurrent > 0.0 && parameters.ForwardBeta > 0.0 && parameters.ReverseBeta > 0.0 &&
-           parameters.EarlyVoltage >= 0.0 && parameters.ForwardKneeCurrent >= 0.0 &&
-           parameters.LeakageSaturationCurrent >= 0.0 && parameters.LeakageEmissionCoefficient > 0.0 &&
-           parameters.BaseResistance >= 0.0 && parameters.CollectorResistance >= 0.0 &&
-           parameters.EmitterResistance >= 0.0 && parameters.EmitterCapacitance >= 0.0 &&
-           parameters.CollectorCapacitance >= 0.0 && parameters.TransitTime >= 0.0 &&
-           parameters.MaxCollectorEmitterVoltage > 0.0 && parameters.MaxCollectorCurrent > 0.0 &&
-           parameters.MaxPower > 0.0;
+    return parameters.SaturationCurrent > 0.0 && parameters.ForwardBeta > 0.0 && parameters.ReverseBeta > 0.0
+        && parameters.EarlyVoltage >= 0.0 && parameters.ForwardKneeCurrent >= 0.0
+        && parameters.LeakageSaturationCurrent >= 0.0 && parameters.LeakageEmissionCoefficient > 0.0
+        && parameters.BaseResistance >= 0.0 && parameters.CollectorResistance >= 0.0
+        && parameters.EmitterResistance >= 0.0 && parameters.EmitterCapacitance >= 0.0
+        && parameters.CollectorCapacitance >= 0.0 && parameters.TransitTime >= 0.0
+        && parameters.MaxCollectorEmitterVoltage > 0.0 && parameters.MaxCollectorCurrent > 0.0
+        && parameters.MaxPower > 0.0;
 }
 
 /**
@@ -291,15 +291,24 @@ const BJTModel *FindBJTModel(const ComponentType type, const std::string_view na
  * @param[in] parameters  Model parameters.
  * @return  The line, newline included, with values in exponent notation and six significant digits.
  */
-std::string FormatBJTModel(const ComponentType type, const std::string_view spice_name,
-                           const BJTParameters &parameters) {
+std::string
+FormatBJTModel(const ComponentType type, const std::string_view spice_name, const BJTParameters &parameters) {
     return std::format(".model {} {}(IS={:.6g} BF={:.6g} BR={:.6g} VAF={:.6g} IKF={:.6g} ISE={:.6g} NE={:.6g} "
                        "RB={:.6g} RC={:.6g} RE={:.6g} CJE={:.6g} CJC={:.6g} TF={:.6g})\n",
-                       spice_name, type == ComponentType::PNP ? "PNP" : "NPN", parameters.SaturationCurrent,
-                       parameters.ForwardBeta, parameters.ReverseBeta, parameters.EarlyVoltage,
-                       parameters.ForwardKneeCurrent, parameters.LeakageSaturationCurrent,
-                       parameters.LeakageEmissionCoefficient, parameters.BaseResistance, parameters.CollectorResistance,
-                       parameters.EmitterResistance, parameters.EmitterCapacitance, parameters.CollectorCapacitance,
+                       spice_name,
+                       type == ComponentType::PNP ? "PNP" : "NPN",
+                       parameters.SaturationCurrent,
+                       parameters.ForwardBeta,
+                       parameters.ReverseBeta,
+                       parameters.EarlyVoltage,
+                       parameters.ForwardKneeCurrent,
+                       parameters.LeakageSaturationCurrent,
+                       parameters.LeakageEmissionCoefficient,
+                       parameters.BaseResistance,
+                       parameters.CollectorResistance,
+                       parameters.EmitterResistance,
+                       parameters.EmitterCapacitance,
+                       parameters.CollectorCapacitance,
                        parameters.TransitTime);
 }
 

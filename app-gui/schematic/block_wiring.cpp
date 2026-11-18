@@ -30,9 +30,9 @@ bool IsInside(const WorldBounds &bounds, const GridPoint point) {
 bool IsOnWire(const UIWire &wire, const GridPoint point) {
     const GridPoint start = wire.GetStart();
     const GridPoint end = wire.GetEnd();
-    return point.X >= std::min(start.X, end.X) && point.X <= std::max(start.X, end.X) &&
-           point.Y >= std::min(start.Y, end.Y) && point.Y <= std::max(start.Y, end.Y) &&
-           (start.X == end.X || start.Y == end.Y);
+    return point.X >= std::min(start.X, end.X) && point.X <= std::max(start.X, end.X)
+        && point.Y >= std::min(start.Y, end.Y) && point.Y <= std::max(start.Y, end.Y)
+        && (start.X == end.X || start.Y == end.Y);
 }
 
 /**
@@ -58,14 +58,16 @@ std::vector<GridPoint> ListPointsInside(const UIWire &wire, const WorldBounds &b
  * @brief   Whether the names of a block at its current spot leave the points its wires start from free.
  * @details A name over a pin point, a terminal or a wire would wall in the routes that start there.
  */
-bool AreNamesClear(const UISubcircuit &block, const std::vector<GridPoint> &pin_points,
-                   const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires) {
+bool AreNamesClear(const UISubcircuit &block,
+                   const std::vector<GridPoint> &pin_points,
+                   const std::vector<std::unique_ptr<UIElement>> &elements,
+                   const std::vector<UIWire> &wires) {
     return std::ranges::none_of(block.GetNameLabelPoints(), [&](const GridPoint point) {
-        return std::ranges::contains(pin_points, point) ||
-               std::ranges::any_of(
+        return std::ranges::contains(pin_points, point)
+            || std::ranges::any_of(
                    elements,
-                   [&](const auto &element) { return std::ranges::contains(element->GetTerminals(), point); }) ||
-               std::ranges::any_of(wires, [&](const UIWire &wire) { return IsOnWire(wire, point); });
+                   [&](const auto &element) { return std::ranges::contains(element->GetTerminals(), point); })
+            || std::ranges::any_of(wires, [&](const UIWire &wire) { return IsOnWire(wire, point); });
     });
 }
 
@@ -76,8 +78,10 @@ bool AreNamesClear(const UISubcircuit &block, const std::vector<GridPoint> &pin_
  *          markers where the terminals end up: the wire there, and what ends on it, lies over the lead. Its names
  *          keep off the same points.
  */
-bool IsFreeSpot(const UISubcircuit &block, const std::vector<GridPoint> &pin_points,
-                const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires) {
+bool IsFreeSpot(const UISubcircuit &block,
+                const std::vector<GridPoint> &pin_points,
+                const std::vector<std::unique_ptr<UIElement>> &elements,
+                const std::vector<UIWire> &wires) {
     if (!AreNamesClear(block, pin_points, elements, wires)) {
         return false;
     }
@@ -106,8 +110,8 @@ bool IsFreeSpot(const UISubcircuit &block, const std::vector<GridPoint> &pin_poi
     };
     for (const auto &element : elements) {
         for (const GridPoint terminal : element->GetTerminals()) {
-            if (IsInside(bounds, terminal) &&
-                !is_on_own_lead(terminal, [&](const GridPoint pin_point) { return pin_point == terminal; })) {
+            if (IsInside(bounds, terminal)
+                && !is_on_own_lead(terminal, [&](const GridPoint pin_point) { return pin_point == terminal; })) {
                 return false;
             }
         }
@@ -149,7 +153,9 @@ std::optional<GridPoint> FindWayOut(const std::vector<UIWire> &wires, const Grid
  * @brief   The wires with the one that runs from a point into a box cut back to the point, and the pieces inside the
  *          box that reach none of its terminals left out.
  */
-std::vector<UIWire> CutAtBox(const std::vector<UIWire> &wires, const GridPoint point, const WorldBounds &box,
+std::vector<UIWire> CutAtBox(const std::vector<UIWire> &wires,
+                             const GridPoint point,
+                             const WorldBounds &box,
                              const std::vector<GridPoint> &terminals) {
     std::vector<UIWire> kept;
     for (const UIWire &wire : wires) {
@@ -180,8 +186,10 @@ std::vector<UIWire> CutAtBox(const std::vector<UIWire> &wires, const GridPoint p
  *          names none at all; the block
  *          stays where it was when no spot within MAX_BLOCK_SHIFT steps is free.
  */
-void MoveToFreeSpot(UISubcircuit &block, const std::vector<GridPoint> &pin_points,
-                    const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires) {
+void MoveToFreeSpot(UISubcircuit &block,
+                    const std::vector<GridPoint> &pin_points,
+                    const std::vector<std::unique_ptr<UIElement>> &elements,
+                    const std::vector<UIWire> &wires) {
     const GridPoint middle = block.GetPosition();
     const auto is_free = [&](const GridPoint position) {
         block.SetPosition(position);
@@ -191,8 +199,8 @@ void MoveToFreeSpot(UISubcircuit &block, const std::vector<GridPoint> &pin_point
         // The spots this many steps away along the grid
         for (int x_shift = -distance; x_shift <= distance; ++x_shift) {
             const int y_shift = distance - std::abs(x_shift);
-            if (is_free({middle.X + x_shift, middle.Y - y_shift}) ||
-                (y_shift != 0 && is_free({middle.X + x_shift, middle.Y + y_shift}))) {
+            if (is_free({middle.X + x_shift, middle.Y - y_shift})
+                || (y_shift != 0 && is_free({middle.X + x_shift, middle.Y + y_shift}))) {
                 return;
             }
         }

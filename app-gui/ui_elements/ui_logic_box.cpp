@@ -68,16 +68,19 @@ void UILogicBox::DrawLead(SchematicCanvas &canvas, const ViewTransform &view, co
 }
 
 void UILogicBox::DrawBox(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
-    const std::array<ImVec2, 4> box = {
-        LocalToScreen(view, -BOX_HALF_WIDTH, BOX_TOP), LocalToScreen(view, BOX_HALF_WIDTH, BOX_TOP),
-        LocalToScreen(view, BOX_HALF_WIDTH, BOX_BOTTOM), LocalToScreen(view, -BOX_HALF_WIDTH, BOX_BOTTOM)};
+    const std::array<ImVec2, 4> box = {LocalToScreen(view, -BOX_HALF_WIDTH, BOX_TOP),
+                                       LocalToScreen(view, BOX_HALF_WIDTH, BOX_TOP),
+                                       LocalToScreen(view, BOX_HALF_WIDTH, BOX_BOTTOM),
+                                       LocalToScreen(view, -BOX_HALF_WIDTH, BOX_BOTTOM)};
     canvas.AddPolyline(box.data(), static_cast<int>(box.size()), color, ImDrawFlags_Closed, LINE_THICKNESS);
 }
 
 /**
  * @brief   The digit in the middle of the box, sized with the zoom and left out when too small to read.
  */
-void UILogicBox::DrawDigit(SchematicCanvas &canvas, const ViewTransform &view, const char *digit,
+void UILogicBox::DrawDigit(SchematicCanvas &canvas,
+                           const ViewTransform &view,
+                           const char *digit,
                            const ImU32 color) const {
     const float middle = (BOX_TOP + BOX_BOTTOM) / 2.0f;
     const ImVec2 center = LocalToScreen(view, 0.0f, middle);

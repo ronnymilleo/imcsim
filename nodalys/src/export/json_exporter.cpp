@@ -258,8 +258,8 @@ std::string ExportJson(const SParameterResult &result) {
         ss << (pt + 1 < result.Frequencies.size() ? "],\n" : "]\n");
     }
     ss << "  ]";
-    if (result.ImpedanceMatrices.size() == result.Frequencies.size() &&
-        result.AdmittanceMatrices.size() == result.Frequencies.size()) {
+    if (result.ImpedanceMatrices.size() == result.Frequencies.size()
+        && result.AdmittanceMatrices.size() == result.Frequencies.size()) {
         ss << ",\n  \"impedance\": ";
         WritePortMatrices(ss, result.ImpedanceMatrices);
         ss << ",\n  \"admittance\": ";

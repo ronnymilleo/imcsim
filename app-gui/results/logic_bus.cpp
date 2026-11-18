@@ -45,8 +45,8 @@ std::optional<int> FindBitNode(const std::string_view bit, const NetResolver &fi
  * @return  The node of each bit, the most significant first; the reason otherwise: a bus with no bits or more than
  *          MAX_BUS_BITS, or a bit that names no node of the result.
  */
-std::expected<std::vector<int>, std::string> ResolveBusBits(const LogicBus &bus, const NetResolver &find_node,
-                                                            const std::size_t node_count) {
+std::expected<std::vector<int>, std::string>
+ResolveBusBits(const LogicBus &bus, const NetResolver &find_node, const std::size_t node_count) {
     if (bus.Bits.empty()) {
         return std::unexpected("Add the signals of its bits");
     }
@@ -73,8 +73,10 @@ std::expected<std::vector<int>, std::string> ResolveBusBits(const LogicBus &bus,
  * @return  The shown buses whose bits all name a node of the result, in order; a bit on a node no logic part is
  *          connected to is read against the usual 5 V.
  */
-std::vector<BusLane> ResolveBusLanes(const std::vector<LogicBus> &buses, const std::vector<LogicNode> &logic_nodes,
-                                     const NetResolver &find_node, const std::size_t node_count) {
+std::vector<BusLane> ResolveBusLanes(const std::vector<LogicBus> &buses,
+                                     const std::vector<LogicNode> &logic_nodes,
+                                     const NetResolver &find_node,
+                                     const std::size_t node_count) {
     std::vector<BusLane> lanes;
     for (const LogicBus &bus : buses) {
         if (!bus.Shown) {
@@ -159,8 +161,8 @@ std::vector<BusSegment> FindBusSegments(const std::span<const double> times, con
  * @return  Such as "1010", "A" or "10", with leading zeros in binary and hexadecimal so every value of a bus is as
  *          wide; "X" while a bit is unknown.
  */
-std::string FormatBusValue(const std::optional<std::uint64_t> value, const std::size_t bit_count,
-                           const BusFormat format) {
+std::string
+FormatBusValue(const std::optional<std::uint64_t> value, const std::size_t bit_count, const BusFormat format) {
     if (!value) {
         return "X";
     }
@@ -168,7 +170,8 @@ std::string FormatBusValue(const std::optional<std::uint64_t> value, const std::
     case BusFormat::BINARY:
         return std::format("{:0{}b}", *value, std::max<std::size_t>(bit_count, 1));
     case BusFormat::HEXADECIMAL:
-        return std::format("{:0{}X}", *value,
+        return std::format("{:0{}X}",
+                           *value,
                            std::max<std::size_t>((bit_count + BITS_PER_HEX_DIGIT - 1) / BITS_PER_HEX_DIGIT, 1));
     case BusFormat::DECIMAL:
     default:
@@ -185,7 +188,8 @@ std::string FormatBusValue(const std::optional<std::uint64_t> value, const std::
  *          so the lane reads as a band pinched at every change; and the value at each point, not a number while a bit
  *          is unknown.
  */
-BusOutline BuildBusOutline(const std::span<const LogicSignal> bits, const std::size_t sample_count,
+BusOutline BuildBusOutline(const std::span<const LogicSignal> bits,
+                           const std::size_t sample_count,
                            const std::size_t lane_position) {
     const double base = static_cast<double>(lane_position) * LANE_STRIDE;
     const double middle = base + (LANE_LOW_OFFSET + LANE_HIGH_OFFSET) / 2.0;

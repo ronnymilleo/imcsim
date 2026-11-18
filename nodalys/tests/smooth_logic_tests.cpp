@@ -325,7 +325,8 @@ TEST_CASE("The asynchronous set and reset of a D flip-flop override the clock an
 
     // Runs a transient of a flip-flop whose D is 5 V, clocked at 20 ns and 60 ns, with the given set and reset
     // pulses, and returns the voltage of Q and Q_bar at the given instants
-    const auto run = [&](const Nodalys::PulseParameters &set, const Nodalys::PulseParameters &reset,
+    const auto run = [&](const Nodalys::PulseParameters &set,
+                         const Nodalys::PulseParameters &reset,
                          const std::vector<double> &instants) {
         Nodalys::CircuitBuilder builder;
         builder.AddVdc("V_D", D, Nodalys::GROUND_NODE, SUPPLY);

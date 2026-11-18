@@ -102,8 +102,8 @@ bool LogicBuses::DrawEditor(LogicBus &bus, const std::vector<std::string> &signa
     ImGui::SetNextItemWidth(ImGui::GetFontSize() * EDITOR_FIELD_WIDTH);
     std::string name = bus.Name;
     // A name another bus has, or none, is not taken, so the list never shows two alike
-    if (ImGui::InputText("Name", &name, ImGuiInputTextFlags_CharsNoBlank) && !name.empty() &&
-        !std::ranges::contains(m_Schematic.GetBuses(), name, &LogicBus::Name)) {
+    if (ImGui::InputText("Name", &name, ImGuiInputTextFlags_CharsNoBlank) && !name.empty()
+        && !std::ranges::contains(m_Schematic.GetBuses(), name, &LogicBus::Name)) {
         bus.Name = name;
     }
     for (std::size_t index = 0; index < BUS_FORMATS.size(); ++index) {

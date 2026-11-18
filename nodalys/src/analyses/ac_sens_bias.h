@@ -42,9 +42,11 @@ std::vector<JacobianDerivative> FindJacobianDerivatives(const CompiledCircuit &c
                                                         const std::vector<double> &x_dc);
 
 // Bias weights
-std::vector<std::complex<double>> FindBiasWeights(const std::vector<JacobianDerivative> &derivatives, std::size_t size,
+std::vector<std::complex<double>> FindBiasWeights(const std::vector<JacobianDerivative> &derivatives,
+                                                  std::size_t size,
                                                   const std::vector<std::complex<double>> &adjoint,
-                                                  const std::vector<std::complex<double>> &x_ac, double omega);
+                                                  const std::vector<std::complex<double>> &x_ac,
+                                                  double omega);
 
 } // namespace Nodalys
 

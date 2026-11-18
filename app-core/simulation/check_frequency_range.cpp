@@ -25,8 +25,8 @@ constexpr int MAX_POINTS_PER_DECADE = 1000;
  * @param[in] points_per_decade  Points in each decade.
  * @return  What is wrong with the range, in words for the user, or no value when nothing is.
  */
-std::optional<std::string> CheckFrequencyRange(const double start_frequency, const double stop_frequency,
-                                               const int points_per_decade) {
+std::optional<std::string>
+CheckFrequencyRange(const double start_frequency, const double stop_frequency, const int points_per_decade) {
     if (start_frequency <= 0.0) {
         return "The start frequency must be positive";
     }

@@ -45,18 +45,22 @@ constexpr auto SEVEN_SEGMENT_FIELDS = std::to_array<ParameterField<Core::SevenSe
 void LoadLogicFields(LogicFields &fields, const Core::Component &component) {
     const Core::ComponentType type = component.GetType();
     if (Core::IsLogicPart(type)) {
-        LoadParameterFields(LOGIC_FIELDS, fields.Logic,
+        LoadParameterFields(LOGIC_FIELDS,
+                            fields.Logic,
                             static_cast<const Core::LogicPart &>(component).GetParameters());
     } else if (type == Core::ComponentType::CLOCK) {
         LoadParameterFields(CLOCK_FIELDS, fields.Clock, static_cast<const Core::Clock &>(component).GetParameters());
     } else if (type == Core::ComponentType::LOGIC_INPUT) {
-        LoadParameterFields(LOGIC_INPUT_FIELDS, fields.Input,
+        LoadParameterFields(LOGIC_INPUT_FIELDS,
+                            fields.Input,
                             static_cast<const Core::LogicInput &>(component).GetParameters());
     } else if (type == Core::ComponentType::LOGIC_OUTPUT) {
-        LoadParameterFields(LOGIC_OUTPUT_FIELDS, fields.Output,
+        LoadParameterFields(LOGIC_OUTPUT_FIELDS,
+                            fields.Output,
                             static_cast<const Core::LogicOutput &>(component).GetParameters());
     } else if (type == Core::ComponentType::SEVEN_SEGMENT) {
-        LoadParameterFields(SEVEN_SEGMENT_FIELDS, fields.SevenSegment,
+        LoadParameterFields(SEVEN_SEGMENT_FIELDS,
+                            fields.SevenSegment,
                             static_cast<const Core::SevenSegmentDisplay &>(component).GetParameters());
     }
 }
@@ -79,8 +83,8 @@ void DrawLogicPart(Core::LogicPart &part, LogicFields &fields, Schematic &schema
         DrawFieldLabel("Inputs");
         if (ImGui::BeginCombo("##inputs", std::to_string(input_count).c_str())) {
             for (int candidate = Core::MIN_LOGIC_INPUTS; candidate <= Core::MAX_LOGIC_INPUTS; ++candidate) {
-                if (ImGui::Selectable(std::to_string(candidate).c_str(), candidate == input_count) &&
-                    candidate != input_count) {
+                if (ImGui::Selectable(std::to_string(candidate).c_str(), candidate == input_count)
+                    && candidate != input_count) {
                     part.SetInputCount(candidate);
                     schematic.MarkModified();
                 }

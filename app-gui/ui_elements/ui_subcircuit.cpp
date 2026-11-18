@@ -35,8 +35,9 @@ const Core::SubcircuitInstance &Instance(const Core::Component &component) {
 }
 
 int CountPins(const Core::SubcircuitInstance &instance, const Core::PinSide side) {
-    return static_cast<int>(std::ranges::count_if(
-        instance.GetPins(), [&](const std::string &pin) { return instance.GetPinSide(pin) == side; }));
+    return static_cast<int>(std::ranges::count_if(instance.GetPins(), [&](const std::string &pin) {
+        return instance.GetPinSide(pin) == side;
+    }));
 }
 
 /// The half sizes of the box, in whole units so the terminals land on the grid: tall enough for the pins of the fuller
@@ -126,18 +127,23 @@ void UISubcircuit::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &v
     for (const GridPoint pin : GetLocalTerminals()) {
         const ImVec2 edge = GetEdgePoint(pin, box);
         canvas.AddLine(LocalToScreen(view, static_cast<float>(pin.X), static_cast<float>(pin.Y)),
-                       LocalToScreen(view, edge.x, edge.y), color, LINE_THICKNESS);
+                       LocalToScreen(view, edge.x, edge.y),
+                       color,
+                       LINE_THICKNESS);
     }
 }
 
-void UISubcircuit::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
+void UISubcircuit::DrawSymbol(SchematicCanvas &canvas,
+                              const ViewTransform &view,
+                              const ImU32 color,
                               const SymbolStyle) const {
     const BoxSize box = MeasureBox(Instance(GetComponent()));
     const auto half_width = static_cast<float>(box.HalfWidth);
     const auto half_height = static_cast<float>(box.HalfHeight);
-    const std::array corners = {
-        LocalToScreen(view, -half_width, -half_height), LocalToScreen(view, half_width, -half_height),
-        LocalToScreen(view, half_width, half_height), LocalToScreen(view, -half_width, half_height)};
+    const std::array corners = {LocalToScreen(view, -half_width, -half_height),
+                                LocalToScreen(view, half_width, -half_height),
+                                LocalToScreen(view, half_width, half_height),
+                                LocalToScreen(view, -half_width, half_height)};
     canvas.AddPolyline(corners.data(), static_cast<int>(corners.size()), color, ImDrawFlags_Closed, LINE_THICKNESS);
 }
 
@@ -156,8 +162,12 @@ void UISubcircuit::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view
         // From the edge toward the middle of the box
         const ImVec2 inward = {edge.x - static_cast<float>(terminals[pin].X),
                                edge.y - static_cast<float>(terminals[pin].Y)};
-        DrawLabel(canvas, view, {edge.x + inward.x * PIN_LABEL_INSET, edge.y + inward.y * PIN_LABEL_INSET}, inward,
-                  instance.GetPins()[pin], color);
+        DrawLabel(canvas,
+                  view,
+                  {edge.x + inward.x * PIN_LABEL_INSET, edge.y + inward.y * PIN_LABEL_INSET},
+                  inward,
+                  instance.GetPins()[pin],
+                  color);
     }
 }
 

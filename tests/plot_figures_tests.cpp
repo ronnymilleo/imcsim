@@ -20,8 +20,11 @@ TEST_CASE("The Bode figure exports math channels on both panels, an impedance on
     sweep.Frequencies = {10.0, 100.0, 1000.0};
     sweep.NodeMagnitudesDecibels = {{}, {0.0, 0.0, 0.0}};
     sweep.NodePhasesDegrees = {{}, {0.0, 0.0, 0.0}};
-    const GUI::MathTrace magnitude{
-        .Label = "M1: V(1)/I(R1)", .Values = {60.0, 60.0, 60.0}, .Unit = "Ohm", .Axis = ImAxis_Y3, .Color = 0};
+    const GUI::MathTrace magnitude{.Label = "M1: V(1)/I(R1)",
+                                   .Values = {60.0, 60.0, 60.0},
+                                   .Unit = "Ohm",
+                                   .Axis = ImAxis_Y3,
+                                   .Color = 0};
     GUI::MathTrace phase = magnitude;
     phase.Values = {-45.0, -45.0, -45.0};
     const GUI::ACMathTraces math{.Magnitudes = {magnitude}, .Phases = {phase}};

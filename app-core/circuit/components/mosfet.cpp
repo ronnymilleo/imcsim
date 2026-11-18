@@ -164,11 +164,11 @@ void MOSFET::SetCustomParameters(const MOSFETParameters &parameters) {
  *          may have either sign, so depletion parts can be modeled too.
  */
 bool MOSFET::IsValidParameters(const MOSFETParameters &parameters) const {
-    return parameters.Transconductance > 0.0 && parameters.ChannelModulation >= 0.0 &&
-           parameters.DrainResistance >= 0.0 && parameters.SourceResistance >= 0.0 &&
-           parameters.GateSourceOverlap >= 0.0 && parameters.GateDrainOverlap >= 0.0 && parameters.Width > 0.0 &&
-           parameters.Length > 0.0 && parameters.MaxDrainSourceVoltage > 0.0 && parameters.MaxGateSourceVoltage > 0.0 &&
-           parameters.MaxDrainCurrent > 0.0 && parameters.MaxPower > 0.0;
+    return parameters.Transconductance > 0.0 && parameters.ChannelModulation >= 0.0 && parameters.DrainResistance >= 0.0
+        && parameters.SourceResistance >= 0.0 && parameters.GateSourceOverlap >= 0.0
+        && parameters.GateDrainOverlap >= 0.0 && parameters.Width > 0.0 && parameters.Length > 0.0
+        && parameters.MaxDrainSourceVoltage > 0.0 && parameters.MaxGateSourceVoltage > 0.0
+        && parameters.MaxDrainCurrent > 0.0 && parameters.MaxPower > 0.0;
 }
 
 /**
@@ -243,13 +243,19 @@ const MOSFETModel *FindMOSFETModel(const ComponentType type, const std::string_v
  * @param[in] parameters  Model parameters; W and L go on the MOSFET line instead, since SPICE sets them per part.
  * @return  The line, newline included, with values in exponent notation and six significant digits.
  */
-std::string FormatMOSFETModel(const ComponentType type, const std::string_view spice_name,
-                              const MOSFETParameters &parameters) {
+std::string
+FormatMOSFETModel(const ComponentType type, const std::string_view spice_name, const MOSFETParameters &parameters) {
     return std::format(".model {} {}(LEVEL=1 VTO={:.6g} KP={:.6g} LAMBDA={:.6g} RD={:.6g} RS={:.6g} CGSO={:.6g} "
                        "CGDO={:.6g})\n",
-                       spice_name, type == ComponentType::PMOS ? "PMOS" : "NMOS", parameters.ThresholdVoltage,
-                       parameters.Transconductance, parameters.ChannelModulation, parameters.DrainResistance,
-                       parameters.SourceResistance, parameters.GateSourceOverlap, parameters.GateDrainOverlap);
+                       spice_name,
+                       type == ComponentType::PMOS ? "PMOS" : "NMOS",
+                       parameters.ThresholdVoltage,
+                       parameters.Transconductance,
+                       parameters.ChannelModulation,
+                       parameters.DrainResistance,
+                       parameters.SourceResistance,
+                       parameters.GateSourceOverlap,
+                       parameters.GateDrainOverlap);
 }
 
 } // namespace Core

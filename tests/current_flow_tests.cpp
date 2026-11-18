@@ -15,17 +15,18 @@
 
 namespace {
 
-std::unique_ptr<GUI::UIElement> Part(const Core::ComponentType type, const GUI::GridPoint position,
-                                     const std::string &name) {
+std::unique_ptr<GUI::UIElement>
+Part(const Core::ComponentType type, const GUI::GridPoint position, const std::string &name) {
     auto element = GUI::CreateElement(type, position, GUI::Rotation::R0);
     element->GetComponent().SetName(name);
     return element;
 }
 
-const GUI::WireCurrent &FindPiece(const std::vector<GUI::WireCurrent> &pieces, const GUI::GridPoint start,
-                                  const GUI::GridPoint end) {
-    const auto piece = std::ranges::find_if(
-        pieces, [&](const GUI::WireCurrent &candidate) { return candidate.Start == start && candidate.End == end; });
+const GUI::WireCurrent &
+FindPiece(const std::vector<GUI::WireCurrent> &pieces, const GUI::GridPoint start, const GUI::GridPoint end) {
+    const auto piece = std::ranges::find_if(pieces, [&](const GUI::WireCurrent &candidate) {
+        return candidate.Start == start && candidate.End == end;
+    });
     REQUIRE(piece != pieces.end());
     return *piece;
 }
@@ -121,8 +122,10 @@ TEST_CASE("Control pins and the op-amp pins other than the output carry no curre
 
 TEST_CASE("A relay and a transformer have a current per pair of terminals, opposite at the two ends",
           "[current_flow]") {
-    const std::vector<Core::ComponentCurrent> currents = {
-        {"K1.S", 2e-3}, {"K1.C", 7e-2}, {"T1.P", 0.5}, {"T1.S", -0.25}};
+    const std::vector<Core::ComponentCurrent> currents = {{"K1.S", 2e-3},
+                                                          {"K1.C", 7e-2},
+                                                          {"T1.P", 0.5},
+                                                          {"T1.S", -0.25}};
     const auto relay = Part(Core::ComponentType::RELAY, {0, 0}, "K1");
     // Contact terminals 0 and 1, coil terminals 2 and 3
     CHECK(GUI::GetTerminalCurrent(relay->GetComponent(), 0, currents) == 2e-3);

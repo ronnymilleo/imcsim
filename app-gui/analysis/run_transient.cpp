@@ -21,7 +21,8 @@ namespace GUI {
  * @brief   A live run is a transient that goes on to its limit at the pace the settings give, unless the user stops it
  *          first.
  */
-void AnalysisControls::RunTransientAnalysis(const Core::Circuit &circuit, const std::optional<StepPlan> &steps,
+void AnalysisControls::RunTransientAnalysis(const Core::Circuit &circuit,
+                                            const std::optional<StepPlan> &steps,
                                             const std::optional<Core::MonteCarloSettings> &monte_carlo) {
     const Core::TransientSettings settings = m_Schematic.GetSimulationSettings().Transient;
     m_IsLiveResult = false;
@@ -31,14 +32,18 @@ void AnalysisControls::RunTransientAnalysis(const Core::Circuit &circuit, const 
                      circuit,
                      [settings, monte_carlo = *monte_carlo](const Core::Circuit &copy, Core::RunControl &control) {
                          return RunMonteCarlo<Core::Transient>(
-                             monte_carlo, copy, control,
+                             monte_carlo,
+                             copy,
+                             control,
                              [&](const Core::Circuit &varied) { return Core::RunTransient(varied, settings); },
                              MeasureTransient);
                      },
                      [this](MonteCarloRuns<Core::Transient> runs) {
                          Finish(
                              Analysis::TRANSIENT,
-                             StoreMonteCarlo(std::move(runs.Family), std::move(runs.Table), m_Results,
+                             StoreMonteCarlo(std::move(runs.Family),
+                                             std::move(runs.Table),
+                                             m_Results,
                                              [this](auto family) { m_Results.SetTransientSteps(std::move(family)); }),
                              std::move(runs.Messages));
                      }));
@@ -49,7 +54,10 @@ void AnalysisControls::RunTransientAnalysis(const Core::Circuit &circuit, const 
                  MakeJob<SteppedRuns<Core::Transient>>(
                      circuit,
                      [settings, plan = *steps](const Core::Circuit &copy, Core::RunControl &control) {
-                         return RunSteps<Core::Transient>(plan.Settings, plan.Unit, plan.Values, control,
+                         return RunSteps<Core::Transient>(plan.Settings,
+                                                          plan.Unit,
+                                                          plan.Values,
+                                                          control,
                                                           [&](const Core::ParameterValue &value) {
                                                               return Core::RunTransient(copy, settings, value);
                                                           });
@@ -92,7 +100,9 @@ void AnalysisControls::RunTransientAnalysis(const Core::Circuit &circuit, const 
                                  }
                              });
                      };
-                     return Core::RunTransient(copy, run_settings, std::nullopt,
+                     return Core::RunTransient(copy,
+                                               run_settings,
+                                               std::nullopt,
                                                {.Control = &control, .OnChunk = post_chunk, .LivePace = pace});
                  },
                  [this, is_live](Core::TransientRun run) {

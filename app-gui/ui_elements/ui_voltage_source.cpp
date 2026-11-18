@@ -32,7 +32,9 @@ UIVoltageSource::UIVoltageSource(const GridPoint position, const Rotation rotati
  * @brief   The positive terminal is the first one, at x = -2.
  * @details AC and pulse sources show their waveform instead of signs.
  */
-void UIVoltageSource::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
+void UIVoltageSource::DrawSymbol(SchematicCanvas &canvas,
+                                 const ViewTransform &view,
+                                 const ImU32 color,
                                  const SymbolStyle style) const {
     DrawCircle(canvas, view, color);
     if (DrawWaveform(canvas, view, color)) {
@@ -41,24 +43,34 @@ void UIVoltageSource::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &v
 
     if (style == SymbolStyle::IEC) {
         // IEC draws the conductor through the circle and marks the positive side outside it
-        canvas.AddLine(LocalToScreen(view, -CIRCLE_RADIUS, 0), LocalToScreen(view, CIRCLE_RADIUS, 0), color,
+        canvas.AddLine(LocalToScreen(view, -CIRCLE_RADIUS, 0),
+                       LocalToScreen(view, CIRCLE_RADIUS, 0),
+                       color,
                        LINE_THICKNESS);
         canvas.AddLine(LocalToScreen(view, -IEC_PLUS_POSITION - SIGN_HALF_SIZE, -IEC_PLUS_HEIGHT),
-                       LocalToScreen(view, -IEC_PLUS_POSITION + SIGN_HALF_SIZE, -IEC_PLUS_HEIGHT), color,
+                       LocalToScreen(view, -IEC_PLUS_POSITION + SIGN_HALF_SIZE, -IEC_PLUS_HEIGHT),
+                       color,
                        LINE_THICKNESS);
         canvas.AddLine(LocalToScreen(view, -IEC_PLUS_POSITION, -IEC_PLUS_HEIGHT - SIGN_HALF_SIZE),
-                       LocalToScreen(view, -IEC_PLUS_POSITION, -IEC_PLUS_HEIGHT + SIGN_HALF_SIZE), color,
+                       LocalToScreen(view, -IEC_PLUS_POSITION, -IEC_PLUS_HEIGHT + SIGN_HALF_SIZE),
+                       color,
                        LINE_THICKNESS);
         return;
     }
 
     // The minus bar is drawn across the axis, so it reads as a minus when the source stands vertically
     canvas.AddLine(LocalToScreen(view, -SIGN_OFFSET - SIGN_HALF_SIZE, 0),
-                   LocalToScreen(view, -SIGN_OFFSET + SIGN_HALF_SIZE, 0), color, LINE_THICKNESS);
+                   LocalToScreen(view, -SIGN_OFFSET + SIGN_HALF_SIZE, 0),
+                   color,
+                   LINE_THICKNESS);
     canvas.AddLine(LocalToScreen(view, -SIGN_OFFSET, -SIGN_HALF_SIZE),
-                   LocalToScreen(view, -SIGN_OFFSET, SIGN_HALF_SIZE), color, LINE_THICKNESS);
-    canvas.AddLine(LocalToScreen(view, SIGN_OFFSET, -SIGN_HALF_SIZE), LocalToScreen(view, SIGN_OFFSET, SIGN_HALF_SIZE),
-                   color, LINE_THICKNESS);
+                   LocalToScreen(view, -SIGN_OFFSET, SIGN_HALF_SIZE),
+                   color,
+                   LINE_THICKNESS);
+    canvas.AddLine(LocalToScreen(view, SIGN_OFFSET, -SIGN_HALF_SIZE),
+                   LocalToScreen(view, SIGN_OFFSET, SIGN_HALF_SIZE),
+                   color,
+                   LINE_THICKNESS);
 }
 
 } // namespace GUI

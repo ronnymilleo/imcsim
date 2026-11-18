@@ -45,7 +45,9 @@ UIElement::UIElement(std::unique_ptr<Core::Component> component, const GridPoint
  * @param[in] color      Line color, so the same element can be drawn as a placement preview.
  * @param[in] style      Drawing standard for the symbol.
  */
-void UIElement::Draw(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
+void UIElement::Draw(SchematicCanvas &canvas,
+                     const ViewTransform &view,
+                     const ImU32 color,
                      const SymbolStyle style) const {
     DrawTerminals(canvas, view, color);
     DrawSymbol(canvas, view, color, style);
@@ -61,7 +63,10 @@ void UIElement::Draw(SchematicCanvas &canvas, const ViewTransform &view, const I
  * @param[in] style      Drawing standard for the symbol.
  * @note    Meant for an unrotated, unmirrored element, such as a newly created one.
  */
-void UIElement::DrawIcon(SchematicCanvas &canvas, const ImVec2 center, const float size, const ImU32 color,
+void UIElement::DrawIcon(SchematicCanvas &canvas,
+                         const ImVec2 center,
+                         const float size,
+                         const ImU32 color,
                          const SymbolStyle style) const {
     const LocalBounds bounds = GetLocalBounds();
     const ImVec2 extent = {bounds.Max.x - bounds.Min.x, bounds.Max.y - bounds.Min.y};
@@ -85,8 +90,10 @@ void UIElement::DrawOutline(SchematicCanvas &canvas, const ViewTransform &view, 
     const float top = bounds.Min.y - OUTLINE_PADDING;
     const float right = bounds.Max.x + OUTLINE_PADDING;
     const float bottom = bounds.Max.y + OUTLINE_PADDING;
-    const std::array<ImVec2, 4> corners = {LocalToScreen(view, left, top), LocalToScreen(view, right, top),
-                                           LocalToScreen(view, right, bottom), LocalToScreen(view, left, bottom)};
+    const std::array<ImVec2, 4> corners = {LocalToScreen(view, left, top),
+                                           LocalToScreen(view, right, top),
+                                           LocalToScreen(view, right, bottom),
+                                           LocalToScreen(view, left, bottom)};
     canvas.AddPolyline(corners.data(), static_cast<int>(corners.size()), color, ImDrawFlags_Closed, LINE_THICKNESS);
 }
 
@@ -289,8 +296,12 @@ LocalBounds UIElement::GetLocalBounds() const {
  * @brief   ImGui text cannot rotate, so the text stays upright and is pushed from the anchor along the rotated
  *          direction until it no longer overlaps the anchor, whatever the element rotation.
  */
-void UIElement::DrawLabel(SchematicCanvas &canvas, const ViewTransform &view, const ImVec2 local_anchor,
-                          const ImVec2 local_direction, const std::string &text, const ImU32 color) const {
+void UIElement::DrawLabel(SchematicCanvas &canvas,
+                          const ViewTransform &view,
+                          const ImVec2 local_anchor,
+                          const ImVec2 local_direction,
+                          const std::string &text,
+                          const ImU32 color) const {
     if (text.empty()) {
         return;
     }

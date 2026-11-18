@@ -87,15 +87,23 @@ TEST_CASE("Real cosine/sine harmonic transforms preserve exact trigonometric sig
     constexpr int H = 8;
     // x(t) = 1.25 + 2.0*cos(w*t) - 1.5*sin(w*t) + 0.7*cos(3*w*t) + 0.4*sin(7*w*t)
     const std::vector<double> expected_coeffs = {
-        1.25,       // DC
-        2.0,  -1.5, // k = 1
-        0.0,  0.0,  // k = 2
-        0.7,  0.0,  // k = 3
-        0.0,  0.0,  // k = 4
-        0.0,  0.0,  // k = 5
-        0.0,  0.0,  // k = 6
-        0.0,  0.4,  // k = 7
-        0.0,  0.0,  // k = 8
+        1.25, // DC
+        2.0,
+        -1.5, // k = 1
+        0.0,
+        0.0, // k = 2
+        0.7,
+        0.0, // k = 3
+        0.0,
+        0.0, // k = 4
+        0.0,
+        0.0, // k = 5
+        0.0,
+        0.0, // k = 6
+        0.0,
+        0.4, // k = 7
+        0.0,
+        0.0, // k = 8
     };
 
     std::vector<double> samples;
@@ -104,8 +112,8 @@ TEST_CASE("Real cosine/sine harmonic transforms preserve exact trigonometric sig
 
     for (std::size_t m = 0; m < M; ++m) {
         const double theta = 2.0 * std::numbers::pi * static_cast<double>(m) / static_cast<double>(M);
-        const double direct = 1.25 + 2.0 * std::cos(theta) - 1.5 * std::sin(theta) + 0.7 * std::cos(3.0 * theta) +
-                              0.4 * std::sin(7.0 * theta);
+        const double direct = 1.25 + 2.0 * std::cos(theta) - 1.5 * std::sin(theta) + 0.7 * std::cos(3.0 * theta)
+                            + 0.4 * std::sin(7.0 * theta);
         CHECK_THAT(samples[m], WithinAbs(direct, 1e-12));
     }
 

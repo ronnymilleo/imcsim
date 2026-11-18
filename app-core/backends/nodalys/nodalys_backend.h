@@ -26,11 +26,15 @@ public:
 
     OperatingPointRun RunOperatingPoint(const Circuit &circuit,
                                         const std::optional<double> &temperature_celsius) override;
-    TransientRun RunTransient(const Circuit &circuit, const TransientSettings &settings,
-                              const std::optional<double> &temperature_celsius, const RunMonitor &monitor) override;
-    DCSweepRun RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings,
+    TransientRun RunTransient(const Circuit &circuit,
+                              const TransientSettings &settings,
+                              const std::optional<double> &temperature_celsius,
+                              const RunMonitor &monitor) override;
+    DCSweepRun RunDCSweep(const Circuit &circuit,
+                          const DCSweepSettings &settings,
                           const std::optional<double> &temperature_celsius) override;
-    ACSweepRun RunACSweep(const Circuit &circuit, const ACSweepSettings &settings,
+    ACSweepRun RunACSweep(const Circuit &circuit,
+                          const ACSweepSettings &settings,
                           const std::optional<double> &temperature_celsius) override;
     NoiseRun RunNoise(const Circuit &circuit, const NoiseSettings &settings) override;
     TransferFunctionRun RunTransferFunction(const Circuit &circuit, const TransferFunctionSettings &settings) override;
@@ -38,8 +42,8 @@ public:
     ACSensitivityRun RunACSensitivity(const Circuit &circuit, const ACSensitivitySettings &settings) override;
     PoleZeroRun RunPoleZero(const Circuit &circuit, const PoleZeroSettings &settings) override;
     SParametersRun RunSParameters(const Circuit &circuit, const SParameterSettings &settings) override;
-    HarmonicBalanceRun RunHarmonicBalance(const Circuit &circuit, const HarmonicBalanceSettings &settings,
-                                          RunControl *control) override;
+    HarmonicBalanceRun
+    RunHarmonicBalance(const Circuit &circuit, const HarmonicBalanceSettings &settings, RunControl *control) override;
 
 private:
     BackendCapabilities m_Capabilities;

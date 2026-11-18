@@ -58,8 +58,8 @@ Arguments SplitArguments(const std::vector<std::string> &tokens, const std::size
     Arguments arguments;
     for (std::size_t index = first; index < tokens.size(); ++index) {
         const std::size_t equals = tokens[index].find('=');
-        const bool is_option = equals != std::string::npos && equals > 0 && tokens[index].front() != '{' &&
-                               tokens[index].front() != '\'' && tokens[index].find('(') > equals;
+        const bool is_option = equals != std::string::npos && equals > 0 && tokens[index].front() != '{'
+                            && tokens[index].front() != '\'' && tokens[index].find('(') > equals;
         if (is_option) {
             arguments.Options[ToUpper(tokens[index].substr(0, equals))] = tokens[index].substr(equals + 1);
         } else {
@@ -107,8 +107,10 @@ struct PassiveValues {
     double InitialCondition = 0.0;
 };
 
-std::expected<PassiveValues, std::string> ReadPassive(const TextScope &scope, const ElementLine &element,
-                                                      const std::string_view value_option, const bool has_initial) {
+std::expected<PassiveValues, std::string> ReadPassive(const TextScope &scope,
+                                                      const ElementLine &element,
+                                                      const std::string_view value_option,
+                                                      const bool has_initial) {
     if (const Result nodes = CheckNodeCount(element, 2); !nodes) {
         return std::unexpected(nodes.error());
     }
@@ -123,7 +125,7 @@ std::expected<PassiveValues, std::string> ReadPassive(const TextScope &scope, co
     }
     const auto option = arguments.Options.find(std::string(value_option));
     const std::string *text = option != arguments.Options.end() ? &option->second
-                              : !arguments.Positional.empty()   ? &arguments.Positional.front()
+                            : !arguments.Positional.empty()     ? &arguments.Positional.front()
                                                                 : nullptr;
     if (text == nullptr) {
         return std::unexpected("it has no value");
@@ -149,7 +151,9 @@ Result AddResistorLine(ExpansionContext &context, TextScope &scope, const Elemen
     if (!values) {
         return std::unexpected(values.error());
     }
-    context.Builder.AddResistor(element.Name, Node(context, scope, element, 0), Node(context, scope, element, 1),
+    context.Builder.AddResistor(element.Name,
+                                Node(context, scope, element, 0),
+                                Node(context, scope, element, 1),
                                 values->Value);
     return {};
 }
@@ -159,8 +163,11 @@ Result AddCapacitorLine(ExpansionContext &context, TextScope &scope, const Eleme
     if (!values) {
         return std::unexpected(values.error());
     }
-    context.Builder.AddCapacitor(element.Name, Node(context, scope, element, 0), Node(context, scope, element, 1),
-                                 values->Value, values->InitialCondition);
+    context.Builder.AddCapacitor(element.Name,
+                                 Node(context, scope, element, 0),
+                                 Node(context, scope, element, 1),
+                                 values->Value,
+                                 values->InitialCondition);
     return {};
 }
 
@@ -169,8 +176,11 @@ Result AddInductorLine(ExpansionContext &context, TextScope &scope, const Elemen
     if (!values) {
         return std::unexpected(values.error());
     }
-    context.Builder.AddInductor(element.Name, Node(context, scope, element, 0), Node(context, scope, element, 1),
-                                values->Value, values->InitialCondition);
+    context.Builder.AddInductor(element.Name,
+                                Node(context, scope, element, 0),
+                                Node(context, scope, element, 1),
+                                values->Value,
+                                values->InitialCondition);
     return {};
 }
 
@@ -197,8 +207,8 @@ Result ReadInto(const TextScope &scope, const std::string &text, double &target)
 /**
  * @brief   Reads the magnitude after the word AC, at index, and the phase when a value follows it.
  */
-Result ReadAcValues(const TextScope &scope, const std::vector<std::string> &tokens, std::size_t &index,
-                    SourceValues &values) {
+Result
+ReadAcValues(const TextScope &scope, const std::vector<std::string> &tokens, std::size_t &index, SourceValues &values) {
     Result done = ReadInto(scope, tokens[index + 1], values.Levels.AcMagnitude);
     index += 2;
     if (done && index < tokens.size() && scope.Evaluate(tokens[index])) {
@@ -232,7 +242,9 @@ Result ReadWaveformValues(const TextScope &scope, const std::string &token, std:
  * @brief   Reads the word of a source line at index, with the value that belongs to it, and moves index past them.
  * @return  Nothing, or why the word cannot be simulated: anything but a DC value, an AC value or a waveform.
  */
-Result ReadSourceWord(const TextScope &scope, const std::vector<std::string> &tokens, std::size_t &index,
+Result ReadSourceWord(const TextScope &scope,
+                      const std::vector<std::string> &tokens,
+                      std::size_t &index,
                       SourceValues &values) {
     const std::string upper = ToUpper(tokens[index]);
     const bool has_next = index + 1 < tokens.size();
@@ -287,8 +299,14 @@ Result AddSourceLine(ExpansionContext &context, TextScope &scope, const ElementL
     }
     const NodeId positive = Node(context, scope, element, 0);
     const NodeId negative = Node(context, scope, element, 1);
-    AddWaveformSource(context.Builder, element.Name, is_voltage, positive, negative, values->Waveform,
-                      values->WaveformValues, values->Levels);
+    AddWaveformSource(context.Builder,
+                      element.Name,
+                      is_voltage,
+                      positive,
+                      negative,
+                      values->Waveform,
+                      values->WaveformValues,
+                      values->Levels);
     if (context.OnSource) {
         context.OnSource(element.Name, positive, negative);
     }
@@ -307,10 +325,11 @@ Result AddCurrentSourceLine(ExpansionContext &context, TextScope &scope, const E
  * @brief   Writes an expression of the text for the builder: parameters replaced by their values, nodes by their
  *          numbers and the sources whose current it reads by the names they have in the circuit.
  */
-std::expected<std::string, std::string> ResolveExpression(ExpansionContext &context, TextScope &scope,
-                                                          const std::string_view text) {
-    const std::string substituted = SubstituteParameters(
-        StripValueBrackets(text), [&scope](const std::string &name) { return scope.FindParameter(name); });
+std::expected<std::string, std::string>
+ResolveExpression(ExpansionContext &context, TextScope &scope, const std::string_view text) {
+    const std::string substituted = SubstituteParameters(StripValueBrackets(text), [&scope](const std::string &name) {
+        return scope.FindParameter(name);
+    });
     const auto expression = Expression::Parse(substituted);
     if (!expression) {
         return std::unexpected(std::format("the expression '{}' is not understood: {}", text, expression.error()));
@@ -331,7 +350,8 @@ std::expected<std::string, std::string> ResolveExpression(ExpansionContext &cont
         } else if (reference.Input.Second.empty()) {
             resolved += std::format("v({})", scope.ResolveNode(context, reference.Input.First));
         } else {
-            resolved += std::format("v({},{})", scope.ResolveNode(context, reference.Input.First),
+            resolved += std::format("v({},{})",
+                                    scope.ResolveNode(context, reference.Input.First),
                                     scope.ResolveNode(context, reference.Input.Second));
         }
     }
@@ -342,8 +362,11 @@ std::expected<std::string, std::string> ResolveExpression(ExpansionContext &cont
 /**
  * @brief   Adds a source whose output is an expression, from the text after the equals sign of its line.
  */
-Result AddExpressionSource(ExpansionContext &context, TextScope &scope, const ElementLine &element,
-                           const bool is_voltage, const std::string_view expression_text) {
+Result AddExpressionSource(ExpansionContext &context,
+                           TextScope &scope,
+                           const ElementLine &element,
+                           const bool is_voltage,
+                           const std::string_view expression_text) {
     const auto expression = ResolveExpression(context, scope, expression_text);
     if (!expression) {
         return std::unexpected(expression.error());
@@ -373,9 +396,9 @@ Result AddBehavioralLine(ExpansionContext &context, TextScope &scope, const Elem
     const std::size_t equals = element.Text.find('=');
     const std::string_view before = equals == std::string_view::npos ? element.Text : element.Text.substr(0, equals);
     const std::string_view kind = TrimSpaces(before);
-    if (equals == std::string_view::npos || kind.empty() ||
-        (std::toupper(static_cast<unsigned char>(kind.back())) != 'V' &&
-         std::toupper(static_cast<unsigned char>(kind.back())) != 'I')) {
+    if (equals == std::string_view::npos || kind.empty()
+        || (std::toupper(static_cast<unsigned char>(kind.back())) != 'V'
+            && std::toupper(static_cast<unsigned char>(kind.back())) != 'I')) {
         return std::unexpected("a behavioral source is written B<name> <node> <node> V=<expression> or I=<expression>");
     }
     const bool is_voltage = std::toupper(static_cast<unsigned char>(kind.back())) == 'V';
@@ -385,7 +408,9 @@ Result AddBehavioralLine(ExpansionContext &context, TextScope &scope, const Elem
 /**
  * @brief   Adds the voltage-controlled source E or G: a gain between two nodes, or "VALUE = expression".
  */
-Result AddVoltageControlledLine(ExpansionContext &context, TextScope &scope, const ElementLine &element,
+Result AddVoltageControlledLine(ExpansionContext &context,
+                                TextScope &scope,
+                                const ElementLine &element,
                                 const bool is_voltage) {
     if (const Result nodes = CheckNodeCount(element, 3); !nodes) {
         return nodes;
@@ -394,8 +419,8 @@ Result AddVoltageControlledLine(ExpansionContext &context, TextScope &scope, con
     if (third.starts_with("VALUE")) {
         return AddExpressionSource(context, scope, element, is_voltage, FindExpressionText(element.Text));
     }
-    if (third.starts_with("POLY") || third.starts_with("TABLE") || third.starts_with("LAPLACE") ||
-        third.starts_with("FREQ") || third.starts_with("CUR")) {
+    if (third.starts_with("POLY") || third.starts_with("TABLE") || third.starts_with("LAPLACE")
+        || third.starts_with("FREQ") || third.starts_with("CUR")) {
         return std::unexpected(std::format("the form '{}' of a controlled source is not simulated, only a gain and "
                                            "VALUE={{expression}}",
                                            element.Tokens[FIRST_NODE_INDEX + 2].substr(0, third.find('('))));
@@ -431,7 +456,9 @@ Result AddVccsLine(ExpansionContext &context, TextScope &scope, const ElementLin
 /**
  * @brief   Adds the current-controlled source F or H, which reads the current of a voltage source of the subcircuit.
  */
-Result AddCurrentControlledLine(ExpansionContext &context, TextScope &scope, const ElementLine &element,
+Result AddCurrentControlledLine(ExpansionContext &context,
+                                TextScope &scope,
+                                const ElementLine &element,
                                 const bool is_voltage) {
     constexpr std::size_t NODES_SOURCE_AND_GAIN = 4;
     if (const Result nodes = CheckNodeCount(element, 3); !nodes) {
@@ -475,8 +502,8 @@ Result AddCccsLine(ExpansionContext &context, TextScope &scope, const ElementLin
 /**
  * @brief   Reads the area of a diode or a bipolar transistor, given as the word after its model or as AREA=.
  */
-std::expected<double, std::string> ReadArea(const TextScope &scope, const Arguments &arguments,
-                                            const std::size_t area_position) {
+std::expected<double, std::string>
+ReadArea(const TextScope &scope, const Arguments &arguments, const std::size_t area_position) {
     if (const Result checked = CheckOptions(arguments, {"AREA"}); !checked) {
         return std::unexpected(checked.error());
     }
@@ -508,8 +535,11 @@ Result AddDiodeLine(ExpansionContext &context, TextScope &scope, const ElementLi
     std::set<std::string> read_keys;
     const DiodeParameters parameters = BuildDiodeParameters((*model)->Card, &read_keys);
     ReportIgnoredParameters(context, **model, read_keys);
-    context.Builder.AddDiode(element.Name, Node(context, scope, element, 0), Node(context, scope, element, 1),
-                             parameters, *area);
+    context.Builder.AddDiode(element.Name,
+                             Node(context, scope, element, 0),
+                             Node(context, scope, element, 1),
+                             parameters,
+                             *area);
     return {};
 }
 
@@ -519,11 +549,12 @@ Result AddBjtLine(ExpansionContext &context, TextScope &scope, const ElementLine
         return nodes;
     }
     // The fourth word is the model, unless the model is the fifth and the fourth is the substrate node
-    const std::size_t model_index = scope.FindModel(ToUpper(element.Tokens[FIRST_NODE_INDEX + NODES])) == nullptr &&
-                                            element.Tokens.size() > FIRST_NODE_INDEX + NODES + 1
-                                        ? FIRST_NODE_INDEX + NODES + 1
-                                        : FIRST_NODE_INDEX + NODES;
-    const auto model = UseTextModel(scope, element.Tokens[model_index],
+    const std::size_t model_index = scope.FindModel(ToUpper(element.Tokens[FIRST_NODE_INDEX + NODES])) == nullptr
+                                         && element.Tokens.size() > FIRST_NODE_INDEX + NODES + 1
+                                      ? FIRST_NODE_INDEX + NODES + 1
+                                      : FIRST_NODE_INDEX + NODES;
+    const auto model = UseTextModel(scope,
+                                    element.Tokens[model_index],
                                     {ParsedModel::ModelKind::BJT_NPN, ParsedModel::ModelKind::BJT_PNP});
     if (!model) {
         return std::unexpected(model.error());
@@ -535,9 +566,13 @@ Result AddBjtLine(ExpansionContext &context, TextScope &scope, const ElementLine
     std::set<std::string> read_keys;
     const BjtParameters parameters = BuildBjtParameters((*model)->Card, &read_keys);
     ReportIgnoredParameters(context, **model, read_keys);
-    context.Builder.AddBjt(element.Name, Node(context, scope, element, 0), Node(context, scope, element, 1),
-                           Node(context, scope, element, 2), (*model)->Card.Kind != ParsedModel::ModelKind::BJT_PNP,
-                           parameters, *area);
+    context.Builder.AddBjt(element.Name,
+                           Node(context, scope, element, 0),
+                           Node(context, scope, element, 1),
+                           Node(context, scope, element, 2),
+                           (*model)->Card.Kind != ParsedModel::ModelKind::BJT_PNP,
+                           parameters,
+                           *area);
     return {};
 }
 
@@ -546,7 +581,8 @@ Result AddMosfetLine(ExpansionContext &context, TextScope &scope, const ElementL
     if (const Result nodes = CheckNodeCount(element, NODES + 1); !nodes) {
         return nodes;
     }
-    const auto model = UseTextModel(scope, element.Tokens[FIRST_NODE_INDEX + NODES],
+    const auto model = UseTextModel(scope,
+                                    element.Tokens[FIRST_NODE_INDEX + NODES],
                                     {ParsedModel::ModelKind::MOSFET_NMOS, ParsedModel::ModelKind::MOSFET_PMOS});
     if (!model) {
         return std::unexpected(model.error());
@@ -568,9 +604,13 @@ Result AddMosfetLine(ExpansionContext &context, TextScope &scope, const ElementL
         (key == "L" ? parameters.Length : parameters.Width) = *value;
     }
     ReportIgnoredParameters(context, **model, read_keys);
-    context.Builder.AddMosfet(element.Name, Node(context, scope, element, 0), Node(context, scope, element, 1),
-                              Node(context, scope, element, 2), Node(context, scope, element, 3),
-                              (*model)->Card.Kind != ParsedModel::ModelKind::MOSFET_PMOS, parameters);
+    context.Builder.AddMosfet(element.Name,
+                              Node(context, scope, element, 0),
+                              Node(context, scope, element, 1),
+                              Node(context, scope, element, 2),
+                              Node(context, scope, element, 3),
+                              (*model)->Card.Kind != ParsedModel::ModelKind::MOSFET_PMOS,
+                              parameters);
     return {};
 }
 
@@ -591,9 +631,12 @@ Result AddSwitchLine(ExpansionContext &context, TextScope &scope, const ElementL
     std::set<std::string> read_keys;
     const SwitchParameters parameters = BuildSwitchParameters((*model)->Card, &read_keys);
     ReportIgnoredParameters(context, **model, read_keys);
-    context.Builder.AddVoltageControlledSwitch(element.Name, Node(context, scope, element, 0),
-                                               Node(context, scope, element, 1), Node(context, scope, element, 2),
-                                               Node(context, scope, element, 3), parameters);
+    context.Builder.AddVoltageControlledSwitch(element.Name,
+                                               Node(context, scope, element, 0),
+                                               Node(context, scope, element, 1),
+                                               Node(context, scope, element, 2),
+                                               Node(context, scope, element, 3),
+                                               parameters);
     return {};
 }
 
@@ -630,10 +673,20 @@ std::string_view DescribeUnsupportedLetter(const char letter) {
  */
 const std::map<char, Handler> &GetHandlers() {
     static const std::map<char, Handler> handlers{
-        {'R', AddResistorLine},      {'C', AddCapacitorLine},  {'L', AddInductorLine}, {'V', AddVoltageSourceLine},
-        {'I', AddCurrentSourceLine}, {'E', AddVcvsLine},       {'G', AddVccsLine},     {'H', AddCcvsLine},
-        {'F', AddCccsLine},          {'B', AddBehavioralLine}, {'D', AddDiodeLine},    {'Q', AddBjtLine},
-        {'M', AddMosfetLine},        {'S', AddSwitchLine},
+        {'R', AddResistorLine},
+        {'C', AddCapacitorLine},
+        {'L', AddInductorLine},
+        {'V', AddVoltageSourceLine},
+        {'I', AddCurrentSourceLine},
+        {'E', AddVcvsLine},
+        {'G', AddVccsLine},
+        {'H', AddCcvsLine},
+        {'F', AddCccsLine},
+        {'B', AddBehavioralLine},
+        {'D', AddDiodeLine},
+        {'Q', AddBjtLine},
+        {'M', AddMosfetLine},
+        {'S', AddSwitchLine},
     };
     return handlers;
 }
@@ -662,15 +715,19 @@ void NoteVoltageSource(TextScope &scope, const std::vector<std::string> &tokens)
  * @param[in]     tokens   Tokens of the line, the first being the element name.
  * @return  Nothing when the element was added, or why the engine cannot simulate it.
  */
-std::expected<void, std::string> AddTextElement(ExpansionContext &context, TextScope &scope,
-                                                const std::string_view line, const std::vector<std::string> &tokens) {
+std::expected<void, std::string> AddTextElement(ExpansionContext &context,
+                                                TextScope &scope,
+                                                const std::string_view line,
+                                                const std::vector<std::string> &tokens) {
     const char letter = static_cast<char>(std::toupper(static_cast<unsigned char>(tokens[0].front())));
     const auto handler = GetHandlers().find(letter);
     if (handler == GetHandlers().end()) {
-        return std::unexpected(std::format("elements that start with {} ({}) are not simulated by Nodalys", letter,
+        return std::unexpected(std::format("elements that start with {} ({}) are not simulated by Nodalys",
+                                           letter,
                                            DescribeUnsupportedLetter(letter)));
     }
-    return handler->second(context, scope,
+    return handler->second(context,
+                           scope,
                            ElementLine{.Text = line, .Tokens = tokens, .Name = scope.MakeName(tokens[0])});
 }
 

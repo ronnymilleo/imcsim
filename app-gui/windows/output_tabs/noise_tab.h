@@ -47,7 +47,9 @@ private:
     std::vector<std::string> m_PlottedContributions;
 
     void DrawPlot(const Core::Noise &noise);
-    void SetupAxes(const Core::Noise &noise, bool input_shown, const std::string &output_unit,
+    void SetupAxes(const Core::Noise &noise,
+                   bool input_shown,
+                   const std::string &output_unit,
                    const std::string &input_unit);
     void DrawStatistics(const Core::Noise &noise);
 };

@@ -27,7 +27,9 @@ void DrawStatistic(const char *name, const std::string &value);
 void DrawMeasuredValue(const char *name, double value, double scale, const char *unit);
 bool BeginStatisticsTable(const std::string &id);
 void DrawStatisticsHeader(const char *span_text);
-void DrawTraceTable(const char *id, const std::vector<PlottedTrace> &traces, const std::vector<StatisticsRow> &rows,
+void DrawTraceTable(const char *id,
+                    const std::vector<PlottedTrace> &traces,
+                    const std::vector<StatisticsRow> &rows,
                     const CursorReadings &cursor_readings);
 void DrawWithStatistics(const std::function<void()> &draw_plots, const std::function<void()> &draw_statistics);
 

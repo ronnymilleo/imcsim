@@ -224,7 +224,9 @@ std::optional<std::string> FindRootMismatch(const SmallSignalSystem &system, con
     }
     return std::format("The poles and zeros found do not rebuild the response of the circuit (they are off by {:.3g} "
                        "dB and {:.3g} degrees around {:.3g} Hz), so one may be missing or misplaced",
-                       worst.Decibels, worst.Degrees, worst.Omega / (2.0 * std::numbers::pi));
+                       worst.Decibels,
+                       worst.Degrees,
+                       worst.Omega / (2.0 * std::numbers::pi));
 }
 
 } // namespace Nodalys

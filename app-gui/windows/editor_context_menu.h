@@ -39,7 +39,11 @@ struct ContextMenuServices {
 class EditorContextMenu {
 public:
     // Opening
-    void HandleRightClick(Schematic &schematic, EditorMode &mode, const ViewTransform &view, float zoom, bool hovered,
+    void HandleRightClick(Schematic &schematic,
+                          EditorMode &mode,
+                          const ViewTransform &view,
+                          float zoom,
+                          bool hovered,
                           PartPopover &popover);
 
     // Drawing

@@ -35,11 +35,19 @@ enum class PlotTab {
 };
 
 /// Every tab, in the order of the tab bar.
-inline constexpr std::array<PlotTab, 13> PLOT_TABS = {
-    PlotTab::OPERATING_POINT, PlotTab::TRANSIENT,    PlotTab::SPECTRUM,          PlotTab::AC_SWEEP,
-    PlotTab::DC_SWEEP,        PlotTab::NOISE,        PlotTab::TRANSFER_FUNCTION, PlotTab::SENSITIVITY,
-    PlotTab::POLE_ZERO,       PlotTab::S_PARAMETERS, PlotTab::TRUTH_TABLE,       PlotTab::HARMONIC_BALANCE,
-    PlotTab::MONTE_CARLO};
+inline constexpr std::array<PlotTab, 13> PLOT_TABS = {PlotTab::OPERATING_POINT,
+                                                      PlotTab::TRANSIENT,
+                                                      PlotTab::SPECTRUM,
+                                                      PlotTab::AC_SWEEP,
+                                                      PlotTab::DC_SWEEP,
+                                                      PlotTab::NOISE,
+                                                      PlotTab::TRANSFER_FUNCTION,
+                                                      PlotTab::SENSITIVITY,
+                                                      PlotTab::POLE_ZERO,
+                                                      PlotTab::S_PARAMETERS,
+                                                      PlotTab::TRUTH_TABLE,
+                                                      PlotTab::HARMONIC_BALANCE,
+                                                      PlotTab::MONTE_CARLO};
 
 /// Whether each tab has a result to show, indexed by the tab.
 using TabResults = std::array<bool, PLOT_TABS.size()>;

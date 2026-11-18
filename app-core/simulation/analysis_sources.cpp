@@ -23,8 +23,8 @@ namespace {
  *          DC value the analysis replaces.
  */
 bool IsSweepable(const ComponentType type) {
-    return type == ComponentType::VCC || type == ComponentType::VOLTAGE_SOURCE ||
-           type == ComponentType::CURRENT_SOURCE || type == ComponentType::CLOCK || type == ComponentType::LOGIC_INPUT;
+    return type == ComponentType::VCC || type == ComponentType::VOLTAGE_SOURCE || type == ComponentType::CURRENT_SOURCE
+        || type == ComponentType::CLOCK || type == ComponentType::LOGIC_INPUT;
 }
 
 /**
@@ -32,8 +32,8 @@ bool IsSweepable(const ComponentType type) {
  */
 bool IsNoiseInput(const Component &component) {
     const ComponentType type = component.GetType();
-    return (type == ComponentType::VOLTAGE_SOURCE || type == ComponentType::CURRENT_SOURCE) &&
-           static_cast<const Source &>(component).GetSourceType() == Source::SourceType::AC;
+    return (type == ComponentType::VOLTAGE_SOURCE || type == ComponentType::CURRENT_SOURCE)
+        && static_cast<const Source &>(component).GetSourceType() == Source::SourceType::AC;
 }
 
 } // namespace

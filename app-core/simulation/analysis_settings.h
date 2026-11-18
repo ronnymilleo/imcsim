@@ -200,7 +200,7 @@ inline constexpr std::size_t MAX_TRUTH_TABLE_INPUTS = 10;
 /// Most harmonics asked from a Harmonic Balance run; larger counts grow the harmonic Jacobian quadratically.
 inline constexpr int MAX_HARMONIC_BALANCE_HARMONICS = 64;
 /// Most time samples per fundamental period a harmonic balance may ask for.
-inline constexpr int MAX_HARMONIC_BALANCE_SAMPLES = 65536;
+inline constexpr int MAX_HARMONIC_BALANCE_SAMPLES = 65'536;
 /// Relative distance from a multiple of the fundamental within which a source frequency still counts as a harmonic.
 inline constexpr double HARMONIC_RATIO_TOLERANCE = 1e-6;
 

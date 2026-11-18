@@ -85,8 +85,9 @@ TEST_CASE("A behavioral source that squares a swept voltage follows the square a
     builder.AddVdc("V1", 1, 0, 0.0);
     builder.AddBehavioralVoltage("B1", 2, 0, "v(1) ^ 2");
     builder.AddResistor("R1", 2, 0, 1e3);
-    const auto sweep = Nodalys::ComputeDCSweep(
-        Build(builder), {.SweptSource = "V1", .SweptStart = -2.0, .SweptStop = 2.0, .SweptStep = 0.25});
+    const auto sweep =
+        Nodalys::ComputeDCSweep(Build(builder),
+                                {.SweptSource = "V1", .SweptStart = -2.0, .SweptStop = 2.0, .SweptStep = 0.25});
     REQUIRE(sweep.has_value());
     REQUIRE(sweep->SweptValues.size() == 17);
     for (std::size_t index = 0; index < sweep->SweptValues.size(); ++index) {
@@ -145,7 +146,8 @@ TEST_CASE("A behavioral source reading the voltage of a capacitor integrates wit
     // A start at 1 nV, which is how a capacitor is told to start from its own voltage and not from the operating point
     builder.AddCapacitor("C1", 1, 0, 1e-6, 1e-9);
     const auto result = Nodalys::ComputeTransient(
-        Build(builder), {.StopTime = 6e-3, .TimeStep = 20e-6, .MaxStep = 20e-6, .UseInitialConditions = true});
+        Build(builder),
+        {.StopTime = 6e-3, .TimeStep = 20e-6, .MaxStep = 20e-6, .UseInitialConditions = true});
     REQUIRE(result.has_value());
     const double time_constant = 2e-3;
     for (std::size_t index = 0; index < result->Times.size(); ++index) {

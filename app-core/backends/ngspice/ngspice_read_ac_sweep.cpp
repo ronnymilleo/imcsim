@@ -53,13 +53,14 @@ void AddACCurrent(std::string name, const std::vector<std::complex<double>> &cur
 
 // Voltage across the part times its admittance: 1/R for a resistor, j*2*pi*f*C for a capacitor
 std::vector<std::complex<double>>
-PassiveACCurrent(const CircuitEntry &entry, const std::vector<double> &frequencies,
+PassiveACCurrent(const CircuitEntry &entry,
+                 const std::vector<double> &frequencies,
                  const std::vector<std::vector<std::complex<double>>> &node_voltages) {
     const Component &component = *entry.Part;
     std::vector<std::complex<double>> currents(frequencies.size());
     for (std::size_t index = 0; index < frequencies.size(); ++index) {
-        const std::complex<double> voltage = node_voltages[static_cast<std::size_t>(entry.Nodes[0])][index] -
-                                             node_voltages[static_cast<std::size_t>(entry.Nodes[1])][index];
+        const std::complex<double> voltage = node_voltages[static_cast<std::size_t>(entry.Nodes[0])][index]
+                                           - node_voltages[static_cast<std::size_t>(entry.Nodes[1])][index];
         const std::complex<double> admittance =
             component.GetType() == ComponentType::RESISTOR
                 ? std::complex<double>(1.0 / component.GetValue(), 0.0)
@@ -79,8 +80,10 @@ std::vector<std::complex<double>> CurrentSourceACCurrent(const Component &compon
 }
 
 bool HasACBranchCurrent(const ComponentType type) {
-    static constexpr std::array BRANCH_CURRENT_TYPES = {ComponentType::INDUCTOR, ComponentType::VCC,
-                                                        ComponentType::VOLTAGE_SOURCE, ComponentType::CLOCK,
+    static constexpr std::array BRANCH_CURRENT_TYPES = {ComponentType::INDUCTOR,
+                                                        ComponentType::VCC,
+                                                        ComponentType::VOLTAGE_SOURCE,
+                                                        ComponentType::CLOCK,
                                                         ComponentType::LOGIC_INPUT};
     return std::ranges::contains(BRANCH_CURRENT_TYPES, type);
 }
@@ -89,7 +92,8 @@ bool HasACBranchCurrent(const ComponentType type) {
 // their node voltages and values; inductors and voltage sources have their branch current in the results. Probed
 // parts are read from their probes instead
 std::expected<std::vector<std::complex<double>>, std::string>
-ACCurrent(const CircuitEntry &entry, const std::vector<double> &frequencies,
+ACCurrent(const CircuitEntry &entry,
+          const std::vector<double> &frequencies,
           const std::vector<std::vector<std::complex<double>>> &node_voltages) {
     const Component &component = *entry.Part;
     const ComponentType type = component.GetType();
@@ -100,7 +104,8 @@ ACCurrent(const CircuitEntry &entry, const std::vector<double> &frequencies,
         return CurrentSourceACCurrent(component, frequencies.size());
     }
     if (HasACBranchCurrent(type)) {
-        return ReadComplexVectorOfLength(BranchVectorName(component.GetName()), frequencies.size(),
+        return ReadComplexVectorOfLength(BranchVectorName(component.GetName()),
+                                         frequencies.size(),
                                          std::format("currents for {}", component.GetName()));
     }
     return std::unexpected(std::format("{} carries no current", component.GetName()));
@@ -128,13 +133,15 @@ std::expected<ACSweep, std::string> ReadACSweep(const Circuit &circuit) {
     result.NodeMagnitudesDecibels.resize(node_voltages.size());
     result.NodePhasesDegrees.resize(node_voltages.size());
     for (std::size_t node = 1; node < node_voltages.size(); ++node) {
-        auto voltages = ReadComplexVectorOfLength(std::format("v({})", node), point_count,
+        auto voltages = ReadComplexVectorOfLength(std::format("v({})", node),
+                                                  point_count,
                                                   std::format("response for node {}", node));
         if (!voltages) {
             return std::unexpected(voltages.error());
         }
         node_voltages[node] = std::move(*voltages);
-        std::ranges::transform(node_voltages[node], std::back_inserter(result.NodeMagnitudesDecibels[node]),
+        std::ranges::transform(node_voltages[node],
+                               std::back_inserter(result.NodeMagnitudesDecibels[node]),
                                ToDecibels);
         std::ranges::transform(node_voltages[node], std::back_inserter(result.NodePhasesDegrees[node]), ToDegrees);
     }
@@ -143,7 +150,8 @@ std::expected<ACSweep, std::string> ReadACSweep(const Circuit &circuit) {
         const std::vector<CurrentVector> vectors = CurrentVectors(*entry.Part);
         if (!GetCurrentProbes(*entry.Part).empty()) {
             for (const CurrentVector &current : vectors) {
-                const auto currents = ReadComplexVectorOfLength(current.VectorName, point_count,
+                const auto currents = ReadComplexVectorOfLength(current.VectorName,
+                                                                point_count,
                                                                 std::format("currents for {}", current.TraceName));
                 if (!currents) {
                     return std::unexpected(currents.error());

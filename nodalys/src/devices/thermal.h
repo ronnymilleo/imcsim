@@ -54,11 +54,13 @@ double GetFourKt(const ThermalConditions &thermal);
 
 // Laws
 double GetBandGap(double temperature_kelvin);
-double GetSaturationCurrentLogRatio(const ThermalConditions &thermal, double energy_gap,
-                                    double saturation_current_exponent);
+double
+GetSaturationCurrentLogRatio(const ThermalConditions &thermal, double energy_gap, double saturation_current_exponent);
 double GetJunctionPotential(const ThermalConditions &thermal, double potential_at_nominal);
-double GetJunctionCapacitance(const ThermalConditions &thermal, double capacitance_at_nominal,
-                              double potential_at_nominal, double grading_coefficient);
+double GetJunctionCapacitance(const ThermalConditions &thermal,
+                              double capacitance_at_nominal,
+                              double potential_at_nominal,
+                              double grading_coefficient);
 
 } // namespace Nodalys
 

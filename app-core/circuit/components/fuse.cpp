@@ -64,8 +64,8 @@ void Fuse::SetParameters(const FuseParameters &parameters) {
  *          resistance is above the cold one.
  */
 bool Fuse::IsValidParameters(const FuseParameters &parameters) {
-    return parameters.RatedCurrent > 0.0 && parameters.MeltingI2t > 0.0 && parameters.ColdResistance > 0.0 &&
-           parameters.BlownResistance > parameters.ColdResistance;
+    return parameters.RatedCurrent > 0.0 && parameters.MeltingI2t > 0.0 && parameters.ColdResistance > 0.0
+        && parameters.BlownResistance > parameters.ColdResistance;
 }
 
 /**

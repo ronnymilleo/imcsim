@@ -13,9 +13,11 @@ TEST_CASE("Changing the case of a text touches the ASCII letters only", "[text_c
     CHECK(Nodalys::ToUpper("").empty());
     // Bytes above 127 belong to UTF-8 sequences, such as the micro sign, and must come out unchanged
     CHECK(Nodalys::ToLower("4.7\xC2\xB5"
-                           "F") == "4.7\xC2\xB5"
-                                   "f");
+                           "F")
+          == "4.7\xC2\xB5"
+             "f");
     CHECK(Nodalys::ToUpper("4.7\xC2\xB5"
-                           "f") == "4.7\xC2\xB5"
-                                   "F");
+                           "f")
+          == "4.7\xC2\xB5"
+             "F");
 }

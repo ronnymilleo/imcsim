@@ -108,7 +108,8 @@ double FuseDevice::TerminalCurrent(const int terminal, const std::vector<double>
     return terminal == 0 ? current : -current;
 }
 
-std::complex<double> FuseDevice::AcTerminalCurrent(const int terminal, const std::vector<double> & /*x_dc*/,
+std::complex<double> FuseDevice::AcTerminalCurrent(const int terminal,
+                                                   const std::vector<double> & /*x_dc*/,
                                                    const std::vector<std::complex<double>> &x_ac,
                                                    const double /*omega*/) const {
     const std::complex<double> voltage = AcNodeVoltage(x_ac, m_NodeA) - AcNodeVoltage(x_ac, m_NodeB);
@@ -151,8 +152,8 @@ double FuseDevice::NextBreakpoint(const double time) const {
     if (m_Accepted.IsBlown) {
         next = m_Accepted.BlowTime + OPENING_TIME_SHARE * m_CoolingTimeConstant;
     } else if (m_Accepted.Power > BLOW_HEAT && m_Accepted.Heat < BLOW_HEAT) {
-        next = m_Accepted.Time -
-               m_CoolingTimeConstant * std::log((m_Accepted.Power - BLOW_HEAT) / (m_Accepted.Power - m_Accepted.Heat));
+        next = m_Accepted.Time
+             - m_CoolingTimeConstant * std::log((m_Accepted.Power - BLOW_HEAT) / (m_Accepted.Power - m_Accepted.Heat));
     }
     return next - time >= min_gap ? next : std::numeric_limits<double>::infinity();
 }

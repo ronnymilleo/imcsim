@@ -104,8 +104,8 @@ void GlowRenderer::AddGlows(ImDrawList *draw_list, const std::span<const Glow> g
     const auto texture = static_cast<ImTextureID>(reinterpret_cast<std::intptr_t>(m_Texture));
     for (const Glow &glow : glows) {
         const ImVec2 extent = {glow.Radius, glow.Radius};
-        draw_list->AddImage(texture, glow.Center - extent, glow.Center + extent, {0.0f, 0.0f}, {1.0f, 1.0f},
-                            glow.Color);
+        draw_list
+            ->AddImage(texture, glow.Center - extent, glow.Center + extent, {0.0f, 0.0f}, {1.0f, 1.0f}, glow.Color);
     }
     if (switch_pipeline) {
         // The backend binds its own pipeline, buffers and viewport again

@@ -26,8 +26,11 @@ constexpr float WIRE_CURSOR_HALF_SIZE = 4.0f;
  */
 std::optional<MeasurementTarget> FindTargetAt(const ModeInput &input) {
     Schematic &schematic = input.Blocks.GetShown();
-    return FindMeasurementTarget(schematic.GetElements(), schematic.GetWires(), schematic.GetConnectivity(),
-                                 input.View.ToWorld(ImGui::GetIO().MousePos), WIRE_PICK_DISTANCE / input.Zoom);
+    return FindMeasurementTarget(schematic.GetElements(),
+                                 schematic.GetWires(),
+                                 schematic.GetConnectivity(),
+                                 input.View.ToWorld(ImGui::GetIO().MousePos),
+                                 WIRE_PICK_DISTANCE / input.Zoom);
 }
 
 /**
@@ -40,10 +43,11 @@ bool HandlePastingKeys(PastedGroup &group) {
     }
     if (ImGui::IsKeyPressed(ImGuiKey_M)) {
         const bool top_to_bottom = ImGui::GetIO().KeyShift;
-        TransformGroup(group, {.Type = top_to_bottom ? PointTransform::Kind::MIRROR_TOP_BOTTOM
-                                                     : PointTransform::Kind::MIRROR_LEFT_RIGHT,
-                               .Delta = {},
-                               .Pivot = {}});
+        TransformGroup(
+            group,
+            {.Type = top_to_bottom ? PointTransform::Kind::MIRROR_TOP_BOTTOM : PointTransform::Kind::MIRROR_LEFT_RIGHT,
+             .Delta = {},
+             .Pivot = {}});
     }
     return ImGui::IsKeyPressed(ImGuiKey_Escape);
 }
@@ -55,7 +59,8 @@ void DrawWirePreview(const WiringMode &mode, const ModeInput &input, const GridP
     if (!mode.Start) {
         const ImVec2 cursor_on_screen = input.View.ToScreen(ToVec2(cursor));
         const ImVec2 half_size = {WIRE_CURSOR_HALF_SIZE, WIRE_CURSOR_HALF_SIZE};
-        ImGui::GetWindowDrawList()->AddRect(cursor_on_screen - half_size, cursor_on_screen + half_size,
+        ImGui::GetWindowDrawList()->AddRect(cursor_on_screen - half_size,
+                                            cursor_on_screen + half_size,
                                             GetPreviewColor());
     } else {
         const GridPoint corner = FindWireCorner(*mode.Start, cursor, input.IsWireVerticalFirst);
@@ -181,14 +186,18 @@ std::optional<EditorMode> HandleMode(ProbingMode & /*mode*/, const ModeInput &in
     }
     const bool measured =
         target->Node ? schematic.IsVoltageMeasured(*target->Node) : schematic.IsCurrentMeasured(target->Current);
-    ImGui::GetWindowDrawList()->AddCircle(ImGui::GetIO().MousePos, MEASUREMENT_MARKER_RADIUS * 2.0f,
-                                          GetHighlightColor(), 0, LINE_THICKNESS);
+    ImGui::GetWindowDrawList()->AddCircle(ImGui::GetIO().MousePos,
+                                          MEASUREMENT_MARKER_RADIUS * 2.0f,
+                                          GetHighlightColor(),
+                                          0,
+                                          LINE_THICKNESS);
     const std::optional<DisplayedState> &displayed = input.Overlays.GetDisplayed();
-    ImGui::SetTooltip("%s", std::format("{}\nClick to {} the plots",
-                                        DescribeMeasurement(*target, schematic.GetConnectivity(),
-                                                            displayed ? &displayed->Point : nullptr),
-                                        measured ? "remove it from" : "add it to")
-                                .c_str());
+    ImGui::SetTooltip(
+        "%s",
+        std::format("{}\nClick to {} the plots",
+                    DescribeMeasurement(*target, schematic.GetConnectivity(), displayed ? &displayed->Point : nullptr),
+                    measured ? "remove it from" : "add it to")
+            .c_str());
     if (!ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         return std::nullopt;
     }

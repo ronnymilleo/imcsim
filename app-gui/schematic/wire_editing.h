@@ -51,12 +51,16 @@ struct MovedWires {
     std::set<std::size_t> Selected;
 };
 
-std::vector<UIWire> FollowTerminals(const std::vector<UIWire> &wires, const std::vector<GridPoint> &old_terminals,
+std::vector<UIWire> FollowTerminals(const std::vector<UIWire> &wires,
+                                    const std::vector<GridPoint> &old_terminals,
                                     const std::vector<GridPoint> &new_terminals);
 std::vector<UIWire> SimplifyWires(const std::vector<UIWire> &wires, const std::vector<GridPoint> &terminals);
-MovedWires MoveGroup(const std::vector<UIWire> &wires, const std::set<std::size_t> &selected,
-                     const std::vector<GridPoint> &old_terminals, const std::vector<GridPoint> &new_terminals,
-                     const std::vector<GridPoint> &fixed_terminals, const PointTransform &transform);
+MovedWires MoveGroup(const std::vector<UIWire> &wires,
+                     const std::set<std::size_t> &selected,
+                     const std::vector<GridPoint> &old_terminals,
+                     const std::vector<GridPoint> &new_terminals,
+                     const std::vector<GridPoint> &fixed_terminals,
+                     const PointTransform &transform);
 
 } // namespace GUI
 

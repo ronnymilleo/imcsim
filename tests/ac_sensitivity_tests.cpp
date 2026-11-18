@@ -102,8 +102,10 @@ TEST_CASE("A potentiometer reports the sum of its halves, and none where either 
     Core::ACElementFigures second = MakeFigures(2.5e3, 0.01, 0.05);
     second.MagnitudeDecibelsPerPercent[1] = std::nullopt;
 
-    const Core::ACSensitivity sensitivity = Core::BuildACSensitivity(
-        circuit, {.OutputNode = 2}, {{"r-rv1a", std::move(first)}, {"r-rv1b", std::move(second)}});
+    const Core::ACSensitivity sensitivity =
+        Core::BuildACSensitivity(circuit,
+                                 {.OutputNode = 2},
+                                 {{"r-rv1a", std::move(first)}, {"r-rv1b", std::move(second)}});
 
     REQUIRE(sensitivity.Parts.size() == 1);
     const Core::ACPartSensitivity &part = sensitivity.Parts[0];
@@ -180,8 +182,11 @@ TEST_CASE("ngspice does not run the AC sensitivity analysis and says why, so the
 TEST_CASE("Nodalys gives the AC sensitivity of an RC low-pass at its corner", "[ac_sensitivity][nodalys]") {
     const TestSupport::NodalysInUse nodalys;
     const LowPass filter;
-    const Core::ACSensitivitySettings settings{
-        .OutputNode = 2, .InputSource = "V1", .StartFrequency = 100.0, .StopFrequency = 10e3, .PointsPerDecade = 2};
+    const Core::ACSensitivitySettings settings{.OutputNode = 2,
+                                               .InputSource = "V1",
+                                               .StartFrequency = 100.0,
+                                               .StopFrequency = 10e3,
+                                               .PointsPerDecade = 2};
 
     const Core::ACSensitivityRun run = Core::RunACSensitivity(filter.Circuit, settings);
 

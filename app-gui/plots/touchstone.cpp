@@ -70,7 +70,9 @@ std::string FormatPair(const std::complex<double> value, const TouchstoneFormat 
  * @brief   A two-port is a single line per frequency, in the order S11 S21 S12 S22, which is not the order of the
  *          matrix; the others are one row of the matrix at a time, split in lines of four values.
  */
-std::string FormatPoint(const Core::SParameters &result, const std::size_t frequency, const double unit_factor,
+std::string FormatPoint(const Core::SParameters &result,
+                        const std::size_t frequency,
+                        const double unit_factor,
                         const TouchstoneFormat format) {
     const int ports = result.GetPortCount();
     std::string text = std::format("{:.{}g}", result.Frequencies[frequency] / unit_factor, NUMBER_DIGITS);
@@ -161,11 +163,14 @@ std::expected<std::string, std::string> FormatTouchstone(const Core::SParameters
             return std::unexpected(std::format(
                 "A Touchstone file holds one reference impedance, and port 1 has {} ohm while port {} has {} ohm; "
                 "give the ports the same Z0 to export",
-                Core::FormatValue(reference), port + 1, Core::FormatValue(result.ReferenceOhms[port])));
+                Core::FormatValue(reference),
+                port + 1,
+                Core::FormatValue(result.ReferenceOhms[port])));
         }
     }
     const double unit_factor = GetUnitFactor(options.Unit);
-    std::string text = std::format("! S-parameters from imcsim, {} {}\n", result.GetPortCount(),
+    std::string text = std::format("! S-parameters from imcsim, {} {}\n",
+                                   result.GetPortCount(),
                                    result.GetPortCount() == 1 ? "port" : "ports");
     if (result.GetPortCount() == PORTS_IN_ONE_LINE) {
         text += "! Frequency S11 S21 S12 S22\n";

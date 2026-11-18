@@ -129,8 +129,8 @@ std::optional<EditorCommand> DrawEditItems(Schematic &schematic) {
  */
 BlockMenuChoice DrawBlockItems(Schematic &schematic, const bool is_editing_block) {
     BlockMenuChoice choice = BlockMenuChoice::NONE;
-    if (!is_editing_block &&
-        ImGui::MenuItem("Create Block from Selection...", nullptr, false, schematic.HasSelection())) {
+    if (!is_editing_block
+        && ImGui::MenuItem("Create Block from Selection...", nullptr, false, schematic.HasSelection())) {
         choice = BlockMenuChoice::CREATE_FROM_SELECTION;
     }
     const UIElement *selected = schematic.GetSelectedElement();

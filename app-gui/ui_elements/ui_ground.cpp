@@ -31,7 +31,9 @@ void UIGround::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view,
     canvas.AddLine(LocalToScreen(view, 0, 0), LocalToScreen(view, 0, LEAD_LENGTH), color, LINE_THICKNESS);
 }
 
-void UIGround::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
+void UIGround::DrawSymbol(SchematicCanvas &canvas,
+                          const ViewTransform &view,
+                          const ImU32 color,
                           SymbolStyle /*style*/) const {
     float y = LEAD_LENGTH;
     for (const float half_width : BAR_HALF_WIDTHS) {

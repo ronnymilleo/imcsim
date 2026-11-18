@@ -45,8 +45,8 @@ void Clock::SetParameters(const ClockParameters &parameters) {
  *          positive and the start delay is not negative.
  */
 bool Clock::IsValidParameters(const ClockParameters &parameters) {
-    return parameters.Frequency > 0.0 && parameters.DutyCycle > 0.0 && parameters.DutyCycle < 1.0 &&
-           parameters.LogicLevel > 0.0 && parameters.StartDelay >= 0.0;
+    return parameters.Frequency > 0.0 && parameters.DutyCycle > 0.0 && parameters.DutyCycle < 1.0
+        && parameters.LogicLevel > 0.0 && parameters.StartDelay >= 0.0;
 }
 
 } // namespace Core

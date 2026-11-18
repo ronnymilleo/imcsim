@@ -360,15 +360,21 @@ TEST_CASE("A voltage source keeps its sine parameters while switching type", "[c
 }
 
 TEST_CASE("Source type names convert both ways", "[component]") {
-    for (const auto type : {Core::VoltageSource::SourceType::DC, Core::VoltageSource::SourceType::AC,
-                            Core::VoltageSource::SourceType::PULSE, Core::VoltageSource::SourceType::EXP,
-                            Core::VoltageSource::SourceType::SFFM, Core::VoltageSource::SourceType::AM,
-                            Core::VoltageSource::SourceType::PWL, Core::VoltageSource::SourceType::NOISE,
+    for (const auto type : {Core::VoltageSource::SourceType::DC,
+                            Core::VoltageSource::SourceType::AC,
+                            Core::VoltageSource::SourceType::PULSE,
+                            Core::VoltageSource::SourceType::EXP,
+                            Core::VoltageSource::SourceType::SFFM,
+                            Core::VoltageSource::SourceType::AM,
+                            Core::VoltageSource::SourceType::PWL,
+                            Core::VoltageSource::SourceType::NOISE,
                             Core::VoltageSource::SourceType::RANDOM}) {
         CHECK(Core::ParseSourceType(Core::GetSourceTypeName(type)) == type);
     }
-    for (const auto distribution : {Core::RandomDistribution::UNIFORM, Core::RandomDistribution::GAUSSIAN,
-                                    Core::RandomDistribution::EXPONENTIAL, Core::RandomDistribution::POISSON}) {
+    for (const auto distribution : {Core::RandomDistribution::UNIFORM,
+                                    Core::RandomDistribution::GAUSSIAN,
+                                    Core::RandomDistribution::EXPONENTIAL,
+                                    Core::RandomDistribution::POISSON}) {
         CHECK(Core::ParseRandomDistribution(Core::GetRandomDistributionName(distribution)) == distribution);
     }
     CHECK_FALSE(Core::ParseRandomDistribution("gaussian"));
@@ -677,11 +683,18 @@ TEST_CASE("Op-amps are named U and have no value", "[component]") {
 }
 
 TEST_CASE("Gates and flip-flops are U parts with no value, and their type names round-trip", "[component]") {
-    for (const Core::ComponentType type :
-         {Core::ComponentType::AND, Core::ComponentType::OR, Core::ComponentType::NOT, Core::ComponentType::NAND,
-          Core::ComponentType::NOR, Core::ComponentType::XOR, Core::ComponentType::XNOR, Core::ComponentType::BUFFER,
-          Core::ComponentType::D_FLIP_FLOP, Core::ComponentType::JK_FLIP_FLOP, Core::ComponentType::T_FLIP_FLOP,
-          Core::ComponentType::SR_FLIP_FLOP}) {
+    for (const Core::ComponentType type : {Core::ComponentType::AND,
+                                           Core::ComponentType::OR,
+                                           Core::ComponentType::NOT,
+                                           Core::ComponentType::NAND,
+                                           Core::ComponentType::NOR,
+                                           Core::ComponentType::XOR,
+                                           Core::ComponentType::XNOR,
+                                           Core::ComponentType::BUFFER,
+                                           Core::ComponentType::D_FLIP_FLOP,
+                                           Core::ComponentType::JK_FLIP_FLOP,
+                                           Core::ComponentType::T_FLIP_FLOP,
+                                           Core::ComponentType::SR_FLIP_FLOP}) {
         const Core::LogicPart part(type);
         INFO(part.GetTypeName());
         CHECK(std::string_view(part.GetNamePrefix()) == "U");
@@ -700,26 +713,31 @@ TEST_CASE("The terminals of a gate or flip-flop are its inputs, then its outputs
     CHECK(Core::GetLogicInputLabels(Core::ComponentType::OR) == std::vector<std::string>{"A", "B"});
     CHECK(Core::GetLogicInputLabels(Core::ComponentType::BUFFER) == std::vector<std::string>{"A"});
     CHECK(Core::GetLogicOutputLabels(Core::ComponentType::NOR) == std::vector<std::string>{"Y"});
-    CHECK(Core::GetLogicInputLabels(Core::ComponentType::D_FLIP_FLOP) ==
-          std::vector<std::string>{"D", "CLK", "SET", "RESET"});
-    CHECK(Core::GetLogicInputLabels(Core::ComponentType::JK_FLIP_FLOP) ==
-          std::vector<std::string>{"J", "K", "CLK", "SET", "RESET"});
-    CHECK(Core::GetLogicInputLabels(Core::ComponentType::T_FLIP_FLOP) ==
-          std::vector<std::string>{"T", "CLK", "SET", "RESET"});
-    CHECK(Core::GetLogicInputLabels(Core::ComponentType::SR_FLIP_FLOP) ==
-          std::vector<std::string>{"S", "R", "CLK", "SET", "RESET"});
+    CHECK(Core::GetLogicInputLabels(Core::ComponentType::D_FLIP_FLOP)
+          == std::vector<std::string>{"D", "CLK", "SET", "RESET"});
+    CHECK(Core::GetLogicInputLabels(Core::ComponentType::JK_FLIP_FLOP)
+          == std::vector<std::string>{"J", "K", "CLK", "SET", "RESET"});
+    CHECK(Core::GetLogicInputLabels(Core::ComponentType::T_FLIP_FLOP)
+          == std::vector<std::string>{"T", "CLK", "SET", "RESET"});
+    CHECK(Core::GetLogicInputLabels(Core::ComponentType::SR_FLIP_FLOP)
+          == std::vector<std::string>{"S", "R", "CLK", "SET", "RESET"});
     CHECK(Core::GetLogicOutputLabels(Core::ComponentType::SR_FLIP_FLOP) == std::vector<std::string>{"Q", "QN"});
 }
 
 TEST_CASE("A gate takes from 2 to 8 inputs and names them A, B, C...", "[component]") {
-    for (const Core::ComponentType type :
-         {Core::ComponentType::AND, Core::ComponentType::OR, Core::ComponentType::NAND, Core::ComponentType::NOR,
-          Core::ComponentType::XOR, Core::ComponentType::XNOR}) {
+    for (const Core::ComponentType type : {Core::ComponentType::AND,
+                                           Core::ComponentType::OR,
+                                           Core::ComponentType::NAND,
+                                           Core::ComponentType::NOR,
+                                           Core::ComponentType::XOR,
+                                           Core::ComponentType::XNOR}) {
         CHECK(Core::HasVariableInputs(type));
     }
     // The inverter, the buffer and the flip-flops keep the inputs they have
-    for (const Core::ComponentType type : {Core::ComponentType::NOT, Core::ComponentType::BUFFER,
-                                           Core::ComponentType::D_FLIP_FLOP, Core::ComponentType::JK_FLIP_FLOP}) {
+    for (const Core::ComponentType type : {Core::ComponentType::NOT,
+                                           Core::ComponentType::BUFFER,
+                                           Core::ComponentType::D_FLIP_FLOP,
+                                           Core::ComponentType::JK_FLIP_FLOP}) {
         CHECK_FALSE(Core::HasVariableInputs(type));
     }
 

@@ -110,14 +110,16 @@ void DrawNetLabel(Core::NetLabel &label, BlockFields &fields, Schematic &schemat
     }
     const bool changed = ImGui::InputText("##net", fields.Net.data(), fields.Net.size());
     const std::string typed = fields.Net.data();
-    const bool valid = typed.empty() || (is_pin ? Core::SubcircuitInstance::IsValidIdentifier(typed)
-                                                : Core::NetLabel::IsValidNet(typed));
+    const bool valid =
+        typed.empty()
+        || (is_pin ? Core::SubcircuitInstance::IsValidIdentifier(typed) : Core::NetLabel::IsValidNet(typed));
     if (changed && valid && typed != label.GetNet()) {
         label.SetNet(typed);
         schematic.MarkModified();
     }
     if (!valid) {
-        ImGui::TextColored(GetErrorTextColor(), "%s",
+        ImGui::TextColored(GetErrorTextColor(),
+                           "%s",
                            is_pin ? "Use a letter or _, then letters, digits or _"
                                   : "1 to 32 letters, digits, _, - or .");
     } else if (is_pin) {

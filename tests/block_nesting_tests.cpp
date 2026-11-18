@@ -44,7 +44,9 @@ GUI::SavedSubcircuit MakeDefinition(const std::string &name, const std::vector<s
 /**
  * @brief   A pin marker; unturned, its arrow points right, which puts the pin on the left of the block.
  */
-void AddMarker(GUI::Schematic &schematic, const GUI::GridPoint point, const std::string &name,
+void AddMarker(GUI::Schematic &schematic,
+               const GUI::GridPoint point,
+               const std::string &name,
                const GUI::Rotation rotation = GUI::Rotation::R0) {
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::PIN, point, rotation));
     static_cast<Core::NetLabel &>(schematic.GetElements().back()->GetComponent()).SetNet(name);
@@ -248,8 +250,10 @@ TEST_CASE("Copying a block carries the blocks inside it, and a paste renames a c
     GUI::Schematic source;
     MakeNestedBlocks(source);
     const std::size_t outer_instance = source.GetElements().size() - 1;
-    const std::string text = GUI::CopySelection(source.GetElements(), source.GetWires(),
-                                                {.Elements = {outer_instance}, .Wires = {}}, source.GetSubcircuits());
+    const std::string text = GUI::CopySelection(source.GetElements(),
+                                                source.GetWires(),
+                                                {.Elements = {outer_instance}, .Wires = {}},
+                                                source.GetSubcircuits());
     auto group = GUI::ParseCopiedSchematic(text);
     REQUIRE(group);
     REQUIRE(group->Subcircuits.size() == 2);

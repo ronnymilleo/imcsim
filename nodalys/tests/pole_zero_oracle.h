@@ -53,14 +53,15 @@ inline constexpr double MATCH_DECIBELS = 1e-3;
 inline constexpr double MATCH_DEGREES = 1e-2;
 
 // Running
-PoleZeroReport CheckPoleZero(const Nodalys::Circuit &circuit, const Nodalys::PoleZeroConfig &config,
-                             const OracleBand &band);
+PoleZeroReport
+CheckPoleZero(const Nodalys::Circuit &circuit, const Nodalys::PoleZeroConfig &config, const OracleBand &band);
 
 // Reading
 bool IsMatch(const PoleZeroReport &report);
 std::string Describe(const PoleZeroReport &report);
 bool HasRightHalfPlaneRoot(const std::vector<std::complex<double>> &roots, double tolerance_radians_per_second);
-bool HasRootNear(const std::vector<std::complex<double>> &roots, std::complex<double> expected,
+bool HasRootNear(const std::vector<std::complex<double>> &roots,
+                 std::complex<double> expected,
                  double relative_tolerance);
 
 } // namespace Testing

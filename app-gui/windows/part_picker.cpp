@@ -63,7 +63,9 @@ std::optional<EditorMode> PartPicker::Draw(const std::vector<const SavedSubcircu
         ImGui::SetKeyboardFocusHere();
     }
     ImGui::SetNextItemWidth(width);
-    const bool is_entered = ImGui::InputTextWithHint("##part_search", "Find a part (Space)", &m_Query,
+    const bool is_entered = ImGui::InputTextWithHint("##part_search",
+                                                     "Find a part (Space)",
+                                                     &m_Query,
                                                      ImGuiInputTextFlags_EnterReturnsTrue);
     if (ImGui::IsItemEdited()) {
         m_Highlighted = 0;
@@ -112,10 +114,10 @@ bool PartPicker::TakeEditorFocus() {
  */
 std::optional<EditorMode> PartPicker::DrawList(const PartMatches &matches, const ImVec2 position, const bool moved) {
     ImGui::SetNextWindowPos(position);
-    constexpr ImGuiWindowFlags LIST_FLAGS = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
-                                            ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
-                                            ImGuiWindowFlags_NoNav | ImGuiWindowFlags_AlwaysAutoResize |
-                                            ImGuiWindowFlags_NoDocking;
+    constexpr ImGuiWindowFlags LIST_FLAGS = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove
+                                          | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing
+                                          | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_AlwaysAutoResize
+                                          | ImGuiWindowFlags_NoDocking;
     std::optional<EditorMode> clicked;
     if (ImGui::Begin("##part_matches", nullptr, LIST_FLAGS)) {
         ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
@@ -206,7 +208,9 @@ std::optional<EditorMode> PartPicker::DrawMatches(const PartMatches &matches, co
         return std::nullopt;
     }
     const float list_height = static_cast<float>(visible_rows) * (row_height + row_spacing) - row_spacing;
-    ImGui::BeginChild("##matches", {width + ImGui::GetStyle().ScrollbarSize, list_height}, ImGuiChildFlags_None,
+    ImGui::BeginChild("##matches",
+                      {width + ImGui::GetStyle().ScrollbarSize, list_height},
+                      ImGuiChildFlags_None,
                       ImGuiWindowFlags_NoNav);
     std::optional<EditorMode> clicked;
     for (std::size_t index = 0; index < matches.GetCount(); ++index) {
@@ -227,7 +231,9 @@ std::optional<EditorMode> PartPicker::DrawMatches(const PartMatches &matches, co
  *          hovered.
  * @details Returns whether it was clicked.
  */
-bool PartPicker::DrawMatchRow(const PartMatches &matches, const std::size_t index, const bool is_highlighted,
+bool PartPicker::DrawMatchRow(const PartMatches &matches,
+                              const std::size_t index,
+                              const bool is_highlighted,
                               const float width) {
     if (index < matches.Parts.size()) {
         return SelectablePartRow(matches.Parts[index], is_highlighted, width, m_Preferences.Symbols);

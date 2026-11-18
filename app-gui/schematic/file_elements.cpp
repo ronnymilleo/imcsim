@@ -77,8 +77,8 @@ std::expected<void, std::string> ReadSubcircuitInstance(const nlohmann::json &ob
             return std::unexpected("has subcircuit parameters that are not an object");
         }
         for (const auto &[parameter, value] : parameters->items()) {
-            if (!value.is_number() ||
-                !std::ranges::contains(definition->Parameters, parameter, &Core::SubcircuitParameter::Name)) {
+            if (!value.is_number()
+                || !std::ranges::contains(definition->Parameters, parameter, &Core::SubcircuitParameter::Name)) {
                 return std::unexpected(std::format("has no valid value for subcircuit parameter {}", parameter));
             }
             instance.SetParameter(parameter, value.get<double>());
@@ -214,7 +214,9 @@ void FixNames(const std::vector<std::unique_ptr<UIElement>> &elements, std::vect
             warnings.push_back(std::format("A {} had no name and was named {}", component->GetTypeName(), new_name));
         } else {
             warnings.push_back(std::format("{} \"{}\" was renamed to {} because the name was invalid or repeated",
-                                           component->GetTypeName(), component->GetName(), new_name));
+                                           component->GetTypeName(),
+                                           component->GetName(),
+                                           new_name));
         }
         used_names.push_back(new_name);
         component->SetName(std::move(new_name));
@@ -245,8 +247,10 @@ nlohmann::json WriteElements(const std::span<const UIElement *const> elements) {
  * @param[out]    elements     Receives the parts that were read.
  * @param[in,out] warnings     Receives one message for each part skipped or renamed.
  */
-void ReadElements(const nlohmann::json &object, const std::span<const SavedSubcircuit> definitions,
-                  std::vector<std::unique_ptr<UIElement>> &elements, std::vector<std::string> &warnings) {
+void ReadElements(const nlohmann::json &object,
+                  const std::span<const SavedSubcircuit> definitions,
+                  std::vector<std::unique_ptr<UIElement>> &elements,
+                  std::vector<std::string> &warnings) {
     const auto list = object.find("elements");
     if (list != object.end() && list->is_array()) {
         for (std::size_t index = 0; index < list->size(); ++index) {

@@ -45,13 +45,13 @@ bool HasOneInput(const Core::ComponentType type) {
 }
 
 bool IsInverting(const Core::ComponentType type) {
-    return type == Core::ComponentType::NOT || type == Core::ComponentType::NAND || type == Core::ComponentType::NOR ||
-           type == Core::ComponentType::XNOR;
+    return type == Core::ComponentType::NOT || type == Core::ComponentType::NAND || type == Core::ComponentType::NOR
+        || type == Core::ComponentType::XNOR;
 }
 
 bool IsOrFamily(const Core::ComponentType type) {
-    return type == Core::ComponentType::OR || type == Core::ComponentType::NOR || type == Core::ComponentType::XOR ||
-           type == Core::ComponentType::XNOR;
+    return type == Core::ComponentType::OR || type == Core::ComponentType::NOR || type == Core::ComponentType::XOR
+        || type == Core::ComponentType::XNOR;
 }
 
 bool HasTwoDataInputs(const Core::ComponentType type) {
@@ -135,7 +135,9 @@ void UILogicPart::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &vi
     }
 }
 
-void UILogicPart::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
+void UILogicPart::DrawSymbol(SchematicCanvas &canvas,
+                             const ViewTransform &view,
+                             const ImU32 color,
                              const SymbolStyle style) const {
     if (IsFlipFlop()) {
         DrawFlipFlop(canvas, view, color);
@@ -164,22 +166,42 @@ void UILogicPart::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view,
         if (pin.X < 0) {
             // A clock input shows its marker instead of a name
             if (inputs[input] != "CLK") {
-                DrawLabel(canvas, view, {-FLIP_FLOP_HALF_WIDTH + PIN_LABEL_INSET, static_cast<float>(pin.Y)},
-                          {1.0f, 0.0f}, inputs[input], color);
+                DrawLabel(canvas,
+                          view,
+                          {-FLIP_FLOP_HALF_WIDTH + PIN_LABEL_INSET, static_cast<float>(pin.Y)},
+                          {1.0f, 0.0f},
+                          inputs[input],
+                          color);
             }
         } else if (pin.Y < 0) {
-            DrawLabel(canvas, view, {0.0f, -FlipFlopHalfHeight(type) + PIN_LABEL_INSET}, {0.0f, 1.0f}, inputs[input],
+            DrawLabel(canvas,
+                      view,
+                      {0.0f, -FlipFlopHalfHeight(type) + PIN_LABEL_INSET},
+                      {0.0f, 1.0f},
+                      inputs[input],
                       color);
         } else {
-            DrawLabel(canvas, view, {0.0f, FlipFlopHalfHeight(type) - PIN_LABEL_INSET}, {0.0f, -1.0f}, inputs[input],
+            DrawLabel(canvas,
+                      view,
+                      {0.0f, FlipFlopHalfHeight(type) - PIN_LABEL_INSET},
+                      {0.0f, -1.0f},
+                      inputs[input],
                       color);
         }
     }
     const std::size_t first_output = inputs.size();
-    DrawLabel(canvas, view, {FLIP_FLOP_HALF_WIDTH - PIN_LABEL_INSET, static_cast<float>(terminals[first_output].Y)},
-              {-1.0f, 0.0f}, "Q", color);
-    DrawLabel(canvas, view, {FLIP_FLOP_HALF_WIDTH - PIN_LABEL_INSET, static_cast<float>(terminals[first_output + 1].Y)},
-              {-1.0f, 0.0f}, "QN", color);
+    DrawLabel(canvas,
+              view,
+              {FLIP_FLOP_HALF_WIDTH - PIN_LABEL_INSET, static_cast<float>(terminals[first_output].Y)},
+              {-1.0f, 0.0f},
+              "Q",
+              color);
+    DrawLabel(canvas,
+              view,
+              {FLIP_FLOP_HALF_WIDTH - PIN_LABEL_INSET, static_cast<float>(terminals[first_output + 1].Y)},
+              {-1.0f, 0.0f},
+              "QN",
+              color);
 }
 
 /**
@@ -275,7 +297,9 @@ void UILogicPart::DrawGateTerminals(SchematicCanvas &canvas, const ViewTransform
         }
         canvas.AddLine(LocalToScreen(view, -3, y), LocalToScreen(view, end, y), color, LINE_THICKNESS);
     }
-    canvas.AddLine(LocalToScreen(view, OutputStart(type), center), LocalToScreen(view, 3, center), color,
+    canvas.AddLine(LocalToScreen(view, OutputStart(type), center),
+                   LocalToScreen(view, 3, center),
+                   color,
                    LINE_THICKNESS);
 }
 
@@ -318,7 +342,8 @@ void UILogicPart::DrawAnsiGate(SchematicCanvas &canvas, const ViewTransform &vie
         outline.push_back(LocalToScreen(view, arc_start, center - half_height));
         for (int step = 1; step < CURVE_SEGMENTS; ++step) {
             const float angle = std::numbers::pi_v<float> * (0.5f - static_cast<float>(step) / CURVE_SEGMENTS);
-            outline.push_back(LocalToScreen(view, arc_start + (tip - arc_start) * std::cos(angle),
+            outline.push_back(LocalToScreen(view,
+                                            arc_start + (tip - arc_start) * std::cos(angle),
                                             center + half_height * -std::sin(angle)));
         }
         outline.push_back(LocalToScreen(view, arc_start, center + half_height));
@@ -361,9 +386,10 @@ void UILogicPart::DrawIECGate(SchematicCanvas &canvas, const ViewTransform &view
     const float tip = IsInverting(type) ? GATE_RIGHT - 2.0f * BUBBLE_RADIUS : GATE_RIGHT;
     const float half_height = GetGateHalfHeight();
     const float center = GetGateCenterY();
-    const ImVec2 box[4] = {
-        LocalToScreen(view, GATE_LEFT, center - half_height), LocalToScreen(view, tip, center - half_height),
-        LocalToScreen(view, tip, center + half_height), LocalToScreen(view, GATE_LEFT, center + half_height)};
+    const ImVec2 box[4] = {LocalToScreen(view, GATE_LEFT, center - half_height),
+                           LocalToScreen(view, tip, center - half_height),
+                           LocalToScreen(view, tip, center + half_height),
+                           LocalToScreen(view, GATE_LEFT, center + half_height)};
     canvas.AddPolyline(box, 4, color, ImDrawFlags_Closed, LINE_THICKNESS);
     if (IsInverting(type)) {
         DrawBubble(canvas, view, tip + BUBBLE_RADIUS, color);
@@ -389,12 +415,17 @@ void UILogicPart::DrawFlipFlop(SchematicCanvas &canvas, const ViewTransform &vie
     canvas.AddPolyline(mark, 3, color, ImDrawFlags_None, LINE_THICKNESS);
 }
 
-void UILogicPart::DrawBubble(SchematicCanvas &canvas, const ViewTransform &view, const float center_x,
+void UILogicPart::DrawBubble(SchematicCanvas &canvas,
+                             const ViewTransform &view,
+                             const float center_x,
                              const ImU32 color) const {
     const ImVec2 origin = LocalToScreen(view, 0, 0);
     const ImVec2 unit = LocalToScreen(view, 1, 0) - origin;
-    canvas.AddCircle(LocalToScreen(view, center_x, GetGateCenterY()), std::hypot(unit.x, unit.y) * BUBBLE_RADIUS, color,
-                     0, LINE_THICKNESS);
+    canvas.AddCircle(LocalToScreen(view, center_x, GetGateCenterY()),
+                     std::hypot(unit.x, unit.y) * BUBBLE_RADIUS,
+                     color,
+                     0,
+                     LINE_THICKNESS);
 }
 
 } // namespace GUI

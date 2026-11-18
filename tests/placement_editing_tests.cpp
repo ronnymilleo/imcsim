@@ -23,7 +23,9 @@
 
 namespace {
 
-void AddMarker(GUI::Schematic &schematic, const GUI::GridPoint point, const std::string &name,
+void AddMarker(GUI::Schematic &schematic,
+               const GUI::GridPoint point,
+               const std::string &name,
                const GUI::Rotation rotation = GUI::Rotation::R0) {
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::PIN, point, rotation));
     static_cast<Core::NetLabel &>(schematic.GetElements().back()->GetComponent()).SetNet(name);
@@ -79,14 +81,18 @@ TEST_CASE("A block is not placed where it would contain itself", "[placement_edi
     MakeBlock(schematic);
     GUI::BlockSession blocks(schematic);
     GUI::EditorMode mode = GUI::SelectingMode{};
-    GUI::SwitchMode(mode, GUI::PlacingMode{.Type = Core::ComponentType::SUBCIRCUIT, .Block = "inner"}, schematic,
+    GUI::SwitchMode(mode,
+                    GUI::PlacingMode{.Type = Core::ComponentType::SUBCIRCUIT, .Block = "inner"},
+                    schematic,
                     blocks);
     CHECK(GUI::GetPlacingType(mode) == Core::ComponentType::SUBCIRCUIT);
 
     mode = GUI::SelectingMode{};
     REQUIRE(blocks.Open("inner"));
-    GUI::SwitchMode(mode, GUI::PlacingMode{.Type = Core::ComponentType::SUBCIRCUIT, .Block = "inner"},
-                    blocks.GetShown(), blocks);
+    GUI::SwitchMode(mode,
+                    GUI::PlacingMode{.Type = Core::ComponentType::SUBCIRCUIT, .Block = "inner"},
+                    blocks.GetShown(),
+                    blocks);
     CHECK(GUI::IsSelecting(mode));
 }
 
@@ -117,8 +123,11 @@ TEST_CASE("A new label starts with the name of the newest label that has one", "
     }
     CHECK(GUI::FindLastNet(schematic) == "SECOND");
 
-    const auto preview = GUI::MakePlacementPreview(
-        GUI::PlacingMode{.Type = Core::ComponentType::NET_LABEL, .IsMirrored = true}, {2, 2}, schematic, {});
+    const auto preview =
+        GUI::MakePlacementPreview(GUI::PlacingMode{.Type = Core::ComponentType::NET_LABEL, .IsMirrored = true},
+                                  {2, 2},
+                                  schematic,
+                                  {});
     REQUIRE(preview);
     CHECK(static_cast<const Core::NetLabel &>(preview->GetComponent()).GetNet() == "SECOND");
     CHECK(preview->GetPosition() == GUI::GridPoint{2, 2});
@@ -131,8 +140,8 @@ TEST_CASE("The preview of a block takes its pins, and none is made once the bloc
     const GUI::PlacingMode placing = {.Type = Core::ComponentType::SUBCIRCUIT, .Block = "inner"};
     const auto preview = GUI::MakePlacementPreview(placing, {0, 0}, schematic, schematic.GetSubcircuits());
     REQUIRE(preview);
-    CHECK(static_cast<const Core::SubcircuitInstance &>(preview->GetComponent()).GetPins() ==
-          std::vector<std::string>{"IN", "OUT"});
+    CHECK(static_cast<const Core::SubcircuitInstance &>(preview->GetComponent()).GetPins()
+          == std::vector<std::string>{"IN", "OUT"});
     CHECK_FALSE(GUI::MakePlacementPreview(placing, {0, 0}, schematic, {}));
 }
 

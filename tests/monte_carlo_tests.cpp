@@ -118,7 +118,7 @@ TEST_CASE("Different runs and different seeds start different streams", "[monte_
 
 TEST_CASE("The normal draw has a mean of 0, a deviation of 1 and never passes 3 deviations", "[monte_carlo]") {
     std::mt19937_64 engine = Core::MakeRunEngine(7, 1);
-    constexpr int COUNT = 20000;
+    constexpr int COUNT = 20'000;
     double sum = 0.0;
     double squares = 0.0;
     double largest = 0.0;
@@ -159,7 +159,7 @@ TEST_CASE("The Gaussian draw spreads less than the uniform one for the same tole
     std::mt19937_64 engine = Core::MakeRunEngine(5, 1);
     const auto spread = [&engine](const Core::ToleranceDistribution distribution) {
         double squares = 0.0;
-        constexpr int COUNT = 10000;
+        constexpr int COUNT = 10'000;
         for (int index = 0; index < COUNT; ++index) {
             const double deviation = Core::DrawToleranceFactor(engine, distribution, 10.0) - 1.0;
             squares += deviation * deviation;
