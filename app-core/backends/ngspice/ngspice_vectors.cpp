@@ -10,8 +10,7 @@
 #include "circuit/circuit.h"
 #include "circuit/circuit_currents.h"
 #include "circuit/components/source.h"
-#include <algorithm>
-#include <cctype>
+#include "spice/spice_text.h"
 #include <format>
 
 namespace Core {
@@ -60,14 +59,6 @@ std::vector<std::string> ListVectors(std::string plot) {
         names.emplace_back(*vectors);
     }
     return names;
-}
-
-/**
- * @brief   ngspice stores vector names in lower case.
- */
-std::string ToLower(std::string text) {
-    std::ranges::transform(text, text.begin(), [](const unsigned char character) { return std::tolower(character); });
-    return text;
 }
 
 /**

@@ -12,6 +12,7 @@
 #include "circuit/components/fuse.h"
 #include "circuit/components/subcircuit.h"
 #include "circuit/subcircuit.h"
+#include "spice/spice_text.h"
 #include "spice/spice_value.h"
 #include <algorithm>
 #include <cctype>
@@ -34,13 +35,6 @@ bool IsModelNameCharacter(const char character) {
     return std::isalnum(static_cast<unsigned char>(character)) != 0 || character == '_' || character == '-';
 }
 
-std::string ToLowerCase(const std::string_view text) {
-    std::string lower(text);
-    std::ranges::transform(lower, lower.begin(),
-                           [](const unsigned char character) { return static_cast<char>(std::tolower(character)); });
-    return lower;
-}
-
 /**
  * @brief   The names a body declares with .model or .subckt, lowercase, since SPICE reads names without regard to case.
  */
@@ -55,9 +49,9 @@ std::set<std::string> CollectDeclaredNames(const std::string &body) {
         if (!(fields >> directive >> name)) {
             continue;
         }
-        directive = ToLowerCase(directive);
+        directive = ToLower(directive);
         if (directive == ".model" || directive == ".subckt") {
-            declared.insert(ToLowerCase(name));
+            declared.insert(ToLower(name));
         }
     }
     return declared;
@@ -86,7 +80,7 @@ std::string ScopeLine(const std::string_view line, const std::set<std::string> &
         }
         const std::string token(line.substr(start, position - start));
         const bool is_element_name = std::exchange(is_first_word, false);
-        scoped += !is_element_name && declared.contains(ToLowerCase(token)) ? prefix + token : token;
+        scoped += !is_element_name && declared.contains(ToLower(token)) ? prefix + token : token;
     }
     return scoped;
 }

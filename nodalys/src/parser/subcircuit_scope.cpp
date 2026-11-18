@@ -8,6 +8,7 @@
 
 #include "parser/spice_text.h"
 #include "parser/spice_values.h"
+#include "text/text_case.h"
 
 #include <format>
 
@@ -107,7 +108,7 @@ void TextScope::MapNode(const std::string &upper_name, const NodeId node) {
  * @return  The node.
  */
 NodeId TextScope::ResolveNode(ExpansionContext &context, const std::string_view name) {
-    const std::string upper = ToUpperCase(TrimSpaces(name));
+    const std::string upper = ToUpper(TrimSpaces(name));
     if (IsGroundName(upper)) {
         return GROUND_NODE;
     }
@@ -117,7 +118,7 @@ NodeId TextScope::ResolveNode(ExpansionContext &context, const std::string_view 
     const NodeId node = context.Builder.AddNode();
     m_Nodes[upper] = node;
     if (context.OnInternalNode) {
-        context.OnInternalNode(ToUpperCase(MakeName(upper)), node);
+        context.OnInternalNode(ToUpper(MakeName(upper)), node);
     }
     return node;
 }

@@ -59,6 +59,7 @@ add_library(nodalys STATIC
     src/parser/subcircuit_models.cpp
     src/parser/subcircuit_scope.cpp
     src/parser/subcircuit_text.cpp
+    src/text/text_case.cpp
 )
 
 target_include_directories(nodalys

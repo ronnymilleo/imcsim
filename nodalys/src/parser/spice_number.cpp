@@ -5,7 +5,8 @@
 
 #include "parser/spice_number.h"
 
-#include <algorithm>
+#include "text/text_case.h"
+
 #include <array>
 #include <cctype>
 #include <charconv>
@@ -34,15 +35,6 @@ constexpr auto SCALES = std::to_array<Scale>({
     {"g", 1e9},
     {"t", 1e12},
 });
-
-std::string ToLower(std::string_view sv) {
-    std::string s;
-    s.reserve(sv.size());
-    for (const char c : sv) {
-        s.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
-    }
-    return s;
-}
 
 std::string_view Trim(std::string_view text) {
     while (!text.empty() && std::isspace(static_cast<unsigned char>(text.front()))) {

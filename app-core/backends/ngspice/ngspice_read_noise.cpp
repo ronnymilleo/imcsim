@@ -12,6 +12,7 @@
 #include "simulation/analysis_settings.h"
 #include "simulation/analysis_sources.h"
 #include "simulation/simulation_results.h"
+#include "spice/spice_text.h"
 #include <algorithm>
 #include <cmath>
 #include <cstddef>

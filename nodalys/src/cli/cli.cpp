@@ -7,6 +7,7 @@
 
 #include "nodalys/nodalys.h"
 #include "nodalys/version.h"
+#include "text/text_case.h"
 
 #include <CLI/CLI.hpp>
 #include <algorithm>
@@ -28,15 +29,6 @@
 namespace Nodalys {
 
 namespace {
-
-std::string ToLower(std::string_view sv) {
-    std::string s;
-    s.reserve(sv.size());
-    for (const char c : sv) {
-        s.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
-    }
-    return s;
-}
 
 /// Whether an analysis of the netlist is the one that `--analysis` names.
 bool IsOverrideMatch(const std::string &name, const AnalysisKind kind) {

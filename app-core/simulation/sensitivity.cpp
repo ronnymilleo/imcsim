@@ -7,8 +7,8 @@
 
 #include "circuit/components/controlled_source.h"
 #include "circuit/components/source.h"
+#include "spice/spice_text.h"
 #include <algorithm>
-#include <cctype>
 #include <cmath>
 #include <format>
 #include <optional>
@@ -24,16 +24,6 @@ namespace {
 constexpr std::string_view SCALE_SUFFIX = "_scale";
 /// Vector of the change of a controlled source per unit of its gain.
 constexpr std::string_view GAIN_SUFFIX = "_gain";
-
-std::string ToLower(std::string text) {
-    std::ranges::transform(text, text.begin(), [](const unsigned char character) { return std::tolower(character); });
-    return text;
-}
-
-std::string ToUpper(std::string text) {
-    std::ranges::transform(text, text.begin(), [](const unsigned char character) { return std::toupper(character); });
-    return text;
-}
 
 std::optional<double> Find(const SensitivityVectors &vectors, const std::string &name) {
     const auto found = vectors.find(name);

@@ -108,6 +108,7 @@ add_executable(imcsim-tests
             spice_import_tests.cpp
             spice_inclusions_tests.cpp
             spice_library_tests.cpp
+            spice_text_tests.cpp
             spice_value_tests.cpp
             stability_circles_tests.cpp
             stability_summary_tests.cpp

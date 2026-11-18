@@ -31,6 +31,18 @@ std::string ToLower(const std::string_view text) {
 }
 
 /**
+ * @brief   Raises the case of a text, for the keys and words SPICE spells in capitals.
+ * @param[in] text  Text in ASCII; other bytes stay as they are.
+ * @return  The text in uppercase.
+ */
+std::string ToUpper(const std::string_view text) {
+    std::string upper(text);
+    std::ranges::transform(upper, upper.begin(),
+                           [](const unsigned char character) { return static_cast<char>(std::toupper(character)); });
+    return upper;
+}
+
+/**
  * @brief   Drops the spaces, tabs and line ends around a text.
  * @param[in] text  Text to trim.
  * @return  A view of the text without them, empty when the text is all spaces.

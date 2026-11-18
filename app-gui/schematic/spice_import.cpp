@@ -7,6 +7,7 @@
 #include "schematic/spice_import.h"
 
 #include "circuit/components/subcircuit.h"
+#include "spice/spice_text.h"
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -23,19 +24,12 @@ constexpr auto TOP_PORTS = std::to_array<std::string_view>({"V+", "VCC", "VDD", 
 /// Port names of negative supplies and ground, whose pins go on the bottom edge.
 constexpr auto BOTTOM_PORTS = std::to_array<std::string_view>({"V-", "VEE", "VSS", "VNEG", "VS-", "VCC-", "GND", "0"});
 
-std::string ToUpper(const std::string_view text) {
-    std::string upper(text);
-    std::ranges::transform(upper, upper.begin(),
-                           [](const unsigned char character) { return static_cast<char>(std::toupper(character)); });
-    return upper;
-}
-
 /**
  * @brief   The edge a port name suggests; most libraries number their ports, which suggests nothing and stays on the
  *          left.
  */
 Core::PinSide SuggestSide(const std::string_view port) {
-    const std::string upper = ToUpper(port);
+    const std::string upper = Core::ToUpper(port);
     if (std::ranges::contains(TOP_PORTS, upper)) {
         return Core::PinSide::TOP;
     }

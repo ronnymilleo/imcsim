@@ -8,7 +8,7 @@
 #include "circuit/circuit.h"
 #include "circuit/library_model.h"
 #include "circuit/spice_library.h"
-#include <algorithm>
+#include "spice/spice_text.h"
 #include <cctype>
 #include <format>
 #include <map>
@@ -57,11 +57,7 @@ std::map<std::string, std::string> ParameterList(const std::string &text) {
                text[position] != ')') {
             ++position;
         }
-        std::string upper = key;
-        std::ranges::transform(upper, upper.begin(), [](const unsigned char character) {
-            return static_cast<char>(std::toupper(character));
-        });
-        values[upper] = text.substr(value_start, position - value_start);
+        values[ToUpper(key)] = text.substr(value_start, position - value_start);
     }
     return values;
 }

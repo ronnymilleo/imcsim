@@ -14,6 +14,7 @@ namespace Core {
 
 // Text
 std::string ToLower(std::string_view text);
+std::string ToUpper(std::string_view text);
 std::string_view Trim(std::string_view text);
 std::vector<std::string> SplitLines(std::string_view text);
 std::vector<std::string> SplitWords(std::string_view text);

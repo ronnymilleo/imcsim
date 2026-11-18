@@ -32,7 +32,6 @@ std::vector<std::complex<double>> ComplexValues(const vector_info &vector);
 std::vector<std::string> ListVectors(std::string plot);
 
 // Names
-std::string ToLower(std::string text);
 std::string BranchVectorName(const std::string &element_name);
 std::vector<CurrentVector> CurrentVectors(const Component &component);
 
