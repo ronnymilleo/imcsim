@@ -559,6 +559,71 @@ TEST_CASE("A custom diode starts from the parameters of the model it replaces", 
     CHECK(diode.GetParameters().BreakdownVoltage == 1000.0);
 }
 
+TEST_CASE("A library model replaces the ready model, and any other choice replaces the library model",
+          "[component][model_choice]") {
+    Core::Diode diode(Core::ComponentType::DIODE);
+    Core::BJT bjt(Core::ComponentType::NPN);
+    Core::MOSFET mosfet(Core::ComponentType::NMOS);
+    diode.SetLibraryModel("MYD");
+    bjt.SetLibraryModel("MYQ");
+    mosfet.SetLibraryModel("MYM");
+    CHECK(diode.GetModel() == nullptr);
+    CHECK_FALSE(diode.IsCustom());
+    CHECK(std::string_view(diode.GetModelName()) == "MYD");
+    CHECK(bjt.GetModel() == nullptr);
+    CHECK_FALSE(bjt.IsCustom());
+    CHECK(mosfet.GetModel() == nullptr);
+    CHECK_FALSE(mosfet.IsCustom());
+
+    // Going back to the ready model of the list drops the library model
+    diode.SetModel(Core::GetDiodeModels(Core::ComponentType::DIODE).front());
+    CHECK_FALSE(diode.HasLibraryModel());
+    CHECK(diode.GetModel() == Core::GetDiodeModels(Core::ComponentType::DIODE).data());
+
+    // Custom parameters drop it too, and start from the ready model that was selected before it
+    bjt.SetCustom();
+    CHECK_FALSE(bjt.HasLibraryModel());
+    CHECK(bjt.IsCustom());
+    CHECK(bjt.GetParameters().ForwardBeta
+          == Core::GetBJTModels(Core::ComponentType::NPN).front().Parameters.ForwardBeta);
+    mosfet.SetCustomParameters({.Width = 50e-6});
+    CHECK_FALSE(mosfet.HasLibraryModel());
+    CHECK(mosfet.IsCustom());
+    CHECK(mosfet.GetParameters().Width == 50e-6);
+}
+
+TEST_CASE("An op-amp switches between ready and custom specifications like the other modeled parts",
+          "[component][model_choice]") {
+    Core::OpAmp op_amp;
+    op_amp.SetName("U4");
+    const Core::OpAmpModel *ready = Core::FindOpAmpModel(Core::ComponentType::OP_AMP, "uA741");
+    REQUIRE(ready != nullptr);
+    CHECK(op_amp.IsIdeal());
+    CHECK(std::string_view(op_amp.GetModelName()) == "Ideal");
+
+    op_amp.SetModel(*ready);
+    CHECK_FALSE(op_amp.IsIdeal());
+    CHECK(op_amp.GetSpiceModelName() == ready->SpiceName);
+
+    op_amp.SetCustom();
+    CHECK(op_amp.IsCustom());
+    CHECK(op_amp.GetModel() == nullptr);
+    CHECK(std::string_view(op_amp.GetModelName()) == "Custom");
+    CHECK(op_amp.GetSpiceModelName() == "imcsim_opamp_U4");
+    CHECK(op_amp.GetParameters().SlewRate == ready->Parameters.SlewRate);
+
+    // Choosing custom again keeps the edited specifications
+    Core::OpAmpParameters edited = op_amp.GetParameters();
+    edited.SlewRate = 13.0;
+    op_amp.SetCustomParameters(edited);
+    op_amp.SetCustom();
+    CHECK(op_amp.GetParameters().SlewRate == 13.0);
+
+    op_amp.SetModel(*ready);
+    CHECK_FALSE(op_amp.IsCustom());
+    CHECK(op_amp.GetParameters().SlewRate == ready->Parameters.SlewRate);
+}
+
 TEST_CASE("Custom diode parameters must be in the range ngspice simulates", "[component]") {
     const Core::Diode diode(Core::ComponentType::LED);
     CHECK(diode.IsValidParameters({}));

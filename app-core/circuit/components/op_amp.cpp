@@ -9,6 +9,7 @@
 
 #include "circuit/components/op_amp.h"
 
+#include "circuit/components/model_catalog.h"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -200,8 +201,7 @@ FormatInputStage(const OpAmpParameters &parameters, const double tail_current, c
  * @brief   Creates an ideal op-amp with a gain-bandwidth product of 1 MHz.
  */
 OpAmp::OpAmp()
-    : Component(ComponentType::OP_AMP, 0.0), m_Model(MODELS.data()), m_CustomParameters(MODELS.front().Parameters),
-      m_IdealBandwidth(DEFAULT_IDEAL_BANDWIDTH) {
+    : Component(ComponentType::OP_AMP, 0.0), m_Choice(MODELS.front()), m_IdealBandwidth(DEFAULT_IDEAL_BANDWIDTH) {
 }
 
 /**
@@ -217,7 +217,7 @@ std::unique_ptr<Component> OpAmp::Clone() const {
  * @return  An entry of GetOpAmpModels(), or nullptr when it uses custom specifications.
  */
 const OpAmpModel *OpAmp::GetModel() const {
-    return m_Model;
+    return m_Choice.GetModel();
 }
 
 /**
@@ -225,7 +225,7 @@ const OpAmpModel *OpAmp::GetModel() const {
  * @param[in] model  An entry from GetOpAmpModels(); the op-amp keeps a reference to it.
  */
 void OpAmp::SetModel(const OpAmpModel &model) {
-    m_Model = &model;
+    m_Choice.SetModel(model);
 }
 
 /**
@@ -233,7 +233,7 @@ void OpAmp::SetModel(const OpAmpModel &model) {
  * @return  True while it uses the ideal model.
  */
 bool OpAmp::IsIdeal() const {
-    return m_Model != nullptr && m_Model->Ideal;
+    return m_Choice.GetModel() != nullptr && m_Choice.GetModel()->Ideal;
 }
 
 /**
@@ -257,7 +257,7 @@ void OpAmp::SetIdealBandwidth(const double bandwidth) {
  * @return  True for a custom op-amp, which is always a macromodel.
  */
 bool OpAmp::IsCustom() const {
-    return m_Model == nullptr;
+    return m_Choice.IsCustom();
 }
 
 /**
@@ -266,11 +266,7 @@ bool OpAmp::IsCustom() const {
  *          op-amp from the specifications of a uA741.
  */
 void OpAmp::SetCustom() {
-    if (m_Model == nullptr) {
-        return;
-    }
-    m_CustomParameters = m_Model->Parameters;
-    m_Model = nullptr;
+    m_Choice.SetCustom();
 }
 
 /**
@@ -278,8 +274,7 @@ void OpAmp::SetCustom() {
  * @param[in] parameters  New specifications; check them with IsValidParameters() first.
  */
 void OpAmp::SetCustomParameters(const OpAmpParameters &parameters) {
-    m_CustomParameters = parameters;
-    m_Model = nullptr;
+    m_Choice.SetCustomParameters(parameters);
 }
 
 /**
@@ -289,7 +284,7 @@ void OpAmp::SetCustomParameters(const OpAmpParameters &parameters) {
  *          positive, the phase margin is between 0 and 90 degrees, the output resistance is above the 1 Ohm sense
  *          resistance, the headrooms and supply current are not negative and the input offset voltage is finite.
  */
-bool OpAmp::IsValidParameters(const OpAmpParameters &parameters) const {
+bool OpAmp::IsValidParameters(const OpAmpParameters &parameters) {
     return parameters.OpenLoopGainDecibels > 0.0 && parameters.GainBandwidth > 0.0 && parameters.SlewRate > 0.0
         && parameters.PhaseMarginDegrees > 0.0 && parameters.PhaseMarginDegrees < 90.0
         && parameters.InputBiasCurrent > 0.0 && parameters.CommonModeRejectionDecibels > 0.0
@@ -303,7 +298,7 @@ bool OpAmp::IsValidParameters(const OpAmpParameters &parameters) const {
  * @return  Those of its ready model, or its custom ones; an ideal op-amp ignores them.
  */
 const OpAmpParameters &OpAmp::GetParameters() const {
-    return m_Model != nullptr ? m_Model->Parameters : m_CustomParameters;
+    return m_Choice.GetParameters();
 }
 
 /**
@@ -311,7 +306,7 @@ const OpAmpParameters &OpAmp::GetParameters() const {
  * @return  "Ideal", a ready model name such as "uA741", or CustomOpAmpModelName.
  */
 const char *OpAmp::GetModelName() const {
-    return m_Model != nullptr ? m_Model->Name : CUSTOM_OP_AMP_MODEL_NAME;
+    return m_Choice.GetName();
 }
 
 /**
@@ -320,8 +315,8 @@ const char *OpAmp::GetModelName() const {
  *          specifications belong to one op-amp; empty for the ideal model, which needs no subcircuit.
  */
 std::string OpAmp::GetSpiceModelName() const {
-    if (m_Model != nullptr) {
-        return m_Model->SpiceName;
+    if (m_Choice.GetModel() != nullptr) {
+        return m_Choice.GetModel()->SpiceName;
     }
     return std::format("imcsim_opamp_{}", GetName());
 }
@@ -345,12 +340,7 @@ std::span<const OpAmpModel> GetOpAmpModels(const ComponentType type) {
  * @return  The model, or nullptr when the kind has no model of that name.
  */
 const OpAmpModel *FindOpAmpModel(const ComponentType type, const std::string_view name) {
-    for (const OpAmpModel &model : GetOpAmpModels(type)) {
-        if (name == model.Name) {
-            return &model;
-        }
-    }
-    return nullptr;
+    return FindModelByName<OpAmpModel>(GetOpAmpModels(type), name);
 }
 
 /**

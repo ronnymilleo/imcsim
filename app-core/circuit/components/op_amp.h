@@ -7,6 +7,7 @@
 #define IMCSIM_OP_AMP_H
 
 #include "circuit/components/component.h"
+#include "circuit/components/model_choice.h"
 #include <memory>
 #include <optional>
 #include <span>
@@ -68,7 +69,7 @@ struct OpAmpModel {
     OpAmpParameters Parameters;
 };
 
-inline constexpr const char *CUSTOM_OP_AMP_MODEL_NAME = "Custom";
+inline constexpr const char *CUSTOM_OP_AMP_MODEL_NAME = CUSTOM_MODEL_NAME;
 
 /**
  * @class   OpAmp
@@ -99,7 +100,7 @@ public:
     bool IsCustom() const;
     void SetCustom();
     void SetCustomParameters(const OpAmpParameters &parameters);
-    bool IsValidParameters(const OpAmpParameters &parameters) const;
+    static bool IsValidParameters(const OpAmpParameters &parameters);
 
     // Simulation
     const OpAmpParameters &GetParameters() const;
@@ -107,9 +108,7 @@ public:
     std::string GetSpiceModelName() const;
 
 private:
-    /// Null when the op-amp uses its custom parameters.
-    const OpAmpModel *m_Model;
-    OpAmpParameters m_CustomParameters;
+    ModelChoice<OpAmpModel, OpAmpParameters> m_Choice;
     double m_IdealBandwidth;
 };
 

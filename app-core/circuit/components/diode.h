@@ -7,6 +7,7 @@
 #define IMCSIM_DIODE_H
 
 #include "circuit/components/component.h"
+#include "circuit/components/model_choice.h"
 #include <memory>
 #include <span>
 #include <string>
@@ -63,7 +64,7 @@ struct DiodeModel {
     LEDColor Color;
 };
 
-inline constexpr const char *CUSTOM_DIODE_MODEL_NAME = "Custom";
+inline constexpr const char *CUSTOM_DIODE_MODEL_NAME = CUSTOM_MODEL_NAME;
 
 /**
  * @class   Diode
@@ -87,7 +88,7 @@ public:
     bool IsCustom() const;
     void SetCustom();
     void SetCustomParameters(const DiodeParameters &parameters);
-    bool IsValidParameters(const DiodeParameters &parameters) const;
+    static bool IsValidParameters(const DiodeParameters &parameters);
 
     // Simulation
     const DiodeParameters &GetParameters() const;
@@ -95,9 +96,7 @@ public:
     std::string GetSpiceModelName() const;
 
 private:
-    /// Null when the diode uses its custom parameters.
-    const DiodeModel *m_Model;
-    DiodeParameters m_CustomParameters;
+    ModelChoice<DiodeModel, DiodeParameters> m_Choice;
 };
 
 // Diodes
