@@ -125,16 +125,44 @@ BjtDevice::Intrinsic BjtDevice::Evaluate(const double vbe, const double vbc) con
     return result;
 }
 
-BjtDevice::Intrinsic BjtDevice::EvaluateAt(const std::vector<double> &x) const {
-    const double vbe = NodeVoltage(x, m_B) - NodeVoltage(x, m_E);
-    const double vbc = NodeVoltage(x, m_B) - NodeVoltage(x, m_C);
-    Intrinsic result = Evaluate(m_Pnp ? -vbe : vbe, m_Pnp ? -vbc : vbc);
+/**
+ * @brief   Reads the junction voltages from the solution vector and evaluates the intrinsic transistor there.
+ * @param[in] x  Solution vector.
+ * @return  The voltages as the circuit sees them and flipped for a PNP, and the currents in the circuit polarity.
+ */
+BjtDevice::JunctionState BjtDevice::EvaluateState(const std::vector<double> &x) const {
+    JunctionState state{};
+    state.Vbe = NodeVoltage(x, m_B) - NodeVoltage(x, m_E);
+    state.Vbc = NodeVoltage(x, m_B) - NodeVoltage(x, m_C);
+    state.VbeSigned = m_Pnp ? -state.Vbe : state.Vbe;
+    state.VbcSigned = m_Pnp ? -state.Vbc : state.Vbc;
+    state.Dc = Evaluate(state.VbeSigned, state.VbcSigned);
     if (m_Pnp) {
-        result.Ic = -result.Ic;
-        result.Ib = -result.Ib;
-        result.Ie = -result.Ie;
+        state.Dc.Ic = -state.Dc.Ic;
+        state.Dc.Ib = -state.Dc.Ib;
+        state.Dc.Ie = -state.Dc.Ie;
     }
-    return result;
+    return state;
+}
+
+/**
+ * @brief   Evaluates the depletion and transit-time charges of both junctions.
+ * @details The charges and capacitances stay in forward-positive polarity; the callers that need the physical charge
+ *          of a PNP multiply by its sign.
+ * @param[in] state  From EvaluateState().
+ * @note    Only meaningful when HasTransientState() is true; the DC analyses never need it, so Stamp() skips it.
+ */
+BjtDevice::JunctionCharges BjtDevice::EvaluateCharges(const JunctionState &state) const {
+    const BjtParameters &p = m_Parameters;
+    const DepletionCharge qbe = EvaluateDepletion(state.VbeSigned, p.EmitterCapacitance, m_JunctionPotential,
+                                                  BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT);
+    const DepletionCharge qbc = EvaluateDepletion(state.VbcSigned, p.CollectorCapacitance, m_JunctionPotential,
+                                                  BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT);
+    return {.BaseEmitterCharge = qbe.Charge + p.TransitTime * state.Dc.IfwdQb,
+            .BaseEmitterCapacitance = qbe.Capacitance + p.TransitTime * state.Dc.DIfwdQbDvbe,
+            .BaseCollectorCharge = qbc.Charge,
+            .BaseCollectorCapacitance = qbc.Capacitance,
+            .Transcapacitance = p.TransitTime * state.Dc.DIfwdQbDvbc};
 }
 
 void BjtDevice::Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) {
@@ -143,9 +171,10 @@ void BjtDevice::Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeCo
     StampSeriesResistor(sys, m_Base, m_B, p.BaseResistance);
     StampSeriesResistor(sys, m_Emitter, m_E, p.EmitterResistance);
 
-    const Intrinsic dc = EvaluateAt(x);
-    const double vbe = NodeVoltage(x, m_B) - NodeVoltage(x, m_E);
-    const double vbc = NodeVoltage(x, m_B) - NodeVoltage(x, m_C);
+    const JunctionState state = EvaluateState(x);
+    const Intrinsic &dc = state.Dc;
+    const double vbe = state.Vbe;
+    const double vbc = state.Vbc;
 
     // Linearized DC currents around (vbe, vbc):
     //   Ic(v) ≈ GcBe * (vB - vE) + GcBc * (vB - vC) + ieq_c
@@ -175,16 +204,11 @@ void BjtDevice::Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeCo
     // Transient junction charges (BE depletion + forward transit time TF; BC depletion)
     m_Gqbe = m_Gqbc = m_Ieqbe = m_Ieqbc = 0.0;
     if (time.IsTransient && HasTransientState()) {
-        const double vbe_signed = m_Pnp ? -vbe : vbe;
-        const double vbc_signed = m_Pnp ? -vbc : vbc;
-        const DepletionCharge qbe = EvaluateDepletion(vbe_signed, p.EmitterCapacitance, m_JunctionPotential,
-                                                      BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT);
-        const DepletionCharge qbc = EvaluateDepletion(vbc_signed, p.CollectorCapacitance, m_JunctionPotential,
-                                                      BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT);
+        const JunctionCharges charges = EvaluateCharges(state);
         const ChargeCompanion cap_be =
-            ChargeModel(qbe.Capacitance + p.TransitTime * dc.DIfwdQbDvbe, qbe.Charge + p.TransitTime * dc.IfwdQb,
-                        vbe_signed, m_HistoryBe, time);
-        const ChargeCompanion cap_bc = ChargeModel(qbc.Capacitance, qbc.Charge, vbc_signed, m_HistoryBc, time);
+            ChargeModel(charges.BaseEmitterCapacitance, charges.BaseEmitterCharge, state.VbeSigned, m_HistoryBe, time);
+        const ChargeCompanion cap_bc = ChargeModel(charges.BaseCollectorCapacitance, charges.BaseCollectorCharge,
+                                                   state.VbcSigned, m_HistoryBc, time);
         m_Gqbe = cap_be.Conductance;
         m_Ieqbe = cap_be.EquivalentCurrent;
         m_Gqbc = cap_bc.Conductance;
@@ -199,13 +223,12 @@ void BjtDevice::Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeCo
 }
 
 double BjtDevice::TerminalCurrent(const int terminal, const std::vector<double> &x) const {
-    const Intrinsic dc = EvaluateAt(x);
-    const double vbe = NodeVoltage(x, m_B) - NodeVoltage(x, m_E);
-    const double vbc = NodeVoltage(x, m_B) - NodeVoltage(x, m_C);
+    const JunctionState state = EvaluateState(x);
+    const Intrinsic &dc = state.Dc;
     const double sign = m_Pnp ? -1.0 : 1.0;
     // Capacitive currents flowing from Base to Emitter (iqbe) and from Base to Collector (iqbc)
-    const double iqbe = m_Gqbe * vbe + sign * m_Ieqbe;
-    const double iqbc = m_Gqbc * vbc + sign * m_Ieqbc;
+    const double iqbe = m_Gqbe * state.Vbe + sign * m_Ieqbe;
+    const double iqbc = m_Gqbc * state.Vbc + sign * m_Ieqbc;
     switch (terminal) {
     case 0: // Collector
         return dc.Ic - iqbc;
@@ -220,20 +243,11 @@ void BjtDevice::StampAc(MnaSystem &reactive, const std::vector<double> &x_dc) co
     if (!HasTransientState()) {
         return;
     }
-    const BjtParameters &p = m_Parameters;
-    const Intrinsic dc = EvaluateAt(x_dc);
-    const double vbe = NodeVoltage(x_dc, m_B) - NodeVoltage(x_dc, m_E);
-    const double vbc = NodeVoltage(x_dc, m_B) - NodeVoltage(x_dc, m_C);
-    const double vbe_signed = m_Pnp ? -vbe : vbe;
-    const double vbc_signed = m_Pnp ? -vbc : vbc;
-    const DepletionCharge qbe = EvaluateDepletion(vbe_signed, p.EmitterCapacitance, m_JunctionPotential,
-                                                  BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT);
-    const DepletionCharge qbc = EvaluateDepletion(vbc_signed, p.CollectorCapacitance, m_JunctionPotential,
-                                                  BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT);
-    StampConductance(reactive, m_B, m_E, qbe.Capacitance + p.TransitTime * dc.DIfwdQbDvbe);
-    StampConductance(reactive, m_B, m_C, qbc.Capacitance);
-    // SPICE geqcb = d(TF * Ifwd / qb) / dvbc: transcapacitance from vbc into the BE charge (Base -> Emitter)
-    const double geqcb = p.TransitTime * dc.DIfwdQbDvbc;
+    const JunctionCharges charges = EvaluateCharges(EvaluateState(x_dc));
+    StampConductance(reactive, m_B, m_E, charges.BaseEmitterCapacitance);
+    StampConductance(reactive, m_B, m_C, charges.BaseCollectorCapacitance);
+    // The transcapacitance from vbc into the BE charge (Base -> Emitter)
+    const double geqcb = charges.Transcapacitance;
     reactive.AddA(m_B, m_B, geqcb);
     reactive.AddA(m_B, m_C, -geqcb);
     reactive.AddA(m_E, m_B, -geqcb);
@@ -244,51 +258,34 @@ void BjtDevice::StampCharge(MnaSystem &sys, const std::vector<double> &x) const 
     if (!HasTransientState()) {
         return;
     }
-    const BjtParameters &p = m_Parameters;
-    const Intrinsic dc = EvaluateAt(x);
-    const double vbe = NodeVoltage(x, m_B) - NodeVoltage(x, m_E);
-    const double vbc = NodeVoltage(x, m_B) - NodeVoltage(x, m_C);
-    const double vbe_signed = m_Pnp ? -vbe : vbe;
-    const double vbc_signed = m_Pnp ? -vbc : vbc;
-    const DepletionCharge qbe = EvaluateDepletion(vbe_signed, p.EmitterCapacitance, m_JunctionPotential,
-                                                  BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT);
-    const DepletionCharge qbc = EvaluateDepletion(vbc_signed, p.CollectorCapacitance, m_JunctionPotential,
-                                                  BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT);
+    const JunctionState state = EvaluateState(x);
+    const JunctionCharges charges = EvaluateCharges(state);
 
-    const double c_be = qbe.Capacitance + p.TransitTime * dc.DIfwdQbDvbe;
-    const double c_bc = qbc.Capacitance;
-    const double geqcb = p.TransitTime * dc.DIfwdQbDvbc;
+    const double c_be = charges.BaseEmitterCapacitance;
+    const double c_bc = charges.BaseCollectorCapacitance;
+    const double geqcb = charges.Transcapacitance;
     const double sign = m_Pnp ? -1.0 : 1.0;
-    const double q_be_phys = sign * (qbe.Charge + p.TransitTime * dc.IfwdQb);
-    const double q_bc_phys = sign * qbc.Charge;
+    const double q_be_phys = sign * charges.BaseEmitterCharge;
+    const double q_bc_phys = sign * charges.BaseCollectorCharge;
 
     StampConductance(sys, m_B, m_E, c_be);
     sys.AddA(m_B, m_B, geqcb);
     sys.AddA(m_B, m_C, -geqcb);
     sys.AddA(m_E, m_B, -geqcb);
     sys.AddA(m_E, m_C, geqcb);
-    StampCurrentSource(sys, m_B, m_E, q_be_phys - c_be * vbe - geqcb * vbc);
+    StampCurrentSource(sys, m_B, m_E, q_be_phys - c_be * state.Vbe - geqcb * state.Vbc);
 
-    StampNortonBranch(sys, m_B, m_C, c_bc, q_bc_phys, vbc);
+    StampNortonBranch(sys, m_B, m_C, c_bc, q_bc_phys, state.Vbc);
 }
 
 double BjtDevice::TerminalCharge(const int terminal, const std::vector<double> &x) const {
     if (!HasTransientState()) {
         return 0.0;
     }
-    const BjtParameters &p = m_Parameters;
-    const Intrinsic dc = EvaluateAt(x);
-    const double vbe = NodeVoltage(x, m_B) - NodeVoltage(x, m_E);
-    const double vbc = NodeVoltage(x, m_B) - NodeVoltage(x, m_C);
-    const double vbe_signed = m_Pnp ? -vbe : vbe;
-    const double vbc_signed = m_Pnp ? -vbc : vbc;
-    const DepletionCharge qbe = EvaluateDepletion(vbe_signed, p.EmitterCapacitance, m_JunctionPotential,
-                                                  BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT);
-    const DepletionCharge qbc = EvaluateDepletion(vbc_signed, p.CollectorCapacitance, m_JunctionPotential,
-                                                  BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT);
+    const JunctionCharges charges = EvaluateCharges(EvaluateState(x));
     const double sign = m_Pnp ? -1.0 : 1.0;
-    const double q_be = sign * (qbe.Charge + p.TransitTime * dc.IfwdQb);
-    const double q_bc = sign * qbc.Charge;
+    const double q_be = sign * charges.BaseEmitterCharge;
+    const double q_bc = sign * charges.BaseCollectorCharge;
     switch (terminal) {
     case 0: // Collector
         return -q_bc;
@@ -302,7 +299,8 @@ double BjtDevice::TerminalCharge(const int terminal, const std::vector<double> &
 std::complex<double> BjtDevice::AcTerminalCurrent(const int terminal, const std::vector<double> &x_dc,
                                                   const std::vector<std::complex<double>> &x_ac,
                                                   const double omega) const {
-    const Intrinsic dc = EvaluateAt(x_dc);
+    const JunctionState state = EvaluateState(x_dc);
+    const Intrinsic &dc = state.Dc;
     const std::complex<double> vbe_ac = AcNodeVoltage(x_ac, m_B) - AcNodeVoltage(x_ac, m_E);
     const std::complex<double> vbc_ac = AcNodeVoltage(x_ac, m_B) - AcNodeVoltage(x_ac, m_C);
     const std::complex<double> ic_ac = dc.GcBe * vbe_ac + dc.GcBc * vbc_ac;
@@ -311,18 +309,10 @@ std::complex<double> BjtDevice::AcTerminalCurrent(const int terminal, const std:
     std::complex<double> iqbe_ac{0.0, 0.0};
     std::complex<double> iqbc_ac{0.0, 0.0};
     if (HasTransientState()) {
-        const BjtParameters &p = m_Parameters;
-        const double vbe = NodeVoltage(x_dc, m_B) - NodeVoltage(x_dc, m_E);
-        const double vbc = NodeVoltage(x_dc, m_B) - NodeVoltage(x_dc, m_C);
-        const double vbe_signed = m_Pnp ? -vbe : vbe;
-        const double vbc_signed = m_Pnp ? -vbc : vbc;
-        const DepletionCharge qbe = EvaluateDepletion(vbe_signed, p.EmitterCapacitance, m_JunctionPotential,
-                                                      BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT);
-        const DepletionCharge qbc = EvaluateDepletion(vbc_signed, p.CollectorCapacitance, m_JunctionPotential,
-                                                      BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT);
-        iqbe_ac = std::complex<double>(0.0, omega) * ((qbe.Capacitance + p.TransitTime * dc.DIfwdQbDvbe) * vbe_ac +
-                                                      (p.TransitTime * dc.DIfwdQbDvbc) * vbc_ac);
-        iqbc_ac = std::complex<double>(0.0, omega * qbc.Capacitance) * vbc_ac;
+        const JunctionCharges charges = EvaluateCharges(state);
+        iqbe_ac = std::complex<double>(0.0, omega) *
+                  (charges.BaseEmitterCapacitance * vbe_ac + charges.Transcapacitance * vbc_ac);
+        iqbc_ac = std::complex<double>(0.0, omega * charges.BaseCollectorCapacitance) * vbc_ac;
     }
 
     switch (terminal) {
@@ -389,7 +379,7 @@ double BjtDevice::OutputNoiseVariance(const std::vector<double> &x_dc, const std
         const std::complex<double> re_tf = AcNodeVoltage(adjoint, m_Emitter) - AcNodeVoltage(adjoint, m_E);
         variance += (GetFourKt(m_Thermal) / p.EmitterResistance) * std::norm(re_tf);
     }
-    const Intrinsic op = EvaluateAt(x_dc);
+    const Intrinsic op = EvaluateState(x_dc).Dc;
     const std::complex<double> ic_tf = AcNodeVoltage(adjoint, m_C) - AcNodeVoltage(adjoint, m_E);
     const std::complex<double> ib_tf = AcNodeVoltage(adjoint, m_B) - AcNodeVoltage(adjoint, m_E);
     variance += TWO_Q * std::fabs(op.Ic) * std::norm(ic_tf);
@@ -406,21 +396,10 @@ void BjtDevice::AcceptStep(const std::vector<double> &x) {
     if (!HasTransientState()) {
         return;
     }
-    const double vbe = NodeVoltage(x, m_B) - NodeVoltage(x, m_E);
-    const double vbc = NodeVoltage(x, m_B) - NodeVoltage(x, m_C);
-    const double vbe_signed = m_Pnp ? -vbe : vbe;
-    const double vbc_signed = m_Pnp ? -vbc : vbc;
-    const BjtParameters &p = m_Parameters;
-    const Intrinsic dc = EvaluateAt(x);
-    const double charge_be = EvaluateDepletion(vbe_signed, p.EmitterCapacitance, m_JunctionPotential,
-                                               BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT)
-                                 .Charge +
-                             p.TransitTime * dc.IfwdQb;
-    const double charge_bc = EvaluateDepletion(vbc_signed, p.CollectorCapacitance, m_JunctionPotential,
-                                               BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT)
-                                 .Charge;
-    m_HistoryBe = AdvanceHistory(m_HistoryBe, charge_be, m_Gqbe * vbe_signed + m_Ieqbe);
-    m_HistoryBc = AdvanceHistory(m_HistoryBc, charge_bc, m_Gqbc * vbc_signed + m_Ieqbc);
+    const JunctionState state = EvaluateState(x);
+    const JunctionCharges charges = EvaluateCharges(state);
+    m_HistoryBe = AdvanceHistory(m_HistoryBe, charges.BaseEmitterCharge, m_Gqbe * state.VbeSigned + m_Ieqbe);
+    m_HistoryBc = AdvanceHistory(m_HistoryBc, charges.BaseCollectorCharge, m_Gqbc * state.VbcSigned + m_Ieqbc);
     m_SavedHistoryBe = m_HistoryBe;
     m_SavedHistoryBc = m_HistoryBc;
 }

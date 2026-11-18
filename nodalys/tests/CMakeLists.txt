@@ -8,6 +8,7 @@ add_executable(nodalys-tests
     ac_sens_analysis_tests.cpp
     ac_sens_netlist_tests.cpp
     behavioral_device_tests.cpp
+    bjt_device_tests.cpp
     expression_tests.cpp
     fft_tests.cpp
     frequency_sweep_tests.cpp
