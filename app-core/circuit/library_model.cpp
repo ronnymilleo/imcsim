@@ -8,6 +8,7 @@
 #include "circuit/components/bjt.h"
 #include "circuit/components/diode.h"
 #include "circuit/components/mosfet.h"
+#include "spice/spice_text.h"
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -35,13 +36,6 @@ constexpr std::string_view SPICE_NAME_PREFIX = "LIB_";
 
 bool IsSpace(const char character) {
     return std::isspace(static_cast<unsigned char>(character)) != 0;
-}
-
-std::string ToLower(std::string_view text) {
-    std::string lower(text);
-    std::ranges::transform(lower, lower.begin(),
-                           [](const unsigned char character) { return static_cast<char>(std::tolower(character)); });
-    return lower;
 }
 
 /**

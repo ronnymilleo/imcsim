@@ -6,6 +6,7 @@
 #include "results/trace_math.h"
 
 #include "circuit/components/net_label.h"
+#include "spice/spice_text.h"
 #include "spice/spice_value.h"
 #include <algorithm>
 #include <array>
@@ -167,7 +168,7 @@ private:
         if (name.empty()) {
             return std::unexpected(std::format("Unexpected \"{}\"", m_Text.substr(m_Position)));
         }
-        const std::string lower = ToLower(name);
+        const std::string lower = Core::ToLower(name);
         if (lower == "v") {
             return ParseVoltage();
         }
@@ -290,12 +291,6 @@ private:
             ++m_Position;
         }
         return std::string(m_Text.substr(start, m_Position - start));
-    }
-
-    static std::string ToLower(std::string text) {
-        std::ranges::transform(text, text.begin(),
-                               [](const char character) { return static_cast<char>(std::tolower(character)); });
-        return text;
     }
 };
 
