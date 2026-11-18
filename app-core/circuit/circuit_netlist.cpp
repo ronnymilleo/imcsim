@@ -542,6 +542,36 @@ bool WritesNoElement(const ComponentType type) {
 } // namespace
 
 /**
+ * @brief   Writes the parts of a circuit as SPICE lines, with the models they use, and nothing around them.
+ * @details This is what both the top netlist and the body of a ".subckt" block share: no title, options, initial
+ *          voltages, library models, block definitions or ".end". The top netlist and each block add what belongs to
+ *          them around it.
+ * @param[in] circuit             Circuit to write.
+ * @param[in] add_current_probes  As in WriteSpiceNetlist().
+ * @return  One line per component, plus its probes, then one ".model" line per model in use and the subcircuits of
+ *          the op-amp macromodels and fuses it needs.
+ */
+std::string WriteNetlistBody(const Circuit &circuit, const bool add_current_probes) {
+    std::string body;
+    const std::vector<std::string> controlling_currents = ListControllingCurrents(circuit.GetEntries());
+    NetlistExtras extras{.ModelNames = {}, .Models = {}, .NextExtraNode = circuit.GetNodeCount()};
+    for (const CircuitEntry &entry : circuit.GetEntries()) {
+        const Component &component = *entry.Part;
+        // Probed parts connect through the probe nodes; the probe lines follow the part
+        std::vector<int> nodes = entry.Nodes;
+        const std::string probes =
+            ProbeTerminals(component,
+                           ProbesFor(component, add_current_probes, CarriesCurrent(component, controlling_currents)),
+                           nodes,
+                           extras.NextExtraNode);
+        body += FormatPart(circuit, component, nodes, extras);
+        body += probes;
+    }
+    body += extras.Models;
+    return body;
+}
+
+/**
  * @brief   Writes the circuit as a SPICE netlist, ready to hand to ngspice.
  * @param[in] circuit             Circuit to write.
  * @param[in] analysis            Optional analysis command, such as ".op", written right before ".end".
@@ -569,21 +599,7 @@ bool WritesNoElement(const ComponentType type) {
  */
 std::string WriteSpiceNetlist(const Circuit &circuit, const std::string_view analysis, const bool add_current_probes) {
     std::string netlist = "* imcsim netlist\n";
-    const std::vector<std::string> controlling_currents = ListControllingCurrents(circuit.GetEntries());
-    NetlistExtras extras{.ModelNames = {}, .Models = {}, .NextExtraNode = circuit.GetNodeCount()};
-    for (const CircuitEntry &entry : circuit.GetEntries()) {
-        const Component &component = *entry.Part;
-        // Probed parts connect through the probe nodes; the probe lines follow the part
-        std::vector<int> nodes = entry.Nodes;
-        const std::string probes =
-            ProbeTerminals(component,
-                           ProbesFor(component, add_current_probes, CarriesCurrent(component, controlling_currents)),
-                           nodes,
-                           extras.NextExtraNode);
-        netlist += FormatPart(circuit, component, nodes, extras);
-        netlist += probes;
-    }
-    netlist += extras.Models;
+    netlist += WriteNetlistBody(circuit, add_current_probes);
     netlist += FormatSolverOptions(circuit);
     netlist += FormatNodeVoltages(circuit, NodeVoltageKind::INITIAL);
     netlist += FormatNodeVoltages(circuit, NodeVoltageKind::NODESET);

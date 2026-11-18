@@ -9,7 +9,6 @@
 #include "circuit/circuit_currents.h"
 #include "circuit/circuit_netlist.h"
 #include "circuit/components/component.h"
-#include "circuit/components/fuse.h"
 #include "circuit/components/subcircuit.h"
 #include "circuit/subcircuit.h"
 #include "spice/spice_text.h"
@@ -110,18 +109,49 @@ std::string ScopeModels(const std::string &body, const std::string_view definiti
 }
 
 /**
- * @brief   Takes the ".ic" and ".nodeset" lines out of a body, since ngspice does not read them inside a ".subckt".
+ * @brief   The ".subckt" line of a block: its name, the nodes or ports of its pins and its parameters with defaults.
  */
-void RemoveNodeVoltageLines(std::string &body) {
-    std::string kept;
-    std::istringstream lines(body);
-    std::string line;
-    while (std::getline(lines, line)) {
-        if (!line.starts_with(".ic ") && !line.starts_with(".nodeset ")) {
-            kept += line + '\n';
+std::string FormatSubcircuitHeader(const SubcircuitDefinition &definition) {
+    std::string header = std::format(".subckt {}", definition.Name);
+    if (definition.Spice) {
+        for (const std::string &port : definition.Spice->Ports) {
+            header += std::format(" {}", port);
+        }
+    } else {
+        for (const SubcircuitPin &pin : definition.Pins) {
+            header += std::format(" {}", pin.Node);
         }
     }
-    body = std::move(kept);
+    if (!definition.Parameters.empty()) {
+        header += " params:";
+        for (const SubcircuitParameter &parameter : definition.Parameters) {
+            header += std::format(" {}={}", parameter.Name, FormatSpiceValue(parameter.DefaultValue));
+        }
+    }
+    header += "\n";
+    return header;
+}
+
+/**
+ * @brief   What a block holds, before its models are scoped: its SPICE text as it came, or its drawn parts as netlist
+ *          lines.
+ * @details The root netlist writes the options, the initial voltages and the nodesets of every instance, once and at
+ *          the top, where ngspice reads them, so a drawn body is only its parts and their models.
+ */
+std::string FormatSubcircuitBody(const SubcircuitDefinition &definition) {
+    if (definition.Spice) {
+        std::string body = definition.Spice->Text;
+        if (!body.empty() && !body.ends_with('\n')) {
+            body += '\n';
+        }
+        return body;
+    }
+    // A pin that no part inside uses still owns its node, which the extra nodes of the body must not take
+    Circuit numbered_body = definition.Body;
+    for (const SubcircuitPin &pin : definition.Pins) {
+        numbered_body.ReserveNode(pin.Node);
+    }
+    return WriteNetlistBody(numbered_body, false);
 }
 
 } // namespace
@@ -134,51 +164,8 @@ void RemoveNodeVoltageLines(std::string &body) {
  * @return  The block, from ".subckt" to ".ends", each line ending in a line break.
  */
 std::string FormatSubcircuit(const SubcircuitDefinition &definition) {
-    std::string text = std::format(".subckt {}", definition.Name);
-    if (definition.Spice) {
-        for (const std::string &port : definition.Spice->Ports) {
-            text += std::format(" {}", port);
-        }
-    } else {
-        for (const SubcircuitPin &pin : definition.Pins) {
-            text += std::format(" {}", pin.Node);
-        }
-    }
-    if (!definition.Parameters.empty()) {
-        text += " params:";
-        for (const SubcircuitParameter &parameter : definition.Parameters) {
-            text += std::format(" {}={}", parameter.Name, FormatSpiceValue(parameter.DefaultValue));
-        }
-    }
-    text += "\n";
-    std::string body;
-    if (definition.Spice) {
-        body = definition.Spice->Text;
-        if (!body.empty() && !body.ends_with('\n')) {
-            body += '\n';
-        }
-    } else {
-        // A pin that no part inside uses still owns its node, which the extra nodes of the body must not take
-        Circuit numbered_body = definition.Body;
-        for (const SubcircuitPin &pin : definition.Pins) {
-            numbered_body.ReserveNode(pin.Node);
-        }
-        body = numbered_body.ToSpiceNetlist();
-        body.erase(0, body.find('\n') + 1);
-        if (body.ends_with(".end\n")) {
-            body.erase(body.size() - 5);
-        }
-        // The root netlist writes the initial voltages and nodesets of every instance at the top, where ngspice reads
-        // them
-        RemoveNodeVoltageLines(body);
-        // Options are global and the root netlist writes them once, for the fuses of the blocks too
-        if (const std::size_t option = body.find(FUSE_INTEGRATION_OPTION); option != std::string::npos) {
-            body.erase(option, FUSE_INTEGRATION_OPTION.size());
-        }
-    }
-    text += ScopeModels(body, definition.Name);
-    text += std::format(".ends {}\n", definition.Name);
-    return text;
+    return FormatSubcircuitHeader(definition) + ScopeModels(FormatSubcircuitBody(definition), definition.Name)
+         + std::format(".ends {}\n", definition.Name);
 }
 
 /**
