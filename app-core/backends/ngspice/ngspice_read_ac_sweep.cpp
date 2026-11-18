@@ -75,7 +75,7 @@ PassiveACCurrent(const CircuitEntry &entry,
  */
 std::vector<std::complex<double>> CurrentSourceACCurrent(const Component &component, const std::size_t point_count) {
     const auto &source = static_cast<const Source &>(component);
-    const double magnitude = source.GetSourceType() == Source::SourceType::AC ? source.GetAC().Magnitude : 0.0;
+    const double magnitude = source.GetACMagnitude();
     return std::vector<std::complex<double>>(point_count, std::complex<double>(magnitude, 0.0));
 }
 

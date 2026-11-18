@@ -196,6 +196,7 @@ public:
     const ACParameters &GetAC() const;
     void SetAC(const ACParameters &ac);
     bool IsValidAC(const ACParameters &ac) const;
+    double GetACMagnitude() const;
 
     // Pulse parameters, used when the source is a pulse
     const PulseParameters &GetPulse() const;
