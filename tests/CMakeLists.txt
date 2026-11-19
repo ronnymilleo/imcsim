@@ -52,6 +52,7 @@ add_executable(imcsim-tests
             led_glow_tests.cpp
             live_change_tests.cpp
             live_input_tests.cpp
+            live_run_plan_tests.cpp
             logarithmic_level_tests.cpp
             logic_bus_definition_tests.cpp
             logic_bus_tests.cpp

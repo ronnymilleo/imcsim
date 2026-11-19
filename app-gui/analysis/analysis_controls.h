@@ -17,6 +17,7 @@
 #include <array>
 #include <chrono>
 #include <cstddef>
+#include <functional>
 #include <optional>
 #include <string>
 #include <vector>
@@ -163,6 +164,7 @@ private:
     void RunOperatingPointAnalysis(const Core::Circuit &circuit, const RunRepeat &repeat);
     void RunTransientAnalysis(const Core::Circuit &circuit, const RunRepeat &repeat);
     void StartSingleTransient(const Core::Circuit &circuit, const Core::TransientSettings &settings);
+    std::function<void(Core::Transient)> MakeChunkSink(Core::RunControl &control, std::size_t circuit_version);
     void RunACSweepAnalysis(const Core::Circuit &circuit, const RunRepeat &repeat);
     void RunDCSweepAnalysis(const Core::Circuit &circuit, const RunRepeat &repeat);
     void RunNoiseAnalysis(const Core::Circuit &circuit);

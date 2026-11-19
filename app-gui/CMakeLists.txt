@@ -8,6 +8,7 @@ add_library(imcsim-gui-lib
             analysis/analysis_inputs.cpp
             analysis/analysis_settings_panel.cpp
             analysis/auto_rerun.cpp
+            analysis/live_run_plan.cpp
             analysis/run_ac_sweep.cpp
             analysis/run_dc_sweep.cpp
             analysis/run_harmonic_balance.cpp
