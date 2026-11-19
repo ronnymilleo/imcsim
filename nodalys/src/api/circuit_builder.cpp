@@ -120,6 +120,8 @@ BoyleOpAmpValues ComputeBoyleOpAmpValues(const BoyleOpAmpParameters &parameters)
 
 /// The unknown index of the reference node, which has no row in the system.
 constexpr int GROUND_UNKNOWN = -1;
+/// Control branch of a current-controlled source until Build() binds it to its source, or refuses the circuit.
+constexpr int UNBOUND_CONTROL_BRANCH = -1;
 
 /// Saturation current of the diodes that clamp the current limiter of the Boyle op-amp.
 constexpr double CLAMP_DIODE_SATURATION_CURRENT = 1e-20;
@@ -592,9 +594,12 @@ public:
             const int u_pos = MapNode(pos);
             const int u_neg = MapNode(neg);
             const int branch = AllocateBranch();
-            const int ctrl_branch = ResolveControlBranch(ctrl_source);
-            Device *dev = AddDevice(std::make_unique<CcvsDevice>(u_pos, u_neg, branch, ctrl_branch, rm));
-            RegisterElement(name, dev);
+            auto device = std::make_unique<CcvsDevice>(u_pos, u_neg, branch, UNBOUND_CONTROL_BRANCH, rm);
+            CcvsDevice *ccvs = device.get();
+            RegisterElement(name, AddDevice(std::move(device)));
+            m_PendingControls.push_back({.Owner = name, .Source = ctrl_source, .Bind = [ccvs](const int ctrl) {
+                                             ccvs->BindControlBranch(ctrl);
+                                         }});
         });
     }
 
@@ -603,9 +608,12 @@ public:
         Defer([this, name = std::move(name), pos, neg, ctrl_source, gain]() mutable {
             const int u_pos = MapNode(pos);
             const int u_neg = MapNode(neg);
-            const int ctrl_branch = ResolveControlBranch(ctrl_source);
-            Device *dev = AddDevice(std::make_unique<CccsDevice>(u_pos, u_neg, ctrl_branch, gain));
-            RegisterElement(name, dev);
+            auto device = std::make_unique<CccsDevice>(u_pos, u_neg, UNBOUND_CONTROL_BRANCH, gain);
+            CccsDevice *cccs = device.get();
+            RegisterElement(name, AddDevice(std::move(device)));
+            m_PendingControls.push_back({.Owner = name, .Source = ctrl_source, .Bind = [cccs](const int ctrl) {
+                                             cccs->BindControlBranch(ctrl);
+                                         }});
         });
     }
 
@@ -1076,6 +1084,7 @@ public:
         }
         m_NodesetVoltages.clear();
         BindBehavioralCurrents();
+        BindControlBranches();
         if (!m_Errors.empty()) {
             return std::unexpected(m_Errors.front());
         }
@@ -1100,6 +1109,17 @@ private:
         BehavioralSourceDevice *Device;
         std::size_t Input;
         std::string Source;
+    };
+
+    /**
+     * @struct  PendingControl
+     * @brief   The controlling source of a current-controlled source, to be bound to its branch once all sources
+     *          exist, since a netlist may name a source on a later line.
+     */
+    struct PendingControl {
+        std::string Owner;
+        std::string Source;
+        std::function<void(int)> Bind;
     };
 
     /**
@@ -1148,16 +1168,16 @@ private:
     /**
      * @brief   Finds the branch unknown of the voltage source that a current-controlled source reads.
      * @param[in] source_name  Name of the controlling source, as written, so the case matters.
-     * @return  The branch, or -1 when no voltage source has that name.
+     * @return  The branch, or nothing when no voltage source has that name.
      */
-    int ResolveControlBranch(const std::string &source_name) const {
+    std::optional<int> ResolveControlBranch(const std::string &source_name) const {
         const auto it = m_Compiled.SourcesByName.find(source_name);
         if (it != m_Compiled.SourcesByName.end()) {
             if (const auto *source = dynamic_cast<const VoltageSourceDevice *>(it->second)) {
                 return source->GetBranch();
             }
         }
-        return -1;
+        return std::nullopt;
     }
 
     /**
@@ -1456,10 +1476,25 @@ private:
         m_PendingCurrents.clear();
     }
 
+    void BindControlBranches() {
+        for (const PendingControl &control : m_PendingControls) {
+            const std::optional<int> branch = ResolveControlBranch(control.Source);
+            if (!branch) {
+                m_Errors.push_back(std::format("{}: its control source {} is not a voltage source of the circuit",
+                                               control.Owner,
+                                               control.Source));
+                continue;
+            }
+            control.Bind(*branch);
+        }
+        m_PendingControls.clear();
+    }
+
     int m_CircuitNodeCount = 0;
     int m_MaxNode = 0;
     std::vector<std::function<void()>> m_Actions;
     std::vector<PendingCurrent> m_PendingCurrents;
+    std::vector<PendingControl> m_PendingControls;
     std::vector<std::string> m_Errors;
     std::vector<bool> m_IsNodeUnknown;
     std::vector<bool> m_DynamicUnknown;

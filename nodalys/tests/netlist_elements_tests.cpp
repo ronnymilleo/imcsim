@@ -133,6 +133,50 @@ TEST_CASE("Controlled sources in a netlist follow their controlling voltage or c
     }
 }
 
+TEST_CASE("A current-controlled source finds its control source on a later line of the netlist", "[nodalys][parser]") {
+    // Vsense carries the 1 mA that V1 drives through R1: F1 doubles it into the 1k load, H1 turns it into 2 V
+    const std::string_view element = GENERATE(as<std::string_view>{}, "F1 3 0 Vsense 2", "H1 3 0 Vsense 2k");
+    CAPTURE(element);
+    const auto parsed = Nodalys::ParseNetlist(
+        std::format("* late\n{}\nRload 3 0 1k\nV1 1 0 1\nR1 1 2 1k\nVsense 2 0 0\n.op\n.end\n", element));
+    REQUIRE(parsed.has_value());
+    const auto point = Nodalys::ComputeOperatingPoint(parsed->CircuitInstance);
+    REQUIRE(point.has_value());
+    CHECK_THAT(std::abs(point->NodeVoltages[3]), WithinAbs(2.0, 1e-6));
+}
+
+TEST_CASE("A current-controlled source whose control is not a voltage source is refused, with both names",
+          "[nodalys][parser]") {
+    SECTION("A control source the netlist does not have") {
+        for (const std::string_view element : {"F1 1 0 Vmissing 2", "H1 1 0 Vmissing 2"}) {
+            CAPTURE(element);
+            const auto parsed = Nodalys::ParseNetlist(std::format("* missing\n{}\nR1 1 0 1k\n.op\n.end\n", element));
+            REQUIRE_FALSE(parsed.has_value());
+            CHECK(parsed.error()
+                  == std::format("{}: its control source Vmissing is not a voltage source of the circuit",
+                                 element.substr(0, 2)));
+        }
+    }
+    SECTION("A control source that is a current source, read by a CCCS") {
+        Nodalys::CircuitBuilder builder;
+        builder.AddIdc("I1", 2, 0, 1e-3);
+        builder.AddResistor("R2", 2, 0, 1e3);
+        builder.AddCccs("F1", 1, 0, "I1", 2.0);
+        const auto circuit = builder.Build();
+        REQUIRE_FALSE(circuit.has_value());
+        CHECK(circuit.error() == "F1: its control source I1 is not a voltage source of the circuit");
+    }
+    SECTION("A control source that is a current source, read by a CCVS") {
+        Nodalys::CircuitBuilder builder;
+        builder.AddIdc("I1", 2, 0, 1e-3);
+        builder.AddResistor("R2", 2, 0, 1e3);
+        builder.AddCcvs("H1", 1, 0, "I1", 2e3);
+        const auto circuit = builder.Build();
+        REQUIRE_FALSE(circuit.has_value());
+        CHECK(circuit.error() == "H1: its control source I1 is not a voltage source of the circuit");
+    }
+}
+
 TEST_CASE("Initial conditions and ports in a netlist reach the circuit", "[nodalys][parser]") {
     SECTION("A capacitor starts a transient from its IC= with uic") {
         const auto parsed = Nodalys::ParseNetlist("* ic\nC1 1 0 1u IC=3\nR1 1 0 1k\n.tran 10u 5m uic\n.end\n");
