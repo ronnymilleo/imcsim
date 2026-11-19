@@ -50,6 +50,8 @@ struct ComponentTraits {
     std::string_view Unit;
     /// Rule for the value; a component has a value exactly when the rule is not NONE.
     ValueRule AcceptedValues;
+    /// Group of the kinds the compiler and the netlist writer treat alike.
+    ComponentFamily Family;
 };
 
 constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
@@ -59,6 +61,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "R",
         .Unit = "Ohm",
         .AcceptedValues = ValueRule::POSITIVE,
+        .Family = ComponentFamily::PASSIVE,
     },
     {
         .Type = ComponentType::CAPACITOR,
@@ -66,6 +69,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "C",
         .Unit = "F",
         .AcceptedValues = ValueRule::POSITIVE,
+        .Family = ComponentFamily::PASSIVE,
     },
     {
         .Type = ComponentType::INDUCTOR,
@@ -73,6 +77,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "L",
         .Unit = "H",
         .AcceptedValues = ValueRule::POSITIVE,
+        .Family = ComponentFamily::PASSIVE,
     },
     {
         .Type = ComponentType::GROUND,
@@ -80,6 +85,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "",
         .Unit = "",
         .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::MARKER,
     },
     // A supply rail, a clock and a logic input are simulated as voltage sources to ground
     {
@@ -88,6 +94,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "V",
         .Unit = "V",
         .AcceptedValues = ValueRule::ANY,
+        .Family = ComponentFamily::SOURCE,
     },
     {
         .Type = ComponentType::VOLTAGE_SOURCE,
@@ -95,6 +102,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "Vin",
         .Unit = "V",
         .AcceptedValues = ValueRule::ANY,
+        .Family = ComponentFamily::SOURCE,
     },
     {
         .Type = ComponentType::CURRENT_SOURCE,
@@ -102,6 +110,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "I",
         .Unit = "A",
         .AcceptedValues = ValueRule::ANY,
+        .Family = ComponentFamily::SOURCE,
     },
     {
         .Type = ComponentType::DIODE,
@@ -109,6 +118,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "D",
         .Unit = "",
         .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::SEMICONDUCTOR,
     },
     {
         .Type = ComponentType::ZENER_DIODE,
@@ -116,6 +126,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "D",
         .Unit = "",
         .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::SEMICONDUCTOR,
     },
     {
         .Type = ComponentType::LED,
@@ -123,6 +134,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "D",
         .Unit = "",
         .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::SEMICONDUCTOR,
     },
     {
         .Type = ComponentType::NPN,
@@ -130,6 +142,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "Q",
         .Unit = "",
         .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::SEMICONDUCTOR,
     },
     {
         .Type = ComponentType::PNP,
@@ -137,6 +150,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "Q",
         .Unit = "",
         .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::SEMICONDUCTOR,
     },
     {
         .Type = ComponentType::NMOS,
@@ -144,6 +158,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "M",
         .Unit = "",
         .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::SEMICONDUCTOR,
     },
     {
         .Type = ComponentType::PMOS,
@@ -151,6 +166,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "M",
         .Unit = "",
         .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::SEMICONDUCTOR,
     },
     {
         .Type = ComponentType::VCVS,
@@ -158,6 +174,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "E",
         .Unit = "V/V",
         .AcceptedValues = ValueRule::ANY,
+        .Family = ComponentFamily::CONTROLLED_SOURCE,
     },
     {
         .Type = ComponentType::VCCS,
@@ -165,6 +182,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "G",
         .Unit = "A/V",
         .AcceptedValues = ValueRule::ANY,
+        .Family = ComponentFamily::CONTROLLED_SOURCE,
     },
     {
         .Type = ComponentType::CCCS,
@@ -172,6 +190,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "F",
         .Unit = "A/A",
         .AcceptedValues = ValueRule::ANY,
+        .Family = ComponentFamily::CONTROLLED_SOURCE,
     },
     {
         .Type = ComponentType::CCVS,
@@ -179,6 +198,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "H",
         .Unit = "V/A",
         .AcceptedValues = ValueRule::ANY,
+        .Family = ComponentFamily::CONTROLLED_SOURCE,
     },
     // The expression sets the voltage, so the part has a unit but no value
     {
@@ -187,6 +207,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "B",
         .Unit = "V",
         .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::BEHAVIORAL_SOURCE,
     },
     {
         .Type = ComponentType::BEHAVIORAL_CURRENT,
@@ -194,6 +215,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "B",
         .Unit = "A",
         .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::BEHAVIORAL_SOURCE,
     },
     {
         .Type = ComponentType::OP_AMP,
@@ -201,6 +223,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "U",
         .Unit = "",
         .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::AMPLIFIER,
     },
     {
         .Type = ComponentType::SUBCIRCUIT,
@@ -208,6 +231,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "X",
         .Unit = "",
         .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::BLOCK,
     },
     {
         .Type = ComponentType::NET_LABEL,
@@ -215,6 +239,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "",
         .Unit = "",
         .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::MARKER,
     },
     {
         .Type = ComponentType::INITIAL_VOLTAGE,
@@ -222,6 +247,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "",
         .Unit = "V",
         .AcceptedValues = ValueRule::FINITE,
+        .Family = ComponentFamily::MARKER,
     },
     {
         .Type = ComponentType::NODESET,
@@ -229,6 +255,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "",
         .Unit = "V",
         .AcceptedValues = ValueRule::FINITE,
+        .Family = ComponentFamily::MARKER,
     },
     {
         .Type = ComponentType::PIN,
@@ -236,6 +263,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "",
         .Unit = "",
         .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::MARKER,
     },
     {
         .Type = ComponentType::POTENTIOMETER,
@@ -243,6 +271,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "RV",
         .Unit = "Ohm",
         .AcceptedValues = ValueRule::POSITIVE,
+        .Family = ComponentFamily::PASSIVE,
     },
     {
         .Type = ComponentType::SWITCH,
@@ -250,6 +279,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "SW",
         .Unit = "",
         .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::PASSIVE,
     },
     {
         .Type = ComponentType::PUSH_BUTTON,
@@ -257,6 +287,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "PB",
         .Unit = "",
         .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::PASSIVE,
     },
     {
         .Type = ComponentType::V_SWITCH,
@@ -264,6 +295,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "S",
         .Unit = "",
         .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::SWITCHING,
     },
     {
         .Type = ComponentType::RELAY,
@@ -271,6 +303,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "K",
         .Unit = "",
         .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::SWITCHING,
     },
     {
         .Type = ComponentType::FUSE,
@@ -278,6 +311,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "FU",
         .Unit = "",
         .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::SWITCHING,
     },
     {
         .Type = ComponentType::TRANSFORMER,
@@ -285,6 +319,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "T",
         .Unit = "H",
         .AcceptedValues = ValueRule::POSITIVE,
+        .Family = ComponentFamily::TRANSFORMER,
     },
     {
         .Type = ComponentType::AND,
@@ -292,6 +327,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "U",
         .Unit = "",
         .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::LOGIC_GATE,
     },
     {
         .Type = ComponentType::OR,
@@ -299,6 +335,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "U",
         .Unit = "",
         .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::LOGIC_GATE,
     },
     {
         .Type = ComponentType::NOT,
@@ -306,6 +343,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "U",
         .Unit = "",
         .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::LOGIC_GATE,
     },
     {
         .Type = ComponentType::NAND,
@@ -313,6 +351,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "U",
         .Unit = "",
         .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::LOGIC_GATE,
     },
     {
         .Type = ComponentType::NOR,
@@ -320,6 +359,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "U",
         .Unit = "",
         .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::LOGIC_GATE,
     },
     {
         .Type = ComponentType::XOR,
@@ -327,6 +367,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "U",
         .Unit = "",
         .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::LOGIC_GATE,
     },
     {
         .Type = ComponentType::XNOR,
@@ -334,6 +375,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "U",
         .Unit = "",
         .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::LOGIC_GATE,
     },
     {
         .Type = ComponentType::BUFFER,
@@ -341,6 +383,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "U",
         .Unit = "",
         .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::LOGIC_GATE,
     },
     {
         .Type = ComponentType::D_FLIP_FLOP,
@@ -348,6 +391,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "U",
         .Unit = "",
         .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::FLIP_FLOP,
     },
     {
         .Type = ComponentType::JK_FLIP_FLOP,
@@ -355,6 +399,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "U",
         .Unit = "",
         .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::FLIP_FLOP,
     },
     {
         .Type = ComponentType::T_FLIP_FLOP,
@@ -362,6 +407,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "U",
         .Unit = "",
         .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::FLIP_FLOP,
     },
     {
         .Type = ComponentType::SR_FLIP_FLOP,
@@ -369,6 +415,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "U",
         .Unit = "",
         .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::FLIP_FLOP,
     },
     // Simulated as a voltage source to ground, like a supply rail
     {
@@ -377,6 +424,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "V",
         .Unit = "V",
         .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::SOURCE,
     },
     // Simulated as a voltage source to ground, like a supply rail
     {
@@ -385,6 +433,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "V",
         .Unit = "V",
         .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::SOURCE,
     },
     {
         .Type = ComponentType::LOGIC_OUTPUT,
@@ -392,6 +441,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "",
         .Unit = "",
         .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::LOGIC_DISPLAY,
     },
     {
         .Type = ComponentType::SEVEN_SEGMENT,
@@ -399,6 +449,7 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .NamePrefix = "",
         .Unit = "",
         .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::LOGIC_DISPLAY,
     },
 });
 
@@ -709,6 +760,15 @@ void Component::ClearTolerance() {
 }
 
 /**
+ * @brief   Tells which family a kind of component belongs to.
+ * @param[in] type  Kind of component.
+ * @return  The family of the type, such as ComponentFamily::PASSIVE for a resistor.
+ */
+ComponentFamily GetFamily(const ComponentType type) {
+    return GetTraits(type).Family;
+}
+
+/**
  * @brief   Tells whether a kind of part is the pin marker of a subcircuit.
  * @param[in] type  Kind of part.
  * @return  True for ComponentType::PIN.
@@ -723,7 +783,7 @@ bool IsSubcircuitPin(const ComponentType type) {
  * @return  True for the logic output and the 7-segment display.
  */
 bool IsLogicDisplay(const ComponentType type) {
-    return type == ComponentType::LOGIC_OUTPUT || type == ComponentType::SEVEN_SEGMENT;
+    return GetFamily(type) == ComponentFamily::LOGIC_DISPLAY;
 }
 
 /**

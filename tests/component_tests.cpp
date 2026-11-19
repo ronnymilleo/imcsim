@@ -720,6 +720,20 @@ TEST_CASE("Gates and flip-flops are U parts with no value, and their type names 
     CHECK_FALSE(Core::IsLogicPart(Core::ComponentType::OP_AMP));
 }
 
+TEST_CASE("Each kind of component belongs to the family its handling shares", "[component]") {
+    CHECK(Core::GetFamily(Core::ComponentType::RESISTOR) == Core::ComponentFamily::PASSIVE);
+    CHECK(Core::GetFamily(Core::ComponentType::POTENTIOMETER) == Core::ComponentFamily::PASSIVE);
+    CHECK(Core::GetFamily(Core::ComponentType::GROUND) == Core::ComponentFamily::MARKER);
+    CHECK(Core::GetFamily(Core::ComponentType::PIN) == Core::ComponentFamily::MARKER);
+    CHECK(Core::GetFamily(Core::ComponentType::CLOCK) == Core::ComponentFamily::SOURCE);
+    CHECK(Core::GetFamily(Core::ComponentType::CCVS) == Core::ComponentFamily::CONTROLLED_SOURCE);
+    CHECK(Core::GetFamily(Core::ComponentType::LED) == Core::ComponentFamily::SEMICONDUCTOR);
+    CHECK(Core::GetFamily(Core::ComponentType::RELAY) == Core::ComponentFamily::SWITCHING);
+    CHECK(Core::GetFamily(Core::ComponentType::NAND) == Core::ComponentFamily::LOGIC_GATE);
+    CHECK(Core::GetFamily(Core::ComponentType::JK_FLIP_FLOP) == Core::ComponentFamily::FLIP_FLOP);
+    CHECK(Core::GetFamily(Core::ComponentType::SEVEN_SEGMENT) == Core::ComponentFamily::LOGIC_DISPLAY);
+}
+
 TEST_CASE("The terminals of a gate or flip-flop are its inputs, then its outputs", "[component]") {
     CHECK(Core::GetLogicInputLabels(Core::ComponentType::OR) == std::vector<std::string>{"A", "B"});
     CHECK(Core::GetLogicInputLabels(Core::ComponentType::BUFFER) == std::vector<std::string>{"A"});

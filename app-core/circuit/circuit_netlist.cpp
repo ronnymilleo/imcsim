@@ -436,20 +436,30 @@ std::string FormatTransformer(const Transformer &transformer, const std::vector<
 }
 
 /**
- * @brief   The lines of one part, on the nodes its terminals reach, which are the probe nodes where it is probed.
- * @details Ground, labels, pin markers and the parts that only read a node write no line.
+ * @brief   Resistors, reactive parts, potentiometers and switches, which write a plain value or a fixed resistance.
  */
-std::string
-FormatPart(const Circuit &circuit, const Component &component, const std::vector<int> &nodes, NetlistExtras &extras) {
-    const std::string &name = component.GetName();
+std::string FormatPassivePart(const Component &component, const std::vector<int> &nodes) {
     switch (component.GetType()) {
-    case ComponentType::RESISTOR:
-        return std::format("{} {} {} {}\n", name, nodes[0], nodes[1], FormatComponentValue(component));
     case ComponentType::CAPACITOR:
     case ComponentType::INDUCTOR:
         return FormatReactivePart(component, nodes);
-    case ComponentType::VCC:
-        return std::format("{} {} 0 DC {}\n", name, nodes[0], FormatComponentValue(component));
+    case ComponentType::POTENTIOMETER:
+        return FormatPotentiometer(static_cast<const Potentiometer &>(component), nodes);
+    case ComponentType::SWITCH:
+    case ComponentType::PUSH_BUTTON:
+        return std::format("R-{} {} {} {}\n",
+                           component.GetName(),
+                           nodes[0],
+                           nodes[1],
+                           FormatSpiceValue(static_cast<const Switch &>(component).GetResistance()));
+    case ComponentType::RESISTOR:
+    default:
+        return std::format("{} {} {} {}\n", component.GetName(), nodes[0], nodes[1], FormatComponentValue(component));
+    }
+}
+
+std::string FormatSourcePart(const Component &component, const std::vector<int> &nodes) {
+    switch (component.GetType()) {
     case ComponentType::VOLTAGE_SOURCE:
     case ComponentType::CURRENT_SOURCE:
         return FormatSource(static_cast<const Source &>(component), nodes);
@@ -458,76 +468,85 @@ FormatPart(const Circuit &circuit, const Component &component, const std::vector
     case ComponentType::LOGIC_INPUT:
         // A constant source from its terminal to ground: the logic level when high, 0 V when low
         return std::format("{} {} 0 DC {}\n",
-                           name,
+                           component.GetName(),
                            nodes[0],
                            FormatSpiceValue(static_cast<const LogicInput &>(component).GetVoltage()));
+    case ComponentType::VCC:
+    default:
+        return std::format("{} {} 0 DC {}\n", component.GetName(), nodes[0], FormatComponentValue(component));
+    }
+}
+
+std::string
+FormatControlledSourcePart(const Circuit &circuit, const Component &component, const std::vector<int> &nodes) {
+    switch (component.GetType()) {
+    case ComponentType::CCCS:
+    case ComponentType::CCVS:
+        return FormatCurrentControlledSource(circuit, static_cast<const ControlledSource &>(component), nodes);
     case ComponentType::VCVS:
     case ComponentType::VCCS:
+    default:
         return std::format("{} {} {} {} {} {}\n",
-                           name,
+                           component.GetName(),
                            nodes[0],
                            nodes[1],
                            nodes[2],
                            nodes[3],
                            FormatComponentValue(component));
-    case ComponentType::CCCS:
-    case ComponentType::CCVS:
-        return FormatCurrentControlledSource(circuit, static_cast<const ControlledSource &>(component), nodes);
-    case ComponentType::BEHAVIORAL_VOLTAGE:
-    case ComponentType::BEHAVIORAL_CURRENT:
-        return FormatBehavioralSource(circuit, static_cast<const BehavioralSource &>(component), nodes);
-    case ComponentType::SUBCIRCUIT:
-        return FormatSubcircuitInstance(static_cast<const SubcircuitInstance &>(component), nodes);
-    case ComponentType::OP_AMP:
-        return FormatOpAmpPart(static_cast<const OpAmp &>(component), nodes, extras);
-    case ComponentType::DIODE:
-    case ComponentType::ZENER_DIODE:
-    case ComponentType::LED:
-    case ComponentType::NPN:
-    case ComponentType::PNP:
-    case ComponentType::NMOS:
-    case ComponentType::PMOS:
-        return FormatModeledPart(component, nodes, extras.ModelNames, extras.Models);
-    case ComponentType::POTENTIOMETER:
-        return FormatPotentiometer(static_cast<const Potentiometer &>(component), nodes);
-    case ComponentType::SWITCH:
-    case ComponentType::PUSH_BUTTON:
-        return std::format("R-{} {} {} {}\n",
-                           name,
-                           nodes[0],
-                           nodes[1],
-                           FormatSpiceValue(static_cast<const Switch &>(component).GetResistance()));
-    case ComponentType::V_SWITCH:
-        return FormatVoltageSwitch(static_cast<const VoltageControlledSwitch &>(component), nodes, extras);
-    case ComponentType::AND:
-    case ComponentType::OR:
-    case ComponentType::NOT:
-    case ComponentType::NAND:
-    case ComponentType::NOR:
-    case ComponentType::XOR:
-    case ComponentType::XNOR:
-    case ComponentType::BUFFER:
-    case ComponentType::D_FLIP_FLOP:
-    case ComponentType::JK_FLIP_FLOP:
-    case ComponentType::T_FLIP_FLOP:
-    case ComponentType::SR_FLIP_FLOP: {
-        const auto &logic = static_cast<const LogicPart &>(component);
-        extras.Models += FormatLogicModels(logic);
-        return FormatLogicPart(logic, nodes, extras.NextExtraNode);
     }
+}
+
+std::string FormatSwitchingPart(const Component &component, const std::vector<int> &nodes, NetlistExtras &extras) {
+    switch (component.GetType()) {
     case ComponentType::RELAY:
         return FormatRelay(static_cast<const Relay &>(component), nodes, extras);
     case ComponentType::FUSE:
         return FormatFuse(static_cast<const Fuse &>(component), nodes, extras);
-    case ComponentType::TRANSFORMER:
+    case ComponentType::V_SWITCH:
+    default:
+        return FormatVoltageSwitch(static_cast<const VoltageControlledSwitch &>(component), nodes, extras);
+    }
+}
+
+/**
+ * @brief   Gates and flip-flops write their model once, then the elements that build the part from it.
+ */
+std::string FormatLogicFamilyPart(const Component &component, const std::vector<int> &nodes, NetlistExtras &extras) {
+    const auto &logic = static_cast<const LogicPart &>(component);
+    extras.Models += FormatLogicModels(logic);
+    return FormatLogicPart(logic, nodes, extras.NextExtraNode);
+}
+
+/**
+ * @brief   The lines of one part, on the nodes its terminals reach, which are the probe nodes where it is probed.
+ * @details Ground, labels, pin markers and the parts that only read a node write no line.
+ */
+std::string
+FormatPart(const Circuit &circuit, const Component &component, const std::vector<int> &nodes, NetlistExtras &extras) {
+    switch (GetFamily(component.GetType())) {
+    case ComponentFamily::PASSIVE:
+        return FormatPassivePart(component, nodes);
+    case ComponentFamily::SOURCE:
+        return FormatSourcePart(component, nodes);
+    case ComponentFamily::CONTROLLED_SOURCE:
+        return FormatControlledSourcePart(circuit, component, nodes);
+    case ComponentFamily::BEHAVIORAL_SOURCE:
+        return FormatBehavioralSource(circuit, static_cast<const BehavioralSource &>(component), nodes);
+    case ComponentFamily::SEMICONDUCTOR:
+        return FormatModeledPart(component, nodes, extras.ModelNames, extras.Models);
+    case ComponentFamily::SWITCHING:
+        return FormatSwitchingPart(component, nodes, extras);
+    case ComponentFamily::TRANSFORMER:
         return FormatTransformer(static_cast<const Transformer &>(component), nodes, extras);
-    case ComponentType::GROUND:
-    case ComponentType::NET_LABEL:
-    case ComponentType::INITIAL_VOLTAGE:
-    case ComponentType::NODESET:
-    case ComponentType::PIN:
-    case ComponentType::LOGIC_OUTPUT:
-    case ComponentType::SEVEN_SEGMENT:
+    case ComponentFamily::AMPLIFIER:
+        return FormatOpAmpPart(static_cast<const OpAmp &>(component), nodes, extras);
+    case ComponentFamily::BLOCK:
+        return FormatSubcircuitInstance(static_cast<const SubcircuitInstance &>(component), nodes);
+    case ComponentFamily::LOGIC_GATE:
+    case ComponentFamily::FLIP_FLOP:
+        return FormatLogicFamilyPart(component, nodes, extras);
+    case ComponentFamily::MARKER:
+    case ComponentFamily::LOGIC_DISPLAY:
     default:
         return {};
     }
@@ -535,8 +554,8 @@ FormatPart(const Circuit &circuit, const Component &component, const std::vector
 
 /// Whether a part only marks or reads its node, so the netlist has no element for it.
 bool WritesNoElement(const ComponentType type) {
-    return type == ComponentType::GROUND || type == ComponentType::NET_LABEL || type == ComponentType::INITIAL_VOLTAGE
-        || type == ComponentType::NODESET || IsLogicDisplay(type) || IsSubcircuitPin(type);
+    const ComponentFamily family = GetFamily(type);
+    return family == ComponentFamily::MARKER || family == ComponentFamily::LOGIC_DISPLAY;
 }
 
 } // namespace

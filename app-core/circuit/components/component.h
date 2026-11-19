@@ -74,6 +74,39 @@ enum class ComponentType {
 /// before it, or this moves to the new type.
 constexpr ComponentType LAST_COMPONENT_TYPE = ComponentType::SEVEN_SEGMENT;
 
+/**
+ * @enum    ComponentFamily
+ * @brief   Groups the kinds of component that the compiler and the netlist writer handle the same way.
+ */
+enum class ComponentFamily {
+    /// Ground, net labels, initial voltages, nodesets and pins: they mark a node and add no device.
+    MARKER,
+    /// Resistors, capacitors, inductors, potentiometers and switches: two or three terminals and a plain value.
+    PASSIVE,
+    /// Supply rails, voltage and current sources, clocks and logic inputs: they drive their node from a setting.
+    SOURCE,
+    /// VCVS, VCCS, CCCS and CCVS: a source that follows a voltage or a current elsewhere in the circuit.
+    CONTROLLED_SOURCE,
+    /// Behavioral voltage and current sources: a source that follows an expression.
+    BEHAVIORAL_SOURCE,
+    /// Diodes, transistors and the like: parts that run on a device model.
+    SEMICONDUCTOR,
+    /// Voltage-controlled switches, relays and fuses: parts that open and close by themselves.
+    SWITCHING,
+    /// The transformer, which couples two windings.
+    TRANSFORMER,
+    /// The op-amp.
+    AMPLIFIER,
+    /// Subcircuit instances: a block with a circuit of its own inside.
+    BLOCK,
+    /// Logic gates and the buffer.
+    LOGIC_GATE,
+    /// D, JK, T and SR flip-flops.
+    FLIP_FLOP,
+    /// Logic outputs and 7-segment displays, which only show the logic levels of their nodes.
+    LOGIC_DISPLAY,
+};
+
 /// Largest tolerance a part may have, in percent: far beyond any real part, and well short of the 100 % that could take
 /// a value to zero.
 constexpr double MAX_TOLERANCE_PERCENT = 50.0;
@@ -160,6 +193,7 @@ protected:
 };
 
 // Type names
+ComponentFamily GetFamily(ComponentType type);
 bool IsSubcircuitPin(ComponentType type);
 bool IsLogicDisplay(ComponentType type);
 const char *GetTypeName(ComponentType type);
