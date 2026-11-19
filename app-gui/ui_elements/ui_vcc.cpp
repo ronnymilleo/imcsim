@@ -28,11 +28,7 @@ constexpr float LABEL_OFFSET = 1.2f;
  * @param[in] rotation  Orientation on the grid.
  */
 UIVCC::UIVCC(const GridPoint position, const Rotation rotation)
-    : UIElement(std::make_unique<Core::VCC>(), position, rotation) {
-}
-
-void UIVCC::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
-    canvas.AddLine(LocalToScreen(view, 0, 0), LocalToScreen(view, 0, -LEAD_LENGTH), color, LINE_THICKNESS);
+    : UISingleTerminalElement(std::make_unique<Core::VCC>(), position, rotation) {
 }
 
 void UIVCC::DrawSymbol(SchematicCanvas &canvas,
@@ -53,19 +49,15 @@ void UIVCC::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const
     DrawLabel(canvas, view, {0.0f, -LABEL_OFFSET}, {0.0f, -1.0f}, label, color);
 }
 
-std::vector<GridPoint> UIVCC::GetLocalTerminals() const {
-    return {{0, 0}};
+LocalBounds UIVCC::GetLocalBounds() const {
+    return {{-0.6f, -1.0f}, {0.6f, 0.0f}};
 }
 
 /**
  * @brief   The terminal is at the middle of the symbol, and its lead goes up to the bar.
  */
-GridPoint UIVCC::GetLocalTerminalInward(std::size_t /*terminal*/) const {
-    return {0, -1};
-}
-
-LocalBounds UIVCC::GetLocalBounds() const {
-    return {{-0.6f, -1.0f}, {0.6f, 0.0f}};
+ImVec2 UIVCC::GetLeadEnd() const {
+    return {0.0f, -LEAD_LENGTH};
 }
 
 } // namespace GUI

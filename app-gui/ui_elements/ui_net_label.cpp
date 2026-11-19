@@ -29,11 +29,7 @@ constexpr float LABEL_OFFSET = CIRCLE_TOP + 0.2f;
  * @param[in] rotation  Orientation on the grid.
  */
 UINetLabel::UINetLabel(const GridPoint position, const Rotation rotation)
-    : UIElement(std::make_unique<Core::NetLabel>(), position, rotation) {
-}
-
-void UINetLabel::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
-    canvas.AddLine(LocalToScreen(view, 0, 0), LocalToScreen(view, 0, -LEAD_LENGTH), color, LINE_THICKNESS);
+    : UISingleTerminalElement(std::make_unique<Core::NetLabel>(), position, rotation) {
 }
 
 void UINetLabel::DrawSymbol(SchematicCanvas &canvas,
@@ -51,19 +47,15 @@ void UINetLabel::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, 
     DrawLabel(canvas, view, {0.0f, -LABEL_OFFSET}, {0.0f, -1.0f}, net.empty() ? "?" : net, color);
 }
 
-std::vector<GridPoint> UINetLabel::GetLocalTerminals() const {
-    return {{0, 0}};
+LocalBounds UINetLabel::GetLocalBounds() const {
+    return {{-CIRCLE_RADIUS, -CIRCLE_TOP}, {CIRCLE_RADIUS, 0.0f}};
 }
 
 /**
  * @brief   The terminal is at the foot of the symbol, and its lead goes up to the circle.
  */
-GridPoint UINetLabel::GetLocalTerminalInward(std::size_t /*terminal*/) const {
-    return {0, -1};
-}
-
-LocalBounds UINetLabel::GetLocalBounds() const {
-    return {{-CIRCLE_RADIUS, -CIRCLE_TOP}, {CIRCLE_RADIUS, 0.0f}};
+ImVec2 UINetLabel::GetLeadEnd() const {
+    return {0.0f, -LEAD_LENGTH};
 }
 
 } // namespace GUI

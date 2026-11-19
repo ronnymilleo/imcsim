@@ -56,14 +56,7 @@ void UILogicBox::DrawLit(SchematicCanvas &canvas, const ViewTransform &view, con
  * @param[in] rotation   Orientation on the grid.
  */
 UILogicBox::UILogicBox(std::unique_ptr<Core::Component> component, const GridPoint position, const Rotation rotation)
-    : UIElement(std::move(component), position, rotation) {
-}
-
-/**
- * @brief   The lead from the terminal up to the box.
- */
-void UILogicBox::DrawLead(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
-    canvas.AddLine(LocalToScreen(view, 0, 0), LocalToScreen(view, 0, BOX_BOTTOM), color, LINE_THICKNESS);
+    : UISingleTerminalElement(std::move(component), position, rotation) {
 }
 
 void UILogicBox::DrawBox(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
@@ -92,19 +85,15 @@ void UILogicBox::DrawDigit(SchematicCanvas &canvas,
     canvas.AddText(font, font_size, center - text_size / 2.0f, color, digit);
 }
 
-std::vector<GridPoint> UILogicBox::GetLocalTerminals() const {
-    return {{0, 0}};
+LocalBounds UILogicBox::GetLocalBounds() const {
+    return {{-BOX_HALF_WIDTH, BOX_TOP}, {BOX_HALF_WIDTH, 0.0f}};
 }
 
 /**
- * @brief   The terminal is at the origin and its lead goes up to the box.
+ * @brief   The lead goes up from the terminal to the box.
  */
-GridPoint UILogicBox::GetLocalTerminalInward(std::size_t /*terminal*/) const {
-    return {0, -1};
-}
-
-LocalBounds UILogicBox::GetLocalBounds() const {
-    return {{-BOX_HALF_WIDTH, BOX_TOP}, {BOX_HALF_WIDTH, 0.0f}};
+ImVec2 UILogicBox::GetLeadEnd() const {
+    return {0.0f, BOX_BOTTOM};
 }
 
 } // namespace GUI

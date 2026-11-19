@@ -35,11 +35,7 @@ constexpr float HALF_SIDE = SQUARE_SIDE / 2.0f;
  * @param[in] rotation  Orientation of the symbol, which decides the edge of the block the pin goes on.
  */
 UISubcircuitPin::UISubcircuitPin(const GridPoint position, const Rotation rotation)
-    : UIElement(std::make_unique<Core::SubcircuitPinMarker>(), position, rotation) {
-}
-
-void UISubcircuitPin::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
-    canvas.AddLine(LocalToScreen(view, 0, 0), LocalToScreen(view, SQUARE_NEAR, 0), color, LINE_THICKNESS);
+    : UISingleTerminalElement(std::make_unique<Core::SubcircuitPinMarker>(), position, rotation) {
 }
 
 void UISubcircuitPin::DrawSymbol(SchematicCanvas &canvas,
@@ -76,16 +72,15 @@ void UISubcircuitPin::DrawLabels(SchematicCanvas &canvas, const ViewTransform &v
     DrawLabel(canvas, view, {SQUARE_FAR - LABEL_GAP, 0.0f}, {-1.0f, 0.0f}, text, color);
 }
 
-std::vector<GridPoint> UISubcircuitPin::GetLocalTerminals() const {
-    return {{0, 0}};
-}
-
-GridPoint UISubcircuitPin::GetLocalTerminalInward(std::size_t /*terminal*/) const {
-    return {-1, 0};
-}
-
 LocalBounds UISubcircuitPin::GetLocalBounds() const {
     return {{SQUARE_FAR, -HALF_SIDE}, {0.0f, HALF_SIDE}};
+}
+
+/**
+ * @brief   The lead goes left from the terminal to the square.
+ */
+ImVec2 UISubcircuitPin::GetLeadEnd() const {
+    return {SQUARE_NEAR, 0.0f};
 }
 
 } // namespace GUI

@@ -22,7 +22,6 @@ public:
     ~UILogicInput() override = default;
 
 protected:
-    void DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const override;
     void DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color, SymbolStyle style) const override;
     void DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const override;
 };

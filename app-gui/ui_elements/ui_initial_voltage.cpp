@@ -30,11 +30,7 @@ constexpr float LABEL_OFFSET = -BOX_TOP + 0.2f;
  * @param[in] rotation  Orientation on the grid.
  */
 UIInitialVoltage::UIInitialVoltage(const GridPoint position, const Rotation rotation)
-    : UIElement(std::make_unique<Core::InitialVoltage>(), position, rotation) {
-}
-
-void UIInitialVoltage::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
-    canvas.AddLine(LocalToScreen(view, 0, 0), LocalToScreen(view, 0, -LEAD_LENGTH), color, LINE_THICKNESS);
+    : UISingleTerminalElement(std::make_unique<Core::InitialVoltage>(), position, rotation) {
 }
 
 void UIInitialVoltage::DrawSymbol(SchematicCanvas &canvas,
@@ -56,19 +52,15 @@ void UIInitialVoltage::DrawLabels(SchematicCanvas &canvas, const ViewTransform &
     DrawLabel(canvas, view, {0.0f, -LABEL_OFFSET}, {0.0f, -1.0f}, label, color);
 }
 
-std::vector<GridPoint> UIInitialVoltage::GetLocalTerminals() const {
-    return {{0, 0}};
+LocalBounds UIInitialVoltage::GetLocalBounds() const {
+    return {{-BOX_HALF_WIDTH, BOX_TOP}, {BOX_HALF_WIDTH, 0.0f}};
 }
 
 /**
  * @brief   The terminal is at the foot of the symbol, and its lead goes up to the square.
  */
-GridPoint UIInitialVoltage::GetLocalTerminalInward(std::size_t /*terminal*/) const {
-    return {0, -1};
-}
-
-LocalBounds UIInitialVoltage::GetLocalBounds() const {
-    return {{-BOX_HALF_WIDTH, BOX_TOP}, {BOX_HALF_WIDTH, 0.0f}};
+ImVec2 UIInitialVoltage::GetLeadEnd() const {
+    return {0.0f, -LEAD_LENGTH};
 }
 
 } // namespace GUI

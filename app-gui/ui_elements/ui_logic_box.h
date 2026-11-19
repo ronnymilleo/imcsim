@@ -6,7 +6,7 @@
 #ifndef IMCSIM_UI_LOGIC_BOX_H
 #define IMCSIM_UI_LOGIC_BOX_H
 
-#include "ui_elements/ui_element.h"
+#include "ui_elements/ui_single_terminal_element.h"
 #include <memory>
 
 namespace GUI {
@@ -17,7 +17,7 @@ namespace GUI {
  * @details Logic inputs and outputs derive from it, so the two read as a pair. A lit box is filled with the accent of
  *          the theme, as the Logic Lights effect draws a level that is 1.
  */
-class UILogicBox : public UIElement {
+class UILogicBox : public UISingleTerminalElement {
 public:
     ~UILogicBox() override = default;
 
@@ -33,14 +33,12 @@ protected:
     UILogicBox(std::unique_ptr<Core::Component> component, GridPoint position, Rotation rotation);
 
     // Parts of the symbol
-    void DrawLead(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const;
     void DrawBox(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const;
     void DrawDigit(SchematicCanvas &canvas, const ViewTransform &view, const char *digit, ImU32 color) const;
 
     // Geometry
-    std::vector<GridPoint> GetLocalTerminals() const override;
-    GridPoint GetLocalTerminalInward(std::size_t terminal) const override;
     LocalBounds GetLocalBounds() const override;
+    ImVec2 GetLeadEnd() const override;
 };
 
 } // namespace GUI

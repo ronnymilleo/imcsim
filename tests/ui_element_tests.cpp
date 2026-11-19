@@ -73,6 +73,16 @@ TEST_CASE("Ground and VCC have a single terminal at their position", "[ui_elemen
     CHECK(supply.GetTerminals() == std::vector<GUI::GridPoint>{{-1, 4}});
 }
 
+TEST_CASE("A single-terminal symbol leads into its body along its lead, whichever way it is turned", "[ui_element]") {
+    GUI::UIGround ground({0, 0}, GUI::Rotation::R0);
+    CHECK(ground.GetTerminalInward(0) == GUI::GridPoint{0, 1});
+    ground.SetRotation(GUI::Rotation::R90);
+    CHECK(ground.GetTerminalInward(0) == GUI::GridPoint{-1, 0});
+    const GUI::UIVCC supply({0, 0}, GUI::Rotation::R180);
+    CHECK(supply.GetTerminalInward(0) == GUI::GridPoint{0, 1});
+    CHECK(supply.GetTerminals() == std::vector<GUI::GridPoint>{{0, 0}});
+}
+
 TEST_CASE("A net label has a single terminal at its position and leads upward before rotating", "[ui_element]") {
     const GUI::UINetLabel label({5, 5}, GUI::Rotation::R0);
     CHECK(label.GetComponent().GetType() == Core::ComponentType::NET_LABEL);

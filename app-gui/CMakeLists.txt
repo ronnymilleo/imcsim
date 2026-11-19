@@ -154,6 +154,7 @@ add_library(imcsim-gui-lib
             ui_elements/ui_controlled_source.cpp
             ui_elements/ui_controlled_switch.cpp
             ui_elements/ui_current_source.cpp
+            ui_elements/ui_dependent_source.cpp
             ui_elements/ui_diode.cpp
             ui_elements/ui_element.cpp
             ui_elements/ui_fuse.cpp
@@ -171,6 +172,7 @@ add_library(imcsim-gui-lib
             ui_elements/ui_potentiometer.cpp
             ui_elements/ui_resistor.cpp
             ui_elements/ui_seven_segment.cpp
+            ui_elements/ui_single_terminal_element.cpp
             ui_elements/ui_source.cpp
             ui_elements/ui_subcircuit.cpp
             ui_elements/ui_subcircuit_pin.cpp

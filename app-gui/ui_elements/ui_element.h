@@ -60,8 +60,8 @@ struct ArrowHead {
  * @class   UIElement
  * @brief   A component placed on the schematic grid, with its position, rotation and mirroring.
  * @details Owns its Core::Component. By default an element has two terminals at local x = -2 and x = +2 and
- *          derived classes only draw the symbol between them; single-terminal symbols override DrawTerminals()
- *          and GetLocalTerminals(). A mirrored element is flipped across its local vertical axis (x becomes -x)
+ *          derived classes only draw the symbol between them; single-terminal symbols derive from
+ *          UISingleTerminalElement. A mirrored element is flipped across its local vertical axis (x becomes -x)
  *          before it is rotated, so mirroring and the four rotations give every orientation on the grid.
  */
 class UIElement {

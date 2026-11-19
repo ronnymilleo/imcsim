@@ -6,7 +6,7 @@
 #ifndef IMCSIM_UI_GROUND_H
 #define IMCSIM_UI_GROUND_H
 
-#include "ui_elements/ui_element.h"
+#include "ui_elements/ui_single_terminal_element.h"
 
 namespace GUI {
 
@@ -15,18 +15,17 @@ namespace GUI {
  * @brief   Ground drawn as three bars of decreasing width below its terminal.
  * @details The single terminal is the element position (local origin).
  */
-class UIGround : public UIElement {
+class UIGround : public UISingleTerminalElement {
 public:
     UIGround(GridPoint position, Rotation rotation);
     ~UIGround() override = default;
 
 protected:
-    void DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const override;
     void DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color, SymbolStyle style) const override;
     void DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const override;
 
-    std::vector<GridPoint> GetLocalTerminals() const override;
     LocalBounds GetLocalBounds() const override;
+    ImVec2 GetLeadEnd() const override;
 };
 
 } // namespace GUI
