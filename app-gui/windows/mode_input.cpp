@@ -34,10 +34,18 @@ std::optional<MeasurementTarget> FindTargetAt(const ModeInput &input) {
 }
 
 /**
- * @brief   Turns or mirrors the pasted group by the keys pressed this frame.
- * @return  True when Esc cancels the paste.
+ * @brief   Esc while the editor has the focus, or a right click on the canvas, leaves the placing, probing and pasting
+ *          modes.
  */
-bool HandlePastingKeys(PastedGroup &group) {
+bool WantsToLeaveMode(const ModeInput &input) {
+    return (ImGui::IsWindowFocused() && ImGui::IsKeyPressed(ImGuiKey_Escape))
+        || (input.IsHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right));
+}
+
+/**
+ * @brief   Turns or mirrors the pasted group by the keys pressed this frame.
+ */
+void TurnPastedGroup(PastedGroup &group) {
     if (ImGui::IsKeyPressed(ImGuiKey_R)) {
         TransformGroup(group, {.Type = PointTransform::Kind::QUARTER_TURN, .Delta = {}, .Pivot = {}});
     }
@@ -49,7 +57,6 @@ bool HandlePastingKeys(PastedGroup &group) {
              .Delta = {},
              .Pivot = {}});
     }
-    return ImGui::IsKeyPressed(ImGuiKey_Escape);
 }
 
 /**
@@ -91,6 +98,9 @@ std::optional<EditorMode> HandleMode(SelectingMode &mode, const ModeInput &input
  * @details A label or a pin marker needs a name next, so placing one ends the mode and opens its popover on the name.
  */
 std::optional<EditorMode> HandleMode(PlacingMode &mode, const ModeInput &input) {
+    if (WantsToLeaveMode(input)) {
+        return SelectingMode{};
+    }
     // Keyboard shortcuts only apply while the editor has focus, so typing elsewhere does not trigger them
     if (ImGui::IsWindowFocused()) {
         if (ImGui::IsKeyPressed(ImGuiKey_R)) {
@@ -99,15 +109,9 @@ std::optional<EditorMode> HandleMode(PlacingMode &mode, const ModeInput &input) 
         if (ImGui::IsKeyPressed(ImGuiKey_M)) {
             MirrorPlacement(mode, ImGui::GetIO().KeyShift);
         }
-        if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
-            return SelectingMode{};
-        }
     }
     if (!input.IsHovered) {
         return std::nullopt;
-    }
-    if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
-        return SelectingMode{};
     }
 
     Schematic &schematic = input.Blocks.GetShown();
@@ -168,14 +172,11 @@ std::optional<EditorMode> HandleMode(WiringMode &mode, const ModeInput &input) {
  *          current on a part, and a left click adds it to the plots or removes it. Esc or right click leaves the mode.
  */
 std::optional<EditorMode> HandleMode(ProbingMode & /*mode*/, const ModeInput &input) {
-    if (ImGui::IsWindowFocused() && ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+    if (WantsToLeaveMode(input)) {
         return SelectingMode{};
     }
     if (!input.IsHovered) {
         return std::nullopt;
-    }
-    if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
-        return SelectingMode{};
     }
 
     Schematic &schematic = input.Blocks.GetShown();
@@ -215,15 +216,15 @@ std::optional<EditorMode> HandleMode(ProbingMode & /*mode*/, const ModeInput &in
  *          placed. Parts get the next free names of the schematic.
  */
 std::optional<EditorMode> HandleMode(PastingMode &mode, const ModeInput &input) {
-    PastedGroup &group = mode.Group;
-    if (ImGui::IsWindowFocused() && HandlePastingKeys(group)) {
+    if (WantsToLeaveMode(input)) {
         return SelectingMode{};
+    }
+    PastedGroup &group = mode.Group;
+    if (ImGui::IsWindowFocused()) {
+        TurnPastedGroup(group);
     }
     if (!input.IsHovered) {
         return std::nullopt;
-    }
-    if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
-        return SelectingMode{};
     }
 
     MovePivotTo(group, Snap(input.View.ToWorld(ImGui::GetIO().MousePos)));
