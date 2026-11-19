@@ -7,6 +7,7 @@
 #include "analysis/analysis_settings_panel.h"
 
 #include "analysis/analysis_inputs.h"
+#include "analysis/harmonic_balance_samples.h"
 #include "base/theme.h"
 #include "imgui.h"
 #include "schematic/probing.h"
@@ -111,11 +112,12 @@ void DrawSweepRange(const char *id,
 }
 
 /**
- * @brief   A Suggest button, disabled with the reason when the circuit gives nothing to base a suggestion on.
+ * @brief   A button that suggests settings, disabled with the reason when the circuit gives nothing to base a
+ *          suggestion on.
  */
-bool DrawSuggestButton(const bool available, const char *tooltip, const char *unavailable_reason) {
+bool DrawSuggestButton(const char *label, const bool available, const char *tooltip, const char *unavailable_reason) {
     ImGui::BeginDisabled(!available);
-    const bool clicked = ImGui::Button("Suggest");
+    const bool clicked = ImGui::Button(label);
     ImGui::EndDisabled();
     ImGui::SetItemTooltip("%s", available ? tooltip : unavailable_reason);
     return clicked;
@@ -159,7 +161,8 @@ void DrawLogarithmicSweep(const char *id,
     DrawFieldLabel("Points");
     DrawPointsPerDecade(range.PointsPerDecade);
     const auto suggested = Core::SuggestACSweepSettings(circuit);
-    if (DrawSuggestButton(suggested.has_value(),
+    if (DrawSuggestButton("Suggest",
+                          suggested.has_value(),
                           "Two decades past the RC, RL and LC corners and the op-amp bandwidths",
                           "Needs a capacitor, an inductor or an op-amp")
         && suggested) {
@@ -321,7 +324,8 @@ void AnalysisSettingsPanel::DrawTransientSettings(SimulationSettings &settings) 
         settings.Transient.TimeStep = *time_step;
     }
     const auto suggested = Core::SuggestTransientSettings(m_Schematic.BuildCircuit());
-    if (DrawSuggestButton(suggested.has_value(),
+    if (DrawSuggestButton("Suggest",
+                          suggested.has_value(),
                           "Five periods of the slowest source, or the whole span of a one-shot one",
                           "Needs a source with a waveform")
         && suggested) {
@@ -578,17 +582,10 @@ void AnalysisSettingsPanel::DrawTruthTableSettings(SimulationSettings &settings)
         if (!ImGui::Checkbox(name.c_str(), &is_chosen)) {
             continue;
         }
-        // At least one input stays, since a table of none has no rows to show
-        if (!is_chosen && chosen.size() == 1) {
-            continue;
+        if (std::optional<std::vector<std::string>> changed =
+                ToggleTruthTableInput(available, chosen, name, is_chosen)) {
+            settings.TruthTableInputs = std::move(*changed);
         }
-        std::vector<std::string> changed;
-        for (const std::string &candidate : available) {
-            if (candidate == name ? is_chosen : std::ranges::contains(chosen, candidate)) {
-                changed.push_back(candidate);
-            }
-        }
-        settings.TruthTableInputs = std::move(changed);
     }
     chosen = ResolveTruthTableInputs(settings.TruthTableInputs, available);
     if (chosen.size() > Core::MAX_TRUTH_TABLE_INPUTS) {
@@ -601,12 +598,7 @@ void AnalysisSettingsPanel::DrawTruthTableSettings(SimulationSettings &settings)
         ImGui::TextDisabled("Measure a voltage with the Probe tool to read it");
         return;
     }
-    std::string labels;
-    for (const int node : outputs) {
-        labels += labels.empty() ? "" : ", ";
-        labels += GetVoltageLabel(m_Schematic.GetConnectivity(), node);
-    }
-    ImGui::TextDisabled("Reads %s", labels.c_str());
+    ImGui::TextDisabled("Reads %s", FormatMeasuredNodeLabels(m_Schematic.GetConnectivity(), outputs).c_str());
     ImGui::SetItemTooltip("The nodes you measure with the Probe tool; every combination of the inputs is simulated and "
                           "each of these is read as 0, 1 or X");
 }
@@ -617,59 +609,43 @@ void AnalysisSettingsPanel::DrawTruthTableSettings(SimulationSettings &settings)
  * @details An explicit sample count stays above twice the harmonics, so a harmonic never aliases onto another one.
  */
 void AnalysisSettingsPanel::DrawHarmonicBalanceSettings(SimulationSettings &settings) {
-    constexpr int MIN_EXPLICIT_SAMPLES = 32;
-    constexpr int MAX_EXPLICIT_SAMPLES = Core::MAX_HARMONIC_BALANCE_SAMPLES;
+    Core::HarmonicBalanceSettings &harmonic_balance = settings.HarmonicBalance;
     if (const std::optional<double> fundamental = m_HBFundamental.Draw("Fundamental", "Hz", IsPositive)) {
-        settings.HarmonicBalance.FundamentalFrequency = *fundamental;
+        harmonic_balance.FundamentalFrequency = *fundamental;
     }
     DrawFieldLabel("Harmonics");
-    if (ImGui::InputInt("##hb_harmonics", &settings.HarmonicBalance.Harmonics)) {
-        settings.HarmonicBalance.Harmonics =
-            std::clamp(settings.HarmonicBalance.Harmonics, 1, Core::MAX_HARMONIC_BALANCE_HARMONICS);
+    if (ImGui::InputInt("##hb_harmonics", &harmonic_balance.Harmonics)) {
+        harmonic_balance.Harmonics = std::clamp(harmonic_balance.Harmonics, 1, Core::MAX_HARMONIC_BALANCE_HARMONICS);
     }
     ImGui::SetItemTooltip("Number of harmonics above DC (1 to %d)", Core::MAX_HARMONIC_BALANCE_HARMONICS);
-    // An explicit sample count stays above twice the harmonics, the Nyquist limit
-    if (settings.HarmonicBalance.Samples != 0
-        && settings.HarmonicBalance.Samples <= 2 * settings.HarmonicBalance.Harmonics) {
-        int next_power = MIN_EXPLICIT_SAMPLES;
-        while (next_power <= 2 * settings.HarmonicBalance.Harmonics && next_power < MAX_EXPLICIT_SAMPLES) {
-            next_power *= 2;
-        }
-        settings.HarmonicBalance.Samples = next_power;
-    }
+    harmonic_balance.Samples = NormalizeSampleCount(harmonic_balance.Samples, harmonic_balance.Harmonics);
     DrawFieldLabel("Samples");
     const std::string samples_label =
-        settings.HarmonicBalance.Samples == 0 ? "Auto" : std::format("{}", settings.HarmonicBalance.Samples);
+        harmonic_balance.Samples == 0 ? "Auto" : std::format("{}", harmonic_balance.Samples);
     if (ImGui::BeginCombo("##hb_samples", samples_label.c_str())) {
-        if (ImGui::Selectable("Auto", settings.HarmonicBalance.Samples == 0)) {
-            settings.HarmonicBalance.Samples = 0;
+        if (ImGui::Selectable("Auto", harmonic_balance.Samples == 0)) {
+            harmonic_balance.Samples = 0;
         }
         ImGui::SetItemTooltip("The smallest power of two of at least 16 and 4 times the harmonics");
-        for (int candidate = MIN_EXPLICIT_SAMPLES; candidate <= MAX_EXPLICIT_SAMPLES; candidate *= 2) {
-            if (candidate <= 2 * settings.HarmonicBalance.Harmonics) {
-                continue;
-            }
+        for (const int candidate : ListSampleCounts(harmonic_balance.Harmonics)) {
             const std::string label = std::format("{}", candidate);
-            if (ImGui::Selectable(label.c_str(), settings.HarmonicBalance.Samples == candidate)) {
-                settings.HarmonicBalance.Samples = candidate;
+            if (ImGui::Selectable(label.c_str(), harmonic_balance.Samples == candidate)) {
+                harmonic_balance.Samples = candidate;
             }
         }
         ImGui::EndCombo();
     }
-    const Core::Circuit circuit = m_Schematic.BuildCircuit();
-    const auto suggested = Core::SuggestHarmonicBalanceSettings(circuit);
-    ImGui::BeginDisabled(!suggested.has_value());
-    if (ImGui::Button("From sources") && suggested) {
-        settings.HarmonicBalance.FundamentalFrequency = suggested->FundamentalFrequency;
-        settings.HarmonicBalance.Harmonics = suggested->Harmonics;
-        settings.HarmonicBalance.Samples = suggested->Samples;
+    const auto suggested = Core::SuggestHarmonicBalanceSettings(m_Schematic.BuildCircuit());
+    if (DrawSuggestButton("From sources",
+                          suggested.has_value(),
+                          "Set the fundamental frequency and harmonic count from the circuit's periodic sources",
+                          "Needs a sine, AC, pulse or clock source with commensurable frequencies")
+        && suggested) {
+        harmonic_balance.FundamentalFrequency = suggested->FundamentalFrequency;
+        harmonic_balance.Harmonics = suggested->Harmonics;
+        harmonic_balance.Samples = suggested->Samples;
         m_HBFundamental.Load(suggested->FundamentalFrequency);
     }
-    ImGui::EndDisabled();
-    ImGui::SetItemTooltip("%s",
-                          suggested
-                              ? "Set the fundamental frequency and harmonic count from the circuit's periodic sources"
-                              : "Needs a sine, AC, pulse or clock source with commensurable frequencies");
 }
 
 /**

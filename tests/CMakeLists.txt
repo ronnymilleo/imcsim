@@ -45,6 +45,7 @@ add_executable(imcsim-tests
             file_json_tests.cpp
             fuse_tests.cpp
             group_editing_tests.cpp
+            harmonic_balance_samples_tests.cpp
             harmonic_balance_view_tests.cpp
             heat_glow_tests.cpp
             helpers_tests.cpp

@@ -6,6 +6,7 @@
 
 #include "analysis/analysis_inputs.h"
 
+#include "schematic/probing.h"
 #include "simulation/analysis_sources.h"
 #include <algorithm>
 #include <format>
@@ -135,6 +136,21 @@ std::vector<int> ListMeasuredNodes(const Core::Circuit &circuit, const Schematic
 }
 
 /**
+ * @brief   Names the nodes a truth table reads, as the plots label them.
+ * @param[in] connectivity  Connectivity whose net labels name the nodes.
+ * @param[in] nodes         Nodes to name, such as those ListMeasuredNodes() finds.
+ * @return  The labels joined by commas, such as "V(out), V(2)"; empty when there are no nodes.
+ */
+std::string FormatMeasuredNodeLabels(const Connectivity &connectivity, const std::vector<int> &nodes) {
+    std::string labels;
+    for (const int node : nodes) {
+        labels += labels.empty() ? "" : ", ";
+        labels += GetVoltageLabel(connectivity, node);
+    }
+    return labels;
+}
+
+/**
  * @brief   Picks the logic inputs a truth table varies.
  * @param[in] stored     Names stored in the settings.
  * @param[in] available  Logic inputs the circuit has, in circuit order.
@@ -149,6 +165,31 @@ std::vector<std::string> ResolveTruthTableInputs(const std::vector<std::string> 
         }
     }
     return chosen.empty() ? available : chosen;
+}
+
+/**
+ * @brief   Turns one logic input of a truth table on or off.
+ * @param[in] available  Logic inputs the circuit has, in circuit order.
+ * @param[in] chosen     Inputs varied now, as ResolveTruthTableInputs() picks them.
+ * @param[in] name       Input the user turned on or off.
+ * @param[in] is_on      Whether it is now varied.
+ * @return  The inputs to store, in circuit order; no value when it would leave none, since a table of no inputs has no
+ *          rows to show.
+ */
+std::optional<std::vector<std::string>> ToggleTruthTableInput(const std::vector<std::string> &available,
+                                                              const std::vector<std::string> &chosen,
+                                                              const std::string &name,
+                                                              const bool is_on) {
+    std::vector<std::string> changed;
+    for (const std::string &candidate : available) {
+        if (candidate == name ? is_on : std::ranges::contains(chosen, candidate)) {
+            changed.push_back(candidate);
+        }
+    }
+    if (changed.empty()) {
+        return std::nullopt;
+    }
+    return changed;
 }
 
 /**

@@ -9,6 +9,7 @@
 
 #include "base/helpers.h"
 #include "circuit/circuit.h"
+#include "schematic/connectivity.h"
 #include "schematic/schematic.h"
 #include "simulation/analysis_settings.h"
 #include <cstddef>
@@ -43,8 +44,13 @@ std::string ResolveOptionalInput(const std::string &stored, const std::vector<st
 std::optional<int>
 ResolveOutputNode(const std::optional<GridPoint> &point, const Core::Circuit &circuit, Schematic &schematic);
 std::vector<int> ListMeasuredNodes(const Core::Circuit &circuit, const Schematic &schematic);
+std::string FormatMeasuredNodeLabels(const Connectivity &connectivity, const std::vector<int> &nodes);
 std::vector<std::string> ResolveTruthTableInputs(const std::vector<std::string> &stored,
                                                  const std::vector<std::string> &available);
+[[nodiscard]] std::optional<std::vector<std::string>> ToggleTruthTableInput(const std::vector<std::string> &available,
+                                                                            const std::vector<std::string> &chosen,
+                                                                            const std::string &name,
+                                                                            bool is_on);
 
 // Stepped parameter
 std::string GetParameterUnit(const Core::Circuit &circuit, const std::string &part);

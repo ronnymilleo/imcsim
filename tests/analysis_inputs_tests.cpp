@@ -11,6 +11,7 @@
 #include "circuit/components/resistor.h"
 #include "circuit/components/voltage_source.h"
 #include "schematic/examples.h"
+#include "schematic/probing.h"
 #include "schematic/schematic.h"
 #include "simulation/analysis_sources.h"
 #include "test_printers.h"
@@ -98,6 +99,15 @@ TEST_CASE("A truth table varies the stored inputs that are still there, or else 
     CHECK(GUI::ResolveTruthTableInputs({"V9"}, available) == available);
 }
 
+TEST_CASE("Toggling a truth table input keeps circuit order, and never leaves the table without inputs",
+          "[analysis_inputs]") {
+    const std::vector<std::string> available = {"V1", "V2", "V3"};
+    CHECK(GUI::ToggleTruthTableInput(available, {"V3"}, "V1", true) == std::vector<std::string>{"V1", "V3"});
+    CHECK(GUI::ToggleTruthTableInput(available, available, "V2", false) == std::vector<std::string>{"V1", "V3"});
+    // The last input stays, since a table of none has no rows to show
+    CHECK_FALSE(GUI::ToggleTruthTableInput(available, {"V2"}, "V2", false).has_value());
+}
+
 TEST_CASE("The stepped parameter has the unit of its part, or degrees Celsius for the temperature",
           "[analysis_inputs]") {
     Core::Resistor resistor;
@@ -128,6 +138,19 @@ TEST_CASE("The output node is the stored point's, else a measured node that no s
     CHECK(GUI::ResolveOutputNode(GUI::GridPoint{4, 4}, circuit, schematic) == source_node);
     CHECK(GUI::ResolveOutputNode(GUI::GridPoint{40, 40}, circuit, schematic) == measured);
     CHECK(*source_node != *measured);
+}
+
+TEST_CASE("The nodes a truth table reads are named as the plots name them, one after the other", "[analysis_inputs]") {
+    GUI::Schematic schematic;
+    OpenRCFilter(schematic);
+    const std::vector<int> nodes = GUI::ListMeasuredNodes(schematic.BuildCircuit(), schematic);
+    REQUIRE(nodes.size() == 2);
+    const GUI::Connectivity &connectivity = schematic.GetConnectivity();
+    CHECK(GUI::FormatMeasuredNodeLabels(connectivity, nodes)
+          == std::format("{}, {}",
+                         GUI::GetVoltageLabel(connectivity, nodes[0]),
+                         GUI::GetVoltageLabel(connectivity, nodes[1])));
+    CHECK(GUI::FormatMeasuredNodeLabels(connectivity, {}).empty());
 }
 
 TEST_CASE("A circuit with only ground has no node to measure", "[analysis_inputs]") {
