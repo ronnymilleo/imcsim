@@ -14,6 +14,7 @@
 
 namespace Core {
 
+std::string WriteNetlistBody(const Circuit &circuit, bool add_current_probes);
 std::string WriteSpiceNetlist(const Circuit &circuit, std::string_view analysis = "", bool add_current_probes = false);
 std::vector<std::string> GetElementNames(const Component &component);
 

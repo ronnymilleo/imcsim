@@ -5,8 +5,8 @@
 
 #include "circuit/components/bjt.h"
 
+#include "circuit/components/model_catalog.h"
 #include "circuit/library_model.h"
-#include <algorithm>
 #include <array>
 #include <format>
 #include <memory>
@@ -142,8 +142,7 @@ constexpr auto BJT_MODELS = std::to_array<BJTModel>({
  * @brief   Creates a transistor with the default model of its kind.
  * @param[in] type  ComponentType::NPN or PNP.
  */
-BJT::BJT(const ComponentType type)
-    : Component(type, 0.0), m_Model(GetBJTModels(type).data()), m_CustomParameters(m_Model->Parameters) {
+BJT::BJT(const ComponentType type) : Component(type, 0.0), m_Choice(GetBJTModels(type).front()) {
 }
 
 /**
@@ -160,7 +159,7 @@ std::unique_ptr<Component> BJT::Clone() const {
  *          model.
  */
 const BJTModel *BJT::GetModel() const {
-    return HasLibraryModel() ? nullptr : m_Model;
+    return HasLibraryModel() ? nullptr : m_Choice.GetModel();
 }
 
 /**
@@ -168,7 +167,7 @@ const BJTModel *BJT::GetModel() const {
  * @param[in] model  An entry from GetBJTModels() for the type of this transistor; it keeps a reference to it.
  */
 void BJT::SetModel(const BJTModel &model) {
-    m_Model = &model;
+    m_Choice.SetModel(model);
     ClearLibraryModel();
 }
 
@@ -177,7 +176,7 @@ void BJT::SetModel(const BJTModel &model) {
  * @return  True for a custom transistor; false for one with a ready or a library model.
  */
 bool BJT::IsCustom() const {
-    return m_Model == nullptr && !HasLibraryModel();
+    return m_Choice.IsCustom() && !HasLibraryModel();
 }
 
 /**
@@ -186,11 +185,7 @@ bool BJT::IsCustom() const {
  */
 void BJT::SetCustom() {
     ClearLibraryModel();
-    if (m_Model == nullptr) {
-        return;
-    }
-    m_CustomParameters = m_Model->Parameters;
-    m_Model = nullptr;
+    m_Choice.SetCustom();
 }
 
 /**
@@ -199,8 +194,7 @@ void BJT::SetCustom() {
  */
 void BJT::SetCustomParameters(const BJTParameters &parameters) {
     ClearLibraryModel();
-    m_CustomParameters = parameters;
-    m_Model = nullptr;
+    m_Choice.SetCustomParameters(parameters);
 }
 
 /**
@@ -208,7 +202,7 @@ void BJT::SetCustomParameters(const BJTParameters &parameters) {
  * @param[in] parameters  Candidate parameters.
  * @return  True when IS, BF, BR, NE and the ratings are positive and everything else is not negative.
  */
-bool BJT::IsValidParameters(const BJTParameters &parameters) const {
+bool BJT::IsValidParameters(const BJTParameters &parameters) {
     return parameters.SaturationCurrent > 0.0 && parameters.ForwardBeta > 0.0 && parameters.ReverseBeta > 0.0
         && parameters.EarlyVoltage >= 0.0 && parameters.ForwardKneeCurrent >= 0.0
         && parameters.LeakageSaturationCurrent >= 0.0 && parameters.LeakageEmissionCoefficient > 0.0
@@ -224,7 +218,7 @@ bool BJT::IsValidParameters(const BJTParameters &parameters) const {
  * @return  Those of its ready model, or its custom ones.
  */
 const BJTParameters &BJT::GetParameters() const {
-    return m_Model != nullptr ? m_Model->Parameters : m_CustomParameters;
+    return m_Choice.GetParameters();
 }
 
 /**
@@ -236,7 +230,7 @@ const char *BJT::GetModelName() const {
     if (HasLibraryModel()) {
         return GetLibraryModel().c_str();
     }
-    return m_Model != nullptr ? m_Model->Name : CUSTOM_BJT_MODEL_NAME;
+    return m_Choice.GetName();
 }
 
 /**
@@ -248,7 +242,7 @@ std::string BJT::GetSpiceModelName() const {
     if (HasLibraryModel()) {
         return GetLibraryModelSpiceName(GetLibraryModel());
     }
-    return m_Model != nullptr ? std::string(m_Model->SpiceName) : std::format("QCUSTOM_{}", GetName());
+    return m_Choice.IsCustom() ? std::format("QCUSTOM_{}", GetName()) : std::string(m_Choice.GetModel()->SpiceName);
 }
 
 /**
@@ -266,10 +260,7 @@ bool IsBJT(const ComponentType type) {
  * @return  The models of that part, default first; empty for components that are not bipolar transistors.
  */
 std::span<const BJTModel> GetBJTModels(const ComponentType type) {
-    const auto first = std::ranges::find(BJT_MODELS, type, &BJTModel::Type);
-    const auto last =
-        std::find_if(first, BJT_MODELS.end(), [type](const BJTModel &model) { return model.Type != type; });
-    return {first, last};
+    return GetModelsOfType<BJTModel>(BJT_MODELS, type);
 }
 
 /**
@@ -279,9 +270,7 @@ std::span<const BJTModel> GetBJTModels(const ComponentType type) {
  * @return  The model, or nullptr when that part has no model with that name.
  */
 const BJTModel *FindBJTModel(const ComponentType type, const std::string_view name) {
-    const std::span<const BJTModel> models = GetBJTModels(type);
-    const auto model = std::ranges::find(models, name, &BJTModel::Name);
-    return model != models.end() ? &*model : nullptr;
+    return FindModelByName<BJTModel>(GetBJTModels(type), name);
 }
 
 /**

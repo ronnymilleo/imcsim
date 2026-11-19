@@ -7,6 +7,7 @@
 #define IMCSIM_MOSFET_H
 
 #include "circuit/components/component.h"
+#include "circuit/components/model_choice.h"
 #include <memory>
 #include <span>
 #include <string>
@@ -54,7 +55,7 @@ struct MOSFETModel {
     ComponentType Type;
 };
 
-inline constexpr const char *CUSTOM_MOSFET_MODEL_NAME = "Custom";
+inline constexpr const char *CUSTOM_MOSFET_MODEL_NAME = CUSTOM_MODEL_NAME;
 
 /**
  * @class   MOSFET
@@ -79,7 +80,7 @@ public:
     bool IsCustom() const;
     void SetCustom();
     void SetCustomParameters(const MOSFETParameters &parameters);
-    bool IsValidParameters(const MOSFETParameters &parameters) const;
+    static bool IsValidParameters(const MOSFETParameters &parameters);
 
     // Simulation
     const MOSFETParameters &GetParameters() const;
@@ -87,9 +88,7 @@ public:
     std::string GetSpiceModelName() const;
 
 private:
-    /// Null when the transistor uses its custom parameters.
-    const MOSFETModel *m_Model;
-    MOSFETParameters m_CustomParameters;
+    ModelChoice<MOSFETModel, MOSFETParameters> m_Choice;
 };
 
 // MOSFETs

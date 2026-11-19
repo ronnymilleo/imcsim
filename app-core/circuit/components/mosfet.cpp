@@ -5,8 +5,8 @@
 
 #include "circuit/components/mosfet.h"
 
+#include "circuit/components/model_catalog.h"
 #include "circuit/library_model.h"
-#include <algorithm>
 #include <array>
 #include <format>
 #include <memory>
@@ -96,8 +96,7 @@ constexpr auto MOSFET_MODELS = std::to_array<MOSFETModel>({
  * @brief   Creates a MOSFET with the default model of its kind.
  * @param[in] type  ComponentType::NMOS or PMOS.
  */
-MOSFET::MOSFET(const ComponentType type)
-    : Component(type, 0.0), m_Model(GetMOSFETModels(type).data()), m_CustomParameters(m_Model->Parameters) {
+MOSFET::MOSFET(const ComponentType type) : Component(type, 0.0), m_Choice(GetMOSFETModels(type).front()) {
 }
 
 /**
@@ -114,7 +113,7 @@ std::unique_ptr<Component> MOSFET::Clone() const {
  *          model.
  */
 const MOSFETModel *MOSFET::GetModel() const {
-    return HasLibraryModel() ? nullptr : m_Model;
+    return HasLibraryModel() ? nullptr : m_Choice.GetModel();
 }
 
 /**
@@ -122,7 +121,7 @@ const MOSFETModel *MOSFET::GetModel() const {
  * @param[in] model  An entry from GetMOSFETModels() for the type of this MOSFET; it keeps a reference to it.
  */
 void MOSFET::SetModel(const MOSFETModel &model) {
-    m_Model = &model;
+    m_Choice.SetModel(model);
     ClearLibraryModel();
 }
 
@@ -131,7 +130,7 @@ void MOSFET::SetModel(const MOSFETModel &model) {
  * @return  True for a custom MOSFET; false for one with a ready or a library model.
  */
 bool MOSFET::IsCustom() const {
-    return m_Model == nullptr && !HasLibraryModel();
+    return m_Choice.IsCustom() && !HasLibraryModel();
 }
 
 /**
@@ -140,11 +139,7 @@ bool MOSFET::IsCustom() const {
  */
 void MOSFET::SetCustom() {
     ClearLibraryModel();
-    if (m_Model == nullptr) {
-        return;
-    }
-    m_CustomParameters = m_Model->Parameters;
-    m_Model = nullptr;
+    m_Choice.SetCustom();
 }
 
 /**
@@ -153,8 +148,7 @@ void MOSFET::SetCustom() {
  */
 void MOSFET::SetCustomParameters(const MOSFETParameters &parameters) {
     ClearLibraryModel();
-    m_CustomParameters = parameters;
-    m_Model = nullptr;
+    m_Choice.SetCustomParameters(parameters);
 }
 
 /**
@@ -163,7 +157,7 @@ void MOSFET::SetCustomParameters(const MOSFETParameters &parameters) {
  * @return  True when KP, W, L and the ratings are positive and LAMBDA, RD, RS, CGSO and CGDO are not negative. VTO
  *          may have either sign, so depletion parts can be modeled too.
  */
-bool MOSFET::IsValidParameters(const MOSFETParameters &parameters) const {
+bool MOSFET::IsValidParameters(const MOSFETParameters &parameters) {
     return parameters.Transconductance > 0.0 && parameters.ChannelModulation >= 0.0 && parameters.DrainResistance >= 0.0
         && parameters.SourceResistance >= 0.0 && parameters.GateSourceOverlap >= 0.0
         && parameters.GateDrainOverlap >= 0.0 && parameters.Width > 0.0 && parameters.Length > 0.0
@@ -176,7 +170,7 @@ bool MOSFET::IsValidParameters(const MOSFETParameters &parameters) const {
  * @return  Those of its ready model, or its custom ones.
  */
 const MOSFETParameters &MOSFET::GetParameters() const {
-    return m_Model != nullptr ? m_Model->Parameters : m_CustomParameters;
+    return m_Choice.GetParameters();
 }
 
 /**
@@ -188,7 +182,7 @@ const char *MOSFET::GetModelName() const {
     if (HasLibraryModel()) {
         return GetLibraryModel().c_str();
     }
-    return m_Model != nullptr ? m_Model->Name : CUSTOM_MOSFET_MODEL_NAME;
+    return m_Choice.GetName();
 }
 
 /**
@@ -200,7 +194,7 @@ std::string MOSFET::GetSpiceModelName() const {
     if (HasLibraryModel()) {
         return GetLibraryModelSpiceName(GetLibraryModel());
     }
-    return m_Model != nullptr ? std::string(m_Model->SpiceName) : std::format("MCUSTOM_{}", GetName());
+    return m_Choice.IsCustom() ? std::format("MCUSTOM_{}", GetName()) : std::string(m_Choice.GetModel()->SpiceName);
 }
 
 /**
@@ -218,10 +212,7 @@ bool IsMOSFET(const ComponentType type) {
  * @return  The models of that part, default first; empty for components that are not MOSFETs.
  */
 std::span<const MOSFETModel> GetMOSFETModels(const ComponentType type) {
-    const auto first = std::ranges::find(MOSFET_MODELS, type, &MOSFETModel::Type);
-    const auto last =
-        std::find_if(first, MOSFET_MODELS.end(), [type](const MOSFETModel &model) { return model.Type != type; });
-    return {first, last};
+    return GetModelsOfType<MOSFETModel>(MOSFET_MODELS, type);
 }
 
 /**
@@ -231,9 +222,7 @@ std::span<const MOSFETModel> GetMOSFETModels(const ComponentType type) {
  * @return  The model, or nullptr when that part has no model with that name.
  */
 const MOSFETModel *FindMOSFETModel(const ComponentType type, const std::string_view name) {
-    const std::span<const MOSFETModel> models = GetMOSFETModels(type);
-    const auto model = std::ranges::find(models, name, &MOSFETModel::Name);
-    return model != models.end() ? &*model : nullptr;
+    return FindModelByName<MOSFETModel>(GetMOSFETModels(type), name);
 }
 
 /**

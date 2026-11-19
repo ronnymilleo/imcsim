@@ -7,6 +7,7 @@
 #define IMCSIM_BJT_H
 
 #include "circuit/components/component.h"
+#include "circuit/components/model_choice.h"
 #include <memory>
 #include <span>
 #include <string>
@@ -57,7 +58,7 @@ struct BJTModel {
     ComponentType Type;
 };
 
-inline constexpr const char *CUSTOM_BJT_MODEL_NAME = "Custom";
+inline constexpr const char *CUSTOM_BJT_MODEL_NAME = CUSTOM_MODEL_NAME;
 
 /**
  * @class   BJT
@@ -81,7 +82,7 @@ public:
     bool IsCustom() const;
     void SetCustom();
     void SetCustomParameters(const BJTParameters &parameters);
-    bool IsValidParameters(const BJTParameters &parameters) const;
+    static bool IsValidParameters(const BJTParameters &parameters);
 
     // Simulation
     const BJTParameters &GetParameters() const;
@@ -89,9 +90,7 @@ public:
     std::string GetSpiceModelName() const;
 
 private:
-    /// Null when the transistor uses its custom parameters.
-    const BJTModel *m_Model;
-    BJTParameters m_CustomParameters;
+    ModelChoice<BJTModel, BJTParameters> m_Choice;
 };
 
 // Bipolar transistors
