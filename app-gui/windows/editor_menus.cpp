@@ -1,6 +1,7 @@
 /**
  * @file    editor_menus.cpp
- * @brief   The items of the File and Edit menus that the editor draws in the main menu bar.
+ * @brief   The items of the File and Edit menus that the editor draws in the main menu bar, and the turning items its
+ *          context menu shares.
  */
 
 #include "windows/editor_menus.h"
@@ -11,36 +12,26 @@
 
 namespace GUI {
 
-namespace {
-
 /**
- * @brief   Rotate, mirror and flip the selected parts, with or without their wires.
+ * @brief   Draws a menu item that asks for a command, with the keys of the command beside it.
+ * @param[in] label       Text of the item.
+ * @param[in] command     What the item asks for.
+ * @param[in] is_enabled  Whether the item can be clicked.
+ * @note    The item is the last one drawn, so a tooltip set right after it belongs to it.
  */
-void DrawTurnItems(const bool part_selected, std::optional<EditorCommand> &command) {
-    if (ImGui::MenuItem("Rotate", "R", false, part_selected)) {
-        command = EditorCommand::ROTATE;
-    }
-    if (ImGui::MenuItem("Mirror", "M", false, part_selected)) {
-        command = EditorCommand::MIRROR;
-    }
-    if (ImGui::MenuItem("Flip", "Shift+M", false, part_selected)) {
-        command = EditorCommand::FLIP;
-    }
-    if (ImGui::BeginMenu("Keep Wires in Place", part_selected)) {
-        if (ImGui::MenuItem("Rotate", "Alt+R")) {
-            command = EditorCommand::ROTATE_KEEP_WIRES;
-        }
-        if (ImGui::MenuItem("Mirror", "Alt+M")) {
-            command = EditorCommand::MIRROR_KEEP_WIRES;
-        }
-        if (ImGui::MenuItem("Flip", "Alt+Shift+M")) {
-            command = EditorCommand::FLIP_KEEP_WIRES;
-        }
-        ImGui::EndMenu();
+void CommandItems::Draw(const char *label, const EditorCommand command, const bool is_enabled) {
+    if (ImGui::MenuItem(label, GetShortcutLabel(command), false, is_enabled)) {
+        m_Picked = command;
     }
 }
 
-} // namespace
+/**
+ * @brief   The command of the item clicked this frame.
+ * @return  The command, or none when no item was clicked.
+ */
+std::optional<EditorCommand> CommandItems::GetPicked() const {
+    return m_Picked;
+}
 
 /**
  * @brief   Draws the File menu items that act on the schematic, with their shortcuts.
@@ -49,35 +40,21 @@ void DrawTurnItems(const bool part_selected, std::optional<EditorCommand> &comma
  * @note    Call between BeginMenu() and EndMenu().
  */
 std::optional<EditorCommand> DrawFileItems(const bool is_disabled) {
-    std::optional<EditorCommand> command;
+    CommandItems items;
     ImGui::BeginDisabled(is_disabled);
-    if (ImGui::MenuItem("New", IMCSIM_SHORTCUT "N")) {
-        command = EditorCommand::NEW;
-    }
-    if (ImGui::MenuItem("Open...", IMCSIM_SHORTCUT "O")) {
-        command = EditorCommand::OPEN;
-    }
-    if (ImGui::MenuItem("Save", IMCSIM_SHORTCUT "S")) {
-        command = EditorCommand::SAVE;
-    }
-    if (ImGui::MenuItem("Save As...", IMCSIM_SHORTCUT "Shift+S")) {
-        command = EditorCommand::SAVE_AS;
-    }
+    items.Draw("New", EditorCommand::NEW);
+    items.Draw("Open...", EditorCommand::OPEN);
+    items.Draw("Save", EditorCommand::SAVE);
+    items.Draw("Save As...", EditorCommand::SAVE_AS);
     ImGui::Separator();
-    if (ImGui::MenuItem("Import...")) {
-        command = EditorCommand::IMPORT;
-    }
+    items.Draw("Import...", EditorCommand::IMPORT);
     ImGui::SetItemTooltip("Add the circuit of a file to this schematic: it follows the cursor until a click places it");
-    if (ImGui::MenuItem("Import SPICE Library...")) {
-        command = EditorCommand::IMPORT_SPICE;
-    }
+    items.Draw("Import SPICE Library...", EditorCommand::IMPORT_SPICE);
     ImGui::SetItemTooltip("Bring in a vendor's subcircuits, such as op-amp models, as blocks kept in this schematic");
-    if (ImGui::MenuItem("Export Schematic...")) {
-        command = EditorCommand::EXPORT_SCHEMATIC;
-    }
+    items.Draw("Export Schematic...", EditorCommand::EXPORT_SCHEMATIC);
     ImGui::SetItemTooltip("Save the schematic as an SVG image, to show next to its plots");
     ImGui::EndDisabled();
-    return command;
+    return items.GetPicked();
 }
 
 /**
@@ -87,37 +64,39 @@ std::optional<EditorCommand> DrawFileItems(const bool is_disabled) {
  * @note    Call between BeginMenu() and EndMenu(), before DrawBlockItems().
  */
 std::optional<EditorCommand> DrawEditItems(Schematic &schematic) {
-    std::optional<EditorCommand> command;
-    if (ImGui::MenuItem("Undo", IMCSIM_SHORTCUT "Z", false, schematic.CanUndo())) {
-        command = EditorCommand::UNDO;
-    }
-    if (ImGui::MenuItem("Redo", IMCSIM_SHORTCUT "Y", false, schematic.CanRedo())) {
-        command = EditorCommand::REDO;
-    }
+    CommandItems items;
+    items.Draw("Undo", EditorCommand::UNDO, schematic.CanUndo());
+    items.Draw("Redo", EditorCommand::REDO, schematic.CanRedo());
     ImGui::Separator();
-    const bool part_selected = !schematic.GetSelection().Elements.empty();
-    DrawTurnItems(part_selected, command);
+    DrawTurnItems(items, !schematic.GetSelection().Elements.empty());
     ImGui::Separator();
-    if (ImGui::MenuItem("Cut", IMCSIM_SHORTCUT "X", false, schematic.HasSelection())) {
-        command = EditorCommand::CUT;
-    }
-    if (ImGui::MenuItem("Copy", IMCSIM_SHORTCUT "C", false, schematic.HasSelection())) {
-        command = EditorCommand::COPY;
-    }
+    items.Draw("Cut", EditorCommand::CUT, schematic.HasSelection());
+    items.Draw("Copy", EditorCommand::COPY, schematic.HasSelection());
     const char *clipboard_text = ImGui::GetClipboardText();
-    const bool can_paste = clipboard_text != nullptr && LooksLikeCopiedSchematic(clipboard_text);
-    if (ImGui::MenuItem("Paste", IMCSIM_SHORTCUT "V", false, can_paste)) {
-        command = EditorCommand::PASTE;
-    }
+    items.Draw("Paste", EditorCommand::PASTE, clipboard_text != nullptr && LooksLikeCopiedSchematic(clipboard_text));
     ImGui::Separator();
-    if (ImGui::MenuItem("Select All", IMCSIM_SHORTCUT "A")) {
-        command = EditorCommand::SELECT_ALL;
-    }
-    if (ImGui::MenuItem("Delete", "Del", false, schematic.HasSelection())) {
-        command = EditorCommand::DELETE_SELECTION;
-    }
+    items.Draw("Select All", EditorCommand::SELECT_ALL);
+    items.Draw("Delete", EditorCommand::DELETE_SELECTION, schematic.HasSelection());
     ImGui::Separator();
-    return command;
+    return items.GetPicked();
+}
+
+/**
+ * @brief   Draws Rotate, Mirror and Flip for the selected parts, and their variants that keep the wires in place, as
+ *          the Edit menu and the context menu both show them.
+ * @param[in,out] items       The items of the menu, which take the command picked.
+ * @param[in]     is_enabled  Whether parts are selected.
+ */
+void DrawTurnItems(CommandItems &items, const bool is_enabled) {
+    items.Draw("Rotate", EditorCommand::ROTATE, is_enabled);
+    items.Draw("Mirror", EditorCommand::MIRROR, is_enabled);
+    items.Draw("Flip", EditorCommand::FLIP, is_enabled);
+    if (ImGui::BeginMenu("Keep Wires in Place", is_enabled)) {
+        items.Draw("Rotate", EditorCommand::ROTATE_KEEP_WIRES);
+        items.Draw("Mirror", EditorCommand::MIRROR_KEEP_WIRES);
+        items.Draw("Flip", EditorCommand::FLIP_KEEP_WIRES);
+        ImGui::EndMenu();
+    }
 }
 
 /**
@@ -125,33 +104,23 @@ std::optional<EditorCommand> DrawEditItems(Schematic &schematic) {
  *          ways out.
  * @param[in,out] schematic        Schematic on show, whose selection says what applies.
  * @param[in]     is_editing_block  Whether a block is open.
- * @return  The item picked, or none.
+ * @return  The command picked, or none; it runs on the next frame of the editor.
  */
-BlockMenuChoice DrawBlockItems(Schematic &schematic, const bool is_editing_block) {
-    BlockMenuChoice choice = BlockMenuChoice::NONE;
-    if (!is_editing_block
-        && ImGui::MenuItem("Create Block from Selection...", nullptr, false, schematic.HasSelection())) {
-        choice = BlockMenuChoice::CREATE_FROM_SELECTION;
+std::optional<EditorCommand> DrawBlockItems(Schematic &schematic, const bool is_editing_block) {
+    CommandItems items;
+    if (!is_editing_block) {
+        items.Draw("Create Block from Selection...", EditorCommand::CREATE_BLOCK, schematic.HasSelection());
     }
     const UIElement *selected = schematic.GetSelectedElement();
     const bool block_selected =
         selected != nullptr && selected->GetComponent().GetType() == Core::ComponentType::SUBCIRCUIT;
-    if (ImGui::MenuItem("Edit Block Contents", nullptr, false, block_selected)) {
-        choice = BlockMenuChoice::EDIT_CONTENTS;
+    items.Draw("Edit Block Contents", EditorCommand::EDIT_BLOCK, block_selected);
+    if (is_editing_block) {
+        items.Draw("Block Pin and Parameter Settings...", EditorCommand::OPEN_BLOCK_SETTINGS);
+        items.Draw("Apply Block and Return", EditorCommand::APPLY_BLOCK);
+        items.Draw("Discard Block Changes", EditorCommand::DISCARD_BLOCK);
     }
-    if (!is_editing_block) {
-        return choice;
-    }
-    if (ImGui::MenuItem("Block Pin and Parameter Settings...")) {
-        choice = BlockMenuChoice::OPEN_SETTINGS;
-    }
-    if (ImGui::MenuItem("Apply Block and Return")) {
-        choice = BlockMenuChoice::APPLY_AND_RETURN;
-    }
-    if (ImGui::MenuItem("Discard Block Changes")) {
-        choice = BlockMenuChoice::DISCARD_CHANGES;
-    }
-    return choice;
+    return items.GetPicked();
 }
 
 } // namespace GUI

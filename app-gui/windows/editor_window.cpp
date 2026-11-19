@@ -82,7 +82,8 @@ void EditorWindow::Update() {
     }
     m_Files.Update();
     HandleCommandRequest();
-    HandleGlobalShortcuts();
+    RunPressedShortcuts(ShortcutScope::DOCUMENT);
+    RunPressedShortcuts(ShortcutScope::EDITING);
     m_Files.DrawPopups();
     if (DrawBlockDialog(m_Blocks)) {
         OfferBlockParameters();
@@ -98,8 +99,14 @@ void EditorWindow::Update() {
  * @note    It works on the schematic being edited, a block included, whichever window is in front.
  */
 void EditorWindow::DrawCommandBar() {
-    ApplyToolbarRequest(
-        m_Toolbar.Draw(m_Mode, *m_Schematic, IsEditingSubcircuit(), m_PartPicker, m_Blocks.ListPlaceableBlocks()));
+    ToolbarRequest request =
+        m_Toolbar.Draw(m_Mode, *m_Schematic, IsEditingSubcircuit(), m_PartPicker, m_Blocks.ListPlaceableBlocks());
+    if (request.Mode) {
+        SetMode(std::move(*request.Mode));
+    }
+    if (request.Command) {
+        RunCommand(*request.Command);
+    }
 }
 
 /**
@@ -172,32 +179,54 @@ void EditorWindow::DrawEditMenuItems() {
     if (const std::optional<EditorCommand> command = DrawEditItems(*m_Schematic)) {
         m_RequestedCommand = command;
     }
-    RunBlockMenuChoice(DrawBlockItems(*m_Schematic, IsEditingSubcircuit()));
+    if (const std::optional<EditorCommand> command = DrawBlockItems(*m_Schematic, IsEditingSubcircuit())) {
+        m_RequestedCommand = command;
+    }
 }
 
 /**
  * @brief   Draws the View menu items of the editor.
- * @note    Call between BeginMenu() and EndMenu().
+ * @note    Call between BeginMenu() and EndMenu(); the command runs on the next frame of the editor.
  */
 void EditorWindow::DrawViewMenuItems() {
-    if (ImGui::MenuItem("Fit Schematic", "Home")) {
-        m_View.RequestFit();
+    CommandItems items;
+    items.Draw("Fit Schematic", EditorCommand::FIT);
+    if (const std::optional<EditorCommand> command = items.GetPicked()) {
+        m_RequestedCommand = command;
     }
 }
 
+/**
+ * @brief   Draws the frame of the editor: the rail, then the canvas, whose input runs before the schematic is drawn and
+ *          whose mode draws its preview over it, then the bars and menus over the canvas.
+ */
 void EditorWindow::Draw() {
-    // Only while the editor has the focus, since text fields use Home
-    if (ImGui::Shortcut(ImGuiKey_Home)) {
-        m_View.RequestFit();
-    }
-    // A part picked in the search of the command bar is placed here, so the editor takes the keys of placing
+    RunPressedShortcuts(ShortcutScope::VIEW);
+    RunPressedShortcuts(ShortcutScope::CANVAS);
+    HandlePartPicker();
+    m_Overlays.Update(*m_Schematic, GetShownResults(), m_Controls);
+    DrawRail();
+    const CanvasFrame frame = BeginCanvas();
+    HandleCanvasInput(frame);
+    DrawCanvas(frame);
+    DrawCanvasOverlays(frame);
+}
+
+/**
+ * @brief   A part picked in the search of the command bar is placed here, so the editor takes the keys of placing;
+ *          Space opens the search.
+ */
+void EditorWindow::HandlePartPicker() {
     if (m_PartPicker.TakeEditorFocus()) {
         ImGui::SetWindowFocus();
     }
     m_PartPicker.WatchShortcut();
-    m_Overlays.Update(*m_Schematic, GetShownResults(), m_Controls);
+}
 
-    // The rail runs down the left of the canvas, as tall as it
+/**
+ * @brief   The rail runs down the left of the canvas, as tall as it, and starts the mode or the search it asks for.
+ */
+void EditorWindow::DrawRail() {
     RailRequest rail = m_PartRail.Draw(m_Mode, GetCanvasSize().y);
     if (rail.Mode) {
         SetMode(std::move(*rail.Mode));
@@ -205,6 +234,14 @@ void EditorWindow::Draw() {
     if (rail.IsSearchAsked) {
         m_PartPicker.RequestOpen();
     }
+}
+
+/**
+ * @brief   Lays the canvas out beside the rail as one button that takes every mouse button, and lets the wheel and the
+ *          middle button move the view.
+ * @return  Where the canvas is and what the cursor is over, for the rest of the frame.
+ */
+EditorWindow::CanvasFrame EditorWindow::BeginCanvas() {
     ImGui::SameLine(0.0f, 0.0f);
     const ImVec2 origin = ImGui::GetCursorScreenPos();
     const ImVec2 size = GetCanvasSize();
@@ -221,84 +258,15 @@ void EditorWindow::Draw() {
                            ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight
                                | ImGuiButtonFlags_MouseButtonMiddle);
     const bool hovered = ImGui::IsItemHovered();
-    const bool active = ImGui::IsItemActive();
-    // During a live run the wheel over a potentiometer turns it instead of zooming, and a click on a part the user sets
-    // by hand changes it instead of selecting it
-    const bool is_live_part_pickable = !IsEditingSubcircuit() && m_Controls.IsLive() && IsSelecting(m_Mode);
-    const std::optional<std::size_t> live_part =
-        hovered ? m_Live.FindLivePart(*m_Schematic, m_View.GetTransform(origin), is_live_part_pickable)
-                : std::optional<std::size_t>();
-    const bool turns_part =
-        live_part
-        && GetLiveAction(m_Schematic->GetElements()[*live_part]->GetComponent().GetType()) == LiveAction::TURN;
-    m_View.HandlePanAndZoom(origin, hovered && !turns_part, active);
-
-    const ViewTransform view = m_View.GetTransform(origin);
-    const bool took_mouse = m_Live.HandleInput(*m_Schematic, live_part);
-    // Selection runs before drawing so a dragged element is drawn where the cursor is this frame
-    HandleSelection(view, hovered && !took_mouse);
-    m_ContextMenu.HandleRightClick(*m_Schematic, m_Mode, view, m_View.GetZoom(), hovered, m_Popover);
-    m_Popover.HandleValueTyping(m_PartEditor);
-    ImDrawList *draw_list = ImGui::GetWindowDrawList();
-    draw_list->PushClipRect(origin, origin + size, true);
-    draw_list->AddRectFilled(origin, origin + size, GetPalette().CanvasBackground);
-    DrawGrid(draw_list, view, origin, size, m_View.GetZoom());
-
-    DrawListCanvas canvas(draw_list);
-    m_Overlays.DrawWires(canvas, view, *m_Schematic, m_View.GetZoom());
-    const std::optional<std::size_t> held_button = m_Live.GetHeldButton();
-    m_Overlays.DrawElements(canvas,
-                            view,
-                            *m_Schematic,
-                            m_Controls.IsLive() && IsSelecting(m_Mode),
-                            held_button ? held_button : live_part);
-    // Over the symbols, so a lit LED looks lit through its own lines
-    m_Overlays.DrawGlows(draw_list, view, *m_Schematic, m_View.GetZoom());
-    if (m_Preferences.ShowTerminalNumbers) {
-        DrawTerminalNumbers(canvas, view, *m_Schematic, SCREEN_TERMINAL_RING_SCALE);
-    }
-    m_Overlays.DrawNodeVoltages(draw_list, view, *m_Schematic);
-    DrawMeasurementMarkers(canvas, view, *m_Schematic);
-    DrawSelectionBox(draw_list, view, m_Mode);
-
-    HandleModeKeys();
-    // Previews go over the schematic, so the mode handles its clicks after it is drawn
-    const ModeInput input = {.Root = m_RootSchematic,
-                             .Blocks = m_Blocks,
-                             .Overlays = m_Overlays,
-                             .Part = m_PartEditor,
-                             .Popover = m_Popover,
-                             .Files = m_Files,
-                             .UserPreferences = m_Preferences,
-                             .Canvas = canvas,
-                             .View = view,
-                             .Zoom = m_View.GetZoom(),
-                             .IsHovered = hovered,
-                             .IsWireVerticalFirst = m_WireVerticalFirst};
-    std::optional<EditorMode> next = std::visit([&](auto &mode) { return HandleMode(mode, input); }, m_Mode);
-    if (next) {
-        SetMode(std::move(*next));
-    }
-    HandleClipboardShortcuts();
-    m_Overlays.DrawColorLegend(draw_list, origin, size, *m_Schematic);
-    DrawShownInstant(draw_list, origin, GetShownInstant());
-
-    draw_list->PopClipRect();
-    if (const std::optional<std::size_t> picked = DrawBlockBar(m_Blocks, origin)) {
-        ReturnToLevel(*picked);
-    }
-    DrawStatusBar(m_Mode, *m_Schematic, m_Controls, GetShownResults().GetTransient(), view, hovered);
-    const ContextMenuServices services = {.Shown = *m_Schematic,
-                                          .Mode = m_Mode,
-                                          .Controls = m_Controls,
-                                          .Picker = m_PartPicker,
-                                          .View = m_View,
-                                          .Popover = m_Popover};
-    if (m_ContextMenu.Draw(services, m_RootSchematic.GetSimulationSettings().Selected, IsEditingSubcircuit())) {
-        RequestEditSelectedSubcircuit();
-    }
-    m_Popover.Draw(m_PartEditor, *m_Schematic);
-    m_PopupOpenLastFrame = ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel);
+    const std::optional<LivePart> live_part = hovered ? FindHoveredLivePart(origin) : std::nullopt;
+    // During a live run the wheel over a potentiometer turns it instead of zooming
+    const bool is_turning_part = live_part && live_part->Action == LiveAction::TURN;
+    m_View.HandlePanAndZoom(origin, hovered && !is_turning_part, ImGui::IsItemActive());
+    return {.Origin = origin,
+            .Size = size,
+            .View = m_View.GetTransform(origin),
+            .IsHovered = hovered,
+            .HoveredLivePart = live_part};
 }
 
 /**
@@ -308,6 +276,95 @@ ImVec2 EditorWindow::GetCanvasSize() {
     ImVec2 size = ImGui::GetContentRegionAvail();
     size.y -= ImGui::GetTextLineHeightWithSpacing();
     return {std::max(size.x, MIN_CANVAS_SIZE), std::max(size.y, MIN_CANVAS_SIZE)};
+}
+
+/**
+ * @brief   The part under the cursor that a click changes instead of selecting it, during a live run of the document
+ *          while the editor is selecting.
+ */
+std::optional<LivePart> EditorWindow::FindHoveredLivePart(const ImVec2 origin) const {
+    const bool is_live_part_pickable = !IsEditingSubcircuit() && m_Controls.IsLive() && IsSelecting(m_Mode);
+    return m_Live.FindLivePart(*m_Schematic, m_View.GetTransform(origin), is_live_part_pickable);
+}
+
+/**
+ * @brief   The input that runs before the schematic is drawn: the parts of a live run, selecting, the right click and
+ *          typing a value into the properties.
+ * @details Selection runs before drawing so a dragged element is drawn where the cursor is this frame.
+ */
+void EditorWindow::HandleCanvasInput(const CanvasFrame &frame) {
+    const bool took_mouse = m_Live.HandleInput(*m_Schematic, frame.HoveredLivePart);
+    HandleSelection(frame.View, frame.IsHovered && !took_mouse);
+    m_ContextMenu.HandleRightClick(*m_Schematic, m_Mode, frame.View, m_View.GetZoom(), frame.IsHovered, m_Popover);
+    m_Popover.HandleValueTyping(m_PartEditor);
+}
+
+/**
+ * @brief   Draws the schematic, lets the mode draw its preview over it and handle its clicks, and draws the color
+ *          legend and the instant on show on top, all clipped to the canvas.
+ */
+void EditorWindow::DrawCanvas(const CanvasFrame &frame) {
+    ImDrawList *draw_list = ImGui::GetWindowDrawList();
+    draw_list->PushClipRect(frame.Origin, frame.Origin + frame.Size, true);
+    DrawListCanvas canvas(draw_list);
+    DrawSchematicLayers(frame, canvas);
+    HandleModeInput(frame, canvas);
+    m_Overlays.DrawColorLegend(draw_list, frame.Origin, frame.Size, *m_Schematic);
+    DrawShownInstant(draw_list, frame.Origin, GetShownInstant());
+    draw_list->PopClipRect();
+}
+
+/**
+ * @brief   Draws the schematic from the bottom up: background, grid, wires, parts, glows, terminal numbers, node
+ *          voltages, measurement markers and the selection box.
+ */
+void EditorWindow::DrawSchematicLayers(const CanvasFrame &frame, SchematicCanvas &canvas) {
+    ImDrawList *draw_list = ImGui::GetWindowDrawList();
+    const ViewTransform &view = frame.View;
+    const float zoom = m_View.GetZoom();
+    draw_list->AddRectFilled(frame.Origin, frame.Origin + frame.Size, GetPalette().CanvasBackground);
+    DrawGrid(draw_list, view, frame.Origin, frame.Size, zoom);
+    m_Overlays.DrawWires(canvas, view, *m_Schematic, zoom);
+    const std::optional<std::size_t> held_button = m_Live.GetHeldButton();
+    const std::optional<std::size_t> hovered_part =
+        frame.HoveredLivePart ? std::optional<std::size_t>(frame.HoveredLivePart->Index) : std::nullopt;
+    m_Overlays.DrawElements(canvas,
+                            view,
+                            *m_Schematic,
+                            m_Controls.IsLive() && IsSelecting(m_Mode),
+                            held_button ? held_button : hovered_part);
+    // Over the symbols, so a lit LED looks lit through its own lines
+    m_Overlays.DrawGlows(draw_list, view, *m_Schematic, zoom);
+    if (m_Preferences.ShowTerminalNumbers) {
+        DrawTerminalNumbers(canvas, view, *m_Schematic, SCREEN_TERMINAL_RING_SCALE);
+    }
+    m_Overlays.DrawNodeVoltages(draw_list, view, *m_Schematic);
+    DrawMeasurementMarkers(canvas, view, *m_Schematic);
+    DrawSelectionBox(draw_list, view, m_Mode);
+}
+
+/**
+ * @brief   The keys that start a mode, then the input of the mode the editor is in, which may switch to another.
+ * @details Previews go over the schematic, so the mode handles its clicks after it is drawn.
+ */
+void EditorWindow::HandleModeInput(const CanvasFrame &frame, SchematicCanvas &canvas) {
+    HandleModeKeys();
+    const ModeInput input = {.Root = m_RootSchematic,
+                             .Blocks = m_Blocks,
+                             .Overlays = m_Overlays,
+                             .Part = m_PartEditor,
+                             .Popover = m_Popover,
+                             .Files = m_Files,
+                             .UserPreferences = m_Preferences,
+                             .Canvas = canvas,
+                             .View = frame.View,
+                             .Zoom = m_View.GetZoom(),
+                             .IsHovered = frame.IsHovered,
+                             .IsWireVerticalFirst = m_WireVerticalFirst};
+    std::optional<EditorMode> next = std::visit([&](auto &mode) { return HandleMode(mode, input); }, m_Mode);
+    if (next) {
+        SetMode(std::move(*next));
+    }
 }
 
 /**
@@ -329,28 +386,25 @@ void EditorWindow::HandleModeKeys() {
 }
 
 /**
- * @brief   Starts the mode a toolbar button asked for, or runs its command.
+ * @brief   What sits over the canvas once it is drawn: the way back from a block, the status bar, the context menu and
+ *          the properties popover.
+ * @details ImGui closes a popup on Esc before the next frame starts, so whether one is open is kept for that frame.
  */
-void EditorWindow::ApplyToolbarRequest(ToolbarRequest request) {
-    if (request.Mode) {
-        SetMode(std::move(*request.Mode));
+void EditorWindow::DrawCanvasOverlays(const CanvasFrame &frame) {
+    if (const std::optional<std::size_t> picked = DrawBlockBar(m_Blocks, frame.Origin)) {
+        ReturnToLevel(*picked);
     }
-    if (!request.Command) {
-        return;
+    DrawStatusBar(m_Mode, *m_Schematic, m_Controls, GetShownResults().GetTransient(), frame.View, frame.IsHovered);
+    const ContextMenuServices services = {.Shown = *m_Schematic,
+                                          .Controls = m_Controls,
+                                          .Picker = m_PartPicker,
+                                          .Popover = m_Popover};
+    if (const std::optional<EditorCommand> command =
+            m_ContextMenu.Draw(services, m_RootSchematic.GetSimulationSettings().Selected, IsEditingSubcircuit())) {
+        RunCommand(*command);
     }
-    switch (*request.Command) {
-    case ToolbarCommand::UNDO:
-        Undo();
-        break;
-    case ToolbarCommand::REDO:
-        Redo();
-        break;
-    case ToolbarCommand::FIT:
-        m_View.RequestFit();
-        break;
-    default:
-        break;
-    }
+    m_Popover.Draw(m_PartEditor, *m_Schematic);
+    m_PopupOpenLastFrame = ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel);
 }
 
 /**
@@ -487,33 +541,6 @@ void EditorWindow::FinishSubcircuitEditing(const bool apply) {
 }
 
 /**
- * @brief   Carries out the item of the block section of the Edit menu that was picked.
- */
-void EditorWindow::RunBlockMenuChoice(const BlockMenuChoice choice) {
-    switch (choice) {
-    case BlockMenuChoice::CREATE_FROM_SELECTION:
-        m_Blocks.RequestCreate();
-        break;
-    case BlockMenuChoice::EDIT_CONTENTS:
-        RequestEditSelectedSubcircuit();
-        break;
-    case BlockMenuChoice::OPEN_SETTINGS:
-        m_Blocks.SyncPins();
-        m_Blocks.RequestDialog();
-        break;
-    case BlockMenuChoice::APPLY_AND_RETURN:
-        FinishSubcircuitEditing(true);
-        break;
-    case BlockMenuChoice::DISCARD_CHANGES:
-        FinishSubcircuitEditing(false);
-        break;
-    case BlockMenuChoice::NONE:
-    default:
-        break;
-    }
-}
-
-/**
  * @brief   Imported blocks join the schematic as one undo step and the first one starts placing, so it lands where the
  *          user clicks; new settings of a block reach every instance of it.
  */
@@ -544,24 +571,6 @@ void EditorWindow::ApplySpiceBlockResult(SpiceBlockResult result) {
 }
 
 /**
- * @brief   Ctrl+C, Ctrl+X and Ctrl+V while the editor has the focus and no text field wants the keys.
- */
-void EditorWindow::HandleClipboardShortcuts() {
-    if (!ImGui::IsWindowFocused() || ImGui::GetIO().WantTextInput) {
-        return;
-    }
-    if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_C)) {
-        CopySelected();
-    }
-    if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_X)) {
-        CutSelected();
-    }
-    if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_V)) {
-        StartPasting();
-    }
-}
-
-/**
  * @brief   The selection goes to the clipboard as text in the format of the files, so another copy of the program can
  *          paste it.
  */
@@ -579,10 +588,10 @@ void EditorWindow::CopySelected() {
 }
 
 /**
- * @brief   Deleting in the middle of a drag would leave the drag pointing at removed items.
+ * @brief   The selection goes to the clipboard, as CopySelected() puts it, and leaves the schematic.
  */
 void EditorWindow::CutSelected() {
-    if (IsDragging(m_Mode) || !IsSelecting(m_Mode) || !m_Schematic->HasSelection()) {
+    if (!IsSelecting(m_Mode) || !m_Schematic->HasSelection()) {
         return;
     }
     CopySelected();
@@ -635,7 +644,7 @@ void EditorWindow::HandleSelection(const ViewTransform &view, const bool hovered
     UpdateSelectionBox(*selecting, cursor_world);
     UpdateSelectionDrag(*selecting, cursor_world);
     if (ImGui::IsWindowFocused()) {
-        HandleSelectionKeys(*selecting);
+        HandleSelectionKeys();
     }
 }
 
@@ -720,26 +729,23 @@ void EditorWindow::UpdateSelectionDrag(SelectingMode &selecting, const ImVec2 cu
 
 /**
  * @brief   R rotates the selection, M mirrors it, Enter opens its properties, Delete removes it and Esc clears it.
+ * @details R, M and Delete ask for the commands of the Edit menu; they work whatever other modifier is held, which a
+ *          shortcut of the table would not.
  */
-void EditorWindow::HandleSelectionKeys(const SelectingMode &selecting) {
-    const bool shift = ImGui::GetIO().KeyShift;
-    const bool keep_wires = ImGui::GetIO().KeyAlt;
+void EditorWindow::HandleSelectionKeys() {
     if (ImGui::IsKeyPressed(ImGuiKey_R)) {
-        TransformSelection(*m_Schematic, m_Mode, PointTransform::Kind::QUARTER_TURN, keep_wires);
+        RunTurnKey(PointTransform::Kind::QUARTER_TURN);
     }
     const bool enter = ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false);
     if (enter && m_Schematic->GetSelectedElement() != nullptr && !ImGui::IsAnyItemActive()) {
         m_Popover.Open();
     }
     if (ImGui::IsKeyPressed(ImGuiKey_M)) {
-        TransformSelection(*m_Schematic,
-                           m_Mode,
-                           shift ? PointTransform::Kind::MIRROR_TOP_BOTTOM : PointTransform::Kind::MIRROR_LEFT_RIGHT,
-                           keep_wires);
+        RunTurnKey(ImGui::GetIO().KeyShift ? PointTransform::Kind::MIRROR_TOP_BOTTOM
+                                           : PointTransform::Kind::MIRROR_LEFT_RIGHT);
     }
-    // Deleting mid-drag would leave the drag pointing at removed items
-    if (ImGui::IsKeyPressed(ImGuiKey_Delete) && !selecting.Drag) {
-        m_Schematic->DeleteSelection();
+    if (ImGui::IsKeyPressed(ImGuiKey_Delete)) {
+        RunCommand(EditorCommand::DELETE_SELECTION);
     }
     if (ImGui::IsKeyPressed(ImGuiKey_Escape) && !m_PopupOpenLastFrame) {
         ClearSelection(*m_Schematic, m_Mode);
@@ -747,144 +753,131 @@ void EditorWindow::HandleSelectionKeys(const SelectingMode &selecting) {
 }
 
 /**
- * @brief   Global routing makes the shortcuts work while another editor window, such as Properties, has focus.
+ * @brief   Runs the turning command of a key of the selecting mode; holding Alt keeps the wires where they are.
  */
-void EditorWindow::HandleGlobalShortcuts() {
-    if (!IsEditingSubcircuit()) {
-        if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_N, ImGuiInputFlags_RouteGlobal)) {
-            m_Files.RequestNew();
-        }
-        if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_O, ImGuiInputFlags_RouteGlobal)) {
-            m_Files.RequestOpen();
-        }
-        if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_S, ImGuiInputFlags_RouteGlobal)) {
-            m_Files.Save();
-        }
-        if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_S, ImGuiInputFlags_RouteGlobal)) {
-            m_Files.SaveAs();
-        }
-        if (ImGui::Shortcut(ImGuiKey_F5, ImGuiInputFlags_RouteGlobal) && m_Controls.GetRunAction() != RunAction::STOP) {
-            m_Controls.PressRun();
-        }
-        if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Q, ImGuiInputFlags_RouteGlobal)) {
-            RequestQuit();
-        }
+void EditorWindow::RunTurnKey(const PointTransform::Kind kind) {
+    const TurnRequest turn = {.Kind = kind, .IsKeepingWires = ImGui::GetIO().KeyAlt};
+    if (const std::optional<EditorCommand> command = GetTurnCommand(turn)) {
+        RunCommand(*command);
     }
-    // A focused text field keeps Ctrl+Z for undoing its own typing
-    if (ImGui::GetIO().WantTextInput) {
-        return;
-    }
-    if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_A, ImGuiInputFlags_RouteGlobal)) {
-        SelectAll(*m_Schematic, m_Mode);
-    }
-    if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Z, ImGuiInputFlags_RouteGlobal)) {
-        Undo();
-    }
-    if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Y, ImGuiInputFlags_RouteGlobal)
-        || ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_Z, ImGuiInputFlags_RouteGlobal)) {
-        Redo();
-    }
-}
-
-/**
- * @brief   A drag keeps pointers into the elements, so undoing in the middle of one waits until it ends.
- */
-void EditorWindow::Undo() {
-    if (IsDragging(m_Mode)) {
-        return;
-    }
-    m_Schematic->Undo();
-}
-
-void EditorWindow::Redo() {
-    if (IsDragging(m_Mode)) {
-        return;
-    }
-    m_Schematic->Redo();
 }
 
 /**
  * @brief   Menu commands run here, from Update(), where their popups are opened and drawn whichever window is in front.
  */
 void EditorWindow::HandleCommandRequest() {
-    const std::optional<EditorCommand> command = std::exchange(m_RequestedCommand, std::nullopt);
-    if (command && !RunFileCommand(*command) && !RunClipboardCommand(*command)) {
-        RunEditCommand(*command);
+    if (const std::optional<EditorCommand> command = std::exchange(m_RequestedCommand, std::nullopt)) {
+        RunCommand(*command);
     }
 }
 
 /**
- * @brief   The commands of the File menu; false for any other.
+ * @brief   Runs the commands whose keys of one scope were pressed this frame, as the table of shortcuts lists them.
+ * @note    The global scopes are read from Update(), outside any window, so they work whichever window is in front;
+ *          the others from Draw(), inside the editor window, whose focus they need.
  */
-bool EditorWindow::RunFileCommand(const EditorCommand command) {
+void EditorWindow::RunPressedShortcuts(const ShortcutScope scope) {
+    const ShortcutState state = {.IsEditingBlock = IsEditingSubcircuit(),
+                                 .IsTyping = ImGui::GetIO().WantTextInput,
+                                 .IsEditorFocused = ImGui::IsWindowFocused()};
+    if (!IsShortcutScopeOpen(scope, state)) {
+        return;
+    }
+    for (const EditorShortcut &shortcut : GetEditorShortcuts()) {
+        if (shortcut.Scope == scope && ImGui::Shortcut(shortcut.Chord, GetShortcutRoute(scope))) {
+            RunCommand(shortcut.Command);
+        }
+    }
+}
+
+/**
+ * @brief   Carries out a command, whichever menu, button or key asked for it.
+ * @details A drag keeps pointers into the elements, so the commands that remove or replace them wait until it ends.
+ */
+void EditorWindow::RunCommand(const EditorCommand command) {
+    if (IsDragging(m_Mode) && !CanRunDuringDrag(command)) {
+        return;
+    }
     switch (command) {
     case EditorCommand::NEW:
         m_Files.RequestNew();
-        return true;
+        break;
     case EditorCommand::OPEN:
         m_Files.RequestOpen();
-        return true;
+        break;
     case EditorCommand::SAVE:
         m_Files.Save();
-        return true;
+        break;
     case EditorCommand::SAVE_AS:
         m_Files.SaveAs();
-        return true;
+        break;
     case EditorCommand::IMPORT:
         m_Files.Import();
-        return true;
+        break;
     case EditorCommand::IMPORT_SPICE:
         m_Files.ImportSpiceLibrary();
-        return true;
+        break;
     case EditorCommand::EXPORT_SCHEMATIC:
         m_Files.OpenExportPopup();
-        return true;
-    default:
-        return false;
-    }
-}
-
-/**
- * @brief   Cut, Copy and Paste; false for any other.
- */
-bool EditorWindow::RunClipboardCommand(const EditorCommand command) {
-    switch (command) {
-    case EditorCommand::CUT:
-        CutSelected();
-        return true;
-    case EditorCommand::COPY:
-        CopySelected();
-        return true;
-    case EditorCommand::PASTE:
-        StartPasting();
-        return true;
-    default:
-        return false;
-    }
-}
-
-/**
- * @brief   The commands of the Edit menu: history, selecting all, deleting and turning the selection.
- */
-void EditorWindow::RunEditCommand(const EditorCommand command) {
-    switch (command) {
+        break;
+    case EditorCommand::QUIT:
+        RequestQuit();
+        break;
+    case EditorCommand::RUN:
+        // Like the Run button of the analysis settings, the key never stops a run
+        if (m_Controls.GetRunAction() != RunAction::STOP) {
+            m_Controls.PressRun();
+        }
+        break;
     case EditorCommand::UNDO:
-        Undo();
+        m_Schematic->Undo();
         break;
     case EditorCommand::REDO:
-        Redo();
+        m_Schematic->Redo();
+        break;
+    case EditorCommand::ROTATE:
+    case EditorCommand::MIRROR:
+    case EditorCommand::FLIP:
+    case EditorCommand::ROTATE_KEEP_WIRES:
+    case EditorCommand::MIRROR_KEEP_WIRES:
+    case EditorCommand::FLIP_KEEP_WIRES:
+        RunTurnCommand(command);
+        break;
+    case EditorCommand::CUT:
+        CutSelected();
+        break;
+    case EditorCommand::COPY:
+        CopySelected();
+        break;
+    case EditorCommand::PASTE:
+        StartPasting();
         break;
     case EditorCommand::SELECT_ALL:
         SelectAll(*m_Schematic, m_Mode);
         break;
     case EditorCommand::DELETE_SELECTION:
-        // Deleting mid-drag would leave the drag pointing at a removed element
-        if (!IsDragging(m_Mode)) {
-            m_Schematic->DeleteSelection();
-        }
+        m_Schematic->DeleteSelection();
+        break;
+    case EditorCommand::FIT:
+        m_View.RequestFit();
+        break;
+    case EditorCommand::CREATE_BLOCK:
+        m_Blocks.RequestCreate();
+        break;
+    case EditorCommand::EDIT_BLOCK:
+        RequestEditSelectedSubcircuit();
+        break;
+    case EditorCommand::OPEN_BLOCK_SETTINGS:
+        m_Blocks.SyncPins();
+        m_Blocks.RequestDialog();
+        break;
+    case EditorCommand::APPLY_BLOCK:
+        FinishSubcircuitEditing(true);
+        break;
+    case EditorCommand::DISCARD_BLOCK:
+        FinishSubcircuitEditing(false);
         break;
     default:
-        RunTurnCommand(command);
         break;
     }
 }

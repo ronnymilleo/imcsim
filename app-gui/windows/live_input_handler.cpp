@@ -18,14 +18,21 @@ namespace GUI {
  * @param[in] view                   Pan and zoom of the canvas.
  * @param[in] is_live_part_pickable  Whether parts can be set by hand now: a live run goes on, on the document, while
  *                                   the editor is selecting.
+ * @return  The part and what the mouse does to it, so the editor knows whether the wheel turns it instead of zooming.
  */
-std::optional<std::size_t> LiveInputHandler::FindLivePart(const Schematic &schematic,
-                                                          const ViewTransform &view,
-                                                          const bool is_live_part_pickable) const {
+std::optional<LivePart> LiveInputHandler::FindLivePart(const Schematic &schematic,
+                                                       const ViewTransform &view,
+                                                       const bool is_live_part_pickable) const {
     if (!is_live_part_pickable) {
         return std::nullopt;
     }
-    return PickLivePart(schematic.GetElements(), view.ToWorld(ImGui::GetIO().MousePos));
+    const std::optional<std::size_t> index =
+        PickLivePart(schematic.GetElements(), view.ToWorld(ImGui::GetIO().MousePos));
+    if (!index) {
+        return std::nullopt;
+    }
+    return LivePart{.Index = *index,
+                    .Action = GetLiveAction(schematic.GetElements()[*index]->GetComponent().GetType())};
 }
 
 /**
@@ -35,7 +42,7 @@ std::optional<std::size_t> LiveInputHandler::FindLivePart(const Schematic &schem
  * @param[in]     live_part  The part under the cursor, from FindLivePart().
  * @return  Whether the mouse went to a part, so the click does not also select.
  */
-bool LiveInputHandler::HandleInput(Schematic &schematic, const std::optional<std::size_t> live_part) {
+bool LiveInputHandler::HandleInput(Schematic &schematic, const std::optional<LivePart> live_part) {
     if (m_HeldButton) {
         if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
             ReleaseHeldButton(schematic);
@@ -46,8 +53,8 @@ bool LiveInputHandler::HandleInput(Schematic &schematic, const std::optional<std
         return false;
     }
     ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-    Core::Component &component = schematic.GetElement(*live_part).GetComponent();
-    switch (GetLiveAction(component.GetType())) {
+    Core::Component &component = schematic.GetElement(live_part->Index).GetComponent();
+    switch (live_part->Action) {
     case LiveAction::TURN:
         if (Turn(component, ImGui::GetIO().MouseWheel)) {
             schematic.MarkLiveChanged(component);
@@ -66,7 +73,7 @@ bool LiveInputHandler::HandleInput(Schematic &schematic, const std::optional<std
         }
         SetPressed(component, true);
         schematic.MarkLiveChanged(component);
-        m_HeldButton = live_part;
+        m_HeldButton = live_part->Index;
         return true;
     case LiveAction::NONE:
     default:

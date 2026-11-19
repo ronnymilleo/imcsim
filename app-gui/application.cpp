@@ -436,7 +436,7 @@ void Application::DrawMainMenuBar() {
         }
         ImGui::Separator();
         // Quitting asks the editor first, like closing the window
-        if (ImGui::MenuItem("Quit", IMCSIM_SHORTCUT "Q")) {
+        if (ImGui::MenuItem("Quit", GetShortcutLabel(EditorCommand::QUIT))) {
             m_EditorWindow.RequestQuit();
         }
         ImGui::EndMenu();

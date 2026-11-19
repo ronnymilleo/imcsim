@@ -104,6 +104,7 @@ add_executable(imcsim-tests
             sensitivity_tests.cpp
             sensitivity_view_tests.cpp
             seven_segment_tests.cpp
+            shortcuts_tests.cpp
             simulation_backend_tests.cpp
             simulation_service_tests.cpp
             simulator_tests.cpp

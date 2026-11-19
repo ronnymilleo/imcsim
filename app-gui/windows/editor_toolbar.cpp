@@ -197,14 +197,26 @@ ToolbarRequest EditorToolbar::Draw(const EditorMode &mode,
     is_first = true;
 
     // History and view
-    if (tool_button("##undo", ToolIcon::UNDO, false, schematic.CanUndo(), "Undo (" IMCSIM_SHORTCUT "Z)")) {
-        request.Command = ToolbarCommand::UNDO;
+    if (tool_button("##undo",
+                    ToolIcon::UNDO,
+                    false,
+                    schematic.CanUndo(),
+                    NameWithShortcut("Undo", EditorCommand::UNDO).c_str())) {
+        request.Command = EditorCommand::UNDO;
     }
-    if (tool_button("##redo", ToolIcon::REDO, false, schematic.CanRedo(), "Redo (" IMCSIM_SHORTCUT "Y)")) {
-        request.Command = ToolbarCommand::REDO;
+    if (tool_button("##redo",
+                    ToolIcon::REDO,
+                    false,
+                    schematic.CanRedo(),
+                    NameWithShortcut("Redo", EditorCommand::REDO).c_str())) {
+        request.Command = EditorCommand::REDO;
     }
-    if (tool_button("##fit", ToolIcon::FIT, false, true, "Fit the schematic in view (Home)")) {
-        request.Command = ToolbarCommand::FIT;
+    if (tool_button("##fit",
+                    ToolIcon::FIT,
+                    false,
+                    true,
+                    NameWithShortcut("Fit the schematic in view", EditorCommand::FIT).c_str())) {
+        request.Command = EditorCommand::FIT;
     }
     DrawGroupSeparator();
 

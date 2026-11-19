@@ -8,7 +8,8 @@
 #include "imgui.h"
 #include "schematic/selection.h"
 #include "schematic/selection_editing.h"
-#include "schematic/wire_editing.h"
+#include "schematic/shortcuts.h"
+#include "windows/editor_menus.h"
 #include <format>
 #include <string>
 
@@ -20,46 +21,15 @@ constexpr const char *CONTEXT_MENU = "Schematic actions";
 
 /**
  * @brief   Properties and, for a block, its contents, for a part selected alone.
- * @return  Whether the contents of the block were asked for.
  */
-bool DrawPartItems(const ContextMenuServices &services) {
-    bool is_block_edit_asked = false;
+void DrawPartItems(const ContextMenuServices &services, CommandItems &items) {
     if (ImGui::MenuItem("Properties...", "Enter")) {
         services.Popover.Request();
     }
-    if (services.Shown.GetSelectedElement()->GetComponent().GetType() == Core::ComponentType::SUBCIRCUIT
-        && ImGui::MenuItem("Edit Block Contents")) {
-        is_block_edit_asked = true;
+    if (services.Shown.GetSelectedElement()->GetComponent().GetType() == Core::ComponentType::SUBCIRCUIT) {
+        items.Draw("Edit Block Contents", EditorCommand::EDIT_BLOCK);
     }
     ImGui::Separator();
-    return is_block_edit_asked;
-}
-
-/**
- * @brief   Rotate, mirror and flip the selected parts, with or without their wires.
- */
-void DrawTurnItems(const ContextMenuServices &services) {
-    if (ImGui::MenuItem("Rotate", "R")) {
-        TransformSelection(services.Shown, services.Mode, PointTransform::Kind::QUARTER_TURN, false);
-    }
-    if (ImGui::MenuItem("Mirror", "M")) {
-        TransformSelection(services.Shown, services.Mode, PointTransform::Kind::MIRROR_LEFT_RIGHT, false);
-    }
-    if (ImGui::MenuItem("Flip", "Shift+M")) {
-        TransformSelection(services.Shown, services.Mode, PointTransform::Kind::MIRROR_TOP_BOTTOM, false);
-    }
-    if (ImGui::BeginMenu("Keep Wires in Place")) {
-        if (ImGui::MenuItem("Rotate", "Alt+R")) {
-            TransformSelection(services.Shown, services.Mode, PointTransform::Kind::QUARTER_TURN, true);
-        }
-        if (ImGui::MenuItem("Mirror", "Alt+M")) {
-            TransformSelection(services.Shown, services.Mode, PointTransform::Kind::MIRROR_LEFT_RIGHT, true);
-        }
-        if (ImGui::MenuItem("Flip", "Alt+Shift+M")) {
-            TransformSelection(services.Shown, services.Mode, PointTransform::Kind::MIRROR_TOP_BOTTOM, true);
-        }
-        ImGui::EndMenu();
-    }
 }
 
 /**
@@ -82,20 +52,23 @@ void DrawMeasureItem(Schematic &schematic, const MeasurementTarget &target) {
 
 /**
  * @brief   Running, stopping or continuing the live run, for the document and not a block.
+ * @details These drive the run directly, as the Run button does, since each says which of the three it does; F5 only
+ *          ever runs or continues.
  */
 void DrawRunItems(AnalysisControls &controls, const Analysis selected_analysis) {
     if (controls.IsLive() && ImGui::MenuItem("Discard the Live Run")) {
         controls.DiscardLive();
     }
     if (controls.GetRunAction() == RunAction::CONTINUE) {
-        if (ImGui::MenuItem("Continue the Live Run", "F5")) {
+        if (ImGui::MenuItem("Continue the Live Run", GetShortcutLabel(EditorCommand::RUN))) {
             controls.ContinueLive();
         }
     } else if (controls.IsRunning()) {
         if (ImGui::MenuItem("Stop the Run")) {
             controls.StopRun();
         }
-    } else if (ImGui::MenuItem(std::format("Run {}", GetAnalysisName(selected_analysis)).c_str(), "F5")) {
+    } else if (ImGui::MenuItem(std::format("Run {}", GetAnalysisName(selected_analysis)).c_str(),
+                               GetShortcutLabel(EditorCommand::RUN))) {
         controls.RunSelected();
     }
 }
@@ -104,6 +77,7 @@ void DrawRunItems(AnalysisControls &controls, const Analysis selected_analysis) 
  * @brief   What the empty canvas offers: finding a part, running and fitting the view.
  */
 void DrawCanvasItems(const ContextMenuServices &services,
+                     CommandItems &items,
                      const Analysis selected_analysis,
                      const bool is_editing_block) {
     if (ImGui::MenuItem("Find a Part...", "Space")) {
@@ -112,9 +86,7 @@ void DrawCanvasItems(const ContextMenuServices &services,
     if (!is_editing_block) {
         DrawRunItems(services.Controls, selected_analysis);
     }
-    if (ImGui::MenuItem("Fit Schematic", "Home")) {
-        services.View.RequestFit();
-    }
+    items.Draw("Fit Schematic", EditorCommand::FIT);
 }
 
 } // namespace
@@ -160,24 +132,25 @@ void EditorContextMenu::HandleRightClick(Schematic &schematic,
  * @param[in] services           What the items act on.
  * @param[in] selected_analysis  The analysis the Run item runs.
  * @param[in] is_editing_block   Whether a block is open, which has no run of its own.
- * @return  Whether the item that opens the contents of the selected block was picked, which the editor carries out.
+ * @return  The command of the item picked, such as turning the selection or opening the selected block, which the
+ *          editor carries out; none when the menu is closed or the item acted by itself.
  */
-bool EditorContextMenu::Draw(const ContextMenuServices &services,
-                             const Analysis selected_analysis,
-                             const bool is_editing_block) {
+std::optional<EditorCommand> EditorContextMenu::Draw(const ContextMenuServices &services,
+                                                     const Analysis selected_analysis,
+                                                     const bool is_editing_block) {
     if (!ImGui::BeginPopup(CONTEXT_MENU)) {
-        return false;
+        return std::nullopt;
     }
     Schematic &schematic = services.Shown;
     const bool on_element = !schematic.GetSelection().Elements.empty();
     const bool on_wire = !schematic.GetSelection().Wires.empty();
     const bool single = schematic.GetSelection().Elements.size() + schematic.GetSelection().Wires.size() == 1;
-    bool is_block_edit_asked = false;
+    CommandItems items;
     if (schematic.GetSelectedElement() != nullptr) {
-        is_block_edit_asked = DrawPartItems(services);
+        DrawPartItems(services, items);
     }
     if (on_element) {
-        DrawTurnItems(services);
+        DrawTurnItems(items, true);
     }
     if (single && m_Target) {
         if (on_element) {
@@ -187,14 +160,12 @@ bool EditorContextMenu::Draw(const ContextMenuServices &services,
     }
     if (on_element || on_wire) {
         ImGui::Separator();
-        if (ImGui::MenuItem("Delete", "Del")) {
-            schematic.DeleteSelection();
-        }
+        items.Draw("Delete", EditorCommand::DELETE_SELECTION);
     } else {
-        DrawCanvasItems(services, selected_analysis, is_editing_block);
+        DrawCanvasItems(services, items, selected_analysis, is_editing_block);
     }
     ImGui::EndPopup();
-    return is_block_edit_asked;
+    return items.GetPicked();
 }
 
 } // namespace GUI

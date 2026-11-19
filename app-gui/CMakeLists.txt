@@ -128,6 +128,7 @@ add_library(imcsim-gui-lib
             schematic/schematic_file_actions.cpp
             schematic/selection.cpp
             schematic/selection_editing.cpp
+            schematic/shortcuts.cpp
             schematic/simulation_settings.cpp
             schematic/spice_import.cpp
             schematic/subcircuit_pins.cpp
