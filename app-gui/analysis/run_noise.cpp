@@ -7,7 +7,7 @@
 #include "analysis/analysis_controls.h"
 
 #include "analysis/analysis_inputs.h"
-#include "analysis/run_jobs.h"
+#include "analysis/run_starts.h"
 #include "simulation/analysis_sources.h"
 #include <optional>
 #include <string>
@@ -19,14 +19,13 @@ namespace GUI {
 void AnalysisControls::RunNoiseAnalysis(const Core::Circuit &circuit) {
     const SimulationSettings &settings = m_Schematic.GetSimulationSettings();
     const std::vector<std::string> sources = Core::GetNoiseInputSources(circuit);
+    if (sources.empty()) {
+        Refuse(Analysis::NOISE, DescribeMissingACInput("A noise analysis"));
+        return;
+    }
     const std::optional<int> output = ResolveOutputNode(settings.NoiseOutput, circuit, m_Schematic);
-    if (sources.empty() || !output) {
-        m_Results.SetNoise(std::nullopt);
-        Finish(Analysis::NOISE,
-               sources.empty() ? "A noise analysis needs an AC source as its input; select a voltage or current "
-                                 "source and set it to AC"
-                               : "Connect some parts: the noise needs a node to measure",
-               {});
+    if (!output) {
+        Refuse(Analysis::NOISE, DescribeMissingOutputNode("the noise"));
         return;
     }
     const Core::NoiseSettings run_settings{.OutputNode = *output,
@@ -34,18 +33,11 @@ void AnalysisControls::RunNoiseAnalysis(const Core::Circuit &circuit) {
                                            .StartFrequency = settings.NoiseRange.StartFrequency,
                                            .StopFrequency = settings.NoiseRange.StopFrequency,
                                            .PointsPerDecade = settings.NoiseRange.PointsPerDecade};
-    StartRun(Analysis::NOISE,
-             MakeJob<Core::NoiseRun>(
-                 circuit,
-                 [run_settings](const Core::Circuit &copy, Core::RunControl &) {
-                     return Core::RunNoise(copy, run_settings);
-                 },
-                 [this](Core::NoiseRun run) {
-                     Finish(Analysis::NOISE,
-                            StoreResult(std::move(run.Result),
-                                        [this](auto result) { m_Results.SetNoise(std::move(result)); }),
-                            std::move(run.Messages));
-                 }));
+    StartSingleRun(
+        Analysis::NOISE,
+        circuit,
+        [run_settings](const Core::Circuit &copy, Core::RunControl &) { return Core::RunNoise(copy, run_settings); },
+        [this](std::optional<Core::Noise> result) { m_Results.SetNoise(std::move(result)); });
 }
 
 } // namespace GUI

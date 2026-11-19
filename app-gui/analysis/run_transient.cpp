@@ -6,9 +6,8 @@
 
 #include "analysis/analysis_controls.h"
 
-#include "analysis/run_jobs.h"
+#include "analysis/run_starts.h"
 #include "simulation/check_transient.h"
-#include "simulation/monte_carlo.h"
 #include <algorithm>
 #include <cstddef>
 #include <memory>
@@ -17,59 +16,32 @@
 
 namespace GUI {
 
-/**
- * @brief   A live run is a transient that goes on to its limit at the pace the settings give, unless the user stops it
- *          first.
- */
-void AnalysisControls::RunTransientAnalysis(const Core::Circuit &circuit,
-                                            const std::optional<StepPlan> &steps,
-                                            const std::optional<Core::MonteCarloSettings> &monte_carlo) {
+void AnalysisControls::RunTransientAnalysis(const Core::Circuit &circuit, const RunRepeat &repeat) {
     const Core::TransientSettings settings = m_Schematic.GetSimulationSettings().Transient;
+    if (IsSingleRun(repeat)) {
+        StartSingleTransient(circuit, settings);
+        return;
+    }
     m_IsLiveResult = false;
-    if (monte_carlo) {
-        StartRun(Analysis::TRANSIENT,
-                 MakeJob<MonteCarloRuns<Core::Transient>, true>(
-                     circuit,
-                     [settings, monte_carlo = *monte_carlo](const Core::Circuit &copy, Core::RunControl &control) {
-                         return RunMonteCarlo<Core::Transient>(
-                             monte_carlo,
-                             copy,
-                             control,
-                             [&](const Core::Circuit &varied) { return Core::RunTransient(varied, settings); },
-                             MeasureTransient);
-                     },
-                     [this](MonteCarloRuns<Core::Transient> runs) {
-                         Finish(
-                             Analysis::TRANSIENT,
-                             StoreMonteCarlo(std::move(runs.Family),
-                                             std::move(runs.Table),
-                                             m_Results,
-                                             [this](auto family) { m_Results.SetTransientSteps(std::move(family)); }),
-                             std::move(runs.Messages));
-                     }));
-        return;
-    }
-    if (steps) {
-        StartRun(Analysis::TRANSIENT,
-                 MakeJob<SteppedRuns<Core::Transient>>(
-                     circuit,
-                     [settings, plan = *steps](const Core::Circuit &copy, Core::RunControl &control) {
-                         return RunSteps<Core::Transient>(plan.Settings,
-                                                          plan.Unit,
-                                                          plan.Values,
-                                                          control,
-                                                          [&](const Core::ParameterValue &value) {
-                                                              return Core::RunTransient(copy, settings, value);
-                                                          });
-                     },
-                     [this](SteppedRuns<Core::Transient> runs) {
-                         Finish(Analysis::TRANSIENT,
-                                StoreSteps(std::move(runs.Family),
-                                           [this](auto family) { m_Results.SetTransientSteps(std::move(family)); }),
-                                std::move(runs.Messages));
-                     }));
-        return;
-    }
+    StartRepeatable<Core::Transient>(
+        Analysis::TRANSIENT,
+        circuit,
+        repeat,
+        {.RunOnce =
+             [settings](const Core::Circuit &copy, const std::optional<Core::ParameterValue> &value) {
+                 return Core::RunTransient(copy, settings, value);
+             },
+         .Measure = MeasureTransient,
+         .StoreSingle = [this](std::optional<Core::Transient> result) { m_Results.SetTransient(std::move(result)); },
+         .StoreFamily =
+             [this](StepFamily<Core::Transient> family) { m_Results.SetTransientSteps(std::move(family)); }});
+}
+
+/**
+ * @brief   A single transient grows in the results chunk by chunk; a live one goes on to its limit at the pace the
+ *          settings give, unless the user stops it first.
+ */
+void AnalysisControls::StartSingleTransient(const Core::Circuit &circuit, const Core::TransientSettings &settings) {
     // The points arrive in chunks while the run goes on, so the old result gives way to the first one
     m_Results.SetTransient(std::nullopt);
     const std::size_t circuit_version = m_Schematic.GetCircuitVersion();
@@ -89,7 +61,7 @@ void AnalysisControls::RunTransientAnalysis(const Core::Circuit &circuit,
     }
     const bool is_live = m_IsLiveRun;
     StartRun(Analysis::TRANSIENT,
-             MakeJob<Core::TransientRun, true>(
+             MakeJob<Core::TransientRun, KEEPS_PARTIAL_RESULT>(
                  circuit,
                  [this, run_settings, circuit_version, pace](const Core::Circuit &copy, Core::RunControl &control) {
                      const auto post_chunk = [this, &control, circuit_version](Core::Transient chunk) {
