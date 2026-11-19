@@ -583,7 +583,10 @@ private:
                                   figures.WindingResistance);
     }
 
-    /// The inverter and the buffer have one input; every other gate is one device that AddLogicGate() builds.
+    /**
+     * @brief   Adds a logic gate: the inverter and the buffer have one input; every other gate is one device that
+     *          AddLogicGate() builds.
+     */
     void AddGatePart(const EntryContext &entry) {
         const auto &logic = static_cast<const LogicPart &>(entry.Part);
         const std::vector<int> &nodes = entry.Nodes;

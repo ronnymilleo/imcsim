@@ -10,6 +10,13 @@ add_library(nodalys STATIC
     src/analyses/dc_analysis.cpp
     src/analyses/frequency_sweep.cpp
     src/analyses/hb_analysis.cpp
+    src/analyses/hb_bias.cpp
+    src/analyses/hb_residual.cpp
+    src/analyses/hb_result.cpp
+    src/analyses/hb_setup.cpp
+    src/analyses/hb_solve.cpp
+    src/analyses/hb_spectrum.cpp
+    src/analyses/hb_workspace.cpp
     src/analyses/noise_analysis.cpp
     src/analyses/port_matrices.cpp
     src/analyses/pz_analysis.cpp

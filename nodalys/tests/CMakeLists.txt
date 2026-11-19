@@ -14,6 +14,10 @@ add_executable(nodalys-tests
     frequency_sweep_tests.cpp
     fuse_device_tests.cpp
     hb_analysis_tests.cpp
+    hb_bias_tests.cpp
+    hb_setup_tests.cpp
+    hb_spectrum_tests.cpp
+    hb_workspace_tests.cpp
     linear_tests.cpp
     mosfet_device_tests.cpp
     netlist_elements_tests.cpp
