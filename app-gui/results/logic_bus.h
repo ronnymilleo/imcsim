@@ -9,7 +9,7 @@
 #define IMCSIM_LOGIC_BUS_H
 
 #include "results/logic_trace.h"
-#include "results/trace_math.h"
+#include "results/trace_math_parser.h"
 #include "schematic/logic_bus_definition.h"
 #include <cstddef>
 #include <cstdint>

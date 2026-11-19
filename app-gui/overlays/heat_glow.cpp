@@ -5,7 +5,7 @@
 
 #include "overlays/heat_glow.h"
 
-#include "results/current_flow.h"
+#include "results/logarithmic_level.h"
 #include <algorithm>
 
 namespace GUI {

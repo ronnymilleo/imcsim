@@ -259,3 +259,19 @@ TEST_CASE("A change just after the start does not leave a sliver of a cell at th
     CHECK_THAT(cells[0][0].From, Catch::Matchers::WithinAbs(0.0, 1e-12));
     CHECK(Read(cells[0]) == "0101");
 }
+
+TEST_CASE("A sliver of a cell after the last full one stretches it to the last sample", "[logic_trace]") {
+    Cells signals;
+    // Ten more samples, 0.1 ms past the 4 ms edge: too narrow for a cell of its own, so the last cell takes it
+    for (int index = 401; index <= 410; ++index) {
+        signals.Times.push_back(static_cast<double>(index) * 0.01e-3);
+        signals.Clock.push_back(5.0);
+        signals.Slow.push_back(0.0);
+    }
+    const std::vector<GUI::LogicSignal> list = {{signals.Clock, 5.0}, {signals.Slow, 5.0}};
+    const auto cells = GUI::FindBitCells(signals.Times, list, 0.0, 4.1e-3);
+    REQUIRE(cells[0].size() == 4);
+    CHECK(Read(cells[0]) == "0101");
+    CHECK_THAT(cells[0][3].From, Catch::Matchers::WithinAbs(3e-3, 1e-9));
+    CHECK_THAT(cells[0][3].To, Catch::Matchers::WithinAbs(4.1e-3, 1e-9));
+}

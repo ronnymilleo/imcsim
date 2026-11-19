@@ -6,6 +6,8 @@
 #include "results/circuit_snapshot.h"
 
 #include "results/current_flow.h"
+#include "results/logarithmic_level.h"
+#include "results/node_index.h"
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -92,13 +94,13 @@ std::vector<ComponentPower> ComputePowers(const std::vector<std::unique_ptr<UIEl
         double power = 0.0;
         for (std::size_t index = 0; index < terminals.size(); ++index) {
             const std::optional<double> current = GetTerminalCurrent(component, index, operating_point.Currents);
-            const std::optional<int> node = connectivity.GetNode(terminals[index]);
-            if (!current || !node || *node < 0
-                || static_cast<std::size_t>(*node) >= operating_point.NodeVoltages.size()) {
+            const std::optional<std::size_t> node =
+                FindNodeIndex(connectivity.GetNode(terminals[index]), operating_point.NodeVoltages.size());
+            if (!current || !node) {
                 continue;
             }
             has_current = true;
-            power += operating_point.NodeVoltages[static_cast<std::size_t>(*node)] * *current;
+            power += operating_point.NodeVoltages[*node] * *current;
         }
         if (has_current) {
             powers.push_back({component.GetName(), power});
