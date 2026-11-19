@@ -5,10 +5,10 @@
 
 #include "analyses/analyses.h"
 
+#include "analyses/analysis_preamble.h"
 #include "devices/devices.h"
 #include <algorithm>
 #include <cmath>
-#include <format>
 
 namespace Nodalys {
 
@@ -19,38 +19,42 @@ constexpr double SHORT_CIRCUIT_THRESHOLD = 1e-15;
 
 } // namespace
 
+/**
+ * @brief   Computes the DC small-signal gain, input impedance and output impedance from a source to an output node.
+ * @param[in,out] compiled  Compiled circuit with its matrix and devices.
+ * @param[in]     settings  Output node and input source.
+ * @param[in]     options   Numerical limits of the operating point.
+ * @param[out]    messages  Diagnostic messages collected during the analysis; may be null.
+ * @return  The gain and the impedances, or an error description.
+ */
 std::expected<TransferFunctionResult, std::string> ComputeTransferFunction(CompiledCircuit &compiled,
                                                                            const TransferFunctionConfig &settings,
                                                                            const ConvergenceOptions &options,
                                                                            std::vector<DiagnosticMessage> *messages) {
 
     const int out_node = settings.OutputPositiveNode;
-    if (out_node <= 0 || out_node >= compiled.CircuitNodeCount) {
-        return std::unexpected(std::format("The circuit has no output node {}", out_node));
+    if (const std::optional<std::string> refusal = CheckOutputNode(compiled, out_node)) {
+        return std::unexpected(*refusal);
     }
-    const auto source_it = compiled.SourcesByName.find(settings.InputSource);
-    if (source_it == compiled.SourcesByName.end()) {
-        return std::unexpected(std::format("The circuit has no source named {}", settings.InputSource));
+    const std::expected<InputSource, std::string> input =
+        ResolveInputSource(compiled, settings.InputSource, "a transfer function");
+    if (!input) {
+        return std::unexpected(input.error());
     }
-
-    auto *voltage_source = dynamic_cast<VoltageSourceDevice *>(source_it->second);
-    auto *current_source = dynamic_cast<CurrentSourceDevice *>(source_it->second);
-    if (voltage_source == nullptr && current_source == nullptr) {
-        return std::unexpected(std::format("The source {} cannot drive a transfer function", settings.InputSource));
-    }
+    const VoltageSourceDevice *voltage_source = input->Voltage;
+    const CurrentSourceDevice *current_source = input->Current;
 
     const int size = compiled.System->GetSize();
-    std::vector<double> x_dc(static_cast<std::size_t>(size), 0.0);
-    const NewtonOutcome outcome = SolveNewton(*compiled.System, compiled.Devices, x_dc, TimeContext{}, options);
-    if (!outcome.Converged) {
-        return std::unexpected(DescribeFailure("Nodalys found no operating point for the transfer function", outcome));
+    const std::expected<std::vector<double>, std::string> x_dc =
+        SolveOperatingPoint(compiled, options, "Nodalys found no operating point for the transfer function", messages);
+    if (!x_dc) {
+        return std::unexpected(x_dc.error());
     }
-    DescribeOutcome(outcome, "operating point", messages);
 
     const int out_idx = compiled.System->NodeIndex(out_node);
 
     compiled.System->ClearRhs();
-    if (voltage_source != nullptr) {
+    if (input->IsVoltage()) {
         compiled.System->AddRhs(voltage_source->GetBranch(), 1.0);
     } else {
         compiled.System->AddRhs(current_source->GetNodeA(), -1.0);
@@ -66,10 +70,10 @@ std::expected<TransferFunctionResult, std::string> ComputeTransferFunction(Compi
     result.OutputPositiveNode = out_node;
     result.OutputNegativeNode = settings.OutputNegativeNode;
     result.InputSource = settings.InputSource;
-    result.GainUnit = voltage_source != nullptr ? "V/V" : "V/A";
+    result.GainUnit = input->IsVoltage() ? "V/V" : "V/A";
     result.Gain = dx_in[static_cast<std::size_t>(out_idx)];
 
-    if (voltage_source != nullptr) {
+    if (input->IsVoltage()) {
         const double current_into_circuit = -dx_in[static_cast<std::size_t>(voltage_source->GetBranch())];
         if (std::fabs(current_into_circuit) <= 1.01 * options.Gmin) {
             result.InputImpedance = OPEN_CIRCUIT_IMPEDANCE;
