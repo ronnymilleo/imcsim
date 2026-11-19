@@ -5,6 +5,7 @@
 
 #include "analyses/ac_sens_bias.h"
 
+#include "analyses/analysis_preamble.h"
 #include <algorithm>
 #include <cmath>
 #include <map>
@@ -30,7 +31,7 @@ struct DeviceStamp {
 class StampProbe {
 public:
     explicit StampProbe(const CompiledCircuit &compiled)
-        : m_Conductance(MakeSystem(compiled)), m_Reactive(MakeSystem(compiled)) {}
+        : m_Conductance(MakeEmptySystemLike(*compiled.System)), m_Reactive(MakeEmptySystemLike(*compiled.System)) {}
 
     /**
      * @brief   Stamps one device at an iterate into the scratch systems.
@@ -49,19 +50,13 @@ public:
     const MnaSystem &GetReactive() const { return m_Reactive; }
 
 private:
-    static MnaSystem MakeSystem(const CompiledCircuit &compiled) {
-        std::vector<bool> node_flags(static_cast<std::size_t>(compiled.System->GetSize()), false);
-        for (int index = 0; index < compiled.System->GetSize(); ++index) {
-            node_flags[static_cast<std::size_t>(index)] = compiled.System->IsNodeUnknown(index);
-        }
-        return MnaSystem(std::move(node_flags));
-    }
-
     MnaSystem m_Conductance;
     MnaSystem m_Reactive;
 };
 
-/// The unknowns a stamp reads: the columns where it has an entry.
+/**
+ * @brief   The unknowns a stamp reads: the columns where it has an entry.
+ */
 std::vector<int> FindReadUnknowns(const StampProbe &probe, const int size) {
     std::vector<int> unknowns;
     for (int column = 0; column < size; ++column) {
@@ -121,7 +116,9 @@ void ProbeUnknown(StampProbe &probe,
     }
 }
 
-/// Adds the derivatives of one unknown to the total, summing entries of the same position.
+/**
+ * @brief   Adds the derivatives of one unknown to the total, summing entries of the same position.
+ */
 void Merge(std::map<int, std::map<std::pair<int, int>, JacobianEntry>> &total,
            const std::vector<JacobianDerivative> &found) {
     for (const JacobianDerivative &derivative : found) {

@@ -11,24 +11,10 @@
 #include "nodalys/analyses.h"
 #include "nodalys/results.h"
 #include <expected>
-#include <format>
 #include <string>
-#include <utility>
 #include <vector>
 
 namespace Nodalys {
-
-inline void
-DescribeOutcome(const NewtonOutcome &outcome, const char *analysis, std::vector<DiagnosticMessage> *messages) {
-    if (!messages) {
-        return;
-    }
-    std::string text = std::format("nodalys: {} converged in {} iterations", analysis, outcome.Iterations);
-    if (!outcome.Strategy.empty()) {
-        text += std::format(" (with {})", outcome.Strategy);
-    }
-    messages->push_back({std::move(text), false});
-}
 
 std::expected<OperatingPointResult, std::string> ComputeOperatingPoint(CompiledCircuit &compiled,
                                                                        const ConvergenceOptions &options,

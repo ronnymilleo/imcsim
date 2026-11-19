@@ -8,6 +8,8 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
+#include "analyses/frequency_sweep.h"
+
 #include <nodalys/nodalys.h>
 
 #include <format>
@@ -160,4 +162,16 @@ TEST_CASE("The .ac and .noise directives refuse a bad sweep and quote the line",
         CHECK(refuse("dec 10 100 abc").contains("frequency range"));
         CHECK(refuse("dec 10 100").contains("Malformed"));
     }
+}
+
+TEST_CASE("A sweep range needs a start above zero, a stop not below it and at least one point",
+          "[nodalys][frequency_sweep]") {
+    CHECK(Nodalys::IsValidSweepRange(100.0, 10e3, 5));
+    // A sweep of one frequency has its start equal to its stop
+    CHECK(Nodalys::IsValidSweepRange(1e3, 1e3, 1));
+    CHECK_FALSE(Nodalys::IsValidSweepRange(0.0, 10e3, 5));
+    CHECK_FALSE(Nodalys::IsValidSweepRange(-1.0, 10e3, 5));
+    CHECK_FALSE(Nodalys::IsValidSweepRange(10e3, 100.0, 5));
+    CHECK_FALSE(Nodalys::IsValidSweepRange(100.0, 10e3, 0));
+    CHECK_FALSE(Nodalys::IsValidSweepRange(100.0, 10e3, -3));
 }

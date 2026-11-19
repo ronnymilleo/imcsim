@@ -11,6 +11,9 @@
 
 namespace Nodalys {
 
+// Checks
+bool IsValidSweepRange(double start_frequency, double stop_frequency, int points);
+
 // Grid
 std::vector<double>
 MakeFrequencySweep(FrequencySweepType sweep_type, double start_frequency, double stop_frequency, int points);

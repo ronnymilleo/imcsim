@@ -7,6 +7,7 @@ add_library(nodalys STATIC
     src/analyses/ac_sens_analysis.cpp
     src/analyses/ac_sens_bias.cpp
     src/analyses/ac_sens_elements.cpp
+    src/analyses/analysis_preamble.cpp
     src/analyses/dc_analysis.cpp
     src/analyses/frequency_sweep.cpp
     src/analyses/hb_analysis.cpp
@@ -22,6 +23,7 @@ add_library(nodalys STATIC
     src/analyses/pz_analysis.cpp
     src/analyses/pz_checks.cpp
     src/analyses/sens_analysis.cpp
+    src/analyses/solution_readout.cpp
     src/analyses/sp_analysis.cpp
     src/analyses/tf_analysis.cpp
     src/analyses/transient_analysis.cpp
