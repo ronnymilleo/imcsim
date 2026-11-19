@@ -63,6 +63,10 @@ private:
 
 void DrawFieldLabel(const char *label);
 
+// Validity
+bool AnyValue(double value);
+bool IsNonZero(double value);
+
 } // namespace GUI
 
 #endif // IMCSIM_VALUE_FIELD_H

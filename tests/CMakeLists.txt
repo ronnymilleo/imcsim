@@ -45,6 +45,7 @@ add_executable(imcsim-tests
             file_json_tests.cpp
             fuse_tests.cpp
             group_editing_tests.cpp
+            harmonic_balance_samples_tests.cpp
             harmonic_balance_view_tests.cpp
             heat_glow_tests.cpp
             helpers_tests.cpp
@@ -52,6 +53,7 @@ add_executable(imcsim-tests
             led_glow_tests.cpp
             live_change_tests.cpp
             live_input_tests.cpp
+            live_run_plan_tests.cpp
             logarithmic_level_tests.cpp
             logic_bus_definition_tests.cpp
             logic_bus_tests.cpp
@@ -92,7 +94,9 @@ add_executable(imcsim-tests
             readout_placement_tests.cpp
             ready_blocks_tests.cpp
             result_store_tests.cpp
+            run_jobs_tests.cpp
             run_repeat_tests.cpp
+            run_report_tests.cpp
             run_status_tests.cpp
             s_parameter_ports_tests.cpp
             s_parameter_view_tests.cpp

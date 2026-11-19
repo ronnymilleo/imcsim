@@ -7,9 +7,9 @@
 #include "analysis/analysis_settings_panel.h"
 
 #include "analysis/analysis_inputs.h"
+#include "analysis/harmonic_balance_samples.h"
 #include "base/theme.h"
 #include "imgui.h"
-#include "misc/cpp/imgui_stdlib.h"
 #include "schematic/probing.h"
 #include "simulation/analysis_sources.h"
 #include "simulation/analysis_suggestions.h"
@@ -19,7 +19,6 @@
 #include "spice/spice_value.h"
 #include <algorithm>
 #include <format>
-#include <random>
 #include <set>
 #include <utility>
 
@@ -31,80 +30,10 @@ bool IsPositive(const double value) {
     return value > 0.0;
 }
 
-bool AnyValue(double /*value*/) {
-    return true;
-}
-
-bool IsNonZero(const double value) {
-    return value != 0.0;
-}
-
-/**
- * @enum    RunMode
- * @brief   How the transient, AC sweep and DC sweep repeat: not at all, once per value of a parameter, or once per draw
- *          of the values of the parts within their tolerances.
- */
-enum class RunMode {
-    SINGLE,
-    STEP,
-    MONTE_CARLO,
-};
-
 /// What the input picker of an analysis driven through an AC source says when the circuit has none.
 constexpr const char *AC_INPUT_HINT = "Set a voltage or current source to AC";
 
 constexpr std::array<const char *, 3> INTEGRATION_METHOD_NAMES = {"Default", "Trapezoidal", "Gear"};
-
-constexpr std::array<const char *, 3> RUN_MODE_NAMES = {"Single run", "Step a parameter", "Monte Carlo"};
-
-RunMode GetRunMode(const SimulationSettings &settings) {
-    if (settings.MonteCarlo.Enabled) {
-        return RunMode::MONTE_CARLO;
-    }
-    return settings.ParameterStep.Enabled ? RunMode::STEP : RunMode::SINGLE;
-}
-
-/**
- * @brief   Turns one mode on and the others off, so the step and Monte Carlo are never both on; the first time Monte
- *          Carlo is on it gets a random seed.
- */
-void SetRunMode(SimulationSettings &settings, const RunMode mode) {
-    settings.ParameterStep.Enabled = mode == RunMode::STEP;
-    settings.MonteCarlo.Enabled = mode == RunMode::MONTE_CARLO;
-    if (mode == RunMode::MONTE_CARLO && settings.MonteCarlo.Seed == 0) {
-        std::random_device device;
-        settings.MonteCarlo.Seed = device() | 1U;
-    }
-}
-
-Core::AnalysisKind ToKind(const Analysis analysis) {
-    switch (analysis) {
-    case Analysis::OPERATING_POINT:
-        return Core::AnalysisKind::OPERATING_POINT;
-    case Analysis::TRANSIENT:
-        return Core::AnalysisKind::TRANSIENT;
-    case Analysis::AC_SWEEP:
-        return Core::AnalysisKind::AC_SWEEP;
-    case Analysis::DC_SWEEP:
-        return Core::AnalysisKind::DC_SWEEP;
-    case Analysis::NOISE:
-        return Core::AnalysisKind::NOISE;
-    case Analysis::TRANSFER_FUNCTION:
-        return Core::AnalysisKind::TRANSFER_FUNCTION;
-    case Analysis::SENSITIVITY:
-        return Core::AnalysisKind::SENSITIVITY;
-    case Analysis::POLE_ZERO:
-        return Core::AnalysisKind::POLE_ZERO;
-    case Analysis::S_PARAMETERS:
-        return Core::AnalysisKind::S_PARAMETERS;
-    case Analysis::TRUTH_TABLE:
-        return Core::AnalysisKind::TRUTH_TABLE;
-    case Analysis::HARMONIC_BALANCE:
-        return Core::AnalysisKind::HARMONIC_BALANCE;
-    default:
-        return Core::AnalysisKind::OPERATING_POINT;
-    }
-}
 
 std::set<Core::ComponentType> ListPartTypes(const Schematic &schematic) {
     std::set<Core::ComponentType> types;
@@ -154,46 +83,12 @@ void DrawSweepRange(const char *id,
 }
 
 /**
- * @brief   The values of the range of a step as a list to edit, such as "500, 1k, 1.5k"; empty when the range is
- *          invalid.
+ * @brief   A button that suggests settings, disabled with the reason when the circuit gives nothing to base a
+ *          suggestion on.
  */
-std::string FormatRangeAsList(ParameterStepSettings step, const std::string &unit) {
-    step.UsesList = false;
-    std::string list;
-    if (const auto values = ListStepValues(step, unit)) {
-        for (const double value : *values) {
-            list += (list.empty() ? "" : ", ") + Core::FormatValue(value);
-        }
-    }
-    return list;
-}
-
-/**
- * @brief   How many runs the step makes, from which value to which, or why it cannot run.
- */
-void DrawStepSummary(const ParameterStepSettings &step, const std::string &unit) {
-    const auto values = ListStepValues(step, unit);
-    ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetFontSize() * 20.0f);
-    if (!values) {
-        ImGui::TextColored(GetErrorTextColor(), "%s", values.error().c_str());
-    } else {
-        const std::string parameter = GetParameterLabel(step);
-        ImGui::TextDisabled("%s",
-                            std::format("{} runs, {} to {}",
-                                        values->size(),
-                                        FormatStepValue(parameter, values->front(), unit),
-                                        FormatStepValue(parameter, values->back(), unit))
-                                .c_str());
-    }
-    ImGui::PopTextWrapPos();
-}
-
-/**
- * @brief   A Suggest button, disabled with the reason when the circuit gives nothing to base a suggestion on.
- */
-bool DrawSuggestButton(const bool available, const char *tooltip, const char *unavailable_reason) {
+bool DrawSuggestButton(const char *label, const bool available, const char *tooltip, const char *unavailable_reason) {
     ImGui::BeginDisabled(!available);
-    const bool clicked = ImGui::Button("Suggest");
+    const bool clicked = ImGui::Button(label);
     ImGui::EndDisabled();
     ImGui::SetItemTooltip("%s", available ? tooltip : unavailable_reason);
     return clicked;
@@ -237,7 +132,8 @@ void DrawLogarithmicSweep(const char *id,
     DrawFieldLabel("Points");
     DrawPointsPerDecade(range.PointsPerDecade);
     const auto suggested = Core::SuggestACSweepSettings(circuit);
-    if (DrawSuggestButton(suggested.has_value(),
+    if (DrawSuggestButton("Suggest",
+                          suggested.has_value(),
                           "Two decades past the RC, RL and LC corners and the op-amp bandwidths",
                           "Needs a capacitor, an inductor or an op-amp")
         && suggested) {
@@ -281,9 +177,9 @@ void DrawInputPicker(const char *id,
  * @brief   Creates the panel for a schematic.
  * @param[in] schematic  Schematic whose analyses are set; it must outlive the panel.
  */
-AnalysisSettingsPanel::AnalysisSettingsPanel(Schematic &schematic) : m_Schematic(schematic) {
+AnalysisSettingsPanel::AnalysisSettingsPanel(Schematic &schematic)
+    : m_Schematic(schematic), m_RunModeSettings(schematic) {
     LoadSettingsFields();
-    m_ToleranceAllField.Load(m_ToleranceAllPercent);
 }
 
 /**
@@ -320,7 +216,7 @@ void AnalysisSettingsPanel::DrawSettings() {
     SimulationSettings settings = m_Schematic.GetSimulationSettings();
     DrawSelectedSettings(settings);
     if (IsRepeatable(settings.Selected)) {
-        DrawRunModeSettings(settings);
+        m_RunModeSettings.Draw(settings);
     }
     DrawSolverSettings(settings.Solver);
     m_Schematic.SetSimulationSettings(settings);
@@ -332,9 +228,7 @@ void AnalysisSettingsPanel::DrawSettings() {
 void AnalysisSettingsPanel::DrawSelectedSettings(SimulationSettings &settings) {
     switch (settings.Selected) {
     case Analysis::OPERATING_POINT:
-        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetFontSize() * 20.0f);
-        ImGui::TextDisabled("The DC voltages show on the schematic and, with the currents, in the Output window");
-        ImGui::PopTextWrapPos();
+        DrawOperatingPointSettings();
         break;
     case Analysis::TRANSIENT:
         DrawTransientSettings(settings);
@@ -366,6 +260,8 @@ void AnalysisSettingsPanel::DrawSelectedSettings(SimulationSettings &settings) {
     case Analysis::HARMONIC_BALANCE:
         DrawHarmonicBalanceSettings(settings);
         break;
+    default:
+        break;
     }
 }
 
@@ -383,9 +279,18 @@ void AnalysisSettingsPanel::LoadSettingsFields() {
                         settings.ACSensitivityRange.StopFrequency);
     LoadFrequencyFields(m_SParameterRange, settings.SParameters.StartFrequency, settings.SParameters.StopFrequency);
     m_HBFundamental.Load(settings.HarmonicBalance.FundamentalFrequency);
-    LoadParameterStepFields(settings.ParameterStep);
+    m_RunModeSettings.Load(settings);
     LoadSolverFields(settings.Solver);
     m_LoadedSettingsVersion = m_Schematic.GetSimulationSettingsVersion();
+}
+
+/**
+ * @brief   The operating point has no settings, so it says where its results show.
+ */
+void AnalysisSettingsPanel::DrawOperatingPointSettings() {
+    ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetFontSize() * 20.0f);
+    ImGui::TextDisabled("The DC voltages show on the schematic and, with the currents, in the Output window");
+    ImGui::PopTextWrapPos();
 }
 
 /**
@@ -399,7 +304,8 @@ void AnalysisSettingsPanel::DrawTransientSettings(SimulationSettings &settings) 
         settings.Transient.TimeStep = *time_step;
     }
     const auto suggested = Core::SuggestTransientSettings(m_Schematic.BuildCircuit());
-    if (DrawSuggestButton(suggested.has_value(),
+    if (DrawSuggestButton("Suggest",
+                          suggested.has_value(),
                           "Five periods of the slowest source, or the whole span of a one-shot one",
                           "Needs a source with a waveform")
         && suggested) {
@@ -656,17 +562,10 @@ void AnalysisSettingsPanel::DrawTruthTableSettings(SimulationSettings &settings)
         if (!ImGui::Checkbox(name.c_str(), &is_chosen)) {
             continue;
         }
-        // At least one input stays, since a table of none has no rows to show
-        if (!is_chosen && chosen.size() == 1) {
-            continue;
+        if (std::optional<std::vector<std::string>> changed =
+                ToggleTruthTableInput(available, chosen, name, is_chosen)) {
+            settings.TruthTableInputs = std::move(*changed);
         }
-        std::vector<std::string> changed;
-        for (const std::string &candidate : available) {
-            if (candidate == name ? is_chosen : std::ranges::contains(chosen, candidate)) {
-                changed.push_back(candidate);
-            }
-        }
-        settings.TruthTableInputs = std::move(changed);
     }
     chosen = ResolveTruthTableInputs(settings.TruthTableInputs, available);
     if (chosen.size() > Core::MAX_TRUTH_TABLE_INPUTS) {
@@ -679,12 +578,7 @@ void AnalysisSettingsPanel::DrawTruthTableSettings(SimulationSettings &settings)
         ImGui::TextDisabled("Measure a voltage with the Probe tool to read it");
         return;
     }
-    std::string labels;
-    for (const int node : outputs) {
-        labels += labels.empty() ? "" : ", ";
-        labels += GetVoltageLabel(m_Schematic.GetConnectivity(), node);
-    }
-    ImGui::TextDisabled("Reads %s", labels.c_str());
+    ImGui::TextDisabled("Reads %s", FormatMeasuredNodeLabels(m_Schematic.GetConnectivity(), outputs).c_str());
     ImGui::SetItemTooltip("The nodes you measure with the Probe tool; every combination of the inputs is simulated and "
                           "each of these is read as 0, 1 or X");
 }
@@ -695,96 +589,43 @@ void AnalysisSettingsPanel::DrawTruthTableSettings(SimulationSettings &settings)
  * @details An explicit sample count stays above twice the harmonics, so a harmonic never aliases onto another one.
  */
 void AnalysisSettingsPanel::DrawHarmonicBalanceSettings(SimulationSettings &settings) {
-    constexpr int MIN_EXPLICIT_SAMPLES = 32;
-    constexpr int MAX_EXPLICIT_SAMPLES = Core::MAX_HARMONIC_BALANCE_SAMPLES;
+    Core::HarmonicBalanceSettings &harmonic_balance = settings.HarmonicBalance;
     if (const std::optional<double> fundamental = m_HBFundamental.Draw("Fundamental", "Hz", IsPositive)) {
-        settings.HarmonicBalance.FundamentalFrequency = *fundamental;
+        harmonic_balance.FundamentalFrequency = *fundamental;
     }
     DrawFieldLabel("Harmonics");
-    if (ImGui::InputInt("##hb_harmonics", &settings.HarmonicBalance.Harmonics)) {
-        settings.HarmonicBalance.Harmonics =
-            std::clamp(settings.HarmonicBalance.Harmonics, 1, Core::MAX_HARMONIC_BALANCE_HARMONICS);
+    if (ImGui::InputInt("##hb_harmonics", &harmonic_balance.Harmonics)) {
+        harmonic_balance.Harmonics = std::clamp(harmonic_balance.Harmonics, 1, Core::MAX_HARMONIC_BALANCE_HARMONICS);
     }
     ImGui::SetItemTooltip("Number of harmonics above DC (1 to %d)", Core::MAX_HARMONIC_BALANCE_HARMONICS);
-    // An explicit sample count stays above twice the harmonics, the Nyquist limit
-    if (settings.HarmonicBalance.Samples != 0
-        && settings.HarmonicBalance.Samples <= 2 * settings.HarmonicBalance.Harmonics) {
-        int next_power = MIN_EXPLICIT_SAMPLES;
-        while (next_power <= 2 * settings.HarmonicBalance.Harmonics && next_power < MAX_EXPLICIT_SAMPLES) {
-            next_power *= 2;
-        }
-        settings.HarmonicBalance.Samples = next_power;
-    }
+    harmonic_balance.Samples = NormalizeSampleCount(harmonic_balance.Samples, harmonic_balance.Harmonics);
     DrawFieldLabel("Samples");
     const std::string samples_label =
-        settings.HarmonicBalance.Samples == 0 ? "Auto" : std::format("{}", settings.HarmonicBalance.Samples);
+        harmonic_balance.Samples == 0 ? "Auto" : std::format("{}", harmonic_balance.Samples);
     if (ImGui::BeginCombo("##hb_samples", samples_label.c_str())) {
-        if (ImGui::Selectable("Auto", settings.HarmonicBalance.Samples == 0)) {
-            settings.HarmonicBalance.Samples = 0;
+        if (ImGui::Selectable("Auto", harmonic_balance.Samples == 0)) {
+            harmonic_balance.Samples = 0;
         }
         ImGui::SetItemTooltip("The smallest power of two of at least 16 and 4 times the harmonics");
-        for (int candidate = MIN_EXPLICIT_SAMPLES; candidate <= MAX_EXPLICIT_SAMPLES; candidate *= 2) {
-            if (candidate <= 2 * settings.HarmonicBalance.Harmonics) {
-                continue;
-            }
+        for (const int candidate : ListSampleCounts(harmonic_balance.Harmonics)) {
             const std::string label = std::format("{}", candidate);
-            if (ImGui::Selectable(label.c_str(), settings.HarmonicBalance.Samples == candidate)) {
-                settings.HarmonicBalance.Samples = candidate;
+            if (ImGui::Selectable(label.c_str(), harmonic_balance.Samples == candidate)) {
+                harmonic_balance.Samples = candidate;
             }
         }
         ImGui::EndCombo();
     }
-    const Core::Circuit circuit = m_Schematic.BuildCircuit();
-    const auto suggested = Core::SuggestHarmonicBalanceSettings(circuit);
-    ImGui::BeginDisabled(!suggested.has_value());
-    if (ImGui::Button("From sources") && suggested) {
-        settings.HarmonicBalance.FundamentalFrequency = suggested->FundamentalFrequency;
-        settings.HarmonicBalance.Harmonics = suggested->Harmonics;
-        settings.HarmonicBalance.Samples = suggested->Samples;
+    const auto suggested = Core::SuggestHarmonicBalanceSettings(m_Schematic.BuildCircuit());
+    if (DrawSuggestButton("From sources",
+                          suggested.has_value(),
+                          "Set the fundamental frequency and harmonic count from the circuit's periodic sources",
+                          "Needs a sine, AC, pulse or clock source with commensurable frequencies")
+        && suggested) {
+        harmonic_balance.FundamentalFrequency = suggested->FundamentalFrequency;
+        harmonic_balance.Harmonics = suggested->Harmonics;
+        harmonic_balance.Samples = suggested->Samples;
         m_HBFundamental.Load(suggested->FundamentalFrequency);
     }
-    ImGui::EndDisabled();
-    ImGui::SetItemTooltip("%s",
-                          suggested
-                              ? "Set the fundamental frequency and harmonic count from the circuit's periodic sources"
-                              : "Needs a sine, AC, pulse or clock source with commensurable frequencies");
-}
-
-/**
- * @brief   Below the settings of the operating point, the transient, the AC sweep and the DC sweep: how they repeat,
- * which is not at all, once per value of a parameter or once per draw of the parts within their tolerances.
- * @details The fields share their labels with those of the analysis above, so they get an ID of their own.
- */
-void AnalysisSettingsPanel::DrawRunModeSettings(SimulationSettings &settings) {
-    ImGui::Separator();
-    ImGui::PushID("run_mode");
-    // A second stepped source of the DC sweep would also make the family of curves, so a repeated run waits for it
-    const bool is_blocked = settings.Selected == Analysis::DC_SWEEP && settings.StepSource;
-    const RunMode mode = GetRunMode(settings);
-    DrawFieldLabel("Run mode");
-    if (ImGui::BeginCombo("##run_mode", RUN_MODE_NAMES[static_cast<std::size_t>(mode)])) {
-        for (std::size_t index = 0; index < RUN_MODE_NAMES.size(); ++index) {
-            const auto candidate = static_cast<RunMode>(index);
-            ImGui::BeginDisabled(is_blocked && candidate != RunMode::SINGLE);
-            if (ImGui::Selectable(RUN_MODE_NAMES[index], candidate == mode) && candidate != mode) {
-                SetRunMode(settings, candidate);
-            }
-            ImGui::EndDisabled();
-        }
-        ImGui::EndCombo();
-    }
-    ImGui::SetItemTooltip("Single run: the analysis once. Step a parameter: once per value of a part or of the "
-                          "temperature. Monte Carlo: once with every value as it is, then with the values of the parts "
-                          "drawn within their tolerances");
-    if (is_blocked) {
-        ImGui::TextDisabled("Turn off the second stepped source above to repeat the run");
-    }
-    if (settings.ParameterStep.Enabled) {
-        DrawParameterStepSettings(settings.ParameterStep);
-    } else if (settings.MonteCarlo.Enabled) {
-        DrawMonteCarloSettings(settings.MonteCarlo);
-    }
-    ImGui::PopID();
 }
 
 /**
@@ -870,192 +711,6 @@ void AnalysisSettingsPanel::DrawSolverSettings(Core::SolverOptions &options) {
         ImGui::EndDisabled();
     }
     ImGui::PopID();
-}
-
-/**
- * @brief   The part or the temperature, and its values as a range or a typed list.
- */
-void AnalysisSettingsPanel::DrawParameterStepSettings(ParameterStepSettings &step) {
-    const Core::Circuit circuit = m_Schematic.BuildCircuit();
-    DrawParameterPicker(step, circuit);
-    DrawStepValues(step, GetParameterUnit(circuit, step.Part));
-}
-
-/**
- * @brief   The number of runs, how the values spread, the seed, and the tolerances of the parts.
- */
-void AnalysisSettingsPanel::DrawMonteCarloSettings(Core::MonteCarloSettings &monte_carlo) {
-    DrawFieldLabel("Runs");
-    if (ImGui::InputInt("##runs", &monte_carlo.Runs, 1, 10)) {
-        monte_carlo.Runs = std::clamp(monte_carlo.Runs, Core::MIN_MONTE_CARLO_RUNS, Core::MAX_MONTE_CARLO_RUNS);
-    }
-    ImGui::SetItemTooltip("%s",
-                          std::format("Draws, besides the nominal run that keeps every value; {} to {}",
-                                      Core::MIN_MONTE_CARLO_RUNS,
-                                      Core::MAX_MONTE_CARLO_RUNS)
-                              .c_str());
-    DrawFieldLabel("Distribution");
-    if (ImGui::BeginCombo("##distribution", Core::GetDistributionName(monte_carlo.Distribution))) {
-        for (const Core::ToleranceDistribution candidate :
-             {Core::ToleranceDistribution::GAUSSIAN, Core::ToleranceDistribution::UNIFORM}) {
-            if (ImGui::Selectable(Core::GetDistributionName(candidate), candidate == monte_carlo.Distribution)) {
-                monte_carlo.Distribution = candidate;
-            }
-        }
-        ImGui::EndCombo();
-    }
-    ImGui::SetItemTooltip("Gaussian: the tolerance is three standard deviations, and no value falls beyond it. "
-                          "Uniform: every value within the tolerance is as likely");
-    DrawFieldLabel("Seed");
-    ImGui::InputScalar("##seed", ImGuiDataType_U32, &monte_carlo.Seed);
-    ImGui::SetItemTooltip("The same seed draws the same values, whichever the computer, so a run can be repeated");
-    if (ImGui::Button("New seed")) {
-        std::random_device device;
-        monte_carlo.Seed = device() | 1U;
-    }
-    DrawToleranceButtons();
-    DrawMonteCarloSummary(monte_carlo);
-}
-
-/**
- * @brief   Gives every resistor, capacitor or inductor one tolerance, or takes it from them, as a shortcut over setting
- *          it part by part in the properties.
- */
-void AnalysisSettingsPanel::DrawToleranceButtons() {
-    ImGui::TextDisabled("Tolerance of all");
-    if (const std::optional<double> percent = m_ToleranceAllField.Draw("Percent", "%", [](const double value) {
-            return value > 0.0 && value <= Core::MAX_TOLERANCE_PERCENT;
-        })) {
-        m_ToleranceAllPercent = *percent;
-    }
-
-    struct Button {
-        const char *Label;
-        Core::ComponentType Type;
-    };
-
-    const std::array<Button, 3> buttons = {{{"Resistors", Core::ComponentType::RESISTOR},
-                                            {"Capacitors", Core::ComponentType::CAPACITOR},
-                                            {"Inductors", Core::ComponentType::INDUCTOR}}};
-    std::vector<Core::Component *> parts;
-    for (const std::unique_ptr<UIElement> &element : m_Schematic.GetElements()) {
-        parts.push_back(&element->GetComponent());
-    }
-    bool is_changed = false;
-    for (const Button &button : buttons) {
-        if (ImGui::Button(button.Label)) {
-            is_changed = Core::SetTolerances(parts, button.Type, m_ToleranceAllPercent) > 0 || is_changed;
-        }
-        ImGui::SetItemTooltip("Sets the tolerance of every %s to the percent above", button.Label);
-        ImGui::SameLine();
-    }
-    if (ImGui::Button("Clear all")) {
-        for (const Button &button : buttons) {
-            is_changed = Core::SetTolerances(parts, button.Type, std::nullopt) > 0 || is_changed;
-        }
-    }
-    ImGui::SetItemTooltip("Takes the tolerance from every resistor, capacitor and inductor");
-    if (is_changed) {
-        m_Schematic.MarkModified();
-    }
-}
-
-/**
- * @brief   Which parts vary, or why the run cannot start.
- */
-void AnalysisSettingsPanel::DrawMonteCarloSummary(const Core::MonteCarloSettings &monte_carlo) {
-    const Core::Circuit circuit = m_Schematic.BuildCircuit();
-    ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetFontSize() * 20.0f);
-    if (const std::optional<std::string> problem = Core::CheckMonteCarlo(circuit, monte_carlo)) {
-        ImGui::TextColored(GetErrorTextColor(), "%s", problem->c_str());
-    } else {
-        std::string names;
-        for (const Core::Component *part : Core::FindVariedParts(circuit)) {
-            names += (names.empty() ? "" : ", ") + part->GetName();
-        }
-        ImGui::TextDisabled("%s", std::format("{} runs; these parts vary: {}", monte_carlo.Runs, names).c_str());
-    }
-    ImGui::PopTextWrapPos();
-}
-
-/**
- * @brief   The temperature or a resistor, capacitor or inductor; picking a part starts its range around its value, from
- *          half to twice it.
- */
-void AnalysisSettingsPanel::DrawParameterPicker(ParameterStepSettings &step, const Core::Circuit &circuit) {
-    DrawFieldLabel("Parameter");
-    const std::string shown = step.Part.empty() ? std::string("Temperature") : step.Part;
-    if (!ImGui::BeginCombo("##step_parameter", shown.c_str())) {
-        return;
-    }
-    const std::optional<std::string> &no_temperature = Core::GetBackend().GetCapabilities().TemperatureUnsupported;
-    ImGui::BeginDisabled(no_temperature.has_value());
-    if (ImGui::Selectable("Temperature", step.Part.empty()) && !step.Part.empty()) {
-        step.Part.clear();
-        step.Start = 0.0;
-        step.Stop = 100.0;
-        step.Step = 25.0;
-        LoadParameterStepFields(step);
-    }
-    ImGui::EndDisabled();
-    if (no_temperature) {
-        ImGui::SetItemTooltip("%s", no_temperature->c_str());
-    }
-    const std::vector<std::string> steppable = Core::GetSteppableParts(circuit);
-    for (const Core::CircuitEntry &entry : circuit.GetEntries()) {
-        const std::string &part = entry.Part->GetName();
-        if (!std::ranges::contains(steppable, part)) {
-            continue;
-        }
-        const double value = entry.Part->GetValue();
-        const std::string label = std::format("{} ({}{})", part, Core::FormatValue(value), entry.Part->GetUnit());
-        if (ImGui::Selectable(label.c_str(), step.Part == part) && step.Part != part) {
-            step.Part = part;
-            step.Start = value / 2.0;
-            step.Stop = value * 2.0;
-            step.Step = value / 2.0;
-            LoadParameterStepFields(step);
-        }
-    }
-    ImGui::EndCombo();
-}
-
-/**
- * @brief   A range or a typed list, and below it how many runs it makes or why it cannot run.
- * @details A list starts from the values of the range, so it can be edited from there.
- */
-void AnalysisSettingsPanel::DrawStepValues(ParameterStepSettings &step, const std::string &unit) {
-    if (ImGui::RadioButton("Range", !step.UsesList)) {
-        step.UsesList = false;
-    }
-    ImGui::SameLine();
-    if (ImGui::RadioButton("List", step.UsesList) && !step.UsesList) {
-        step.UsesList = true;
-        if (step.List.empty()) {
-            step.List = FormatRangeAsList(step, unit);
-        }
-    }
-    if (step.UsesList) {
-        ImGui::SetNextItemWidth(ImGui::GetFontSize() * 16.0f);
-        ImGui::InputTextWithHint("##step_list", "1k, 2.2k, 4.7k", &step.List);
-    } else {
-        if (const std::optional<double> start = m_ParameterFields[0].Draw("Start", unit, AnyValue)) {
-            step.Start = *start;
-        }
-        if (const std::optional<double> stop = m_ParameterFields[1].Draw("Stop", unit, AnyValue)) {
-            step.Stop = *stop;
-        }
-        if (const std::optional<double> step_size = m_ParameterFields[2].Draw("Step", unit, IsNonZero)) {
-            step.Step = *step_size;
-        }
-    }
-    DrawStepSummary(step, unit);
-}
-
-void AnalysisSettingsPanel::LoadParameterStepFields(const ParameterStepSettings &step) {
-    m_ParameterFields[0].Load(step.Start);
-    m_ParameterFields[1].Load(step.Stop);
-    m_ParameterFields[2].Load(step.Step);
 }
 
 void AnalysisSettingsPanel::LoadSolverFields(const Core::SolverOptions &options) {

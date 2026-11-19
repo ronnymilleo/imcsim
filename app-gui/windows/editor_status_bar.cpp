@@ -80,7 +80,7 @@ float DrawRunStatus(const RunStatusLine &line, const AnalysisControls &controls,
     }
     if (ImGui::BeginPopup("run_report")) {
         if (last_run) {
-            controls.DrawRunReport(*last_run);
+            DrawRunReport(controls, *last_run);
         }
         ImGui::EndPopup();
     }

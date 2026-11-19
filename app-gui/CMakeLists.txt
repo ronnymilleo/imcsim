@@ -8,14 +8,18 @@ add_library(imcsim-gui-lib
             analysis/analysis_inputs.cpp
             analysis/analysis_settings_panel.cpp
             analysis/auto_rerun.cpp
+            analysis/harmonic_balance_samples.cpp
+            analysis/live_run_plan.cpp
             analysis/run_ac_sweep.cpp
             analysis/run_dc_sweep.cpp
             analysis/run_harmonic_balance.cpp
             analysis/run_jobs.cpp
+            analysis/run_mode_settings_panel.cpp
             analysis/run_noise.cpp
             analysis/run_operating_point.cpp
             analysis/run_pole_zero.cpp
             analysis/run_repeat.cpp
+            analysis/run_report.cpp
             analysis/run_s_parameters.cpp
             analysis/run_sensitivity.cpp
             analysis/run_status.cpp
@@ -211,7 +215,6 @@ add_library(imcsim-gui-lib
             windows/part_editor_models.cpp
             windows/part_editor_passives.cpp
             windows/part_editor_sources.cpp
-            windows/part_fields.cpp
             windows/part_picker.cpp
             windows/part_popover.cpp
             windows/part_rail.cpp

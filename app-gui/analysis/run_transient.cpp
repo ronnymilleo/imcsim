@@ -6,10 +6,10 @@
 
 #include "analysis/analysis_controls.h"
 
+#include "analysis/live_run_plan.h"
 #include "analysis/run_starts.h"
-#include "simulation/check_transient.h"
-#include <algorithm>
 #include <cstddef>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <utility>
@@ -18,11 +18,12 @@ namespace GUI {
 
 void AnalysisControls::RunTransientAnalysis(const Core::Circuit &circuit, const RunRepeat &repeat) {
     const Core::TransientSettings settings = m_Schematic.GetSimulationSettings().Transient;
+    // Only a single run can be live, and the transient it makes is the one on display until another one starts
+    m_IsLiveResult = IsSingleRun(repeat) && m_IsLiveModeOn && !FindLiveObstacle();
     if (IsSingleRun(repeat)) {
         StartSingleTransient(circuit, settings);
         return;
     }
-    m_IsLiveResult = false;
     StartRepeatable<Core::Transient>(
         Analysis::TRANSIENT,
         circuit,
@@ -40,54 +41,57 @@ void AnalysisControls::RunTransientAnalysis(const Core::Circuit &circuit, const 
 /**
  * @brief   A single transient grows in the results chunk by chunk; a live one goes on to its limit at the pace the
  *          settings give, unless the user stops it first.
+ * @note    RunTransientAnalysis() has decided whether it runs live, in m_IsLiveResult.
  */
 void AnalysisControls::StartSingleTransient(const Core::Circuit &circuit, const Core::TransientSettings &settings) {
     // The points arrive in chunks while the run goes on, so the old result gives way to the first one
     m_Results.SetTransient(std::nullopt);
-    const std::size_t circuit_version = m_Schematic.GetCircuitVersion();
-    m_IsLiveRun = m_IsLiveModeOn && !FindLiveObstacle();
-    m_IsLiveResult = m_IsLiveRun;
-    m_Schematic.SetLiveRun(m_IsLiveRun);
+    const bool is_live = m_IsLiveResult;
+    m_IsLiveRun = is_live;
+    m_Schematic.SetLiveRun(is_live);
+    const LiveRunPlan plan = is_live ? PlanLiveRun(settings, circuit, m_Schematic.GetSimulationSettings().LiveSeconds)
+                                     : LiveRunPlan{.StopTime = settings.StopTime};
     Core::TransientSettings run_settings = settings;
-    double pace = 0.0;
-    if (m_IsLiveRun) {
-        pace = settings.StopTime / m_Schematic.GetSimulationSettings().LiveSeconds;
-        // One step short of the most a transient may span, which the check would refuse after rounding
-        // A noise or random source steps the transient on its own, so the finest step counts for the points
-        const double finest_step =
-            std::min(settings.TimeStep, Core::FindFinestSignalStep(circuit).value_or(settings.TimeStep));
-        run_settings.StopTime =
-            std::min(pace * LIVE_RUN_LIMIT_SECONDS, finest_step * static_cast<double>(Core::MAX_TRANSIENT_POINTS - 1));
-    }
-    const bool is_live = m_IsLiveRun;
+    run_settings.StopTime = plan.StopTime;
+    const std::size_t circuit_version = m_Schematic.GetCircuitVersion();
     StartRun(Analysis::TRANSIENT,
              MakeJob<Core::TransientRun, KEEPS_PARTIAL_RESULT>(
                  circuit,
-                 [this, run_settings, circuit_version, pace](const Core::Circuit &copy, Core::RunControl &control) {
-                     const auto post_chunk = [this, &control, circuit_version](Core::Transient chunk) {
-                         control.Post(
-                             [this, circuit_version, points = std::make_shared<Core::Transient>(std::move(chunk))] {
-                                 if (m_Schematic.GetCircuitVersion() == circuit_version) {
-                                     m_Results.AppendTransient(std::move(*points));
-                                 }
-                             });
-                     };
-                     return Core::RunTransient(copy,
-                                               run_settings,
-                                               std::nullopt,
-                                               {.Control = &control, .OnChunk = post_chunk, .LivePace = pace});
+                 [this, run_settings, circuit_version, pace = plan.Pace](const Core::Circuit &copy,
+                                                                         Core::RunControl &control) {
+                     return Core::RunTransient(
+                         copy,
+                         run_settings,
+                         std::nullopt,
+                         {.Control = &control, .OnChunk = MakeChunkSink(control, circuit_version), .LivePace = pace});
                  },
                  [this, is_live](Core::TransientRun run) {
-                     if (is_live && run.Result && run.Result->IsComplete) {
-                         run.Result->Warnings.emplace_back(
-                             "The live run reached its limit, an hour on the clock or a million time steps, whichever "
-                             "comes first; Run starts a new one");
+                     if (is_live) {
+                         AddLiveLimitWarning(run);
                      }
-                     Finish(Analysis::TRANSIENT,
-                            StoreResult(std::move(run.Result),
-                                        [this](auto result) { m_Results.SetTransient(std::move(result)); }),
-                            std::move(run.Messages));
+                     RecordRunOutcome(Analysis::TRANSIENT,
+                                      StoreResult(std::move(run.Result),
+                                                  [this](auto result) { m_Results.SetTransient(std::move(result)); }),
+                                      std::move(run.Messages));
                  }));
+}
+
+/**
+ * @brief   Where a transient on the worker thread hands the points of each chunk, which reach the results on the
+ *          thread that polls, unless the circuit changed since the run started.
+ * @param[in] control          Control of the run, through which the chunks are posted.
+ * @param[in] circuit_version  Version of the circuit the run started from.
+ * @return  The sink to give the transient as its OnChunk.
+ */
+std::function<void(Core::Transient)> AnalysisControls::MakeChunkSink(Core::RunControl &control,
+                                                                     const std::size_t circuit_version) {
+    return [this, &control, circuit_version](Core::Transient chunk) {
+        control.Post([this, circuit_version, points = std::make_shared<Core::Transient>(std::move(chunk))] {
+            if (m_Schematic.GetCircuitVersion() == circuit_version) {
+                m_Results.AppendTransient(std::move(*points));
+            }
+        });
+    };
 }
 
 } // namespace GUI

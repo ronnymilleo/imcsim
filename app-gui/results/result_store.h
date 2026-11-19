@@ -9,9 +9,12 @@
 #include "results/monte_carlo_results.h"
 #include "results/parameter_step.h"
 #include "schematic/circuit_listener.h"
+#include "schematic/simulation_settings.h"
 #include "simulation/simulation_results.h"
 #include <cstddef>
 #include <optional>
+#include <string>
+#include <vector>
 
 namespace GUI {
 
@@ -105,6 +108,11 @@ public:
     void SetHarmonicBalance(std::optional<Core::HarmonicBalance> harmonic_balance);
     const std::optional<Core::HarmonicBalance> &GetHarmonicBalance() const;
     std::size_t GetHarmonicBalanceVersion() const;
+
+    // Result of any analysis
+    bool HasResult(Analysis analysis) const;
+    void Clear(Analysis analysis);
+    std::vector<std::string> GetWarnings(Analysis analysis) const;
 
 private:
     // Results, dropped when the circuit changes

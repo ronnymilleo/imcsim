@@ -27,9 +27,6 @@ struct ParameterField {
     double Scale = 1.0;
 };
 
-// Validity
-bool AnyValue(double value);
-
 /**
  * @brief   Loads the text of every field from the members of the parameters.
  */

@@ -1,7 +1,7 @@
 /**
  * @file    run_status.h
- * @brief   The text of the run status in the status bar of the editor: what the last run reported, or how far a run in
- *          progress is.
+ * @brief   The text of the run status in the status bar of the editor, what the last run reported, or how far a run in
+ *          progress is, and the full report of the last run of an analysis.
  */
 
 #ifndef IMCSIM_RUN_STATUS_H
@@ -50,6 +50,9 @@ DescribeRunCost(std::optional<double> seconds, Analysis analysis, const std::opt
 
 // Status
 RunStatusLine DescribeRunStatus(const AnalysisControls &controls, const std::optional<Core::Transient> &transient);
+
+// Report
+void DrawRunReport(const AnalysisControls &controls, Analysis analysis);
 
 } // namespace GUI
 
