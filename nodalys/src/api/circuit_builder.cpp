@@ -24,9 +24,12 @@
 #include <cmath>
 #include <format>
 #include <functional>
+#include <initializer_list>
 #include <map>
 #include <numbers>
 #include <optional>
+#include <string_view>
+#include <utility>
 
 namespace Nodalys {
 
@@ -115,7 +118,105 @@ BoyleOpAmpValues ComputeBoyleOpAmpValues(const BoyleOpAmpParameters &parameters)
             .OutputSenseResistance = OUTPUT_SENSE_RESISTANCE};
 }
 
-/// Reads the node of a voltage in an expression: its number, or 0, gnd or ground for the reference.
+/// The unknown index of the reference node, which has no row in the system.
+constexpr int GROUND_UNKNOWN = -1;
+
+/// Saturation current of the diodes that clamp the current limiter of the Boyle op-amp.
+constexpr double CLAMP_DIODE_SATURATION_CURRENT = 1e-20;
+/// Saturation current of the diodes of the rail swing limiters of the Boyle op-amp.
+constexpr double RAIL_DIODE_SATURATION_CURRENT = 1e-16;
+/// Resistance that senses the current in the limiter branches of the Boyle op-amp.
+constexpr double LIMITER_SENSE_RESISTANCE = 10.0;
+/// Resistance that biases the middle of a rail swing limiter of the Boyle op-amp.
+constexpr double RAIL_BIAS_RESISTANCE = 1e3;
+
+/// Factor that lowers the threshold of one gate of a latch, so the two gates are not alike and the operating point
+/// does not stay on the metastable state.
+constexpr double LATCH_THRESHOLD_ASYMMETRY = 0.99;
+
+/**
+
+ * @struct  OpAmpTerminals
+
+ * @brief   The unknowns of the five terminals of an op-amp, as the devices take them.
+
+ */
+
+struct OpAmpTerminals {
+    int Out;
+    int InPos;
+    int InNeg;
+    int VccPos;
+    int VccNeg;
+};
+
+/**
+
+ * @struct  RailLimiterNodes
+
+ * @brief   The three internal nodes of one rail swing limiter of the Boyle op-amp.
+
+ */
+
+struct RailLimiterNodes {
+    int Sense;
+    int Mid;
+    int Ref;
+};
+
+/**
+
+ * @struct  BoyleNodes
+
+ * @brief   The internal nodes of the Boyle op-amp, which every stage of the macromodel reads a different subset of.
+
+ */
+
+struct BoyleNodes {
+    int Col1;
+    int Col2;
+    int Emit1;
+    int Emit2;
+    int Tail;
+    int Gain;
+    int OutInternal;
+    int ClampNode;
+    int ClampSense;
+    RailLimiterNodes Upper;
+    RailLimiterNodes Lower;
+};
+
+/**
+
+ * @struct  FlipFlopNodes
+
+ * @brief   The nodes of the D flip-flop: its outputs and the outputs of its four inner gates.
+
+ */
+
+struct FlipFlopNodes {
+    int Q;
+    int QBar;
+    int N1;
+    int N2;
+    int N3;
+    int N4;
+};
+
+/**
+ * @brief   Lists the inputs of a gate, followed by the one that only some circuits connect.
+ */
+std::vector<int> WithOptionalInput(const std::initializer_list<int> inputs, const std::optional<int> extra) {
+    std::vector<int> result(inputs);
+    if (extra) {
+        result.push_back(*extra);
+    }
+    return result;
+}
+
+/**
+ * @brief   Reads the node of a voltage in an expression: its number, or 0, gnd or ground for the reference.
+ */
 std::optional<NodeId> ReadExpressionNode(const std::string &text) {
     const std::string lowered = ToLower(text);
     if (lowered == "gnd" || lowered == "ground") {
@@ -129,7 +230,9 @@ std::optional<NodeId> ReadExpressionNode(const std::string &text) {
     return node;
 }
 
-/// Finds the voltage source an expression reads the current of, whatever the case of the name.
+/**
+ * @brief   Finds the voltage source an expression reads the current of, whatever the case of the name.
+ */
 VoltageSourceDevice *FindVoltageSource(const std::map<std::string, Device *> &sources, const std::string &name) {
     const std::string wanted = ToLower(name);
     for (const auto &[source_name, device] : sources) {
@@ -166,6 +269,130 @@ BjtParameters ScaleByArea(BjtParameters parameters, const double area) {
     parameters.CollectorResistance /= area;
     parameters.EmitterResistance /= area;
     return parameters;
+}
+
+/// The periodicity of the sources the harmonic balance cannot take: they have no period it could use.
+constexpr SourcePeriodicity NON_PERIODIC{.Kind = SourceWaveformKind::NON_PERIODIC, .IsSupportedInHb = false};
+
+/**
+
+ * @struct  SourceSpec
+
+ * @brief   What an independent source is made of, whether it is a voltage source or a current source.
+
+ */
+
+struct SourceSpec {
+    double Dc = 0.0;
+    VoltageSourceDevice::Waveform Waveform;
+    double AcMagnitude = 0.0;
+    SourcePeriodicity Periodicity;
+    VoltageSourceDevice::Breakpoints Breakpoints;
+    std::function<void(std::uint64_t)> SetSeed;
+};
+
+/**
+ * @brief   Describes a source that holds a constant level.
+ */
+SourceSpec MakeDcSpec(const double dc, const double ac_magnitude) {
+    return {.Dc = dc, .Waveform = MakeDcWaveform(dc), .AcMagnitude = ac_magnitude};
+}
+
+/**
+ * @brief   Describes a pulse source, which is periodic when the pulse has a period.
+ */
+SourceSpec MakePulseSpec(const PulseParameters &params, const double ac_magnitude) {
+    return {.Dc = params.Low,
+            .Waveform = MakePulseWaveform(params.Low, params),
+            .AcMagnitude = ac_magnitude,
+            .Periodicity = {.Kind = SourceWaveformKind::PULSE,
+                            .Frequency = params.Period > 0.0 ? 1.0 / params.Period : 0.0,
+                            .MinEdgeTime = std::min(params.RiseTime, params.FallTime),
+                            .IsSupportedInHb = params.High == params.Low || params.Period > 0.0},
+            .Breakpoints = MakePulseBreakpoints(params)};
+}
+
+/**
+ * @brief   Describes a sine source; a damped one is not periodic, so the harmonic balance cannot take it.
+ */
+SourceSpec MakeSineSpec(const SineParameters &params, const double ac_magnitude, const bool is_damped) {
+    return {.Dc = params.Offset,
+            .Waveform = MakeSineWaveform(params.Offset, params),
+            .AcMagnitude = ac_magnitude,
+            .Periodicity = {.Kind = SourceWaveformKind::SINE,
+                            .Frequency = params.Frequency,
+                            .MinEdgeTime = 0.0,
+                            .IsSupportedInHb = !is_damped && (params.Amplitude == 0.0 || params.Frequency > 0.0)}};
+}
+
+/**
+ * @brief   Describes an exponential source.
+ */
+SourceSpec MakeExpSpec(const ExpParameters &params, const double ac_magnitude) {
+    return {.Dc = params.InitialValue,
+            .Waveform = MakeExpWaveform(params.InitialValue, params),
+            .AcMagnitude = ac_magnitude,
+            .Periodicity = NON_PERIODIC,
+            .Breakpoints = MakeExpBreakpoints(params)};
+}
+
+/**
+ * @brief   Describes a piecewise linear source, which starts from the value of its first point.
+ */
+SourceSpec MakePwlSpec(const PwlParameters &params, const double ac_magnitude) {
+    const double dc = params.Points.empty() ? 0.0 : params.Points.front().Value;
+    return {.Dc = dc,
+            .Waveform = MakePwlWaveform(dc, params),
+            .AcMagnitude = ac_magnitude,
+            .Periodicity = NON_PERIODIC,
+            .Breakpoints = MakePwlBreakpoints(params)};
+}
+
+/**
+ * @brief   Describes a single-frequency FM source.
+ */
+SourceSpec MakeSffmSpec(const SffmParameters &params, const double ac_magnitude) {
+    return {.Dc = params.Offset,
+            .Waveform = MakeSffmWaveform(params.Offset, params),
+            .AcMagnitude = ac_magnitude,
+            .Periodicity = NON_PERIODIC};
+}
+
+/**
+ * @brief   Describes an amplitude-modulated source.
+ */
+SourceSpec MakeAmSpec(const AmParameters &params, const double ac_magnitude) {
+    return {.Dc = params.Offset,
+            .Waveform = MakeAmWaveform(params.Offset, params),
+            .AcMagnitude = ac_magnitude,
+            .Periodicity = NON_PERIODIC,
+            .Breakpoints = MakeAmBreakpoints(params)};
+}
+
+/**
+ * @brief   Describes a noise source, which redraws its samples when the seed is reset.
+ */
+SourceSpec MakeNoiseSpec(const NoiseParameters &params, const double ac_magnitude) {
+    TransientNoiseSource noise = MakeNoiseSource(params);
+    return {.Dc = params.Offset,
+            .Waveform = std::move(noise.Evaluate),
+            .AcMagnitude = ac_magnitude,
+            .Periodicity = NON_PERIODIC,
+            .Breakpoints = std::move(noise.NextBreakpoint),
+            .SetSeed = std::move(noise.ResetSeed)};
+}
+
+/**
+ * @brief   Describes a source of random levels, which redraws them when the seed is reset.
+ */
+SourceSpec MakeRandomSpec(const RandomParameters &params, const double ac_magnitude) {
+    TransientNoiseSource random = MakeRandomSource(params);
+    return {.Dc = params.Second,
+            .Waveform = std::move(random.Evaluate),
+            .AcMagnitude = ac_magnitude,
+            .Periodicity = NON_PERIODIC,
+            .Breakpoints = std::move(random.NextBreakpoint),
+            .SetSeed = std::move(random.ResetSeed)};
 }
 
 } // namespace
@@ -242,22 +469,19 @@ public:
     }
 
     void AddResistor(std::string name, NodeId n1, NodeId n2, double r, double temp_c) {
-        Track(n1);
-        Track(n2);
+        TrackNodes({n1, n2});
         Defer([this, name = std::move(name), n1, n2, r, temp_c]() mutable {
             (void)temp_c;
             const int u1 = MapNode(n1);
             const int u2 = MapNode(n2);
             Device *dev = AddDevice(std::make_unique<ResistorDevice>(u1, u2, r));
-            m_Compiled.ElementsByName[name] = dev;
-            m_Compiled.Currents.push_back({name, {{dev, 0}}});
+            RegisterElement(name, dev);
             m_Compiled.NoiseGroups.push_back({name, {dev}});
         });
     }
 
     void AddCapacitor(std::string name, NodeId n1, NodeId n2, double c, double ic) {
-        Track(n1);
-        Track(n2);
+        TrackNodes({n1, n2});
         Defer([this, name = std::move(name), n1, n2, c, ic]() mutable {
             const int u1 = MapNode(n1);
             const int u2 = MapNode(n2);
@@ -268,14 +492,12 @@ public:
                 m_Compiled.HasInitialConditions = true;
             }
             Device *dev = AddDevice(std::make_unique<CapacitorDevice>(u1, u2, c, ic, has_ic));
-            m_Compiled.ElementsByName[name] = dev;
-            m_Compiled.Currents.push_back({name, {{dev, 0}}});
+            RegisterElement(name, dev);
         });
     }
 
     void AddInductor(std::string name, NodeId n1, NodeId n2, double l, double ic) {
-        Track(n1);
-        Track(n2);
+        TrackNodes({n1, n2});
         Defer([this, name = std::move(name), n1, n2, l, ic]() mutable {
             const int u1 = MapNode(n1);
             const int u2 = MapNode(n2);
@@ -285,94 +507,62 @@ public:
                 m_Compiled.HasInitialConditions = true;
             }
             Device *dev = AddDevice(std::make_unique<InductorDevice>(u1, u2, branch, l, ic, has_ic));
-            m_Compiled.ElementsByName[name] = dev;
-            m_Compiled.Currents.push_back({name, {{dev, 0}}});
+            RegisterElement(name, dev);
         });
     }
 
-    void AddVoltageSourceDevice(std::string name,
-                                NodeId pos,
-                                NodeId neg,
-                                double dc_val,
-                                VoltageSourceDevice::Waveform waveform,
-                                double ac_mag,
-                                SourcePeriodicity periodicity = {},
-                                VoltageSourceDevice::Breakpoints breakpoints = {},
-                                std::function<void(std::uint64_t)> set_seed = {}) {
-        Track(pos);
-        Track(neg);
-        Defer([this,
-               name = std::move(name),
-               pos,
-               neg,
-               dc_val,
-               waveform = std::move(waveform),
-               ac_mag,
-               periodicity,
-               breakpoints = std::move(breakpoints),
-               set_seed = std::move(set_seed)]() mutable {
+    /**
+     * @brief   Adds an independent voltage source, which takes a branch unknown for its current.
+     * @param[in] name  Name of the source.
+     * @param[in] pos   Positive node.
+     * @param[in] neg   Negative node.
+     * @param[in] spec  Level, waveform and periodicity of the source.
+     */
+    void AddVoltageSourceDevice(std::string name, NodeId pos, NodeId neg, SourceSpec spec) {
+        TrackNodes({pos, neg});
+        Defer([this, name = std::move(name), pos, neg, spec = std::move(spec)]() mutable {
             const int u_pos = MapNode(pos);
             const int u_neg = MapNode(neg);
             const int branch = AllocateBranch();
             auto source = std::make_unique<VoltageSourceDevice>(u_pos,
                                                                 u_neg,
                                                                 branch,
-                                                                dc_val,
-                                                                std::move(waveform),
-                                                                ac_mag,
-                                                                periodicity);
-            source->SetBreakpoints(std::move(breakpoints));
-            source->SetSeedCallback(std::move(set_seed));
-            Device *dev = AddDevice(std::move(source));
-            m_Compiled.SourcesByName[name] = dev;
-            m_Compiled.ElementsByName[name] = dev;
-            m_Compiled.Currents.push_back({name, {{dev, 0}}});
+                                                                spec.Dc,
+                                                                std::move(spec.Waveform),
+                                                                spec.AcMagnitude,
+                                                                spec.Periodicity);
+            InstallSource(name, std::move(source), std::move(spec));
         });
     }
 
-    void AddCurrentSourceDevice(std::string name,
-                                NodeId pos,
-                                NodeId neg,
-                                double dc_val,
-                                VoltageSourceDevice::Waveform waveform,
-                                double ac_mag,
-                                SourcePeriodicity periodicity = {},
-                                VoltageSourceDevice::Breakpoints breakpoints = {},
-                                std::function<void(std::uint64_t)> set_seed = {}) {
-        Track(pos);
-        Track(neg);
-        Defer([this,
-               name = std::move(name),
-               pos,
-               neg,
-               dc_val,
-               waveform = std::move(waveform),
-               ac_mag,
-               periodicity,
-               breakpoints = std::move(breakpoints),
-               set_seed = std::move(set_seed)]() mutable {
+    /**
+     * @brief   Adds an independent current source.
+     * @param[in] name  Name of the source.
+     * @param[in] pos   Node the current leaves.
+     * @param[in] neg   Node the current enters.
+     * @param[in] spec  Level, waveform and periodicity of the source.
+     */
+    void AddCurrentSourceDevice(std::string name, NodeId pos, NodeId neg, SourceSpec spec) {
+        TrackNodes({pos, neg});
+        Defer([this, name = std::move(name), pos, neg, spec = std::move(spec)]() mutable {
             const int u_pos = MapNode(pos);
             const int u_neg = MapNode(neg);
-            auto source =
-                std::make_unique<CurrentSourceDevice>(u_pos, u_neg, dc_val, std::move(waveform), ac_mag, periodicity);
-            source->SetBreakpoints(std::move(breakpoints));
-            source->SetSeedCallback(std::move(set_seed));
-            Device *dev = AddDevice(std::move(source));
-            m_Compiled.SourcesByName[name] = dev;
-            m_Compiled.ElementsByName[name] = dev;
-            m_Compiled.Currents.push_back({name, {{dev, 0}}});
+            auto source = std::make_unique<CurrentSourceDevice>(u_pos,
+                                                                u_neg,
+                                                                spec.Dc,
+                                                                std::move(spec.Waveform),
+                                                                spec.AcMagnitude,
+                                                                spec.Periodicity);
+            InstallSource(name, std::move(source), std::move(spec));
         });
     }
 
     void AddCurrentProbe(std::string probe_name, NodeId node_in, NodeId node_out) {
-        AddVoltageSourceDevice(std::move(probe_name), node_in, node_out, 0.0, MakeDcWaveform(0.0), 0.0);
+        AddVoltageSourceDevice(std::move(probe_name), node_in, node_out, MakeDcSpec(0.0, 0.0));
     }
 
     void AddVcvs(std::string name, NodeId pos, NodeId neg, NodeId ctrl_pos, NodeId ctrl_neg, double gain) {
-        Track(pos);
-        Track(neg);
-        Track(ctrl_pos);
-        Track(ctrl_neg);
+        TrackNodes({pos, neg, ctrl_pos, ctrl_neg});
         Defer([this, name = std::move(name), pos, neg, ctrl_pos, ctrl_neg, gain]() mutable {
             const int u_pos = MapNode(pos);
             const int u_neg = MapNode(neg);
@@ -380,71 +570,57 @@ public:
             const int u_cn = MapNode(ctrl_neg);
             const int branch = AllocateBranch();
             Device *dev = AddDevice(std::make_unique<VcvsDevice>(u_pos, u_neg, u_cp, u_cn, branch, gain));
-            m_Compiled.ElementsByName[name] = dev;
-            m_Compiled.Currents.push_back({name, {{dev, 0}}});
+            RegisterElement(name, dev);
         });
     }
 
     void AddVccs(std::string name, NodeId pos, NodeId neg, NodeId ctrl_pos, NodeId ctrl_neg, double gm) {
-        Track(pos);
-        Track(neg);
-        Track(ctrl_pos);
-        Track(ctrl_neg);
+        TrackNodes({pos, neg, ctrl_pos, ctrl_neg});
         Defer([this, name = std::move(name), pos, neg, ctrl_pos, ctrl_neg, gm]() mutable {
             const int u_pos = MapNode(pos);
             const int u_neg = MapNode(neg);
             const int u_cp = MapNode(ctrl_pos);
             const int u_cn = MapNode(ctrl_neg);
             Device *dev = AddDevice(std::make_unique<VccsDevice>(u_pos, u_neg, u_cp, u_cn, gm));
-            m_Compiled.ElementsByName[name] = dev;
-            m_Compiled.Currents.push_back({name, {{dev, 0}}});
+            RegisterElement(name, dev);
         });
     }
 
     void AddCcvs(std::string name, NodeId pos, NodeId neg, const std::string &ctrl_source, double rm) {
-        Track(pos);
-        Track(neg);
+        TrackNodes({pos, neg});
         Defer([this, name = std::move(name), pos, neg, ctrl_source, rm]() mutable {
             const int u_pos = MapNode(pos);
             const int u_neg = MapNode(neg);
             const int branch = AllocateBranch();
-            auto it = m_Compiled.SourcesByName.find(ctrl_source);
-            int ctrl_branch = -1;
-            if (it != m_Compiled.SourcesByName.end()) {
-                if (auto *vs = dynamic_cast<VoltageSourceDevice *>(it->second)) {
-                    ctrl_branch = vs->GetBranch();
-                }
-            }
+            const int ctrl_branch = ResolveControlBranch(ctrl_source);
             Device *dev = AddDevice(std::make_unique<CcvsDevice>(u_pos, u_neg, branch, ctrl_branch, rm));
-            m_Compiled.ElementsByName[name] = dev;
-            m_Compiled.Currents.push_back({name, {{dev, 0}}});
+            RegisterElement(name, dev);
         });
     }
 
     void AddCccs(std::string name, NodeId pos, NodeId neg, const std::string &ctrl_source, double gain) {
-        Track(pos);
-        Track(neg);
+        TrackNodes({pos, neg});
         Defer([this, name = std::move(name), pos, neg, ctrl_source, gain]() mutable {
             const int u_pos = MapNode(pos);
             const int u_neg = MapNode(neg);
-            auto it = m_Compiled.SourcesByName.find(ctrl_source);
-            int ctrl_branch = -1;
-            if (it != m_Compiled.SourcesByName.end()) {
-                if (auto *vs = dynamic_cast<VoltageSourceDevice *>(it->second)) {
-                    ctrl_branch = vs->GetBranch();
-                }
-            }
+            const int ctrl_branch = ResolveControlBranch(ctrl_source);
             Device *dev = AddDevice(std::make_unique<CccsDevice>(u_pos, u_neg, ctrl_branch, gain));
-            m_Compiled.ElementsByName[name] = dev;
-            m_Compiled.Currents.push_back({name, {{dev, 0}}});
+            RegisterElement(name, dev);
         });
     }
 
-    /// A behavioral source: the expression is read now, so a mistake is reported by Build(), and its inputs are
-    /// bound once every source of the circuit exists, since a current may name a source added after the line.
+    /**
+     * @brief   Adds a behavioral source: the expression is read now, so a mistake is reported by Build(), and its
+     *          inputs are bound once every source of the circuit exists, since a current may name a source added
+     *          after the line.
+     * @param[in] name        Name of the source.
+     * @param[in] pos         Positive node.
+     * @param[in] neg         Negative node.
+     * @param[in] text        Expression of the source.
+     * @param[in] is_voltage  Whether the expression gives a voltage, or a current.
+     */
     void AddBehavioral(std::string name, NodeId pos, NodeId neg, const std::string &text, bool is_voltage) {
-        Track(pos);
-        Track(neg);
+        TrackNodes({pos, neg});
         std::expected<Expression, std::string> expression = Expression::Parse(text);
         if (!expression) {
             m_Errors.push_back(std::format("{}: {}", name, expression.error()));
@@ -452,29 +628,9 @@ public:
         }
         std::vector<BehavioralBinding> bindings;
         std::vector<PendingCurrent> currents;
-        for (const ExpressionInput &input : expression->GetInputs()) {
-            BehavioralBinding binding;
-            if (input.Type == ExpressionInput::Kind::CURRENT) {
-                binding.IsCurrent = true;
-                currents.push_back({.Owner = name, .Device = nullptr, .Input = bindings.size(), .Source = input.First});
-            } else {
-                const std::optional<NodeId> node = ReadExpressionNode(input.First);
-                const std::optional<NodeId> reference =
-                    input.Second.empty() ? std::optional<NodeId>(GROUND_NODE) : ReadExpressionNode(input.Second);
-                if (!node || !reference) {
-                    m_Errors.push_back(std::format("{}: v({}{}{}) must name nodes by their number",
-                                                   name,
-                                                   input.First,
-                                                   input.Second.empty() ? "" : ", ",
-                                                   input.Second));
-                    return;
-                }
-                Track(*node);
-                Track(*reference);
-                binding.Unknown = MapNode(*node);
-                binding.Reference = MapNode(*reference);
-            }
-            bindings.push_back(binding);
+        if (const std::optional<std::string> error = BindExpressionInputs(name, *expression, bindings, currents)) {
+            m_Errors.push_back(*error);
+            return;
         }
         Defer([this,
                name,
@@ -484,28 +640,13 @@ public:
                expression = std::move(*expression),
                bindings = std::move(bindings),
                currents = std::move(currents)]() mutable {
-            const int u_pos = MapNode(pos);
-            const int u_neg = MapNode(neg);
-            BehavioralSourceDevice *device = nullptr;
-            if (is_voltage) {
-                const int branch = AllocateBranch();
-                device = static_cast<BehavioralSourceDevice *>(
-                    AddDevice(std::make_unique<BehavioralVoltageDevice>(name,
-                                                                        u_pos,
-                                                                        u_neg,
-                                                                        branch,
-                                                                        std::move(expression),
-                                                                        std::move(bindings))));
-            } else {
-                device = static_cast<BehavioralSourceDevice *>(
-                    AddDevice(std::make_unique<BehavioralCurrentDevice>(name,
-                                                                        u_pos,
-                                                                        u_neg,
-                                                                        std::move(expression),
-                                                                        std::move(bindings))));
-            }
-            m_Compiled.ElementsByName[name] = device;
-            m_Compiled.Currents.push_back({name, {{device, 0}}});
+            BehavioralSourceDevice *device = MakeBehavioralDevice(name,
+                                                                  is_voltage,
+                                                                  MapNode(pos),
+                                                                  MapNode(neg),
+                                                                  std::move(expression),
+                                                                  std::move(bindings));
+            RegisterElement(name, device);
             for (PendingCurrent &current : currents) {
                 current.Device = device;
                 m_PendingCurrents.push_back(std::move(current));
@@ -514,8 +655,7 @@ public:
     }
 
     void AddDiode(std::string name, NodeId anode, NodeId cathode, const DiodeParameters &unit_params, double area) {
-        Track(anode);
-        Track(cathode);
+        TrackNodes({anode, cathode});
         Defer([this, name = std::move(name), anode, cathode, params = ScaleByArea(unit_params, area)]() mutable {
             const int ua = MapNode(anode);
             const int uc = MapNode(cathode);
@@ -525,17 +665,14 @@ public:
                 MarkDynamic(internal >= 0 ? internal : uc);
             }
             Device *dev = AddDevice(std::make_unique<DiodeDevice>(ua, uc, internal, params));
-            m_Compiled.ElementsByName[name] = dev;
-            m_Compiled.Currents.push_back({name, {{dev, 0}}});
+            RegisterElement(name, dev);
             m_Compiled.NoiseGroups.push_back({name, {dev}});
         });
     }
 
     void
     AddBjt(std::string name, NodeId c, NodeId b, NodeId e, bool is_npn, const BjtParameters &unit_params, double area) {
-        Track(c);
-        Track(b);
-        Track(e);
+        TrackNodes({c, b, e});
         Defer([this, name = std::move(name), c, b, e, is_npn, params = ScaleByArea(unit_params, area)]() mutable {
             const int uc = MapNode(c);
             const int ub = MapNode(b);
@@ -553,9 +690,7 @@ public:
             }
             Device *dev = AddDevice(std::make_unique<BjtDevice>(uc, ub, ue, int_c, int_b, int_e, params, !is_npn));
             m_Compiled.ElementsByName[name] = dev;
-            m_Compiled.Currents.push_back({name + ".C", {{dev, 0}}});
-            m_Compiled.Currents.push_back({name + ".B", {{dev, 1}}});
-            m_Compiled.Currents.push_back({name + ".E", {{dev, 2}}});
+            RegisterTerminalCurrents(name, dev, {"C", "B", "E"});
             m_Compiled.NoiseGroups.push_back({name, {dev}});
         });
     }
@@ -563,10 +698,7 @@ public:
     void
     AddMosfet(std::string name, NodeId d, NodeId g, NodeId s, NodeId b, bool is_nmos, const MosfetParameters &params) {
         (void)b;
-        Track(d);
-        Track(g);
-        Track(s);
-        Track(b);
+        TrackNodes({d, g, s, b});
         Defer([this, name = std::move(name), d, g, s, is_nmos, params]() mutable {
             const int ud = MapNode(d);
             const int ug = MapNode(g);
@@ -582,38 +714,30 @@ public:
             }
             Device *dev = AddDevice(std::make_unique<MosfetDevice>(ud, ug, us, int_d, int_s, params, !is_nmos));
             m_Compiled.ElementsByName[name] = dev;
-            m_Compiled.Currents.push_back({name + ".D", {{dev, 0}}});
-            m_Compiled.Currents.push_back({name + ".G", {{dev, 1}}});
-            m_Compiled.Currents.push_back({name + ".S", {{dev, 2}}});
+            RegisterTerminalCurrents(name, dev, {"D", "G", "S"});
             m_Compiled.NoiseGroups.push_back({name, {dev}});
         });
     }
 
     void AddSwitch(std::string name, NodeId a, NodeId b, NodeId cp, NodeId cn, const SwitchParameters &params) {
-        Track(a);
-        Track(b);
-        Track(cp);
-        Track(cn);
+        TrackNodes({a, b, cp, cn});
         Defer([this, name = std::move(name), a, b, cp, cn, params]() mutable {
             const int ua = MapNode(a);
             const int ub = MapNode(b);
             const int ucp = MapNode(cp);
             const int ucn = MapNode(cn);
             Device *dev = AddDevice(std::make_unique<SwitchDevice>(ua, ub, ucp, ucn, params));
-            m_Compiled.ElementsByName[name] = dev;
-            m_Compiled.Currents.push_back({name, {{dev, 0}}});
+            RegisterElement(name, dev);
         });
     }
 
     void AddFuse(std::string name, NodeId a, NodeId b, const FuseParameters &params) {
-        Track(a);
-        Track(b);
+        TrackNodes({a, b});
         Defer([this, name = std::move(name), a, b, params]() mutable {
             const int ua = MapNode(a);
             const int ub = MapNode(b);
             Device *dev = AddDevice(std::make_unique<FuseDevice>(ua, ub, params));
-            m_Compiled.ElementsByName[name] = dev;
-            m_Compiled.Currents.push_back({name, {{dev, 0}}});
+            RegisterElement(name, dev);
         });
     }
 
@@ -625,10 +749,7 @@ public:
                   double coil_r,
                   double coil_l,
                   const SwitchParameters &contact_params) {
-        Track(coil_p);
-        Track(coil_n);
-        Track(contact_a);
-        Track(contact_b);
+        TrackNodes({coil_p, coil_n, contact_a, contact_b});
         Defer([this,
                name = std::move(name),
                coil_p,
@@ -662,10 +783,7 @@ public:
                         double secondary_l,
                         double k,
                         double winding_r) {
-        Track(p1);
-        Track(p2);
-        Track(s1);
-        Track(s2);
+        TrackNodes({p1, p2, s1, s2});
         Defer([this, name = std::move(name), p1, p2, s1, s2, primary_l, secondary_l, k, winding_r]() mutable {
             const int up1 = MapNode(p1);
             const int up2 = MapNode(p2);
@@ -686,9 +804,7 @@ public:
     }
 
     void AddPotentiometer(std::string name, NodeId a, NodeId wiper, NodeId b, double total_r, double fraction) {
-        Track(a);
-        Track(wiper);
-        Track(b);
+        TrackNodes({a, wiper, b});
         Defer([this, name = std::move(name), a, wiper, b, total_r, fraction]() mutable {
             const double frac = std::clamp(fraction, 1e-6, 1.0 - 1e-6);
             const double r1 = total_r * frac;
@@ -716,36 +832,38 @@ public:
                        NodeId vcc_pos,
                        NodeId vcc_neg,
                        double bandwidth_hz) {
-        Track(out);
-        Track(in_pos);
-        Track(in_neg);
-        Track(vcc_pos);
-        Track(vcc_neg);
+        TrackNodes({out, in_pos, in_neg, vcc_pos, vcc_neg});
         Defer([this, name = std::move(name), out, in_pos, in_neg, vcc_pos, vcc_neg, bandwidth_hz]() mutable {
             const IdealOpAmpValues figures = ComputeIdealOpAmpValues(bandwidth_hz);
-            constexpr int GROUND = -1;
             const int n_stage = AllocateInternalNode();
             MarkDynamic(n_stage);
+            const OpAmpTerminals t = MapOpAmpTerminals(out, in_pos, in_neg, vcc_pos, vcc_neg);
 
-            const int u_out = MapNode(out);
-            const int u_inp = MapNode(in_pos);
-            const int u_inm = MapNode(in_neg);
-            const int u_vcc = MapNode(vcc_pos);
-            const int u_vee = MapNode(vcc_neg);
-
-            Device *d1 =
-                AddDevice(std::make_unique<VccsDevice>(GROUND, n_stage, u_inp, u_inm, figures.Transconductance));
-            Device *d2 = AddDevice(std::make_unique<ResistorDevice>(n_stage, GROUND, figures.Resistance, false));
-            Device *d3 = AddDevice(std::make_unique<CapacitorDevice>(n_stage, GROUND, figures.Capacitance, 0.0, false));
-            Device *d4 = AddDevice(std::make_unique<DiodeDevice>(n_stage, u_vcc, -1, figures.Clamp));
-            Device *d5 = AddDevice(std::make_unique<DiodeDevice>(u_vee, n_stage, -1, figures.Clamp));
-            Device *output =
-                AddDevice(std::make_unique<VcvsDevice>(u_out, GROUND, n_stage, GROUND, AllocateBranch(), 1.0));
+            Device *d1 = AddDevice(
+                std::make_unique<VccsDevice>(GROUND_UNKNOWN, n_stage, t.InPos, t.InNeg, figures.Transconductance));
+            Device *d2 =
+                AddDevice(std::make_unique<ResistorDevice>(n_stage, GROUND_UNKNOWN, figures.Resistance, false));
+            Device *d3 =
+                AddDevice(std::make_unique<CapacitorDevice>(n_stage, GROUND_UNKNOWN, figures.Capacitance, 0.0, false));
+            Device *d4 = AddDevice(std::make_unique<DiodeDevice>(n_stage, t.VccPos, -1, figures.Clamp));
+            Device *d5 = AddDevice(std::make_unique<DiodeDevice>(t.VccNeg, n_stage, -1, figures.Clamp));
+            Device *output = AddDevice(
+                std::make_unique<VcvsDevice>(t.Out, GROUND_UNKNOWN, n_stage, GROUND_UNKNOWN, AllocateBranch(), 1.0));
             m_Compiled.Currents.push_back({name, {{output, 0}}});
             m_Compiled.NoiseGroups.push_back({name, {d1, d2, d3, d4, d5, output}});
         });
     }
 
+    /**
+     * @brief   Adds the Boyle op-amp macromodel, built in five stages when the circuit is compiled.
+     * @param[in] name      Name of the op-amp.
+     * @param[in] out       Output node.
+     * @param[in] in_pos    Non-inverting input node.
+     * @param[in] in_neg    Inverting input node.
+     * @param[in] vcc_pos   Positive supply node.
+     * @param[in] vcc_neg   Negative supply node.
+     * @param[in] params    Datasheet figures the macromodel is fitted to.
+     */
     void AddBoyleOpAmp(std::string name,
                        NodeId out,
                        NodeId in_pos,
@@ -753,123 +871,25 @@ public:
                        NodeId vcc_pos,
                        NodeId vcc_neg,
                        const BoyleOpAmpParameters &params) {
-        Track(out);
-        Track(in_pos);
-        Track(in_neg);
-        Track(vcc_pos);
-        Track(vcc_neg);
+        TrackNodes({out, in_pos, in_neg, vcc_pos, vcc_neg});
         Defer([this, name = std::move(name), out, in_pos, in_neg, vcc_pos, vcc_neg, params]() mutable {
             const BoyleOpAmpValues v = ComputeBoyleOpAmpValues(params);
-            constexpr int GROUND = -1;
-            const int u_out = MapNode(out);
-            const int u_inp = MapNode(in_pos);
-            const int u_inm = MapNode(in_neg);
-            const int u_vcc = MapNode(vcc_pos);
-            const int u_vee = MapNode(vcc_neg);
+            OpAmpTerminals t = MapOpAmpTerminals(out, in_pos, in_neg, vcc_pos, vcc_neg);
+            const BoyleNodes n = AllocateBoyleNodes();
+            MarkDynamic(n.Gain);
+            t.InPos = AddBoyleInputOffset(params, t.InPos);
 
-            const int n_col1 = AllocateInternalNode();
-            const int n_col2 = AllocateInternalNode();
-            const int n_emit1 = AllocateInternalNode();
-            const int n_emit2 = AllocateInternalNode();
-            const int n_tail = AllocateInternalNode();
-            const int n_gain = AllocateInternalNode();
-            const int n_out_int = AllocateInternalNode();
-            const int n_cl_clamp = AllocateInternalNode();
-            const int n_cl_sense = AllocateInternalNode();
-            const int n_pos_sense = AllocateInternalNode();
-            const int n_pos_mid = AllocateInternalNode();
-            const int n_pos_ref = AllocateInternalNode();
-            const int n_neg_sense = AllocateInternalNode();
-            const int n_neg_mid = AllocateInternalNode();
-            const int n_neg_ref = AllocateInternalNode();
-
-            MarkDynamic(n_gain);
-
-            BjtParameters pair;
-            pair.SaturationCurrent = v.InputSaturationCurrent;
-            pair.ForwardBeta = v.Beta;
-            const DiodeParameters dm1{.SaturationCurrent = 1e-20};
-            const DiodeParameters dm3{.SaturationCurrent = 1e-16};
-
-            int u_inp_actual = u_inp;
-            if (params.InputOffsetVoltage != 0.0) {
-                const int n_vos = AllocateInternalNode();
-                AddDevice(std::make_unique<VoltageSourceDevice>(n_vos,
-                                                                u_inp,
-                                                                AllocateBranch(),
-                                                                params.InputOffsetVoltage,
-                                                                MakeDcWaveform(params.InputOffsetVoltage)));
-                u_inp_actual = n_vos;
-            }
-
-            // 1. Differential Input Stage
+            // The offset source is not part of the noise of the op-amp, the devices from here on are
             const std::size_t first_device = m_Compiled.Devices.size();
-            const int load_node = params.IsPnpInput ? u_vee : u_vcc;
-            AddDevice(std::make_unique<ResistorDevice>(load_node, n_col1, v.CollectorResistance));
-            AddDevice(std::make_unique<ResistorDevice>(load_node, n_col2, v.CollectorResistance));
-            AddDevice(std::make_unique<BjtDevice>(n_col1, u_inm, n_emit1, -1, -1, -1, pair, params.IsPnpInput));
-            AddDevice(std::make_unique<BjtDevice>(n_col2, u_inp_actual, n_emit2, -1, -1, -1, pair, params.IsPnpInput));
-            AddDevice(std::make_unique<CapacitorDevice>(n_col1, n_col2, v.CollectorCapacitance, 0.0, false));
-            AddDevice(std::make_unique<ResistorDevice>(n_emit1, n_tail, v.EmitterResistance));
-            AddDevice(std::make_unique<ResistorDevice>(n_emit2, n_tail, v.EmitterResistance));
-            if (params.IsPnpInput) {
-                AddDevice(
-                    std::make_unique<CurrentSourceDevice>(u_vcc, n_tail, v.TailCurrent, MakeDcWaveform(v.TailCurrent)));
-            } else {
-                AddDevice(
-                    std::make_unique<CurrentSourceDevice>(n_tail, u_vee, v.TailCurrent, MakeDcWaveform(v.TailCurrent)));
-            }
-            AddDevice(std::make_unique<ResistorDevice>(n_tail, GROUND, v.TailResistance));
-
-            // 2. Intermediate Gain Stage & Miller Compensation
-            AddDevice(std::make_unique<VccsDevice>(GROUND, n_gain, n_tail, GROUND, v.CommonModeTransconductance));
-            AddDevice(std::make_unique<VccsDevice>(n_gain, GROUND, n_col1, n_col2, v.Transconductance));
-            AddDevice(std::make_unique<ResistorDevice>(n_gain, GROUND, v.GainStageResistance));
-            AddDevice(std::make_unique<CapacitorDevice>(n_out_int, n_gain, v.CompensationCapacitance, 0.0, false));
-
-            // 3. Output Stage
-            AddDevice(std::make_unique<VccsDevice>(n_out_int, GROUND, n_gain, GROUND, v.OutputGain));
-            AddDevice(std::make_unique<ResistorDevice>(n_out_int, GROUND, v.GainStageLoad));
-            Device *rso = AddDevice(std::make_unique<ResistorDevice>(n_out_int, u_out, v.OutputSenseResistance));
-
-            // 4. Short-Circuit Current Limiter
-            AddDevice(std::make_unique<VcvsDevice>(n_cl_sense,
-                                                   GROUND,
-                                                   n_out_int,
-                                                   u_out,
-                                                   AllocateBranch(),
-                                                   v.CurrentLimitGain));
-            AddDevice(std::make_unique<VccsDevice>(GROUND, n_gain, n_cl_clamp, GROUND, 1.0));
-            AddDevice(std::make_unique<ResistorDevice>(n_cl_clamp, GROUND, 10.0));
-            AddDevice(std::make_unique<DiodeDevice>(n_cl_sense, n_cl_clamp, -1, dm1));
-            AddDevice(std::make_unique<DiodeDevice>(n_cl_clamp, n_cl_sense, -1, dm1));
-
-            // 5. Rail Swing Limiters
-            AddDevice(std::make_unique<DiodeDevice>(n_pos_mid, n_pos_sense, -1, dm3));
-            AddDevice(std::make_unique<DiodeDevice>(n_pos_ref, n_pos_mid, -1, dm3));
-            AddDevice(std::make_unique<VccsDevice>(GROUND, n_gain, n_pos_sense, u_vcc, 1.0));
-            Device *vc = AddDevice(std::make_unique<VoltageSourceDevice>(n_pos_ref,
-                                                                         u_out,
-                                                                         AllocateBranch(),
-                                                                         v.PositiveSwing,
-                                                                         MakeDcWaveform(v.PositiveSwing)));
-            AddDevice(std::make_unique<ResistorDevice>(u_vcc, n_pos_sense, 10.0));
-            AddDevice(std::make_unique<ResistorDevice>(u_vcc, n_pos_mid, 1e3));
-
-            AddDevice(std::make_unique<DiodeDevice>(n_neg_sense, n_neg_mid, -1, dm3));
-            AddDevice(std::make_unique<DiodeDevice>(n_neg_mid, n_neg_ref, -1, dm3));
-            AddDevice(std::make_unique<VccsDevice>(GROUND, n_gain, n_neg_sense, u_vee, 1.0));
-            Device *ve = AddDevice(std::make_unique<VoltageSourceDevice>(u_out,
-                                                                         n_neg_ref,
-                                                                         AllocateBranch(),
-                                                                         v.NegativeSwing,
-                                                                         MakeDcWaveform(v.NegativeSwing)));
-            AddDevice(std::make_unique<ResistorDevice>(n_neg_sense, u_vee, 10.0));
-            AddDevice(std::make_unique<ResistorDevice>(n_neg_mid, u_vee, 1e3));
-
+            AddBoyleInputStage(params, v, n, t);
+            AddBoyleGainStage(v, n);
+            Device *output_sense = AddBoyleOutputStage(v, n, t);
+            AddBoyleCurrentLimiter(v, n, t);
+            Device *upper_limit = AddBoyleRailLimiter(n.Upper, n.Gain, t.VccPos, t.Out, v.PositiveSwing, true);
+            Device *lower_limit = AddBoyleRailLimiter(n.Lower, n.Gain, t.VccNeg, t.Out, v.NegativeSwing, false);
             if (v.RestOfSupplyCurrent > 0.0) {
-                AddDevice(std::make_unique<CurrentSourceDevice>(u_vcc,
-                                                                u_vee,
+                AddDevice(std::make_unique<CurrentSourceDevice>(t.VccPos,
+                                                                t.VccNeg,
                                                                 v.RestOfSupplyCurrent,
                                                                 MakeDcWaveform(v.RestOfSupplyCurrent)));
             }
@@ -878,7 +898,7 @@ public:
             for (std::size_t i = first_device; i < m_Compiled.Devices.size(); ++i) {
                 noise_devices.push_back(m_Compiled.Devices[i].get());
             }
-            m_Compiled.Currents.push_back({name, {{rso, 1}, {vc, 1}, {ve, 0}}});
+            m_Compiled.Currents.push_back({name, {{output_sense, 1}, {upper_limit, 1}, {lower_limit, 0}}});
             m_Compiled.NoiseGroups.push_back({name, std::move(noise_devices)});
         });
     }
@@ -937,11 +957,22 @@ public:
                     NodeId reset,
                     const SmoothLogicParameters &params) {
         SmoothLogicParameters nor2_params = params;
-        nor2_params.VThreshold *= 0.99;
+        nor2_params.VThreshold *= LATCH_THRESHOLD_ASYMMETRY;
         AddLogicGate(name + ".NOR1", LogicGateType::NOR, q, {reset, q_bar}, params);
         AddLogicGate(name + ".NOR2", LogicGateType::NOR, q_bar, {set, q}, nor2_params);
     }
 
+    /**
+     * @brief   Adds the edge-triggered D flip-flop macromodel of six NAND gates, as in the classic 7474.
+     * @param[in] name    Name of the flip-flop.
+     * @param[in] q       True output node.
+     * @param[in] q_bar   Complementary output node.
+     * @param[in] d       Data input node.
+     * @param[in] clk     Clock input node.
+     * @param[in] params  Parameters of every gate.
+     * @param[in] set     Asynchronous set node, active high, or empty when the flip-flop has none.
+     * @param[in] reset   Asynchronous reset node, active high, or empty when the flip-flop has none.
+     */
     void AddDFlipFlop(std::string name,
                       NodeId q,
                       NodeId q_bar,
@@ -950,10 +981,7 @@ public:
                       const SmoothLogicParameters &params,
                       const std::optional<NodeId> set,
                       const std::optional<NodeId> reset) {
-        Track(q);
-        Track(q_bar);
-        Track(d);
-        Track(clk);
+        TrackNodes({q, q_bar, d, clk});
         if (set) {
             Track(*set);
         }
@@ -961,54 +989,45 @@ public:
             Track(*reset);
         }
         Defer([this, name = std::move(name), q, q_bar, d, clk, params, set, reset]() mutable {
-            const int u_q = MapNode(q);
-            const int u_qb = MapNode(q_bar);
             const int u_d = MapNode(d);
             const int u_clk = MapNode(clk);
-
-            const int n1 = AllocateInternalNode();
-            const int n2 = AllocateInternalNode();
-            const int n3 = AllocateInternalNode();
-            const int n4 = AllocateInternalNode();
+            const FlipFlopNodes n{.Q = MapNode(q),
+                                  .QBar = MapNode(q_bar),
+                                  .N1 = AllocateInternalNode(),
+                                  .N2 = AllocateInternalNode(),
+                                  .N3 = AllocateInternalNode(),
+                                  .N4 = AllocateInternalNode()};
 
             // The set and reset inputs are active high, so each goes through an inverter into the active-low
             // inputs of the gates, as in the classic 7474 (preset on G1 and G5, clear on G2, G4 and G6)
-            std::vector<int> set_bar;
-            std::vector<int> reset_bar;
-            if (set) {
-                set_bar.push_back(AllocateInternalNode());
-                AddRawLogicGate(name + ".NOT_SET", LogicGateType::NOT, set_bar.front(), {MapNode(*set)}, params);
-            }
-            if (reset) {
-                reset_bar.push_back(AllocateInternalNode());
-                AddRawLogicGate(name + ".NOT_RESET", LogicGateType::NOT, reset_bar.front(), {MapNode(*reset)}, params);
-            }
-            const auto with = [](std::vector<int> inputs, const std::vector<int> &extra) {
-                inputs.insert(inputs.end(), extra.begin(), extra.end());
-                return inputs;
-            };
+            const std::optional<int> set_bar = AddActiveLowInput(name + ".NOT_SET", set, params);
+            const std::optional<int> reset_bar = AddActiveLowInput(name + ".NOT_RESET", reset, params);
 
             // Master latch and edge-steering section
-            AddRawLogicGate(name + ".G1", LogicGateType::NAND, n1, with({n4, n2}, set_bar), params);
-            AddRawLogicGate(name + ".G2", LogicGateType::NAND, n2, with({n1, u_clk}, reset_bar), params);
-            AddRawLogicGate(name + ".G3", LogicGateType::NAND, n3, {n2, u_clk, n4}, params);
-            AddRawLogicGate(name + ".G4", LogicGateType::NAND, n4, with({n3, u_d}, reset_bar), params);
+            AddRawLogicGate(name + ".G1", LogicGateType::NAND, n.N1, WithOptionalInput({n.N4, n.N2}, set_bar), params);
+            AddRawLogicGate(name + ".G2",
+                            LogicGateType::NAND,
+                            n.N2,
+                            WithOptionalInput({n.N1, u_clk}, reset_bar),
+                            params);
+            AddRawLogicGate(name + ".G3", LogicGateType::NAND, n.N3, {n.N2, u_clk, n.N4}, params);
+            AddRawLogicGate(name + ".G4", LogicGateType::NAND, n.N4, WithOptionalInput({n.N3, u_d}, reset_bar), params);
 
             // Slave output latch (slight asymmetry breaks DC operating point metastability in the reset state)
             SmoothLogicParameters g5_params = params;
-            g5_params.VThreshold *= 0.99;
-            AddRawLogicGate(name + ".G5", LogicGateType::NAND, u_q, with({n2, u_qb}, set_bar), g5_params);
-            AddRawLogicGate(name + ".G6", LogicGateType::NAND, u_qb, with({n3, u_q}, reset_bar), params);
+            g5_params.VThreshold *= LATCH_THRESHOLD_ASYMMETRY;
+            AddRawLogicGate(name + ".G5",
+                            LogicGateType::NAND,
+                            n.Q,
+                            WithOptionalInput({n.N2, n.QBar}, set_bar),
+                            g5_params);
+            AddRawLogicGate(name + ".G6",
+                            LogicGateType::NAND,
+                            n.QBar,
+                            WithOptionalInput({n.N3, n.Q}, reset_bar),
+                            params);
 
-            // Seed Newton in the reset equilibrium so downstream stages clocked HIGH still start reset
-            m_Compiled.Devices.push_back(std::make_unique<NodeSeedDevice>(std::vector<NodeSeed>{
-                {.Node = u_q, .Voltage = params.VLow},
-                {.Node = u_qb, .Voltage = params.VHigh},
-                {.Node = n1, .Voltage = params.VLow},
-                {.Node = n2, .Voltage = params.VHigh},
-                {.Node = n3, .Voltage = params.VLow},
-                {.Node = n4, .Voltage = params.VHigh},
-            }));
+            AddFlipFlopSeed(n, params);
         });
     }
 
@@ -1072,13 +1091,357 @@ public:
     }
 
 private:
-    /// A current that a behavioral source reads, to be bound to the branch of its source once all exist.
+    /**
+     * @struct  PendingCurrent
+     * @brief   A current that a behavioral source reads, to be bound to the branch of its source once all exist.
+     */
     struct PendingCurrent {
         std::string Owner;
         BehavioralSourceDevice *Device;
         std::size_t Input;
         std::string Source;
     };
+
+    /**
+     * @brief   Registers a device under its name, with the current through its first terminal as the current of the
+     *          element.
+     * @param[in] name    Name of the element.
+     * @param[in] device  Device of the element, which the circuit owns.
+     */
+    void RegisterElement(const std::string &name, Device *device) {
+        m_Compiled.ElementsByName[name] = device;
+        m_Compiled.Currents.push_back({name, {{device, 0}}});
+    }
+
+    /**
+     * @brief   Registers a device that has one current for each of its terminals, named after the element and the
+     *          terminal, such as "Q1.C".
+     * @param[in] name       Name of the element.
+     * @param[in] device     Device of the element, which the circuit owns.
+     * @param[in] terminals  Names of the terminals, in the order the device numbers them.
+     */
+    void RegisterTerminalCurrents(const std::string &name,
+                                  const Device *device,
+                                  const std::initializer_list<std::string_view> terminals) {
+        int terminal_index = 0;
+        for (const std::string_view terminal : terminals) {
+            m_Compiled.Currents.push_back({std::format("{}.{}", name, terminal), {{device, terminal_index++}}});
+        }
+    }
+
+    /**
+     * @brief   Finishes an independent source: gives it its breakpoints and seed, adds it to the circuit and names it
+     *          as an element and as a source that other elements can read the current of.
+     * @param[in] name     Name of the source.
+     * @param[in] source   The source device, built from the same spec.
+     * @param[in] spec     Spec the source was built from, of which the breakpoints and the seed are used here.
+     */
+    template <typename SourceDevice>
+    void InstallSource(const std::string &name, std::unique_ptr<SourceDevice> source, SourceSpec spec) {
+        source->SetBreakpoints(std::move(spec.Breakpoints));
+        source->SetSeedCallback(std::move(spec.SetSeed));
+        Device *device = AddDevice(std::move(source));
+        m_Compiled.SourcesByName[name] = device;
+        RegisterElement(name, device);
+    }
+
+    /**
+     * @brief   Finds the branch unknown of the voltage source that a current-controlled source reads.
+     * @param[in] source_name  Name of the controlling source, as written, so the case matters.
+     * @return  The branch, or -1 when no voltage source has that name.
+     */
+    int ResolveControlBranch(const std::string &source_name) const {
+        const auto it = m_Compiled.SourcesByName.find(source_name);
+        if (it != m_Compiled.SourcesByName.end()) {
+            if (const auto *source = dynamic_cast<const VoltageSourceDevice *>(it->second)) {
+                return source->GetBranch();
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * @brief   Maps the five terminals of an op-amp to their unknowns.
+     */
+    OpAmpTerminals MapOpAmpTerminals(NodeId out, NodeId in_pos, NodeId in_neg, NodeId vcc_pos, NodeId vcc_neg) const {
+        return {.Out = MapNode(out),
+                .InPos = MapNode(in_pos),
+                .InNeg = MapNode(in_neg),
+                .VccPos = MapNode(vcc_pos),
+                .VccNeg = MapNode(vcc_neg)};
+    }
+
+    /**
+     * @brief   Turns the inputs of an expression into the bindings of a behavioral source.
+     * @param[in] name           Name of the source, for the messages.
+     * @param[in] expression     Expression to read the inputs of.
+     * @param[out] bindings      One binding for each input, a voltage bound to its nodes and a current left open.
+     * @param[out] currents      The currents to bind to a source once every source exists.
+     * @return  The message of the first voltage that does not name its nodes by number, or empty when all do.
+     * @note    The nodes of the voltages are tracked, so the circuit has them.
+     */
+    std::optional<std::string> BindExpressionInputs(const std::string &name,
+                                                    const Expression &expression,
+                                                    std::vector<BehavioralBinding> &bindings,
+                                                    std::vector<PendingCurrent> &currents) {
+        for (const ExpressionInput &input : expression.GetInputs()) {
+            BehavioralBinding binding;
+            if (input.Type == ExpressionInput::Kind::CURRENT) {
+                binding.IsCurrent = true;
+                currents.push_back({.Owner = name, .Device = nullptr, .Input = bindings.size(), .Source = input.First});
+            } else {
+                const std::optional<NodeId> node = ReadExpressionNode(input.First);
+                const std::optional<NodeId> reference =
+                    input.Second.empty() ? std::optional<NodeId>(GROUND_NODE) : ReadExpressionNode(input.Second);
+                if (!node || !reference) {
+                    return std::format("{}: v({}{}{}) must name nodes by their number",
+                                       name,
+                                       input.First,
+                                       input.Second.empty() ? "" : ", ",
+                                       input.Second);
+                }
+                TrackNodes({*node, *reference});
+                binding.Unknown = MapNode(*node);
+                binding.Reference = MapNode(*reference);
+            }
+            bindings.push_back(binding);
+        }
+        return std::nullopt;
+    }
+
+    /**
+     * @brief   Adds the device of a behavioral source, which has a branch unknown when it is a voltage source.
+     * @param[in] name        Name of the source, which the device carries.
+     * @param[in] is_voltage  Whether the source gives a voltage, or a current.
+     * @param[in] u_pos       Unknown of the positive node.
+     * @param[in] u_neg       Unknown of the negative node.
+     * @param[in] expression  Expression of the source.
+     * @param[in] bindings    Bindings of the inputs of the expression.
+     * @return  The device, which the circuit owns.
+     */
+    BehavioralSourceDevice *MakeBehavioralDevice(const std::string &name,
+                                                 const bool is_voltage,
+                                                 const int u_pos,
+                                                 const int u_neg,
+                                                 Expression expression,
+                                                 std::vector<BehavioralBinding> bindings) {
+        if (is_voltage) {
+            const int branch = AllocateBranch();
+            return static_cast<BehavioralSourceDevice *>(
+                AddDevice(std::make_unique<BehavioralVoltageDevice>(name,
+                                                                    u_pos,
+                                                                    u_neg,
+                                                                    branch,
+                                                                    std::move(expression),
+                                                                    std::move(bindings))));
+        }
+        return static_cast<BehavioralSourceDevice *>(AddDevice(
+            std::make_unique<BehavioralCurrentDevice>(name, u_pos, u_neg, std::move(expression), std::move(bindings))));
+    }
+
+    /**
+     * @brief   Allocates the internal nodes of the Boyle op-amp.
+     */
+    BoyleNodes AllocateBoyleNodes() {
+        // The nodes are allocated in the order the fields are listed, so the unknowns keep their numbers
+        return {
+            .Col1 = AllocateInternalNode(),
+            .Col2 = AllocateInternalNode(),
+            .Emit1 = AllocateInternalNode(),
+            .Emit2 = AllocateInternalNode(),
+            .Tail = AllocateInternalNode(),
+            .Gain = AllocateInternalNode(),
+            .OutInternal = AllocateInternalNode(),
+            .ClampNode = AllocateInternalNode(),
+            .ClampSense = AllocateInternalNode(),
+            .Upper = {.Sense = AllocateInternalNode(), .Mid = AllocateInternalNode(), .Ref = AllocateInternalNode()},
+            .Lower = {.Sense = AllocateInternalNode(), .Mid = AllocateInternalNode(), .Ref = AllocateInternalNode()}};
+    }
+
+    /**
+     * @brief   Puts the input offset voltage of the Boyle op-amp in series with its non-inverting input.
+     * @param[in] params   Datasheet figures of the op-amp.
+     * @param[in] u_input  Unknown of the non-inverting input node.
+     * @return  The node the input stage reads: the input itself when there is no offset, or else the node behind the
+     *          offset source.
+     */
+    int AddBoyleInputOffset(const BoyleOpAmpParameters &params, const int u_input) {
+        if (params.InputOffsetVoltage == 0.0) {
+            return u_input;
+        }
+        const int n_vos = AllocateInternalNode();
+        AddDevice(std::make_unique<VoltageSourceDevice>(n_vos,
+                                                        u_input,
+                                                        AllocateBranch(),
+                                                        params.InputOffsetVoltage,
+                                                        MakeDcWaveform(params.InputOffsetVoltage)));
+        return n_vos;
+    }
+
+    /**
+     * @brief   Adds the differential input stage of the Boyle op-amp: a pair of transistors with a tail current.
+     * @param[in] params  Datasheet figures of the op-amp.
+     * @param[in] v       Values of the devices computed from the figures.
+     * @param[in] n       Internal nodes of the op-amp.
+     * @param[in] t       Terminals of the op-amp, with the non-inverting input behind the offset.
+     */
+    void AddBoyleInputStage(const BoyleOpAmpParameters &params,
+                            const BoyleOpAmpValues &v,
+                            const BoyleNodes &n,
+                            const OpAmpTerminals &t) {
+        BjtParameters pair;
+        pair.SaturationCurrent = v.InputSaturationCurrent;
+        pair.ForwardBeta = v.Beta;
+
+        const int load_node = params.IsPnpInput ? t.VccNeg : t.VccPos;
+        AddDevice(std::make_unique<ResistorDevice>(load_node, n.Col1, v.CollectorResistance));
+        AddDevice(std::make_unique<ResistorDevice>(load_node, n.Col2, v.CollectorResistance));
+        AddDevice(std::make_unique<BjtDevice>(n.Col1, t.InNeg, n.Emit1, -1, -1, -1, pair, params.IsPnpInput));
+        AddDevice(std::make_unique<BjtDevice>(n.Col2, t.InPos, n.Emit2, -1, -1, -1, pair, params.IsPnpInput));
+        AddDevice(std::make_unique<CapacitorDevice>(n.Col1, n.Col2, v.CollectorCapacitance, 0.0, false));
+        AddDevice(std::make_unique<ResistorDevice>(n.Emit1, n.Tail, v.EmitterResistance));
+        AddDevice(std::make_unique<ResistorDevice>(n.Emit2, n.Tail, v.EmitterResistance));
+        if (params.IsPnpInput) {
+            AddDevice(
+                std::make_unique<CurrentSourceDevice>(t.VccPos, n.Tail, v.TailCurrent, MakeDcWaveform(v.TailCurrent)));
+        } else {
+            AddDevice(
+                std::make_unique<CurrentSourceDevice>(n.Tail, t.VccNeg, v.TailCurrent, MakeDcWaveform(v.TailCurrent)));
+        }
+        AddDevice(std::make_unique<ResistorDevice>(n.Tail, GROUND_UNKNOWN, v.TailResistance));
+    }
+
+    /**
+     * @brief   Adds the intermediate gain stage of the Boyle op-amp, with the Miller compensation capacitor.
+     * @param[in] v  Values of the devices computed from the datasheet figures.
+     * @param[in] n  Internal nodes of the op-amp.
+     */
+    void AddBoyleGainStage(const BoyleOpAmpValues &v, const BoyleNodes &n) {
+        AddDevice(
+            std::make_unique<VccsDevice>(GROUND_UNKNOWN, n.Gain, n.Tail, GROUND_UNKNOWN, v.CommonModeTransconductance));
+        AddDevice(std::make_unique<VccsDevice>(n.Gain, GROUND_UNKNOWN, n.Col1, n.Col2, v.Transconductance));
+        AddDevice(std::make_unique<ResistorDevice>(n.Gain, GROUND_UNKNOWN, v.GainStageResistance));
+        AddDevice(std::make_unique<CapacitorDevice>(n.OutInternal, n.Gain, v.CompensationCapacitance, 0.0, false));
+    }
+
+    /**
+     * @brief   Adds the output stage of the Boyle op-amp.
+     * @param[in] v  Values of the devices computed from the datasheet figures.
+     * @param[in] n  Internal nodes of the op-amp.
+     * @param[in] t  Terminals of the op-amp.
+     * @return  The resistor between the internal node and the output, whose current is the output current.
+     */
+    Device *AddBoyleOutputStage(const BoyleOpAmpValues &v, const BoyleNodes &n, const OpAmpTerminals &t) {
+        AddDevice(std::make_unique<VccsDevice>(n.OutInternal, GROUND_UNKNOWN, n.Gain, GROUND_UNKNOWN, v.OutputGain));
+        AddDevice(std::make_unique<ResistorDevice>(n.OutInternal, GROUND_UNKNOWN, v.GainStageLoad));
+        return AddDevice(std::make_unique<ResistorDevice>(n.OutInternal, t.Out, v.OutputSenseResistance));
+    }
+
+    /**
+     * @brief   Adds the short-circuit current limiter of the Boyle op-amp: it senses the voltage across the output
+     *          resistor and pulls the gain node back when the current passes the limit.
+     * @param[in] v  Values of the devices computed from the datasheet figures.
+     * @param[in] n  Internal nodes of the op-amp.
+     * @param[in] t  Terminals of the op-amp.
+     */
+    void AddBoyleCurrentLimiter(const BoyleOpAmpValues &v, const BoyleNodes &n, const OpAmpTerminals &t) {
+        const DiodeParameters clamp{.SaturationCurrent = CLAMP_DIODE_SATURATION_CURRENT};
+        AddDevice(std::make_unique<VcvsDevice>(n.ClampSense,
+                                               GROUND_UNKNOWN,
+                                               n.OutInternal,
+                                               t.Out,
+                                               AllocateBranch(),
+                                               v.CurrentLimitGain));
+        AddDevice(std::make_unique<VccsDevice>(GROUND_UNKNOWN, n.Gain, n.ClampNode, GROUND_UNKNOWN, 1.0));
+        AddDevice(std::make_unique<ResistorDevice>(n.ClampNode, GROUND_UNKNOWN, LIMITER_SENSE_RESISTANCE));
+        AddDevice(std::make_unique<DiodeDevice>(n.ClampSense, n.ClampNode, -1, clamp));
+        AddDevice(std::make_unique<DiodeDevice>(n.ClampNode, n.ClampSense, -1, clamp));
+    }
+
+    /**
+     * @brief   Adds one of the two rail swing limiters of the Boyle op-amp, which pull the gain node back when the
+     *          output comes within the headroom of a supply.
+     * @param[in] limiter     Internal nodes of the limiter.
+     * @param[in] gain_node   Gain node of the op-amp, which the limiter pulls.
+     * @param[in] supply      Unknown of the supply the limiter guards.
+     * @param[in] output      Unknown of the output node.
+     * @param[in] swing       Voltage between the output and the reference node of the limiter.
+     * @param[in] is_upper    Whether the limiter guards the positive supply, or the negative one; the negative one
+     *                        is the mirror image, with the terminals of its devices swapped.
+     * @return  The voltage source of the limiter, whose current is read as part of the output current.
+     */
+    Device *AddBoyleRailLimiter(const RailLimiterNodes &limiter,
+                                const int gain_node,
+                                const int supply,
+                                const int output,
+                                const double swing,
+                                const bool is_upper) {
+        const DiodeParameters rail_diode{.SaturationCurrent = RAIL_DIODE_SATURATION_CURRENT};
+        const auto oriented = [is_upper](const int first, const int second) {
+            return is_upper ? std::pair{first, second} : std::pair{second, first};
+        };
+
+        const auto [diode1_from, diode1_to] = oriented(limiter.Mid, limiter.Sense);
+        const auto [diode2_from, diode2_to] = oriented(limiter.Ref, limiter.Mid);
+        AddDevice(std::make_unique<DiodeDevice>(diode1_from, diode1_to, -1, rail_diode));
+        AddDevice(std::make_unique<DiodeDevice>(diode2_from, diode2_to, -1, rail_diode));
+        AddDevice(std::make_unique<VccsDevice>(GROUND_UNKNOWN, gain_node, limiter.Sense, supply, 1.0));
+        const auto [swing_from, swing_to] = oriented(limiter.Ref, output);
+        Device *swing_source = AddDevice(std::make_unique<VoltageSourceDevice>(swing_from,
+                                                                               swing_to,
+                                                                               AllocateBranch(),
+                                                                               swing,
+                                                                               MakeDcWaveform(swing)));
+        const auto [sense_from, sense_to] = oriented(supply, limiter.Sense);
+        const auto [mid_from, mid_to] = oriented(supply, limiter.Mid);
+        AddDevice(std::make_unique<ResistorDevice>(sense_from, sense_to, LIMITER_SENSE_RESISTANCE));
+        AddDevice(std::make_unique<ResistorDevice>(mid_from, mid_to, RAIL_BIAS_RESISTANCE));
+        return swing_source;
+    }
+
+    /**
+     * @brief   Adds the inverter that turns an active-high input of the D flip-flop into the active-low input of its
+     *          gates.
+     * @param[in] gate_name  Name of the inverter.
+     * @param[in] input      Active-high node, or empty when the flip-flop has no such input.
+     * @param[in] params     Parameters of the inverter.
+     * @return  The node of the inverted input, or empty when there is no input.
+     */
+    std::optional<int>
+    AddActiveLowInput(std::string gate_name, const std::optional<NodeId> input, const SmoothLogicParameters &params) {
+        if (!input) {
+            return std::nullopt;
+        }
+        const int inverted = AllocateInternalNode();
+        AddRawLogicGate(std::move(gate_name), LogicGateType::NOT, inverted, {MapNode(*input)}, params);
+        return inverted;
+    }
+
+    /**
+     * @brief   Seeds Newton in the reset equilibrium of the D flip-flop, so downstream stages clocked high still start
+     *          reset.
+     * @param[in] n       Nodes of the flip-flop.
+     * @param[in] params  Logic levels of the gates.
+     */
+    void AddFlipFlopSeed(const FlipFlopNodes &n, const SmoothLogicParameters &params) {
+        AddDevice(std::make_unique<NodeSeedDevice>(std::vector<NodeSeed>{
+            {.Node = n.Q, .Voltage = params.VLow},
+            {.Node = n.QBar, .Voltage = params.VHigh},
+            {.Node = n.N1, .Voltage = params.VLow},
+            {.Node = n.N2, .Voltage = params.VHigh},
+            {.Node = n.N3, .Voltage = params.VLow},
+            {.Node = n.N4, .Voltage = params.VHigh},
+        }));
+    }
+
+    /**
+     * @brief   Tracks several nodes at once.
+     */
+    void TrackNodes(const std::initializer_list<NodeId> nodes) {
+        for (const NodeId node : nodes) {
+            Track(node);
+        }
+    }
 
     void BindBehavioralCurrents() {
         for (const PendingCurrent &current : m_PendingCurrents) {
@@ -1146,11 +1509,11 @@ void CircuitBuilder::AddInductor(std::string name, NodeId n1, NodeId n2, double 
 }
 
 void CircuitBuilder::AddVdc(std::string name, NodeId pos, NodeId neg, double dc_volts, double ac_mag, double) {
-    m_Impl->AddVoltageSourceDevice(std::move(name), pos, neg, dc_volts, MakeDcWaveform(dc_volts), ac_mag);
+    m_Impl->AddVoltageSourceDevice(std::move(name), pos, neg, MakeDcSpec(dc_volts, ac_mag));
 }
 
 void CircuitBuilder::AddIdc(std::string name, NodeId pos, NodeId neg, double dc_amps, double ac_mag, double) {
-    m_Impl->AddCurrentSourceDevice(std::move(name), pos, neg, dc_amps, MakeDcWaveform(dc_amps), ac_mag);
+    m_Impl->AddCurrentSourceDevice(std::move(name), pos, neg, MakeDcSpec(dc_amps, ac_mag));
 }
 
 void CircuitBuilder::AddVpulse(std::string name,
@@ -1159,18 +1522,7 @@ void CircuitBuilder::AddVpulse(std::string name,
                                const PulseParameters &params,
                                double ac_mag,
                                double) {
-    const SourcePeriodicity periodicity{.Kind = SourceWaveformKind::PULSE,
-                                        .Frequency = params.Period > 0.0 ? 1.0 / params.Period : 0.0,
-                                        .MinEdgeTime = std::min(params.RiseTime, params.FallTime),
-                                        .IsSupportedInHb = params.High == params.Low || params.Period > 0.0};
-    m_Impl->AddVoltageSourceDevice(std::move(name),
-                                   pos,
-                                   neg,
-                                   params.Low,
-                                   MakePulseWaveform(params.Low, params),
-                                   ac_mag,
-                                   periodicity,
-                                   MakePulseBreakpoints(params));
+    m_Impl->AddVoltageSourceDevice(std::move(name), pos, neg, MakePulseSpec(params, ac_mag));
 }
 
 void CircuitBuilder::AddIpulse(std::string name,
@@ -1179,18 +1531,7 @@ void CircuitBuilder::AddIpulse(std::string name,
                                const PulseParameters &params,
                                double ac_mag,
                                double) {
-    const SourcePeriodicity periodicity{.Kind = SourceWaveformKind::PULSE,
-                                        .Frequency = params.Period > 0.0 ? 1.0 / params.Period : 0.0,
-                                        .MinEdgeTime = std::min(params.RiseTime, params.FallTime),
-                                        .IsSupportedInHb = params.High == params.Low || params.Period > 0.0};
-    m_Impl->AddCurrentSourceDevice(std::move(name),
-                                   pos,
-                                   neg,
-                                   params.Low,
-                                   MakePulseWaveform(params.Low, params),
-                                   ac_mag,
-                                   periodicity,
-                                   MakePulseBreakpoints(params));
+    m_Impl->AddCurrentSourceDevice(std::move(name), pos, neg, MakePulseSpec(params, ac_mag));
 }
 
 void CircuitBuilder::AddVsine(std::string name,
@@ -1200,18 +1541,7 @@ void CircuitBuilder::AddVsine(std::string name,
                               double ac_mag,
                               double,
                               const bool damped) {
-    const SourcePeriodicity periodicity{.Kind = SourceWaveformKind::SINE,
-                                        .Frequency = params.Frequency,
-                                        .MinEdgeTime = 0.0,
-                                        .IsSupportedInHb =
-                                            !damped && (params.Amplitude == 0.0 || params.Frequency > 0.0)};
-    m_Impl->AddVoltageSourceDevice(std::move(name),
-                                   pos,
-                                   neg,
-                                   params.Offset,
-                                   MakeSineWaveform(params.Offset, params),
-                                   ac_mag,
-                                   periodicity);
+    m_Impl->AddVoltageSourceDevice(std::move(name), pos, neg, MakeSineSpec(params, ac_mag, damped));
 }
 
 void CircuitBuilder::AddIsine(std::string name,
@@ -1221,18 +1551,7 @@ void CircuitBuilder::AddIsine(std::string name,
                               double ac_mag,
                               double,
                               const bool damped) {
-    const SourcePeriodicity periodicity{.Kind = SourceWaveformKind::SINE,
-                                        .Frequency = params.Frequency,
-                                        .MinEdgeTime = 0.0,
-                                        .IsSupportedInHb =
-                                            !damped && (params.Amplitude == 0.0 || params.Frequency > 0.0)};
-    m_Impl->AddCurrentSourceDevice(std::move(name),
-                                   pos,
-                                   neg,
-                                   params.Offset,
-                                   MakeSineWaveform(params.Offset, params),
-                                   ac_mag,
-                                   periodicity);
+    m_Impl->AddCurrentSourceDevice(std::move(name), pos, neg, MakeSineSpec(params, ac_mag, damped));
 }
 
 void CircuitBuilder::AddVexp(std::string name,
@@ -1241,15 +1560,7 @@ void CircuitBuilder::AddVexp(std::string name,
                              const ExpParameters &params,
                              double ac_mag,
                              double) {
-    const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NON_PERIODIC, .IsSupportedInHb = false};
-    m_Impl->AddVoltageSourceDevice(std::move(name),
-                                   pos,
-                                   neg,
-                                   params.InitialValue,
-                                   MakeExpWaveform(params.InitialValue, params),
-                                   ac_mag,
-                                   non_periodic,
-                                   MakeExpBreakpoints(params));
+    m_Impl->AddVoltageSourceDevice(std::move(name), pos, neg, MakeExpSpec(params, ac_mag));
 }
 
 void CircuitBuilder::AddIexp(std::string name,
@@ -1258,15 +1569,7 @@ void CircuitBuilder::AddIexp(std::string name,
                              const ExpParameters &params,
                              double ac_mag,
                              double) {
-    const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NON_PERIODIC, .IsSupportedInHb = false};
-    m_Impl->AddCurrentSourceDevice(std::move(name),
-                                   pos,
-                                   neg,
-                                   params.InitialValue,
-                                   MakeExpWaveform(params.InitialValue, params),
-                                   ac_mag,
-                                   non_periodic,
-                                   MakeExpBreakpoints(params));
+    m_Impl->AddCurrentSourceDevice(std::move(name), pos, neg, MakeExpSpec(params, ac_mag));
 }
 
 void CircuitBuilder::AddVpwl(std::string name,
@@ -1275,16 +1578,7 @@ void CircuitBuilder::AddVpwl(std::string name,
                              const PwlParameters &params,
                              double ac_mag,
                              double) {
-    const double dc = params.Points.empty() ? 0.0 : params.Points.front().Value;
-    const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NON_PERIODIC, .IsSupportedInHb = false};
-    m_Impl->AddVoltageSourceDevice(std::move(name),
-                                   pos,
-                                   neg,
-                                   dc,
-                                   MakePwlWaveform(dc, params),
-                                   ac_mag,
-                                   non_periodic,
-                                   MakePwlBreakpoints(params));
+    m_Impl->AddVoltageSourceDevice(std::move(name), pos, neg, MakePwlSpec(params, ac_mag));
 }
 
 void CircuitBuilder::AddIpwl(std::string name,
@@ -1293,16 +1587,7 @@ void CircuitBuilder::AddIpwl(std::string name,
                              const PwlParameters &params,
                              double ac_mag,
                              double) {
-    const double dc = params.Points.empty() ? 0.0 : params.Points.front().Value;
-    const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NON_PERIODIC, .IsSupportedInHb = false};
-    m_Impl->AddCurrentSourceDevice(std::move(name),
-                                   pos,
-                                   neg,
-                                   dc,
-                                   MakePwlWaveform(dc, params),
-                                   ac_mag,
-                                   non_periodic,
-                                   MakePwlBreakpoints(params));
+    m_Impl->AddCurrentSourceDevice(std::move(name), pos, neg, MakePwlSpec(params, ac_mag));
 }
 
 void CircuitBuilder::AddVsffm(std::string name,
@@ -1311,14 +1596,7 @@ void CircuitBuilder::AddVsffm(std::string name,
                               const SffmParameters &params,
                               double ac_mag,
                               double) {
-    const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NON_PERIODIC, .IsSupportedInHb = false};
-    m_Impl->AddVoltageSourceDevice(std::move(name),
-                                   pos,
-                                   neg,
-                                   params.Offset,
-                                   MakeSffmWaveform(params.Offset, params),
-                                   ac_mag,
-                                   non_periodic);
+    m_Impl->AddVoltageSourceDevice(std::move(name), pos, neg, MakeSffmSpec(params, ac_mag));
 }
 
 void CircuitBuilder::AddIsffm(std::string name,
@@ -1327,14 +1605,7 @@ void CircuitBuilder::AddIsffm(std::string name,
                               const SffmParameters &params,
                               double ac_mag,
                               double) {
-    const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NON_PERIODIC, .IsSupportedInHb = false};
-    m_Impl->AddCurrentSourceDevice(std::move(name),
-                                   pos,
-                                   neg,
-                                   params.Offset,
-                                   MakeSffmWaveform(params.Offset, params),
-                                   ac_mag,
-                                   non_periodic);
+    m_Impl->AddCurrentSourceDevice(std::move(name), pos, neg, MakeSffmSpec(params, ac_mag));
 }
 
 void CircuitBuilder::AddVam(std::string name,
@@ -1343,15 +1614,7 @@ void CircuitBuilder::AddVam(std::string name,
                             const AmParameters &params,
                             double ac_mag,
                             double) {
-    const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NON_PERIODIC, .IsSupportedInHb = false};
-    m_Impl->AddVoltageSourceDevice(std::move(name),
-                                   pos,
-                                   neg,
-                                   params.Offset,
-                                   MakeAmWaveform(params.Offset, params),
-                                   ac_mag,
-                                   non_periodic,
-                                   MakeAmBreakpoints(params));
+    m_Impl->AddVoltageSourceDevice(std::move(name), pos, neg, MakeAmSpec(params, ac_mag));
 }
 
 void CircuitBuilder::AddIam(std::string name,
@@ -1360,43 +1623,15 @@ void CircuitBuilder::AddIam(std::string name,
                             const AmParameters &params,
                             double ac_mag,
                             double) {
-    const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NON_PERIODIC, .IsSupportedInHb = false};
-    m_Impl->AddCurrentSourceDevice(std::move(name),
-                                   pos,
-                                   neg,
-                                   params.Offset,
-                                   MakeAmWaveform(params.Offset, params),
-                                   ac_mag,
-                                   non_periodic,
-                                   MakeAmBreakpoints(params));
+    m_Impl->AddCurrentSourceDevice(std::move(name), pos, neg, MakeAmSpec(params, ac_mag));
 }
 
 void CircuitBuilder::AddVnoise(std::string name, NodeId pos, NodeId neg, const NoiseParameters &params, double ac_mag) {
-    const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NON_PERIODIC, .IsSupportedInHb = false};
-    TransientNoiseSource noise = MakeNoiseSource(params);
-    m_Impl->AddVoltageSourceDevice(std::move(name),
-                                   pos,
-                                   neg,
-                                   params.Offset,
-                                   std::move(noise.Evaluate),
-                                   ac_mag,
-                                   non_periodic,
-                                   std::move(noise.NextBreakpoint),
-                                   std::move(noise.ResetSeed));
+    m_Impl->AddVoltageSourceDevice(std::move(name), pos, neg, MakeNoiseSpec(params, ac_mag));
 }
 
 void CircuitBuilder::AddInoise(std::string name, NodeId pos, NodeId neg, const NoiseParameters &params, double ac_mag) {
-    const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NON_PERIODIC, .IsSupportedInHb = false};
-    TransientNoiseSource noise = MakeNoiseSource(params);
-    m_Impl->AddCurrentSourceDevice(std::move(name),
-                                   pos,
-                                   neg,
-                                   params.Offset,
-                                   std::move(noise.Evaluate),
-                                   ac_mag,
-                                   non_periodic,
-                                   std::move(noise.NextBreakpoint),
-                                   std::move(noise.ResetSeed));
+    m_Impl->AddCurrentSourceDevice(std::move(name), pos, neg, MakeNoiseSpec(params, ac_mag));
 }
 
 void CircuitBuilder::AddVrandom(std::string name,
@@ -1404,17 +1639,7 @@ void CircuitBuilder::AddVrandom(std::string name,
                                 NodeId neg,
                                 const RandomParameters &params,
                                 double ac_mag) {
-    const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NON_PERIODIC, .IsSupportedInHb = false};
-    TransientNoiseSource random = MakeRandomSource(params);
-    m_Impl->AddVoltageSourceDevice(std::move(name),
-                                   pos,
-                                   neg,
-                                   params.Second,
-                                   std::move(random.Evaluate),
-                                   ac_mag,
-                                   non_periodic,
-                                   std::move(random.NextBreakpoint),
-                                   std::move(random.ResetSeed));
+    m_Impl->AddVoltageSourceDevice(std::move(name), pos, neg, MakeRandomSpec(params, ac_mag));
 }
 
 void CircuitBuilder::AddIrandom(std::string name,
@@ -1422,34 +1647,23 @@ void CircuitBuilder::AddIrandom(std::string name,
                                 NodeId neg,
                                 const RandomParameters &params,
                                 double ac_mag) {
-    const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NON_PERIODIC, .IsSupportedInHb = false};
-    TransientNoiseSource random = MakeRandomSource(params);
-    m_Impl->AddCurrentSourceDevice(std::move(name),
-                                   pos,
-                                   neg,
-                                   params.Second,
-                                   std::move(random.Evaluate),
-                                   ac_mag,
-                                   non_periodic,
-                                   std::move(random.NextBreakpoint),
-                                   std::move(random.ResetSeed));
+    m_Impl->AddCurrentSourceDevice(std::move(name), pos, neg, MakeRandomSpec(params, ac_mag));
 }
 
 void CircuitBuilder::AddClock(std::string name, NodeId pos, NodeId neg, const ClockParameters &params) {
     constexpr double CLOCK_EDGE_FRACTION = 1e-4;
     const double period = params.Frequency > 0.0 ? 1.0 / params.Frequency : 0.0;
-    const SourcePeriodicity periodicity{.Kind = SourceWaveformKind::CLOCK,
-                                        .Frequency = params.Frequency,
-                                        .MinEdgeTime = CLOCK_EDGE_FRACTION * period,
-                                        .IsSupportedInHb = params.Frequency > 0.0};
     m_Impl->AddVoltageSourceDevice(std::move(name),
                                    pos,
                                    neg,
-                                   0.0,
-                                   MakeClockWaveform(params),
-                                   0.0,
-                                   periodicity,
-                                   MakeClockBreakpoints(params));
+                                   {.Dc = 0.0,
+                                    .Waveform = MakeClockWaveform(params),
+                                    .AcMagnitude = 0.0,
+                                    .Periodicity = {.Kind = SourceWaveformKind::CLOCK,
+                                                    .Frequency = params.Frequency,
+                                                    .MinEdgeTime = CLOCK_EDGE_FRACTION * period,
+                                                    .IsSupportedInHb = params.Frequency > 0.0},
+                                    .Breakpoints = MakeClockBreakpoints(params)});
 }
 
 void CircuitBuilder::AddLogicInput(std::string name,
@@ -1458,8 +1672,7 @@ void CircuitBuilder::AddLogicInput(std::string name,
                                    bool high_state,
                                    double high_volts,
                                    double low_volts) {
-    const double v = high_state ? high_volts : low_volts;
-    m_Impl->AddVoltageSourceDevice(std::move(name), pos, neg, v, MakeDcWaveform(v), 0.0);
+    m_Impl->AddVoltageSourceDevice(std::move(name), pos, neg, MakeDcSpec(high_state ? high_volts : low_volts, 0.0));
 }
 
 void CircuitBuilder::AddCurrentProbe(std::string probe_name, NodeId node_in, NodeId node_out) {
@@ -1691,7 +1904,7 @@ void CircuitBuilder::AddDFlipFlop(std::string name,
 }
 
 /**
- * @brief   Sets the initial voltage of a node at $t = 0$ in a transient analysis (SPICE `.ic`).
+ * @brief   Sets the initial voltage of a node at \f$ t = 0 \f$ in a transient analysis (SPICE `.ic`).
  * @param[in] node     Node to clamp at the start of the transient; ground (0) is ignored.
  * @param[in] voltage  Initial voltage in volts.
  * @note    The node is held at the voltage while the operating point that starts the transient is found, and then

@@ -5,11 +5,28 @@
 
 #include "nodalys/exporters.h"
 
+#include <complex>
 #include <format>
 #include <fstream>
 #include <sstream>
 
 namespace Nodalys {
+
+namespace {
+
+/// Touchstone writes a two-port as one line of its four parameters.
+constexpr int PORTS_IN_ONE_LINE = 2;
+/// Largest number of parameters, as real and imaginary pairs, on one line of a Touchstone file with more ports.
+constexpr int PAIRS_PER_LINE = 4;
+
+/**
+ * @brief   Writes a parameter as the real and imaginary parts Touchstone expects, after a space.
+ */
+void WriteComplexPair(std::ostringstream &ss, const std::complex<double> value) {
+    ss << std::format(" {:.10g} {:.10g}", value.real(), value.imag());
+}
+
+} // namespace
 
 std::string ExportRaw(const SimulationResult &result, std::string_view title) {
     return std::visit(
@@ -37,6 +54,11 @@ std::string ExportJson(const SimulationResult &result) {
     return std::visit([](const auto &res) { return ExportJson(res); }, result);
 }
 
+/**
+ * @brief   Writes S-parameters as a Touchstone version 1 file, in real and imaginary parts.
+ * @param[in] result  S-parameters to write.
+ * @return  The text of the file, or an empty string when the result has no ports.
+ */
 std::string ExportTouchstone(const SParameterResult &result) {
     const int ports = result.GetPortCount();
     if (ports <= 0) {
@@ -47,15 +69,13 @@ std::string ExportTouchstone(const SParameterResult &result) {
     ss << "! Nodalys S-Parameter Simulation\n";
     ss << "# HZ S RI R " << std::format("{:.8g}", z0) << "\n";
 
-    constexpr int PORTS_IN_ONE_LINE = 2;
     for (std::size_t pt = 0; pt < result.Frequencies.size(); ++pt) {
         ss << std::format("{:.10g}", result.Frequencies[pt]);
         if (ports == PORTS_IN_ONE_LINE) {
             // S11, S21, S12, S22
             for (const int col : {1, 2}) {
                 for (const int row : {1, 2}) {
-                    const auto s = result.Get(pt, row, col);
-                    ss << std::format(" {:.10g} {:.10g}", s.real(), s.imag());
+                    WriteComplexPair(ss, result.Get(pt, row, col));
                 }
             }
             ss << "\n";
@@ -66,12 +86,11 @@ std::string ExportTouchstone(const SParameterResult &result) {
                 }
                 int pairs_in_line = 0;
                 for (int col = 1; col <= ports; ++col) {
-                    if (pairs_in_line == 4) {
+                    if (pairs_in_line == PAIRS_PER_LINE) {
                         ss << "\n ";
                         pairs_in_line = 0;
                     }
-                    const auto s = result.Get(pt, row, col);
-                    ss << std::format(" {:.10g} {:.10g}", s.real(), s.imag());
+                    WriteComplexPair(ss, result.Get(pt, row, col));
                     ++pairs_in_line;
                 }
                 ss << "\n";

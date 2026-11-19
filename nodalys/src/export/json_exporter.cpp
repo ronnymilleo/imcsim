@@ -26,7 +26,9 @@ void WriteDoubleArray(std::ostringstream &ss, const std::vector<double> &arr) {
     ss << "]";
 }
 
-/// Writes the matrices of ports of every frequency as an array, with null where the circuit has no finite one.
+/**
+ * @brief   Writes the matrices of ports of every frequency as an array, with null where the circuit has no finite one.
+ */
 void WritePortMatrices(std::ostringstream &ss, const std::vector<std::optional<PortMatrix>> &matrices) {
     ss << "[\n";
     for (std::size_t pt = 0; pt < matrices.size(); ++pt) {
@@ -48,7 +50,9 @@ void WritePortMatrices(std::ostringstream &ss, const std::vector<std::optional<P
     ss << "  ]";
 }
 
-/// Writes a text as a JSON string, escaping what JSON does not allow bare.
+/**
+ * @brief   Writes a text as a JSON string, escaping what JSON does not allow bare.
+ */
 void WriteQuoted(std::ostringstream &ss, std::string_view text) {
     ss << '"';
     for (const char ch : text) {
@@ -60,7 +64,9 @@ void WriteQuoted(std::ostringstream &ss, std::string_view text) {
     ss << '"';
 }
 
-/// Writes numbers that may be missing, null where the figure is none.
+/**
+ * @brief   Writes numbers that may be missing, null where the figure is none.
+ */
 void WriteOptionalArray(std::ostringstream &ss, const std::vector<std::optional<double>> &values) {
     ss << "[";
     for (std::size_t i = 0; i < values.size(); ++i) {
@@ -74,11 +80,79 @@ void WriteOptionalArray(std::ostringstream &ss, const std::vector<std::optional<
     ss << "]";
 }
 
-/// Writes the real or the imaginary parts of complex values as an array.
+/**
+ * @brief   Writes the real or the imaginary parts of complex values as an array.
+ */
 void WriteComplexPart(std::ostringstream &ss, const std::vector<std::complex<double>> &values, const bool is_real) {
     ss << "[";
     for (std::size_t i = 0; i < values.size(); ++i) {
         ss << (i > 0 ? ", " : "") << std::format("{:.8g}", is_real ? values[i].real() : values[i].imag());
+    }
+    ss << "]";
+}
+
+/**
+ * @brief   Opens a document: the brace and the name of the analysis, which every result starts with.
+ */
+void BeginDocument(std::ostringstream &ss, const std::string_view analysis) {
+    ss << "{\n  \"analysis\": \"" << analysis << "\",\n";
+}
+
+/**
+ * @brief   Writes the members of an object that hold a series for each node but ground, one per line.
+ * @param[in,out] ss       Stream to write to.
+ * @param[in] indent       Spaces in front of each member.
+ * @param[in] nodes        Series indexed by node, whose first entry is ground and is left out.
+ * @param[in] write_array  Writes one series to the stream.
+ */
+template <typename Series, typename WriteArray>
+void WriteNodeSeries(std::ostringstream &ss,
+                     const std::string_view indent,
+                     const Series &nodes,
+                     const WriteArray &write_array) {
+    for (std::size_t node = 1; node < nodes.size(); ++node) {
+        if (node > 1) {
+            ss << ",\n";
+        }
+        ss << indent << "\"" << node << "\": ";
+        write_array(ss, nodes[node]);
+    }
+}
+
+/**
+ * @brief   Writes the real and imaginary parts, the magnitude and the phase of each phasor of a series as an array.
+ */
+void WritePhasorArray(std::ostringstream &ss, const std::vector<std::complex<double>> &phasors) {
+    constexpr double RAD_TO_DEG = 180.0 / std::numbers::pi;
+    ss << "[";
+    for (std::size_t k = 0; k < phasors.size(); ++k) {
+        if (k > 0) {
+            ss << ", ";
+        }
+        const std::complex<double> &p = phasors[k];
+        const double mag = std::abs(p);
+        const double phase_deg = std::arg(p) * RAD_TO_DEG;
+        ss << "{\"re\": " << std::format("{:.8g}", p.real()) << ", \"im\": " << std::format("{:.8g}", p.imag())
+           << ", \"mag\": " << std::format("{:.8g}", mag) << ", \"phase_deg\": " << std::format("{:.8g}", phase_deg)
+           << "}";
+    }
+    ss << "]";
+}
+
+/**
+ * @brief   Writes the roots of a polynomial, poles or zeros, as an array with the frequency of each in hertz.
+ */
+void WriteRootList(std::ostringstream &ss, const std::vector<std::complex<double>> &roots) {
+    constexpr double TWO_PI = 2.0 * std::numbers::pi;
+    ss << "[";
+    for (std::size_t i = 0; i < roots.size(); ++i) {
+        if (i > 0) {
+            ss << ", ";
+        }
+        const double f_hz = std::abs(roots[i]) / TWO_PI;
+        ss << "{\"real\": " << std::format("{:.8g}", roots[i].real())
+           << ", \"imag\": " << std::format("{:.8g}", roots[i].imag())
+           << ", \"frequency_hz\": " << std::format("{:.8g}", f_hz) << "}";
     }
     ss << "]";
 }
@@ -106,7 +180,8 @@ const char *DescribeParameter(const SensitivityParameter parameter) {
 
 std::string ExportJson(const OperatingPointResult &result) {
     std::ostringstream ss;
-    ss << "{\n  \"analysis\": \"operating_point\",\n  \"node_voltages\": {";
+    BeginDocument(ss, "operating_point");
+    ss << "  \"node_voltages\": {";
     bool first = true;
     for (std::size_t node = 1; node < result.NodeVoltages.size(); ++node) {
         if (!first) {
@@ -130,18 +205,12 @@ std::string ExportJson(const OperatingPointResult &result) {
 
 std::string ExportJson(const TransientResult &result) {
     std::ostringstream ss;
-    ss << "{\n  \"analysis\": \"transient\",\n";
+    BeginDocument(ss, "transient");
     ss << "  \"points\": " << result.Times.size() << ",\n";
     ss << "  \"times\": ";
     WriteDoubleArray(ss, result.Times);
     ss << ",\n  \"node_voltages\": {\n";
-    for (std::size_t node = 1; node < result.NodeVoltages.size(); ++node) {
-        if (node > 1) {
-            ss << ",\n";
-        }
-        ss << "    \"" << node << "\": ";
-        WriteDoubleArray(ss, result.NodeVoltages[node]);
-    }
+    WriteNodeSeries(ss, "    ", result.NodeVoltages, WriteDoubleArray);
     ss << "\n  },\n  \"currents\": {\n";
     for (std::size_t c = 0; c < result.Currents.size(); ++c) {
         if (c > 0) {
@@ -156,7 +225,7 @@ std::string ExportJson(const TransientResult &result) {
 
 std::string ExportJson(const DcSweepResult &result) {
     std::ostringstream ss;
-    ss << "{\n  \"analysis\": \"dc_sweep\",\n";
+    BeginDocument(ss, "dc_sweep");
     ss << "  \"swept_source\": \"" << result.SweptSource << "\",\n";
     ss << "  \"swept_values\": ";
     WriteDoubleArray(ss, result.SweptValues);
@@ -168,13 +237,7 @@ std::string ExportJson(const DcSweepResult &result) {
         const auto &curve = result.Curves[idx];
         ss << "    {\n      \"step_value\": " << std::format("{:.8g}", curve.StepValue) << ",\n";
         ss << "      \"node_voltages\": {\n";
-        for (std::size_t node = 1; node < curve.NodeVoltages.size(); ++node) {
-            if (node > 1) {
-                ss << ",\n";
-            }
-            ss << "        \"" << node << "\": ";
-            WriteDoubleArray(ss, curve.NodeVoltages[node]);
-        }
+        WriteNodeSeries(ss, "        ", curve.NodeVoltages, WriteDoubleArray);
         ss << "\n      }\n    }";
     }
     ss << "\n  ]\n}\n";
@@ -183,32 +246,20 @@ std::string ExportJson(const DcSweepResult &result) {
 
 std::string ExportJson(const AcSweepResult &result) {
     std::ostringstream ss;
-    ss << "{\n  \"analysis\": \"ac_sweep\",\n";
+    BeginDocument(ss, "ac_sweep");
     ss << "  \"frequencies\": ";
     WriteDoubleArray(ss, result.Frequencies);
     ss << ",\n  \"node_magnitudes_db\": {\n";
-    for (std::size_t node = 1; node < result.NodeMagnitudesDecibels.size(); ++node) {
-        if (node > 1) {
-            ss << ",\n";
-        }
-        ss << "    \"" << node << "\": ";
-        WriteDoubleArray(ss, result.NodeMagnitudesDecibels[node]);
-    }
+    WriteNodeSeries(ss, "    ", result.NodeMagnitudesDecibels, WriteDoubleArray);
     ss << "\n  },\n  \"node_phases_deg\": {\n";
-    for (std::size_t node = 1; node < result.NodePhasesDegrees.size(); ++node) {
-        if (node > 1) {
-            ss << ",\n";
-        }
-        ss << "    \"" << node << "\": ";
-        WriteDoubleArray(ss, result.NodePhasesDegrees[node]);
-    }
+    WriteNodeSeries(ss, "    ", result.NodePhasesDegrees, WriteDoubleArray);
     ss << "\n  }\n}\n";
     return ss.str();
 }
 
 std::string ExportJson(const TransferFunctionResult &result) {
     std::ostringstream ss;
-    ss << "{\n  \"analysis\": \"transfer_function\",\n";
+    BeginDocument(ss, "transfer_function");
     ss << "  \"input_source\": \"" << result.InputSource << "\",\n";
     ss << "  \"gain\": " << std::format("{:.8g}", result.Gain) << ",\n";
     ss << "  \"gain_unit\": \"" << result.GainUnit << "\",\n";
@@ -219,7 +270,7 @@ std::string ExportJson(const TransferFunctionResult &result) {
 
 std::string ExportJson(const NoiseResult &result) {
     std::ostringstream ss;
-    ss << "{\n  \"analysis\": \"noise\",\n";
+    BeginDocument(ss, "noise");
     ss << "  \"input_source\": \"" << result.InputSource << "\",\n";
     ss << "  \"output_total\": " << std::format("{:.8g}", result.OutputTotal) << ",\n";
     ss << "  \"input_total\": " << std::format("{:.8g}", result.InputTotal) << ",\n";
@@ -235,7 +286,7 @@ std::string ExportJson(const NoiseResult &result) {
 
 std::string ExportJson(const SParameterResult &result) {
     std::ostringstream ss;
-    ss << "{\n  \"analysis\": \"s_parameters\",\n";
+    BeginDocument(ss, "s_parameters");
     ss << "  \"ports\": " << result.GetPortCount() << ",\n";
     ss << "  \"reference_ohms\": ";
     WriteDoubleArray(ss, result.ReferenceOhms);
@@ -271,35 +322,18 @@ std::string ExportJson(const SParameterResult &result) {
 
 std::string ExportJson(const PoleZeroResult &result) {
     std::ostringstream ss;
-    constexpr double TWO_PI = 2.0 * std::numbers::pi;
-    ss << "{\n  \"analysis\": \"pole_zero\",\n";
-    ss << "  \"poles\": [";
-    for (std::size_t i = 0; i < result.Poles.size(); ++i) {
-        if (i > 0) {
-            ss << ", ";
-        }
-        const double f_hz = std::abs(result.Poles[i]) / TWO_PI;
-        ss << "{\"real\": " << std::format("{:.8g}", result.Poles[i].real())
-           << ", \"imag\": " << std::format("{:.8g}", result.Poles[i].imag())
-           << ", \"frequency_hz\": " << std::format("{:.8g}", f_hz) << "}";
-    }
-    ss << "],\n  \"zeros\": [";
-    for (std::size_t i = 0; i < result.Zeros.size(); ++i) {
-        if (i > 0) {
-            ss << ", ";
-        }
-        const double f_hz = std::abs(result.Zeros[i]) / TWO_PI;
-        ss << "{\"real\": " << std::format("{:.8g}", result.Zeros[i].real())
-           << ", \"imag\": " << std::format("{:.8g}", result.Zeros[i].imag())
-           << ", \"frequency_hz\": " << std::format("{:.8g}", f_hz) << "}";
-    }
-    ss << "]\n}\n";
+    BeginDocument(ss, "pole_zero");
+    ss << "  \"poles\": ";
+    WriteRootList(ss, result.Poles);
+    ss << ",\n  \"zeros\": ";
+    WriteRootList(ss, result.Zeros);
+    ss << "\n}\n";
     return ss.str();
 }
 
 std::string ExportJson(const SensitivityResult &result) {
     std::ostringstream ss;
-    ss << "{\n  \"analysis\": \"sensitivity\",\n";
+    BeginDocument(ss, "sensitivity");
     ss << "  \"output_positive_node\": " << result.OutputPositiveNode << ",\n";
     ss << "  \"output_negative_node\": " << result.OutputNegativeNode << ",\n";
     ss << "  \"vectors\": {\n";
@@ -317,7 +351,7 @@ std::string ExportJson(const SensitivityResult &result) {
 
 std::string ExportJson(const AcSensitivityResult &result) {
     std::ostringstream ss;
-    ss << "{\n  \"analysis\": \"ac_sensitivity\",\n";
+    BeginDocument(ss, "ac_sensitivity");
     ss << "  \"output_positive_node\": " << result.OutputPositiveNode << ",\n";
     ss << "  \"output_negative_node\": " << result.OutputNegativeNode << ",\n";
     ss << "  \"input_source\": ";
@@ -355,57 +389,22 @@ std::string ExportJson(const AcSensitivityResult &result) {
 
 std::string ExportJson(const HarmonicBalanceResult &result) {
     std::ostringstream ss;
-    constexpr double RAD_TO_DEG = 180.0 / std::numbers::pi;
-
-    auto write_escaped = [&](std::string_view text) {
-        ss << '"';
-        for (const char ch : text) {
-            if (ch == '"' || ch == '\\') {
-                ss << '\\';
-            }
-            ss << ch;
-        }
-        ss << '"';
-    };
-
-    auto write_phasor_array = [&](const std::vector<std::complex<double>> &phasors) {
-        ss << "[";
-        for (std::size_t k = 0; k < phasors.size(); ++k) {
-            if (k > 0) {
-                ss << ", ";
-            }
-            const auto &p = phasors[k];
-            const double mag = std::abs(p);
-            const double phase_deg = std::arg(p) * RAD_TO_DEG;
-            ss << "{\"re\": " << std::format("{:.8g}", p.real()) << ", \"im\": " << std::format("{:.8g}", p.imag())
-               << ", \"mag\": " << std::format("{:.8g}", mag) << ", \"phase_deg\": " << std::format("{:.8g}", phase_deg)
-               << "}";
-        }
-        ss << "]";
-    };
-
-    ss << "{\n  \"analysis\": \"harmonic_balance\",\n";
+    BeginDocument(ss, "harmonic_balance");
     ss << "  \"iterations\": " << result.Iterations << ",\n";
     ss << "  \"strategy\": ";
-    write_escaped(result.Strategy);
+    WriteQuoted(ss, result.Strategy);
     ss << ",\n  \"warnings\": [";
     for (std::size_t i = 0; i < result.Warnings.size(); ++i) {
         if (i > 0) {
             ss << ", ";
         }
-        write_escaped(result.Warnings[i]);
+        WriteQuoted(ss, result.Warnings[i]);
     }
     ss << "],\n  \"frequencies\": ";
     WriteDoubleArray(ss, result.Frequencies);
 
     ss << ",\n  \"node_phasors\": {\n";
-    for (std::size_t node = 1; node < result.NodePhasors.size(); ++node) {
-        if (node > 1) {
-            ss << ",\n";
-        }
-        ss << "    \"" << node << "\": ";
-        write_phasor_array(result.NodePhasors[node]);
-    }
+    WriteNodeSeries(ss, "    ", result.NodePhasors, WritePhasorArray);
 
     ss << "\n  },\n  \"current_phasors\": {\n";
     for (std::size_t c = 0; c < result.CurrentPhasors.size(); ++c) {
@@ -413,9 +412,9 @@ std::string ExportJson(const HarmonicBalanceResult &result) {
             ss << ",\n";
         }
         ss << "    ";
-        write_escaped(result.CurrentPhasors[c].Name);
+        WriteQuoted(ss, result.CurrentPhasors[c].Name);
         ss << ": ";
-        write_phasor_array(result.CurrentPhasors[c].Phasors);
+        WritePhasorArray(ss, result.CurrentPhasors[c].Phasors);
     }
 
     ss << "\n  },\n  \"thd_percent\": {\n";
@@ -439,13 +438,7 @@ std::string ExportJson(const HarmonicBalanceResult &result) {
     WriteDoubleArray(ss, result.Times);
 
     ss << ",\n  \"node_waveforms\": {\n";
-    for (std::size_t node = 1; node < result.NodeWaveforms.size(); ++node) {
-        if (node > 1) {
-            ss << ",\n";
-        }
-        ss << "    \"" << node << "\": ";
-        WriteDoubleArray(ss, result.NodeWaveforms[node]);
-    }
+    WriteNodeSeries(ss, "    ", result.NodeWaveforms, WriteDoubleArray);
 
     ss << "\n  },\n  \"current_waveforms\": {\n";
     for (std::size_t c = 0; c < result.CurrentWaveforms.size(); ++c) {
@@ -453,7 +446,7 @@ std::string ExportJson(const HarmonicBalanceResult &result) {
             ss << ",\n";
         }
         ss << "    ";
-        write_escaped(result.CurrentWaveforms[c].Name);
+        WriteQuoted(ss, result.CurrentWaveforms[c].Name);
         ss << ": ";
         WriteDoubleArray(ss, result.CurrentWaveforms[c].Values);
     }

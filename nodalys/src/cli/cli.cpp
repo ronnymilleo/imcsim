@@ -11,10 +11,10 @@
 
 #include <CLI/CLI.hpp>
 #include <algorithm>
-
+#include <array>
 #include <chrono>
 #include <cstdlib>
-#include <filesystem>
+#include <expected>
 #include <format>
 #include <fstream>
 #include <istream>
@@ -23,6 +23,7 @@
 #include <ostream>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <variant>
 #include <vector>
 
@@ -30,40 +31,85 @@ namespace Nodalys {
 
 namespace {
 
-/// Whether an analysis of the netlist is the one that `--analysis` names.
-bool IsOverrideMatch(const std::string &name, const AnalysisKind kind) {
-    if (name == "op") {
-        return kind == AnalysisKind::OPERATING_POINT;
+/// A name that `--analysis` accepts and the kind of directive it picks in the netlist.
+struct AnalysisChoice {
+    std::string_view Name;
+    AnalysisKind Kind;
+};
+
+/// The names of `--analysis`; a sensitivity has two forms, so its name picks both kinds.
+constexpr auto ANALYSIS_CHOICES = std::to_array<AnalysisChoice>({
+    {"op", AnalysisKind::OPERATING_POINT},
+    {"tran", AnalysisKind::TRANSIENT},
+    {"dc", AnalysisKind::DC_SWEEP},
+    {"ac", AnalysisKind::AC_SWEEP},
+    {"tf", AnalysisKind::TRANSFER_FUNCTION},
+    {"noise", AnalysisKind::NOISE},
+    {"sp", AnalysisKind::S_PARAMETERS},
+    {"pz", AnalysisKind::POLE_ZERO},
+    {"sens", AnalysisKind::SENSITIVITY},
+    {"sens", AnalysisKind::AC_SENSITIVITY},
+    {"hb", AnalysisKind::HARMONIC_BALANCE},
+});
+
+/// Time step of the transient that `--analysis tran` synthesizes when the netlist has none.
+constexpr double DEFAULT_TIME_STEP_S = 1e-6;
+/// Stop time of the transient that `--analysis tran` synthesizes when the netlist has none.
+constexpr double DEFAULT_STOP_TIME_S = 1e-3;
+
+/// What the command line asks for.
+struct CliOptions {
+    std::string InputFile;
+    std::string OutputFile;
+    std::string Format = "raw";
+    std::string AnalysisOverride;
+    bool IsBatchMode = false;
+    bool IsVerbose = false;
+    std::optional<double> StepOverride;
+    std::optional<double> StopOverride;
+    std::optional<double> GminOverride;
+    std::optional<double> RelTolOverride;
+    std::optional<double> AbsTolOverride;
+    std::optional<double> VnTolOverride;
+    std::optional<int> MaxIterationsOverride;
+};
+
+/// What the steps of one run share: the options, the streams and the solver messages collected on the way.
+struct CliSession {
+    CliOptions Options;
+    std::ostream &Output;
+    std::ostream &Errors;
+    std::vector<DiagnosticMessage> Diagnostics;
+
+    /**
+     * @brief   Tells whether the progress text is wanted: verbose, and not batch mode.
+     */
+    bool IsChatty() const { return Options.IsVerbose && !Options.IsBatchMode; }
+
+    /**
+     * @brief   Writes a progress line when the run is chatty.
+     * @param[in] text  Text to write, with its line break.
+     */
+    void Say(const std::string_view text) const {
+        if (IsChatty()) {
+            Output << text;
+        }
     }
-    if (name == "tran") {
-        return kind == AnalysisKind::TRANSIENT;
-    }
-    if (name == "dc") {
-        return kind == AnalysisKind::DC_SWEEP;
-    }
-    if (name == "ac") {
-        return kind == AnalysisKind::AC_SWEEP;
-    }
-    if (name == "tf") {
-        return kind == AnalysisKind::TRANSFER_FUNCTION;
-    }
-    if (name == "noise") {
-        return kind == AnalysisKind::NOISE;
-    }
-    if (name == "sp") {
-        return kind == AnalysisKind::S_PARAMETERS;
-    }
-    if (name == "pz") {
-        return kind == AnalysisKind::POLE_ZERO;
-    }
-    if (name == "sens") {
-        // Both forms of .sens
-        return kind == AnalysisKind::SENSITIVITY || kind == AnalysisKind::AC_SENSITIVITY;
-    }
-    if (name == "hb") {
-        return kind == AnalysisKind::HARMONIC_BALANCE;
-    }
-    return false;
+
+    /**
+     * @brief   Gives the list the solver writes its messages to.
+     * @return  The list when verbose, or null when the messages are not wanted.
+     */
+    std::vector<DiagnosticMessage> *GetDiagnosticsSink() { return Options.IsVerbose ? &Diagnostics : nullptr; }
+};
+
+/**
+ * @brief   Tells whether a directive of the netlist is the one that `--analysis` names.
+ */
+bool IsOverrideMatch(const std::string_view name, const AnalysisKind kind) {
+    return std::ranges::any_of(ANALYSIS_CHOICES, [&](const AnalysisChoice &choice) {
+        return choice.Name == name && choice.Kind == kind;
+    });
 }
 
 std::optional<std::string> ReadFileContent(const std::string &path, std::istream &input) {
@@ -81,6 +127,406 @@ std::optional<std::string> ReadFileContent(const std::string &path, std::istream
     return ss.str();
 }
 
+/**
+ * @brief   Declares the options of the command line and reads them from the arguments.
+ * @param[in] argc          Number of arguments, the program name included.
+ * @param[in] argv          Arguments, the program name first.
+ * @param[out] options      The values read.
+ * @param[in,out] output    Stream of the help and version text.
+ * @param[in,out] errors    Stream of the parse errors.
+ * @return  The exit code when the run ends here, because the arguments are wrong or the help or the version was asked
+ *          for; empty when the run goes on.
+ */
+[[nodiscard]] std::optional<int>
+ParseOptions(const int argc, const char *const *argv, CliOptions &options, std::ostream &output, std::ostream &errors) {
+    CLI::App app{"Nodalys - Autonomous SPICE Circuit Simulator\n"
+                 "High-performance autonomous MNA simulation engine with zero external dependencies."};
+
+    // Command-line arguments
+    app.add_option("netlist", options.InputFile, "Path to SPICE netlist file (.cir, .sp, .net) or '-' for stdin");
+    app.add_flag("-b,--batch", options.IsBatchMode, "Run in batch mode (suppress interactive messages)");
+    app.add_option("-o,--output", options.OutputFile, "Destination output file (default: stdout)");
+    app.add_option("-f,--format",
+                   options.Format,
+                   "Output format: raw (Nutmeg ASCII), csv, json, touchstone (default: raw)")
+        ->check(CLI::IsMember({"raw", "raw-ascii", "csv", "json", "touchstone", "s2p"}, CLI::ignore_case));
+    app.add_option("-a,--analysis",
+                   options.AnalysisOverride,
+                   "Override analysis: op, tran, dc, ac, tf, noise, sp, pz, sens (DC and AC), hb")
+        ->check(CLI::IsMember({"op", "tran", "dc", "ac", "tf", "noise", "sp", "pz", "sens", "hb"}, CLI::ignore_case));
+    app.add_option("-s,--step", options.StepOverride, "Override transient step time / sweep step");
+    app.add_option("-t,--stop", options.StopOverride, "Override transient stop time");
+
+    // Solver tolerance options
+    app.add_option("--gmin", options.GminOverride, "Minimum conductance to ground in Siemens (default: 1e-12)");
+    app.add_option("--reltol", options.RelTolOverride, "Relative tolerance for Newton-Raphson (default: 1e-3)");
+    app.add_option("--abstol", options.AbsTolOverride, "Absolute current tolerance in Amperes (default: 1e-12)");
+    app.add_option("--vntol", options.VnTolOverride, "Absolute voltage tolerance in Volts (default: 1e-6)");
+    app.add_option("--maxiter",
+                   options.MaxIterationsOverride,
+                   "Maximum Newton-Raphson iterations per step (default: 100)");
+
+    app.add_flag("-v,--verbose", options.IsVerbose, "Enable verbose output (solver diagnostics and timings)");
+    app.set_version_flag("--version",
+                         std::format("nodalys {} (imcsim engine, standalone SPICE simulator)", NODALYS_VERSION_STRING));
+
+    try {
+        app.parse(argc, argv);
+    } catch (const CLI::ParseError &error) {
+        // CLI11 reports a parse failure, and a request for the help or the version, by throwing
+        return app.exit(error, output, errors);
+    }
+    return std::nullopt;
+}
+
+/**
+ * @brief   Reads the text of the netlist from its file, or from the input stream when the path is "-".
+ * @param[in,out] session  Run that names the netlist and receives the error message.
+ * @param[in,out] input    Stream read when the path is "-".
+ * @return  The text, or empty after writing the error message when no netlist is named or it cannot be opened.
+ */
+[[nodiscard]] std::optional<std::string> LoadNetlistText(CliSession &session, std::istream &input) {
+    if (session.Options.InputFile.empty()) {
+        session.Errors << "Error: No input netlist specified. Run 'nodalys --help' for usage.\n";
+        return std::nullopt;
+    }
+
+    std::optional<std::string> content = ReadFileContent(session.Options.InputFile, input);
+    if (!content) {
+        session.Errors << std::format("Error: Cannot open netlist file '{}'\n", session.Options.InputFile);
+    }
+    return content;
+}
+
+/**
+ * @brief   Parses the text of the netlist and reports the time it took when the run is chatty.
+ * @param[in,out] session  Run that receives the progress text and the error message.
+ * @param[in] text         Text of the netlist.
+ * @return  The parsed netlist, or empty after writing the error message when the text does not parse.
+ */
+[[nodiscard]] std::optional<ParsedNetlist> ParseNetlistText(CliSession &session, const std::string_view text) {
+    session.Say(std::format("Nodalys Engine v{}\n", NODALYS_VERSION_STRING));
+    session.Say(
+        std::format("Parsing netlist: {}\n", session.Options.InputFile == "-" ? "<stdin>" : session.Options.InputFile));
+
+    const auto parse_start = std::chrono::steady_clock::now();
+    std::expected<ParsedNetlist, std::string> parsed = Nodalys::ParseNetlist(text);
+    const auto parse_end = std::chrono::steady_clock::now();
+
+    if (!parsed) {
+        session.Errors << std::format("Parse Error: {}\n", parsed.error());
+        return std::nullopt;
+    }
+
+    const auto parse_ms = std::chrono::duration<double, std::milli>(parse_end - parse_start).count();
+    session.Say(std::format("Netlist parsed in {:.2f} ms: {} nodes, {} MNA unknowns\n",
+                            parse_ms,
+                            parsed->CircuitInstance.GetNodeCount(),
+                            parsed->CircuitInstance.GetUnknownCount()));
+    return std::move(*parsed);
+}
+
+/**
+ * @brief   Replaces the solver options the command line gives.
+ * @param[in] options     Overrides of the command line.
+ * @param[in,out] solver  Options of the netlist, changed where an override is given.
+ */
+void ApplyToleranceOverrides(const CliOptions &options, ConvergenceOptions &solver) {
+    if (options.GminOverride) {
+        solver.Gmin = *options.GminOverride;
+    }
+    if (options.RelTolOverride) {
+        solver.RelTol = *options.RelTolOverride;
+    }
+    if (options.AbsTolOverride) {
+        solver.CurrentAbsTol = *options.AbsTolOverride;
+    }
+    if (options.VnTolOverride) {
+        solver.VoltageAbsTol = *options.VnTolOverride;
+    }
+    if (options.MaxIterationsOverride) {
+        solver.MaxIterations = *options.MaxIterationsOverride;
+    }
+}
+
+/**
+ * @brief   Builds the analysis that `--analysis` asks for when the netlist has no directive of that kind.
+ * @param[in] name     Name given to `--analysis`, in lower case.
+ * @param[in] options  Overrides of the command line, read for the transient.
+ * @return  The analysis with its default settings, or empty for the names that need settings of their own (dc, ac,
+ *          tf and noise), which leaves the run to the operating point.
+ */
+std::optional<ParsedAnalysis> MakeDefaultAnalysis(const std::string_view name, const CliOptions &options) {
+    if (name == "op") {
+        return ParsedAnalysis{AnalysisKind::OPERATING_POINT, std::monostate{}};
+    }
+    if (name == "tran") {
+        TransientConfig config;
+        config.TimeStep = options.StepOverride.value_or(DEFAULT_TIME_STEP_S);
+        config.StopTime = options.StopOverride.value_or(DEFAULT_STOP_TIME_S);
+        config.MaxStep = config.TimeStep;
+        return ParsedAnalysis{AnalysisKind::TRANSIENT, config};
+    }
+    if (name == "sp") {
+        return ParsedAnalysis{AnalysisKind::S_PARAMETERS, SParameterConfig{}};
+    }
+    if (name == "pz") {
+        return ParsedAnalysis{AnalysisKind::POLE_ZERO, PoleZeroConfig{}};
+    }
+    if (name == "sens") {
+        return ParsedAnalysis{AnalysisKind::SENSITIVITY, SensitivityConfig{}};
+    }
+    if (name == "hb") {
+        return ParsedAnalysis{AnalysisKind::HARMONIC_BALANCE, HarmonicBalanceConfig{}};
+    }
+    return std::nullopt;
+}
+
+/**
+ * @brief   Chooses the analyses to run: the ones the netlist asks for, narrowed by `--analysis`, or the operating
+ *          point when there are none.
+ * @param[in] options        Overrides of the command line.
+ * @param[in,out] analyses   Directives of the netlist, replaced by the ones to run.
+ */
+void SelectAnalyses(const CliOptions &options, std::vector<ParsedAnalysis> &analyses) {
+    if (!options.AnalysisOverride.empty()) {
+        const std::string name = ToLower(options.AnalysisOverride);
+        const auto is_match = [&](const ParsedAnalysis &analysis) { return IsOverrideMatch(name, analysis.Kind); };
+
+        if (std::ranges::any_of(analyses, is_match)) {
+            std::vector<ParsedAnalysis> matches;
+            std::ranges::copy_if(analyses, std::back_inserter(matches), is_match);
+            // Only a sensitivity keeps every match, since a netlist may ask for both of its forms
+            if (name != "sens") {
+                matches.resize(1);
+            }
+            analyses = std::move(matches);
+        } else {
+            analyses.clear();
+            if (const std::optional<ParsedAnalysis> analysis = MakeDefaultAnalysis(name, options)) {
+                analyses.push_back(*analysis);
+            }
+        }
+    }
+
+    if (analyses.empty()) {
+        analyses.push_back({AnalysisKind::OPERATING_POINT, std::monostate{}});
+    }
+}
+
+/**
+ * @brief   Wraps the result of one analysis as a result of any analysis.
+ */
+template <typename Result>
+std::expected<SimulationResult, std::string> ToSimulationResult(std::expected<Result, std::string> result) {
+    if (!result) {
+        return std::unexpected(std::move(result.error()));
+    }
+    return SimulationResult{std::move(*result)};
+}
+
+/**
+ * @brief   Runs one analysis, after saying what it is when the run is chatty.
+ * @param[in,out] session   Run that receives the progress text and the solver messages.
+ * @param[in] parsed        Circuit and solver options of the netlist.
+ * @param[in,out] analysis  Analysis to run; a transient takes the step and stop time of the command line.
+ * @return  The result, or the message of the failure.
+ */
+std::expected<SimulationResult, std::string>
+RunAnalysis(CliSession &session, const ParsedNetlist &parsed, ParsedAnalysis &analysis) {
+    const Circuit &circuit = parsed.CircuitInstance;
+    const ConvergenceOptions &solver = parsed.Options;
+    std::vector<DiagnosticMessage> *diagnostics = session.GetDiagnosticsSink();
+
+    switch (analysis.Kind) {
+    case AnalysisKind::OPERATING_POINT:
+        session.Say("Running Operating Point (.op) analysis...\n");
+        return ToSimulationResult(ComputeOperatingPoint(circuit, solver, diagnostics));
+
+    case AnalysisKind::TRANSIENT: {
+        auto &config = std::get<TransientConfig>(analysis.Config);
+        if (session.Options.StepOverride) {
+            config.TimeStep = *session.Options.StepOverride;
+        }
+        if (session.Options.StopOverride) {
+            config.StopTime = *session.Options.StopOverride;
+        }
+        if (config.MaxStep <= 0.0) {
+            config.MaxStep = config.TimeStep;
+        }
+        session.Say(
+            std::format("Running Transient (.tran) analysis: tstep={}, tstop={}\n", config.TimeStep, config.StopTime));
+        return ToSimulationResult(
+            ComputeTransient(circuit, config, config.UseInitialConditions, {}, solver, diagnostics));
+    }
+
+    case AnalysisKind::DC_SWEEP: {
+        const auto &config = std::get<DcSweepConfig>(analysis.Config);
+        session.Say(std::format("Running DC Sweep (.dc) analysis on source {}\n", config.SweptSource));
+        return ToSimulationResult(ComputeDCSweep(circuit, config, solver, diagnostics));
+    }
+
+    case AnalysisKind::AC_SWEEP: {
+        const auto &config = std::get<AcSweepConfig>(analysis.Config);
+        session.Say(std::format("Running AC Sweep (.ac) analysis: {} Hz to {} Hz\n",
+                                config.StartFrequency,
+                                config.StopFrequency));
+        return ToSimulationResult(ComputeACSweep(circuit, config, solver, diagnostics));
+    }
+
+    case AnalysisKind::TRANSFER_FUNCTION: {
+        const auto &config = std::get<TransferFunctionConfig>(analysis.Config);
+        session.Say(std::format("Running Transfer Function (.tf) analysis for source {}\n", config.InputSource));
+        return ToSimulationResult(ComputeTransferFunction(circuit, config, solver, diagnostics));
+    }
+
+    case AnalysisKind::NOISE: {
+        const auto &config = std::get<NoiseConfig>(analysis.Config);
+        session.Say(std::format("Running Noise (.noise) analysis for source {}\n", config.InputSource));
+        return ToSimulationResult(ComputeNoise(circuit, config, solver, diagnostics));
+    }
+
+    case AnalysisKind::S_PARAMETERS: {
+        const auto &config = std::get<SParameterConfig>(analysis.Config);
+        session.Say(std::format("Running S-Parameter (.sp) analysis: {} Hz to {} Hz\n",
+                                config.StartFrequency,
+                                config.StopFrequency));
+        return ToSimulationResult(ComputeSParameters(circuit, config, solver, diagnostics));
+    }
+
+    case AnalysisKind::POLE_ZERO: {
+        const auto &config = std::get<PoleZeroConfig>(analysis.Config);
+        session.Say(std::format("Running Pole-Zero (.pz) analysis: output={}, input={}\n",
+                                config.OutputNode,
+                                config.InputSource));
+        return ToSimulationResult(ComputePoleZero(circuit, config, solver, diagnostics));
+    }
+
+    case AnalysisKind::SENSITIVITY: {
+        const auto &config = std::get<SensitivityConfig>(analysis.Config);
+        session.Say(std::format("Running DC Sensitivity (.sens) analysis: pos={}, neg={}\n",
+                                config.OutputPositiveNode,
+                                config.OutputNegativeNode));
+        return ToSimulationResult(ComputeSensitivity(circuit, config, solver, diagnostics));
+    }
+
+    case AnalysisKind::AC_SENSITIVITY: {
+        const auto &config = std::get<AcSensitivityConfig>(analysis.Config);
+        session.Say(std::format("Running AC Sensitivity (.sens ... ac) analysis: pos={}, neg={}, input={}\n",
+                                config.OutputPositiveNode,
+                                config.OutputNegativeNode,
+                                config.InputSource));
+        return ToSimulationResult(ComputeAcSensitivity(circuit, config, solver, diagnostics));
+    }
+
+    case AnalysisKind::HARMONIC_BALANCE: {
+        const auto &config = std::get<HarmonicBalanceConfig>(analysis.Config);
+        session.Say(std::format("Running Harmonic Balance (.hb) analysis: f0={} Hz, H={}\n",
+                                config.FundamentalFrequency,
+                                config.Harmonics));
+        return ToSimulationResult(ComputeHarmonicBalance(circuit, config, solver, diagnostics));
+    }
+
+    default:
+        return std::unexpected("Unknown analysis kind");
+    }
+}
+
+/**
+ * @brief   Writes a result in the format the command line asks for.
+ * @param[in] result  Result of one analysis.
+ * @param[in] format  Format named by `--format`, in lower case.
+ * @param[in] title   Title of the raw file.
+ * @return  The text of the result; a touchstone file of a result that has no S-parameters falls back to CSV.
+ */
+std::string ExportResult(const SimulationResult &result, const std::string_view format, const std::string_view title) {
+    if (format == "csv") {
+        return Nodalys::ExportCsv(result);
+    }
+    if (format == "json") {
+        return Nodalys::ExportJson(result);
+    }
+    if (format == "touchstone" || format == "s2p") {
+        if (const auto *s_parameters = std::get_if<SParameterResult>(&result)) {
+            return Nodalys::ExportTouchstone(*s_parameters);
+        }
+        return Nodalys::ExportCsv(result);
+    }
+    // raw or raw-ascii
+    return Nodalys::ExportRaw(result, title);
+}
+
+/**
+ * @brief   Names the simulation in the title of the raw file: the title of the netlist, or else its file.
+ */
+std::string ChooseTitle(const ParsedNetlist &parsed, const std::string_view input_file) {
+    if (!parsed.Title.empty()) {
+        return parsed.Title;
+    }
+    return input_file == "-" ? "Simulation" : std::string(input_file);
+}
+
+/**
+ * @brief   Runs every selected analysis and writes each result in the chosen format.
+ * @param[in,out] session  Run that receives the progress text, the error message and the solver messages.
+ * @param[in,out] parsed   Netlist whose analyses are run.
+ * @return  The results of all analyses one after the other, or empty after writing the error message when an
+ *          analysis fails.
+ */
+[[nodiscard]] std::optional<std::string> RunAnalyses(CliSession &session, ParsedNetlist &parsed) {
+    const std::string format = ToLower(session.Options.Format);
+    const std::string title = ChooseTitle(parsed, session.Options.InputFile);
+    std::string exported;
+
+    for (ParsedAnalysis &analysis : parsed.Analyses) {
+        const auto start = std::chrono::steady_clock::now();
+        const std::expected<SimulationResult, std::string> result = RunAnalysis(session, parsed, analysis);
+        if (!result) {
+            session.Errors << std::format("Simulation Error: {}\n", result.error());
+            return std::nullopt;
+        }
+
+        const auto end = std::chrono::steady_clock::now();
+        const auto elapsed_ms = std::chrono::duration<double, std::milli>(end - start).count();
+        session.Say(std::format("Analysis completed in {:.2f} ms\n", elapsed_ms));
+
+        exported.append(ExportResult(*result, format, title));
+    }
+    return exported;
+}
+
+/**
+ * @brief   Lists the messages of the solver when the run is verbose.
+ */
+void ReportDiagnostics(const CliSession &session) {
+    if (!session.Options.IsVerbose || session.Diagnostics.empty()) {
+        return;
+    }
+    session.Output << "\nDiagnostic Messages:\n";
+    for (const DiagnosticMessage &diagnostic : session.Diagnostics) {
+        session.Output << "  - " << diagnostic.Text << "\n";
+    }
+}
+
+/**
+ * @brief   Writes the exported text to the output file, or to the output stream when no file is named.
+ * @param[in,out] session  Run that names the file and receives the output and the error message.
+ * @param[in] exported     Text to write.
+ * @return  EXIT_SUCCESS, or EXIT_FAILURE when the file cannot be written.
+ */
+int WriteOutput(const CliSession &session, const std::string_view exported) {
+    if (session.Options.OutputFile.empty()) {
+        session.Output << exported;
+        return EXIT_SUCCESS;
+    }
+    if (!Nodalys::SaveStringToFile(session.Options.OutputFile, exported)) {
+        session.Errors << std::format("Error: Failed to write output file '{}'\n", session.Options.OutputFile);
+        return EXIT_FAILURE;
+    }
+    session.Say(std::format("Simulation output written to '{}'\n", session.Options.OutputFile));
+    return EXIT_SUCCESS;
+}
+
 } // namespace
 
 /**
@@ -94,413 +540,31 @@ std::optional<std::string> ReadFileContent(const std::string &path, std::istream
  *          or the version succeeds.
  */
 int RunCli(const int argc, const char *const *argv, std::istream &input, std::ostream &output, std::ostream &errors) {
-    CLI::App app{"Nodalys - Autonomous SPICE Circuit Simulator\n"
-                 "High-performance autonomous MNA simulation engine with zero external dependencies."};
-
-    std::string input_file;
-    std::string output_file;
-    std::string format_str = "raw";
-    std::string analysis_override;
-    bool batch_mode = false;
-    bool verbose = false;
-
-    std::optional<double> step_override;
-    std::optional<double> stop_override;
-    std::optional<double> gmin_override;
-    std::optional<double> reltol_override;
-    std::optional<double> abstol_override;
-    std::optional<double> vntol_override;
-    std::optional<int> maxiter_override;
-
-    // Command-line arguments
-    app.add_option("netlist", input_file, "Path to SPICE netlist file (.cir, .sp, .net) or '-' for stdin");
-    app.add_flag("-b,--batch", batch_mode, "Run in batch mode (suppress interactive messages)");
-    app.add_option("-o,--output", output_file, "Destination output file (default: stdout)");
-    app.add_option("-f,--format", format_str, "Output format: raw (Nutmeg ASCII), csv, json, touchstone (default: raw)")
-        ->check(CLI::IsMember({"raw", "raw-ascii", "csv", "json", "touchstone", "s2p"}, CLI::ignore_case));
-    app.add_option("-a,--analysis",
-                   analysis_override,
-                   "Override analysis: op, tran, dc, ac, tf, noise, sp, pz, sens (DC and AC), hb")
-        ->check(CLI::IsMember({"op", "tran", "dc", "ac", "tf", "noise", "sp", "pz", "sens", "hb"}, CLI::ignore_case));
-    app.add_option("-s,--step", step_override, "Override transient step time / sweep step");
-    app.add_option("-t,--stop", stop_override, "Override transient stop time");
-
-    // Solver tolerance options
-    app.add_option("--gmin", gmin_override, "Minimum conductance to ground in Siemens (default: 1e-12)");
-    app.add_option("--reltol", reltol_override, "Relative tolerance for Newton-Raphson (default: 1e-3)");
-    app.add_option("--abstol", abstol_override, "Absolute current tolerance in Amperes (default: 1e-12)");
-    app.add_option("--vntol", vntol_override, "Absolute voltage tolerance in Volts (default: 1e-6)");
-    app.add_option("--maxiter", maxiter_override, "Maximum Newton-Raphson iterations per step (default: 100)");
-
-    app.add_flag("-v,--verbose", verbose, "Enable verbose output (solver diagnostics and timings)");
-    app.set_version_flag("--version",
-                         std::format("nodalys {} (imcsim engine, standalone SPICE simulator)", NODALYS_VERSION_STRING));
-
-    try {
-        app.parse(argc, argv);
-    } catch (const CLI::ParseError &error) {
-        // CLI11 reports a parse failure, and a request for the help or the version, by throwing
-        return app.exit(error, output, errors);
+    CliOptions options;
+    if (const std::optional<int> exit_code = ParseOptions(argc, argv, options, output, errors)) {
+        return *exit_code;
     }
+    CliSession session{.Options = std::move(options), .Output = output, .Errors = errors, .Diagnostics = {}};
 
-    if (input_file.empty()) {
-        errors << "Error: No input netlist specified. Run 'nodalys --help' for usage.\n";
+    const std::optional<std::string> text = LoadNetlistText(session, input);
+    if (!text) {
+        return EXIT_FAILURE;
+    }
+    std::optional<ParsedNetlist> parsed = ParseNetlistText(session, *text);
+    if (!parsed) {
         return EXIT_FAILURE;
     }
 
-    const auto content_opt = ReadFileContent(input_file, input);
-    if (!content_opt) {
-        errors << std::format("Error: Cannot open netlist file '{}'\n", input_file);
+    ApplyToleranceOverrides(session.Options, parsed->Options);
+    SelectAnalyses(session.Options, parsed->Analyses);
+
+    const std::optional<std::string> exported = RunAnalyses(session, *parsed);
+    if (!exported) {
         return EXIT_FAILURE;
     }
 
-    if (verbose && !batch_mode) {
-        output << std::format("Nodalys Engine v{}\n", NODALYS_VERSION_STRING);
-        output << std::format("Parsing netlist: {}\n", input_file == "-" ? "<stdin>" : input_file);
-    }
-
-    const auto parse_start = std::chrono::steady_clock::now();
-    auto parsed_res = Nodalys::ParseNetlist(*content_opt);
-    const auto parse_end = std::chrono::steady_clock::now();
-
-    if (!parsed_res) {
-        errors << std::format("Parse Error: {}\n", parsed_res.error());
-        return EXIT_FAILURE;
-    }
-
-    auto parsed = std::move(*parsed_res);
-
-    if (verbose && !batch_mode) {
-        const auto parse_ms = std::chrono::duration<double, std::milli>(parse_end - parse_start).count();
-        output << std::format("Netlist parsed in {:.2f} ms: {} nodes, {} MNA unknowns\n",
-                              parse_ms,
-                              parsed.CircuitInstance.GetNodeCount(),
-                              parsed.CircuitInstance.GetUnknownCount());
-    }
-
-    // Apply tolerance overrides if provided
-    if (gmin_override) {
-        parsed.Options.Gmin = *gmin_override;
-    }
-    if (reltol_override) {
-        parsed.Options.RelTol = *reltol_override;
-    }
-    if (abstol_override) {
-        parsed.Options.CurrentAbsTol = *abstol_override;
-    }
-    if (vntol_override) {
-        parsed.Options.VoltageAbsTol = *vntol_override;
-    }
-    if (maxiter_override) {
-        parsed.Options.MaxIterations = *maxiter_override;
-    }
-
-    // Apply analysis overrides
-    if (!analysis_override.empty()) {
-        const std::string a_lower = ToLower(analysis_override);
-        const auto it =
-            std::ranges::find_if(parsed.Analyses, [&](const auto &an) { return IsOverrideMatch(a_lower, an.Kind); });
-
-        if (it != parsed.Analyses.end()) {
-            std::vector<Nodalys::ParsedAnalysis> matches;
-            std::ranges::copy_if(parsed.Analyses, std::back_inserter(matches), [&](const auto &an) {
-                return IsOverrideMatch(a_lower, an.Kind);
-            });
-            // Only a sensitivity keeps every match, since a netlist may ask for both of its forms
-            if (a_lower != "sens") {
-                matches.resize(1);
-            }
-            parsed.Analyses = std::move(matches);
-        } else {
-            parsed.Analyses.clear();
-            if (a_lower == "op") {
-                parsed.Analyses.push_back({Nodalys::AnalysisKind::OPERATING_POINT, std::monostate{}});
-            } else if (a_lower == "tran") {
-                Nodalys::TransientConfig cfg;
-                cfg.TimeStep = step_override.value_or(1e-6);
-                cfg.StopTime = stop_override.value_or(1e-3);
-                cfg.MaxStep = cfg.TimeStep;
-                parsed.Analyses.push_back({Nodalys::AnalysisKind::TRANSIENT, cfg});
-            } else if (a_lower == "sp") {
-                parsed.Analyses.push_back({Nodalys::AnalysisKind::S_PARAMETERS, Nodalys::SParameterConfig{}});
-            } else if (a_lower == "pz") {
-                parsed.Analyses.push_back({Nodalys::AnalysisKind::POLE_ZERO, Nodalys::PoleZeroConfig{}});
-            } else if (a_lower == "sens") {
-                parsed.Analyses.push_back({Nodalys::AnalysisKind::SENSITIVITY, Nodalys::SensitivityConfig{}});
-            } else if (a_lower == "hb") {
-                parsed.Analyses.push_back({Nodalys::AnalysisKind::HARMONIC_BALANCE, Nodalys::HarmonicBalanceConfig{}});
-            }
-        }
-    }
-
-    if (parsed.Analyses.empty()) {
-        parsed.Analyses.push_back({Nodalys::AnalysisKind::OPERATING_POINT, std::monostate{}});
-    }
-
-    std::vector<Nodalys::DiagnosticMessage> diagnostics;
-    std::string all_exported_output;
-
-    const std::string fmt_lower = ToLower(format_str);
-    const std::string sim_title = parsed.Title.empty() ? (input_file == "-" ? "Simulation" : input_file) : parsed.Title;
-
-    for (std::size_t a_idx = 0; a_idx < parsed.Analyses.size(); ++a_idx) {
-        auto &analysis = parsed.Analyses[a_idx];
-        const auto sim_start = std::chrono::steady_clock::now();
-
-        Nodalys::SimulationResult sim_result;
-
-        switch (analysis.Kind) {
-        case Nodalys::AnalysisKind::OPERATING_POINT: {
-            if (verbose && !batch_mode) {
-                output << "Running Operating Point (.op) analysis...\n";
-            }
-            auto res = Nodalys::ComputeOperatingPoint(parsed.CircuitInstance,
-                                                      parsed.Options,
-                                                      verbose ? &diagnostics : nullptr);
-            if (!res) {
-                errors << std::format("Simulation Error: {}\n", res.error());
-                return EXIT_FAILURE;
-            }
-            sim_result = std::move(*res);
-            break;
-        }
-
-        case Nodalys::AnalysisKind::TRANSIENT: {
-            auto &cfg = std::get<Nodalys::TransientConfig>(analysis.Config);
-            if (step_override) {
-                cfg.TimeStep = *step_override;
-            }
-            if (stop_override) {
-                cfg.StopTime = *stop_override;
-            }
-            if (cfg.MaxStep <= 0.0) {
-                cfg.MaxStep = cfg.TimeStep;
-            }
-            if (verbose && !batch_mode) {
-                output << std::format("Running Transient (.tran) analysis: tstep={}, tstop={}\n",
-                                      cfg.TimeStep,
-                                      cfg.StopTime);
-            }
-            auto res = Nodalys::ComputeTransient(parsed.CircuitInstance,
-                                                 cfg,
-                                                 cfg.UseInitialConditions,
-                                                 {},
-                                                 parsed.Options,
-                                                 verbose ? &diagnostics : nullptr);
-            if (!res) {
-                errors << std::format("Simulation Error: {}\n", res.error());
-                return EXIT_FAILURE;
-            }
-            sim_result = std::move(*res);
-            break;
-        }
-
-        case Nodalys::AnalysisKind::DC_SWEEP: {
-            const auto &cfg = std::get<Nodalys::DcSweepConfig>(analysis.Config);
-            if (verbose && !batch_mode) {
-                output << std::format("Running DC Sweep (.dc) analysis on source {}\n", cfg.SweptSource);
-            }
-            auto res =
-                Nodalys::ComputeDCSweep(parsed.CircuitInstance, cfg, parsed.Options, verbose ? &diagnostics : nullptr);
-            if (!res) {
-                errors << std::format("Simulation Error: {}\n", res.error());
-                return EXIT_FAILURE;
-            }
-            sim_result = std::move(*res);
-            break;
-        }
-
-        case Nodalys::AnalysisKind::AC_SWEEP: {
-            const auto &cfg = std::get<Nodalys::AcSweepConfig>(analysis.Config);
-            if (verbose && !batch_mode) {
-                output << std::format("Running AC Sweep (.ac) analysis: {} Hz to {} Hz\n",
-                                      cfg.StartFrequency,
-                                      cfg.StopFrequency);
-            }
-            auto res =
-                Nodalys::ComputeACSweep(parsed.CircuitInstance, cfg, parsed.Options, verbose ? &diagnostics : nullptr);
-            if (!res) {
-                errors << std::format("Simulation Error: {}\n", res.error());
-                return EXIT_FAILURE;
-            }
-            sim_result = std::move(*res);
-            break;
-        }
-
-        case Nodalys::AnalysisKind::TRANSFER_FUNCTION: {
-            const auto &cfg = std::get<Nodalys::TransferFunctionConfig>(analysis.Config);
-            if (verbose && !batch_mode) {
-                output << std::format("Running Transfer Function (.tf) analysis for source {}\n", cfg.InputSource);
-            }
-            auto res = Nodalys::ComputeTransferFunction(parsed.CircuitInstance,
-                                                        cfg,
-                                                        parsed.Options,
-                                                        verbose ? &diagnostics : nullptr);
-            if (!res) {
-                errors << std::format("Simulation Error: {}\n", res.error());
-                return EXIT_FAILURE;
-            }
-            sim_result = std::move(*res);
-            break;
-        }
-
-        case Nodalys::AnalysisKind::NOISE: {
-            const auto &cfg = std::get<Nodalys::NoiseConfig>(analysis.Config);
-            if (verbose && !batch_mode) {
-                output << std::format("Running Noise (.noise) analysis for source {}\n", cfg.InputSource);
-            }
-            auto res =
-                Nodalys::ComputeNoise(parsed.CircuitInstance, cfg, parsed.Options, verbose ? &diagnostics : nullptr);
-            if (!res) {
-                errors << std::format("Simulation Error: {}\n", res.error());
-                return EXIT_FAILURE;
-            }
-            sim_result = std::move(*res);
-            break;
-        }
-
-        case Nodalys::AnalysisKind::S_PARAMETERS: {
-            const auto &cfg = std::get<Nodalys::SParameterConfig>(analysis.Config);
-            if (verbose && !batch_mode) {
-                output << std::format("Running S-Parameter (.sp) analysis: {} Hz to {} Hz\n",
-                                      cfg.StartFrequency,
-                                      cfg.StopFrequency);
-            }
-            auto res = Nodalys::ComputeSParameters(parsed.CircuitInstance,
-                                                   cfg,
-                                                   parsed.Options,
-                                                   verbose ? &diagnostics : nullptr);
-            if (!res) {
-                errors << std::format("Simulation Error: {}\n", res.error());
-                return EXIT_FAILURE;
-            }
-            sim_result = std::move(*res);
-            break;
-        }
-
-        case Nodalys::AnalysisKind::POLE_ZERO: {
-            const auto &cfg = std::get<Nodalys::PoleZeroConfig>(analysis.Config);
-            if (verbose && !batch_mode) {
-                output << std::format("Running Pole-Zero (.pz) analysis: output={}, input={}\n",
-                                      cfg.OutputNode,
-                                      cfg.InputSource);
-            }
-            auto res =
-                Nodalys::ComputePoleZero(parsed.CircuitInstance, cfg, parsed.Options, verbose ? &diagnostics : nullptr);
-            if (!res) {
-                errors << std::format("Simulation Error: {}\n", res.error());
-                return EXIT_FAILURE;
-            }
-            sim_result = std::move(*res);
-            break;
-        }
-
-        case Nodalys::AnalysisKind::SENSITIVITY: {
-            const auto &cfg = std::get<Nodalys::SensitivityConfig>(analysis.Config);
-            if (verbose && !batch_mode) {
-                output << std::format("Running DC Sensitivity (.sens) analysis: pos={}, neg={}\n",
-                                      cfg.OutputPositiveNode,
-                                      cfg.OutputNegativeNode);
-            }
-            auto res = Nodalys::ComputeSensitivity(parsed.CircuitInstance,
-                                                   cfg,
-                                                   parsed.Options,
-                                                   verbose ? &diagnostics : nullptr);
-            if (!res) {
-                errors << std::format("Simulation Error: {}\n", res.error());
-                return EXIT_FAILURE;
-            }
-            sim_result = std::move(*res);
-            break;
-        }
-
-        case Nodalys::AnalysisKind::AC_SENSITIVITY: {
-            const auto &cfg = std::get<Nodalys::AcSensitivityConfig>(analysis.Config);
-            if (verbose && !batch_mode) {
-                output << std::format("Running AC Sensitivity (.sens ... ac) analysis: pos={}, neg={}, input={}\n",
-                                      cfg.OutputPositiveNode,
-                                      cfg.OutputNegativeNode,
-                                      cfg.InputSource);
-            }
-            auto res = Nodalys::ComputeAcSensitivity(parsed.CircuitInstance,
-                                                     cfg,
-                                                     parsed.Options,
-                                                     verbose ? &diagnostics : nullptr);
-            if (!res) {
-                errors << std::format("Simulation Error: {}\n", res.error());
-                return EXIT_FAILURE;
-            }
-            sim_result = std::move(*res);
-            break;
-        }
-
-        case Nodalys::AnalysisKind::HARMONIC_BALANCE: {
-            const auto &cfg = std::get<Nodalys::HarmonicBalanceConfig>(analysis.Config);
-            if (verbose && !batch_mode) {
-                output << std::format("Running Harmonic Balance (.hb) analysis: f0={} Hz, H={}\n",
-                                      cfg.FundamentalFrequency,
-                                      cfg.Harmonics);
-            }
-            auto res = Nodalys::ComputeHarmonicBalance(parsed.CircuitInstance,
-                                                       cfg,
-                                                       parsed.Options,
-                                                       verbose ? &diagnostics : nullptr);
-            if (!res) {
-                errors << std::format("Simulation Error: {}\n", res.error());
-                return EXIT_FAILURE;
-            }
-            sim_result = std::move(*res);
-            break;
-        }
-        }
-
-        const auto sim_end = std::chrono::steady_clock::now();
-        if (verbose && !batch_mode) {
-            const auto sim_ms = std::chrono::duration<double, std::milli>(sim_end - sim_start).count();
-            output << std::format("Analysis completed in {:.2f} ms\n", sim_ms);
-        }
-
-        // Export result
-        std::string exported;
-        if (fmt_lower == "csv") {
-            exported = Nodalys::ExportCsv(sim_result);
-        } else if (fmt_lower == "json") {
-            exported = Nodalys::ExportJson(sim_result);
-        } else if (fmt_lower == "touchstone" || fmt_lower == "s2p") {
-            if (std::holds_alternative<Nodalys::SParameterResult>(sim_result)) {
-                exported = Nodalys::ExportTouchstone(std::get<Nodalys::SParameterResult>(sim_result));
-            } else {
-                exported = Nodalys::ExportCsv(sim_result);
-            }
-        } else {
-            // raw or raw-ascii
-            exported = Nodalys::ExportRaw(sim_result, sim_title);
-        }
-
-        all_exported_output.append(exported);
-    }
-
-    if (verbose && !diagnostics.empty()) {
-        output << "\nDiagnostic Messages:\n";
-        for (const auto &diag : diagnostics) {
-            output << "  - " << diag.Text << "\n";
-        }
-    }
-
-    // Write output
-    if (!output_file.empty()) {
-        if (!Nodalys::SaveStringToFile(output_file, all_exported_output)) {
-            errors << std::format("Error: Failed to write output file '{}'\n", output_file);
-            return EXIT_FAILURE;
-        }
-        if (verbose && !batch_mode) {
-            output << std::format("Simulation output written to '{}'\n", output_file);
-        }
-    } else {
-        output << all_exported_output;
-    }
-
-    return EXIT_SUCCESS;
+    ReportDiagnostics(session);
+    return WriteOutput(session, *exported);
 }
 
 } // namespace Nodalys
