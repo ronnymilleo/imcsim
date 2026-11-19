@@ -7,23 +7,78 @@
 
 #include "base/helpers.h"
 #include "base/node_colors.h"
-#include "results/current_flow.h"
 #include <algorithm>
 #include <cmath>
+#include <optional>
 
 namespace GUI {
 
 namespace {
 
-/// Distance between flowing-current arrows along the wires, in grid units, so they follow the zoom. The arrows only
-/// show direction, so they all have the same size and scroll at one speed; the magnitude stays on the heat color.
-constexpr float FLOW_ARROW_SPACING = 0.60f;
-constexpr float FLOW_ARROW_LENGTH = 0.20f;
 constexpr float FLOW_ARROW_HALF_WIDTH = 0.10f;
 /// Speed of the flowing-current arrows, in grid units per second.
 constexpr float FLOW_SPEED = 1.5f;
 
+/**
+ * @brief   The unit vector along a piece of wire, turned to point the way its current goes.
+ * @return  The direction, or none for a piece too short to hold an arrow.
+ */
+std::optional<ImVec2> GetFlowDirection(const WireCurrent &piece) {
+    const ImVec2 delta = ToVec2(piece.End) - ToVec2(piece.Start);
+    const float length = std::sqrt(delta.x * delta.x + delta.y * delta.y);
+    if (length < FLOW_ARROW_LENGTH) {
+        return std::nullopt;
+    }
+    const ImVec2 along = delta / length;
+    return piece.Current >= 0.0 ? along : -along;
+}
+
+/**
+ * @brief   Draws one arrow, a filled triangle centered on a point of the wire and pointing the way the current goes.
+ */
+void DrawFlowArrow(SchematicCanvas &canvas,
+                   const ViewTransform &view,
+                   const ImVec2 center,
+                   const ImVec2 flow,
+                   const ImU32 color) {
+    const ImVec2 across = {-flow.y, flow.x};
+    const ImVec2 tip = center + flow * (FLOW_ARROW_LENGTH * 0.5f);
+    const ImVec2 back = center - flow * (FLOW_ARROW_LENGTH * 0.5f);
+    canvas.AddTriangleFilled(view.ToScreen(tip),
+                             view.ToScreen(back + across * FLOW_ARROW_HALF_WIDTH),
+                             view.ToScreen(back - across * FLOW_ARROW_HALF_WIDTH),
+                             color);
+}
+
 } // namespace
+
+/**
+ * @brief   Where the arrows of a piece of wire sit at a moment of their scrolling.
+ * @param[in] piece  The piece of wire.
+ * @param[in] flow   Unit vector along the piece, the way its current goes.
+ * @param[in] phase  How far the arrows have scrolled, in grid units, from 0 to FLOW_ARROW_SPACING.
+ * @return  The centers of the arrows, in world units, from the back of the flow to its front; an arrow sits wherever
+ * its projection onto the flow is the phase plus a multiple of the spacing, so the arrows stay aligned to the grid
+ *          across the whole schematic, and every arrow stays whole on the piece.
+ */
+std::vector<ImVec2> ListArrowCenters(const WireCurrent &piece, const ImVec2 flow, const float phase) {
+    const ImVec2 start = ToVec2(piece.Start);
+    const ImVec2 end = ToVec2(piece.End);
+    // Both ends are projected so the arrows stay on the wire whether the current runs with its start-to-end order or
+    // against it
+    const float start_projection = start.x * flow.x + start.y * flow.y;
+    const float end_projection = end.x * flow.x + end.y * flow.y;
+    const float low = std::min(start_projection, end_projection) + FLOW_ARROW_LENGTH * 0.5f;
+    const float high = std::max(start_projection, end_projection) - FLOW_ARROW_LENGTH * 0.5f;
+    std::vector<ImVec2> centers;
+    for (int arrow = static_cast<int>(std::ceil((low - phase) / FLOW_ARROW_SPACING));
+         arrow <= static_cast<int>(std::floor((high - phase) / FLOW_ARROW_SPACING));
+         ++arrow) {
+        const float distance = phase + static_cast<float>(arrow) * FLOW_ARROW_SPACING - start_projection;
+        centers.push_back(start + flow * distance);
+    }
+    return centers;
+}
 
 /**
  * @brief   Draws the live current as arrows flowing along every piece of wire, in the direction the current goes.
@@ -50,40 +105,18 @@ void DrawLiveCurrent(SchematicCanvas &canvas,
     if (largest <= 0.0) {
         return;
     }
+    // Every arrow scrolls at one speed, so they all share the phase
+    const float phase = std::fmod(static_cast<float>(time) * FLOW_SPEED, FLOW_ARROW_SPACING);
     for (const WireCurrent &piece :
          ComputeWireCurrents(schematic.GetElements(), schematic.GetWires(), operating_point.Currents)) {
-        const ImVec2 start = ToVec2(piece.Start);
-        const ImVec2 end = ToVec2(piece.End);
-        const ImVec2 delta = end - start;
-        const float length = std::sqrt(delta.x * delta.x + delta.y * delta.y);
         const float level = CurrentLevel(piece.Current, largest);
-        if (level < 0.0f || length < FLOW_ARROW_LENGTH) {
+        const std::optional<ImVec2> flow = GetFlowDirection(piece);
+        if (level < 0.0f || !flow) {
             continue;
         }
-        // Unit vector along the wire, turned to point the way the current goes
-        const ImVec2 along = delta / length;
-        const ImVec2 flow = piece.Current >= 0.0 ? along : -along;
-        const ImVec2 across = {-flow.y, flow.x};
-        // Projection of a point onto the flow direction: an arrow sits wherever it is the scrolling phase plus a
-        // multiple of the spacing, so the arrows stay aligned to the grid across the whole schematic. Both ends are
-        // projected so the arrows stay on the wire whether the current runs with its start-to-end order or against it
-        const float phase = std::fmod(static_cast<float>(time) * FLOW_SPEED, FLOW_ARROW_SPACING);
-        const float start_projection = start.x * flow.x + start.y * flow.y;
-        const float end_projection = end.x * flow.x + end.y * flow.y;
-        const float low = std::min(start_projection, end_projection) + FLOW_ARROW_LENGTH * 0.5f;
-        const float high = std::max(start_projection, end_projection) - FLOW_ARROW_LENGTH * 0.5f;
         const ImU32 color = GetHeatColor(std::min(level, 1.0f));
-        for (int arrow = static_cast<int>(std::ceil((low - phase) / FLOW_ARROW_SPACING));
-             arrow <= static_cast<int>(std::floor((high - phase) / FLOW_ARROW_SPACING));
-             ++arrow) {
-            const float distance = phase + static_cast<float>(arrow) * FLOW_ARROW_SPACING - start_projection;
-            const ImVec2 center = start + flow * distance;
-            const ImVec2 tip = center + flow * (FLOW_ARROW_LENGTH * 0.5f);
-            const ImVec2 back = center - flow * (FLOW_ARROW_LENGTH * 0.5f);
-            canvas.AddTriangleFilled(view.ToScreen(tip),
-                                     view.ToScreen(back + across * FLOW_ARROW_HALF_WIDTH),
-                                     view.ToScreen(back - across * FLOW_ARROW_HALF_WIDTH),
-                                     color);
+        for (const ImVec2 center : ListArrowCenters(piece, *flow, phase)) {
+            DrawFlowArrow(canvas, view, center, *flow, color);
         }
     }
 }

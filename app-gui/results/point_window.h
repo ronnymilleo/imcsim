@@ -28,6 +28,8 @@ constexpr int MAX_WINDOW_POINTS = 10'000;
 struct PointWindow {
     std::size_t First = 0;
     std::size_t Count = 0;
+
+    bool operator==(const PointWindow &) const = default;
 };
 
 // Choosing the window

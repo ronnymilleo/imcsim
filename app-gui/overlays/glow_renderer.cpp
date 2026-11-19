@@ -6,37 +6,116 @@
 #include "overlays/glow_renderer.h"
 
 #include "imgui_impl_sdlgpu3_shaders.h"
-#include <algorithm>
 #include <array>
-#include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <optional>
+#include <span>
 #include <string_view>
 
 namespace GUI {
 
 namespace {
 
-/// Side of the falloff texture, in texels; the glow is smooth, so a small texture scales up without steps.
-constexpr std::uint32_t TEXTURE_SIZE = 64;
-/// Share of the broad halo in the falloff of a glow; with the narrow core it adds up to 1, the alpha at the center.
-constexpr float HALO_WEIGHT = 0.65f;
-/// Share of the narrow core in the falloff, so a glow looks hot in the middle.
-constexpr float CORE_WEIGHT = 0.35f;
-/// Width of the core, as a fraction of the radius.
-constexpr float CORE_WIDTH = 0.2f;
+/**
+ * @struct  ShaderCode
+ * @brief   The bytecode of the shaders of the ImGui backend for one GPU driver, and how to load it.
+ */
+struct ShaderCode {
+    SDL_GPUShaderFormat Format = SDL_GPU_SHADERFORMAT_INVALID;
+    const char *Entrypoint = "main";
+    std::span<const std::uint8_t> Vertex;
+    std::span<const std::uint8_t> Fragment;
+};
 
 /**
- * @brief   Alpha of the glow at a distance from its center, as a fraction of its radius.
+ * @struct  ShaderPair
+ * @brief   The vertex and fragment shaders of a pipeline.
  */
-float Falloff(const float distance) {
-    if (distance >= 1.0f) {
-        return 0.0f;
+struct ShaderPair {
+    SDL_GPUShader *Vertex = nullptr;
+    SDL_GPUShader *Fragment = nullptr;
+};
+
+/**
+ * @brief   The shaders the ImGui backend builds its pipeline from, for the driver of a device.
+ * @return  SPIR-V for Vulkan, DXBC for Direct3D 12 and, on Apple platforms, a Metal library or Metal source; empty code
+ *          for another driver, which the shaders then fail to be created from.
+ */
+ShaderCode SelectShaders(SDL_GPUDevice *device) {
+    const std::string_view driver = SDL_GetGPUDeviceDriver(device);
+    if (driver == "vulkan") {
+        return {.Format = SDL_GPU_SHADERFORMAT_SPIRV, .Vertex = spirv_vertex, .Fragment = spirv_fragment};
     }
-    const float halo = (1.0f - distance) * (1.0f - distance);
-    const float core = std::exp(-(distance / CORE_WIDTH) * (distance / CORE_WIDTH));
-    return HALO_WEIGHT * halo + CORE_WEIGHT * core;
+    if (driver == "direct3d12") {
+        return {.Format = SDL_GPU_SHADERFORMAT_DXBC, .Vertex = dxbc_vertex, .Fragment = dxbc_fragment};
+    }
+#ifdef __APPLE__
+    if (SDL_GetGPUShaderFormats(device) & SDL_GPU_SHADERFORMAT_METALLIB) {
+        return {.Format = SDL_GPU_SHADERFORMAT_METALLIB,
+                .Entrypoint = "main0",
+                .Vertex = metallib_vertex,
+                .Fragment = metallib_fragment};
+    }
+    return {.Format = SDL_GPU_SHADERFORMAT_MSL, .Entrypoint = "main0", .Vertex = msl_vertex, .Fragment = msl_fragment};
+#else
+    return {};
+#endif
+}
+
+/**
+ * @brief   Creates the two shaders of the pipeline, with the uniforms and the sampler the backend binds.
+ * @return  Both shaders, or none if either cannot be created, in which case the other is released.
+ */
+std::optional<ShaderPair> CreateShaders(SDL_GPUDevice *device, const ShaderCode &code) {
+    SDL_GPUShaderCreateInfo vertex_info{};
+    vertex_info.entrypoint = code.Entrypoint;
+    vertex_info.format = code.Format;
+    vertex_info.code = code.Vertex.data();
+    vertex_info.code_size = code.Vertex.size();
+    vertex_info.stage = SDL_GPU_SHADERSTAGE_VERTEX;
+    vertex_info.num_uniform_buffers = 1;
+    SDL_GPUShaderCreateInfo fragment_info{};
+    fragment_info.entrypoint = code.Entrypoint;
+    fragment_info.format = code.Format;
+    fragment_info.code = code.Fragment.data();
+    fragment_info.code_size = code.Fragment.size();
+    fragment_info.stage = SDL_GPU_SHADERSTAGE_FRAGMENT;
+    fragment_info.num_samplers = 1;
+
+    const ShaderPair shaders = {.Vertex = SDL_CreateGPUShader(device, &vertex_info),
+                                .Fragment = SDL_CreateGPUShader(device, &fragment_info)};
+    if (shaders.Vertex != nullptr && shaders.Fragment != nullptr) {
+        return shaders;
+    }
+    // Releasing a null shader would replace the error SDL_GetError() reports
+    for (SDL_GPUShader *shader : {shaders.Vertex, shaders.Fragment}) {
+        if (shader != nullptr) {
+            SDL_ReleaseGPUShader(device, shader);
+        }
+    }
+    return std::nullopt;
+}
+
+/**
+ * @brief   The color target of the pipeline: the color adds its light weighted by alpha, and the alpha of the target is
+ *          left as it is, since the swapchain should stay opaque.
+ */
+SDL_GPUColorTargetDescription MakeAdditiveTarget(const SDL_GPUTextureFormat target_format) {
+    SDL_GPUColorTargetDescription target{};
+    target.format = target_format;
+    target.blend_state.enable_blend = true;
+    target.blend_state.src_color_blendfactor = SDL_GPU_BLENDFACTOR_SRC_ALPHA;
+    target.blend_state.dst_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE;
+    target.blend_state.color_blend_op = SDL_GPU_BLENDOP_ADD;
+    target.blend_state.src_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ZERO;
+    target.blend_state.dst_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE;
+    target.blend_state.alpha_blend_op = SDL_GPU_BLENDOP_ADD;
+    target.blend_state.color_write_mask =
+        SDL_GPU_COLORCOMPONENT_R | SDL_GPU_COLORCOMPONENT_G | SDL_GPU_COLORCOMPONENT_B | SDL_GPU_COLORCOMPONENT_A;
+    return target;
 }
 
 } // namespace
@@ -118,62 +197,8 @@ void GlowRenderer::AddGlows(ImDrawList *draw_list, const std::span<const Glow> g
  *          glows can be drawn from the vertex and index buffers the backend has already bound.
  */
 int GlowRenderer::CreatePipeline(const SDL_GPUTextureFormat target_format) {
-    SDL_GPUShaderCreateInfo vertex_info{};
-    vertex_info.entrypoint = "main";
-    vertex_info.stage = SDL_GPU_SHADERSTAGE_VERTEX;
-    vertex_info.num_uniform_buffers = 1;
-    SDL_GPUShaderCreateInfo fragment_info{};
-    fragment_info.entrypoint = "main";
-    fragment_info.stage = SDL_GPU_SHADERSTAGE_FRAGMENT;
-    fragment_info.num_samplers = 1;
-
-    const std::string_view driver = SDL_GetGPUDeviceDriver(m_Device);
-    if (driver == "vulkan") {
-        vertex_info.format = SDL_GPU_SHADERFORMAT_SPIRV;
-        vertex_info.code = spirv_vertex;
-        vertex_info.code_size = sizeof(spirv_vertex);
-        fragment_info.format = SDL_GPU_SHADERFORMAT_SPIRV;
-        fragment_info.code = spirv_fragment;
-        fragment_info.code_size = sizeof(spirv_fragment);
-    } else if (driver == "direct3d12") {
-        vertex_info.format = SDL_GPU_SHADERFORMAT_DXBC;
-        vertex_info.code = dxbc_vertex;
-        vertex_info.code_size = sizeof(dxbc_vertex);
-        fragment_info.format = SDL_GPU_SHADERFORMAT_DXBC;
-        fragment_info.code = dxbc_fragment;
-        fragment_info.code_size = sizeof(dxbc_fragment);
-    }
-#ifdef __APPLE__
-    else if (SDL_GetGPUShaderFormats(m_Device) & SDL_GPU_SHADERFORMAT_METALLIB) {
-        vertex_info.entrypoint = "main0";
-        vertex_info.format = SDL_GPU_SHADERFORMAT_METALLIB;
-        vertex_info.code = metallib_vertex;
-        vertex_info.code_size = sizeof(metallib_vertex);
-        fragment_info.entrypoint = "main0";
-        fragment_info.format = SDL_GPU_SHADERFORMAT_METALLIB;
-        fragment_info.code = metallib_fragment;
-        fragment_info.code_size = sizeof(metallib_fragment);
-    } else {
-        vertex_info.entrypoint = "main0";
-        vertex_info.format = SDL_GPU_SHADERFORMAT_MSL;
-        vertex_info.code = msl_vertex;
-        vertex_info.code_size = sizeof(msl_vertex);
-        fragment_info.entrypoint = "main0";
-        fragment_info.format = SDL_GPU_SHADERFORMAT_MSL;
-        fragment_info.code = msl_fragment;
-        fragment_info.code_size = sizeof(msl_fragment);
-    }
-#endif
-
-    SDL_GPUShader *vertex_shader = SDL_CreateGPUShader(m_Device, &vertex_info);
-    SDL_GPUShader *fragment_shader = SDL_CreateGPUShader(m_Device, &fragment_info);
-    if (vertex_shader == nullptr || fragment_shader == nullptr) {
-        // Releasing a null shader would replace the error SDL_GetError() reports
-        for (SDL_GPUShader *shader : {vertex_shader, fragment_shader}) {
-            if (shader != nullptr) {
-                SDL_ReleaseGPUShader(m_Device, shader);
-            }
-        }
+    const std::optional<ShaderPair> shaders = CreateShaders(m_Device, SelectShaders(m_Device));
+    if (!shaders) {
         return EXIT_FAILURE;
     }
 
@@ -186,24 +211,11 @@ int GlowRenderer::CreatePipeline(const SDL_GPUTextureFormat target_format) {
         {1, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2, offsetof(ImDrawVert, uv)},
         {2, 0, SDL_GPU_VERTEXELEMENTFORMAT_UBYTE4_NORM, offsetof(ImDrawVert, col)},
     }};
-
-    // The color adds its light weighted by alpha; the alpha of the target is left as it is, since the swapchain
-    // should stay opaque
-    SDL_GPUColorTargetDescription target{};
-    target.format = target_format;
-    target.blend_state.enable_blend = true;
-    target.blend_state.src_color_blendfactor = SDL_GPU_BLENDFACTOR_SRC_ALPHA;
-    target.blend_state.dst_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE;
-    target.blend_state.color_blend_op = SDL_GPU_BLENDOP_ADD;
-    target.blend_state.src_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ZERO;
-    target.blend_state.dst_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE;
-    target.blend_state.alpha_blend_op = SDL_GPU_BLENDOP_ADD;
-    target.blend_state.color_write_mask =
-        SDL_GPU_COLORCOMPONENT_R | SDL_GPU_COLORCOMPONENT_G | SDL_GPU_COLORCOMPONENT_B | SDL_GPU_COLORCOMPONENT_A;
+    const SDL_GPUColorTargetDescription target = MakeAdditiveTarget(target_format);
 
     SDL_GPUGraphicsPipelineCreateInfo pipeline_info{};
-    pipeline_info.vertex_shader = vertex_shader;
-    pipeline_info.fragment_shader = fragment_shader;
+    pipeline_info.vertex_shader = shaders->Vertex;
+    pipeline_info.fragment_shader = shaders->Fragment;
     pipeline_info.vertex_input_state.vertex_buffer_descriptions = &buffer_description;
     pipeline_info.vertex_input_state.num_vertex_buffers = 1;
     pipeline_info.vertex_input_state.vertex_attributes = attributes.data();
@@ -218,34 +230,21 @@ int GlowRenderer::CreatePipeline(const SDL_GPUTextureFormat target_format) {
     m_Pipeline = SDL_CreateGPUGraphicsPipeline(m_Device, &pipeline_info);
 
     // The pipeline keeps what it needs from the shaders
-    SDL_ReleaseGPUShader(m_Device, vertex_shader);
-    SDL_ReleaseGPUShader(m_Device, fragment_shader);
+    SDL_ReleaseGPUShader(m_Device, shaders->Vertex);
+    SDL_ReleaseGPUShader(m_Device, shaders->Fragment);
     return m_Pipeline != nullptr ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 /**
- * @brief   White texels whose alpha falls off from the center, so the vertex color of each glow tints it.
+ * @brief   A texture of white texels whose alpha falls off from the center, so the vertex color of each glow tints it.
  */
 int GlowRenderer::CreateTexture() {
-    std::array<std::uint8_t, std::size_t{TEXTURE_SIZE} * TEXTURE_SIZE * 4> texels{};
-    for (std::uint32_t row = 0; row < TEXTURE_SIZE; ++row) {
-        for (std::uint32_t column = 0; column < TEXTURE_SIZE; ++column) {
-            // Texel centers, from -1 to 1 across the texture
-            const float x = (static_cast<float>(column) + 0.5f) / TEXTURE_SIZE * 2.0f - 1.0f;
-            const float y = (static_cast<float>(row) + 0.5f) / TEXTURE_SIZE * 2.0f - 1.0f;
-            const float alpha = std::clamp(Falloff(std::sqrt(x * x + y * y)), 0.0f, 1.0f);
-            std::uint8_t *texel = &texels[(std::size_t{row} * TEXTURE_SIZE + column) * 4];
-            texel[0] = texel[1] = texel[2] = 255;
-            texel[3] = static_cast<std::uint8_t>(std::lround(alpha * 255.0f));
-        }
-    }
-
     SDL_GPUTextureCreateInfo texture_info{};
     texture_info.type = SDL_GPU_TEXTURETYPE_2D;
     texture_info.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
     texture_info.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER;
-    texture_info.width = TEXTURE_SIZE;
-    texture_info.height = TEXTURE_SIZE;
+    texture_info.width = GLOW_TEXTURE_SIZE;
+    texture_info.height = GLOW_TEXTURE_SIZE;
     texture_info.layer_count_or_depth = 1;
     texture_info.num_levels = 1;
     texture_info.sample_count = SDL_GPU_SAMPLECOUNT_1;
@@ -253,7 +252,15 @@ int GlowRenderer::CreateTexture() {
     if (m_Texture == nullptr) {
         return EXIT_FAILURE;
     }
+    return UploadTexture(BuildFalloffTexels());
+}
 
+/**
+ * @brief   Copies the texels into the texture through a transfer buffer and a copy pass.
+ * @param[in] texels  The whole texture, row by row.
+ * @return  EXIT_SUCCESS once the copy is submitted, EXIT_FAILURE if a GPU object cannot be had.
+ */
+int GlowRenderer::UploadTexture(const GlowTexels &texels) {
     SDL_GPUTransferBufferCreateInfo transfer_info{};
     transfer_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
     transfer_info.size = static_cast<Uint32>(texels.size());
@@ -279,8 +286,8 @@ int GlowRenderer::CreateTexture() {
     source.transfer_buffer = transfer_buffer;
     SDL_GPUTextureRegion destination{};
     destination.texture = m_Texture;
-    destination.w = TEXTURE_SIZE;
-    destination.h = TEXTURE_SIZE;
+    destination.w = GLOW_TEXTURE_SIZE;
+    destination.h = GLOW_TEXTURE_SIZE;
     destination.d = 1;
     SDL_UploadToGPUTexture(copy_pass, &source, &destination, false);
     SDL_EndGPUCopyPass(copy_pass);

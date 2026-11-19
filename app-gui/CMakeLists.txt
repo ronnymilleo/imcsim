@@ -37,11 +37,18 @@ add_library(imcsim-gui-lib
             base/trace_swatch.cpp
             base/value_field.cpp
             canvas/schematic_canvas.cpp
+            overlays/color_legend.cpp
+            overlays/displayed_state.cpp
+            overlays/fuse_blow_tracker.cpp
             overlays/fuse_flash.cpp
+            overlays/glow_falloff.cpp
             overlays/glow_renderer.cpp
             overlays/heat_glow.cpp
+            overlays/hovered_value.cpp
             overlays/led_glow.cpp
             overlays/live_current.cpp
+            overlays/node_readouts.cpp
+            overlays/part_heat.cpp
             overlays/readout_placement.cpp
             overlays/schematic_overlays.cpp
             plots/harmonic_balance_view.cpp
