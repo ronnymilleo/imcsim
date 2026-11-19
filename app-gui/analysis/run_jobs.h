@@ -123,6 +123,59 @@ constexpr std::size_t MAX_KEPT_TRACES = 100;
 MonteCarloTable MakeMonteCarloTable(const Core::Circuit &circuit, const Core::MonteCarloSettings &settings);
 
 /**
+ * @struct  MonteCarloDraws
+ * @brief   What the runs of a Monte Carlo analysis have left so far: the traces kept and the table of every run.
+ */
+template <typename Result>
+struct MonteCarloDraws {
+    StepFamily<Result> Family;
+    MonteCarloTable Table;
+};
+
+/**
+ * @brief   Tells whether the next run that converges keeps its trace, which only the first runs do.
+ * @param[in] family  Traces kept so far, the nominal one first.
+ * @return  True while the family holds no more than MAX_KEPT_TRACES traces besides the nominal one.
+ */
+template <typename Result>
+bool HasRoomForTrace(const StepFamily<Result> &family) {
+    return family.Results.size() <= MAX_KEPT_TRACES;
+}
+
+/**
+ * @brief   Adds one run to the table, with what it measured or why it failed, and its trace to the family while there
+ *          is room; the nominal run also names the columns of the table.
+ * @param[in,out] draws    What the runs have left so far.
+ * @param[in]     run      Number of the run, 0 for the nominal one.
+ * @param[in]     values   Values the run gave the varied parts.
+ * @param[in]     result   What the run made, or why it failed.
+ * @param[in]     measure  What the table keeps from a run that converged.
+ */
+template <typename Result, typename Measure>
+void RecordDraw(MonteCarloDraws<Result> &draws,
+                const int run,
+                std::vector<double> values,
+                std::expected<Result, std::string> result,
+                const Measure &measure) {
+    MonteCarloRun entry{.Values = std::move(values)};
+    if (!result) {
+        entry.IsFailed = true;
+        entry.Error = std::move(result.error());
+    } else {
+        Measurement measured = measure(*result);
+        if (run == 0) {
+            draws.Table.Columns = std::move(measured.Columns);
+        }
+        entry.Measures = std::move(measured.Values);
+        if (HasRoomForTrace(draws.Family)) {
+            draws.Family.Values.push_back(static_cast<double>(run));
+            draws.Family.Results.push_back(std::move(*result));
+        }
+    }
+    draws.Table.Runs.push_back(std::move(entry));
+}
+
+/**
  * @brief   Runs the nominal circuit and then each draw, and goes on past a run that fails to converge, since a random
  *          draw may land on values the solver cannot handle; the nominal run has to work.
  * @details A stop keeps the runs made. Only the first runs keep their traces; every run keeps its measurements.
@@ -133,57 +186,56 @@ MonteCarloRuns<Result> RunMonteCarlo(const Core::MonteCarloSettings &settings,
                                      Core::RunControl &control,
                                      const RunCircuit &run_circuit,
                                      const Measure &measure) {
-    StepFamily<Result> family{.Parameter = MONTE_CARLO_PARAMETER, .Unit = "", .Values = {}, .Results = {}};
-    MonteCarloTable table = MakeMonteCarloTable(circuit, settings);
+    MonteCarloDraws<Result> draws{
+        .Family = {.Parameter = MONTE_CARLO_PARAMETER, .Unit = "", .Values = {}, .Results = {}},
+        .Table = MakeMonteCarloTable(circuit, settings)};
     std::vector<Core::SimulatorMessage> messages;
     for (int run = 0; run <= settings.Runs && !control.IsCancelled(); ++run) {
         control.SetProgress(static_cast<double>(run) / static_cast<double>(settings.Runs + 1));
-        const Core::MonteCarloCircuit built = Core::BuildMonteCarloCircuit(circuit, settings, run);
+        Core::MonteCarloCircuit built = Core::BuildMonteCarloCircuit(circuit, settings, run);
         auto outcome = run_circuit(built.Simulated);
         messages.push_back({run == 0 ? std::string("Nominal run") : std::format("Run {}", run), false});
         std::ranges::move(outcome.Messages, std::back_inserter(messages));
-        MonteCarloRun entry{.Values = built.Values};
-        if (!outcome.Result) {
-            if (run == 0) {
-                return {std::unexpected(std::format("The nominal run failed: {}", outcome.Result.error())),
-                        {},
-                        std::move(messages)};
-            }
-            entry.IsFailed = true;
-            entry.Error = std::move(outcome.Result.error());
-        } else {
-            Measurement measured = measure(*outcome.Result);
-            if (run == 0) {
-                table.Columns = std::move(measured.Columns);
-            }
-            entry.Measures = std::move(measured.Values);
-            if (family.Results.size() <= MAX_KEPT_TRACES) {
-                family.Values.push_back(static_cast<double>(run));
-                family.Results.push_back(std::move(*outcome.Result));
-            }
+        if (!outcome.Result && run == 0) {
+            return {std::unexpected(std::format("The nominal run failed: {}", outcome.Result.error())),
+                    {},
+                    std::move(messages)};
         }
-        table.Runs.push_back(std::move(entry));
+        RecordDraw(draws, run, std::move(built.Values), std::move(outcome.Result), measure);
     }
-    if (table.Runs.empty()) {
+    if (draws.Table.Runs.empty()) {
         return {std::unexpected("Stopped"), {}, std::move(messages)};
     }
-    return {std::move(family), std::move(table), std::move(messages)};
+    return {std::move(draws.Family), std::move(draws.Table), std::move(messages)};
 }
 
 /**
- * @brief   Hands the traces and the table of the runs to the results, or reports why they did not run.
+ * @brief   Hands the steps to the results, or reports the step that failed; the old result is cleared before the
+ *          steps run.
+ */
+template <typename Result, typename Store>
+std::optional<std::string> StoreSteps(std::expected<StepFamily<Result>, std::string> family, Store store) {
+    if (!family) {
+        return std::move(family.error());
+    }
+    store(std::move(*family));
+    return std::nullopt;
+}
+
+/**
+ * @brief   Hands the traces of the runs to the results as StoreSteps() does, and then their table, or reports why they
+ *          did not run.
  */
 template <typename Result, typename Store>
 std::optional<std::string> StoreMonteCarlo(std::expected<StepFamily<Result>, std::string> family,
                                            MonteCarloTable table,
                                            ResultStore &results,
                                            Store store) {
-    if (!family) {
-        return std::move(family.error());
+    std::optional<std::string> error = StoreSteps(std::move(family), std::move(store));
+    if (!error) {
+        results.SetMonteCarlo(std::move(table));
     }
-    store(std::move(*family));
-    results.SetMonteCarlo(std::move(table));
-    return std::nullopt;
+    return error;
 }
 
 /**
@@ -202,19 +254,6 @@ Core::Job MakeJob(const Core::Circuit &circuit, Work work, Store store) {
         }
         return [run, store] { store(std::move(*run)); };
     };
-}
-
-/**
- * @brief   Hands the steps to the results, or reports the step that failed; the old result is cleared before the
- *          steps run.
- */
-template <typename Result, typename Store>
-std::optional<std::string> StoreSteps(std::expected<StepFamily<Result>, std::string> family, Store store) {
-    if (!family) {
-        return std::move(family.error());
-    }
-    store(std::move(*family));
-    return std::nullopt;
 }
 
 } // namespace GUI

@@ -93,6 +93,7 @@ add_executable(imcsim-tests
             readout_placement_tests.cpp
             ready_blocks_tests.cpp
             result_store_tests.cpp
+            run_jobs_tests.cpp
             run_repeat_tests.cpp
             run_report_tests.cpp
             run_status_tests.cpp
