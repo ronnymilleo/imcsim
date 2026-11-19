@@ -50,6 +50,7 @@ add_executable(imcsim-tests
             led_glow_tests.cpp
             live_change_tests.cpp
             live_input_tests.cpp
+            logarithmic_level_tests.cpp
             logic_bus_definition_tests.cpp
             logic_bus_tests.cpp
             logic_outputs_tests.cpp
@@ -61,6 +62,7 @@ add_executable(imcsim-tests
             nodalys_backend_tests.cpp
             nodalys_benchmark_tests.cpp
             nodalys_in_use.cpp
+            node_index_tests.cpp
             nodeset_tests.cpp
             nonlinear_tests.cpp
             op_amp_tests.cpp

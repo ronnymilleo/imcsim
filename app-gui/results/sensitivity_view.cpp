@@ -6,6 +6,7 @@
 
 #include "results/sensitivity_view.h"
 
+#include "results/logarithmic_level.h"
 #include "spice/spice_value.h"
 #include <algorithm>
 #include <cmath>
@@ -69,9 +70,7 @@ std::optional<float> FindSensitivityLevel(const Core::Sensitivity &sensitivity, 
     if (found->Normalized == 0.0 || largest <= 0.0) {
         return 0.0f;
     }
-    const double level =
-        (std::log10(std::abs(found->Normalized)) - std::log10(largest) + SENSITIVITY_DECADES) / SENSITIVITY_DECADES;
-    return static_cast<float>(std::clamp(level, 0.0, 1.0));
+    return std::clamp(LogarithmicLevel(found->Normalized, largest, SENSITIVITY_DECADES), 0.0f, 1.0f);
 }
 
 /**

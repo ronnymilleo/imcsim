@@ -5,6 +5,7 @@
 
 #include "results/logic_bus.h"
 
+#include "results/node_index.h"
 #include <algorithm>
 #include <array>
 #include <charconv>
@@ -55,11 +56,11 @@ ResolveBusBits(const LogicBus &bus, const NetResolver &find_node, const std::siz
     }
     std::vector<int> nodes;
     for (const std::string &bit : bus.Bits) {
-        const std::optional<int> node = FindBitNode(bit, find_node);
-        if (!node || *node < 0 || static_cast<std::size_t>(*node) >= node_count) {
+        const std::optional<std::size_t> node = FindNodeIndex(FindBitNode(bit, find_node), node_count);
+        if (!node) {
             return std::unexpected(std::format("The circuit has no {}", bit));
         }
-        nodes.push_back(*node);
+        nodes.push_back(static_cast<int>(*node));
     }
     return nodes;
 }

@@ -7,11 +7,15 @@
 
 #include "circuit/circuit_currents.h"
 #include "circuit/components/logic_part.h"
+#include "results/logarithmic_level.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <map>
+#include <ranges>
+#include <set>
 #include <string>
+#include <utility>
 
 namespace GUI {
 
@@ -90,6 +94,157 @@ double GetSingleCurrentAt(const Core::Component &component, const double current
     return terminal == 1 ? -current : 0.0;
 }
 
+/**
+ * @struct  TerminalLoads
+ * @brief   What the terminals of the parts ask of the wires.
+ */
+struct TerminalLoads {
+    /// Current each point hands to the parts there.
+    std::map<GridPoint, double> DrawnAt;
+    /// The points ground holds.
+    std::set<GridPoint> Grounded;
+    /// Every terminal, where the wires are split.
+    std::vector<GridPoint> Points;
+};
+
+/**
+ * @struct  WireGraph
+ * @brief   The pieces of wire, and the pieces that meet at each point.
+ */
+struct WireGraph {
+    std::vector<WireCurrent> Pieces;
+    std::map<GridPoint, std::vector<std::size_t>> PiecesAt;
+
+    /**
+     * @brief   Gives the end of a piece that is not the given point.
+     * @param[in] piece_index  Index into Pieces.
+     * @param[in] point        One end of the piece.
+     * @return  The other end.
+     */
+    GridPoint GetOtherEnd(const std::size_t piece_index, const GridPoint point) const {
+        const WireCurrent &piece = Pieces[piece_index];
+        return piece.Start == point ? piece.End : piece.Start;
+    }
+};
+
+/**
+ * @struct  SpanningTree
+ * @brief   The points of a group of joined wires, each reached through one piece from the root.
+ */
+struct SpanningTree {
+    /// Points by distance from the root, which comes first.
+    std::vector<GridPoint> Order;
+    /// For every point but the root, the piece that reached it.
+    std::map<GridPoint, std::size_t> ParentPiece;
+};
+
+/**
+ * @brief   Collects the current each terminal draws and the terminals that are ground.
+ */
+TerminalLoads CollectTerminalLoads(const std::vector<std::unique_ptr<UIElement>> &elements,
+                                   const std::vector<Core::ComponentCurrent> &currents) {
+    TerminalLoads loads;
+    for (const auto &element : elements) {
+        const std::vector<GridPoint> terminals = element->GetTerminals();
+        for (std::size_t index = 0; index < terminals.size(); ++index) {
+            loads.Points.push_back(terminals[index]);
+            if (const std::optional<double> current = GetTerminalCurrent(element->GetComponent(), index, currents)) {
+                loads.DrawnAt[terminals[index]] += *current;
+            } else if (element->GetComponent().GetType() == Core::ComponentType::GROUND) {
+                loads.Grounded.insert(terminals[index]);
+            }
+        }
+    }
+    return loads;
+}
+
+/**
+ * @brief   Splits the wires at the terminals and at each other's ends, and indexes the pieces by their points.
+ */
+WireGraph BuildWireGraph(const std::vector<UIWire> &wires, std::vector<GridPoint> points) {
+    for (const UIWire &wire : wires) {
+        points.push_back(wire.GetStart());
+        points.push_back(wire.GetEnd());
+    }
+    WireGraph graph{.Pieces = SplitWires(wires, points), .PiecesAt = {}};
+    for (std::size_t index = 0; index < graph.Pieces.size(); ++index) {
+        graph.PiecesAt[graph.Pieces[index].Start].push_back(index);
+        graph.PiecesAt[graph.Pieces[index].End].push_back(index);
+    }
+    return graph;
+}
+
+/**
+ * @brief   Visits the points joined to a root by wire, nearest first, each once.
+ * @param[in]     graph     The wires.
+ * @param[in]     root      Where the walk starts.
+ * @param[in,out] reached   Points already visited, which the walk skips and adds to; the root is added too.
+ * @param[in]     on_reach  Called with each new point and the piece that reached it.
+ * @return  The points reached, the root first.
+ */
+template <typename OnReach>
+std::vector<GridPoint>
+WalkBreadthFirst(const WireGraph &graph, const GridPoint root, std::set<GridPoint> &reached, const OnReach &on_reach) {
+    std::vector<GridPoint> order = {root};
+    reached.insert(root);
+    for (std::size_t next = 0; next < order.size(); ++next) {
+        const GridPoint point = order[next];
+        for (const std::size_t index : graph.PiecesAt.at(point)) {
+            const GridPoint other = graph.GetOtherEnd(index, point);
+            if (reached.insert(other).second) {
+                on_reach(other, index);
+                order.push_back(other);
+            }
+        }
+    }
+    return order;
+}
+
+/**
+ * @brief   Gathers the points joined to a seed, marking them visited so the caller does not start from them again.
+ */
+std::vector<GridPoint> FindJoinedPoints(const WireGraph &graph, const GridPoint seed, std::set<GridPoint> &visited) {
+    return WalkBreadthFirst(graph, seed, visited, [](const GridPoint, const std::size_t) {});
+}
+
+/**
+ * @brief   Roots a group at a ground terminal when it has one, since ground takes what the rest leaves over.
+ */
+GridPoint ChooseRoot(const std::vector<GridPoint> &group, const std::set<GridPoint> &grounded) {
+    const auto ground =
+        std::ranges::find_if(group, [&grounded](const GridPoint point) { return grounded.contains(point); });
+    return ground != group.end() ? *ground : group.front();
+}
+
+SpanningTree BuildSpanningTree(const WireGraph &graph, const GridPoint root) {
+    SpanningTree tree;
+    std::set<GridPoint> reached;
+    tree.Order = WalkBreadthFirst(graph, root, reached, [&tree](const GridPoint point, const std::size_t index) {
+        tree.ParentPiece[point] = index;
+    });
+    return tree;
+}
+
+/**
+ * @brief   Sets the current of the pieces of a tree, from the leaves up: the piece into each point carries what that
+ *          point and the points beyond it draw.
+ */
+void AccumulateTreeCurrents(WireGraph &graph, const SpanningTree &tree, const TerminalLoads &loads) {
+    const GridPoint root = tree.Order.front();
+    std::map<GridPoint, double> drawn_beyond;
+    for (const GridPoint point : std::views::reverse(tree.Order)) {
+        const auto drawn = loads.DrawnAt.find(point);
+        drawn_beyond[point] += drawn != loads.DrawnAt.end() ? drawn->second : 0.0;
+        if (point == root) {
+            continue;
+        }
+        const std::size_t piece_index = tree.ParentPiece.at(point);
+        WireCurrent &piece = graph.Pieces[piece_index];
+        piece.Current = piece.End == point ? drawn_beyond[point] : -drawn_beyond[point];
+        drawn_beyond[graph.GetOtherEnd(piece_index, point)] += drawn_beyond[point];
+    }
+}
+
 } // namespace
 
 /**
@@ -136,25 +291,10 @@ double LargestCurrent(const Core::OperatingPoint &operating_point) {
 }
 
 /**
- * @brief   Returns where a value falls on a logarithmic heat scale, as the editor colors currents and powers.
- * @param[in] value          Value to place, of either sign: only its size counts.
- * @param[in] largest_value  Largest size of the scale, as the circuit or the whole simulation has it.
- * @param[in] decades        How many decades below the largest value the scale reaches.
- * @return  1 for the largest value, 0 for those `decades` below it or less, linear in between on a logarithmic
- *          scale, and 0 when the value is zero or there is no largest value.
- */
-float LogarithmicLevel(const double value, const double largest_value, const double decades) {
-    if (value == 0.0 || largest_value <= 0.0) {
-        return 0.0f;
-    }
-    return static_cast<float>((std::log10(std::abs(value)) - std::log10(largest_value) + decades) / decades);
-}
-
-/**
  * @brief   Returns where a current falls on the heat scale the editor colors wires and parts with.
  * @param[in] current          Current to place.
  * @param[in] largest_current  Largest current of the circuit, as LargestCurrent() returns it.
- * @return  The LogarithmicLevel() of the current over CurrentDecades.
+ * @return  The LogarithmicLevel() of the current over CURRENT_DECADES.
  */
 float CurrentLevel(const double current, const double largest_current) {
     return LogarithmicLevel(current, largest_current, CURRENT_DECADES);
@@ -174,85 +314,18 @@ float CurrentLevel(const double current, const double largest_current) {
 std::vector<WireCurrent> ComputeWireCurrents(const std::vector<std::unique_ptr<UIElement>> &elements,
                                              const std::vector<UIWire> &wires,
                                              const std::vector<Core::ComponentCurrent> &currents) {
-    // Current each point hands to the parts there, and the points ground holds
-    std::map<GridPoint, double> drawn_at;
-    std::map<GridPoint, bool> grounded;
-    std::vector<GridPoint> points;
-    for (const auto &element : elements) {
-        const std::vector<GridPoint> terminals = element->GetTerminals();
-        for (std::size_t index = 0; index < terminals.size(); ++index) {
-            points.push_back(terminals[index]);
-            if (const std::optional<double> current = GetTerminalCurrent(element->GetComponent(), index, currents)) {
-                drawn_at[terminals[index]] += *current;
-            } else if (element->GetComponent().GetType() == Core::ComponentType::GROUND) {
-                grounded[terminals[index]] = true;
-            }
-        }
-    }
-    for (const UIWire &wire : wires) {
-        points.push_back(wire.GetStart());
-        points.push_back(wire.GetEnd());
-    }
-    std::vector<WireCurrent> pieces = SplitWires(wires, points);
-
-    std::map<GridPoint, std::vector<std::size_t>> pieces_at;
-    for (std::size_t index = 0; index < pieces.size(); ++index) {
-        pieces_at[pieces[index].Start].push_back(index);
-        pieces_at[pieces[index].End].push_back(index);
-    }
-
-    std::map<GridPoint, bool> visited;
-    for (const auto &[seed, seed_pieces] : pieces_at) {
-        if (visited[seed]) {
+    const TerminalLoads loads = CollectTerminalLoads(elements, currents);
+    WireGraph graph = BuildWireGraph(wires, loads.Points);
+    std::set<GridPoint> visited;
+    for (const GridPoint seed : std::views::keys(graph.PiecesAt)) {
+        if (visited.contains(seed)) {
             continue;
         }
-        // Gathers the group first, to root its tree at a ground terminal when there is one
-        std::vector<GridPoint> group = {seed};
-        visited[seed] = true;
-        for (std::size_t next = 0; next < group.size(); ++next) {
-            for (const std::size_t index : pieces_at[group[next]]) {
-                const WireCurrent &piece = pieces[index];
-                const GridPoint other = piece.Start == group[next] ? piece.End : piece.Start;
-                if (!visited[other]) {
-                    visited[other] = true;
-                    group.push_back(other);
-                }
-            }
-        }
-        const auto ground =
-            std::ranges::find_if(group, [&grounded](const GridPoint point) { return grounded.contains(point); });
-        const GridPoint root = ground != group.end() ? *ground : group.front();
-
-        // Breadth-first tree from the root; each point remembers the piece that reached it
-        std::map<GridPoint, std::size_t> parent_piece;
-        std::map<GridPoint, bool> reached = {{root, true}};
-        std::vector<GridPoint> order = {root};
-        for (std::size_t next = 0; next < order.size(); ++next) {
-            for (const std::size_t index : pieces_at[order[next]]) {
-                const WireCurrent &piece = pieces[index];
-                const GridPoint other = piece.Start == order[next] ? piece.End : piece.Start;
-                if (!reached[other]) {
-                    reached[other] = true;
-                    parent_piece[other] = index;
-                    order.push_back(other);
-                }
-            }
-        }
-
-        // From the leaves up, the piece into each point carries what that point and the points beyond it draw
-        std::map<GridPoint, double> drawn_beyond;
-        for (auto point = order.rbegin(); point != order.rend(); ++point) {
-            drawn_beyond[*point] += drawn_at[*point];
-            if (*point == root) {
-                continue;
-            }
-            WireCurrent &piece = pieces[parent_piece[*point]];
-            piece.Current = piece.End == *point ? drawn_beyond[*point] : -drawn_beyond[*point];
-            const GridPoint parent = piece.Start == *point ? piece.End : piece.Start;
-            drawn_beyond[parent] += drawn_beyond[*point];
-        }
+        const std::vector<GridPoint> group = FindJoinedPoints(graph, seed, visited);
+        const GridPoint root = ChooseRoot(group, loads.Grounded);
+        AccumulateTreeCurrents(graph, BuildSpanningTree(graph, root), loads);
     }
-    return pieces;
+    return graph.Pieces;
 }
 
 } // namespace GUI

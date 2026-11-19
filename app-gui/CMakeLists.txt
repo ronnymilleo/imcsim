@@ -62,11 +62,13 @@ add_library(imcsim-gui-lib
             results/circuit_snapshot.cpp
             results/current_flow.cpp
             results/fuse_readings.cpp
+            results/logarithmic_level.cpp
             results/logic_bus.cpp
             results/logic_outputs.cpp
             results/logic_trace.cpp
             results/math_channel.cpp
             results/monte_carlo_results.cpp
+            results/node_index.cpp
             results/parameter_step.cpp
             results/playback.cpp
             results/point_window.cpp
@@ -75,7 +77,10 @@ add_library(imcsim-gui-lib
             results/sensitivity_view.cpp
             results/stability_circles.cpp
             results/stability_summary.cpp
-            results/trace_math.cpp
+            results/trace_math_eval.cpp
+            results/trace_math_parser.cpp
+            results/trace_math_samples.cpp
+            results/trace_math_units.cpp
             results/trace_statistics.cpp
             results/transient_window.cpp
             results/truth_table.cpp

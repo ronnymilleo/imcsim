@@ -7,6 +7,7 @@
 
 #include "circuit/components/logic_output.h"
 #include "circuit/components/seven_segment.h"
+#include "results/node_index.h"
 
 namespace GUI {
 
@@ -16,11 +17,11 @@ std::optional<LogicState> ReadTerminal(const GridPoint terminal,
                                        const double logic_level,
                                        const Connectivity &connectivity,
                                        const Core::OperatingPoint &point) {
-    const std::optional<int> node = connectivity.GetNode(terminal);
-    if (!node || *node < 0 || static_cast<std::size_t>(*node) >= point.NodeVoltages.size()) {
+    const std::optional<std::size_t> node = FindNodeIndex(connectivity.GetNode(terminal), point.NodeVoltages.size());
+    if (!node) {
         return std::nullopt;
     }
-    return ReadLogicState(point.NodeVoltages[static_cast<std::size_t>(*node)], logic_level);
+    return ReadLogicState(point.NodeVoltages[*node], logic_level);
 }
 
 } // namespace
