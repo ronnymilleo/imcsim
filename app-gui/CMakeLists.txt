@@ -193,10 +193,14 @@ add_library(imcsim-gui-lib
             windows/output_tabs/plot_widgets.cpp
             windows/output_tabs/pole_zero_tab.cpp
             windows/output_tabs/result_tables.cpp
+            windows/output_tabs/s_parameter_smith.cpp
+            windows/output_tabs/s_parameter_stability.cpp
             windows/output_tabs/s_parameter_tab.cpp
+            windows/output_tabs/s_parameter_widgets.cpp
             windows/output_tabs/spectrum_tab.cpp
             windows/output_tabs/statistics_widgets.cpp
             windows/output_tabs/step_widgets.cpp
+            windows/output_tabs/touchstone_export_control.cpp
             windows/output_tabs/transient_tab.cpp
             windows/output_window.cpp
             windows/part_editor.cpp
