@@ -8,6 +8,7 @@
 #include "test_printers.h"
 #include <catch2/catch_test_macros.hpp>
 #include <cstddef>
+#include <string>
 #include <vector>
 
 TEST_CASE("Each analysis has its own results version", "[result_store]") {
@@ -203,4 +204,64 @@ TEST_CASE("A change of the circuit drops the AC sensitivity too", "[result_store
     results.OnCircuitChanged();
 
     CHECK_FALSE(results.GetACSensitivity().has_value());
+}
+
+TEST_CASE("Any analysis tells whether it has a result, and the sensitivity has one with either kind",
+          "[result_store]") {
+    GUI::ResultStore results;
+    CHECK_FALSE(results.HasResult(GUI::Analysis::TRANSIENT));
+    results.SetTransient(Core::Transient{});
+    CHECK(results.HasResult(GUI::Analysis::TRANSIENT));
+    CHECK_FALSE(results.HasResult(GUI::Analysis::AC_SWEEP));
+
+    CHECK_FALSE(results.HasResult(GUI::Analysis::SENSITIVITY));
+    results.SetSensitivity(Core::Sensitivity{});
+    CHECK(results.HasResult(GUI::Analysis::SENSITIVITY));
+    Core::ACSensitivity ac;
+    ac.Frequencies = {1.0};
+    ac.Output = {1.0};
+    results.SetACSensitivity(ac);
+    CHECK(results.HasResult(GUI::Analysis::SENSITIVITY));
+}
+
+TEST_CASE("Clearing an analysis drops only its result, as storing none would", "[result_store]") {
+    GUI::ResultStore results;
+    results.SetTransient(Core::Transient{});
+    results.SetACSweep(Core::ACSweep{});
+    const std::size_t version = results.GetTransientVersion();
+
+    results.Clear(GUI::Analysis::TRANSIENT);
+    CHECK_FALSE(results.GetTransient().has_value());
+    CHECK(results.GetTransientVersion() != version);
+    CHECK(results.GetACSweep().has_value());
+
+    // The sensitivity drops both kinds, each of which counts as a new result
+    results.SetSensitivity(Core::Sensitivity{});
+    const std::size_t sensitivity_version = results.GetSensitivityVersion();
+    results.Clear(GUI::Analysis::SENSITIVITY);
+    CHECK_FALSE(results.HasResult(GUI::Analysis::SENSITIVITY));
+    CHECK(results.GetSensitivityVersion() == sensitivity_version + 2);
+}
+
+TEST_CASE("The warnings of an analysis are those of its result, and the sensitivity reads its AC kind",
+          "[result_store]") {
+    GUI::ResultStore results;
+    CHECK(results.GetWarnings(GUI::Analysis::TRANSIENT).empty());
+
+    Core::Transient transient;
+    transient.Warnings = {"Q1 past its maximum voltage"};
+    results.SetTransient(transient);
+    CHECK(results.GetWarnings(GUI::Analysis::TRANSIENT) == std::vector<std::string>{"Q1 past its maximum voltage"});
+    CHECK(results.GetWarnings(GUI::Analysis::OPERATING_POINT).empty());
+
+    Core::ACSensitivity ac;
+    ac.Frequencies = {1.0};
+    ac.Output = {1.0};
+    ac.Warnings = {"No response at the output"};
+    results.SetACSensitivity(ac);
+    CHECK(results.GetWarnings(GUI::Analysis::SENSITIVITY) == std::vector<std::string>{"No response at the output"});
+
+    // A DC sensitivity carries no warnings, and replaces the AC one
+    results.SetSensitivity(Core::Sensitivity{});
+    CHECK(results.GetWarnings(GUI::Analysis::SENSITIVITY).empty());
 }

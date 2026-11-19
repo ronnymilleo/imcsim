@@ -177,10 +177,8 @@ private:
     void RunHarmonicBalanceAnalysis(const Core::Circuit &circuit);
 
     // Results
-    void ClearResult(Analysis analysis);
     void Finish(Analysis analysis, std::optional<std::string> error, std::vector<Core::SimulatorMessage> messages);
     std::vector<std::string> GetResultWarnings(Analysis analysis) const;
-    bool HasResult(Analysis analysis) const;
 };
 
 } // namespace GUI

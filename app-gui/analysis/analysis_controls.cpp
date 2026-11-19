@@ -23,34 +23,6 @@ std::size_t ToIndex(const Analysis analysis) {
     return static_cast<std::size_t>(analysis);
 }
 
-/**
- * @brief   The warnings the stored result of one analysis carries, or none when it has no result or no warnings.
- */
-std::vector<std::string> ListWarningsOfResult(const ResultStore &results, const Analysis analysis) {
-    if (analysis == Analysis::OPERATING_POINT && results.GetOperatingPoint()) {
-        return results.GetOperatingPoint()->Warnings;
-    }
-    if (analysis == Analysis::TRANSIENT && results.GetTransient()) {
-        return results.GetTransient()->Warnings;
-    }
-    if (analysis == Analysis::SENSITIVITY && results.GetACSensitivity()) {
-        return results.GetACSensitivity()->Warnings;
-    }
-    if (analysis == Analysis::POLE_ZERO && results.GetPoleZero()) {
-        return results.GetPoleZero()->Warnings;
-    }
-    if (analysis == Analysis::S_PARAMETERS && results.GetSParameters()) {
-        return results.GetSParameters()->Warnings;
-    }
-    if (analysis == Analysis::TRUTH_TABLE && results.GetTruthTable()) {
-        return results.GetTruthTable()->Warnings;
-    }
-    if (analysis == Analysis::HARMONIC_BALANCE && results.GetHarmonicBalance()) {
-        return results.GetHarmonicBalance()->Warnings;
-    }
-    return {};
-}
-
 } // namespace
 
 /**
@@ -88,7 +60,7 @@ void AnalysisControls::RunSelected() {
     // Steps and draws deliver only when the whole run ends, and a stopped step delivers nothing, so the old result goes
     // now rather than be taken for theirs
     if (!IsSingleRun(*repeat)) {
-        ClearResult(analysis);
+        m_Results.Clear(analysis);
     }
     StartAnalysis(analysis, circuit, *repeat);
 }
@@ -284,7 +256,7 @@ void AnalysisControls::DiscardLive() {
     m_IsLiveRun = false;
     m_IsLiveResult = false;
     m_Schematic.SetLiveRun(false);
-    ClearResult(Analysis::TRANSIENT);
+    m_Results.Clear(Analysis::TRANSIENT);
     m_Statuses[ToIndex(Analysis::TRANSIENT)] = {};
 }
 
@@ -324,7 +296,7 @@ RunOutcome AnalysisControls::GetOutcome(const Analysis analysis) const {
     if (status.Error) {
         return RunOutcome::FAILED;
     }
-    if (!HasResult(analysis)) {
+    if (!m_Results.HasResult(analysis)) {
         return RunOutcome::NONE;
     }
     if (analysis == Analysis::TRANSIENT && m_Results.GetTransient() && !m_Results.GetTransient()->IsComplete) {
@@ -365,7 +337,7 @@ void AnalysisControls::DrawRunReport(const Analysis analysis) const {
     ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetFontSize() * 30.0f);
     if (status.Error) {
         ImGui::TextColored(GetErrorTextColor(), "%s", status.Error->c_str());
-    } else if (HasResult(analysis)) {
+    } else if (m_Results.HasResult(analysis)) {
         ImGui::Text("%s done", GetAnalysisName(analysis));
         for (const std::string &warning : GetResultWarnings(analysis)) {
             ImGui::TextColored(GetWarningTextColor(), "%s", warning.c_str());
@@ -408,7 +380,7 @@ void AnalysisControls::StartRun(const Analysis analysis, Core::Job job) {
  * @note    A refused run took no time, so it reports none.
  */
 void AnalysisControls::Refuse(const Analysis analysis, std::string message) {
-    ClearResult(analysis);
+    m_Results.Clear(analysis);
     Finish(analysis, std::move(message), {});
     m_Statuses[ToIndex(analysis)].Seconds.reset();
 }
@@ -456,47 +428,6 @@ void AnalysisControls::StartAnalysis(const Analysis analysis, const Core::Circui
     }
 }
 
-void AnalysisControls::ClearResult(const Analysis analysis) {
-    switch (analysis) {
-    case Analysis::OPERATING_POINT:
-        m_Results.SetOperatingPoint(std::nullopt);
-        break;
-    case Analysis::TRANSIENT:
-        m_Results.SetTransient(std::nullopt);
-        break;
-    case Analysis::AC_SWEEP:
-        m_Results.SetACSweep(std::nullopt);
-        break;
-    case Analysis::DC_SWEEP:
-        m_Results.SetDCSweep(std::nullopt);
-        break;
-    case Analysis::NOISE:
-        m_Results.SetNoise(std::nullopt);
-        break;
-    case Analysis::TRANSFER_FUNCTION:
-        m_Results.SetTransferFunction(std::nullopt);
-        break;
-    case Analysis::SENSITIVITY:
-        m_Results.SetSensitivity(std::nullopt);
-        m_Results.SetACSensitivity(std::nullopt);
-        break;
-    case Analysis::POLE_ZERO:
-        m_Results.SetPoleZero(std::nullopt);
-        break;
-    case Analysis::S_PARAMETERS:
-        m_Results.SetSParameters(std::nullopt);
-        break;
-    case Analysis::TRUTH_TABLE:
-        m_Results.SetTruthTable(std::nullopt);
-        break;
-    case Analysis::HARMONIC_BALANCE:
-        m_Results.SetHarmonicBalance(std::nullopt);
-        break;
-    default:
-        break;
-    }
-}
-
 void AnalysisControls::Finish(const Analysis analysis,
                               std::optional<std::string> error,
                               std::vector<Core::SimulatorMessage> messages) {
@@ -514,45 +445,12 @@ void AnalysisControls::Finish(const Analysis analysis,
  *          analysis that failed or did not run.
  */
 std::vector<std::string> AnalysisControls::GetResultWarnings(const Analysis analysis) const {
+    std::vector<std::string> warnings;
     if (const auto &monte_carlo = m_Results.GetMonteCarlo(); monte_carlo && IsRepeatable(analysis)) {
-        std::vector<std::string> warnings = ListMonteCarloWarnings(*monte_carlo);
-        if (analysis == Analysis::TRANSIENT && m_Results.GetTransient()) {
-            std::ranges::copy(m_Results.GetTransient()->Warnings, std::back_inserter(warnings));
-        }
-        if (analysis == Analysis::OPERATING_POINT && m_Results.GetOperatingPoint()) {
-            std::ranges::copy(m_Results.GetOperatingPoint()->Warnings, std::back_inserter(warnings));
-        }
-        return warnings;
+        warnings = ListMonteCarloWarnings(*monte_carlo);
     }
-    return ListWarningsOfResult(m_Results, analysis);
-}
-
-bool AnalysisControls::HasResult(const Analysis analysis) const {
-    switch (analysis) {
-    case Analysis::OPERATING_POINT:
-        return m_Results.GetOperatingPoint().has_value();
-    case Analysis::TRANSIENT:
-        return m_Results.GetTransient().has_value();
-    case Analysis::AC_SWEEP:
-        return m_Results.GetACSweep().has_value();
-    case Analysis::DC_SWEEP:
-        return m_Results.GetDCSweep().has_value();
-    case Analysis::NOISE:
-        return m_Results.GetNoise().has_value();
-    case Analysis::TRANSFER_FUNCTION:
-        return m_Results.GetTransferFunction().has_value();
-    case Analysis::SENSITIVITY:
-        return m_Results.GetSensitivity().has_value() || m_Results.GetACSensitivity().has_value();
-    case Analysis::POLE_ZERO:
-        return m_Results.GetPoleZero().has_value();
-    case Analysis::S_PARAMETERS:
-        return m_Results.GetSParameters().has_value();
-    case Analysis::TRUTH_TABLE:
-        return m_Results.GetTruthTable().has_value();
-    case Analysis::HARMONIC_BALANCE:
-        return m_Results.GetHarmonicBalance().has_value();
-    }
-    return false;
+    std::ranges::copy(m_Results.GetWarnings(analysis), std::back_inserter(warnings));
+    return warnings;
 }
 
 } // namespace GUI
