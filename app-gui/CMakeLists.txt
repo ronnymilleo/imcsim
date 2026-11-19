@@ -92,11 +92,14 @@ add_library(imcsim-gui-lib
             schematic/element_factory.cpp
             schematic/examples.cpp
             schematic/file_elements.cpp
+            schematic/file_figure_fields.cpp
             schematic/file_json.cpp
             schematic/file_library_models.cpp
             schematic/file_measurements.cpp
-            schematic/file_part_fields.cpp
+            schematic/file_model_fields.cpp
+            schematic/file_part_state_fields.cpp
             schematic/file_settings.cpp
+            schematic/file_source_fields.cpp
             schematic/file_subcircuits.cpp
             schematic/file_wires.cpp
             schematic/group_editing.cpp

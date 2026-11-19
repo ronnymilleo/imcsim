@@ -15,12 +15,32 @@
 #include <cmath>
 #include <format>
 #include <limits>
+#include <string>
 #include <string_view>
 #include <utility>
 
 namespace GUI {
 
 namespace {
+
+/// File names of the analyses, in the order of the Analysis enum.
+constexpr auto ANALYSIS_KEYS = std::to_array<std::string_view>({"operating_point",
+                                                                "transient",
+                                                                "ac_sweep",
+                                                                "dc_sweep",
+                                                                "noise",
+                                                                "transfer_function",
+                                                                "sensitivity",
+                                                                "pole_zero",
+                                                                "s_parameters",
+                                                                "truth_table",
+                                                                "harmonic_balance"});
+
+/// Fewest points of a linear S-parameter sweep a file may hold: Nodalys gives two, and a run on ngspice, which needs
+/// more, says so when it starts.
+constexpr int MIN_FILE_LINEAR_S_POINTS = 2;
+
+constexpr int MIN_POINTS_PER_DECADE = 1;
 
 constexpr auto TRANSIENT_KEYS = std::to_array<ParameterKey<Core::TransientSettings>>({
     {"stop", &Core::TransientSettings::StopTime},
@@ -33,9 +53,11 @@ constexpr auto AC_SWEEP_KEYS = std::to_array<ParameterKey<Core::ACSweepSettings>
     {"stop", &Core::ACSweepSettings::StopFrequency},
 });
 
-/// Fewest points of a linear S-parameter sweep a file may hold: Nodalys gives two, and a run on ngspice, which needs
-/// more, says so when it starts.
-constexpr int MIN_FILE_LINEAR_S_POINTS = 2;
+constexpr auto SWEEP_RANGE_KEYS = std::to_array<ParameterKey<Core::SweepRange>>({
+    {"start", &Core::SweepRange::Start},
+    {"stop", &Core::SweepRange::Stop},
+    {"step", &Core::SweepRange::Step},
+});
 
 /// The sweep type and the points are written and read apart.
 constexpr auto S_PARAMETER_KEYS = std::to_array<ParameterKey<Core::SParameterSettings>>({
@@ -54,30 +76,14 @@ constexpr auto PARAMETER_STEP_KEYS = std::to_array<ParameterKey<ParameterStepSet
     {"step", &ParameterStepSettings::Step},
 });
 
-constexpr auto SWEEP_RANGE_KEYS = std::to_array<ParameterKey<Core::SweepRange>>({
-    {"start", &Core::SweepRange::Start},
-    {"stop", &Core::SweepRange::Stop},
-    {"step", &Core::SweepRange::Step},
+constexpr auto SOLVER_KEYS = std::to_array<ParameterKey<Core::SolverOptions>>({
+    {"reltol", &Core::SolverOptions::RelativeTolerance},
+    {"abstol", &Core::SolverOptions::CurrentToleranceAmperes},
+    {"vntol", &Core::SolverOptions::VoltageToleranceVolts},
+    {"tnom", &Core::SolverOptions::NominalTemperatureCelsius},
 });
 
-nlohmann::json WriteSweepRange(const Core::SweepRange &range) {
-    nlohmann::json object = {{"source", range.Source}};
-    WriteParameters(SWEEP_RANGE_KEYS, range, object);
-    return object;
-}
-
-/// File names of the analyses, in the order of the Analysis enum.
-constexpr auto ANALYSIS_KEYS = std::to_array<std::string_view>({"operating_point",
-                                                                "transient",
-                                                                "ac_sweep",
-                                                                "dc_sweep",
-                                                                "noise",
-                                                                "transfer_function",
-                                                                "sensitivity",
-                                                                "pole_zero",
-                                                                "s_parameters",
-                                                                "truth_table",
-                                                                "harmonic_balance"});
+// Names of the enums
 
 const char *ToFileName(const Core::ToleranceDistribution distribution) {
     return distribution == Core::ToleranceDistribution::UNIFORM ? "uniform" : "gaussian";
@@ -92,13 +98,6 @@ std::optional<Core::ToleranceDistribution> ParseDistributionName(const std::stri
     }
     return std::nullopt;
 }
-
-constexpr auto SOLVER_KEYS = std::to_array<ParameterKey<Core::SolverOptions>>({
-    {"reltol", &Core::SolverOptions::RelativeTolerance},
-    {"abstol", &Core::SolverOptions::CurrentToleranceAmperes},
-    {"vntol", &Core::SolverOptions::VoltageToleranceVolts},
-    {"tnom", &Core::SolverOptions::NominalTemperatureCelsius},
-});
 
 const char *ToFileName(const Core::IntegrationMethod method) {
     switch (method) {
@@ -122,30 +121,84 @@ std::optional<Core::IntegrationMethod> ParseMethodName(const std::string_view na
     return std::nullopt;
 }
 
-nlohmann::json WriteSolverOptions(const Core::SolverOptions &options) {
-    nlohmann::json object = {{"method", ToFileName(options.Method)}};
-    WriteParameters(SOLVER_KEYS, options, object);
-    return object;
+/**
+ * @brief   Lower-cases the first letter of a check's message, so it reads inside "are out of range (...)".
+ */
+std::string DescribeOutOfRange(std::string error) {
+    error.front() = static_cast<char>(std::tolower(static_cast<unsigned char>(error.front())));
+    return std::format("are out of range ({})", error);
 }
 
-nlohmann::json WriteHarmonicBalanceSettings(const Core::HarmonicBalanceSettings &settings) {
+// Shared parts of the analyses
+
+/**
+ * @brief   The frequency range of the AC sweep, the noise analysis and the AC sensitivity: two bounds and the points
+ *          per decade.
+ */
+void WriteFrequencyRange(const Core::ACSweepSettings &range, nlohmann::json &object) {
+    WriteParameters(AC_SWEEP_KEYS, range, object);
+    object["points_per_decade"] = range.PointsPerDecade;
+}
+
+/**
+ * @brief   Reads the two bounds of a frequency range, which must be positive; the S-parameter sweep shares this step.
+ */
+template <typename Range, std::size_t Count>
+std::expected<void, std::string>
+ReadFrequencyBounds(const std::array<ParameterKey<Range>, Count> &keys, const nlohmann::json &object, Range &range) {
+    if (const auto read = ReadParameters(keys, object, range); !read) {
+        return read;
+    }
+    if (range.StartFrequency <= 0.0 || range.StopFrequency <= 0.0) {
+        return std::unexpected("have a frequency that is not positive");
+    }
+    return {};
+}
+
+std::expected<bool, std::string> ReadPointsPerDecade(const nlohmann::json &object, int &points_per_decade) {
+    return ReadOptionalInt(object,
+                           "points_per_decade",
+                           points_per_decade,
+                           "have no valid points_per_decade",
+                           MIN_POINTS_PER_DECADE);
+}
+
+std::expected<void, std::string> ReadFrequencyRange(const nlohmann::json &object, Core::ACSweepSettings &range) {
+    if (const auto read = ReadFrequencyBounds(AC_SWEEP_KEYS, object, range); !read) {
+        return read;
+    }
+    return FirstError({ReadPointsPerDecade(object, range.PointsPerDecade)});
+}
+
+/**
+ * @brief   The part of the noise, transfer function and pole-zero analyses that names the input source and the output
+ *          point.
+ */
+void WriteSourceAndOutput(const std::string &source, const std::optional<GridPoint> &output, nlohmann::json &object) {
+    object["source"] = source;
+    if (output) {
+        object["output"] = {output->X, output->Y};
+    }
+}
+
+std::expected<void, std::string>
+ReadSourceAndOutput(const nlohmann::json &object, std::string &source, std::optional<GridPoint> &output) {
+    return FirstError({ReadOptionalString(object, "source", source, "have no valid source"),
+                       ReadOptionalPoint(object, "output", output, "have no valid output point")});
+}
+
+// Transient
+
+nlohmann::json WriteTransientSettings(const SimulationSettings &settings) {
     nlohmann::json object = nlohmann::json::object();
-    WriteParameters(HARMONIC_BALANCE_KEYS, settings, object);
-    object["harmonics"] = settings.Harmonics;
-    object["samples"] = settings.Samples;
-    return object;
-}
-
-nlohmann::json WriteSParameterSettings(const Core::SParameterSettings &settings) {
-    nlohmann::json object = {{"logarithmic", settings.IsLogarithmic},
-                             {"points_per_decade", settings.PointsPerDecade},
-                             {"linear_points", settings.LinearPoints}};
-    WriteParameters(S_PARAMETER_KEYS, settings, object);
+    WriteParameters(TRANSIENT_KEYS, settings.Transient, object);
+    object["live_seconds"] = settings.LiveSeconds;
+    object["seed"] = settings.Transient.Seed;
     return object;
 }
 
 /**
- * @brief   The analysis readers below change only their own part of the settings; missing keys keep its value.
+ * @brief   The analysis readers change only their own part of the settings; missing keys keep its value.
  */
 std::expected<void, std::string> ReadTransientSettings(const nlohmann::json &object, SimulationSettings &settings) {
     if (const auto read = ReadParameters(TRANSIENT_KEYS, object, settings.Transient); !read) {
@@ -154,57 +207,51 @@ std::expected<void, std::string> ReadTransientSettings(const nlohmann::json &obj
     if (settings.Transient.StopTime <= 0.0 || settings.Transient.TimeStep <= 0.0) {
         return std::unexpected("have a time that is not positive");
     }
-    if (object.contains("live_seconds")) {
-        const std::optional<double> live_seconds = ReadNumber(object, "live_seconds");
-        if (!live_seconds || !IsValidLiveSeconds(*live_seconds)) {
-            return std::unexpected("have no valid live_seconds");
-        }
-        settings.LiveSeconds = *live_seconds;
+    if (const auto read = ReadOptionalNumber(object,
+                                             "live_seconds",
+                                             settings.LiveSeconds,
+                                             "have no valid live_seconds",
+                                             &IsValidLiveSeconds);
+        !read) {
+        return std::unexpected(read.error());
     }
-    if (object.contains("seed")) {
-        const std::optional<int> seed = ReadInt(object, "seed");
-        if (!seed || *seed < 0) {
-            return std::unexpected("have no valid seed");
-        }
-        settings.Transient.Seed = static_cast<unsigned int>(*seed);
+    int seed = 0;
+    const std::expected<bool, std::string> has_seed = ReadOptionalInt(object, "seed", seed, "have no valid seed", 0);
+    if (!has_seed) {
+        return std::unexpected(has_seed.error());
+    }
+    if (*has_seed) {
+        settings.Transient.Seed = static_cast<unsigned int>(seed);
     }
     return {};
 }
 
-/**
- * @brief   The AC sweep and the noise analysis share the form of their frequency range.
- */
-std::expected<void, std::string> ReadFrequencyRange(const nlohmann::json &object, Core::ACSweepSettings &range) {
-    if (const auto read = ReadParameters(AC_SWEEP_KEYS, object, range); !read) {
-        return read;
-    }
-    if (range.StartFrequency <= 0.0 || range.StopFrequency <= 0.0) {
-        return std::unexpected("have a frequency that is not positive");
-    }
-    if (object.contains("points_per_decade")) {
-        const std::optional<int> points = ReadInt(object, "points_per_decade");
-        if (!points || *points < 1) {
-            return std::unexpected("have no valid points_per_decade");
-        }
-        range.PointsPerDecade = *points;
-    }
-    return {};
+// AC sweep
+
+nlohmann::json WriteACSweepSettings(const SimulationSettings &settings) {
+    nlohmann::json object = nlohmann::json::object();
+    WriteFrequencyRange(settings.ACSweep, object);
+    return object;
 }
 
 std::expected<void, std::string> ReadACSweepSettings(const nlohmann::json &object, SimulationSettings &settings) {
     return ReadFrequencyRange(object, settings.ACSweep);
 }
 
+// DC sweep
+
+nlohmann::json WriteSweepRange(const Core::SweepRange &range) {
+    nlohmann::json object = {{"source", range.Source}};
+    WriteParameters(SWEEP_RANGE_KEYS, range, object);
+    return object;
+}
+
 std::expected<void, std::string> ReadSweepRange(const nlohmann::json &object, Core::SweepRange &range) {
     if (!object.is_object()) {
         return std::unexpected("have a range that is not an object");
     }
-    if (object.contains("source")) {
-        const std::optional<std::string> source = ReadString(object, "source");
-        if (!source) {
-            return std::unexpected("have no valid source");
-        }
-        range.Source = *source;
+    if (const auto read = ReadOptionalString(object, "source", range.Source, "have no valid source"); !read) {
+        return std::unexpected(read.error());
     }
     if (const auto read = ReadParameters(SWEEP_RANGE_KEYS, object, range); !read) {
         return read;
@@ -213,6 +260,14 @@ std::expected<void, std::string> ReadSweepRange(const nlohmann::json &object, Co
         return std::unexpected("have a step of zero");
     }
     return {};
+}
+
+nlohmann::json WriteDCSweepSettings(const SimulationSettings &settings) {
+    return {
+        {"swept", WriteSweepRange(settings.SweptRange)},
+        {"stepped", WriteSweepRange(settings.SteppedRange)},
+        {"step_source", settings.StepSource},
+    };
 }
 
 std::expected<void, std::string> ReadDCSweepSettings(const nlohmann::json &object, SimulationSettings &settings) {
@@ -226,162 +281,124 @@ std::expected<void, std::string> ReadDCSweepSettings(const nlohmann::json &objec
             return read;
         }
     }
-    if (object.contains("step_source")) {
-        const std::optional<bool> step_source = ReadBool(object, "step_source");
-        if (!step_source) {
-            return std::unexpected("have a step_source flag that is not true or false");
-        }
-        settings.StepSource = *step_source;
-    }
-    return {};
+    return FirstError({ReadOptionalBool(object,
+                                        "step_source",
+                                        settings.StepSource,
+                                        "have a step_source flag that is not true or false")});
+}
+
+// Noise
+
+nlohmann::json WriteNoiseSettings(const SimulationSettings &settings) {
+    nlohmann::json object = nlohmann::json::object();
+    WriteFrequencyRange(settings.NoiseRange, object);
+    WriteSourceAndOutput(settings.NoiseSource, settings.NoiseOutput, object);
+    return object;
 }
 
 std::expected<void, std::string> ReadNoiseSettings(const nlohmann::json &object, SimulationSettings &settings) {
     if (const auto read = ReadFrequencyRange(object, settings.NoiseRange); !read) {
         return read;
     }
-    if (object.contains("source")) {
-        const std::optional<std::string> source = ReadString(object, "source");
-        if (!source) {
-            return std::unexpected("have no valid source");
-        }
-        settings.NoiseSource = *source;
-    }
-    if (object.contains("output")) {
-        const std::optional<GridPoint> output = ReadPoint(object, "output");
-        if (!output) {
-            return std::unexpected("have no valid output point");
-        }
-        settings.NoiseOutput = *output;
-    }
-    return {};
+    return ReadSourceAndOutput(object, settings.NoiseSource, settings.NoiseOutput);
+}
+
+// Transfer function
+
+nlohmann::json WriteTransferFunctionSettings(const SimulationSettings &settings) {
+    nlohmann::json object = nlohmann::json::object();
+    WriteSourceAndOutput(settings.TransferFunctionSource, settings.TransferFunctionOutput, object);
+    return object;
 }
 
 std::expected<void, std::string> ReadTransferFunctionSettings(const nlohmann::json &object,
                                                               SimulationSettings &settings) {
-    if (object.contains("source")) {
-        const std::optional<std::string> source = ReadString(object, "source");
-        if (!source) {
-            return std::unexpected("have no valid source");
-        }
-        settings.TransferFunctionSource = *source;
-    }
-    if (object.contains("output")) {
-        const std::optional<GridPoint> output = ReadPoint(object, "output");
-        if (!output) {
-            return std::unexpected("have no valid output point");
-        }
-        settings.TransferFunctionOutput = *output;
-    }
-    return {};
+    return ReadSourceAndOutput(object, settings.TransferFunctionSource, settings.TransferFunctionOutput);
 }
 
-std::expected<void, std::string> ReadPoleZeroSettings(const nlohmann::json &object, SimulationSettings &settings) {
-    if (object.contains("source")) {
-        const std::optional<std::string> source = ReadString(object, "source");
-        if (!source) {
-            return std::unexpected("have no valid source");
-        }
-        settings.PoleZeroSource = *source;
-    }
-    if (object.contains("output")) {
-        const std::optional<GridPoint> output = ReadPoint(object, "output");
-        if (!output) {
-            return std::unexpected("have no valid output point");
-        }
-        settings.PoleZeroOutput = *output;
-    }
-    return {};
-}
+// Sensitivity
 
-std::expected<void, std::string> ReadHarmonicBalanceSettings(const nlohmann::json &object,
-                                                             SimulationSettings &settings) {
-    Core::HarmonicBalanceSettings range;
-    if (const auto read = ReadParameters(HARMONIC_BALANCE_KEYS, object, range); !read) {
-        return std::unexpected(read.error());
+nlohmann::json WriteSensitivitySettings(const SimulationSettings &settings) {
+    nlohmann::json object = {{"kind", settings.SensitivityType == SensitivityKind::AC ? "ac" : "dc"}};
+    if (settings.SensitivityOutput) {
+        object["output"] = {settings.SensitivityOutput->X, settings.SensitivityOutput->Y};
     }
-    if (object.contains("harmonics")) {
-        const std::optional<int> harmonics = ReadInt(object, "harmonics");
-        if (!harmonics) {
-            return std::unexpected("has no valid harmonics");
-        }
-        range.Harmonics = *harmonics;
-    }
-    if (object.contains("samples")) {
-        const std::optional<int> samples = ReadInt(object, "samples");
-        if (!samples) {
-            return std::unexpected("has no valid samples");
-        }
-        range.Samples = *samples;
-    }
-    if (std::optional<std::string> error = Core::CheckHarmonicBalanceGrid(range)) {
-        error->front() = static_cast<char>(std::tolower(static_cast<unsigned char>(error->front())));
-        return std::unexpected(std::format("are out of range ({})", *error));
-    }
-    settings.HarmonicBalance = range;
-    return {};
-}
-
-std::expected<void, std::string> ReadSParameterSettings(const nlohmann::json &object, SimulationSettings &settings) {
-    Core::SParameterSettings &range = settings.SParameters;
-    if (const auto read = ReadParameters(S_PARAMETER_KEYS, object, range); !read) {
-        return read;
-    }
-    if (range.StartFrequency <= 0.0 || range.StopFrequency <= 0.0) {
-        return std::unexpected("have a frequency that is not positive");
-    }
-    if (object.contains("logarithmic")) {
-        const std::optional<bool> is_logarithmic = ReadBool(object, "logarithmic");
-        if (!is_logarithmic) {
-            return std::unexpected("have a logarithmic flag that is not true or false");
-        }
-        range.IsLogarithmic = *is_logarithmic;
-    }
-    if (object.contains("points_per_decade")) {
-        const std::optional<int> points = ReadInt(object, "points_per_decade");
-        if (!points || *points < 1) {
-            return std::unexpected("have no valid points_per_decade");
-        }
-        range.PointsPerDecade = *points;
-    }
-    if (object.contains("linear_points")) {
-        const std::optional<int> points = ReadInt(object, "linear_points");
-        if (!points || *points < MIN_FILE_LINEAR_S_POINTS) {
-            return std::unexpected("have no valid linear_points");
-        }
-        range.LinearPoints = *points;
-    }
-    return {};
+    nlohmann::json ac = {{"source", settings.ACSensitivitySource}};
+    WriteFrequencyRange(settings.ACSensitivityRange, ac);
+    object["ac"] = std::move(ac);
+    return object;
 }
 
 std::expected<void, std::string> ReadSensitivitySettings(const nlohmann::json &object, SimulationSettings &settings) {
-    if (object.contains("output")) {
-        const std::optional<GridPoint> output = ReadPoint(object, "output");
-        if (!output) {
-            return std::unexpected("have no valid output point");
-        }
-        settings.SensitivityOutput = *output;
+    if (const auto read = ReadOptionalPoint(object, "output", settings.SensitivityOutput, "have no valid output point");
+        !read) {
+        return std::unexpected(read.error());
     }
-    if (object.contains("kind")) {
-        const std::optional<std::string> kind = ReadString(object, "kind");
-        if (!kind || (*kind != "dc" && *kind != "ac")) {
+    std::string kind;
+    const std::expected<bool, std::string> has_kind =
+        ReadOptionalString(object, "kind", kind, "have a kind that is neither dc nor ac");
+    if (!has_kind) {
+        return std::unexpected(has_kind.error());
+    }
+    if (*has_kind) {
+        if (kind != "dc" && kind != "ac") {
             return std::unexpected("have a kind that is neither dc nor ac");
         }
-        settings.SensitivityType = *kind == "ac" ? SensitivityKind::AC : SensitivityKind::DC;
+        settings.SensitivityType = kind == "ac" ? SensitivityKind::AC : SensitivityKind::DC;
     }
     if (const auto ac = object.find("ac"); ac != object.end()) {
         if (const auto read = ReadFrequencyRange(*ac, settings.ACSensitivityRange); !read) {
             return read;
         }
-        if (ac->contains("source")) {
-            const std::optional<std::string> source = ReadString(*ac, "source");
-            if (!source) {
-                return std::unexpected("have no valid source");
-            }
-            settings.ACSensitivitySource = *source;
-        }
+        return FirstError({ReadOptionalString(*ac, "source", settings.ACSensitivitySource, "have no valid source")});
     }
     return {};
+}
+
+// Pole-zero
+
+nlohmann::json WritePoleZeroSettings(const SimulationSettings &settings) {
+    nlohmann::json object = nlohmann::json::object();
+    WriteSourceAndOutput(settings.PoleZeroSource, settings.PoleZeroOutput, object);
+    return object;
+}
+
+std::expected<void, std::string> ReadPoleZeroSettings(const nlohmann::json &object, SimulationSettings &settings) {
+    return ReadSourceAndOutput(object, settings.PoleZeroSource, settings.PoleZeroOutput);
+}
+
+// S-parameters
+
+nlohmann::json WriteSParameterSettings(const SimulationSettings &settings) {
+    const Core::SParameterSettings &range = settings.SParameters;
+    nlohmann::json object = {{"logarithmic", range.IsLogarithmic},
+                             {"points_per_decade", range.PointsPerDecade},
+                             {"linear_points", range.LinearPoints}};
+    WriteParameters(S_PARAMETER_KEYS, range, object);
+    return object;
+}
+
+std::expected<void, std::string> ReadSParameterSettings(const nlohmann::json &object, SimulationSettings &settings) {
+    Core::SParameterSettings &range = settings.SParameters;
+    if (const auto read = ReadFrequencyBounds(S_PARAMETER_KEYS, object, range); !read) {
+        return read;
+    }
+    return FirstError({ReadOptionalBool(object,
+                                        "logarithmic",
+                                        range.IsLogarithmic,
+                                        "have a logarithmic flag that is not true or false"),
+                       ReadPointsPerDecade(object, range.PointsPerDecade),
+                       ReadOptionalInt(object,
+                                       "linear_points",
+                                       range.LinearPoints,
+                                       "have no valid linear_points",
+                                       MIN_FILE_LINEAR_S_POINTS)});
+}
+
+// Truth table
+
+nlohmann::json WriteTruthTableSettings(const SimulationSettings &settings) {
+    return {{"inputs", settings.TruthTableInputs}};
 }
 
 std::expected<void, std::string> ReadTruthTableSettings(const nlohmann::json &object, SimulationSettings &settings) {
@@ -403,67 +420,131 @@ std::expected<void, std::string> ReadTruthTableSettings(const nlohmann::json &ob
     return {};
 }
 
+// Harmonic balance
+
+nlohmann::json WriteHarmonicBalanceSettings(const SimulationSettings &settings) {
+    nlohmann::json object = nlohmann::json::object();
+    WriteParameters(HARMONIC_BALANCE_KEYS, settings.HarmonicBalance, object);
+    object["harmonics"] = settings.HarmonicBalance.Harmonics;
+    object["samples"] = settings.HarmonicBalance.Samples;
+    return object;
+}
+
+std::expected<void, std::string> ReadHarmonicBalanceSettings(const nlohmann::json &object,
+                                                             SimulationSettings &settings) {
+    Core::HarmonicBalanceSettings range;
+    if (const auto read = ReadParameters(HARMONIC_BALANCE_KEYS, object, range); !read) {
+        return read;
+    }
+    if (const auto read = FirstError({ReadOptionalInt(object, "harmonics", range.Harmonics, "has no valid harmonics"),
+                                      ReadOptionalInt(object, "samples", range.Samples, "has no valid samples")});
+        !read) {
+        return read;
+    }
+    if (std::optional<std::string> error = Core::CheckHarmonicBalanceGrid(range)) {
+        return std::unexpected(DescribeOutOfRange(std::move(*error)));
+    }
+    settings.HarmonicBalance = range;
+    return {};
+}
+
+// Parameter step
+
+nlohmann::json WriteParameterStepSettings(const SimulationSettings &settings) {
+    const ParameterStepSettings &step = settings.ParameterStep;
+    nlohmann::json object = {{"enabled", step.Enabled},
+                             {"part", step.Part},
+                             {"uses_list", step.UsesList},
+                             {"list", step.List}};
+    WriteParameters(PARAMETER_STEP_KEYS, step, object);
+    return object;
+}
+
 std::expected<void, std::string> ReadParameterStepSettings(const nlohmann::json &object, SimulationSettings &settings) {
     ParameterStepSettings &step = settings.ParameterStep;
     if (const auto read = ReadParameters(PARAMETER_STEP_KEYS, object, step); !read) {
         return read;
     }
     for (const auto &[key, flag] : {std::pair{"enabled", &step.Enabled}, std::pair{"uses_list", &step.UsesList}}) {
-        if (object.contains(key)) {
-            const std::optional<bool> value = ReadBool(object, key);
-            if (!value) {
-                return std::unexpected(std::format("have a {} flag that is not true or false", key));
-            }
-            *flag = *value;
+        if (const auto read =
+                ReadOptionalBool(object, key, *flag, std::format("have a {} flag that is not true or false", key));
+            !read) {
+            return std::unexpected(read.error());
         }
     }
     for (const auto &[key, text] : {std::pair{"part", &step.Part}, std::pair{"list", &step.List}}) {
-        if (object.contains(key)) {
-            const std::optional<std::string> value = ReadString(object, key);
-            if (!value) {
-                return std::unexpected(std::format("have no valid {}", key));
-            }
-            *text = *value;
+        if (const auto read = ReadOptionalString(object, key, *text, std::format("have no valid {}", key)); !read) {
+            return std::unexpected(read.error());
         }
     }
     return {};
 }
 
+// Monte Carlo
+
+/**
+ * @brief   A seed is a whole number that fits the generator, which a JSON number may not be.
+ */
+bool IsValidMonteCarloSeed(const double seed) {
+    return seed >= 0.0 && seed <= static_cast<double>(std::numeric_limits<unsigned int>::max())
+        && seed == std::floor(seed);
+}
+
+nlohmann::json WriteMonteCarloSettings(const SimulationSettings &settings) {
+    const Core::MonteCarloSettings &monte_carlo = settings.MonteCarlo;
+    return {
+        {"enabled", monte_carlo.Enabled},
+        {"runs", monte_carlo.Runs},
+        {"distribution", ToFileName(monte_carlo.Distribution)},
+        {"seed", monte_carlo.Seed},
+    };
+}
+
 std::expected<void, std::string> ReadMonteCarloSettings(const nlohmann::json &object, SimulationSettings &settings) {
     Core::MonteCarloSettings &monte_carlo = settings.MonteCarlo;
-    if (object.contains("enabled")) {
-        const std::optional<bool> enabled = ReadBool(object, "enabled");
-        if (!enabled) {
-            return std::unexpected("have an enabled flag that is not true or false");
-        }
-        monte_carlo.Enabled = *enabled;
+    if (const auto read = FirstError(
+            {ReadOptionalBool(object, "enabled", monte_carlo.Enabled, "have an enabled flag that is not true or false"),
+             ReadOptionalInt(
+                 object,
+                 "runs",
+                 monte_carlo.Runs,
+                 std::format("have no valid runs, {} to {}", Core::MIN_MONTE_CARLO_RUNS, Core::MAX_MONTE_CARLO_RUNS),
+                 Core::MIN_MONTE_CARLO_RUNS,
+                 Core::MAX_MONTE_CARLO_RUNS)});
+        !read) {
+        return read;
     }
-    if (object.contains("runs")) {
-        const std::optional<int> runs = ReadInt(object, "runs");
-        if (!runs || *runs < Core::MIN_MONTE_CARLO_RUNS || *runs > Core::MAX_MONTE_CARLO_RUNS) {
-            return std::unexpected(
-                std::format("have no valid runs, {} to {}", Core::MIN_MONTE_CARLO_RUNS, Core::MAX_MONTE_CARLO_RUNS));
-        }
-        monte_carlo.Runs = *runs;
+    std::string distribution_name;
+    const std::expected<bool, std::string> has_distribution =
+        ReadOptionalString(object, "distribution", distribution_name, "have an unknown distribution");
+    if (!has_distribution) {
+        return std::unexpected(has_distribution.error());
     }
-    if (object.contains("distribution")) {
-        const std::optional<std::string> name = ReadString(object, "distribution");
-        const std::optional<Core::ToleranceDistribution> distribution =
-            name ? ParseDistributionName(*name) : std::nullopt;
+    if (*has_distribution) {
+        const std::optional<Core::ToleranceDistribution> distribution = ParseDistributionName(distribution_name);
         if (!distribution) {
             return std::unexpected("have an unknown distribution");
         }
         monte_carlo.Distribution = *distribution;
     }
-    if (object.contains("seed")) {
-        const std::optional<double> seed = ReadNumber(object, "seed");
-        if (!seed || *seed < 0.0 || *seed > static_cast<double>(std::numeric_limits<unsigned int>::max())
-            || *seed != std::floor(*seed)) {
-            return std::unexpected("have no valid seed");
-        }
-        monte_carlo.Seed = static_cast<unsigned int>(*seed);
+    double seed = 0.0;
+    const std::expected<bool, std::string> has_seed =
+        ReadOptionalNumber(object, "seed", seed, "have no valid seed", &IsValidMonteCarloSeed);
+    if (!has_seed) {
+        return std::unexpected(has_seed.error());
+    }
+    if (*has_seed) {
+        monte_carlo.Seed = static_cast<unsigned int>(seed);
     }
     return {};
+}
+
+// Solver
+
+nlohmann::json WriteSolverSettings(const SimulationSettings &settings) {
+    nlohmann::json object = {{"method", ToFileName(settings.Solver.Method)}};
+    WriteParameters(SOLVER_KEYS, settings.Solver, object);
+    return object;
 }
 
 std::expected<void, std::string> ReadSolverSettings(const nlohmann::json &object, SimulationSettings &settings) {
@@ -471,46 +552,54 @@ std::expected<void, std::string> ReadSolverSettings(const nlohmann::json &object
     if (const auto read = ReadParameters(SOLVER_KEYS, object, options); !read) {
         return read;
     }
-    if (object.contains("method")) {
-        const std::optional<std::string> name = ReadString(object, "method");
-        const std::optional<Core::IntegrationMethod> method = name ? ParseMethodName(*name) : std::nullopt;
+    std::string method_name;
+    const std::expected<bool, std::string> has_method =
+        ReadOptionalString(object, "method", method_name, "have an unknown integration method");
+    if (!has_method) {
+        return std::unexpected(has_method.error());
+    }
+    if (*has_method) {
+        const std::optional<Core::IntegrationMethod> method = ParseMethodName(method_name);
         if (!method) {
             return std::unexpected("have an unknown integration method");
         }
         options.Method = *method;
     }
     if (std::optional<std::string> error = Core::CheckSolverOptions(options)) {
-        error->front() = static_cast<char>(std::tolower(static_cast<unsigned char>(error->front())));
-        return std::unexpected(std::format("are out of range ({})", *error));
+        return std::unexpected(DescribeOutOfRange(std::move(*error)));
     }
     settings.Solver = options;
     return {};
 }
 
+// Table of the analyses
+
 /**
- * @struct  AnalysisReader
- * @brief   JSON key of the settings of one analysis, its name in warnings and the function that reads them.
+ * @struct  AnalysisCodec
+ * @brief   JSON key of the settings of one analysis, its name in warnings, and the functions that write and read
+ *          them, so a field is never added to one side only.
  */
-struct AnalysisReader {
+struct AnalysisCodec {
     const char *Key;
     const char *Label;
+    nlohmann::json (*Write)(const SimulationSettings &);
     std::expected<void, std::string> (*Read)(const nlohmann::json &, SimulationSettings &);
 };
 
-constexpr auto ANALYSIS_READERS = std::to_array<AnalysisReader>({
-    {"transient", "transient", &ReadTransientSettings},
-    {"ac_sweep", "AC sweep", &ReadACSweepSettings},
-    {"dc_sweep", "DC sweep", &ReadDCSweepSettings},
-    {"noise", "noise", &ReadNoiseSettings},
-    {"transfer_function", "transfer function", &ReadTransferFunctionSettings},
-    {"sensitivity", "sensitivity", &ReadSensitivitySettings},
-    {"pole_zero", "pole-zero", &ReadPoleZeroSettings},
-    {"s_parameters", "S-parameter", &ReadSParameterSettings},
-    {"truth_table", "truth table", &ReadTruthTableSettings},
-    {"harmonic_balance", "harmonic balance", &ReadHarmonicBalanceSettings},
-    {"parameter_step", "parameter step", &ReadParameterStepSettings},
-    {"monte_carlo", "Monte Carlo", &ReadMonteCarloSettings},
-    {"solver", "solver", &ReadSolverSettings},
+constexpr auto ANALYSIS_CODECS = std::to_array<AnalysisCodec>({
+    {"transient", "transient", &WriteTransientSettings, &ReadTransientSettings},
+    {"ac_sweep", "AC sweep", &WriteACSweepSettings, &ReadACSweepSettings},
+    {"dc_sweep", "DC sweep", &WriteDCSweepSettings, &ReadDCSweepSettings},
+    {"noise", "noise", &WriteNoiseSettings, &ReadNoiseSettings},
+    {"transfer_function", "transfer function", &WriteTransferFunctionSettings, &ReadTransferFunctionSettings},
+    {"sensitivity", "sensitivity", &WriteSensitivitySettings, &ReadSensitivitySettings},
+    {"pole_zero", "pole-zero", &WritePoleZeroSettings, &ReadPoleZeroSettings},
+    {"s_parameters", "S-parameter", &WriteSParameterSettings, &ReadSParameterSettings},
+    {"truth_table", "truth table", &WriteTruthTableSettings, &ReadTruthTableSettings},
+    {"harmonic_balance", "harmonic balance", &WriteHarmonicBalanceSettings, &ReadHarmonicBalanceSettings},
+    {"parameter_step", "parameter step", &WriteParameterStepSettings, &ReadParameterStepSettings},
+    {"monte_carlo", "Monte Carlo", &WriteMonteCarloSettings, &ReadMonteCarloSettings},
+    {"solver", "solver", &WriteSolverSettings, &ReadSolverSettings},
 });
 
 } // namespace
@@ -521,70 +610,11 @@ constexpr auto ANALYSIS_READERS = std::to_array<AnalysisReader>({
  * @return  An object with one entry for each analysis and the selected one.
  */
 nlohmann::json WriteSettings(const SimulationSettings &settings) {
-    nlohmann::json transient = nlohmann::json::object();
-    WriteParameters(TRANSIENT_KEYS, settings.Transient, transient);
-    transient["live_seconds"] = settings.LiveSeconds;
-    transient["seed"] = settings.Transient.Seed;
-    nlohmann::json ac_sweep = nlohmann::json::object();
-    WriteParameters(AC_SWEEP_KEYS, settings.ACSweep, ac_sweep);
-    ac_sweep["points_per_decade"] = settings.ACSweep.PointsPerDecade;
-    nlohmann::json noise = {{"source", settings.NoiseSource}};
-    WriteParameters(AC_SWEEP_KEYS, settings.NoiseRange, noise);
-    noise["points_per_decade"] = settings.NoiseRange.PointsPerDecade;
-    if (settings.NoiseOutput) {
-        noise["output"] = {settings.NoiseOutput->X, settings.NoiseOutput->Y};
+    nlohmann::json object = {{"analysis", ANALYSIS_KEYS[static_cast<std::size_t>(settings.Selected)]}};
+    for (const AnalysisCodec &codec : ANALYSIS_CODECS) {
+        object[codec.Key] = codec.Write(settings);
     }
-    nlohmann::json transfer_function = {{"source", settings.TransferFunctionSource}};
-    if (settings.TransferFunctionOutput) {
-        transfer_function["output"] = {settings.TransferFunctionOutput->X, settings.TransferFunctionOutput->Y};
-    }
-    nlohmann::json sensitivity = {{"kind", settings.SensitivityType == SensitivityKind::AC ? "ac" : "dc"}};
-    if (settings.SensitivityOutput) {
-        sensitivity["output"] = {settings.SensitivityOutput->X, settings.SensitivityOutput->Y};
-    }
-    nlohmann::json ac_sensitivity = {{"source", settings.ACSensitivitySource}};
-    WriteParameters(AC_SWEEP_KEYS, settings.ACSensitivityRange, ac_sensitivity);
-    ac_sensitivity["points_per_decade"] = settings.ACSensitivityRange.PointsPerDecade;
-    sensitivity["ac"] = std::move(ac_sensitivity);
-    nlohmann::json pole_zero = {{"source", settings.PoleZeroSource}};
-    if (settings.PoleZeroOutput) {
-        pole_zero["output"] = {settings.PoleZeroOutput->X, settings.PoleZeroOutput->Y};
-    }
-    const nlohmann::json truth_table = {{"inputs", settings.TruthTableInputs}};
-    const ParameterStepSettings &step = settings.ParameterStep;
-    nlohmann::json parameter_step = {{"enabled", step.Enabled},
-                                     {"part", step.Part},
-                                     {"uses_list", step.UsesList},
-                                     {"list", step.List}};
-    WriteParameters(PARAMETER_STEP_KEYS, step, parameter_step);
-    const Core::MonteCarloSettings &monte_carlo = settings.MonteCarlo;
-    const nlohmann::json monte_carlo_object = {
-        {"enabled", monte_carlo.Enabled},
-        {"runs", monte_carlo.Runs},
-        {"distribution", ToFileName(monte_carlo.Distribution)},
-        {"seed", monte_carlo.Seed},
-    };
-    return {
-        {"analysis", ANALYSIS_KEYS[static_cast<std::size_t>(settings.Selected)]},
-        {"transient", transient},
-        {"ac_sweep", ac_sweep},
-        {"dc_sweep",
-         {
-             {"swept", WriteSweepRange(settings.SweptRange)},
-             {"stepped", WriteSweepRange(settings.SteppedRange)},
-             {"step_source", settings.StepSource},
-         }},
-        {"noise", noise},
-        {"transfer_function", transfer_function},
-        {"sensitivity", sensitivity},
-        {"pole_zero", pole_zero},
-        {"s_parameters", WriteSParameterSettings(settings.SParameters)},
-        {"truth_table", truth_table},
-        {"harmonic_balance", WriteHarmonicBalanceSettings(settings.HarmonicBalance)},
-        {"parameter_step", parameter_step},
-        {"monte_carlo", monte_carlo_object},
-        {"solver", WriteSolverOptions(settings.Solver)},
-    };
+    return object;
 }
 
 /**
@@ -614,21 +644,21 @@ SimulationSettings ReadSettings(const nlohmann::json &document, std::vector<std:
             warnings.push_back("The selected analysis is unknown and was reset to the transient");
         }
     }
-    for (const AnalysisReader &reader : ANALYSIS_READERS) {
-        const auto object = simulation->find(reader.Key);
+    for (const AnalysisCodec &codec : ANALYSIS_CODECS) {
+        const auto object = simulation->find(codec.Key);
         if (object == simulation->end()) {
             continue;
         }
         SimulationSettings read_settings = settings;
         std::expected<void, std::string> read = std::unexpected("are not an object");
         if (object->is_object()) {
-            read = reader.Read(*object, read_settings);
+            read = codec.Read(*object, read_settings);
         }
         if (read) {
             settings = std::move(read_settings);
         } else {
             warnings.push_back(
-                std::format("The {} settings {} and were reset to the defaults", reader.Label, read.error()));
+                std::format("The {} settings {} and were reset to the defaults", codec.Label, read.error()));
         }
     }
     return settings;

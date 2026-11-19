@@ -97,33 +97,53 @@ bool ContainsBlock(const std::span<const SavedSubcircuit> definitions,
 }
 
 /**
+ * @brief   Orders some items so each one comes after every item it depends on.
+ * @details The walk is depth first and keeps the order of the list where items do not depend on each other. An item in
+ *          a cycle, which only a damaged file can hold, comes after the others it can instead of looping.
+ * @param[in] count           Number of items, which are known by their positions 0 to count - 1.
+ * @param[in] dependencies_of Returns the positions of the items one item depends on, in the order to visit them.
+ * @return  The positions of all the items, in that order.
+ */
+std::vector<std::size_t>
+OrderByDependencies(const std::size_t count,
+                    const std::function<std::vector<std::size_t>(std::size_t)> &dependencies_of) {
+    std::vector<std::size_t> order;
+    std::vector<bool> is_placed(count, false);
+    std::vector<bool> is_open(count, false);
+    const std::function<void(std::size_t)> place = [&](const std::size_t index) {
+        if (is_placed[index] || is_open[index]) {
+            return;
+        }
+        is_open[index] = true;
+        for (const std::size_t dependency : dependencies_of(index)) {
+            place(dependency);
+        }
+        is_open[index] = false;
+        is_placed[index] = true;
+        order.push_back(index);
+    };
+    for (std::size_t index = 0; index < count; ++index) {
+        place(index);
+    }
+    return order;
+}
+
+/**
  * @brief   Orders the definitions so each one comes after every block it uses, as a netlist or a merge reads them.
  * @param[in] definitions  Every block definition.
  * @return  Their positions in that order; among blocks that do not depend on each other, the order of the list stays.
  *          A block that uses one it contains, which only a damaged file can hold, keeps its place after the others.
  */
 std::vector<std::size_t> OrderByUse(const std::span<const SavedSubcircuit> definitions) {
-    std::vector<std::size_t> order;
-    std::vector<bool> is_placed(definitions.size(), false);
-    std::vector<bool> is_open(definitions.size(), false);
-    const std::function<void(std::size_t)> place = [&](const std::size_t index) {
-        if (is_placed[index] || is_open[index]) {
-            return;
-        }
-        is_open[index] = true;
+    return OrderByDependencies(definitions.size(), [&](const std::size_t index) {
+        std::vector<std::size_t> used_definitions;
         for (const std::string &used : ListUsedBlocks(definitions[index].Elements)) {
             if (const std::optional<std::size_t> inner = FindDefinition(definitions, used)) {
-                place(*inner);
+                used_definitions.push_back(*inner);
             }
         }
-        is_open[index] = false;
-        is_placed[index] = true;
-        order.push_back(index);
-    };
-    for (std::size_t index = 0; index < definitions.size(); ++index) {
-        place(index);
-    }
-    return order;
+        return used_definitions;
+    });
 }
 
 /**

@@ -40,6 +40,7 @@ add_executable(imcsim-tests
             element_factory_tests.cpp
             engine_cross_validation_tests.cpp
             examples_tests.cpp
+            file_json_tests.cpp
             fuse_tests.cpp
             group_editing_tests.cpp
             harmonic_balance_view_tests.cpp
@@ -152,6 +153,7 @@ target_include_directories(imcsim-tests
 target_link_libraries(imcsim-tests
         PRIVATE
             imcsim-gui-lib
+            nlohmann_json::nlohmann_json
             Catch2::Catch2WithMain
 )
 
