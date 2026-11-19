@@ -7,11 +7,22 @@
 #define IMCSIM_LIVE_INPUT_HANDLER_H
 
 #include "base/helpers.h"
+#include "schematic/live_input.h"
 #include "schematic/schematic.h"
 #include <cstddef>
 #include <optional>
 
 namespace GUI {
+
+/**
+ * @struct  LivePart
+ * @brief   A part under the cursor that the user sets by hand during a live run, and what the mouse does to it.
+ */
+struct LivePart {
+    /// Index of the part among the elements of the schematic on show.
+    std::size_t Index = 0;
+    LiveAction Action = LiveAction::NONE;
+};
 
 /**
  * @class   LiveInputHandler
@@ -20,11 +31,11 @@ namespace GUI {
 class LiveInputHandler {
 public:
     // Picking
-    std::optional<std::size_t>
+    std::optional<LivePart>
     FindLivePart(const Schematic &schematic, const ViewTransform &view, bool is_live_part_pickable) const;
 
     // Input
-    bool HandleInput(Schematic &schematic, std::optional<std::size_t> live_part);
+    bool HandleInput(Schematic &schematic, std::optional<LivePart> live_part);
 
     // The push button the mouse holds down
     std::optional<std::size_t> GetHeldButton() const;

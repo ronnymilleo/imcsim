@@ -9,6 +9,7 @@
 #include "analysis/analysis_controls.h"
 #include "analysis/analysis_settings_panel.h"
 #include "base/helpers.h"
+#include "canvas/schematic_canvas.h"
 #include "circuit/components/component.h"
 #include "imgui.h"
 #include "overlays/glow_renderer.h"
@@ -26,6 +27,7 @@
 #include "schematic/schematic.h"
 #include "schematic/schematic_file_actions.h"
 #include "schematic/selection.h"
+#include "schematic/shortcuts.h"
 #include "schematic/wire_editing.h"
 #include "ui_elements/ui_element.h"
 #include "windows/app_window.h"
@@ -104,6 +106,22 @@ private:
         double To = 0.0;
     };
 
+    /**
+     * @struct  CanvasFrame
+     * @brief   Where the canvas is this frame and what the cursor is over, which each step of the frame reads.
+     */
+    struct CanvasFrame {
+        /// Top left corner of the canvas on the screen.
+        ImVec2 Origin;
+        ImVec2 Size;
+        /// Pan and zoom, once the wheel and the middle button of this frame moved them.
+        ViewTransform View;
+        /// Whether the cursor is over the canvas.
+        bool IsHovered = false;
+        /// The part under the cursor that a live run lets the user set by hand, or none.
+        std::optional<LivePart> HoveredLivePart;
+    };
+
     Schematic &m_RootSchematic;
     Schematic *m_Schematic;
     /// The results of the root schematic, the only one an analysis runs on.
@@ -148,9 +166,17 @@ private:
 
     // Frame
     void Draw() override;
+    void HandlePartPicker();
+    void DrawRail();
+    CanvasFrame BeginCanvas();
     static ImVec2 GetCanvasSize();
+    std::optional<LivePart> FindHoveredLivePart(ImVec2 origin) const;
+    void HandleCanvasInput(const CanvasFrame &frame);
+    void DrawCanvas(const CanvasFrame &frame);
+    void DrawSchematicLayers(const CanvasFrame &frame, SchematicCanvas &canvas);
+    void HandleModeInput(const CanvasFrame &frame, SchematicCanvas &canvas);
     void HandleModeKeys();
-    void ApplyToolbarRequest(ToolbarRequest request);
+    void DrawCanvasOverlays(const CanvasFrame &frame);
     std::optional<TimeSpan> GetWindowSpan() const;
     std::optional<double> GetShownInstant() const;
 
@@ -166,11 +192,9 @@ private:
     void OfferBlockParameters();
     void RequestEditSelectedSubcircuit();
     void FinishSubcircuitEditing(bool apply);
-    void RunBlockMenuChoice(BlockMenuChoice choice);
     void ApplySpiceBlockResult(SpiceBlockResult result);
 
     // Clipboard
-    void HandleClipboardShortcuts();
     void CopySelected();
     void CutSelected();
     void StartPasting();
@@ -182,16 +206,13 @@ private:
     void HandleSelectionDoubleClick();
     void UpdateSelectionBox(SelectingMode &selecting, ImVec2 cursor_world);
     void UpdateSelectionDrag(SelectingMode &selecting, ImVec2 cursor_world);
-    void HandleSelectionKeys(const SelectingMode &selecting);
+    void HandleSelectionKeys();
+    void RunTurnKey(PointTransform::Kind kind);
 
-    // Menu commands and shortcuts
-    void HandleGlobalShortcuts();
-    void Undo();
-    void Redo();
+    // Commands and shortcuts
     void HandleCommandRequest();
-    bool RunFileCommand(EditorCommand command);
-    bool RunClipboardCommand(EditorCommand command);
-    void RunEditCommand(EditorCommand command);
+    void RunPressedShortcuts(ShortcutScope scope);
+    void RunCommand(EditorCommand command);
     void RunTurnCommand(EditorCommand command);
 };
 

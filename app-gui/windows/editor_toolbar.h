@@ -9,6 +9,7 @@
 #include "analysis/analysis_controls.h"
 #include "analysis/analysis_settings_panel.h"
 #include "circuit/components/component.h"
+#include "schematic/editor_command.h"
 #include "schematic/editor_mode.h"
 #include "schematic/schematic.h"
 #include "windows/part_picker.h"
@@ -18,22 +19,13 @@
 namespace GUI {
 
 /**
- * @enum    ToolbarCommand
- * @brief   A button of the toolbar that acts on the editor without changing its mode.
- */
-enum class ToolbarCommand {
-    UNDO,
-    REDO,
-    FIT
-};
-
-/**
  * @struct  ToolbarRequest
  * @brief   What the buttons pressed this frame ask the editor to do: start a mode, or run a command.
  */
 struct ToolbarRequest {
     std::optional<EditorMode> Mode;
-    std::optional<ToolbarCommand> Command;
+    /// What a button that acts without changing the mode asks for: undo, redo or fit.
+    std::optional<EditorCommand> Command;
 };
 
 /**
