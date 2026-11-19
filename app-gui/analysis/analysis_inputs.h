@@ -1,6 +1,7 @@
 /**
  * @file    analysis_inputs.h
- * @brief   What an analysis takes from the circuit and the stored settings: the sources, nodes and inputs it runs with.
+ * @brief   What an analysis takes from the circuit and the stored settings: the sources, nodes and inputs it runs with,
+ *          and what to say when the circuit lacks one.
  */
 
 #ifndef IMCSIM_ANALYSIS_INPUTS_H
@@ -13,6 +14,7 @@
 #include <cstddef>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace GUI {
@@ -46,6 +48,11 @@ std::vector<std::string> ResolveTruthTableInputs(const std::vector<std::string> 
 
 // Stepped parameter
 std::string GetParameterUnit(const Core::Circuit &circuit, const std::string &part);
+
+// Missing inputs
+std::string DescribeMissingOutputNode(std::string_view analysis);
+std::string DescribeMissingACInput(std::string_view analysis);
+std::string DescribeMissingInputSource(std::string_view analysis);
 
 } // namespace GUI
 

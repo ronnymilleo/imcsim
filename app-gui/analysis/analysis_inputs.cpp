@@ -1,12 +1,14 @@
 /**
  * @file    analysis_inputs.cpp
- * @brief   What an analysis takes from the circuit and the stored settings: the sources, nodes and inputs it runs with.
+ * @brief   What an analysis takes from the circuit and the stored settings: the sources, nodes and inputs it runs with,
+ *          and what to say when the circuit lacks one.
  */
 
 #include "analysis/analysis_inputs.h"
 
 #include "simulation/analysis_sources.h"
 #include <algorithm>
+#include <format>
 
 namespace GUI {
 
@@ -166,6 +168,34 @@ std::string GetParameterUnit(const Core::Circuit &circuit, const std::string &pa
         }
     }
     return "";
+}
+
+/**
+ * @brief   Tells the user an analysis has no node to measure, as in a circuit without connected parts.
+ * @param[in] analysis  The analysis as the subject of the sentence, such as "the noise".
+ * @return  The message, such as "Connect some parts: the noise needs a node to measure".
+ */
+std::string DescribeMissingOutputNode(const std::string_view analysis) {
+    return std::format("Connect some parts: {} needs a node to measure", analysis);
+}
+
+/**
+ * @brief   Tells the user an analysis driven through an AC source has none.
+ * @param[in] analysis  The analysis as the subject of the sentence, such as "A noise analysis".
+ * @return  The message, which says how to make a source AC.
+ */
+std::string DescribeMissingACInput(const std::string_view analysis) {
+    return std::format("{} needs an AC source as its input; select a voltage or current source and set it to AC",
+                       analysis);
+}
+
+/**
+ * @brief   Tells the user an analysis measured from an input source has none.
+ * @param[in] analysis  The analysis as the subject of the sentence, such as "A pole-zero analysis".
+ * @return  The message, which lists the sources that can be the input.
+ */
+std::string DescribeMissingInputSource(const std::string_view analysis) {
+    return std::format("{} needs an input source; add {}", analysis, Core::SWEEPABLE_SOURCES);
 }
 
 } // namespace GUI

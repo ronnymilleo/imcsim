@@ -574,6 +574,8 @@ TEST_CASE("A run that cannot start says why, and a circuit that cannot run fails
     CHECK(controls.GetOutcome(GUI::Analysis::TRUTH_TABLE) == GUI::RunOutcome::FAILED);
     REQUIRE(controls.GetError(GUI::Analysis::TRUTH_TABLE).has_value());
     CHECK(controls.GetError(GUI::Analysis::TRUTH_TABLE)->contains("Logic input"));
+    // A run that never started took no time
+    CHECK_FALSE(controls.GetRunSeconds(GUI::Analysis::TRUTH_TABLE).has_value());
 
     // A stepped parameter without values
     GUI::SimulationSettings settings = schematic.GetSimulationSettings();

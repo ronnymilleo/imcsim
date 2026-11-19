@@ -12,9 +12,11 @@
 #include "circuit/components/voltage_source.h"
 #include "schematic/examples.h"
 #include "schematic/schematic.h"
+#include "simulation/analysis_sources.h"
 #include "test_printers.h"
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
+#include <format>
 #include <optional>
 #include <string>
 #include <vector>
@@ -135,4 +137,13 @@ TEST_CASE("A circuit with only ground has no node to measure", "[analysis_inputs
     circuit.Add(ground, {0});
     CHECK_FALSE(GUI::ResolveOutputNode(std::nullopt, circuit, schematic).has_value());
     CHECK(GUI::ListMeasuredNodes(circuit, schematic).empty());
+}
+
+TEST_CASE("A missing input or output is told in a sentence about the analysis that needs it", "[analysis_inputs]") {
+    CHECK(GUI::DescribeMissingOutputNode("the noise") == "Connect some parts: the noise needs a node to measure");
+    CHECK(GUI::DescribeMissingACInput("A noise analysis")
+          == "A noise analysis needs an AC source as its input; select a voltage or current source and set it to AC");
+    // The input source list is the one a DC sweep can drive, so the message names the same sources
+    CHECK(GUI::DescribeMissingInputSource("A pole-zero analysis")
+          == std::format("A pole-zero analysis needs an input source; add {}", Core::SWEEPABLE_SOURCES));
 }

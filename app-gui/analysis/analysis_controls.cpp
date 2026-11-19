@@ -11,6 +11,7 @@
 #include "imgui.h"
 #include <algorithm>
 #include <chrono>
+#include <expected>
 #include <iterator>
 #include <utility>
 
@@ -79,28 +80,17 @@ void AnalysisControls::RunSelected() {
     const SimulationSettings &settings = m_Schematic.GetSimulationSettings();
     const Analysis analysis = settings.Selected;
     const Core::Circuit circuit = m_Schematic.BuildCircuit();
-    // The noise, the transfer function and the other analyses run once, whatever the step and Monte Carlo settings
-    std::optional<StepPlan> steps;
-    std::optional<Core::MonteCarloSettings> monte_carlo;
-    const bool is_repeated = IsRepeatable(analysis);
-    if (is_repeated && settings.MonteCarlo.Enabled) {
-        ClearResult(analysis);
-        if (const std::optional<std::string> problem = Core::CheckMonteCarlo(circuit, settings.MonteCarlo)) {
-            Finish(analysis, problem, {});
-            return;
-        }
-        monte_carlo = settings.MonteCarlo;
-    } else if (is_repeated && settings.ParameterStep.Enabled) {
-        ClearResult(analysis);
-        const std::string unit = GetParameterUnit(circuit, settings.ParameterStep.Part);
-        auto values = ListStepValues(settings.ParameterStep, unit);
-        if (!values) {
-            Finish(analysis, std::move(values.error()), {});
-            return;
-        }
-        steps = StepPlan{.Settings = settings.ParameterStep, .Unit = unit, .Values = std::move(*values)};
+    std::expected<RunRepeat, std::string> repeat = PlanRunRepeat(settings, circuit);
+    if (!repeat) {
+        Refuse(analysis, std::move(repeat.error()));
+        return;
     }
-    StartAnalysis(analysis, circuit, steps, monte_carlo);
+    // Steps and draws deliver only when the whole run ends, and a stopped step delivers nothing, so the old result goes
+    // now rather than be taken for theirs
+    if (!IsSingleRun(*repeat)) {
+        ClearResult(analysis);
+    }
+    StartAnalysis(analysis, circuit, *repeat);
 }
 
 /**
@@ -413,24 +403,32 @@ void AnalysisControls::StartRun(const Analysis analysis, Core::Job job) {
 }
 
 /**
- * @brief   The analysis picked, on the circuit built from the schematic, run once or once per step.
+ * @brief   Records why an analysis could not start, and drops its old result, which would not answer the settings that
+ *          were refused.
+ * @note    A refused run took no time, so it reports none.
  */
-void AnalysisControls::StartAnalysis(const Analysis analysis,
-                                     const Core::Circuit &circuit,
-                                     const std::optional<StepPlan> &steps,
-                                     const std::optional<Core::MonteCarloSettings> &monte_carlo) {
+void AnalysisControls::Refuse(const Analysis analysis, std::string message) {
+    ClearResult(analysis);
+    Finish(analysis, std::move(message), {});
+    m_Statuses[ToIndex(analysis)].Seconds.reset();
+}
+
+/**
+ * @brief   The analysis picked, on the circuit built from the schematic, run once, once per step or once per draw.
+ */
+void AnalysisControls::StartAnalysis(const Analysis analysis, const Core::Circuit &circuit, const RunRepeat &repeat) {
     switch (analysis) {
     case Analysis::OPERATING_POINT:
-        RunOperatingPointAnalysis(circuit, steps, monte_carlo);
+        RunOperatingPointAnalysis(circuit, repeat);
         break;
     case Analysis::TRANSIENT:
-        RunTransientAnalysis(circuit, steps, monte_carlo);
+        RunTransientAnalysis(circuit, repeat);
         break;
     case Analysis::AC_SWEEP:
-        RunACSweepAnalysis(circuit, steps, monte_carlo);
+        RunACSweepAnalysis(circuit, repeat);
         break;
     case Analysis::DC_SWEEP:
-        RunDCSweepAnalysis(circuit, steps, monte_carlo);
+        RunDCSweepAnalysis(circuit, repeat);
         break;
     case Analysis::NOISE:
         RunNoiseAnalysis(circuit);

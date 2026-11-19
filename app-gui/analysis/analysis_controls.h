@@ -7,6 +7,7 @@
 #ifndef IMCSIM_ANALYSIS_CONTROLS_H
 #define IMCSIM_ANALYSIS_CONTROLS_H
 
+#include "analysis/run_repeat.h"
 #include "results/parameter_step.h"
 #include "results/result_store.h"
 #include "schematic/schematic.h"
@@ -21,6 +22,10 @@
 #include <vector>
 
 namespace GUI {
+
+/// Defined in run_jobs.h, which only the sources that start a run include.
+template <typename Result>
+struct RepeatableRun;
 
 /**
  * @enum    RunOutcome
@@ -106,16 +111,6 @@ private:
         std::optional<double> Seconds;
     };
 
-    /**
-     * @struct  StepPlan
-     * @brief   The stepped parameter of a run, the unit of its values and the values, one run each.
-     */
-    struct StepPlan {
-        ParameterStepSettings Settings;
-        std::string Unit;
-        std::vector<double> Values;
-    };
-
     Schematic &m_Schematic;
     ResultStore &m_Results;
 
@@ -146,22 +141,30 @@ private:
 
     // Runs of one analysis
     void StartRun(Analysis analysis, Core::Job job);
-    void StartAnalysis(Analysis analysis,
-                       const Core::Circuit &circuit,
-                       const std::optional<StepPlan> &steps,
-                       const std::optional<Core::MonteCarloSettings> &monte_carlo);
-    void RunOperatingPointAnalysis(const Core::Circuit &circuit,
-                                   const std::optional<StepPlan> &steps,
-                                   const std::optional<Core::MonteCarloSettings> &monte_carlo);
-    void RunTransientAnalysis(const Core::Circuit &circuit,
-                              const std::optional<StepPlan> &steps,
-                              const std::optional<Core::MonteCarloSettings> &monte_carlo);
-    void RunACSweepAnalysis(const Core::Circuit &circuit,
-                            const std::optional<StepPlan> &steps,
-                            const std::optional<Core::MonteCarloSettings> &monte_carlo);
-    void RunDCSweepAnalysis(const Core::Circuit &circuit,
-                            const std::optional<StepPlan> &steps,
-                            const std::optional<Core::MonteCarloSettings> &monte_carlo);
+    template <typename Work, typename Store>
+    void StartSingleRun(Analysis analysis, const Core::Circuit &circuit, Work work, Store store);
+    template <typename Result>
+    void StartRepeatable(Analysis analysis,
+                         const Core::Circuit &circuit,
+                         const RunRepeat &repeat,
+                         const RepeatableRun<Result> &run);
+    template <typename Result>
+    void StartSteppedRuns(Analysis analysis,
+                          const Core::Circuit &circuit,
+                          const StepPlan &plan,
+                          const RepeatableRun<Result> &run);
+    template <typename Result>
+    void StartMonteCarloRuns(Analysis analysis,
+                             const Core::Circuit &circuit,
+                             const Core::MonteCarloSettings &monte_carlo,
+                             const RepeatableRun<Result> &run);
+    void Refuse(Analysis analysis, std::string message);
+    void StartAnalysis(Analysis analysis, const Core::Circuit &circuit, const RunRepeat &repeat);
+    void RunOperatingPointAnalysis(const Core::Circuit &circuit, const RunRepeat &repeat);
+    void RunTransientAnalysis(const Core::Circuit &circuit, const RunRepeat &repeat);
+    void StartSingleTransient(const Core::Circuit &circuit, const Core::TransientSettings &settings);
+    void RunACSweepAnalysis(const Core::Circuit &circuit, const RunRepeat &repeat);
+    void RunDCSweepAnalysis(const Core::Circuit &circuit, const RunRepeat &repeat);
     void RunNoiseAnalysis(const Core::Circuit &circuit);
     void RunTransferFunctionAnalysis(const Core::Circuit &circuit);
     void RunSensitivityAnalysis(const Core::Circuit &circuit);

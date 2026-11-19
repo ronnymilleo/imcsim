@@ -20,6 +20,7 @@
 #include <cstddef>
 #include <expected>
 #include <format>
+#include <functional>
 #include <iterator>
 #include <memory>
 #include <optional>
@@ -28,6 +29,28 @@
 #include <vector>
 
 namespace GUI {
+
+/**
+ * @struct  RepeatableRun
+ * @brief   What an analysis that a parameter step or a Monte Carlo run can repeat gives the run: how to simulate the
+ *          circuit once, what to measure in each draw, and where the results go.
+ */
+template <typename Result>
+struct RepeatableRun {
+    /// Simulates the circuit once, with the stepped parameter at a value, or as it is when there is none.
+    std::function<Core::SimulationRun<Result>(const Core::Circuit &, const std::optional<Core::ParameterValue> &)>
+        RunOnce;
+    /// What the table of a Monte Carlo analysis keeps from each draw.
+    std::function<Measurement(const Result &)> Measure;
+    /// Stores the result of a single run, or clears it when the run failed.
+    std::function<void(std::optional<Result>)> StoreSingle;
+    /// Stores the results of the steps, or the runs a Monte Carlo analysis kept.
+    std::function<void(StepFamily<Result>)> StoreFamily;
+};
+
+/// A job that is stopped still delivers what it made, as the points of a transient or the runs of a Monte Carlo
+/// analysis.
+constexpr bool KEEPS_PARTIAL_RESULT = true;
 
 /**
  * @brief   Hands a result to the results, or clears the old one so stale values never sit next to an error.

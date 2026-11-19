@@ -50,6 +50,9 @@ enum class RunMode {
     MONTE_CARLO,
 };
 
+/// What the input picker of an analysis driven through an AC source says when the circuit has none.
+constexpr const char *AC_INPUT_HINT = "Set a voltage or current source to AC";
+
 constexpr std::array<const char *, 3> INTEGRATION_METHOD_NAMES = {"Default", "Trapezoidal", "Gear"};
 
 constexpr std::array<const char *, 3> RUN_MODE_NAMES = {"Single run", "Step a parameter", "Monte Carlo"};
@@ -196,6 +199,82 @@ bool DrawSuggestButton(const bool available, const char *tooltip, const char *un
     return clicked;
 }
 
+void LoadFrequencyFields(FrequencyRangeFields &fields, const double start, const double stop) {
+    fields.Start.Load(start);
+    fields.Stop.Load(stop);
+}
+
+/**
+ * @brief   Draws the start and stop of a frequency range; each changes as soon as its field is valid.
+ */
+void DrawFrequencyFields(FrequencyRangeFields &fields, double &start, double &stop) {
+    if (const std::optional<double> value = fields.Start.Draw("Start", "Hz", IsPositive)) {
+        start = *value;
+    }
+    if (const std::optional<double> value = fields.Stop.Draw("Stop", "Hz", IsPositive)) {
+        stop = *value;
+    }
+}
+
+void DrawPointsPerDecade(int &points) {
+    // Files reject fewer than one point, so the field never produces a value that would not load back
+    if (ImGui::InputInt("per decade", &points)) {
+        points = std::max(points, 1);
+    }
+}
+
+/**
+ * @brief   Draws the start, stop and points per decade of a logarithmic sweep, and a Suggest button that sets the range
+ *          from the corners of the circuit.
+ * @details The id tells the fields of one analysis from those of another.
+ */
+void DrawLogarithmicSweep(const char *id,
+                          Core::ACSweepSettings &range,
+                          FrequencyRangeFields &fields,
+                          const Core::Circuit &circuit) {
+    ImGui::PushID(id);
+    DrawFrequencyFields(fields, range.StartFrequency, range.StopFrequency);
+    DrawFieldLabel("Points");
+    DrawPointsPerDecade(range.PointsPerDecade);
+    const auto suggested = Core::SuggestACSweepSettings(circuit);
+    if (DrawSuggestButton(suggested.has_value(),
+                          "Two decades past the RC, RL and LC corners and the op-amp bandwidths",
+                          "Needs a capacitor, an inductor or an op-amp")
+        && suggested) {
+        range.StartFrequency = suggested->StartFrequency;
+        range.StopFrequency = suggested->StopFrequency;
+        LoadFrequencyFields(fields, suggested->StartFrequency, suggested->StopFrequency);
+    }
+    ImGui::PopID();
+}
+
+/**
+ * @brief   A combo over the sources that can be the input of an analysis, or the text that says how to get one.
+ * @param[in]     id          Hidden label of the combo, which tells it from the combos of the other analyses.
+ * @param[in,out] stored      Stored input source; changed when the user picks another.
+ * @param[in]     sources     Sources to pick from; the combo shows the first one when the stored one is not among them.
+ * @param[in]     empty_text  Shown in place of the combo when there is no source.
+ */
+void DrawInputPicker(const char *id,
+                     std::string &stored,
+                     const std::vector<std::string> &sources,
+                     const std::string &empty_text) {
+    DrawFieldLabel("Input");
+    if (sources.empty()) {
+        ImGui::TextDisabled("%s", empty_text.c_str());
+        return;
+    }
+    const std::string input = ResolveOptionalInput(stored, sources);
+    if (ImGui::BeginCombo(id, input.c_str())) {
+        for (const std::string &source : sources) {
+            if (ImGui::Selectable(source.c_str(), source == input)) {
+                stored = source;
+            }
+        }
+        ImGui::EndCombo();
+    }
+}
+
 } // namespace
 
 /**
@@ -295,16 +374,14 @@ void AnalysisSettingsPanel::LoadSettingsFields() {
     m_StopTime.Load(settings.Transient.StopTime);
     m_TimeStep.Load(settings.Transient.TimeStep);
     m_LiveSeconds.Load(settings.LiveSeconds);
-    m_StartFrequency.Load(settings.ACSweep.StartFrequency);
-    m_StopFrequency.Load(settings.ACSweep.StopFrequency);
+    LoadFrequencyFields(m_ACSweepRange, settings.ACSweep.StartFrequency, settings.ACSweep.StopFrequency);
     LoadSweepFields(settings.SweptRange, m_SweptFields);
     LoadSweepFields(settings.SteppedRange, m_SteppedFields);
-    m_NoiseStartFrequency.Load(settings.NoiseRange.StartFrequency);
-    m_NoiseStopFrequency.Load(settings.NoiseRange.StopFrequency);
-    m_ACSensitivityStartFrequency.Load(settings.ACSensitivityRange.StartFrequency);
-    m_ACSensitivityStopFrequency.Load(settings.ACSensitivityRange.StopFrequency);
-    m_SStartFrequency.Load(settings.SParameters.StartFrequency);
-    m_SStopFrequency.Load(settings.SParameters.StopFrequency);
+    LoadFrequencyFields(m_NoiseRange, settings.NoiseRange.StartFrequency, settings.NoiseRange.StopFrequency);
+    LoadFrequencyFields(m_ACSensitivityRange,
+                        settings.ACSensitivityRange.StartFrequency,
+                        settings.ACSensitivityRange.StopFrequency);
+    LoadFrequencyFields(m_SParameterRange, settings.SParameters.StartFrequency, settings.SParameters.StopFrequency);
     m_HBFundamental.Load(settings.HarmonicBalance.FundamentalFrequency);
     LoadParameterStepFields(settings.ParameterStep);
     LoadSolverFields(settings.Solver);
@@ -351,27 +428,7 @@ void AnalysisSettingsPanel::DrawTransientSettings(SimulationSettings &settings) 
 }
 
 void AnalysisSettingsPanel::DrawACSweepSettings(SimulationSettings &settings) {
-    if (const std::optional<double> start = m_StartFrequency.Draw("Start", "Hz", IsPositive)) {
-        settings.ACSweep.StartFrequency = *start;
-    }
-    if (const std::optional<double> stop = m_StopFrequency.Draw("Stop", "Hz", IsPositive)) {
-        settings.ACSweep.StopFrequency = *stop;
-    }
-    DrawFieldLabel("Points");
-    // Files reject fewer than one point, so the field never produces a value that would not load back
-    if (ImGui::InputInt("per decade", &settings.ACSweep.PointsPerDecade)) {
-        settings.ACSweep.PointsPerDecade = std::max(settings.ACSweep.PointsPerDecade, 1);
-    }
-    const auto suggested = Core::SuggestACSweepSettings(m_Schematic.BuildCircuit());
-    if (DrawSuggestButton(suggested.has_value(),
-                          "Two decades past the RC, RL and LC corners and the op-amp bandwidths",
-                          "Needs a capacitor, an inductor or an op-amp")
-        && suggested) {
-        settings.ACSweep.StartFrequency = suggested->StartFrequency;
-        settings.ACSweep.StopFrequency = suggested->StopFrequency;
-        m_StartFrequency.Load(suggested->StartFrequency);
-        m_StopFrequency.Load(suggested->StopFrequency);
-    }
+    DrawLogarithmicSweep("ac_sweep", settings.ACSweep, m_ACSweepRange, m_Schematic.BuildCircuit());
 }
 
 void AnalysisSettingsPanel::DrawDCSweepSettings(SimulationSettings &settings) {
@@ -400,55 +457,15 @@ void AnalysisSettingsPanel::DrawDCSweepSettings(SimulationSettings &settings) {
  */
 void AnalysisSettingsPanel::DrawNoiseSettings(SimulationSettings &settings) {
     const Core::Circuit circuit = m_Schematic.BuildCircuit();
-    const std::vector<std::string> sources = Core::GetNoiseInputSources(circuit);
-    const std::string input = ResolveOptionalInput(settings.NoiseSource, sources);
     const std::optional<int> output = ResolveOutputNode(settings.NoiseOutput, circuit, m_Schematic);
     if (!output) {
         ImGui::TextDisabled("Connect some parts to measure their noise");
         return;
     }
-    const Connectivity &connectivity = m_Schematic.GetConnectivity();
-    DrawFieldLabel("Output");
-    if (ImGui::BeginCombo("##noise_output", GetVoltageLabel(connectivity, *output).c_str())) {
-        for (int node = 1; node < circuit.GetNodeCount(); ++node) {
-            if (ImGui::Selectable(GetVoltageLabel(connectivity, node).c_str(), node == *output)) {
-                settings.NoiseOutput = connectivity.FindPointOfNode(node);
-            }
-        }
-        ImGui::EndCombo();
-    }
-    DrawFieldLabel("Input");
-    if (sources.empty()) {
-        ImGui::TextDisabled("Set a voltage or current source to AC");
-    } else if (ImGui::BeginCombo("##noise_input", input.c_str())) {
-        for (const std::string &source : sources) {
-            if (ImGui::Selectable(source.c_str(), source == input)) {
-                settings.NoiseSource = source;
-            }
-        }
-        ImGui::EndCombo();
-    }
+    DrawOutputPicker("##noise_output", settings.NoiseOutput, *output, circuit);
+    DrawInputPicker("##noise_input", settings.NoiseSource, Core::GetNoiseInputSources(circuit), AC_INPUT_HINT);
     ImGui::SetItemTooltip("The noise is also referred to this source, as the noise it would need at its input");
-    if (const std::optional<double> start = m_NoiseStartFrequency.Draw("Start", "Hz", IsPositive)) {
-        settings.NoiseRange.StartFrequency = *start;
-    }
-    if (const std::optional<double> stop = m_NoiseStopFrequency.Draw("Stop", "Hz", IsPositive)) {
-        settings.NoiseRange.StopFrequency = *stop;
-    }
-    DrawFieldLabel("Points");
-    if (ImGui::InputInt("per decade##noise", &settings.NoiseRange.PointsPerDecade)) {
-        settings.NoiseRange.PointsPerDecade = std::max(settings.NoiseRange.PointsPerDecade, 1);
-    }
-    const auto suggested = Core::SuggestACSweepSettings(circuit);
-    if (DrawSuggestButton(suggested.has_value(),
-                          "Two decades past the RC, RL and LC corners and the op-amp bandwidths",
-                          "Needs a capacitor, an inductor or an op-amp")
-        && suggested) {
-        settings.NoiseRange.StartFrequency = suggested->StartFrequency;
-        settings.NoiseRange.StopFrequency = suggested->StopFrequency;
-        m_NoiseStartFrequency.Load(suggested->StartFrequency);
-        m_NoiseStopFrequency.Load(suggested->StopFrequency);
-    }
+    DrawLogarithmicSweep("noise", settings.NoiseRange, m_NoiseRange, circuit);
 }
 
 /**
@@ -470,12 +487,7 @@ void AnalysisSettingsPanel::DrawTransferFunctionSettings(SimulationSettings &set
  */
 void AnalysisSettingsPanel::DrawSParameterSettings(SimulationSettings &settings) {
     Core::SParameterSettings &range = settings.SParameters;
-    if (const std::optional<double> start = m_SStartFrequency.Draw("Start", "Hz", IsPositive)) {
-        range.StartFrequency = *start;
-    }
-    if (const std::optional<double> stop = m_SStopFrequency.Draw("Stop", "Hz", IsPositive)) {
-        range.StopFrequency = *stop;
-    }
+    DrawFrequencyFields(m_SParameterRange, range.StartFrequency, range.StopFrequency);
     DrawFieldLabel("Sweep");
     if (ImGui::RadioButton("Log", range.IsLogarithmic)) {
         range.IsLogarithmic = true;
@@ -485,11 +497,9 @@ void AnalysisSettingsPanel::DrawSParameterSettings(SimulationSettings &settings)
         range.IsLogarithmic = false;
     }
     DrawFieldLabel("Points");
-    // Files reject too few points for any backend, so the fields never produce a value that would not load back
+    // Files reject too few points for any backend, so the field never produces a value that would not load back
     if (range.IsLogarithmic) {
-        if (ImGui::InputInt("per decade", &range.PointsPerDecade)) {
-            range.PointsPerDecade = std::max(range.PointsPerDecade, 1);
-        }
+        DrawPointsPerDecade(range.PointsPerDecade);
     } else if (ImGui::InputInt("in all", &range.LinearPoints)) {
         range.LinearPoints =
             std::max(range.LinearPoints, Core::GetBackend().GetCapabilities().SParameters.MinLinearPoints);
@@ -542,36 +552,42 @@ void AnalysisSettingsPanel::DrawSourceAndOutputPickers(std::string &source,
                                                        const char *empty_text,
                                                        const char *tooltip) {
     const Core::Circuit circuit = m_Schematic.BuildCircuit();
-    const std::vector<std::string> sources = Core::GetTransferFunctionInputSources(circuit);
-    const std::string input = ResolveOptionalInput(source, sources);
     const std::optional<int> output_node = ResolveOutputNode(output, circuit, m_Schematic);
     if (!output_node) {
         ImGui::TextDisabled("%s", empty_text);
         return;
     }
+    DrawOutputPicker(std::format("##{}_output", id).c_str(), output, *output_node, circuit);
+    DrawInputPicker(std::format("##{}_input", id).c_str(),
+                    source,
+                    Core::GetTransferFunctionInputSources(circuit),
+                    std::format("Add {}", Core::SWEEPABLE_SOURCES));
+    ImGui::SetItemTooltip("%s", tooltip);
+}
+
+/**
+ * @brief   A combo over every node of the circuit, labelled as the plots label them; picking one stores a point of it,
+ *          so the choice follows the node through edits.
+ * @param[in]     id          Hidden label of the combo, which tells it from the combos of the other analyses.
+ * @param[in,out] output      Stored output point; changed when the user picks another node.
+ * @param[in]     shown_node  Node the analysis measures now, which the combo shows.
+ * @param[in]     circuit     Circuit whose nodes are listed.
+ */
+void AnalysisSettingsPanel::DrawOutputPicker(const char *id,
+                                             std::optional<GridPoint> &output,
+                                             const int shown_node,
+                                             const Core::Circuit &circuit) {
     const Connectivity &connectivity = m_Schematic.GetConnectivity();
     DrawFieldLabel("Output");
-    if (ImGui::BeginCombo(std::format("##{}_output", id).c_str(),
-                          GetVoltageLabel(connectivity, *output_node).c_str())) {
-        for (int node = 1; node < circuit.GetNodeCount(); ++node) {
-            if (ImGui::Selectable(GetVoltageLabel(connectivity, node).c_str(), node == *output_node)) {
-                output = connectivity.FindPointOfNode(node);
-            }
-        }
-        ImGui::EndCombo();
+    if (!ImGui::BeginCombo(id, GetVoltageLabel(connectivity, shown_node).c_str())) {
+        return;
     }
-    DrawFieldLabel("Input");
-    if (sources.empty()) {
-        ImGui::TextDisabled("%s", std::format("Add {}", Core::SWEEPABLE_SOURCES).c_str());
-    } else if (ImGui::BeginCombo(std::format("##{}_input", id).c_str(), input.c_str())) {
-        for (const std::string &candidate : sources) {
-            if (ImGui::Selectable(candidate.c_str(), candidate == input)) {
-                source = candidate;
-            }
+    for (int node = 1; node < circuit.GetNodeCount(); ++node) {
+        if (ImGui::Selectable(GetVoltageLabel(connectivity, node).c_str(), node == shown_node)) {
+            output = connectivity.FindPointOfNode(node);
         }
-        ImGui::EndCombo();
     }
-    ImGui::SetItemTooltip("%s", tooltip);
+    ImGui::EndCombo();
 }
 
 /**
@@ -603,62 +619,23 @@ void AnalysisSettingsPanel::DrawSensitivitySettings(SimulationSettings &settings
                           ac_unsupported ? ac_unsupported->c_str()
                                          : "How much the gain and the phase at the output change with the "
                                            "value of each part, across frequency");
-    const Connectivity &connectivity = m_Schematic.GetConnectivity();
-    DrawFieldLabel("Output");
-    if (ImGui::BeginCombo("##sensitivity_output", GetVoltageLabel(connectivity, *output).c_str())) {
-        for (int node = 1; node < circuit.GetNodeCount(); ++node) {
-            if (ImGui::Selectable(GetVoltageLabel(connectivity, node).c_str(), node == *output)) {
-                settings.SensitivityOutput = connectivity.FindPointOfNode(node);
-            }
-        }
-        ImGui::EndCombo();
-    }
+    DrawOutputPicker("##sensitivity_output", settings.SensitivityOutput, *output, circuit);
     ImGui::SetItemTooltip("The voltage of this node is the output of the analysis");
     if (settings.SensitivityType == SensitivityKind::AC) {
-        DrawACSensitivityInputs(settings);
+        DrawACSensitivityInputs(settings, circuit);
     }
 }
 
 /**
  * @brief   The AC source that drives the circuit and the frequency range of the AC kind of the sensitivity analysis.
  */
-void AnalysisSettingsPanel::DrawACSensitivityInputs(SimulationSettings &settings) {
-    const Core::Circuit circuit = m_Schematic.BuildCircuit();
-    const std::vector<std::string> sources = Core::GetNoiseInputSources(circuit);
-    const std::string input = ResolveOptionalInput(settings.ACSensitivitySource, sources);
-    DrawFieldLabel("Input");
-    if (sources.empty()) {
-        ImGui::TextDisabled("Set a voltage or current source to AC");
-    } else if (ImGui::BeginCombo("##ac_sensitivity_input", input.c_str())) {
-        for (const std::string &source : sources) {
-            if (ImGui::Selectable(source.c_str(), source == input)) {
-                settings.ACSensitivitySource = source;
-            }
-        }
-        ImGui::EndCombo();
-    }
+void AnalysisSettingsPanel::DrawACSensitivityInputs(SimulationSettings &settings, const Core::Circuit &circuit) {
+    DrawInputPicker("##ac_sensitivity_input",
+                    settings.ACSensitivitySource,
+                    Core::GetNoiseInputSources(circuit),
+                    AC_INPUT_HINT);
     ImGui::SetItemTooltip("The response measured is the one to this source");
-    Core::ACSweepSettings &range = settings.ACSensitivityRange;
-    if (const std::optional<double> start = m_ACSensitivityStartFrequency.Draw("Start", "Hz", IsPositive)) {
-        range.StartFrequency = *start;
-    }
-    if (const std::optional<double> stop = m_ACSensitivityStopFrequency.Draw("Stop", "Hz", IsPositive)) {
-        range.StopFrequency = *stop;
-    }
-    DrawFieldLabel("Points");
-    if (ImGui::InputInt("per decade##ac_sensitivity", &range.PointsPerDecade)) {
-        range.PointsPerDecade = std::max(range.PointsPerDecade, 1);
-    }
-    const auto suggested = Core::SuggestACSweepSettings(circuit);
-    if (DrawSuggestButton(suggested.has_value(),
-                          "Two decades past the RC, RL and LC corners and the op-amp bandwidths",
-                          "Needs a capacitor, an inductor or an op-amp")
-        && suggested) {
-        range.StartFrequency = suggested->StartFrequency;
-        range.StopFrequency = suggested->StopFrequency;
-        m_ACSensitivityStartFrequency.Load(suggested->StartFrequency);
-        m_ACSensitivityStopFrequency.Load(suggested->StopFrequency);
-    }
+    DrawLogarithmicSweep("ac_sensitivity", settings.ACSensitivityRange, m_ACSensitivityRange, circuit);
 }
 
 /**

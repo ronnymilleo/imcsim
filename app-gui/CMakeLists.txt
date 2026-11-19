@@ -15,6 +15,7 @@ add_library(imcsim-gui-lib
             analysis/run_noise.cpp
             analysis/run_operating_point.cpp
             analysis/run_pole_zero.cpp
+            analysis/run_repeat.cpp
             analysis/run_s_parameters.cpp
             analysis/run_sensitivity.cpp
             analysis/run_status.cpp

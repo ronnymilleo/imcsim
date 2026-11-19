@@ -6,25 +6,21 @@
 
 #include "analysis/analysis_controls.h"
 
-#include "analysis/run_jobs.h"
+#include "analysis/run_starts.h"
+#include <optional>
 #include <utility>
 
 namespace GUI {
 
 void AnalysisControls::RunHarmonicBalanceAnalysis(const Core::Circuit &circuit) {
     const Core::HarmonicBalanceSettings run_settings = m_Schematic.GetSimulationSettings().HarmonicBalance;
-    StartRun(Analysis::HARMONIC_BALANCE,
-             MakeJob<Core::HarmonicBalanceRun>(
-                 circuit,
-                 [run_settings](const Core::Circuit &copy, Core::RunControl &control) {
-                     return Core::RunHarmonicBalance(copy, run_settings, &control);
-                 },
-                 [this](Core::HarmonicBalanceRun run) {
-                     Finish(Analysis::HARMONIC_BALANCE,
-                            StoreResult(std::move(run.Result),
-                                        [this](auto result) { m_Results.SetHarmonicBalance(std::move(result)); }),
-                            std::move(run.Messages));
-                 }));
+    StartSingleRun(
+        Analysis::HARMONIC_BALANCE,
+        circuit,
+        [run_settings](const Core::Circuit &copy, Core::RunControl &control) {
+            return Core::RunHarmonicBalance(copy, run_settings, &control);
+        },
+        [this](std::optional<Core::HarmonicBalance> result) { m_Results.SetHarmonicBalance(std::move(result)); });
 }
 
 } // namespace GUI
