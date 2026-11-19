@@ -74,6 +74,10 @@ ImVec4 GetWarningTextColor();
 ImU32 GetPreviewColor();
 ImU32 GetHighlightColor();
 
+// Alpha
+ImU32 ReplaceAlpha(ImU32 color, ImU32 alpha);
+ImU32 ScaleAlpha(ImU32 color, float factor);
+
 // Widgets
 bool PrimaryButton(const char *label, ImVec2 size = ImVec2(0.0f, 0.0f));
 

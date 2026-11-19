@@ -77,10 +77,6 @@ constexpr ImU32 LIVE_PART_OUTLINE_ALPHA = 110;
 /// The part under the cursor or held is outlined fully.
 constexpr ImU32 LIVE_PART_HOVERED_ALPHA = 255;
 
-ImU32 WithAlpha(const ImU32 color, const ImU32 alpha) {
-    return (color & ~IM_COL32_A_MASK) | (alpha << IM_COL32_A_SHIFT);
-}
-
 /**
  * @brief   Light of an LED color, kept bright so it reads on any background; an LED with custom parameters glows warm
  *          white.
@@ -297,7 +293,7 @@ void SchematicOverlays::DrawElements(SchematicCanvas &canvas,
             }
         } else if (marks_live_parts && GetLiveAction(elements[index]->GetComponent().GetType()) != LiveAction::NONE) {
             const ImU32 alpha = index == lit_live_part ? LIVE_PART_HOVERED_ALPHA : LIVE_PART_OUTLINE_ALPHA;
-            elements[index]->DrawOutline(canvas, view, WithAlpha(GetHighlightColor(), alpha));
+            elements[index]->DrawOutline(canvas, view, ReplaceAlpha(GetHighlightColor(), alpha));
         }
     }
 }
@@ -459,7 +455,7 @@ void SchematicOverlays::DrawWireSelectionHalos(SchematicCanvas &canvas,
         const UIWire &wire = schematic.GetWires()[selected];
         canvas.AddLine(view.ToScreen(ToVec2(wire.GetStart())),
                        view.ToScreen(ToVec2(wire.GetEnd())),
-                       WithAlpha(GetPalette().Selected, SELECTION_HALO_ALPHA),
+                       ReplaceAlpha(GetPalette().Selected, SELECTION_HALO_ALPHA),
                        LINE_THICKNESS + SELECTION_HALO_EXTRA);
     }
 }

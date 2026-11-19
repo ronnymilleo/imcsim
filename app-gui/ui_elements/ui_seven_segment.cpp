@@ -75,12 +75,6 @@ std::array<ImVec2, 6> GetSegmentCorners(const std::size_t segment) {
     };
 }
 
-ImU32 WithAlpha(const ImU32 color, const float alpha) {
-    ImVec4 components = ImGui::ColorConvertU32ToFloat4(color);
-    components.w *= alpha;
-    return ImGui::ColorConvertFloat4ToU32(components);
-}
-
 } // namespace
 
 /**
@@ -119,7 +113,7 @@ void UISevenSegment::DrawReading(SchematicCanvas &canvas,
                                OUTLINE_THICKNESS);
             }
         } else if (segments[segment] == LogicState::UNKNOWN) {
-            FillSegment(canvas, view, segment, WithAlpha(lit, UNKNOWN_ALPHA));
+            FillSegment(canvas, view, segment, ScaleAlpha(lit, UNKNOWN_ALPHA));
         }
     }
 }

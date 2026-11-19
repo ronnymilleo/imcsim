@@ -142,6 +142,7 @@ add_executable(imcsim-tests
             switches_tests.cpp
             text_fitting_tests.cpp
             theme_contrast_tests.cpp
+            theme_tests.cpp
             touchstone_tests.cpp
             trace_fit_state_tests.cpp
             trace_math_tests.cpp
