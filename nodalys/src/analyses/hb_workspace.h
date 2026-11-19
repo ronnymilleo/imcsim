@@ -92,7 +92,10 @@ struct HbWorkspace {
                 double f0,
                 std::vector<bool> is_node_unknown);
 
-    /// Inline because every loop over the coefficients calls it.
+    /**
+     * @brief   Position of one coefficient of one unknown in the packed harmonic vectors.
+     * @details Inline because every loop over the coefficients calls it.
+     */
     std::size_t Index(const int unknown, const int coeff_slot) const {
         return static_cast<std::size_t>(unknown) * static_cast<std::size_t>(CoeffsPerUnknown)
              + static_cast<std::size_t>(coeff_slot);

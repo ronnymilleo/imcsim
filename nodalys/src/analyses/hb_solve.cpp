@@ -59,7 +59,9 @@ struct NewtonBuffers {
     std::vector<std::vector<double>> PreviousSamples;
 };
 
-/// Solves the Jacobian for the Newton step and takes it from the state, which gives the candidate.
+/**
+ * @brief   Solves the Jacobian for the Newton step and takes it from the state, which gives the candidate.
+ */
 bool TakeNewtonStep(const std::vector<double> &x_hb, NewtonBuffers &buffers) {
     const std::size_t total = x_hb.size();
     for (std::size_t i = 0; i < total; ++i) {
@@ -74,8 +76,10 @@ bool TakeNewtonStep(const std::vector<double> &x_hb, NewtonBuffers &buffers) {
     return true;
 }
 
-/// Applies the per-sample junction and smooth-logic limiting of the devices to the candidate, in the time domain. When
-/// a device limited, the limited samples become the next state.
+/**
+ * @brief   Applies the per-sample junction and smooth-logic limiting of the devices to the candidate, in the time
+ *          domain. When a device limited, the limited samples become the next state.
+ */
 bool LimitInTimeDomain(HbWorkspace &ws, const std::vector<double> &x_hb, NewtonBuffers &buffers) {
     UnpackCoefficientsToSamples(ws, x_hb, buffers.PreviousSamples);
     UnpackCoefficientsToSamples(ws, buffers.Candidate, buffers.CandidateSamples);
@@ -93,7 +97,9 @@ bool LimitInTimeDomain(HbWorkspace &ws, const std::vector<double> &x_hb, NewtonB
     return any_limited;
 }
 
-/// Takes the whole step, unless it overshoots, and then tries shorter ones until one lowers the residual.
+/**
+ * @brief   Takes the whole step, unless it overshoots, and then tries shorter ones until one lowers the residual.
+ */
 void BacktrackLineSearch(HbWorkspace &ws,
                          const std::vector<double> &x_hb,
                          const double prev_norm,
@@ -119,7 +125,9 @@ void BacktrackLineSearch(HbWorkspace &ws,
     }
 }
 
-/// Tells whether the step moved every harmonic by less than its tolerance.
+/**
+ * @brief   Tells whether the step moved every harmonic by less than its tolerance.
+ */
 bool HasStepConverged(const HbWorkspace &ws,
                       const std::vector<double> &x_next,
                       const std::vector<double> &x_hb,
@@ -138,7 +146,9 @@ bool HasStepConverged(const HbWorkspace &ws,
     return true;
 }
 
-/// Runs the Newton iteration on the balance from the state in `x_hb`, which ends at the last iterate.
+/**
+ * @brief   Runs the Newton iteration on the balance from the state in `x_hb`, which ends at the last iterate.
+ */
 HbNewtonOutcome RunHbNewton(HbWorkspace &ws,
                             const double ac_scale,
                             const double gmin,
@@ -176,7 +186,9 @@ HbNewtonOutcome RunHbNewton(HbWorkspace &ws,
     return {};
 }
 
-/// Starts the harmonics at the DC bias, with nothing at the other harmonics.
+/**
+ * @brief   Starts the harmonics at the DC bias, with nothing at the other harmonics.
+ */
 void ResetToDc(const HbWorkspace &ws, const std::vector<double> &x_dc, std::vector<double> &x_hb) {
     x_hb.assign(static_cast<std::size_t>(ws.UnknownCount) * static_cast<std::size_t>(ws.CoeffsPerUnknown), 0.0);
     for (int u = 0; u < ws.UnknownCount; ++u) {
@@ -184,7 +196,10 @@ void ResetToDc(const HbWorkspace &ws, const std::vector<double> &x_dc, std::vect
     }
 }
 
-/// Ramps the harmonics of the sources from zero to full with an adaptive step, solving at each stage from the last.
+/**
+ * @brief   Ramps the harmonics of the sources from zero to full with an adaptive step, solving at each stage from the
+ *          last.
+ */
 bool TrySourceStepping(HbWorkspace &ws,
                        const ConvergenceOptions &options,
                        const int initial_steps,
@@ -215,7 +230,9 @@ bool TrySourceStepping(HbWorkspace &ws,
     return !ws.IsStopped;
 }
 
-/// Solves at a large gmin, then lowers it by decades down to the gmin of the options, each solve from the last.
+/**
+ * @brief   Solves at a large gmin, then lowers it by decades down to the gmin of the options, each solve from the last.
+ */
 bool TryGminStepping(HbWorkspace &ws,
                      const ConvergenceOptions &options,
                      const int initial_steps,

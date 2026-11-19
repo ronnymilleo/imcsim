@@ -17,7 +17,10 @@ constexpr int EMITTER = 2;
 constexpr int NO_INTERNAL_NODE = -1;
 constexpr int TERMINAL_COUNT = 3;
 
-/// A transistor with Early effect, knee current, leakage and every charge term, so no branch of the model is skipped.
+/**
+ * @brief   A transistor with Early effect, knee current, leakage and every charge term, so no branch of the model is
+ *          skipped.
+ */
 Nodalys::BjtParameters MakeFullParameters() {
     Nodalys::BjtParameters parameters;
     parameters.SaturationCurrent = 1e-15;

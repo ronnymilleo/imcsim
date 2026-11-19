@@ -38,7 +38,9 @@ namespace Nodalys {
 
 namespace {
 
-/// Solves the balance with the strategy that fits the circuit, and fills the harmonics of all unknowns.
+/**
+ * @brief   Solves the balance with the strategy that fits the circuit, and fills the harmonics of all unknowns.
+ */
 std::expected<HbSolveOutcome, std::string> SolveBalance(HbWorkspace &ws,
                                                         const PartitionedCircuit &partitioned,
                                                         const HarmonicBalanceConfig &settings,
@@ -67,7 +69,9 @@ std::expected<HbSolveOutcome, std::string> SolveBalance(HbWorkspace &ws,
     return outcome;
 }
 
-/// Reports the convergence and the warnings of a balance to the diagnostic log.
+/**
+ * @brief   Reports the convergence and the warnings of a balance to the diagnostic log.
+ */
 void ReportOutcome(const HarmonicBalanceConfig &settings,
                    const std::size_t sample_count,
                    const HbSolveOutcome &outcome,

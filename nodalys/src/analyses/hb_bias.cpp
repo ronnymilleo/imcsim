@@ -26,7 +26,9 @@ void AddMatrixScaled(MnaSystem &target, const MnaSystem &source) {
     }
 }
 
-/// The first fault among the devices at their last stamp, or an empty text.
+/**
+ * @brief   The first fault among the devices at their last stamp, or an empty text.
+ */
 std::string_view FindFault(const std::vector<Device *> &devices) {
     for (const Device *device : devices) {
         if (const std::string_view fault = device->GetFault(); !fault.empty()) {
@@ -36,7 +38,9 @@ std::string_view FindFault(const std::vector<Device *> &devices) {
     return {};
 }
 
-/// Adds the stiff pull of the nodesets to the DC system while the pulled pass runs, and nothing otherwise.
+/**
+ * @brief   Adds the stiff pull of the nodesets to the DC system while the pulled pass runs, and nothing otherwise.
+ */
 void StampNodesets(const HbWorkspace &ws, const bool is_nodeset_pass, const std::vector<double> &x, MnaSystem &sys) {
     if (!is_nodeset_pass) {
         return;
@@ -47,7 +51,10 @@ void StampNodesets(const HbWorkspace &ws, const bool is_nodeset_pass, const std:
     }
 }
 
-/// Stamps the DC system at a state: the linear matrix, the scaled DC excitation, the nonlinear devices and the gmin.
+/**
+ * @brief   Stamps the DC system at a state: the linear matrix, the scaled DC excitation, the nonlinear devices and the
+ *          gmin.
+ */
 void StampDcSystem(const HbWorkspace &ws,
                    const std::vector<double> &b0,
                    const double b0_scale,
@@ -67,7 +74,9 @@ void StampDcSystem(const HbWorkspace &ws,
     sys.AddGminToNodes(gmin);
 }
 
-/// Starts the guess at zero and lets the nonlinear devices move it to where they conduct.
+/**
+ * @brief   Starts the guess at zero and lets the nonlinear devices move it to where they conduct.
+ */
 void SeedDcGuess(const HbWorkspace &ws, std::vector<double> &x) {
     x.assign(static_cast<std::size_t>(ws.UnknownCount), 0.0);
     for (const Device *device : ws.NonlinearDevices) {
@@ -123,9 +132,11 @@ bool RunDcNewtonWithB0(const HbWorkspace &ws,
     return false;
 }
 
-/// One pass of the DC bias: the direct Newton and its two fallbacks. The released pass of the nodesets starts from the
-/// point the pulled one found, so it applies no seed and tries the direct Newton only; the solve then falls back to a
-/// plain one.
+/**
+ * @brief   One pass of the DC bias: the direct Newton and its two fallbacks. The released pass of the nodesets starts
+ *          from the point the pulled one found, so it applies no seed and tries the direct Newton only; the solve then
+ *          falls back to a plain one.
+ */
 bool SolveDcBiasPass(const HbWorkspace &ws,
                      const ConvergenceOptions &options,
                      const NodesetPass pass,

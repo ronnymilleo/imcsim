@@ -96,7 +96,9 @@ UnknownHarmonics FindUnknownHarmonics(const HbWorkspace &ws, const std::vector<d
     return unknowns;
 }
 
-/// Puts the nonlinear devices at the state, so the current and charge they report are those of the solution.
+/**
+ * @brief   Puts the nonlinear devices at the state, so the current and charge they report are those of the solution.
+ */
 void PrepareDeviceStates(HbWorkspace &ws, const std::vector<double> &x_hb, const std::vector<double> &x_dc) {
     UnpackCoefficientsToSamples(ws, x_hb, ws.StateSamples);
     // Ensure nonlinear devices carry zero residual transient companion state before calling TerminalCurrent

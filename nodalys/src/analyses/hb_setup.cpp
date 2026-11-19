@@ -40,7 +40,9 @@ SourceView FindSource(const Device &device) {
     return {};
 }
 
-/// Checks that a source repeats with a harmonic of the fundamental that the expansion keeps.
+/**
+ * @brief   Checks that a source repeats with a harmonic of the fundamental that the expansion keeps.
+ */
 std::expected<void, std::string> CheckSourcePeriodicity(const SourcePeriodicity &periodicity,
                                                         const std::string_view kind_label,
                                                         const HarmonicBalanceConfig &config) {

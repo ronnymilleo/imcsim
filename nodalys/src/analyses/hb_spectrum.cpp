@@ -82,8 +82,16 @@ std::vector<double> PhasorsToCoefficients(const std::span<const std::complex<dou
 
 /**
  * @brief   Stamps a (2H+1) x (2H+1) harmonic conversion matrix block into the real Jacobian from a
- *          1/M-normalized time-domain entry spectrum $\hat{g}_n$.
- * @details When `apply_omega` is true, pre-multiplies by the time-derivative operator $\Omega$ for nonlinear charges.
+ *          1/M-normalized time-domain entry spectrum \f$\hat{g}_n\f$.
+ * @details When `apply_omega` is true, pre-multiplies by the time-derivative operator \f$\Omega\f$ for nonlinear
+ *          charges.
+ * @param[in,out] jacobian     Real Jacobian of the balance, which receives the block.
+ * @param[in]     row_offset   First row of the block, the first coefficient of the unknown the entry belongs to.
+ * @param[in]     col_offset   First column of the block, the first coefficient of the unknown it depends on.
+ * @param[in]     harmonics    Number of harmonics H above DC.
+ * @param[in]     omega0       Angular frequency of the fundamental in radians per second.
+ * @param[in]     spectrum     Spectrum of the entry over the period, at least H + 1 values from DC up.
+ * @param[in]     apply_omega  Whether the entry is a charge, whose block is multiplied by the derivative operator.
  */
 void StampConversionBlock(DenseMatrix &jacobian,
                           const std::size_t row_offset,

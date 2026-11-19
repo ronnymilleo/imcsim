@@ -18,13 +18,18 @@ namespace {
 /// Weight of a branch current in the norm of the residual, so amperes do not drown the volts.
 constexpr double BRANCH_ROW_WEIGHT = 1e-3;
 
-/// Conductance of one entry of the linear matrix, with the gmin that holds each node unknown to ground.
+/**
+ * @brief   Conductance of one entry of the linear matrix, with the gmin that holds each node unknown to ground.
+ */
 double LinearConductance(const HbWorkspace &ws, const int row, const int col, const double gmin) {
     return ws.GLin.Matrix().At(static_cast<std::size_t>(row), static_cast<std::size_t>(col))
          + ((row == col && ws.IsNodeUnknown[static_cast<std::size_t>(row)]) ? gmin : 0.0);
 }
 
-/// Subtracts the excitation B from the residual; the harmonics above DC follow the scale of the ramp of the sources.
+/**
+ * @brief   Subtracts the excitation B from the residual; the harmonics above DC follow the scale of the ramp of the
+ *          sources.
+ */
 void SubtractExcitation(const HbWorkspace &ws, const double ac_scale, HarmonicResidual &residual) {
     for (int r = 0; r < ws.UnknownCount; ++r) {
         const double b0_val = ws.BaseRhsHarmonics[ws.Index(r, 0)];
@@ -44,7 +49,9 @@ void SubtractExcitation(const HbWorkspace &ws, const double ac_scale, HarmonicRe
     }
 }
 
-/// Adds the linear part, `(Y_lin + gmin) * X`, to the residual.
+/**
+ * @brief   Adds the linear part, `(Y_lin + gmin) * X`, to the residual.
+ */
 void AddLinearResidual(const HbWorkspace &ws,
                        const std::vector<double> &x_hb,
                        const double gmin,
@@ -84,7 +91,9 @@ void AddLinearResidual(const HbWorkspace &ws,
     }
 }
 
-/// Stamps the blocks of the linear part into the Jacobian; they do not depend on the state.
+/**
+ * @brief   Stamps the blocks of the linear part into the Jacobian; they do not depend on the state.
+ */
 void StampLinearJacobian(const HbWorkspace &ws, const double gmin, DenseMatrix &jacobian) {
     const int n = ws.UnknownCount;
     const DenseMatrix &c_lin = ws.CLin.Matrix();
@@ -115,7 +124,10 @@ void StampLinearJacobian(const HbWorkspace &ws, const double gmin, DenseMatrix &
     }
 }
 
-/// Evaluates the nonlinear devices at every time sample of the state, filling the traces of their currents and charges.
+/**
+ * @brief   Evaluates the nonlinear devices at every time sample of the state, filling the traces of their currents and
+ *          charges.
+ */
 void SampleNonlinearDevices(HbWorkspace &ws, const bool is_recording_matrices) {
     const int n = ws.UnknownCount;
     if (is_recording_matrices) {
@@ -161,7 +173,10 @@ void SampleNonlinearDevices(HbWorkspace &ws, const bool is_recording_matrices) {
     }
 }
 
-/// Takes the currents and the charges of the nonlinear devices back to the harmonics and adds them to the residual.
+/**
+ * @brief   Takes the currents and the charges of the nonlinear devices back to the harmonics and adds them to the
+ *          residual.
+ */
 void AddNonlinearResidual(HbWorkspace &ws, HarmonicResidual &residual) {
     ws.TimeSeriesScratch.resize(ws.SampleCount);
     for (int r = 0; r < ws.UnknownCount; ++r) {
@@ -195,7 +210,9 @@ void AddNonlinearResidual(HbWorkspace &ws, HarmonicResidual &residual) {
     }
 }
 
-/// Stamps one family of traces, the conductances or the capacitances, as harmonic conversion blocks.
+/**
+ * @brief   Stamps one family of traces, the conductances or the capacitances, as harmonic conversion blocks.
+ */
 void StampTraces(HbWorkspace &ws, const ActiveMatrixTraces &traces, const bool apply_omega, DenseMatrix &jacobian) {
     const auto c_count = static_cast<std::size_t>(ws.CoeffsPerUnknown);
     for (std::size_t idx = 0; idx < traces.Pairs.size(); ++idx) {
@@ -212,13 +229,17 @@ void StampTraces(HbWorkspace &ws, const ActiveMatrixTraces &traces, const bool a
     }
 }
 
-/// Stamps the blocks of the nonlinear devices recorded while they were sampled.
+/**
+ * @brief   Stamps the blocks of the nonlinear devices recorded while they were sampled.
+ */
 void StampNonlinearJacobian(HbWorkspace &ws, DenseMatrix &jacobian) {
     StampTraces(ws, ws.GTraces, false, jacobian);
     StampTraces(ws, ws.CTraces, true, jacobian);
 }
 
-/// The steps shared by the residual with and without the Jacobian.
+/**
+ * @brief   The steps shared by the residual with and without the Jacobian.
+ */
 void EvaluateSteps(HbWorkspace &ws,
                    const std::vector<double> &x_hb,
                    const double ac_scale,
