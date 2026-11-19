@@ -19,6 +19,7 @@ add_executable(nodalys-tests
     hb_setup_tests.cpp
     hb_spectrum_tests.cpp
     hb_workspace_tests.cpp
+    json_exporter_tests.cpp
     linear_tests.cpp
     mosfet_device_tests.cpp
     netlist_elements_tests.cpp
@@ -28,6 +29,7 @@ add_executable(nodalys-tests
     pole_zero_oracle.cpp
     pz_analysis_tests.cpp
     random_draws_tests.cpp
+    raw_plot_tests.cpp
     sens_analysis_tests.cpp
     subcircuit_text_tests.cpp
     smooth_logic_tests.cpp

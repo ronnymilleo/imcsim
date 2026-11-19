@@ -47,6 +47,7 @@ add_library(nodalys STATIC
     src/export/exporters.cpp
     src/export/json_exporter.cpp
     src/export/raw_exporter.cpp
+    src/export/raw_plot.cpp
     src/expression/expression.cpp
     src/expression/expression_math.cpp
     src/expression/expression_parser.cpp
