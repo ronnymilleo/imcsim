@@ -152,6 +152,7 @@ add_executable(imcsim-tests
             transient_window_tests.cpp
             truth_table_tests.cpp
             ui_element_tests.cpp
+            ui_source_tests.cpp
             ui_wire_tests.cpp
             undo_history_tests.cpp
             voltage_probes_tests.cpp

@@ -4,14 +4,16 @@
  */
 
 #include "circuit/components/logic_part.h"
+#include "schematic/element_factory.h"
 #include "test_printers.h"
 #include "ui_elements/ui_behavioral_source.h"
 #include "ui_elements/ui_bjt.h"
 #include "ui_elements/ui_controlled_source.h"
 #include "ui_elements/ui_controlled_switch.h"
 #include "ui_elements/ui_diode.h"
+#include "ui_elements/ui_flip_flop.h"
+#include "ui_elements/ui_gate.h"
 #include "ui_elements/ui_ground.h"
-#include "ui_elements/ui_logic_part.h"
 #include "ui_elements/ui_mosfet.h"
 #include "ui_elements/ui_net_label.h"
 #include "ui_elements/ui_op_amp.h"
@@ -23,6 +25,7 @@
 #include "ui_elements/ui_vcc.h"
 #include <catch2/catch_test_macros.hpp>
 #include <cstdlib>
+#include <memory>
 #include <vector>
 
 TEST_CASE("Two-terminal elements have terminals two units each side, after rotation", "[ui_element]") {
@@ -307,7 +310,7 @@ TEST_CASE("Op-amps list the output, the inputs and the supply pins", "[ui_elemen
 }
 
 TEST_CASE("A gate has its inputs on the left and its output on the right", "[ui_element]") {
-    const GUI::UILogicPart gate(Core::ComponentType::AND, {10, 10}, GUI::Rotation::R0);
+    const GUI::UIGate gate(Core::ComponentType::AND, {10, 10}, GUI::Rotation::R0);
     CHECK(gate.GetComponent().GetType() == Core::ComponentType::AND);
     CHECK(gate.GetTerminals() == std::vector<GUI::GridPoint>{{7, 9}, {7, 11}, {13, 10}});
     CHECK(gate.GetTerminalInward(0) == GUI::GridPoint{1, 0});
@@ -315,13 +318,13 @@ TEST_CASE("A gate has its inputs on the left and its output on the right", "[ui_
     CHECK(gate.Contains({10.0f, 10.0f}));
     CHECK_FALSE(gate.Contains({10.0f, 12.0f}));
 
-    const GUI::UILogicPart inverter(Core::ComponentType::NOT, {0, 0}, GUI::Rotation::R0);
+    const GUI::UIGate inverter(Core::ComponentType::NOT, {0, 0}, GUI::Rotation::R0);
     CHECK(inverter.GetTerminals() == std::vector<GUI::GridPoint>{{-3, 0}, {3, 0}});
 }
 
 TEST_CASE("A gate with more inputs keeps A and B in place, adds the others below and centers the output",
           "[ui_element]") {
-    GUI::UILogicPart gate(Core::ComponentType::NAND, {0, 0}, GUI::Rotation::R0);
+    GUI::UIGate gate(Core::ComponentType::NAND, {0, 0}, GUI::Rotation::R0);
     auto &part = static_cast<Core::LogicPart &>(gate.GetComponent());
     part.SetInputCount(3);
     // The body runs from y = -1.5 to 3.5, so its middle, where the output is, is at y = 1
@@ -346,12 +349,12 @@ TEST_CASE("A gate with more inputs keeps A and B in place, adds the others below
 
 TEST_CASE("A flip-flop has its data and clock on the left, SET and RESET above and below, and Q and QN on the right",
           "[ui_element]") {
-    const GUI::UILogicPart d_type(Core::ComponentType::D_FLIP_FLOP, {0, 0}, GUI::Rotation::R0);
+    const GUI::UIFlipFlop d_type(Core::ComponentType::D_FLIP_FLOP, {0, 0}, GUI::Rotation::R0);
     CHECK(d_type.GetTerminals() == std::vector<GUI::GridPoint>{{-3, -1}, {-3, 1}, {0, -3}, {0, 3}, {3, -1}, {3, 1}});
     CHECK(d_type.GetTerminalInward(2) == GUI::GridPoint{0, 1});
     CHECK(d_type.GetTerminalInward(3) == GUI::GridPoint{0, -1});
 
-    const GUI::UILogicPart jk(Core::ComponentType::JK_FLIP_FLOP, {0, 0}, GUI::Rotation::R0);
+    const GUI::UIFlipFlop jk(Core::ComponentType::JK_FLIP_FLOP, {0, 0}, GUI::Rotation::R0);
     CHECK(jk.GetTerminals()
           == std::vector<GUI::GridPoint>{{-3, -2}, {-3, 2}, {-3, 0}, {0, -4}, {0, 4}, {3, -2}, {3, 2}});
 }
@@ -369,9 +372,10 @@ TEST_CASE("Every gate and flip-flop has one terminal for each input and each out
                                            Core::ComponentType::JK_FLIP_FLOP,
                                            Core::ComponentType::T_FLIP_FLOP,
                                            Core::ComponentType::SR_FLIP_FLOP}) {
-        const GUI::UILogicPart part(type, {0, 0}, GUI::Rotation::R0);
-        INFO(part.GetComponent().GetTypeName());
-        CHECK(part.GetTerminals().size()
+        const std::unique_ptr<GUI::UIElement> part = GUI::CreateElement(type, {0, 0}, GUI::Rotation::R0);
+        REQUIRE(part != nullptr);
+        INFO(part->GetComponent().GetTypeName());
+        CHECK(part->GetTerminals().size()
               == Core::GetLogicInputLabels(type).size() + Core::GetLogicOutputLabels(type).size());
     }
 }

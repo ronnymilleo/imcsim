@@ -4,8 +4,12 @@
  */
 
 #include "schematic/element_factory.h"
+
+#include "ui_elements/ui_flip_flop.h"
+#include "ui_elements/ui_gate.h"
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
+#include <memory>
 #include <string>
 
 TEST_CASE("GetPartName names parts as the user reads them", "[element_factory]") {
@@ -53,5 +57,28 @@ TEST_CASE("FindParts ignores case, spaces and punctuation", "[element_factory]")
         CHECK(std::ranges::contains(all, ComponentType::RESISTOR));
         CHECK(std::ranges::contains(all, ComponentType::CLOCK));
         CHECK(std::ranges::contains(all, ComponentType::LOGIC_INPUT));
+    }
+}
+
+TEST_CASE("Gates and flip-flops are drawn by symbols of their own", "[element_factory]") {
+    for (const Core::ComponentType type : {Core::ComponentType::AND,
+                                           Core::ComponentType::OR,
+                                           Core::ComponentType::NOT,
+                                           Core::ComponentType::NAND,
+                                           Core::ComponentType::NOR,
+                                           Core::ComponentType::XOR,
+                                           Core::ComponentType::XNOR,
+                                           Core::ComponentType::BUFFER}) {
+        const std::unique_ptr<GUI::UIElement> gate = GUI::CreateElement(type, {0, 0}, GUI::Rotation::R0);
+        CHECK(dynamic_cast<const GUI::UIGate *>(gate.get()) != nullptr);
+        CHECK(gate->GetComponent().GetType() == type);
+    }
+    for (const Core::ComponentType type : {Core::ComponentType::D_FLIP_FLOP,
+                                           Core::ComponentType::JK_FLIP_FLOP,
+                                           Core::ComponentType::T_FLIP_FLOP,
+                                           Core::ComponentType::SR_FLIP_FLOP}) {
+        const std::unique_ptr<GUI::UIElement> flip_flop = GUI::CreateElement(type, {0, 0}, GUI::Rotation::R0);
+        CHECK(dynamic_cast<const GUI::UIFlipFlop *>(flip_flop.get()) != nullptr);
+        CHECK(flip_flop->GetComponent().GetType() == type);
     }
 }

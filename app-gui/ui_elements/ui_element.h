@@ -57,6 +57,21 @@ struct ArrowHead {
 };
 
 /**
+ * @struct  CoilTurns
+ * @brief   A row of half-circle turns, as on an inductor or a transformer, in local grid units.
+ */
+struct CoilTurns {
+    /// Where the first turn starts, on the axis of the coil.
+    ImVec2 Start;
+    /// Unit vector along the coil, from the first turn to the last.
+    ImVec2 Axis;
+    /// Unit vector toward the side the turns bulge to.
+    ImVec2 Bulge;
+    int TurnCount = 0;
+    float TurnRadius = 0.0f;
+};
+
+/**
  * @class   UIElement
  * @brief   A component placed on the schematic grid, with its position, rotation and mirroring.
  * @details Owns its Core::Component. By default an element has two terminals at local x = -2 and x = +2 and
@@ -150,6 +165,7 @@ protected:
                              ImVec2 local_direction,
                              ArrowHead head,
                              ImU32 color) const;
+    void DrawCoilTurns(SchematicCanvas &canvas, const ViewTransform &view, const CoilTurns &coil, ImU32 color) const;
 
 private:
     std::unique_ptr<Core::Component> m_Component;

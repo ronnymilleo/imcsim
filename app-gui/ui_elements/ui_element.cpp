@@ -13,6 +13,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <format>
+#include <numbers>
 #include <optional>
 #include <string>
 #include <utility>
@@ -27,6 +28,8 @@ constexpr float LABEL_OFFSET = 1.0f;
 constexpr float OUTLINE_PADDING = 0.15f;
 /// Half the length of each bar of a plus or minus sign on a symbol.
 constexpr float SIGN_HALF_SIZE = 0.15f;
+/// Straight pieces each half circle of a coil is drawn with.
+constexpr int SEGMENTS_PER_TURN = 8;
 
 /**
  * @brief   The two corners of the base of an arrow head, in local grid units.
@@ -497,6 +500,36 @@ void UIElement::DrawFilledArrowHead(SchematicCanvas &canvas,
                              LocalToScreen(view, corners[0]),
                              LocalToScreen(view, corners[1]),
                              color);
+}
+
+/**
+ * @brief   Draws the turns of a coil, each its own polyline, sampled in local coordinates so the arcs follow the
+ * element rotation instead of using PathArcTo.
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     coil    Where the turns go and which way they bulge.
+ * @param[in]     color   Line color.
+ * @details Turns are separate polylines: joining them would put a near 180 degree corner where two turns meet, and
+ *          ImGui extends such miter joins into visible spikes.
+ */
+void UIElement::DrawCoilTurns(SchematicCanvas &canvas,
+                              const ViewTransform &view,
+                              const CoilTurns &coil,
+                              const ImU32 color) const {
+    const float radius = coil.TurnRadius;
+    std::array<ImVec2, SEGMENTS_PER_TURN + 1> points;
+    for (int turn = 0; turn < coil.TurnCount; ++turn) {
+        const ImVec2 center = coil.Start + coil.Axis * (radius + 2.0f * radius * static_cast<float>(turn));
+        for (int segment = 0; segment <= SEGMENTS_PER_TURN; ++segment) {
+            // Sweep from the start of the turn (angle pi) to its end (angle 0), through the side it bulges to
+            const float angle = std::numbers::pi_v<float>
+                              * (1.0f - static_cast<float>(segment) / static_cast<float>(SEGMENTS_PER_TURN));
+            points[static_cast<std::size_t>(segment)] = LocalToScreen(view,
+                                                                      center + coil.Axis * (radius * std::cos(angle))
+                                                                          + coil.Bulge * (radius * std::sin(angle)));
+        }
+        canvas.AddPolyline(points.data(), static_cast<int>(points.size()), color, ImDrawFlags_None, LINE_THICKNESS);
+    }
 }
 
 /**

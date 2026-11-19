@@ -157,14 +157,15 @@ add_library(imcsim-gui-lib
             ui_elements/ui_dependent_source.cpp
             ui_elements/ui_diode.cpp
             ui_elements/ui_element.cpp
+            ui_elements/ui_flip_flop.cpp
             ui_elements/ui_fuse.cpp
+            ui_elements/ui_gate.cpp
             ui_elements/ui_ground.cpp
             ui_elements/ui_inductor.cpp
             ui_elements/ui_initial_voltage.cpp
             ui_elements/ui_logic_box.cpp
             ui_elements/ui_logic_input.cpp
             ui_elements/ui_logic_output.cpp
-            ui_elements/ui_logic_part.cpp
             ui_elements/ui_mosfet.cpp
             ui_elements/ui_net_label.cpp
             ui_elements/ui_nodeset.cpp

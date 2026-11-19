@@ -11,6 +11,7 @@
 #include <format>
 #include <functional>
 #include <numbers>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -148,58 +149,13 @@ UISource::UISource(std::unique_ptr<Core::Source> source, const GridPoint positio
  * @brief   Every waveform but DC ignores the value of the source, so it is labeled by its main figures instead.
  */
 void UISource::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
-    const Core::Source &source = GetSource();
-    const std::string unit = source.GetUnit();
-    std::string waveform;
-    switch (source.GetSourceType()) {
-    case Core::Source::SourceType::DC:
+    const std::optional<std::string> waveform = DescribeWaveform(GetSource());
+    if (!waveform) {
         UIElement::DrawLabels(canvas, view, color);
         return;
-    case Core::Source::SourceType::AC:
-        waveform = std::format("{}{} {}Hz",
-                               Core::FormatValue(source.GetAC().Amplitude),
-                               unit,
-                               Core::FormatValue(source.GetAC().Frequency));
-        break;
-    case Core::Source::SourceType::PULSE: {
-        const Core::PulseParameters &pulse = source.GetPulse();
-        waveform = std::format("{}{}/{}{} {}Hz",
-                               Core::FormatValue(pulse.Low),
-                               unit,
-                               Core::FormatValue(pulse.High),
-                               unit,
-                               Core::FormatValue(1.0 / pulse.Period));
-        break;
     }
-    case Core::Source::SourceType::EXP:
-        waveform = std::format("{}{}", Core::FormatValue(source.GetEXP().PeakValue), unit);
-        break;
-    case Core::Source::SourceType::SFFM:
-        waveform = std::format("{}{} {}Hz",
-                               Core::FormatValue(source.GetSFFM().Amplitude),
-                               unit,
-                               Core::FormatValue(source.GetSFFM().CarrierFrequency));
-        break;
-    case Core::Source::SourceType::AM:
-        waveform = std::format("{}{} {}Hz",
-                               Core::FormatValue(source.GetAM().Amplitude),
-                               unit,
-                               Core::FormatValue(source.GetAM().CarrierFrequency));
-        break;
-    case Core::Source::SourceType::PWL:
-        waveform = std::format("{}pt", source.GetPWL().Points.size());
-        break;
-    case Core::Source::SourceType::NOISE:
-        waveform = std::format("{}{} rms", Core::FormatValue(source.GetNoise().WhiteAmplitude), unit);
-        break;
-    case Core::Source::SourceType::RANDOM:
-        waveform = Core::GetRandomDistributionName(source.GetRandom().Distribution);
-        break;
-    default:
-        break;
-    }
-    DrawLabel(canvas, view, {0.0f, -LABEL_OFFSET}, {0.0f, -1.0f}, source.GetName(), color);
-    DrawLabel(canvas, view, {0.0f, LABEL_OFFSET}, {0.0f, 1.0f}, waveform, color);
+    DrawLabel(canvas, view, {0.0f, -LABEL_OFFSET}, {0.0f, -1.0f}, GetSource().GetName(), color);
+    DrawLabel(canvas, view, {0.0f, LABEL_OFFSET}, {0.0f, 1.0f}, *waveform, color);
 }
 
 /**
@@ -241,6 +197,54 @@ bool UISource::DrawWaveform(SchematicCanvas &canvas, const ViewTransform &view, 
     }
     canvas.AddPolyline(points.data(), static_cast<int>(points.size()), color, ImDrawFlags_None, LINE_THICKNESS);
     return true;
+}
+
+/**
+ * @brief   Writes the main figures of the waveform of a source, as its symbol labels it.
+ * @param[in] source  The source.
+ * @return  Such as "1V 1kHz" for an AC source or "0V/5V 1kHz" for a pulse; none for a DC source, which is labeled by
+ *          its value.
+ */
+std::optional<std::string> DescribeWaveform(const Core::Source &source) {
+    const std::string unit = source.GetUnit();
+    switch (source.GetSourceType()) {
+    case Core::Source::SourceType::DC:
+        return std::nullopt;
+    case Core::Source::SourceType::AC:
+        return std::format("{}{} {}Hz",
+                           Core::FormatValue(source.GetAC().Amplitude),
+                           unit,
+                           Core::FormatValue(source.GetAC().Frequency));
+    case Core::Source::SourceType::PULSE: {
+        const Core::PulseParameters &pulse = source.GetPulse();
+        return std::format("{}{}/{}{} {}Hz",
+                           Core::FormatValue(pulse.Low),
+                           unit,
+                           Core::FormatValue(pulse.High),
+                           unit,
+                           Core::FormatValue(1.0 / pulse.Period));
+    }
+    case Core::Source::SourceType::EXP:
+        return std::format("{}{}", Core::FormatValue(source.GetEXP().PeakValue), unit);
+    case Core::Source::SourceType::SFFM:
+        return std::format("{}{} {}Hz",
+                           Core::FormatValue(source.GetSFFM().Amplitude),
+                           unit,
+                           Core::FormatValue(source.GetSFFM().CarrierFrequency));
+    case Core::Source::SourceType::AM:
+        return std::format("{}{} {}Hz",
+                           Core::FormatValue(source.GetAM().Amplitude),
+                           unit,
+                           Core::FormatValue(source.GetAM().CarrierFrequency));
+    case Core::Source::SourceType::PWL:
+        return std::format("{}pt", source.GetPWL().Points.size());
+    case Core::Source::SourceType::NOISE:
+        return std::format("{}{} rms", Core::FormatValue(source.GetNoise().WhiteAmplitude), unit);
+    case Core::Source::SourceType::RANDOM:
+        return Core::GetRandomDistributionName(source.GetRandom().Distribution);
+    default:
+        return std::string();
+    }
 }
 
 } // namespace GUI
