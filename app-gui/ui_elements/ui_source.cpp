@@ -217,10 +217,7 @@ const Core::Source &UISource::GetSource() const {
  * @param[in] color      Line color.
  */
 void UISource::DrawCircle(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
-    const ImVec2 center = LocalToScreen(view, 0, 0);
-    const ImVec2 radius_offset = LocalToScreen(view, CIRCLE_RADIUS, 0) - center;
-    const float radius = std::hypot(radius_offset.x, radius_offset.y);
-    canvas.AddCircle(center, radius, color, 0, LINE_THICKNESS);
+    DrawCircleAt(canvas, view, {0.0f, 0.0f}, CIRCLE_RADIUS, color);
     canvas.AddLine(LocalToScreen(view, -LEAD_END, 0), LocalToScreen(view, -CIRCLE_RADIUS, 0), color, LINE_THICKNESS);
     canvas.AddLine(LocalToScreen(view, CIRCLE_RADIUS, 0), LocalToScreen(view, LEAD_END, 0), color, LINE_THICKNESS);
 }

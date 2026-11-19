@@ -9,7 +9,6 @@
 #include <algorithm>
 #include <array>
 #include <cfloat>
-#include <cmath>
 
 namespace GUI {
 
@@ -84,9 +83,7 @@ void UILogicBox::DrawDigit(SchematicCanvas &canvas,
                            const ImU32 color) const {
     const float middle = (BOX_TOP + BOX_BOTTOM) / 2.0f;
     const ImVec2 center = LocalToScreen(view, 0.0f, middle);
-    // One grid unit long in local space, so its length on screen is the current zoom
-    const ImVec2 unit = LocalToScreen(view, 0.0f, middle + 1.0f) - center;
-    const float font_size = std::hypot(unit.x, unit.y) * DIGIT_SCALE;
+    const float font_size = LocalLengthToScreen(view, DIGIT_SCALE);
     if (font_size < MIN_LABEL_SIZE) {
         return;
     }

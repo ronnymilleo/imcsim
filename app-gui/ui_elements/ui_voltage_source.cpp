@@ -47,26 +47,12 @@ void UIVoltageSource::DrawSymbol(SchematicCanvas &canvas,
                        LocalToScreen(view, CIRCLE_RADIUS, 0),
                        color,
                        LINE_THICKNESS);
-        canvas.AddLine(LocalToScreen(view, -IEC_PLUS_POSITION - SIGN_HALF_SIZE, -IEC_PLUS_HEIGHT),
-                       LocalToScreen(view, -IEC_PLUS_POSITION + SIGN_HALF_SIZE, -IEC_PLUS_HEIGHT),
-                       color,
-                       LINE_THICKNESS);
-        canvas.AddLine(LocalToScreen(view, -IEC_PLUS_POSITION, -IEC_PLUS_HEIGHT - SIGN_HALF_SIZE),
-                       LocalToScreen(view, -IEC_PLUS_POSITION, -IEC_PLUS_HEIGHT + SIGN_HALF_SIZE),
-                       color,
-                       LINE_THICKNESS);
+        DrawSign(canvas, view, {-IEC_PLUS_POSITION, -IEC_PLUS_HEIGHT}, true, color);
         return;
     }
 
     // The minus bar is drawn across the axis, so it reads as a minus when the source stands vertically
-    canvas.AddLine(LocalToScreen(view, -SIGN_OFFSET - SIGN_HALF_SIZE, 0),
-                   LocalToScreen(view, -SIGN_OFFSET + SIGN_HALF_SIZE, 0),
-                   color,
-                   LINE_THICKNESS);
-    canvas.AddLine(LocalToScreen(view, -SIGN_OFFSET, -SIGN_HALF_SIZE),
-                   LocalToScreen(view, -SIGN_OFFSET, SIGN_HALF_SIZE),
-                   color,
-                   LINE_THICKNESS);
+    DrawSign(canvas, view, {-SIGN_OFFSET, 0.0f}, true, color);
     canvas.AddLine(LocalToScreen(view, SIGN_OFFSET, -SIGN_HALF_SIZE),
                    LocalToScreen(view, SIGN_OFFSET, SIGN_HALF_SIZE),
                    color,

@@ -59,11 +59,9 @@ void UITransformer::DrawSymbol(SchematicCanvas &canvas,
     for (const float x : {-CORE_X, CORE_X}) {
         canvas.AddLine(LocalToScreen(view, x, -1), LocalToScreen(view, x, 1), color, LINE_THICKNESS);
     }
-    const ImVec2 origin = LocalToScreen(view, 0, 0);
-    const ImVec2 unit = LocalToScreen(view, 1, 0) - origin;
-    const float radius = std::hypot(unit.x, unit.y) * DOT_RADIUS;
-    canvas.AddCircleFilled(LocalToScreen(view, PRIMARY_DOT.x, PRIMARY_DOT.y), radius, color);
-    canvas.AddCircleFilled(LocalToScreen(view, SECONDARY_DOT.x, SECONDARY_DOT.y), radius, color);
+    const float radius = LocalLengthToScreen(view, DOT_RADIUS);
+    canvas.AddCircleFilled(LocalToScreen(view, PRIMARY_DOT), radius, color);
+    canvas.AddCircleFilled(LocalToScreen(view, SECONDARY_DOT), radius, color);
 }
 
 /**

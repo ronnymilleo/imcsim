@@ -6,7 +6,6 @@
 #include "ui_elements/ui_net_label.h"
 
 #include "circuit/components/net_label.h"
-#include <cmath>
 #include <memory>
 #include <string>
 
@@ -41,9 +40,7 @@ void UINetLabel::DrawSymbol(SchematicCanvas &canvas,
                             const ViewTransform &view,
                             const ImU32 color,
                             SymbolStyle /*style*/) const {
-    const ImVec2 center = LocalToScreen(view, 0, -(LEAD_LENGTH + CIRCLE_RADIUS));
-    const ImVec2 radius_offset = LocalToScreen(view, CIRCLE_RADIUS, -(LEAD_LENGTH + CIRCLE_RADIUS)) - center;
-    canvas.AddCircle(center, std::hypot(radius_offset.x, radius_offset.y), color, 0, LINE_THICKNESS);
+    DrawCircleAt(canvas, view, {0.0f, -(LEAD_LENGTH + CIRCLE_RADIUS)}, CIRCLE_RADIUS, color);
 }
 
 /**

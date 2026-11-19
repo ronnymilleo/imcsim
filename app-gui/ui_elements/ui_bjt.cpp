@@ -50,11 +50,11 @@ void UIBJT::DrawSymbol(SchematicCanvas &canvas,
     if (GetComponent().GetType() == Core::ComponentType::NPN) {
         const ImVec2 tip = {emitter_start.x + emitter.x * NPN_ARROW_POSITION,
                             emitter_start.y + emitter.y * NPN_ARROW_POSITION};
-        DrawArrowHead(canvas, view, tip, emitter, color);
+        DrawFilledArrowHead(canvas, view, tip, emitter, ARROW_HEAD, color);
     } else {
         const ImVec2 tip = {emitter_start.x + emitter.x * PNP_ARROW_POSITION,
                             emitter_start.y + emitter.y * PNP_ARROW_POSITION};
-        DrawArrowHead(canvas, view, tip, {-emitter.x, -emitter.y}, color);
+        DrawFilledArrowHead(canvas, view, tip, {-emitter.x, -emitter.y}, ARROW_HEAD, color);
     }
 }
 

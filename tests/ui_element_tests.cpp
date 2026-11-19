@@ -36,6 +36,35 @@ TEST_CASE("Two-terminal elements have terminals two units each side, after rotat
     CHECK(resistor.GetTerminals() == std::vector<GUI::GridPoint>{{0, -2}, {0, 2}});
 }
 
+TEST_CASE("A point of a symbol is mirrored, then rotated, then moved to the element, and back", "[ui_element]") {
+    GUI::UIResistor resistor({10, 20}, GUI::Rotation::R0);
+    CHECK(resistor.LocalToWorld(GUI::GridPoint{1, 2}) == GUI::GridPoint{11, 22});
+
+    // Mirroring flips x, and a quarter turn clockwise takes (-1, 2) to (-2, -1)
+    resistor.SetMirrored(true);
+    resistor.SetRotation(GUI::Rotation::R90);
+    CHECK(resistor.LocalToWorld(GUI::GridPoint{1, 2}) == GUI::GridPoint{8, 19});
+    const ImVec2 world = resistor.LocalToWorld(ImVec2{1.0f, 2.0f});
+    CHECK(world.x == 8.0f);
+    CHECK(world.y == 19.0f);
+
+    for (const GUI::Rotation rotation :
+         {GUI::Rotation::R0, GUI::Rotation::R90, GUI::Rotation::R180, GUI::Rotation::R270}) {
+        for (const bool is_mirrored : {false, true}) {
+            resistor.SetRotation(rotation);
+            resistor.SetMirrored(is_mirrored);
+            const ImVec2 local = resistor.WorldToLocal(resistor.LocalToWorld(ImVec2{1.5f, -0.5f}));
+            CHECK(local.x == 1.5f);
+            CHECK(local.y == -0.5f);
+            // The grid and the float forms agree
+            const ImVec2 corner = resistor.LocalToWorld(ImVec2{1.0f, 2.0f});
+            const GUI::GridPoint grid_corner = resistor.LocalToWorld(GUI::GridPoint{1, 2});
+            CHECK(corner.x == static_cast<float>(grid_corner.X));
+            CHECK(corner.y == static_cast<float>(grid_corner.Y));
+        }
+    }
+}
+
 TEST_CASE("Ground and VCC have a single terminal at their position", "[ui_element]") {
     const GUI::UIGround ground({2, 3}, GUI::Rotation::R180);
     CHECK(ground.GetTerminals() == std::vector<GUI::GridPoint>{{2, 3}});

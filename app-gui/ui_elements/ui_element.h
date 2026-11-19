@@ -46,6 +46,17 @@ struct WorldBounds {
 };
 
 /**
+ * @struct  ArrowHead
+ * @brief   The size of the head of an arrow drawn on a symbol, in local grid units.
+ */
+struct ArrowHead {
+    /// From the tip back to the base, along the arrow.
+    float Length = 0.0f;
+    /// From the axis of the arrow to each corner of the base.
+    float HalfWidth = 0.0f;
+};
+
+/**
  * @class   UIElement
  * @brief   A component placed on the schematic grid, with its position, rotation and mirroring.
  * @details Owns its Core::Component. By default an element has two terminals at local x = -2 and x = +2 and
@@ -74,6 +85,9 @@ public:
     void SetMirrored(bool mirrored);
 
     // Geometry in world units
+    ImVec2 LocalToWorld(ImVec2 local) const;
+    GridPoint LocalToWorld(GridPoint local) const;
+    ImVec2 WorldToLocal(ImVec2 world) const;
     std::vector<GridPoint> GetTerminals() const;
     GridPoint GetTerminalInward(std::size_t terminal) const;
     bool Contains(ImVec2 world_pos) const;
@@ -107,6 +121,35 @@ protected:
                    const std::string &text,
                    ImU32 color) const;
     ImVec2 LocalToScreen(const ViewTransform &view, float x, float y) const;
+    ImVec2 LocalToScreen(const ViewTransform &view, ImVec2 local) const;
+    float LocalLengthToScreen(const ViewTransform &view, float length) const;
+
+    // Parts of symbols, for derived classes
+    void DrawCircleAt(SchematicCanvas &canvas,
+                      const ViewTransform &view,
+                      ImVec2 local_center,
+                      float local_radius,
+                      ImU32 color) const;
+    void
+    DrawSign(SchematicCanvas &canvas, const ViewTransform &view, ImVec2 local_center, bool is_plus, ImU32 color) const;
+    void DrawArrowHead(SchematicCanvas &canvas,
+                       const ViewTransform &view,
+                       ImVec2 local_tip,
+                       ImVec2 local_direction,
+                       ArrowHead head,
+                       ImU32 color) const;
+    void DrawArrow(SchematicCanvas &canvas,
+                   const ViewTransform &view,
+                   ImVec2 local_start,
+                   ImVec2 local_tip,
+                   ArrowHead head,
+                   ImU32 color) const;
+    void DrawFilledArrowHead(SchematicCanvas &canvas,
+                             const ViewTransform &view,
+                             ImVec2 local_tip,
+                             ImVec2 local_direction,
+                             ArrowHead head,
+                             ImU32 color) const;
 
 private:
     std::unique_ptr<Core::Component> m_Component;

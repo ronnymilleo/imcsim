@@ -419,13 +419,7 @@ void UILogicPart::DrawBubble(SchematicCanvas &canvas,
                              const ViewTransform &view,
                              const float center_x,
                              const ImU32 color) const {
-    const ImVec2 origin = LocalToScreen(view, 0, 0);
-    const ImVec2 unit = LocalToScreen(view, 1, 0) - origin;
-    canvas.AddCircle(LocalToScreen(view, center_x, GetGateCenterY()),
-                     std::hypot(unit.x, unit.y) * BUBBLE_RADIUS,
-                     color,
-                     0,
-                     LINE_THICKNESS);
+    DrawCircleAt(canvas, view, {center_x, GetGateCenterY()}, BUBBLE_RADIUS, color);
 }
 
 } // namespace GUI

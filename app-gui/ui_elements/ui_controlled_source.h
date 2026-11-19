@@ -34,7 +34,6 @@ protected:
 
 private:
     const Core::ControlledSource &GetSource() const;
-    void DrawSign(SchematicCanvas &canvas, const ViewTransform &view, ImVec2 center, bool plus, ImU32 color) const;
 };
 
 } // namespace GUI
