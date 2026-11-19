@@ -79,6 +79,36 @@ std::vector<LogicNode> ListMeasuredLogicNodes(const std::vector<LogicNode> &logi
 }
 
 /**
+ * @struct  PlotHeights
+ * @brief   The heights of the analog plot and of the plot of logic lanes under it, in pixels.
+ */
+struct PlotHeights {
+    float Analog = 0.0f;
+    float Lanes = 0.0f;
+};
+
+/**
+ * @brief   Splits the room left in the window between the analog plot and the plot of logic lanes.
+ * @details The lanes take a row each, up to a share of the room, and the analog plot takes the rest; a plot alone takes
+ *          all of it.
+ */
+PlotHeights GetPlotHeights(const std::size_t lane_count, const bool has_analog_plot) {
+    if (lane_count == 0 || !has_analog_plot) {
+        const float height = PlotHeight(1);
+        return {.Analog = height, .Lanes = height};
+    }
+    const float font_size = ImGui::GetFontSize();
+    const float available = ImGui::GetContentRegionAvail().y;
+    const float lane_height =
+        std::clamp(font_size * (LANE_PLOT_MARGIN + static_cast<float>(lane_count) * LANE_ROW_HEIGHT),
+                   font_size * MIN_PLOT_HEIGHT,
+                   available * MAX_LANE_SHARE);
+    const float analog_height =
+        std::max(font_size * MIN_PLOT_HEIGHT, available - lane_height - ImGui::GetStyle().ItemSpacing.y * 2.0f);
+    return {.Analog = analog_height, .Lanes = lane_height};
+}
+
+/**
  * @brief   The instant of the transient shown on the schematic, as a line along the plot.
  * @details Dragging it moves the instant and stops the playback, so the line stays where it was dropped.
  */
@@ -482,87 +512,111 @@ void TransientTab::DrawPlots(const Core::Transient &transient,
     const std::vector<LogicNode> lanes = FindMeasuredLanes(transient.NodeVoltages.size());
     const std::vector<BusLane> buses = FindShownBuses(transient.NodeVoltages.size());
     const std::size_t lane_count = lanes.size() + buses.size();
-    const std::vector<int> lane_nodes = ListNodes(lanes);
-    std::vector<int> analog_nodes = ListMeasuredNodes(transient.NodeVoltages.size(), m_Schematic, lane_nodes);
-    const bool has_voltages = !analog_nodes.empty() || UsesAxis(math, ImAxis_Y1);
-    std::vector<std::string> measured_currents = ListMeasuredCurrents(transient.Currents, m_Schematic);
-    const bool show_currents = !measured_currents.empty();
-    const bool has_analog_plot = has_voltages || show_currents || !math.empty() || lane_count == 0;
-    const bool currents_changed = m_Fit.TakeCurrentsChanged(std::move(measured_currents));
-    const bool voltages_changed = m_Fit.TakeNodesChanged(std::move(analog_nodes));
+    std::vector<int> lane_nodes = ListNodes(lanes);
+    ShownTraces shown{.Nodes = ListMeasuredNodes(transient.NodeVoltages.size(), m_Schematic, lane_nodes),
+                      .Currents = ListMeasuredCurrents(transient.Currents, m_Schematic),
+                      .MathLabels = ListMathLabels(math)};
+    const AnalogPlan plan = PlanAnalog(shown, math, std::move(lane_nodes), lane_count > 0);
+    const TraceFits fits = TakeAnalogFits(transient, std::move(shown));
+    // The fits go to the next plot, which is the plot of lanes when the analog one is left out
+    SetNextFits(fits, math);
+    const PlotHeights heights = GetPlotHeights(lane_count, plan.IsShown);
+    if (plan.IsShown) {
+        DrawAnalog(transient, math, steps, plan, heights.Analog);
+    }
+    if (lane_count > 0) {
+        if (fits.IsNewResult) {
+            ImPlot::SetNextAxisToFit(ImAxis_X1);
+        }
+        DrawLogicLanes(transient, buses, lanes, heights.Lanes);
+    }
+}
+
+/**
+ * @brief   Tells which axes of the analog plot fit this frame, and keeps what it drew for the next one.
+ * @details Every axis fits for a new result, for a run that is still being made and has grown, and for a window that
+ *          moved or changed size.
+ * @param[in] transient  The window of the transient shown.
+ * @param[in] shown      The traces the plot shows this frame.
+ * @return  The axes that fit.
+ */
+TraceFits TransientTab::TakeAnalogFits(const Core::Transient &transient, ShownTraces shown) {
     // A transient that is still being made fits its axes as the chunks arrive, so the plot follows the run; once the
     // run ends, whether whole or stopped, the axes are the user's again
-    const bool has_grown =
-        std::exchange(m_DrawnDataVersion, m_Results.GetTransientDataVersion()) != m_Results.GetTransientDataVersion()
-        && !transient.IsComplete;
+    const std::size_t data_version = m_Results.GetTransientDataVersion();
+    const bool has_grown = std::exchange(m_DrawnDataVersion, data_version) != data_version && !transient.IsComplete;
     // The window that moved is the one this frame's points come from, so the fit sees the points it moved to
     const PointWindow window = m_Playback.Window.GetWindow();
     const PointWindow previous = std::exchange(m_DrawnWindow, window);
     const bool has_moved = previous.First != window.First || previous.Count != window.Count;
-    const bool new_result = m_Fit.TakeNewResult(m_Results.GetTransientVersion()) || has_grown || has_moved;
-    SetNextFits(new_result, voltages_changed, currents_changed);
-    if (m_Fit.TakeMathChanged(ListMathLabels(math))) {
-        FitMathAxes(math);
-    }
-    float analog_height = PlotHeight(1);
-    float lane_height = analog_height;
-    if (lane_count > 0 && has_analog_plot) {
-        const float font_size = ImGui::GetFontSize();
-        const float available = ImGui::GetContentRegionAvail().y;
-        lane_height = std::clamp(font_size * (LANE_PLOT_MARGIN + static_cast<float>(lane_count) * LANE_ROW_HEIGHT),
-                                 font_size * MIN_PLOT_HEIGHT,
-                                 available * MAX_LANE_SHARE);
-        analog_height =
-            std::max(font_size * MIN_PLOT_HEIGHT, available - lane_height - ImGui::GetStyle().ItemSpacing.y * 2.0f);
-    }
-    if (has_analog_plot) {
-        DrawAnalog(transient, math, steps, lane_nodes, show_currents, has_voltages, lane_count > 0, analog_height);
-    }
-    if (lane_count > 0) {
-        if (new_result) {
-            ImPlot::SetNextAxisToFit(ImAxis_X1);
-        }
-        DrawLogicLanes(transient, buses, lanes, lane_height);
-    }
+    return m_Fit.TakeFits(m_Results.GetTransientVersion(), std::move(shown), has_grown || has_moved);
 }
 
+/**
+ * @brief   The analog plot: the other steps faint, the measured traces and the math channels, with the cursors and the
+ *          playhead.
+ */
 void TransientTab::DrawAnalog(const Core::Transient &transient,
                               const std::vector<MathTrace> &math,
                               const std::optional<StepFamily<Core::Transient>> &steps,
-                              const std::vector<int> &lane_nodes,
-                              const bool show_currents,
-                              const bool has_voltages,
-                              const bool has_lanes,
+                              const AnalogPlan &plan,
                               const float height) {
     if (!BeginTracePlot("##transient", ImVec2(-1.0f, height))) {
         return;
     }
+    const std::string third_unit = ThirdAxisUnit(math);
+    SetupAnalogAxes(math, plan, third_unit);
+    const std::vector<PlottedTrace> plotted = PlotAnalogTraces(transient, math, steps, plan);
+    DrawTimeMarkers(transient, plotted);
+    KeepVisibleTime();
+    ImPlot::EndPlot();
+}
+
+/**
+ * @brief   Time, voltage, the current axis when a current is shown, and the axes of the math channels.
+ * @param[in] math        The math channels of the plot.
+ * @param[in] plan        What the plot shows.
+ * @param[in] third_unit  Unit of the third axis, which must outlive the plot because ImPlot formats the ticks when it
+ *                        ends.
+ */
+void TransientTab::SetupAnalogAxes(const std::vector<MathTrace> &math,
+                                   const AnalogPlan &plan,
+                                   const std::string &third_unit) {
     ImPlot::SetupAxes("Time",
                       "Voltage",
                       ImPlotAxisFlags_None,
-                      VoltageAxisFlags(has_voltages, show_currents || !math.empty()));
+                      VoltageAxisFlags(plan.HasVoltages, plan.ShowsCurrents || !math.empty()));
     // The plot of the lanes below shares the time axis
-    if (has_lanes) {
+    if (plan.HasLanes) {
         ImPlot::SetupAxisLinks(ImAxis_X1, &m_View.From, &m_View.To);
     }
     ImPlot::SetupAxisFormat(ImAxis_X1, FormatAxisValue, const_cast<char *>("s"));
     ImPlot::SetupAxisFormat(ImAxis_Y1, FormatAxisValue, const_cast<char *>("V"));
-    if (show_currents) {
+    if (plan.ShowsCurrents) {
         ImPlot::SetupAxis(ImAxis_Y2, "Current", ImPlotAxisFlags_AuxDefault);
         ImPlot::SetupAxisFormat(ImAxis_Y2, FormatAxisValue, const_cast<char *>("A"));
     }
-    const std::string third_unit = ThirdAxisUnit(math);
-    SetupMathAxes(math, show_currents, third_unit);
+    SetupMathAxes(math, plan.ShowsCurrents, third_unit);
+}
+
+/**
+ * @brief   Plots the other steps faint under the measured traces and the math channels, and labels the steps.
+ * @return  The traces drawn, for the cursor readout.
+ */
+std::vector<PlottedTrace> TransientTab::PlotAnalogTraces(const Core::Transient &transient,
+                                                         const std::vector<MathTrace> &math,
+                                                         const std::optional<StepFamily<Core::Transient>> &steps,
+                                                         const AnalogPlan &plan) {
     std::vector<StepTraces> step_traces;
     if (steps) {
         for (const Core::Transient &step : steps->Results) {
             step_traces.push_back({&step.Times, &step.NodeVoltages, &step.Currents});
         }
-        PlotOtherSteps(step_traces, steps->Selected, m_Schematic, show_currents, lane_nodes);
+        PlotOtherSteps(step_traces, steps->Selected, m_Schematic, plan.ShowsCurrents, plan.LaneNodes);
     }
     std::vector<PlottedTrace> plotted;
-    PlotNodes(transient.Times, transient.NodeVoltages, m_Schematic, "V", "", plotted, lane_nodes);
-    if (show_currents) {
+    PlotNodes(transient.Times, transient.NodeVoltages, m_Schematic, "V", "", plotted, plan.LaneNodes);
+    if (plan.ShowsCurrents) {
         PlotCurrents(transient.Times, transient.Currents, m_Schematic, "A", "", plotted);
     }
     PlotMath(transient.Times, math, "", plotted);
@@ -571,15 +625,10 @@ void TransientTab::DrawAnalog(const Core::Transient &transient,
                    steps->Selected,
                    ListStepLabels(steps->Parameter, steps->Unit, steps->Values),
                    m_Schematic,
-                   show_currents,
-                   lane_nodes);
+                   plan.ShowsCurrents,
+                   plan.LaneNodes);
     }
-    DrawCursors(m_Cursors, false);
-    DrawPlayhead(m_Playback, transient.Times.front(), transient.Times.back());
-    DrawCursorReadout(transient.Times, "s", false, plotted);
-    const ImPlotRange view = ImPlot::GetPlotLimits().X;
-    m_View = {.From = view.Min, .To = view.Max};
-    ImPlot::EndPlot();
+    return plotted;
 }
 
 /**
@@ -646,12 +695,31 @@ void TransientTab::DrawLogicLanes(const Core::Transient &transient,
             DrawBitValues(cells[lane], position_of(buses.size() + lane), GetNodeColor(lanes[lane].Node));
         }
     }
+    DrawTimeMarkers(transient, plotted);
+    KeepVisibleTime();
+    ImPlot::EndPlot();
+}
+
+/**
+ * @brief   The cursors, which the user drags, the playhead of the schematic and the readout of the traces under the
+ *          pointer, over a plot against time.
+ * @param[in] transient  The window of the transient shown.
+ * @param[in] plotted    The traces drawn, for the readout.
+ * @note    Call it inside a plot.
+ */
+void TransientTab::DrawTimeMarkers(const Core::Transient &transient, const std::vector<PlottedTrace> &plotted) {
     DrawCursors(m_Cursors, false);
     DrawPlayhead(m_Playback, transient.Times.front(), transient.Times.back());
     DrawCursorReadout(transient.Times, "s", false, plotted);
+}
+
+/**
+ * @brief   Keeps the time range the plot shows, which the other plot and the statistics follow.
+ * @note    Call it inside a plot.
+ */
+void TransientTab::KeepVisibleTime() {
     const ImPlotRange view = ImPlot::GetPlotLimits().X;
     m_View = {.From = view.Min, .To = view.Max};
-    ImPlot::EndPlot();
 }
 
 /**
@@ -687,12 +755,8 @@ std::vector<BusLane> TransientTab::FindShownBuses(const std::size_t node_count) 
  */
 void TransientTab::DrawStatistics(const Core::Transient &transient, const std::vector<MathTrace> &math) {
     const PlotCursors &cursors = m_Cursors;
-    const CursorReadings cursor_readings = {
-        {"A", FormatQuantity(cursors.A, "s")},
-        {"B", FormatQuantity(cursors.B, "s")},
-        {"B-A", FormatQuantity(cursors.B - cursors.A, "s")},
-        {"1/(B-A)",
-         cursors.B != cursors.A ? FormatQuantity(1.0 / std::abs(cursors.B - cursors.A), "Hz") : std::string(NO_VALUE)}};
+    const CursorReadings cursor_readings =
+        ReadCursors(cursors, "s", {ReadCursorDifference(cursors, "s"), ReadCursorFrequency(cursors)});
     DrawStatisticsHeader(cursors.Shown ? "Between the cursors" : "Over the visible time");
     if (!FindLogicNodes(m_Schematic.BuildCircuit()).empty()) {
         ImGui::SameLine(0.0f, ImGui::GetFontSize());
@@ -718,11 +782,29 @@ void TransientTab::DrawStatistics(const Core::Transient &transient, const std::v
         measured.push_back({.Values = *trace.Values, .Unit = trace.Unit});
     }
     const std::vector<StatisticsRow> rows =
-        BuildTransientStatistics(transient.Times,
-                                 measured,
-                                 MeasuredSpan(cursors, m_View),
-                                 cursors.Shown ? std::optional(cursors) : std::nullopt);
-    DrawTraceTable("trace_statistics", traces, rows, cursors.Shown ? cursor_readings : CursorReadings{});
+        BuildTransientStatistics(transient.Times, measured, MeasuredSpan(cursors, m_View), GetShownCursors(cursors));
+    DrawTraceTable("trace_statistics", traces, rows, cursor_readings);
+}
+
+/**
+ * @brief   Works out what the analog plot of a transient shows in a frame.
+ * @param[in] shown       The traces it shows, logic lanes left out.
+ * @param[in] math        The math channels of the plot.
+ * @param[in] lane_nodes  Nodes drawn as logic lanes.
+ * @param[in] has_lanes   Whether the plot of logic lanes is drawn, for signals or buses.
+ * @return  The plan; the plot is left out when it would show nothing beside the lanes.
+ */
+AnalogPlan PlanAnalog(const ShownTraces &shown,
+                      const std::vector<MathTrace> &math,
+                      std::vector<int> lane_nodes,
+                      const bool has_lanes) {
+    const bool shows_currents = !shown.Currents.empty();
+    const bool has_voltages = !shown.Nodes.empty() || UsesAxis(math, ImAxis_Y1);
+    return {.LaneNodes = std::move(lane_nodes),
+            .ShowsCurrents = shows_currents,
+            .HasVoltages = has_voltages,
+            .HasLanes = has_lanes,
+            .IsShown = has_voltages || shows_currents || !math.empty() || !has_lanes};
 }
 
 } // namespace GUI

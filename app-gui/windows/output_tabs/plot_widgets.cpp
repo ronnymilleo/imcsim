@@ -101,22 +101,38 @@ ImPlotAxisFlags VoltageAxisFlags(const bool has_voltages, const bool has_other_t
 /**
  * @brief   Fits every axis for a new result; otherwise only the axes whose traces changed, so the zoom of the others
  *          stays.
- * @param[in] new_result        Whether the result is new.
- * @param[in] voltages_changed  Whether the measured voltages changed.
- * @param[in] currents_changed  Whether the measured currents changed.
+ * @param[in] fits  Which axes fit this frame.
+ * @param[in] math  The math channels of the plot, whose axes fit when they changed.
  * @note    Call it before each BeginPlot().
  */
-void SetNextFits(const bool new_result, const bool voltages_changed, const bool currents_changed) {
-    if (new_result) {
+void SetNextFits(const TraceFits &fits, const std::vector<MathTrace> &math) {
+    if (fits.IsNewResult) {
         ImPlot::SetNextAxesToFit();
-        return;
+    } else {
+        if (fits.HaveVoltagesChanged) {
+            ImPlot::SetNextAxisToFit(ImAxis_Y1);
+        }
+        if (fits.HaveCurrentsChanged) {
+            ImPlot::SetNextAxisToFit(ImAxis_Y2);
+        }
     }
-    if (voltages_changed) {
-        ImPlot::SetNextAxisToFit(ImAxis_Y1);
+    if (fits.HasMathChanged) {
+        FitMathAxes(math);
     }
-    if (currents_changed) {
-        ImPlot::SetNextAxisToFit(ImAxis_Y2);
+}
+
+/**
+ * @brief   Sets up the X axis of a plot against frequency: logarithmic, in hertz.
+ * @param[in,out] shared_view  The frequency range the plots of a tab share, so zooming one zooms the others; or null
+ *                             for a plot that keeps its own.
+ * @note    Call it between BeginPlot() and the first item.
+ */
+void SetupLogFrequencyAxis(PlotSpan *shared_view) {
+    ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
+    if (shared_view != nullptr) {
+        ImPlot::SetupAxisLinks(ImAxis_X1, &shared_view->From, &shared_view->To);
     }
+    ImPlot::SetupAxisFormat(ImAxis_X1, FormatAxisValue, const_cast<char *>("Hz"));
 }
 
 /**

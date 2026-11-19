@@ -148,9 +148,7 @@ void ACSensitivityTab::DrawPlot(const Core::ACSensitivity &sensitivity, const bo
                       is_phase ? "Phase (deg per 1 %)" : "Gain (dB per 1 %)",
                       ImPlotAxisFlags_None,
                       ImPlotAxisFlags_AutoFit);
-    ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
-    ImPlot::SetupAxisLinks(ImAxis_X1, &m_View.From, &m_View.To);
-    ImPlot::SetupAxisFormat(ImAxis_X1, FormatAxisValue, const_cast<char *>("Hz"));
+    SetupLogFrequencyAxis(&m_View);
     for (std::size_t index = 0; index < sensitivity.Parts.size(); ++index) {
         const Core::ACPartSensitivity &part = sensitivity.Parts[index];
         if (!m_ShownParts.contains(part.Name)) {

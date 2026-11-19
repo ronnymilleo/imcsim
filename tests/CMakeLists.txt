@@ -34,6 +34,7 @@ add_executable(imcsim-tests
             controlled_sources_tests.cpp
             counter_examples_tests.cpp
             current_flow_tests.cpp
+            cursor_widgets_tests.cpp
             default_backend.cpp
             dock_layout_tests.cpp
             editor_command_tests.cpp
@@ -122,6 +123,7 @@ add_executable(imcsim-tests
             stability_view_tests.cpp
             standard_values_tests.cpp
             statistics_table_tests.cpp
+            statistics_widgets_tests.cpp
             stepped_circuit_tests.cpp
             subcircuit_tests.cpp
             svg_writer_tests.cpp
@@ -134,6 +136,7 @@ add_executable(imcsim-tests
             trace_statistics_tests.cpp
             two_port_metrics_tests.cpp
             transient_chunks_tests.cpp
+            transient_tab_tests.cpp
             transient_window_tests.cpp
             truth_table_tests.cpp
             ui_element_tests.cpp

@@ -116,6 +116,15 @@ PlotSpan MeasuredSpan(const PlotCursors &cursors, const PlotSpan &view) {
 }
 
 /**
+ * @brief   The cursors the statistics read the traces at.
+ * @param[in] cursors  The cursors of the plot.
+ * @return  The cursors while they are shown, otherwise no value.
+ */
+std::optional<PlotCursors> GetShownCursors(const PlotCursors &cursors) {
+    return cursors.Shown ? std::optional(cursors) : std::nullopt;
+}
+
+/**
  * @brief   The width the cursor checkbox takes, for a header that places it at its right end.
  * @return  The width in pixels.
  */

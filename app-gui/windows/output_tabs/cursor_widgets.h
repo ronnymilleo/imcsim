@@ -10,6 +10,7 @@
 #include "plots/plot_types.h"
 #include "results/playback.h"
 #include "windows/output_tabs/plot_widgets.h"
+#include <optional>
 #include <vector>
 
 namespace GUI {
@@ -21,6 +22,7 @@ void DrawCursorReadout(const std::vector<double> &xs,
                        const std::vector<PlottedTrace> &plotted);
 void DrawCursors(PlotCursors &cursors, bool logarithmic);
 PlotSpan MeasuredSpan(const PlotCursors &cursors, const PlotSpan &view);
+std::optional<PlotCursors> GetShownCursors(const PlotCursors &cursors);
 float GetCursorToggleWidth();
 void DrawCursorToggle(PlotCursors &cursors, float right_edge);
 void DrawCursorCheckbox(PlotCursors &cursors);
