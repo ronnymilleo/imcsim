@@ -532,6 +532,8 @@ public:
 
     int ControlBranch() const { return m_ControlBranch; }
 
+    void BindControlBranch(int branch) { m_ControlBranch = branch; }
+
     double GetGain() const { return m_Gain; }
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
@@ -563,6 +565,8 @@ public:
     int GetBranch() const { return m_Branch; }
 
     int ControlBranch() const { return m_ControlBranch; }
+
+    void BindControlBranch(int branch) { m_ControlBranch = branch; }
 
     double GetGain() const { return m_Gain; }
 
