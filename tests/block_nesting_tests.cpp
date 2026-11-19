@@ -21,7 +21,9 @@
 #include <algorithm>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <cstddef>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -141,6 +143,36 @@ TEST_CASE("A cycle in a damaged file neither loops nor loses a block", "[block_n
     CHECK(GUI::ContainsBlock(definitions, "first", "first"));
     CHECK(GUI::ContainsBlock(definitions, "first", "second"));
     CHECK(GUI::OrderByUse(definitions).size() == 2);
+}
+
+TEST_CASE("Items are ordered after the items they depend on, in the order the dependencies are listed",
+          "[block_nesting]") {
+    // 0 needs 2 and then 1; 1 needs 3; 2 and 3 need nothing, and 4 stands alone
+    const std::vector<std::vector<std::size_t>> dependencies = {{2, 1}, {3}, {}, {}, {}};
+    const std::vector<std::size_t> order =
+        GUI::OrderByDependencies(dependencies.size(), [&](const std::size_t index) { return dependencies[index]; });
+    CHECK(order == std::vector<std::size_t>{2, 3, 1, 0, 4});
+}
+
+TEST_CASE("An item that several others depend on is placed once", "[block_nesting]") {
+    const std::vector<std::vector<std::size_t>> dependencies = {{1, 2}, {3}, {3}, {}};
+    const std::vector<std::size_t> order =
+        GUI::OrderByDependencies(dependencies.size(), [&](const std::size_t index) { return dependencies[index]; });
+    CHECK(order == std::vector<std::size_t>{3, 1, 2, 0});
+}
+
+TEST_CASE("Items in a cycle are all placed, once each, and the walk ends", "[block_nesting]") {
+    const std::vector<std::vector<std::size_t>> dependencies = {{1}, {2}, {0}, {}};
+    std::vector<std::size_t> order =
+        GUI::OrderByDependencies(dependencies.size(), [&](const std::size_t index) { return dependencies[index]; });
+    // The item that closes the cycle comes first among the three, since it finds its dependency still open
+    CHECK(order == std::vector<std::size_t>{2, 1, 0, 3});
+    std::ranges::sort(order);
+    CHECK(order == std::vector<std::size_t>{0, 1, 2, 3});
+}
+
+TEST_CASE("Ordering no items gives no positions", "[block_nesting]") {
+    CHECK(GUI::OrderByDependencies(0, [](const std::size_t) { return std::vector<std::size_t>{}; }).empty());
 }
 
 TEST_CASE("Renaming a block points only its own instances at the new name", "[block_nesting]") {

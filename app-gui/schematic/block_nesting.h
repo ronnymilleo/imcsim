@@ -10,6 +10,7 @@
 #include "schematic/schematic_file.h"
 #include "ui_elements/ui_element.h"
 #include <cstddef>
+#include <functional>
 #include <memory>
 #include <set>
 #include <span>
@@ -27,6 +28,8 @@ bool UsesBlock(const std::vector<std::unique_ptr<UIElement>> &elements,
 bool ContainsBlock(std::span<const SavedSubcircuit> definitions, std::string_view outer, std::string_view inner);
 
 // Order
+std::vector<std::size_t>
+OrderByDependencies(std::size_t count, const std::function<std::vector<std::size_t>(std::size_t)> &dependencies_of);
 std::vector<std::size_t> OrderByUse(std::span<const SavedSubcircuit> definitions);
 
 // Renaming
