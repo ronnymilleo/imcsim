@@ -7,6 +7,7 @@ include(Catch)
 add_executable(nodalys-tests
     ac_sens_analysis_tests.cpp
     ac_sens_netlist_tests.cpp
+    analysis_preamble_tests.cpp
     behavioral_device_tests.cpp
     bjt_device_tests.cpp
     expression_tests.cpp
@@ -30,6 +31,7 @@ add_executable(nodalys-tests
     sens_analysis_tests.cpp
     subcircuit_text_tests.cpp
     smooth_logic_tests.cpp
+    solution_readout_tests.cpp
     sp_analysis_tests.cpp
     text_case_tests.cpp
     thermal_tests.cpp
