@@ -14,9 +14,19 @@
 #include "simulation/monte_carlo.h"
 #include <array>
 #include <cstddef>
+#include <optional>
 #include <string>
 
 namespace GUI {
+
+/**
+ * @struct  FrequencyRangeFields
+ * @brief   The start and stop fields of a frequency range, which keep the text being typed.
+ */
+struct FrequencyRangeFields {
+    ValueField Start;
+    ValueField Stop;
+};
 
 /**
  * @class   AnalysisSettingsPanel
@@ -43,18 +53,14 @@ private:
     ValueField m_StopTime;
     ValueField m_TimeStep;
     ValueField m_LiveSeconds;
-    ValueField m_StartFrequency;
-    ValueField m_StopFrequency;
+    FrequencyRangeFields m_ACSweepRange;
     /// Start, stop and step of the swept DC sweep range.
     std::array<ValueField, 3> m_SweptFields;
     /// Start, stop and step of the stepped DC sweep range.
     std::array<ValueField, 3> m_SteppedFields;
-    ValueField m_NoiseStartFrequency;
-    ValueField m_NoiseStopFrequency;
-    ValueField m_ACSensitivityStartFrequency;
-    ValueField m_ACSensitivityStopFrequency;
-    ValueField m_SStartFrequency;
-    ValueField m_SStopFrequency;
+    FrequencyRangeFields m_NoiseRange;
+    FrequencyRangeFields m_ACSensitivityRange;
+    FrequencyRangeFields m_SParameterRange;
     ValueField m_HBFundamental;
     /// Start, stop and step of the stepped parameter.
     std::array<ValueField, 3> m_ParameterFields;
@@ -74,16 +80,18 @@ private:
     void DrawDCSweepSettings(SimulationSettings &settings);
     void DrawNoiseSettings(SimulationSettings &settings);
     void DrawTransferFunctionSettings(SimulationSettings &settings);
-    void DrawSensitivitySettings(SimulationSettings &settings);
-    void DrawACSensitivityInputs(SimulationSettings &settings);
-    void DrawPoleZeroSettings(SimulationSettings &settings);
     void DrawSParameterSettings(SimulationSettings &settings);
     void DrawPortSummary();
+    void DrawPoleZeroSettings(SimulationSettings &settings);
     void DrawSourceAndOutputPickers(std::string &source,
                                     std::optional<GridPoint> &output,
                                     const std::string &id,
                                     const char *empty_text,
                                     const char *tooltip);
+    void
+    DrawOutputPicker(const char *id, std::optional<GridPoint> &output, int shown_node, const Core::Circuit &circuit);
+    void DrawSensitivitySettings(SimulationSettings &settings);
+    void DrawACSensitivityInputs(SimulationSettings &settings, const Core::Circuit &circuit);
     void DrawTruthTableSettings(SimulationSettings &settings);
     void DrawHarmonicBalanceSettings(SimulationSettings &settings);
     void DrawRunModeSettings(SimulationSettings &settings);
