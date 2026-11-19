@@ -157,7 +157,7 @@ void DrawMeasurementMarkers(SchematicCanvas &canvas, const ViewTransform &view, 
     std::set<int> marked_nodes;
     for (const UIWire &wire : schematic.GetWires()) {
         const int node = connectivity.GetNode(wire.GetStart()).value_or(0);
-        if (node == 0 || !schematic.IsVoltageMeasured(node) || !marked_nodes.insert(node).second) {
+        if (node == 0 || !schematic.GetMeasurements().IsVoltageMeasured(node) || !marked_nodes.insert(node).second) {
             continue;
         }
         const ImVec2 point = view.ToScreen((ToVec2(wire.GetStart()) + ToVec2(wire.GetEnd())) / 2.0f);
@@ -179,7 +179,7 @@ void DrawMeasurementMarkers(SchematicCanvas &canvas, const ViewTransform &view, 
         const std::vector<std::size_t> current_terminals = Core::GetCurrentTerminals(element->GetComponent());
         const std::vector<GridPoint> terminals = element->GetTerminals();
         for (std::size_t index = 0; index < currents.size(); ++index, ++current_index) {
-            if (!schematic.IsCurrentMeasured(currents[index])) {
+            if (!schematic.GetMeasurements().IsCurrentMeasured(currents[index])) {
                 continue;
             }
             // Results report a current as positive into a terminal: the first one of a two-terminal part or a

@@ -569,7 +569,7 @@ void EditorWindow::CopySelected() {
     if (!IsSelecting(m_Mode) || !m_Schematic->HasSelection()) {
         return;
     }
-    const Selection selection = {m_Schematic->GetSelectedElements(), m_Schematic->GetSelectedWires()};
+    const Selection selection = {m_Schematic->GetSelection().Elements, m_Schematic->GetSelection().Wires};
     ImGui::SetClipboardText(CopySelection(m_Schematic->GetElements(),
                                           m_Schematic->GetWires(),
                                           selection,
@@ -649,7 +649,7 @@ void EditorWindow::HandleSelectionClick(SelectingMode &selecting, const ImVec2 c
                                     m_Schematic->GetWires(),
                                     cursor_world,
                                     WIRE_PICK_DISTANCE / m_View.GetZoom());
-    const Selection current = {m_Schematic->GetSelectedElements(), m_Schematic->GetSelectedWires()};
+    const Selection current = {m_Schematic->GetSelection().Elements, m_Schematic->GetSelection().Wires};
     if (picked.Empty()) {
         // Empty canvas starts a box; with Shift it adds to what is selected, otherwise it starts over
         if (!shift) {
@@ -679,9 +679,10 @@ void EditorWindow::HandleSelectionDoubleClick() {
         } else {
             m_Popover.Open();
         }
-    } else if (m_Schematic->GetSelectedElements().empty() && m_Schematic->GetSelectedWires().size() == 1) {
-        const Selection node =
-            PickNode(m_Schematic->GetWires(), m_Schematic->GetConnectivity(), *m_Schematic->GetSelectedWires().begin());
+    } else if (m_Schematic->GetSelection().Elements.empty() && m_Schematic->GetSelection().Wires.size() == 1) {
+        const Selection node = PickNode(m_Schematic->GetWires(),
+                                        m_Schematic->GetConnectivity(),
+                                        *m_Schematic->GetSelection().Wires.begin());
         EndDrag(*m_Schematic, m_Mode);
         ApplySelection(*m_Schematic, m_Mode, node);
     }

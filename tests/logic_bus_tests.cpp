@@ -106,10 +106,10 @@ TEST_CASE("Buses are saved with the measurements of a file and read back", "[log
     CHECK_FALSE(read->Warnings.empty());
 
     GUI::Schematic schematic;
-    schematic.SetBuses(measurements.Buses);
+    schematic.GetMeasurements().SetBuses(measurements.Buses);
     CHECK(schematic.SaveMeasurements().Buses == measurements.Buses);
-    schematic.ClearMeasurements();
-    CHECK(schematic.GetBuses().empty());
+    schematic.GetMeasurements().Clear();
+    CHECK(schematic.GetMeasurements().GetBuses().empty());
 }
 
 TEST_CASE("A plot draws the shown buses whose bits all name a node, read against their logic levels", "[logic_bus]") {

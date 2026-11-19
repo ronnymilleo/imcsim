@@ -39,7 +39,7 @@ void SelectEverything(GUI::Schematic &schematic) {
     for (std::size_t index = 0; index < schematic.GetWires().size(); ++index) {
         wires.insert(index);
     }
-    schematic.SetSelection(std::move(elements), std::move(wires));
+    schematic.SetSelection({.Elements = std::move(elements), .Wires = std::move(wires)});
 }
 
 /**

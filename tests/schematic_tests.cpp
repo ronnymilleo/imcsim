@@ -95,16 +95,16 @@ TEST_CASE("The selection holds several elements and wires, and one element is ed
     schematic.AddWire({2, 0}, {6, 0});
     CHECK_FALSE(schematic.HasSelection());
 
-    schematic.SetSelection({0, 1}, {0});
+    schematic.SetSelection({.Elements = {0, 1}, .Wires = {0}});
     CHECK(schematic.HasSelection());
-    CHECK(schematic.GetSelectedElements() == std::set<std::size_t>{0, 1});
-    CHECK(schematic.GetSelectedWires() == std::set<std::size_t>{0});
+    CHECK(schematic.GetSelection().Elements == std::set<std::size_t>{0, 1});
+    CHECK(schematic.GetSelection().Wires == std::set<std::size_t>{0});
     CHECK(schematic.GetSelectedElement() == nullptr);
 
-    schematic.SetSelection({1}, {});
+    schematic.SetSelection({.Elements = {1}, .Wires = {}});
     CHECK(schematic.GetSelectedElement() == schematic.GetElements()[1].get());
     // A wire selected beside the element makes it a group, which has no single part to edit
-    schematic.SetSelection({1}, {0});
+    schematic.SetSelection({.Elements = {1}, .Wires = {0}});
     CHECK(schematic.GetSelectedElement() == nullptr);
 }
 
@@ -138,7 +138,7 @@ TEST_CASE("DeleteSelection removes every selected element and wire in one step",
     schematic.AddWire({20, 0}, {24, 0});
     schematic.CommitUndoStep();
 
-    schematic.SetSelection({0, 2}, {0, 2});
+    schematic.SetSelection({.Elements = {0, 2}, .Wires = {0, 2}});
     schematic.DeleteSelection();
     REQUIRE(schematic.GetElements().size() == 1);
     CHECK(schematic.GetElements()[0]->GetPosition() == GUI::GridPoint{8, 0});
@@ -168,11 +168,11 @@ TEST_CASE("SimplifyAllWires deselects the wires because indices change, and keep
     schematic.AddElement(MakeResistor({0, 8}));
     schematic.AddWire({0, 0}, {3, 0});
     schematic.AddWire({3, 0}, {6, 0});
-    schematic.SetSelection({0}, {1});
+    schematic.SetSelection({.Elements = {0}, .Wires = {1}});
 
     schematic.SimplifyAllWires();
     CHECK(schematic.GetWires().size() == 1);
-    CHECK(schematic.GetSelectedWires().empty());
+    CHECK(schematic.GetSelection().Wires.empty());
     CHECK(schematic.IsElementSelected(0));
 }
 
@@ -468,19 +468,19 @@ TEST_CASE("Measurements are saved by node point and restored by node", "[schemat
     schematic.AddWire({-2, 0}, {-2, 4});
     const int node = *schematic.GetConnectivity().GetNode({-2, 4});
     schematic.SetVoltageMeasured(node, true);
-    schematic.SetCurrentMeasured("R1", true);
+    schematic.GetMeasurements().SetCurrentMeasured("R1", true);
 
     const GUI::SavedMeasurements saved = schematic.SaveMeasurements();
     REQUIRE(saved.Voltages.size() == 1);
     CHECK(schematic.GetConnectivity().GetNode(saved.Voltages[0]) == node);
     CHECK(saved.Currents == std::vector<std::string>{"R1"});
 
-    schematic.ClearMeasurements();
+    schematic.GetMeasurements().Clear();
     // Ground and points that connect to nothing are skipped
     schematic.RestoreMeasurements({.Voltages = {saved.Voltages[0], {2, 0}, {50, 50}}, .Currents = saved.Currents});
-    CHECK(schematic.IsVoltageMeasured(node));
-    CHECK_FALSE(schematic.IsVoltageMeasured(0));
-    CHECK(schematic.IsCurrentMeasured("R1"));
+    CHECK(schematic.GetMeasurements().IsVoltageMeasured(node));
+    CHECK_FALSE(schematic.GetMeasurements().IsVoltageMeasured(0));
+    CHECK(schematic.GetMeasurements().IsCurrentMeasured("R1"));
 }
 
 TEST_CASE("The document version changes when the content is replaced, not when it is edited or undone", "[schematic]") {
@@ -498,12 +498,12 @@ TEST_CASE("Measuring is not an unsaved change and adds no undo step", "[schemati
     GUI::Schematic schematic;
     schematic.AddElement(MakeResistor({0, 0}));
     schematic.MarkSaved("circuit.imcsim");
-    schematic.SetCurrentMeasured("R1", true);
+    schematic.GetMeasurements().SetCurrentMeasured("R1", true);
     schematic.CommitUndoStep();
     CHECK_FALSE(schematic.IsModified());
     schematic.Undo();
     CHECK(schematic.GetElements().empty());
-    CHECK(schematic.IsCurrentMeasured("R1"));
+    CHECK(schematic.GetMeasurements().IsCurrentMeasured("R1"));
 }
 
 TEST_CASE("Math channels are saved and restored with the measurements, and are no unsaved change", "[schematic]") {
@@ -511,15 +511,15 @@ TEST_CASE("Math channels are saved and restored with the measurements, and are n
     schematic.AddElement(MakeResistor({0, 0}));
     schematic.MarkSaved("circuit.imcsim");
     const std::vector<GUI::MathChannel> channels = {{.Name = "M1", .UsesExpression = true, .Expression = "V(OUT)"}};
-    schematic.SetMathChannels(channels);
+    schematic.GetMeasurements().SetMathChannels(channels);
     schematic.CommitUndoStep();
     CHECK_FALSE(schematic.IsModified());
     CHECK(schematic.SaveMeasurements().MathChannels == channels);
 
-    schematic.ClearMeasurements();
-    CHECK(schematic.GetMathChannels().empty());
+    schematic.GetMeasurements().Clear();
+    CHECK(schematic.GetMeasurements().GetMathChannels().empty());
     schematic.RestoreMeasurements({.Voltages = {}, .Currents = {}, .MathChannels = channels});
-    CHECK(schematic.GetMathChannels() == channels);
+    CHECK(schematic.GetMeasurements().GetMathChannels() == channels);
 }
 
 TEST_CASE("A measured node stays the same node when an edit renumbers the nodes", "[schematic]") {
@@ -533,9 +533,9 @@ TEST_CASE("A measured node stays the same node when an edit renumbers the nodes"
     schematic.AddWire({0, 0}, {4, 0});
     const GUI::Connectivity &nodes = schematic.GetConnectivity();
     CHECK(nodes.GetNode({20, 0}).value() != measured);
-    CHECK(schematic.IsVoltageMeasured(nodes.GetNode({20, 0}).value()));
-    CHECK_FALSE(schematic.IsVoltageMeasured(nodes.GetNode({0, 0}).value()));
-    CHECK_FALSE(schematic.IsVoltageMeasured(nodes.GetNode({10, 0}).value()));
+    CHECK(schematic.GetMeasurements().IsVoltageMeasured(nodes.GetNode({20, 0}).value()));
+    CHECK_FALSE(schematic.GetMeasurements().IsVoltageMeasured(nodes.GetNode({0, 0}).value()));
+    CHECK_FALSE(schematic.GetMeasurements().IsVoltageMeasured(nodes.GetNode({10, 0}).value()));
 }
 
 TEST_CASE("A measured node survives changes that pile up before the nodes are asked for again", "[schematic]") {
@@ -547,7 +547,7 @@ TEST_CASE("A measured node survives changes that pile up before the nodes are as
     schematic.AddWire({0, 0}, {4, 0});
     schematic.AddWire({5, 6}, {9, 6});
     const GUI::Connectivity &nodes = schematic.GetConnectivity();
-    CHECK(schematic.IsVoltageMeasured(nodes.GetNode({20, 0}).value()));
+    CHECK(schematic.GetMeasurements().IsVoltageMeasured(nodes.GetNode({20, 0}).value()));
     CHECK(schematic.GetConnectivity().GetNode({10, 0}).value() != nodes.GetNode({20, 0}).value());
 }
 
@@ -561,7 +561,7 @@ TEST_CASE("A measured node that loses all its wires is no longer measured", "[sc
     schematic.SelectWire(0);
     schematic.DeleteSelection();
     const GUI::Connectivity &nodes = schematic.GetConnectivity();
-    CHECK_FALSE(schematic.IsVoltageMeasured(nodes.GetNode({20, 0}).value()));
+    CHECK_FALSE(schematic.GetMeasurements().IsVoltageMeasured(nodes.GetNode({20, 0}).value()));
 }
 
 TEST_CASE("A measured node follows its wires when part of them moves", "[schematic]") {
@@ -573,7 +573,7 @@ TEST_CASE("A measured node follows its wires when part of them moves", "[schemat
     // The horizontal piece slides away; the other piece still carries the node
     schematic.SetWires({{{10, 2}, {14, 2}}, {{14, 2}, {14, 6}}});
     const GUI::Connectivity &nodes = schematic.GetConnectivity();
-    CHECK(schematic.IsVoltageMeasured(nodes.GetNode({14, 6}).value()));
+    CHECK(schematic.GetMeasurements().IsVoltageMeasured(nodes.GetNode({14, 6}).value()));
 }
 
 TEST_CASE("A measured node stays measured when a net label takes the place of a deleted wire", "[schematic]") {
@@ -592,7 +592,7 @@ TEST_CASE("A measured node stays measured when a net label takes the place of a 
     schematic.DeleteSelection();
     const GUI::Connectivity &nodes = schematic.GetConnectivity();
     REQUIRE(nodes.GetNode({10, 0}) == nodes.GetNode({20, 6}));
-    CHECK(schematic.IsVoltageMeasured(nodes.GetNode({10, 0}).value()));
+    CHECK(schematic.GetMeasurements().IsVoltageMeasured(nodes.GetNode({10, 0}).value()));
 }
 
 TEST_CASE("A measured node survives net labels being placed, named and moved", "[schematic]") {
@@ -609,7 +609,7 @@ TEST_CASE("A measured node survives net labels being placed, named and moved", "
         int count = 0;
         const int nodes = 20;
         for (int node = 1; node < nodes; ++node) {
-            count += schematic.IsVoltageMeasured(node) ? 1 : 0;
+            count += schematic.GetMeasurements().IsVoltageMeasured(node) ? 1 : 0;
         }
         return count;
     };
@@ -663,7 +663,7 @@ TEST_CASE("A measured node that is joined to ground and then freed is measured a
     schematic.MarkModified();
     const GUI::Connectivity &nodes = schematic.GetConnectivity();
     CHECK(nodes.GetNode({10, 10}).value() > 0);
-    CHECK(schematic.IsVoltageMeasured(nodes.GetNode({10, 10}).value()));
+    CHECK(schematic.GetMeasurements().IsVoltageMeasured(nodes.GetNode({10, 10}).value()));
 }
 
 TEST_CASE("A part set by hand during a live run keeps the transient and goes to the run as a change", "[schematic]") {

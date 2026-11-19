@@ -278,7 +278,7 @@ void HarmonicBalanceTab::DrawSpectrumPlot(const Core::HarmonicBalance &result,
     const double stem_ref = m_Scale == HarmonicScale::LINEAR ? 0.0 : HARMONIC_DECIBEL_FLOOR;
     const int count = static_cast<int>(result.Frequencies.size());
     for (std::size_t node = 1; node < result.NodePhasors.size(); ++node) {
-        if (!m_Schematic.IsVoltageMeasured(static_cast<int>(node))) {
+        if (!m_Schematic.GetMeasurements().IsVoltageMeasured(static_cast<int>(node))) {
             continue;
         }
         const std::vector<double> values =
@@ -298,7 +298,7 @@ void HarmonicBalanceTab::DrawSpectrumPlot(const Core::HarmonicBalance &result,
     if (has_currents) {
         ImPlot::SetAxes(ImAxis_X1, ImAxis_Y2);
         for (std::size_t index = 0; index < result.CurrentPhasors.size(); ++index) {
-            if (!m_Schematic.IsCurrentMeasured(result.CurrentPhasors[index].Name)) {
+            if (!m_Schematic.GetMeasurements().IsCurrentMeasured(result.CurrentPhasors[index].Name)) {
                 continue;
             }
             const std::vector<double> values =

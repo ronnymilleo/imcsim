@@ -48,9 +48,9 @@ TEST_CASE("A single part turns about its own position, a group about the middle 
     elements.push_back(GUI::CreateElement(Core::ComponentType::RESISTOR, {10, 6}, GUI::Rotation::R0));
     const std::vector<GUI::UIWire> wires = {{{12, 6}, {12, 12}}};
 
-    CHECK(GUI::FindPivot(elements, {1}, wires, {}) == GUI::GridPoint{10, 6});
-    CHECK(GUI::FindPivot(elements, {0, 1}, wires, {}) == GUI::GridPoint{6, 4});
+    CHECK(GUI::FindPivot(elements, wires, {.Elements = {1}, .Wires = {}}) == GUI::GridPoint{10, 6});
+    CHECK(GUI::FindPivot(elements, wires, {.Elements = {0, 1}, .Wires = {}}) == GUI::GridPoint{6, 4});
     // A wire counts by its ends, and a lone wire is no single part
-    CHECK(GUI::FindPivot(elements, {1}, wires, {0}) == GUI::GridPoint{11, 9});
-    CHECK(GUI::FindPivot(elements, {}, wires, {}) == GUI::GridPoint{0, 0});
+    CHECK(GUI::FindPivot(elements, wires, {.Elements = {1}, .Wires = {0}}) == GUI::GridPoint{11, 9});
+    CHECK(GUI::FindPivot(elements, wires, {}) == GUI::GridPoint{0, 0});
 }

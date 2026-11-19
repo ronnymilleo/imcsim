@@ -347,7 +347,7 @@ void OutputWindow::DrawTraceList(const std::size_t node_count, const std::vector
             if (measure_all) {
                 m_Schematic.SetVoltageMeasured(node, *measure_all);
             }
-            bool measured = m_Schematic.IsVoltageMeasured(node);
+            bool measured = m_Schematic.GetMeasurements().IsVoltageMeasured(node);
             if (DrawTraceCheckbox(GetVoltageLabel(m_Schematic.GetConnectivity(), node).c_str(),
                                   &measured,
                                   GetNodeColor(node),
@@ -363,14 +363,14 @@ void OutputWindow::DrawTraceList(const std::size_t node_count, const std::vector
         for (std::size_t index = 0; index < currents.size(); ++index) {
             const std::string &name = currents[index].Name;
             if (measure_all) {
-                m_Schematic.SetCurrentMeasured(name, *measure_all);
+                m_Schematic.GetMeasurements().SetCurrentMeasured(name, *measure_all);
             }
-            bool measured = m_Schematic.IsCurrentMeasured(name);
+            bool measured = m_Schematic.GetMeasurements().IsCurrentMeasured(name);
             if (DrawTraceCheckbox(std::format("I({})", name).c_str(),
                                   &measured,
                                   GetCurrentColor(index),
                                   TraceStyle::DASHED)) {
-                m_Schematic.SetCurrentMeasured(name, measured);
+                m_Schematic.GetMeasurements().SetCurrentMeasured(name, measured);
             }
         }
     }
@@ -417,7 +417,7 @@ void OutputWindow::DrawBusPanel(const std::size_t node_count) {
             signals.push_back(GetVoltageLabel(m_Schematic.GetConnectivity(), logic_node.Node));
         }
     }
-    if (!signals.empty() || !m_Schematic.GetBuses().empty()) {
+    if (!signals.empty() || !m_Schematic.GetMeasurements().GetBuses().empty()) {
         m_Buses.Draw(signals);
     }
 }

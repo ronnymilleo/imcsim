@@ -215,7 +215,7 @@ BuildHarmonicWaveforms(const Core::HarmonicBalance &result, Schematic &schematic
     }
 
     for (std::size_t node = 1; node < result.NodeWaveforms.size(); ++node) {
-        if (!schematic.IsVoltageMeasured(static_cast<int>(node))) {
+        if (!schematic.GetMeasurements().IsVoltageMeasured(static_cast<int>(node))) {
             continue;
         }
         std::vector<double> values = TilePeriodicValues(result.NodeWaveforms[node], cycles);
@@ -229,7 +229,7 @@ BuildHarmonicWaveforms(const Core::HarmonicBalance &result, Schematic &schematic
     }
     for (std::size_t index = 0; index < result.CurrentWaveforms.size(); ++index) {
         const Core::ComponentTrace &current = result.CurrentWaveforms[index];
-        if (!schematic.IsCurrentMeasured(current.Name)) {
+        if (!schematic.GetMeasurements().IsCurrentMeasured(current.Name)) {
             continue;
         }
         std::vector<double> values = TilePeriodicValues(current.Values, cycles);
@@ -293,7 +293,7 @@ std::vector<HarmonicTraceSummary> BuildHarmonicSummaries(const Core::HarmonicBal
                                                          const HarmonicAmplitudeUnit unit_kind) {
     std::vector<HarmonicTraceSummary> summaries;
     for (std::size_t node = 1; node < result.NodePhasors.size(); ++node) {
-        if (!schematic.IsVoltageMeasured(static_cast<int>(node))) {
+        if (!schematic.GetMeasurements().IsVoltageMeasured(static_cast<int>(node))) {
             continue;
         }
         summaries.push_back(
@@ -305,7 +305,7 @@ std::vector<HarmonicTraceSummary> BuildHarmonicSummaries(const Core::HarmonicBal
                                       unit_kind));
     }
     for (const Core::ComponentPhasors &current : result.CurrentPhasors) {
-        if (!schematic.IsCurrentMeasured(current.Name)) {
+        if (!schematic.GetMeasurements().IsCurrentMeasured(current.Name)) {
             continue;
         }
         summaries.push_back(BuildHarmonicTraceSummary(std::format("I({})", current.Name),
@@ -369,13 +369,13 @@ std::string BuildHarmonicBalanceCsv(const Core::HarmonicBalance &result,
 
     std::vector<WaveformColumn> columns;
     for (std::size_t node = 1; node < result.NodeWaveforms.size(); ++node) {
-        if (schematic.IsVoltageMeasured(static_cast<int>(node))) {
+        if (schematic.GetMeasurements().IsVoltageMeasured(static_cast<int>(node))) {
             columns.push_back(
                 {GetVoltageLabel(schematic.GetConnectivity(), static_cast<int>(node)), &result.NodeWaveforms[node]});
         }
     }
     for (const Core::ComponentTrace &current : result.CurrentWaveforms) {
-        if (schematic.IsCurrentMeasured(current.Name)) {
+        if (schematic.GetMeasurements().IsCurrentMeasured(current.Name)) {
             columns.push_back({std::format("I({})", current.Name), &current.Values});
         }
     }

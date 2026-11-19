@@ -132,7 +132,7 @@ void PartEditor::LoadFields(const Core::Component &component) {
  * @brief   What there is to edit when no single part is selected: how many items are, or a hint.
  */
 void PartEditor::DrawSelectionSummary() {
-    const std::size_t count = m_Schematic->GetSelectedElements().size() + m_Schematic->GetSelectedWires().size();
+    const std::size_t count = m_Schematic->GetSelection().Elements.size() + m_Schematic->GetSelection().Wires.size();
     if (count > 1) {
         ImGui::TextUnformatted(std::format("{} items selected", count).c_str());
     } else if (count == 1) {
@@ -153,7 +153,7 @@ void PartEditor::DrawName(Core::Component &component) {
     DrawFieldLabel("Name");
     ImGui::InputText("##name", m_Name.data(), m_Name.size(), ImGuiInputTextFlags_CharsNoBlank);
     if (ImGui::IsItemDeactivatedAfterEdit()) {
-        const std::size_t index = *m_Schematic->GetSelectedElements().begin();
+        const std::size_t index = *m_Schematic->GetSelection().Elements.begin();
         const auto renamed = m_Schematic->RenameElement(index, m_Name.data());
         m_NameError = renamed ? std::string() : renamed.error();
         m_Name.fill('\0');

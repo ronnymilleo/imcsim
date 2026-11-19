@@ -70,7 +70,8 @@ std::vector<LogicNode> ListMeasuredLogicNodes(const std::vector<LogicNode> &logi
                                               const Schematic &schematic) {
     std::vector<LogicNode> measured;
     for (const LogicNode &logic_node : logic_nodes) {
-        if (static_cast<std::size_t>(logic_node.Node) < node_count && schematic.IsVoltageMeasured(logic_node.Node)) {
+        if (static_cast<std::size_t>(logic_node.Node) < node_count
+            && schematic.GetMeasurements().IsVoltageMeasured(logic_node.Node)) {
             measured.push_back(logic_node);
         }
     }
@@ -674,7 +675,10 @@ std::vector<BusLane> TransientTab::FindShownBuses(const std::size_t node_count) 
     const NetResolver find_node = [this](const std::string_view net) {
         return m_Schematic.GetConnectivity().FindNodeOfNet(net);
     };
-    return ResolveBusLanes(m_Schematic.GetBuses(), FindLogicNodes(m_Schematic.BuildCircuit()), find_node, node_count);
+    return ResolveBusLanes(m_Schematic.GetMeasurements().GetBuses(),
+                           FindLogicNodes(m_Schematic.BuildCircuit()),
+                           find_node,
+                           node_count);
 }
 
 /**

@@ -11,6 +11,7 @@
 #include "base/helpers.h"
 #include "circuit/components/subcircuit.h"
 #include "schematic/schematic_file.h"
+#include "schematic/selection.h"
 #include "ui_elements/ui_element.h"
 #include "ui_elements/ui_wire.h"
 #include <cstddef>
@@ -52,8 +53,7 @@ std::vector<std::optional<std::size_t>> MatchPins(const std::vector<SavedSubcirc
 // Definitions
 std::expected<SavedSubcircuit, std::string> DrawDefinition(const std::vector<std::unique_ptr<UIElement>> &elements,
                                                            const std::vector<UIWire> &wires,
-                                                           const std::set<std::size_t> &selected_elements,
-                                                           const std::set<std::size_t> &selected_wires,
+                                                           const Selection &selection,
                                                            const std::vector<SavedSubcircuit> &definitions,
                                                            SavedSubcircuit definition);
 std::string DescribeDefinition(const SavedSubcircuit &definition);

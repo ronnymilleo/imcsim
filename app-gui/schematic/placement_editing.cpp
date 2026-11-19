@@ -122,15 +122,14 @@ std::optional<std::string> PlacePastedGroup(Schematic &root, BlockSession &block
     for (const UIWire &wire : group.Wires) {
         schematic.AddWire(wire.GetStart(), wire.GetEnd());
     }
-    std::set<std::size_t> elements;
+    Selection pasted;
     for (std::size_t index = first_element; index < schematic.GetElements().size(); ++index) {
-        elements.insert(index);
+        pasted.Elements.insert(index);
     }
-    std::set<std::size_t> wires;
     for (std::size_t index = first_wire; index < schematic.GetWires().size(); ++index) {
-        wires.insert(index);
+        pasted.Wires.insert(index);
     }
-    schematic.SetSelection(std::move(elements), std::move(wires));
+    schematic.SetSelection(std::move(pasted));
     return std::nullopt;
 }
 

@@ -95,7 +95,7 @@ std::optional<EditorCommand> DrawEditItems(Schematic &schematic) {
         command = EditorCommand::REDO;
     }
     ImGui::Separator();
-    const bool part_selected = !schematic.GetSelectedElements().empty();
+    const bool part_selected = !schematic.GetSelection().Elements.empty();
     DrawTurnItems(part_selected, command);
     ImGui::Separator();
     if (ImGui::MenuItem("Cut", IMCSIM_SHORTCUT "X", false, schematic.HasSelection())) {

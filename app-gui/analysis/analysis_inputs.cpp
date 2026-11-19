@@ -106,7 +106,7 @@ ResolveOutputNode(const std::optional<GridPoint> &point, const Core::Circuit &ci
     }
     const std::vector<int> held = ListHeldNodes(circuit);
     for (int node = 1; node < circuit.GetNodeCount(); ++node) {
-        if (schematic.IsVoltageMeasured(node) && !std::ranges::contains(held, node)) {
+        if (schematic.GetMeasurements().IsVoltageMeasured(node) && !std::ranges::contains(held, node)) {
             return node;
         }
     }
@@ -127,7 +127,7 @@ ResolveOutputNode(const std::optional<GridPoint> &point, const Core::Circuit &ci
 std::vector<int> ListMeasuredNodes(const Core::Circuit &circuit, const Schematic &schematic) {
     std::vector<int> nodes;
     for (int node = 1; node < circuit.GetNodeCount(); ++node) {
-        if (schematic.IsVoltageMeasured(node)) {
+        if (schematic.GetMeasurements().IsVoltageMeasured(node)) {
             nodes.push_back(node);
         }
     }

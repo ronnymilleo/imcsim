@@ -138,7 +138,7 @@ void PlotNodes(const std::vector<double> &xs,
                std::vector<PlottedTrace> &plotted,
                const std::vector<int> &excluded) {
     for (std::size_t node = 1; node < node_values.size(); ++node) {
-        if (!schematic.IsVoltageMeasured(static_cast<int>(node))
+        if (!schematic.GetMeasurements().IsVoltageMeasured(static_cast<int>(node))
             || std::ranges::contains(excluded, static_cast<int>(node))) {
             continue;
         }
@@ -210,7 +210,7 @@ void PlotCurrents(const std::vector<double> &xs,
                   std::vector<PlottedTrace> &plotted) {
     ImPlot::SetAxes(ImAxis_X1, ImAxis_Y2);
     for (std::size_t index = 0; index < currents.size(); ++index) {
-        if (!schematic.IsCurrentMeasured(currents[index].Name)) {
+        if (!schematic.GetMeasurements().IsCurrentMeasured(currents[index].Name)) {
             continue;
         }
         const std::string label = std::format("I({})", currents[index].Name);
@@ -228,7 +228,7 @@ void PlotCurrents(const std::vector<double> &xs,
  */
 bool HasMeasuredVoltage(const std::size_t node_count, const Schematic &schematic) {
     for (std::size_t node = 1; node < node_count; ++node) {
-        if (schematic.IsVoltageMeasured(static_cast<int>(node))) {
+        if (schematic.GetMeasurements().IsVoltageMeasured(static_cast<int>(node))) {
             return true;
         }
     }
@@ -246,7 +246,7 @@ std::vector<int>
 ListMeasuredNodes(const std::size_t node_count, const Schematic &schematic, const std::vector<int> &excluded) {
     std::vector<int> nodes;
     for (std::size_t node = 1; node < node_count; ++node) {
-        if (schematic.IsVoltageMeasured(static_cast<int>(node))
+        if (schematic.GetMeasurements().IsVoltageMeasured(static_cast<int>(node))
             && !std::ranges::contains(excluded, static_cast<int>(node))) {
             nodes.push_back(static_cast<int>(node));
         }
@@ -264,7 +264,7 @@ std::vector<std::string> ListMeasuredCurrents(const std::vector<Core::ComponentT
                                               const Schematic &schematic) {
     std::vector<std::string> names;
     for (const Core::ComponentTrace &current : currents) {
-        if (schematic.IsCurrentMeasured(current.Name)) {
+        if (schematic.GetMeasurements().IsCurrentMeasured(current.Name)) {
             names.push_back(current.Name);
         }
     }
@@ -287,7 +287,7 @@ std::vector<PlottedTrace> ListTraces(const std::vector<std::vector<double>> &nod
                                      const char *current_unit) {
     std::vector<PlottedTrace> traces;
     for (std::size_t node = 1; node < node_values.size(); ++node) {
-        if (schematic.IsVoltageMeasured(static_cast<int>(node))) {
+        if (schematic.GetMeasurements().IsVoltageMeasured(static_cast<int>(node))) {
             traces.push_back({GetVoltageLabel(schematic.GetConnectivity(), static_cast<int>(node)),
                               &node_values[node],
                               voltage_unit,
@@ -295,7 +295,7 @@ std::vector<PlottedTrace> ListTraces(const std::vector<std::vector<double>> &nod
         }
     }
     for (std::size_t index = 0; index < currents.size(); ++index) {
-        if (schematic.IsCurrentMeasured(currents[index].Name)) {
+        if (schematic.GetMeasurements().IsCurrentMeasured(currents[index].Name)) {
             traces.push_back({std::format("I({})", currents[index].Name),
                               &currents[index].Values,
                               current_unit,
