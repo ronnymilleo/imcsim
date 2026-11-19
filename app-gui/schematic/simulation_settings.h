@@ -10,6 +10,7 @@
 #include "circuit/solver_options.h"
 #include "schematic/parameter_step_settings.h"
 #include "simulation/monte_carlo.h"
+#include "simulation/simulation_backend.h"
 #include "simulation/simulator.h"
 #include <cstddef>
 #include <optional>
@@ -114,6 +115,9 @@ struct SimulationSettings {
 
 // Names
 const char *GetAnalysisName(Analysis analysis);
+
+// Backend kinds
+Core::AnalysisKind ToKind(Analysis analysis);
 
 // Live runs
 bool IsValidLiveSeconds(double seconds);

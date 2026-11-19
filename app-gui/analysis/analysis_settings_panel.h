@@ -72,6 +72,7 @@ private:
     // Settings fields
     void DrawSelectedSettings(SimulationSettings &settings);
     void LoadSettingsFields();
+    void DrawOperatingPointSettings();
     void DrawTransientSettings(SimulationSettings &settings);
     void DrawACSweepSettings(SimulationSettings &settings);
     void DrawDCSweepSettings(SimulationSettings &settings);

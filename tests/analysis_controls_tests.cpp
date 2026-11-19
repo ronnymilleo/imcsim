@@ -615,6 +615,16 @@ TEST_CASE("Analyses have names, and all of them are counted", "[analysis_control
     CHECK(static_cast<std::size_t>(GUI::Analysis::HARMONIC_BALANCE) + 1 == GUI::ANALYSIS_COUNT);
 }
 
+TEST_CASE("Each analysis is the backend analysis of the same name, and the sensitivity its DC kind",
+          "[analysis_controls]") {
+    CHECK(GUI::ToKind(GUI::Analysis::OPERATING_POINT) == Core::AnalysisKind::OPERATING_POINT);
+    CHECK(GUI::ToKind(GUI::Analysis::DC_SWEEP) == Core::AnalysisKind::DC_SWEEP);
+    CHECK(GUI::ToKind(GUI::Analysis::SENSITIVITY) == Core::AnalysisKind::SENSITIVITY);
+    // The backend lists the AC sensitivity between the sensitivity and the poles and zeros, which the table skips
+    CHECK(GUI::ToKind(GUI::Analysis::POLE_ZERO) == Core::AnalysisKind::POLE_ZERO);
+    CHECK(GUI::ToKind(GUI::Analysis::HARMONIC_BALANCE) == Core::AnalysisKind::HARMONIC_BALANCE);
+}
+
 TEST_CASE("A transient grows in the schematic while it runs, and the whole run replaces its chunks",
           "[analysis_controls]") {
     GUI::Schematic schematic;

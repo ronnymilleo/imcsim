@@ -35,35 +35,6 @@ constexpr const char *AC_INPUT_HINT = "Set a voltage or current source to AC";
 
 constexpr std::array<const char *, 3> INTEGRATION_METHOD_NAMES = {"Default", "Trapezoidal", "Gear"};
 
-Core::AnalysisKind ToKind(const Analysis analysis) {
-    switch (analysis) {
-    case Analysis::OPERATING_POINT:
-        return Core::AnalysisKind::OPERATING_POINT;
-    case Analysis::TRANSIENT:
-        return Core::AnalysisKind::TRANSIENT;
-    case Analysis::AC_SWEEP:
-        return Core::AnalysisKind::AC_SWEEP;
-    case Analysis::DC_SWEEP:
-        return Core::AnalysisKind::DC_SWEEP;
-    case Analysis::NOISE:
-        return Core::AnalysisKind::NOISE;
-    case Analysis::TRANSFER_FUNCTION:
-        return Core::AnalysisKind::TRANSFER_FUNCTION;
-    case Analysis::SENSITIVITY:
-        return Core::AnalysisKind::SENSITIVITY;
-    case Analysis::POLE_ZERO:
-        return Core::AnalysisKind::POLE_ZERO;
-    case Analysis::S_PARAMETERS:
-        return Core::AnalysisKind::S_PARAMETERS;
-    case Analysis::TRUTH_TABLE:
-        return Core::AnalysisKind::TRUTH_TABLE;
-    case Analysis::HARMONIC_BALANCE:
-        return Core::AnalysisKind::HARMONIC_BALANCE;
-    default:
-        return Core::AnalysisKind::OPERATING_POINT;
-    }
-}
-
 std::set<Core::ComponentType> ListPartTypes(const Schematic &schematic) {
     std::set<Core::ComponentType> types;
     for (const std::unique_ptr<UIElement> &element : schematic.GetElements()) {
@@ -257,9 +228,7 @@ void AnalysisSettingsPanel::DrawSettings() {
 void AnalysisSettingsPanel::DrawSelectedSettings(SimulationSettings &settings) {
     switch (settings.Selected) {
     case Analysis::OPERATING_POINT:
-        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetFontSize() * 20.0f);
-        ImGui::TextDisabled("The DC voltages show on the schematic and, with the currents, in the Output window");
-        ImGui::PopTextWrapPos();
+        DrawOperatingPointSettings();
         break;
     case Analysis::TRANSIENT:
         DrawTransientSettings(settings);
@@ -291,6 +260,8 @@ void AnalysisSettingsPanel::DrawSelectedSettings(SimulationSettings &settings) {
     case Analysis::HARMONIC_BALANCE:
         DrawHarmonicBalanceSettings(settings);
         break;
+    default:
+        break;
     }
 }
 
@@ -311,6 +282,15 @@ void AnalysisSettingsPanel::LoadSettingsFields() {
     m_RunModeSettings.Load(settings);
     LoadSolverFields(settings.Solver);
     m_LoadedSettingsVersion = m_Schematic.GetSimulationSettingsVersion();
+}
+
+/**
+ * @brief   The operating point has no settings, so it says where its results show.
+ */
+void AnalysisSettingsPanel::DrawOperatingPointSettings() {
+    ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetFontSize() * 20.0f);
+    ImGui::TextDisabled("The DC voltages show on the schematic and, with the currents, in the Output window");
+    ImGui::PopTextWrapPos();
 }
 
 /**
