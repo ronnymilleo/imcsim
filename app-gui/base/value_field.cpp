@@ -282,4 +282,18 @@ void DrawFieldLabel(const char *label) {
     ImGui::SetNextItemWidth(ImGui::GetFontSize() * INPUT_WIDTH);
 }
 
+/**
+ * @brief   The validity check of a value that has no limit.
+ */
+bool AnyValue(double /*value*/) {
+    return true;
+}
+
+/**
+ * @brief   The validity check of a value that must not be zero, such as the step of a range.
+ */
+bool IsNonZero(const double value) {
+    return value != 0.0;
+}
+
 } // namespace GUI

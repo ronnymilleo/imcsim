@@ -13,6 +13,7 @@ add_library(imcsim-gui-lib
             analysis/run_dc_sweep.cpp
             analysis/run_harmonic_balance.cpp
             analysis/run_jobs.cpp
+            analysis/run_mode_settings_panel.cpp
             analysis/run_noise.cpp
             analysis/run_operating_point.cpp
             analysis/run_pole_zero.cpp
@@ -213,7 +214,6 @@ add_library(imcsim-gui-lib
             windows/part_editor_models.cpp
             windows/part_editor_passives.cpp
             windows/part_editor_sources.cpp
-            windows/part_fields.cpp
             windows/part_picker.cpp
             windows/part_popover.cpp
             windows/part_rail.cpp
