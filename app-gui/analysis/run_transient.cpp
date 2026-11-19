@@ -69,10 +69,10 @@ void AnalysisControls::StartSingleTransient(const Core::Circuit &circuit, const 
                      if (is_live) {
                          AddLiveLimitWarning(run);
                      }
-                     Finish(Analysis::TRANSIENT,
-                            StoreResult(std::move(run.Result),
-                                        [this](auto result) { m_Results.SetTransient(std::move(result)); }),
-                            std::move(run.Messages));
+                     RecordRunOutcome(Analysis::TRANSIENT,
+                                      StoreResult(std::move(run.Result),
+                                                  [this](auto result) { m_Results.SetTransient(std::move(result)); }),
+                                      std::move(run.Messages));
                  }));
 }
 

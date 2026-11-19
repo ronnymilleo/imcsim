@@ -1,14 +1,17 @@
 /**
  * @file    run_status.cpp
- * @brief   The text of the run status in the status bar of the editor: what the last run reported, or how far a run in
- *          progress is.
+ * @brief   The text of the run status in the status bar of the editor, what the last run reported, or how far a run in
+ *          progress is, and the full report of the last run of an analysis.
  */
 
 #include "analysis/run_status.h"
 
 #include "base/text_fitting.h"
+#include "base/theme.h"
+#include "imgui.h"
 #include "spice/spice_value.h"
 #include <format>
+#include <string>
 
 namespace GUI {
 
@@ -93,6 +96,43 @@ RunStatusLine DescribeRunStatus(const AnalysisControls &controls, const std::opt
     case RunOutcome::NONE:
     default:
         return {};
+    }
+}
+
+/**
+ * @brief   Draws what the last run of an analysis reported: its error or its warnings, and the ngspice output.
+ * @param[in] controls  Controls that ran the analysis.
+ * @param[in] analysis  Analysis whose last run is shown.
+ */
+void DrawRunReport(const AnalysisControls &controls, const Analysis analysis) {
+    const RunStatus &status = controls.GetRunStatus(analysis);
+    ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetFontSize() * 30.0f);
+    if (status.Error) {
+        ImGui::TextColored(GetErrorTextColor(), "%s", status.Error->c_str());
+    } else if (controls.GetOutcome(analysis) != RunOutcome::NONE) {
+        // Without an error, the outcome is None exactly when the analysis has no result
+        ImGui::Text("%s done", GetAnalysisName(analysis));
+        for (const std::string &warning : controls.GetResultWarnings(analysis)) {
+            ImGui::TextColored(GetWarningTextColor(), "%s", warning.c_str());
+        }
+        if (status.HasNgspiceWarnings()) {
+            ImGui::TextColored(GetWarningTextColor(),
+                               "ngspice reported warnings; check its output before trusting "
+                               "the results");
+        }
+    } else {
+        ImGui::TextDisabled("No results for the current circuit");
+    }
+    ImGui::PopTextWrapPos();
+    if (status.Messages.empty() || !ImGui::CollapsingHeader("ngspice output")) {
+        return;
+    }
+    for (const Core::SimulatorMessage &message : status.Messages) {
+        if (message.FromErrorStream) {
+            ImGui::TextColored(GetWarningTextColor(), "%s", message.Text.c_str());
+        } else {
+            ImGui::TextUnformatted(message.Text.c_str());
+        }
     }
 }
 

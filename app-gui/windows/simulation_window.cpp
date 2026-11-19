@@ -5,6 +5,7 @@
 
 #include "windows/simulation_window.h"
 
+#include "analysis/run_status.h"
 #include "base/theme.h"
 
 namespace GUI {
@@ -37,7 +38,7 @@ void SimulationWindow::Draw() {
         m_Controls.PressRun();
     }
     ImGui::Separator();
-    m_Controls.DrawRunReport(m_Schematic.GetSimulationSettings().Selected);
+    DrawRunReport(m_Controls, m_Schematic.GetSimulationSettings().Selected);
 }
 
 } // namespace GUI

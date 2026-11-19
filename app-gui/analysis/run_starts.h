@@ -29,7 +29,7 @@ template <typename Work, typename Store>
 void AnalysisControls::StartSingleRun(const Analysis analysis, const Core::Circuit &circuit, Work work, Store store) {
     using Run = std::invoke_result_t<const Work &, const Core::Circuit &, Core::RunControl &>;
     StartRun(analysis, MakeJob<Run>(circuit, std::move(work), [this, analysis, store = std::move(store)](Run run) {
-                 Finish(analysis, StoreResult(std::move(run.Result), store), std::move(run.Messages));
+                 RecordRunOutcome(analysis, StoreResult(std::move(run.Result), store), std::move(run.Messages));
              }));
 }
 
@@ -79,7 +79,7 @@ void AnalysisControls::StartSteppedRuns(const Analysis analysis,
                                              [&](const Core::ParameterValue &value) { return run_once(copy, value); });
                  },
                  [this, analysis, store = run.StoreFamily](SteppedRuns<Result> runs) {
-                     Finish(analysis, StoreSteps(std::move(runs.Family), store), std::move(runs.Messages));
+                     RecordRunOutcome(analysis, StoreSteps(std::move(runs.Family), store), std::move(runs.Messages));
                  }));
 }
 
@@ -104,9 +104,9 @@ void AnalysisControls::StartMonteCarloRuns(const Analysis analysis,
                          measure);
                  },
                  [this, analysis, store = run.StoreFamily](MonteCarloRuns<Result> runs) {
-                     Finish(analysis,
-                            StoreMonteCarlo(std::move(runs.Family), std::move(runs.Table), m_Results, store),
-                            std::move(runs.Messages));
+                     RecordRunOutcome(analysis,
+                                      StoreMonteCarlo(std::move(runs.Family), std::move(runs.Table), m_Results, store),
+                                      std::move(runs.Messages));
                  }));
 }
 

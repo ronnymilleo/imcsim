@@ -8,13 +8,13 @@
 #define IMCSIM_ANALYSIS_CONTROLS_H
 
 #include "analysis/run_repeat.h"
+#include "analysis/run_report.h"
 #include "results/parameter_step.h"
 #include "results/result_store.h"
 #include "schematic/schematic.h"
 #include "schematic/simulation_settings.h"
 #include "simulation/simulation_service.h"
 #include "simulation/simulator.h"
-#include <array>
 #include <chrono>
 #include <cstddef>
 #include <functional>
@@ -27,20 +27,6 @@ namespace GUI {
 /// Defined in run_jobs.h, which only the sources that start a run include.
 template <typename Result>
 struct RepeatableRun;
-
-/**
- * @enum    RunOutcome
- * @brief   How the last run of an analysis went, as the editor status bar reports it.
- * @details Succeeded turns back into None when the result is dropped, as when the circuit changes; Failed stays
- *          until the next run. Stopped is a transient that ended early and kept the points made until then.
- */
-enum class RunOutcome {
-    NONE,
-    SUCCEEDED,
-    SUCCEEDED_WITH_WARNINGS,
-    STOPPED,
-    FAILED
-};
 
 /**
  * @enum    RunAction
@@ -98,20 +84,10 @@ public:
     RunOutcome GetOutcome(Analysis analysis) const;
     const std::optional<std::string> &GetError(Analysis analysis) const;
     std::optional<double> GetRunSeconds(Analysis analysis) const;
-    void DrawRunReport(Analysis analysis) const;
+    const RunStatus &GetRunStatus(Analysis analysis) const;
+    std::vector<std::string> GetResultWarnings(Analysis analysis) const;
 
 private:
-    /**
-     * @struct  RunStatus
-     * @brief   What the last run of one analysis left besides its result.
-     */
-    struct RunStatus {
-        std::optional<std::string> Error;
-        std::vector<Core::SimulatorMessage> Messages;
-        /// Wall time from Run to the result, none for a live run, which keeps pace with the clock.
-        std::optional<double> Seconds;
-    };
-
     Schematic &m_Schematic;
     ResultStore &m_Results;
 
@@ -134,11 +110,8 @@ private:
     /// Whether the transient on display came from a live run.
     bool m_IsLiveResult = false;
 
-    /// Last run of each analysis, in the order of the Analysis enum.
-    std::array<RunStatus, ANALYSIS_COUNT> m_Statuses;
-    std::optional<Analysis> m_LastRun;
-    /// Runs finished so far, which tells a new outcome from the same one seen again.
-    std::size_t m_FinishedRunCount = 0;
+    // Last runs
+    RunReport m_Report;
 
     // Runs of one analysis
     void StartRun(Analysis analysis, Core::Job job);
@@ -176,9 +149,9 @@ private:
     void RunTruthTableAnalysis(const Core::Circuit &circuit);
     void RunHarmonicBalanceAnalysis(const Core::Circuit &circuit);
 
-    // Results
-    void Finish(Analysis analysis, std::optional<std::string> error, std::vector<Core::SimulatorMessage> messages);
-    std::vector<std::string> GetResultWarnings(Analysis analysis) const;
+    // Outcomes
+    void
+    RecordRunOutcome(Analysis analysis, std::optional<std::string> error, std::vector<Core::SimulatorMessage> messages);
 };
 
 } // namespace GUI

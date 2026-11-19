@@ -7,8 +7,6 @@
 #include "analysis/analysis_controls.h"
 
 #include "analysis/analysis_inputs.h"
-#include "base/theme.h"
-#include "imgui.h"
 #include <algorithm>
 #include <chrono>
 #include <expected>
@@ -16,14 +14,6 @@
 #include <utility>
 
 namespace GUI {
-
-namespace {
-
-std::size_t ToIndex(const Analysis analysis) {
-    return static_cast<std::size_t>(analysis);
-}
-
-} // namespace
 
 /**
  * @brief   Creates the controls for a schematic.
@@ -257,7 +247,7 @@ void AnalysisControls::DiscardLive() {
     m_IsLiveResult = false;
     m_Schematic.SetLiveRun(false);
     m_Results.Clear(Analysis::TRANSIENT);
-    m_Statuses[ToIndex(Analysis::TRANSIENT)] = {};
+    m_Report.Clear(Analysis::TRANSIENT);
 }
 
 /**
@@ -274,7 +264,7 @@ bool AnalysisControls::IsLiveResult() const {
  * @return  The analysis, or no value before the first run.
  */
 std::optional<Analysis> AnalysisControls::GetLastRun() const {
-    return m_LastRun;
+    return m_Report.GetLastRun();
 }
 
 /**
@@ -282,7 +272,7 @@ std::optional<Analysis> AnalysisControls::GetLastRun() const {
  * @return  The number of runs finished since the start, failed ones included.
  */
 std::size_t AnalysisControls::GetFinishedRunCount() const {
-    return m_FinishedRunCount;
+    return m_Report.GetFinishedRunCount();
 }
 
 /**
@@ -292,21 +282,7 @@ std::size_t AnalysisControls::GetFinishedRunCount() const {
  *          result or ngspice reported some; None when it has no result, such as after the circuit changed.
  */
 RunOutcome AnalysisControls::GetOutcome(const Analysis analysis) const {
-    const RunStatus &status = m_Statuses[ToIndex(analysis)];
-    if (status.Error) {
-        return RunOutcome::FAILED;
-    }
-    if (!m_Results.HasResult(analysis)) {
-        return RunOutcome::NONE;
-    }
-    if (analysis == Analysis::TRANSIENT && m_Results.GetTransient() && !m_Results.GetTransient()->IsComplete) {
-        return RunOutcome::STOPPED;
-    }
-    const bool ngspice_warned = std::ranges::any_of(status.Messages, [](const Core::SimulatorMessage &message) {
-        return message.FromErrorStream;
-    });
-    return ngspice_warned || !GetResultWarnings(analysis).empty() ? RunOutcome::SUCCEEDED_WITH_WARNINGS
-                                                                  : RunOutcome::SUCCEEDED;
+    return m_Report.GetOutcome(analysis, m_Results, GetResultWarnings(analysis));
 }
 
 /**
@@ -315,7 +291,7 @@ RunOutcome AnalysisControls::GetOutcome(const Analysis analysis) const {
  * @return  The error, or no value when the last run succeeded or there was none.
  */
 const std::optional<std::string> &AnalysisControls::GetError(const Analysis analysis) const {
-    return m_Statuses[ToIndex(analysis)].Error;
+    return m_Report.GetStatus(analysis).Error;
 }
 
 /**
@@ -325,43 +301,33 @@ const std::optional<std::string> &AnalysisControls::GetError(const Analysis anal
  *          which keeps pace with the clock.
  */
 std::optional<double> AnalysisControls::GetRunSeconds(const Analysis analysis) const {
-    return m_Statuses[ToIndex(analysis)].Seconds;
+    return m_Report.GetStatus(analysis).Seconds;
 }
 
 /**
- * @brief   Draws what the last run of an analysis reported: its error or its warnings, and the ngspice output.
- * @param[in] analysis  Analysis whose last run is shown.
+ * @brief   Returns what the last run of an analysis left besides its result.
+ * @param[in] analysis  Analysis to read.
+ * @return  Its error, the ngspice output and the time it took; empty before its first run.
  */
-void AnalysisControls::DrawRunReport(const Analysis analysis) const {
-    const RunStatus &status = m_Statuses[ToIndex(analysis)];
-    ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetFontSize() * 30.0f);
-    if (status.Error) {
-        ImGui::TextColored(GetErrorTextColor(), "%s", status.Error->c_str());
-    } else if (m_Results.HasResult(analysis)) {
-        ImGui::Text("%s done", GetAnalysisName(analysis));
-        for (const std::string &warning : GetResultWarnings(analysis)) {
-            ImGui::TextColored(GetWarningTextColor(), "%s", warning.c_str());
-        }
-        if (std::ranges::any_of(status.Messages,
-                                [](const Core::SimulatorMessage &message) { return message.FromErrorStream; })) {
-            ImGui::TextColored(GetWarningTextColor(),
-                               "ngspice reported warnings; check its output before trusting "
-                               "the results");
-        }
-    } else {
-        ImGui::TextDisabled("No results for the current circuit");
+const RunStatus &AnalysisControls::GetRunStatus(const Analysis analysis) const {
+    return m_Report.GetStatus(analysis);
+}
+
+/**
+ * @brief   Lists the warnings of the result of an analysis: rating warnings, such as a transistor past its maximum
+ *          voltage, which the operating point and the transient check, the combinations of a truth table that have no
+ *          operating point, and the runs of a Monte Carlo analysis that failed or did not run.
+ * @param[in] analysis  Analysis whose result is read.
+ * @return  The Monte Carlo warnings first, when the analysis is one Monte Carlo repeats, then those of the result; none
+ *          when it has no result.
+ */
+std::vector<std::string> AnalysisControls::GetResultWarnings(const Analysis analysis) const {
+    std::vector<std::string> warnings;
+    if (const auto &monte_carlo = m_Results.GetMonteCarlo(); monte_carlo && IsRepeatable(analysis)) {
+        warnings = ListMonteCarloWarnings(*monte_carlo);
     }
-    ImGui::PopTextWrapPos();
-    if (status.Messages.empty() || !ImGui::CollapsingHeader("ngspice output")) {
-        return;
-    }
-    for (const Core::SimulatorMessage &message : status.Messages) {
-        if (message.FromErrorStream) {
-            ImGui::TextColored(GetWarningTextColor(), "%s", message.Text.c_str());
-        } else {
-            ImGui::TextUnformatted(message.Text.c_str());
-        }
-    }
+    std::ranges::copy(m_Results.GetWarnings(analysis), std::back_inserter(warnings));
+    return warnings;
 }
 
 /**
@@ -381,8 +347,7 @@ void AnalysisControls::StartRun(const Analysis analysis, Core::Job job) {
  */
 void AnalysisControls::Refuse(const Analysis analysis, std::string message) {
     m_Results.Clear(analysis);
-    Finish(analysis, std::move(message), {});
-    m_Statuses[ToIndex(analysis)].Seconds.reset();
+    m_Report.Record(analysis, {.Error = std::move(message), .Messages = {}, .Seconds = std::nullopt});
 }
 
 /**
@@ -428,29 +393,17 @@ void AnalysisControls::StartAnalysis(const Analysis analysis, const Core::Circui
     }
 }
 
-void AnalysisControls::Finish(const Analysis analysis,
-                              std::optional<std::string> error,
-                              std::vector<Core::SimulatorMessage> messages) {
-    const std::chrono::duration<double> elapsed = std::chrono::steady_clock::now() - m_RunStart;
-    m_Statuses[ToIndex(analysis)] = {.Error = std::move(error),
-                                     .Messages = std::move(messages),
-                                     .Seconds = m_IsLiveRun ? std::nullopt : std::optional(elapsed.count())};
-    m_LastRun = analysis;
-    ++m_FinishedRunCount;
-}
-
 /**
- * @brief   Rating warnings, such as a transistor past its maximum voltage, which the operating point and the transient
- *          check, the combinations of a truth table that have no operating point, and the runs of a Monte Carlo
- *          analysis that failed or did not run.
+ * @brief   Records how a run that started ended, with the wall time since it started, unless it was live and kept pace
+ *          with the clock.
  */
-std::vector<std::string> AnalysisControls::GetResultWarnings(const Analysis analysis) const {
-    std::vector<std::string> warnings;
-    if (const auto &monte_carlo = m_Results.GetMonteCarlo(); monte_carlo && IsRepeatable(analysis)) {
-        warnings = ListMonteCarloWarnings(*monte_carlo);
-    }
-    std::ranges::copy(m_Results.GetWarnings(analysis), std::back_inserter(warnings));
-    return warnings;
+void AnalysisControls::RecordRunOutcome(const Analysis analysis,
+                                        std::optional<std::string> error,
+                                        std::vector<Core::SimulatorMessage> messages) {
+    const std::chrono::duration<double> elapsed = std::chrono::steady_clock::now() - m_RunStart;
+    m_Report.Record(analysis,
+                    {.Error = std::move(error),
+                     .Messages = std::move(messages),
+                     .Seconds = m_IsLiveRun ? std::nullopt : std::optional(elapsed.count())});
 }
-
 } // namespace GUI
