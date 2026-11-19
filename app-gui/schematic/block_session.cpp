@@ -51,7 +51,7 @@ const Schematic &BlockSession::GetShown() const {
  */
 bool BlockSession::CanPlaceBlock(const std::string_view name) const {
     return std::ranges::none_of(m_OpenBlocks, [&](const OpenBlock &block) {
-        return ContainsBlock(m_Root.GetSubcircuits(), name, block.Name);
+        return ContainsBlock(m_Root.GetSubcircuits(), name, block.Settings.Name);
     });
 }
 
@@ -73,7 +73,7 @@ std::vector<const SavedSubcircuit *> BlockSession::ListPlaceableBlocks() const {
  */
 void BlockSession::SyncDefinitions() {
     for (OpenBlock &block : m_OpenBlocks) {
-        block.Content->CopyDefinitionsFrom(m_Root, block.Name);
+        block.Content->CopyDefinitionsFrom(m_Root, block.Settings.Name);
     }
 }
 
@@ -108,17 +108,17 @@ void BlockSession::RequestCreate() {
         return;
     }
     auto candidates = m_Root.GetSubcircuitPinCandidates();
-    m_Name = "block";
-    while (std::ranges::find(m_Root.GetSubcircuits(), m_Name, &SavedSubcircuit::Name)
+    m_NewBlock.Name = "block";
+    while (std::ranges::find(m_Root.GetSubcircuits(), m_NewBlock.Name, &SavedSubcircuit::Name)
            != m_Root.GetSubcircuits().end()) {
-        m_Name += "_2";
+        m_NewBlock.Name += "_2";
     }
-    m_Pins.clear();
-    m_Parameters.clear();
+    m_NewBlock.Pins.clear();
+    m_NewBlock.Parameters.clear();
     m_Error.clear();
     if (candidates) {
         for (const auto &candidate : *candidates) {
-            m_Pins.push_back({candidate.SuggestedName, candidate.Point});
+            m_NewBlock.Pins.push_back({candidate.SuggestedName, candidate.Point});
         }
     } else {
         m_Error = candidates.error();
@@ -128,7 +128,7 @@ void BlockSession::RequestCreate() {
 
 /**
  * @brief   Opens a block of the document one level down: the way back up keeps the path, and the block it leaves keeps
- *          its pins and parameters until the editor comes back to it.
+ *          its settings until the editor comes back to it.
  * @param[in] name  A block of the document.
  * @return  True when it opened; false leaves the reason in GetError() and asks for the dialog.
  * @note    The block must have drawn contents, so a SPICE block is not opened here.
@@ -141,14 +141,9 @@ bool BlockSession::Open(const std::string &name) {
         return false;
     }
     const SavedSubcircuit *definition = FindDefinition(name);
-    if (IsOpen()) {
-        m_OpenBlocks.back().Pins = std::move(m_Pins);
-        m_OpenBlocks.back().Parameters = std::move(m_Parameters);
-    }
-    m_OpenBlocks.push_back({.Name = name, .Content = std::move(*content), .Pins = {}, .Parameters = {}});
-    m_Name = name;
-    m_Pins = definition->Pins;
-    m_Parameters = definition->Parameters;
+    m_OpenBlocks.push_back(
+        {.Content = std::move(*content),
+         .Settings = {.Name = name, .Pins = definition->Pins, .Parameters = definition->Parameters}});
     return true;
 }
 
@@ -164,17 +159,18 @@ bool BlockSession::Close(const bool apply) {
         return false;
     }
     const OpenBlock &block = m_OpenBlocks.back();
+    const BlockSettings &settings = block.Settings;
     if (apply) {
         if (!SyncPins()) {
             m_IsDialogRequested = true;
             return false;
         }
         // A block opened and closed without a change leaves the document unmodified
-        const auto definition = std::ranges::find(m_Root.GetSubcircuits(), block.Name, &SavedSubcircuit::Name);
+        const auto definition = std::ranges::find(m_Root.GetSubcircuits(), settings.Name, &SavedSubcircuit::Name);
         const bool is_changed = block.Content->IsModified() || definition == m_Root.GetSubcircuits().end()
-                             || definition->Pins != m_Pins || definition->Parameters != m_Parameters;
+                             || definition->Pins != settings.Pins || definition->Parameters != settings.Parameters;
         if (is_changed) {
-            auto updated = m_Root.UpdateSubcircuit(block.Name, *block.Content, m_Pins, m_Parameters);
+            auto updated = m_Root.UpdateSubcircuit(settings.Name, *block.Content, settings.Pins, settings.Parameters);
             if (!updated) {
                 m_Error = updated.error();
                 m_IsDialogRequested = true;
@@ -183,20 +179,19 @@ bool BlockSession::Close(const bool apply) {
             m_Root.CommitUndoStep();
             // Every copy holds the same blocks as the document, so they take it as the document did
             for (std::size_t level = 0; level + 1 < m_OpenBlocks.size(); ++level) {
-                static_cast<void>(
-                    m_OpenBlocks[level].Content->UpdateSubcircuit(block.Name, *block.Content, m_Pins, m_Parameters));
+                static_cast<void>(m_OpenBlocks[level].Content->UpdateSubcircuit(settings.Name,
+                                                                                *block.Content,
+                                                                                settings.Pins,
+                                                                                settings.Parameters));
             }
         }
     }
+    std::string closed_name = settings.Name;
     m_OpenBlocks.pop_back();
-    if (IsOpen()) {
-        OpenBlock &outer = m_OpenBlocks.back();
-        m_Name = outer.Name;
-        m_Pins = std::move(outer.Pins);
-        m_Parameters = std::move(outer.Parameters);
-    } else {
-        m_Pins.clear();
-        m_Parameters.clear();
+    if (!IsOpen()) {
+        // Back at the schematic the dialog has no pins or parameters to offer until a block is made, and the name
+        // stays the one last shown
+        m_NewBlock = {.Name = std::move(closed_name), .Pins = {}, .Parameters = {}};
     }
     return true;
 }
@@ -232,9 +227,10 @@ bool BlockSession::SyncPins() {
         m_Error = markers.error();
         return false;
     }
+    BlockSettings &settings = m_OpenBlocks.back().Settings;
     std::vector<SavedSubcircuitPin> synchronized;
     std::set<std::string> added;
-    for (const SavedSubcircuitPin &pin : m_Pins) {
+    for (const SavedSubcircuitPin &pin : settings.Pins) {
         const auto marker = std::ranges::find(*markers, pin.Name, &Schematic::SubcircuitPinCandidate::SuggestedName);
         if (marker != markers->end()) {
             synchronized.push_back({pin.Name, marker->Point});
@@ -246,7 +242,7 @@ bool BlockSession::SyncPins() {
             synchronized.push_back({marker.SuggestedName, marker.Point});
         }
     }
-    m_Pins = std::move(synchronized);
+    settings.Pins = std::move(synchronized);
     return true;
 }
 
@@ -256,13 +252,14 @@ bool BlockSession::SyncPins() {
  */
 bool BlockSession::ApplyPinNames() {
     Schematic &content = *m_OpenBlocks.back().Content;
+    const std::vector<SavedSubcircuitPin> &pins = m_OpenBlocks.back().Settings.Pins;
     for (auto &element : content.GetElements()) {
         if (!Core::IsSubcircuitPin(element->GetComponent().GetType())) {
             continue;
         }
         const GridPoint point = element->GetTerminals().front();
-        const auto pin = std::ranges::find(m_Pins, point, &SavedSubcircuitPin::Point);
-        if (pin == m_Pins.end()) {
+        const auto pin = std::ranges::find(pins, point, &SavedSubcircuitPin::Point);
+        if (pin == pins.end()) {
             m_Error = "Every pin marker needs a block pin name";
             return false;
         }
@@ -280,7 +277,7 @@ bool BlockSession::ApplyPinNames() {
  * @return  True when it was made; false leaves the reason in GetError().
  */
 bool BlockSession::CreateBlock() {
-    auto created = m_Root.CreateSubcircuitFromSelection(m_Name, m_Pins, m_Parameters);
+    auto created = m_Root.CreateSubcircuitFromSelection(m_NewBlock.Name, m_NewBlock.Pins, m_NewBlock.Parameters);
     if (!created) {
         m_Error = created.error();
         return false;
@@ -295,21 +292,22 @@ bool BlockSession::CreateBlock() {
  *          settings dialog does when it is cancelled.
  */
 void BlockSession::RestoreSettings() {
-    const SavedSubcircuit *definition = FindDefinition(m_OpenBlocks.back().Name);
-    m_Pins = definition->Pins;
-    m_Parameters = definition->Parameters;
+    BlockSettings &settings = m_OpenBlocks.back().Settings;
+    const SavedSubcircuit *definition = FindDefinition(settings.Name);
+    settings.Pins = definition->Pins;
+    settings.Parameters = definition->Parameters;
 }
 
 std::string &BlockSession::GetName() {
-    return m_Name;
+    return GetShownSettings().Name;
 }
 
 std::vector<SavedSubcircuitPin> &BlockSession::GetPins() {
-    return m_Pins;
+    return GetShownSettings().Pins;
 }
 
 std::vector<Core::SubcircuitParameter> &BlockSession::GetParameters() {
-    return m_Parameters;
+    return GetShownSettings().Parameters;
 }
 
 std::string &BlockSession::GetError() {
@@ -328,6 +326,14 @@ void BlockSession::RequestDialog() {
  */
 bool BlockSession::TakeDialogRequest() {
     return std::exchange(m_IsDialogRequested, false);
+}
+
+/**
+ * @brief   The settings the dialog edits: those of the innermost open block, or of the block to make from the
+ * selection.
+ */
+BlockSettings &BlockSession::GetShownSettings() {
+    return IsOpen() ? m_OpenBlocks.back().Settings : m_NewBlock;
 }
 
 } // namespace GUI

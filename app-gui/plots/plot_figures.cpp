@@ -111,7 +111,7 @@ void AddExportTraces(PanelBuilder &builder,
                      const bool in_legend,
                      const std::vector<int> &excluded = {}) {
     for (std::size_t node = 1; node < node_values.size(); ++node) {
-        if (!schematic.IsVoltageMeasured(static_cast<int>(node))
+        if (!schematic.GetMeasurements().IsVoltageMeasured(static_cast<int>(node))
             || std::ranges::contains(excluded, static_cast<int>(node))) {
             continue;
         }
@@ -123,7 +123,7 @@ void AddExportTraces(PanelBuilder &builder,
                     ImAxis_Y1);
     }
     for (std::size_t index = 0; index < currents.size(); ++index) {
-        if (!schematic.IsCurrentMeasured(currents[index].Name)) {
+        if (!schematic.GetMeasurements().IsCurrentMeasured(currents[index].Name)) {
             continue;
         }
         const std::string label = std::format("I({})", currents[index].Name);
@@ -259,7 +259,7 @@ void AddExportMath(PanelBuilder &builder,
  */
 bool HasMeasuredCurrent(const std::vector<Core::ComponentTrace> &currents, const Schematic &schematic) {
     return std::ranges::any_of(currents, [&schematic](const Core::ComponentTrace &current) {
-        return schematic.IsCurrentMeasured(current.Name);
+        return schematic.GetMeasurements().IsCurrentMeasured(current.Name);
     });
 }
 
@@ -317,7 +317,7 @@ std::vector<CurveFamily> ListCurveFamilies(const Core::DCSweep &sweep,
     std::vector<CurveFamily> families;
     const Core::DCSweepCurve &first_curve = sweep.Curves.front();
     for (std::size_t node = 1; node < first_curve.NodeVoltages.size(); ++node) {
-        if (!schematic.IsVoltageMeasured(static_cast<int>(node))) {
+        if (!schematic.GetMeasurements().IsVoltageMeasured(static_cast<int>(node))) {
             continue;
         }
         CurveFamily family{.Label = GetVoltageLabel(schematic.GetConnectivity(), static_cast<int>(node)),
@@ -331,7 +331,7 @@ std::vector<CurveFamily> ListCurveFamilies(const Core::DCSweep &sweep,
         families.push_back(std::move(family));
     }
     for (std::size_t current = 0; show_currents && current < first_curve.Currents.size(); ++current) {
-        if (!schematic.IsCurrentMeasured(first_curve.Currents[current].Name)) {
+        if (!schematic.GetMeasurements().IsCurrentMeasured(first_curve.Currents[current].Name)) {
             continue;
         }
         CurveFamily family{.Label = std::format("I({})", first_curve.Currents[current].Name),

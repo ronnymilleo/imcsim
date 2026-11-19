@@ -84,7 +84,7 @@ MathChannels::MathChannels(Schematic &schematic) : m_Schematic(schematic) {
  */
 void MathChannels::Draw(const std::vector<std::string> &operands) {
     ImGui::TextDisabled("Math");
-    std::vector<MathChannel> channels = m_Schematic.GetMathChannels();
+    std::vector<MathChannel> channels = m_Schematic.GetMeasurements().GetMathChannels();
     const NetResolver find_node = GetNetResolver();
     bool open_new_editor = false;
     if (ImGui::SmallButton("Add")) {
@@ -106,8 +106,8 @@ void MathChannels::Draw(const std::vector<std::string> &operands) {
     if (removed) {
         channels.erase(channels.begin() + static_cast<std::ptrdiff_t>(*removed));
     }
-    if (channels != m_Schematic.GetMathChannels()) {
-        m_Schematic.SetMathChannels(std::move(channels));
+    if (channels != m_Schematic.GetMeasurements().GetMathChannels()) {
+        m_Schematic.GetMeasurements().SetMathChannels(std::move(channels));
     }
 }
 
@@ -119,7 +119,7 @@ void MathChannels::Draw(const std::vector<std::string> &operands) {
  */
 std::string MathChannels::GetSignature() const {
     std::string signature;
-    for (const MathChannel &channel : m_Schematic.GetMathChannels()) {
+    for (const MathChannel &channel : m_Schematic.GetMeasurements().GetMathChannels()) {
         signature += std::format("{}|{}|{};", channel.Name, channel.Shown, GetChannelExpression(channel));
     }
     return signature;
@@ -140,7 +140,7 @@ std::vector<MathTrace> MathChannels::Evaluate(const std::span<const double> xs,
                                               const std::vector<Core::ComponentTrace> &currents,
                                               std::vector<std::string> &errors) const {
     std::vector<MathTrace> traces;
-    const std::vector<MathChannel> &channels = m_Schematic.GetMathChannels();
+    const std::vector<MathChannel> &channels = m_Schematic.GetMeasurements().GetMathChannels();
     const NetResolver find_node = GetNetResolver();
     for (std::size_t index = 0; index < channels.size(); ++index) {
         const MathChannel &channel = channels[index];
@@ -170,7 +170,7 @@ std::vector<MathTrace> MathChannels::Evaluate(const std::span<const double> xs,
  */
 ACMathTraces MathChannels::EvaluateAC(const Core::ACSweep &sweep, std::vector<std::string> &errors) const {
     ACMathTraces traces;
-    const std::vector<MathChannel> &channels = m_Schematic.GetMathChannels();
+    const std::vector<MathChannel> &channels = m_Schematic.GetMeasurements().GetMathChannels();
     const NetResolver find_node = GetNetResolver();
     for (std::size_t index = 0; index < channels.size(); ++index) {
         const MathChannel &channel = channels[index];

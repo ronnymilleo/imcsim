@@ -55,7 +55,7 @@ std::pair<GUI::Schematic, int> BuildMeasuredDividerSchematic() {
     REQUIRE(*node_opt > 0);
     const int node_out = *node_opt;
     schematic.SetVoltageMeasured(node_out, true);
-    schematic.SetCurrentMeasured("R1", true);
+    schematic.GetMeasurements().SetCurrentMeasured("R1", true);
     return {std::move(schematic), node_out};
 }
 
@@ -169,8 +169,8 @@ TEST_CASE("BuildHarmonicWaveforms prepares immutable multi-trace waveforms prese
     // Add extra voltage and current slots so total measured traces >= 3 and source indices are non-sequential
     const int extra_node = measured_node + 1;
     schematic.SetVoltageMeasured(extra_node, true);
-    schematic.SetCurrentMeasured("V1", true);
-    schematic.SetCurrentMeasured("R1", true);
+    schematic.GetMeasurements().SetCurrentMeasured("V1", true);
+    schematic.GetMeasurements().SetCurrentMeasured("R1", true);
 
     result.NodeWaveforms.resize(static_cast<std::size_t>(extra_node) + 2);
     result.NodeWaveforms[static_cast<std::size_t>(measured_node)] = {1.0, 2.0, -1.0, -2.0};

@@ -119,7 +119,7 @@ TEST_CASE("The output node is the stored point's, else a measured node that no s
     // The example measures the source node, which the source holds, and the node of the capacitor
     const std::optional<int> measured = GUI::ResolveOutputNode(std::nullopt, circuit, schematic);
     REQUIRE(measured.has_value());
-    CHECK(schematic.IsVoltageMeasured(*measured));
+    CHECK(schematic.GetMeasurements().IsVoltageMeasured(*measured));
     CHECK(GUI::ListMeasuredNodes(circuit, schematic).size() == 2);
 
     // A stored point wins over the measured nodes, and a point that left the circuit is ignored

@@ -29,8 +29,8 @@ bool IsDragging(const EditorMode &mode) {
 GroupDrag MakeDrag(const Schematic &schematic, const GridPoint cursor, std::optional<Selection> collapse_to) {
     GroupDrag drag;
     drag.StartCursor = cursor;
-    drag.Elements = schematic.GetSelectedElements();
-    drag.Wires = schematic.GetSelectedWires();
+    drag.Elements = schematic.GetSelection().Elements;
+    drag.Wires = schematic.GetSelection().Wires;
     drag.StartWires = schematic.GetWires();
     drag.CollapseTo = std::move(collapse_to);
     const auto &elements = schematic.GetElements();
@@ -88,7 +88,7 @@ void UpdateDrag(Schematic &schematic, EditorMode &mode, const GridPoint cursor) 
     MovedWires moved =
         MoveGroup(drag.StartWires, drag.Wires, drag.StartTerminals, new_terminals, drag.FixedTerminals, translation);
     schematic.SetWires(std::move(moved.Wires));
-    schematic.SetSelection(drag.Elements, std::move(moved.Selected));
+    schematic.SetSelection({.Elements = drag.Elements, .Wires = std::move(moved.Selected)});
     schematic.MarkModified();
 }
 
@@ -105,7 +105,7 @@ void EndDrag(Schematic &schematic, EditorMode &mode) {
     const std::optional<Selection> collapse_to = std::move(selecting->Drag->CollapseTo);
     selecting->Drag.reset();
     if (collapse_to) {
-        schematic.SetSelection(collapse_to->Elements, collapse_to->Wires);
+        schematic.SetSelection(*collapse_to);
     }
     schematic.SimplifyAllWires();
 }
@@ -115,7 +115,7 @@ void EndDrag(Schematic &schematic, EditorMode &mode) {
  */
 void ApplySelection(Schematic &schematic, EditorMode &mode, const Selection &selection) {
     EndDrag(schematic, mode);
-    schematic.SetSelection(selection.Elements, selection.Wires);
+    schematic.SetSelection(selection);
 }
 
 /**
@@ -148,7 +148,7 @@ void TransformSelection(Schematic &schematic,
                         EditorMode &mode,
                         const PointTransform::Kind kind,
                         const bool keep_wires) {
-    if (schematic.GetSelectedElements().empty()) {
+    if (schematic.GetSelection().Elements.empty()) {
         return;
     }
     const auto *selecting = std::get_if<SelectingMode>(&mode);
@@ -157,19 +157,17 @@ void TransformSelection(Schematic &schematic,
     EndDrag(schematic, mode);
 
     const auto &elements = schematic.GetElements();
-    const std::set<std::size_t> selected_elements = schematic.GetSelectedElements();
-    const std::set<std::size_t> selected_wires = schematic.GetSelectedWires();
+    const Selection selected = schematic.GetSelection();
     const PointTransform transform = {.Type = kind,
                                       .Delta = {},
-                                      .Pivot =
-                                          FindPivot(elements, selected_elements, schematic.GetWires(), selected_wires)};
+                                      .Pivot = FindPivot(elements, schematic.GetWires(), selected)};
 
     std::vector<GridPoint> old_terminals;
     std::vector<GridPoint> new_terminals;
     std::vector<GridPoint> fixed_terminals;
     for (std::size_t index = 0; index < elements.size(); ++index) {
         const std::vector<GridPoint> before = elements[index]->GetTerminals();
-        if (!selected_elements.contains(index)) {
+        if (!selected.Elements.contains(index)) {
             fixed_terminals.insert(fixed_terminals.end(), before.begin(), before.end());
             continue;
         }
@@ -180,9 +178,9 @@ void TransformSelection(Schematic &schematic,
     }
     if (!keep_wires) {
         MovedWires moved =
-            MoveGroup(schematic.GetWires(), selected_wires, old_terminals, new_terminals, fixed_terminals, transform);
+            MoveGroup(schematic.GetWires(), selected.Wires, old_terminals, new_terminals, fixed_terminals, transform);
         schematic.SetWires(std::move(moved.Wires));
-        schematic.SetSelection(selected_elements, std::move(moved.Selected));
+        schematic.SetSelection({.Elements = selected.Elements, .Wires = std::move(moved.Selected)});
     }
     schematic.MarkModified();
     if (drag_cursor) {

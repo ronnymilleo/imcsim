@@ -110,7 +110,7 @@ std::string DescribeEditorHint(const EditorMode &mode, Schematic &schematic, con
         selected_part =
             component.GetName().empty() ? std::string(GetPartName(component.GetType())) : component.GetName();
     }
-    const std::size_t count = schematic.GetSelectedElements().size() + schematic.GetSelectedWires().size();
+    const std::size_t count = schematic.GetSelection().Elements.size() + schematic.GetSelection().Wires.size();
     return DescribeSelecting(is_live, selected_part, count);
 }
 

@@ -525,7 +525,7 @@ void SchematicOverlays::DrawWireSelectionHalos(SchematicCanvas &canvas,
     if (!AreWiresHeatColored()) {
         return;
     }
-    for (const std::size_t selected : schematic.GetSelectedWires()) {
+    for (const std::size_t selected : schematic.GetSelection().Wires) {
         const UIWire &wire = schematic.GetWires()[selected];
         canvas.AddLine(view.ToScreen(ToVec2(wire.GetStart())),
                        view.ToScreen(ToVec2(wire.GetEnd())),

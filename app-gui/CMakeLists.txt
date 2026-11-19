@@ -87,6 +87,7 @@ add_library(imcsim-gui-lib
             results/truth_table.cpp
             results/two_port_metrics.cpp
             schematic/block_definitions.cpp
+            schematic/block_library.cpp
             schematic/block_nesting.cpp
             schematic/block_session.cpp
             schematic/block_wiring.cpp
@@ -112,6 +113,7 @@ add_library(imcsim-gui-lib
             schematic/live_input.cpp
             schematic/logic_bus_definition.cpp
             schematic/math_channel_definition.cpp
+            schematic/measurements.cpp
             schematic/parameter_step_settings.cpp
             schematic/part_catalog.cpp
             schematic/part_names.cpp

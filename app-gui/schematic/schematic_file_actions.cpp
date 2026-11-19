@@ -256,7 +256,7 @@ void SchematicFileActions::HandleExampleRequest() {
 void SchematicFileActions::NewSchematic() {
     m_Hooks.StopEditing();
     m_Schematic.Clear();
-    m_Schematic.ClearMeasurements();
+    m_Schematic.GetMeasurements().Clear();
 }
 
 /**

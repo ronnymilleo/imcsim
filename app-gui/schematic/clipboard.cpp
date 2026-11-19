@@ -9,6 +9,7 @@
 #include "schematic/block_nesting.h"
 #include "schematic/group_editing.h"
 #include "schematic/schematic_file.h"
+#include "schematic/selection.h"
 #include <algorithm>
 #include <set>
 
@@ -17,15 +18,7 @@ namespace GUI {
 namespace {
 
 GridPoint FindGroupPivot(const PastedGroup &group) {
-    std::set<std::size_t> elements;
-    std::set<std::size_t> wires;
-    for (std::size_t index = 0; index < group.Elements.size(); ++index) {
-        elements.insert(index);
-    }
-    for (std::size_t index = 0; index < group.Wires.size(); ++index) {
-        wires.insert(index);
-    }
-    return FindPivot(group.Elements, elements, group.Wires, wires);
+    return FindPivot(group.Elements, group.Wires, PickAll(group.Elements, group.Wires));
 }
 
 } // namespace

@@ -38,7 +38,7 @@ void MakeBlock(GUI::Schematic &schematic) {
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 0}, GUI::Rotation::R0));
     AddMarker(schematic, {-2, 0}, "IN");
     AddMarker(schematic, {2, 0}, "OUT", GUI::Rotation::R180);
-    schematic.SetSelection({0, 1, 2}, {});
+    schematic.SetSelection({.Elements = {0, 1, 2}, .Wires = {}});
     REQUIRE(schematic.CreateSubcircuitFromSelection("inner", {{"IN", {-2, 0}}, {"OUT", {2, 0}}}));
     schematic.CommitUndoStep();
 }
@@ -54,7 +54,7 @@ std::unique_ptr<GUI::UIElement> MakeInstance(const std::string &block) {
 TEST_CASE("Starting a mode other than selecting empties the selection, and selecting keeps it", "[placement_editing]") {
     GUI::Schematic schematic;
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 0}, GUI::Rotation::R0));
-    schematic.SetSelection({0}, {});
+    schematic.SetSelection({.Elements = {0}, .Wires = {}});
     GUI::BlockSession blocks(schematic);
     GUI::EditorMode mode = GUI::PastingMode{};
 
@@ -99,7 +99,7 @@ TEST_CASE("A block is not placed where it would contain itself", "[placement_edi
 TEST_CASE("Stopping the editing ends a drag and a paste, and leaves probing alone", "[placement_editing]") {
     GUI::Schematic schematic;
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 0}, GUI::Rotation::R0));
-    schematic.SetSelection({0}, {});
+    schematic.SetSelection({.Elements = {0}, .Wires = {}});
     GUI::EditorMode mode = GUI::SelectingMode{};
     std::get<GUI::SelectingMode>(mode).Drag = GUI::MakeDrag(schematic, {0, 0}, std::nullopt);
     GUI::StopEditing(schematic, mode);
@@ -155,8 +155,8 @@ TEST_CASE("A pasted group joins the schematic and is what ends up selected", "[p
 
     CHECK_FALSE(GUI::PlacePastedGroup(schematic, blocks, group));
     CHECK(schematic.GetElements().size() == 2);
-    CHECK(schematic.GetSelectedElements() == std::set<std::size_t>{1});
-    CHECK(schematic.GetSelectedWires() == std::set<std::size_t>{0});
+    CHECK(schematic.GetSelection().Elements == std::set<std::size_t>{1});
+    CHECK(schematic.GetSelection().Wires == std::set<std::size_t>{0});
 }
 
 TEST_CASE("A group that places the block being edited is refused inside that block", "[placement_editing]") {

@@ -248,24 +248,22 @@ std::vector<std::optional<std::size_t>> MatchPins(const std::vector<SavedSubcirc
  * @details The pins must reach nodes the outside can connect to.
  * @param[in] elements           Parts of the schematic.
  * @param[in] wires              Wires of the schematic.
- * @param[in] selected_elements  Indices of the parts to copy.
- * @param[in] selected_wires     Indices of the wires to copy.
+ * @param[in] selection          The parts and wires to copy.
  * @param[in] definitions        Blocks the schematic has, which the copied instances use.
  * @param[in] definition         The block with its name, pins and parameters set, which receives the contents.
  * @return  The block with its parts and wires; the reason when its pins cannot connect.
  */
 std::expected<SavedSubcircuit, std::string> DrawDefinition(const std::vector<std::unique_ptr<UIElement>> &elements,
                                                            const std::vector<UIWire> &wires,
-                                                           const std::set<std::size_t> &selected_elements,
-                                                           const std::set<std::size_t> &selected_wires,
+                                                           const Selection &selection,
                                                            const std::vector<SavedSubcircuit> &definitions,
                                                            SavedSubcircuit definition) {
     std::vector<const UIElement *> copied_elements;
-    for (const std::size_t index : selected_elements) {
+    for (const std::size_t index : selection.Elements) {
         copied_elements.push_back(elements[index].get());
     }
     std::vector<UIWire> copied_wires;
-    for (const std::size_t index : selected_wires) {
+    for (const std::size_t index : selection.Wires) {
         copied_wires.push_back(wires[index]);
     }
     // The blocks the selection places go along, so their instances read back

@@ -110,7 +110,7 @@ void PlotOtherSteps(const std::vector<StepTraces> &steps,
         const StepTraces &traces = steps[step];
         const int count = static_cast<int>(traces.Xs->size());
         for (std::size_t node = 1; node < traces.Nodes->size(); ++node) {
-            if (!schematic.IsVoltageMeasured(static_cast<int>(node))
+            if (!schematic.GetMeasurements().IsVoltageMeasured(static_cast<int>(node))
                 || std::ranges::contains(lane_nodes, static_cast<int>(node))) {
                 continue;
             }
@@ -129,7 +129,7 @@ void PlotOtherSteps(const std::vector<StepTraces> &steps,
         ImPlot::SetAxes(ImAxis_X1, ImAxis_Y2);
         for (std::size_t index = 0; index < traces.Currents->size(); ++index) {
             const Core::ComponentTrace &current = (*traces.Currents)[index];
-            if (!schematic.IsCurrentMeasured(current.Name)) {
+            if (!schematic.GetMeasurements().IsCurrentMeasured(current.Name)) {
                 continue;
             }
             ImPlotSpec spec;
@@ -200,7 +200,7 @@ void LabelSteps(const std::vector<StepTraces> &steps,
     };
     const StepTraces &first = steps.front();
     for (std::size_t node = 1; node < first.Nodes->size(); ++node) {
-        if (!schematic.IsVoltageMeasured(static_cast<int>(node))
+        if (!schematic.GetMeasurements().IsVoltageMeasured(static_cast<int>(node))
             || std::ranges::contains(lane_nodes, static_cast<int>(node))) {
             continue;
         }
@@ -215,7 +215,7 @@ void LabelSteps(const std::vector<StepTraces> &steps,
     }
     ImPlot::SetAxes(ImAxis_X1, ImAxis_Y2);
     for (std::size_t index = 0; index < first.Currents->size(); ++index) {
-        if (!schematic.IsCurrentMeasured((*first.Currents)[index].Name)) {
+        if (!schematic.GetMeasurements().IsCurrentMeasured((*first.Currents)[index].Name)) {
             continue;
         }
         std::vector<const std::vector<double> *> curves;

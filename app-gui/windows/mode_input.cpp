@@ -184,8 +184,8 @@ std::optional<EditorMode> HandleMode(ProbingMode & /*mode*/, const ModeInput &in
         ImGui::SetTooltip("Click a wire for its voltage, or a part for its current");
         return std::nullopt;
     }
-    const bool measured =
-        target->Node ? schematic.IsVoltageMeasured(*target->Node) : schematic.IsCurrentMeasured(target->Current);
+    const bool measured = target->Node ? schematic.GetMeasurements().IsVoltageMeasured(*target->Node)
+                                       : schematic.GetMeasurements().IsCurrentMeasured(target->Current);
     ImGui::GetWindowDrawList()->AddCircle(ImGui::GetIO().MousePos,
                                           MEASUREMENT_MARKER_RADIUS * 2.0f,
                                           GetHighlightColor(),
@@ -204,7 +204,7 @@ std::optional<EditorMode> HandleMode(ProbingMode & /*mode*/, const ModeInput &in
     if (target->Node) {
         schematic.SetVoltageMeasured(*target->Node, !measured);
     } else {
-        schematic.SetCurrentMeasured(target->Current, !measured);
+        schematic.GetMeasurements().SetCurrentMeasured(target->Current, !measured);
     }
     return std::nullopt;
 }

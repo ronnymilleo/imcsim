@@ -66,8 +66,8 @@ void DrawTurnItems(const ContextMenuServices &services) {
  * @brief   Adds the item under the cursor to the plots, or removes it.
  */
 void DrawMeasureItem(Schematic &schematic, const MeasurementTarget &target) {
-    const bool measured =
-        target.Node ? schematic.IsVoltageMeasured(*target.Node) : schematic.IsCurrentMeasured(target.Current);
+    const bool measured = target.Node ? schematic.GetMeasurements().IsVoltageMeasured(*target.Node)
+                                      : schematic.GetMeasurements().IsCurrentMeasured(target.Current);
     const std::string label = std::format("{} {}",
                                           measured ? "Stop measuring" : "Measure",
                                           GetMeasurementLabel(target, schematic.GetConnectivity()));
@@ -75,7 +75,7 @@ void DrawMeasureItem(Schematic &schematic, const MeasurementTarget &target) {
         if (target.Node) {
             schematic.SetVoltageMeasured(*target.Node, !measured);
         } else {
-            schematic.SetCurrentMeasured(target.Current, !measured);
+            schematic.GetMeasurements().SetCurrentMeasured(target.Current, !measured);
         }
     }
 }
@@ -141,7 +141,7 @@ void EditorContextMenu::HandleRightClick(Schematic &schematic,
     // Right click keeps a group when it lands on one of its items; anywhere else it selects what is under the cursor
     const Selection picked =
         PickAt(schematic.GetElements(), schematic.GetWires(), cursor_world, WIRE_PICK_DISTANCE / zoom);
-    const Selection current = {schematic.GetSelectedElements(), schematic.GetSelectedWires()};
+    const Selection current = {schematic.GetSelection().Elements, schematic.GetSelection().Wires};
     if (picked.Empty() || Joined(current, picked) != current) {
         ApplySelection(schematic, mode, picked);
     }
@@ -169,9 +169,9 @@ bool EditorContextMenu::Draw(const ContextMenuServices &services,
         return false;
     }
     Schematic &schematic = services.Shown;
-    const bool on_element = !schematic.GetSelectedElements().empty();
-    const bool on_wire = !schematic.GetSelectedWires().empty();
-    const bool single = schematic.GetSelectedElements().size() + schematic.GetSelectedWires().size() == 1;
+    const bool on_element = !schematic.GetSelection().Elements.empty();
+    const bool on_wire = !schematic.GetSelection().Wires.empty();
+    const bool single = schematic.GetSelection().Elements.size() + schematic.GetSelection().Wires.size() == 1;
     bool is_block_edit_asked = false;
     if (schematic.GetSelectedElement() != nullptr) {
         is_block_edit_asked = DrawPartItems(services);

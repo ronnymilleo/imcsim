@@ -1400,7 +1400,7 @@ TEST_CASE("The 8-bit counter of two nested 4-bit blocks carries into its high ni
         }
         CHECK(count == edges);
     }
-    CHECK(schematic.GetBuses().size() == 1);
+    CHECK(schematic.GetMeasurements().GetBuses().size() == 1);
     // The pins of the block reach flip-flops two levels down, so the plot draws them as logic lanes
     const std::vector<GUI::LogicNode> logic_nodes = GUI::FindLogicNodes(schematic.BuildCircuit());
     for (const std::size_t bit : bits) {
@@ -1479,8 +1479,8 @@ TEST_CASE("The S-parameter example is a T low-pass whose matrix is the closed fo
 TEST_CASE("The series RLC example plots its impedance, resistive at resonance", "[examples]") {
     GUI::Schematic schematic;
     OpenExample("series_rlc.imcsim", schematic);
-    REQUIRE(schematic.GetMathChannels().size() == 1);
-    const auto compiled = GUI::CompileExpression(schematic.GetMathChannels().front().Expression);
+    REQUIRE(schematic.GetMeasurements().GetMathChannels().size() == 1);
+    const auto compiled = GUI::CompileExpression(schematic.GetMeasurements().GetMathChannels().front().Expression);
     REQUIRE(compiled.has_value());
     const auto program = GUI::ResolveNetNames(*compiled, [&schematic](const std::string_view net) {
         return schematic.GetConnectivity().FindNodeOfNet(net);

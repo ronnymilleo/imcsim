@@ -64,19 +64,19 @@ TEST_CASE("Renaming a part carries its measured current, the sources that follow
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::BEHAVIORAL_VOLTAGE, {12, 0}, GUI::Rotation::R0));
     auto &behavioral = static_cast<Core::BehavioralSource &>(schematic.GetElement(3).GetComponent());
     behavioral.SetExpression("1k*I(R1) + I(R10)");
-    schematic.SetCurrentMeasured("R1", true);
-    schematic.SetCurrentMeasured("R2", true);
-    schematic.SetMathChannels({{.Name = "M1", .Expression = "I(R1)*2"}});
+    schematic.GetMeasurements().SetCurrentMeasured("R1", true);
+    schematic.GetMeasurements().SetCurrentMeasured("R2", true);
+    schematic.GetMeasurements().SetMathChannels({{.Name = "M1", .Expression = "I(R1)*2"}});
     schematic.CommitUndoStep();
 
     REQUIRE(schematic.RenameElement(0, "RLOAD"));
     CHECK(schematic.GetElement(0).GetComponent().GetName() == "RLOAD");
     CHECK(follower.GetControllingCurrent() == "RLOAD");
     CHECK(behavioral.GetExpression() == "1k*I(RLOAD) + I(R10)");
-    CHECK(schematic.IsCurrentMeasured("RLOAD"));
-    CHECK_FALSE(schematic.IsCurrentMeasured("R1"));
-    CHECK(schematic.IsCurrentMeasured("R2"));
-    CHECK(schematic.GetMathChannels()[0].Expression == "I(RLOAD)*2");
+    CHECK(schematic.GetMeasurements().IsCurrentMeasured("RLOAD"));
+    CHECK_FALSE(schematic.GetMeasurements().IsCurrentMeasured("R1"));
+    CHECK(schematic.GetMeasurements().IsCurrentMeasured("R2"));
+    CHECK(schematic.GetMeasurements().GetMathChannels()[0].Expression == "I(RLOAD)*2");
     CHECK(schematic.IsModified());
 
     // A refused name changes nothing

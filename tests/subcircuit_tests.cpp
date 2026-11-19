@@ -319,7 +319,7 @@ TEST_CASE("A selection becomes a reusable block and its creation is undoable", "
     AddMarker(schematic, {2, 0}, "OUT", GUI::Rotation::R180);
     schematic.AddWire({2, 0}, {6, 0});
     schematic.AddWire({-6, 0}, {-2, 0});
-    schematic.SetSelection({0, 3, 4}, {0, 1});
+    schematic.SetSelection({.Elements = {0, 3, 4}, .Wires = {0, 1}});
     schematic.CommitUndoStep();
 
     auto candidates = schematic.GetSubcircuitPinCandidates();
@@ -364,7 +364,7 @@ TEST_CASE("Only selected pin markers become block connections", "[subcircuit]") 
     schematic.AddWire({2, 0}, {6, 0});
     schematic.AddWire({-6, 0}, {-2, 0});
     schematic.AddWire({0, 2}, {0, 6});
-    schematic.SetSelection({0, 4, 5}, {0, 1, 2});
+    schematic.SetSelection({.Elements = {0, 4, 5}, .Wires = {0, 1, 2}});
 
     auto candidates = schematic.GetSubcircuitPinCandidates();
     REQUIRE(candidates);
@@ -380,7 +380,7 @@ TEST_CASE("Only selected pin markers become block connections", "[subcircuit]") 
 TEST_CASE("Block creation requires unique markers on separate nodes", "[subcircuit]") {
     GUI::Schematic schematic;
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 0}, GUI::Rotation::R0));
-    schematic.SetSelection({0}, {});
+    schematic.SetSelection({.Elements = {0}, .Wires = {}});
     auto unmarked = schematic.GetSubcircuitPinCandidates();
     REQUIRE_FALSE(unmarked);
     CHECK(unmarked.error().contains("pin markers"));
@@ -388,7 +388,7 @@ TEST_CASE("Block creation requires unique markers on separate nodes", "[subcircu
 
     AddMarker(schematic, {-2, 0}, "IN");
     AddMarker(schematic, {2, 0}, "IN", GUI::Rotation::R180);
-    schematic.SetSelection({0, 1, 2}, {});
+    schematic.SetSelection({.Elements = {0, 1, 2}, .Wires = {}});
     auto repeated = schematic.GetSubcircuitPinCandidates();
     REQUIRE_FALSE(repeated);
     CHECK(repeated.error().contains("unique"));
@@ -409,7 +409,7 @@ TEST_CASE("Editing a definition propagates pins, parameters and contents to ever
     AddMarker(schematic, {2, 0}, "OUT", GUI::Rotation::R180);
     schematic.AddWire({2, 0}, {6, 0});
     schematic.AddWire({-6, 0}, {-2, 0});
-    schematic.SetSelection({0, 3, 4}, {});
+    schematic.SetSelection({.Elements = {0, 3, 4}, .Wires = {}});
     auto created = schematic.CreateSubcircuitFromSelection("block",
                                                            {{"IN", {-2, 0}}, {"OUT", {2, 0}}},
                                                            {{"R", 1e3}, {"DROP", 2.0}});
@@ -468,7 +468,7 @@ TEST_CASE("Block creation needs pin markers in the selection and valid metadata"
     GUI::Schematic schematic;
     CHECK_FALSE(schematic.GetSubcircuitPinCandidates());
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::SUBCIRCUIT, {0, 0}, GUI::Rotation::R0));
-    schematic.SetSelection({0}, {});
+    schematic.SetSelection({.Elements = {0}, .Wires = {}});
     CHECK_FALSE(schematic.GetSubcircuitPinCandidates());
     CHECK_FALSE(schematic.CreateSubcircuitFromSelection("not valid", {}));
     CHECK_FALSE(schematic.OpenSubcircuit("missing"));
@@ -501,7 +501,7 @@ TEST_CASE("A pin on the ground inside a block is refused, since it would connect
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::GROUND, {2, 0}, GUI::Rotation::R0));
     AddMarker(schematic, {-2, 0}, "IN");
     AddMarker(schematic, {2, 0}, "GND", GUI::Rotation::R180);
-    schematic.SetSelection({0, 1, 2, 3}, {});
+    schematic.SetSelection({.Elements = {0, 1, 2, 3}, .Wires = {}});
     const auto created = schematic.CreateSubcircuitFromSelection("grounded", {{"IN", {-2, 0}}, {"GND", {2, 0}}});
     REQUIRE_FALSE(created);
     CHECK(created.error().contains("ground"));
@@ -527,7 +527,7 @@ TEST_CASE("Reordering the pins of a new block keeps each name on its own marker"
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 0}, GUI::Rotation::R0));
     AddMarker(schematic, {-2, 0}, "IN");
     AddMarker(schematic, {2, 0}, "OUT", GUI::Rotation::R180);
-    schematic.SetSelection({0, 1, 2}, {});
+    schematic.SetSelection({.Elements = {0, 1, 2}, .Wires = {}});
     // The output first, as the dialog's Up button leaves them
     REQUIRE(schematic.CreateSubcircuitFromSelection("block", {{"OUT", {2, 0}}, {"IN", {-2, 0}}}));
 
@@ -612,7 +612,7 @@ TEST_CASE("Renaming a pin keeps the wires of every instance on it", "[subcircuit
     AddMarker(schematic, {2, 0}, "OUT", GUI::Rotation::R180);
     schematic.AddWire({2, 0}, {6, 0});
     schematic.AddWire({-6, 0}, {-2, 0});
-    schematic.SetSelection({0, 3, 4}, {});
+    schematic.SetSelection({.Elements = {0, 3, 4}, .Wires = {}});
     REQUIRE(schematic.CreateSubcircuitFromSelection("block", {{"IN", {-2, 0}}, {"OUT", {2, 0}}}));
     schematic.CommitUndoStep();
     const std::size_t wire_count = schematic.GetWires().size();
@@ -644,7 +644,7 @@ TEST_CASE("The wires of a new block go around its box, from the edge each pin is
     schematic.AddWire({-2, 6}, {-6, 6});
     schematic.AddWire({2, 0}, {2, 6});
     schematic.AddWire({2, 6}, {6, 6});
-    schematic.SetSelection({0, 3, 4}, {});
+    schematic.SetSelection({.Elements = {0, 3, 4}, .Wires = {}});
     REQUIRE(schematic.CreateSubcircuitFromSelection("block", {{"IN", {-2, 0}}, {"OUT", {2, 0}}}));
 
     const GUI::UIElement &block = *schematic.GetElements().back();
@@ -694,7 +694,7 @@ TEST_CASE("A new block moves aside when its box would cover a point its wires go
     AddMarker(schematic, {1, 0}, "OUT", GUI::Rotation::R180);
     schematic.AddWire({-6, 0}, {-1, 0});
     schematic.AddWire({1, 0}, {6, 0});
-    schematic.SetSelection({0, 3, 4}, {});
+    schematic.SetSelection({.Elements = {0, 3, 4}, .Wires = {}});
     REQUIRE(schematic.CreateSubcircuitFromSelection("block", {{"IN", {-1, 0}}, {"OUT", {1, 0}}}));
 
     const GUI::UIElement &block = *schematic.GetElements().back();
@@ -739,7 +739,7 @@ TEST_CASE("A part follows only a parameter of the block it is in", "[subcircuit]
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 0}, GUI::Rotation::R0));
     AddMarker(schematic, {-2, 0}, "IN");
     AddMarker(schematic, {2, 0}, "OUT", GUI::Rotation::R180);
-    schematic.SetSelection({0, 1, 2}, {});
+    schematic.SetSelection({.Elements = {0, 1, 2}, .Wires = {}});
     REQUIRE(schematic.CreateSubcircuitFromSelection("block", {{"IN", {-2, 0}}, {"OUT", {2, 0}}}, {{"R", 1e3}}));
     auto content = schematic.OpenSubcircuit("block");
     REQUIRE(content);
@@ -811,7 +811,7 @@ TEST_CASE("Picking another edge for a pin turns its marker in place, and the ins
     AddMarker(schematic, {2, 0}, "OUT", GUI::Rotation::R180);
     schematic.AddWire({2, 0}, {6, 0});
     schematic.AddWire({-6, 0}, {-2, 0});
-    schematic.SetSelection({0, 3, 4}, {});
+    schematic.SetSelection({.Elements = {0, 3, 4}, .Wires = {}});
     REQUIRE(schematic.CreateSubcircuitFromSelection("block", {{"IN", {-2, 0}}, {"OUT", {2, 0}}}));
     schematic.CommitUndoStep();
 

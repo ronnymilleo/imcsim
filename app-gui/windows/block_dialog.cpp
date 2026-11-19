@@ -179,7 +179,7 @@ std::optional<std::size_t> DrawBlockBar(const BlockSession &session, const ImVec
         ImGui::AlignTextToFramePadding();
         ImGui::TextColored(text_color, ">");
         ImGui::SameLine();
-        const std::string &name = open_blocks[level].Name;
+        const std::string &name = open_blocks[level].Settings.Name;
         if (level + 1 == open_blocks.size()) {
             ImGui::AlignTextToFramePadding();
             ImGui::TextColored(text_color, "%s", name.c_str());

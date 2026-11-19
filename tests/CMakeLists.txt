@@ -15,6 +15,7 @@ add_executable(imcsim-tests
             backend_comparison_tests.cpp
             behavioral_expression_tests.cpp
             block_definitions_tests.cpp
+            block_library_tests.cpp
             block_nesting_tests.cpp
             block_session_tests.cpp
             canvas_view_tests.cpp
@@ -57,6 +58,7 @@ add_executable(imcsim-tests
             logic_trace_tests.cpp
             math_channel_definition_tests.cpp
             math_channel_tests.cpp
+            measurements_tests.cpp
             monte_carlo_results_tests.cpp
             monte_carlo_tests.cpp
             nodalys_backend_tests.cpp
