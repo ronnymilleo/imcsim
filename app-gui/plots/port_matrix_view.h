@@ -61,6 +61,10 @@ std::vector<std::string> DescribeMatrixReading(const Core::SParameters &result,
                                                std::size_t frequency,
                                                const SParameterEntry &entry,
                                                SParameterQuantity quantity);
+std::string DescribeMatrixReadings(const Core::SParameters &result,
+                                   std::size_t frequency,
+                                   const std::vector<SParameterEntry> &entries,
+                                   SParameterQuantity quantity);
 
 // Figures
 ExportFigure BuildMatrixMagnitudePhaseFigure(const Core::SParameters &result,

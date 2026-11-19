@@ -295,6 +295,32 @@ std::vector<std::string> DescribeMatrixReading(const Core::SParameters &result,
 }
 
 /**
+ * @brief   Joins the readings of several entries at one frequency into the text of a tooltip.
+ * @param[in] result     Result of the sweep.
+ * @param[in] frequency  Index of the frequency.
+ * @param[in] entries    Entries to read.
+ * @param[in] quantity   Scattering, impedance or admittance.
+ * @return  The lines of each entry, as DescribeMatrixReading() words them, with a blank line between entries; empty
+ *          without entries.
+ */
+std::string DescribeMatrixReadings(const Core::SParameters &result,
+                                   const std::size_t frequency,
+                                   const std::vector<SParameterEntry> &entries,
+                                   const SParameterQuantity quantity) {
+    std::string text;
+    for (const SParameterEntry &entry : entries) {
+        for (const std::string &line : DescribeMatrixReading(result, frequency, entry, quantity)) {
+            text += (text.empty() ? "" : "\n") + line;
+        }
+        text += "\n";
+    }
+    if (!text.empty()) {
+        text.pop_back();
+    }
+    return text;
+}
+
+/**
  * @brief   Builds the figure of the magnitude and phase plots of the shown entries of a matrix.
  * @param[in] result    Result of the sweep.
  * @param[in] entries   Entries to draw, which must lie inside the matrix.

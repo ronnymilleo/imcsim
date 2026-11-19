@@ -228,8 +228,7 @@ void NoiseTab::SetupAxes(const Core::Noise &noise,
                           std::vector<std::string>(m_ShownContributions.begin(), m_ShownContributions.end()));
     const bool input_in_volts = noise.InputUnit == "V";
     ImPlot::SetupAxes("Frequency", "Noise density", ImPlotAxisFlags_None, ImPlotAxisFlags_None);
-    ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
-    ImPlot::SetupAxisFormat(ImAxis_X1, FormatAxisValue, const_cast<char *>("Hz"));
+    SetupLogFrequencyAxis(nullptr);
     ImPlot::SetupAxisScale(ImAxis_Y1, ImPlotScale_Log10);
     ImPlot::SetupAxisFormat(ImAxis_Y1, FormatAxisValue, const_cast<char *>(output_unit.c_str()));
     if (input_shown && !input_in_volts) {

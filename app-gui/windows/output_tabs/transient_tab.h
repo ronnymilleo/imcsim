@@ -17,12 +17,31 @@
 #include "results/result_store.h"
 #include "schematic/schematic.h"
 #include "windows/output_tabs/frame_results.h"
+#include "windows/output_tabs/plot_widgets.h"
 #include <cstddef>
 #include <optional>
 #include <string>
 #include <vector>
 
 namespace GUI {
+
+/**
+ * @struct  AnalogPlan
+ * @brief   What the analog plot of a transient shows in a frame, worked out once from the traces and the lanes.
+ */
+struct AnalogPlan {
+    /// Nodes drawn as logic lanes, which the analog plot leaves out.
+    std::vector<int> LaneNodes;
+    bool ShowsCurrents = false;
+    /// Whether a voltage is shown, measured or as a math channel, so the voltage axis keeps its label and ticks.
+    bool HasVoltages = false;
+    /// Whether the plot of logic lanes under it shares its time axis.
+    bool HasLanes = false;
+    /// Left out when it would be empty, so a circuit measured only at logic nodes shows the lanes alone.
+    bool IsShown = false;
+
+    bool operator==(const AnalogPlan &) const = default;
+};
 
 /**
  * @class   TransientTab
@@ -76,24 +95,33 @@ private:
     void DrawPlots(const Core::Transient &transient,
                    const std::vector<MathTrace> &math,
                    const std::optional<StepFamily<Core::Transient>> &steps);
+    TraceFits TakeAnalogFits(const Core::Transient &transient, ShownTraces shown);
     void DrawAnalog(const Core::Transient &transient,
                     const std::vector<MathTrace> &math,
                     const std::optional<StepFamily<Core::Transient>> &steps,
-                    const std::vector<int> &lane_nodes,
-                    bool show_currents,
-                    bool has_voltages,
-                    bool has_lanes,
+                    const AnalogPlan &plan,
                     float height);
+    void SetupAnalogAxes(const std::vector<MathTrace> &math, const AnalogPlan &plan, const std::string &third_unit);
+    std::vector<PlottedTrace> PlotAnalogTraces(const Core::Transient &transient,
+                                               const std::vector<MathTrace> &math,
+                                               const std::optional<StepFamily<Core::Transient>> &steps,
+                                               const AnalogPlan &plan);
     void DrawLogicLanes(const Core::Transient &transient,
                         const std::vector<BusLane> &buses,
                         const std::vector<LogicNode> &lanes,
                         float height);
+    void DrawTimeMarkers(const Core::Transient &transient, const std::vector<PlottedTrace> &plotted);
+    void KeepVisibleTime();
     std::vector<LogicNode> FindMeasuredLanes(std::size_t node_count) const;
     std::vector<BusLane> FindShownBuses(std::size_t node_count) const;
 
     // Statistics
     void DrawStatistics(const Core::Transient &transient, const std::vector<MathTrace> &math);
 };
+
+// Analog plot
+AnalogPlan
+PlanAnalog(const ShownTraces &shown, const std::vector<MathTrace> &math, std::vector<int> lane_nodes, bool has_lanes);
 
 } // namespace GUI
 

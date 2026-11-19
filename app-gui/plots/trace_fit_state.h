@@ -14,6 +14,32 @@
 namespace GUI {
 
 /**
+ * @struct  ShownTraces
+ * @brief   The traces a plot shows in a frame, which its fit state compares with those of the last frame.
+ */
+struct ShownTraces {
+    std::vector<int> Nodes;
+    /// Names of the currents.
+    std::vector<std::string> Currents;
+    /// Labels and units of the math traces.
+    std::vector<std::string> MathLabels;
+};
+
+/**
+ * @struct  TraceFits
+ * @brief   Which axes of a plot fit this frame.
+ */
+struct TraceFits {
+    /// Every axis fits: for a new result, or when something else changes the whole plot, such as its scale.
+    bool IsNewResult = false;
+    bool HaveVoltagesChanged = false;
+    bool HaveCurrentsChanged = false;
+    bool HasMathChanged = false;
+
+    bool operator==(const TraceFits &) const = default;
+};
+
+/**
  * @class   TraceFitState
  * @brief   What a plot showed last frame: the result version its axes fitted, and its nodes, currents and math
  *          channels, so it knows which axes must fit this frame.
@@ -21,6 +47,7 @@ namespace GUI {
  */
 class TraceFitState {
 public:
+    TraceFits TakeFits(std::size_t version, ShownTraces shown, bool must_fit_all = false);
     bool TakeNewResult(std::size_t version);
     bool TakeNodesChanged(std::vector<int> nodes);
     bool TakeCurrentsChanged(std::vector<std::string> currents);

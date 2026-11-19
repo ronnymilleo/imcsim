@@ -142,6 +142,15 @@ TEST_CASE("The reading of an entry of Z gives its magnitude, angle and parts, or
     CHECK(absent[1] == "No finite admittance matrix at this frequency");
 }
 
+TEST_CASE("The readings of several entries are joined with a blank line between entries", "[port_matrix_view]") {
+    const Core::SParameters result = MakeResult(false);
+    const std::string text = GUI::DescribeMatrixReadings(result, 0, {{1, 1}, {2, 2}}, GUI::SParameterQuantity::Z);
+    CHECK(text
+          == "Z11 at 1MHz\n11.18 Ohm at 26.57 deg\n10 + j5 Ohm\n\n"
+             "Z22 at 1MHz\n20.62 Ohm at -14.04 deg\n20 - j5 Ohm");
+    CHECK(GUI::DescribeMatrixReadings(result, 0, {}, GUI::SParameterQuantity::Z).empty());
+}
+
 TEST_CASE("The magnitude and phase figure of Z has a logarithmic axis in ohms and a gap where it is absent",
           "[port_matrix_view]") {
     const Core::SParameters result = MakeResult(true);

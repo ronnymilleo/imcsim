@@ -12,14 +12,13 @@
 #include "plots/plot_types.h"
 #include "plots/port_matrix_view.h"
 #include "plots/s_parameter_view.h"
-#include "plots/stability_view.h"
-#include "plots/touchstone.h"
 #include "results/result_store.h"
-#include "results/two_port_metrics.h"
 #include "schematic/schematic.h"
 #include "simulation/simulation_results.h"
+#include "windows/output_tabs/s_parameter_smith.h"
+#include "windows/output_tabs/s_parameter_stability.h"
+#include "windows/output_tabs/touchstone_export_control.h"
 #include <cstddef>
-#include <string>
 #include <vector>
 
 namespace GUI {
@@ -60,6 +59,8 @@ public:
 private:
     Schematic &m_Schematic;
     const ResultStore &m_Results;
+
+    // Choices
     /// The entries of S the magnitude and phase plots show.
     SParameterSelection m_Selection;
     /// The entries the Smith chart shows, which starts from the reflections.
@@ -70,26 +71,19 @@ private:
     SParameterQuantity m_Quantity = SParameterQuantity::S;
     /// The view the user chose for S, which Z and Y leave alone and S gets back.
     SParameterView m_Display = SParameterView::SMITH;
+
+    // Fit
     /// The visible frequency range of the magnitude and phase plots, shared by both.
     PlotSpan m_View{.From = 1.0, .To = 1e9};
-    TouchstoneOptions m_Touchstone;
     /// The result the selection and the axes were set for.
     std::size_t m_FittedVersion = 0;
-    /// Size of the room for the chart when its axes were last fitted, so a resized window fits them again.
-    float m_FittedWidth = 0.0f;
-    float m_FittedHeight = 0.0f;
     /// Whether the next frame fits the axes to the curves, after a new result or another choice of entries.
     bool m_IsFitting = true;
-    /// Why the last Touchstone export could not be written, or empty.
-    std::string m_ExportError;
-    /// Whether the Smith chart shows the stability circles of a two-port.
-    bool m_AreCirclesShown = false;
-    /// Index of the frequency of the circles, which each new result sets where mu is lowest.
-    std::size_t m_CircleFrequency = 0;
-    /// The metrics of the result, with the curves and the sentence that go with them; empty unless it is a two-port.
-    TwoPortSweep m_Sweep;
-    StabilityCurves m_Curves;
-    std::string m_StabilitySummary;
+
+    // Views
+    TouchstoneExportControl m_Touchstone;
+    SParameterSmithChart m_Smith;
+    SParameterStability m_Stability;
 
     // Result
     void StartResult(const Core::SParameters &result);
@@ -102,17 +96,7 @@ private:
     void DrawHeader(const Core::SParameters &result);
     void DrawQuantityChoice(const Core::SParameters &result);
     void DrawViewChoice(const Core::SParameters &result, SParameterView view, PlotExporter &exporter);
-    void DrawCircleControls(const Core::SParameters &result);
     void DrawSelection(const Core::SParameters &result, SParameterView view);
-    void DrawTouchstoneExport(const Core::SParameters &result, PlotExporter &exporter);
-    void SaveTouchstone(const Core::SParameters &result, PlotExporter &exporter);
-
-    // Smith chart
-    void DrawSmith(const Core::SParameters &result, SParameterView view);
-    void PlotSmithCurves(const Core::SParameters &result, const std::vector<SParameterEntry> &entries);
-    void PlotStabilityCircles(const Core::SParameters &result);
-    void ShowCircleFrequency();
-    void ShowSmithReading(const Core::SParameters &result, const std::vector<SParameterEntry> &entries);
 
     // Magnitude and phase
     void DrawMagnitudePhase(const Core::SParameters &result, SParameterView view);
@@ -120,12 +104,9 @@ private:
                       const std::vector<SParameterEntry> &entries,
                       bool is_phase,
                       float height);
-
-    // Stability
-    void DrawStability();
-    void DrawFactorPlot(float height);
-    void DrawGainPlot(float height);
-    void MarkCircleFrequency();
+    void SetupBodeAxes(const Core::SParameters &result, const std::vector<SParameterEntry> &entries, bool is_phase);
+    void
+    PlotBodeCurves(const Core::SParameters &result, const std::vector<SParameterEntry> &entries, bool is_phase) const;
 };
 
 } // namespace GUI

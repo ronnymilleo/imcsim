@@ -12,6 +12,7 @@
 #include "plots/math_channels.h"
 #include "plots/plot_types.h"
 #include "plots/statistics_table.h"
+#include "plots/trace_fit_state.h"
 #include "results/playback.h"
 #include "schematic/schematic.h"
 #include "simulation/simulation_results.h"
@@ -51,7 +52,8 @@ int FormatAxisValue(double value, char *buffer, int size, void *unit);
 bool BeginTracePlot(const char *id, ImVec2 size, bool has_legend = false);
 float PlotHeight(int plot_count);
 ImPlotAxisFlags VoltageAxisFlags(bool has_voltages, bool has_other_traces);
-void SetNextFits(bool new_result, bool voltages_changed, bool currents_changed);
+void SetNextFits(const TraceFits &fits, const std::vector<MathTrace> &math = {});
+void SetupLogFrequencyAxis(PlotSpan *shared_view);
 
 // Traces
 void PlotNodes(const std::vector<double> &xs,

@@ -211,15 +211,15 @@ const Core::DCSweep *OperatingPointTab::GetStepSweep() const {
  */
 void OperatingPointTab::DrawStepPlot(const Core::DCSweep &sweep) {
     const Core::DCSweepCurve &curve = sweep.Curves.front();
-    std::vector<std::string> measured_currents = ListMeasuredCurrents(curve.Currents, m_Schematic);
-    const bool show_currents = !measured_currents.empty();
-    const bool currents_changed = m_Fit.TakeCurrentsChanged(std::move(measured_currents));
-    const bool voltages_changed = m_Fit.TakeNodesChanged(ListMeasuredNodes(curve.NodeVoltages.size(), m_Schematic));
+    ShownTraces shown{.Nodes = ListMeasuredNodes(curve.NodeVoltages.size(), m_Schematic),
+                      .Currents = ListMeasuredCurrents(curve.Currents, m_Schematic),
+                      .MathLabels = {}};
+    const bool show_currents = !shown.Currents.empty();
     const bool has_voltages = HasMeasuredVoltage(curve.NodeVoltages.size(), m_Schematic);
     if (!has_voltages && !show_currents) {
         ImGui::TextDisabled("%s", NOTHING_MEASURED);
     }
-    SetNextFits(m_Fit.TakeNewResult(m_StepSweepVersion), voltages_changed, currents_changed);
+    SetNextFits(m_Fit.TakeFits(m_StepSweepVersion, std::move(shown)));
     if (!BeginTracePlot("##operating_point_steps", ImVec2(-1.0f, ImGui::GetFontSize() * STEP_PLOT_HEIGHT))) {
         return;
     }

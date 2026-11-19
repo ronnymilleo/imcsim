@@ -132,15 +132,11 @@ void DCSweepTab::DrawPlot(const Core::DCSweep &sweep, const std::vector<std::vec
     static const std::vector<MathTrace> no_math;
     const std::vector<MathTrace> &first_math = math.empty() ? no_math : math.front();
     const Core::DCSweepCurve &first_curve = sweep.Curves.front();
-    std::vector<std::string> measured_currents = ListMeasuredCurrents(first_curve.Currents, m_Schematic);
-    const bool show_currents = !measured_currents.empty();
-    const bool currents_changed = m_Fit.TakeCurrentsChanged(std::move(measured_currents));
-    const bool voltages_changed =
-        m_Fit.TakeNodesChanged(ListMeasuredNodes(first_curve.NodeVoltages.size(), m_Schematic));
-    SetNextFits(m_Fit.TakeNewResult(m_Results.GetDCSweepVersion()), voltages_changed, currents_changed);
-    if (m_Fit.TakeMathChanged(ListMathLabels(first_math))) {
-        FitMathAxes(first_math);
-    }
+    ShownTraces shown{.Nodes = ListMeasuredNodes(first_curve.NodeVoltages.size(), m_Schematic),
+                      .Currents = ListMeasuredCurrents(first_curve.Currents, m_Schematic),
+                      .MathLabels = ListMathLabels(first_math)};
+    const bool show_currents = !shown.Currents.empty();
+    SetNextFits(m_Fit.TakeFits(m_Results.GetDCSweepVersion(), std::move(shown)), first_math);
     const bool stepped = !sweep.SteppedSource.empty();
     if (stepped) {
         const std::string note =
@@ -197,9 +193,8 @@ void DCSweepTab::DrawPlot(const Core::DCSweep &sweep, const std::vector<std::vec
 void DCSweepTab::DrawStatistics(const Core::DCSweep &sweep, const std::vector<std::vector<MathTrace>> &math) {
     const PlotCursors &cursors = m_Cursors;
     const char *swept_unit = sweep.SweptUnit.c_str();
-    const CursorReadings cursor_readings = {{"A", FormatQuantity(cursors.A, swept_unit)},
-                                            {"B", FormatQuantity(cursors.B, swept_unit)},
-                                            {"B-A", FormatQuantity(cursors.B - cursors.A, swept_unit)}};
+    const CursorReadings cursor_readings =
+        ReadCursors(cursors, swept_unit, {ReadCursorDifference(cursors, swept_unit)});
     DrawStatisticsHeader(cursors.Shown ? "Between the cursors" : "Over the visible sweep");
     const bool show_currents = HasMeasuredCurrent(sweep.Curves.front().Currents, m_Schematic);
     const std::vector<CurveFamily> families = ListCurveFamilies(sweep, m_Schematic, show_currents, math);
@@ -224,8 +219,8 @@ void DCSweepTab::DrawStatistics(const Core::DCSweep &sweep, const std::vector<st
                                                                  sweep.SweptUnit,
                                                                  traces,
                                                                  MeasuredSpan(cursors, m_View),
-                                                                 cursors.Shown ? std::optional(cursors) : std::nullopt);
-    DrawTraceTable("sweep_statistics", columns, rows, cursors.Shown ? cursor_readings : CursorReadings{});
+                                                                 GetShownCursors(cursors));
+    DrawTraceTable("sweep_statistics", columns, rows, cursor_readings);
 }
 
 } // namespace GUI

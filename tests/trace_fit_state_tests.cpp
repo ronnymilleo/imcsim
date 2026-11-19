@@ -35,6 +35,33 @@ TEST_CASE("Voltages, currents and math channels are tracked apart", "[trace_fit]
     CHECK_FALSE(fit.TakeCurrentsChanged({"R1"}));
 }
 
+TEST_CASE("A frame tells at once which axes fit, and the next frame with the same traces fits none", "[trace_fit]") {
+    GUI::TraceFitState fit;
+    const GUI::TraceFits first = fit.TakeFits(1, {.Nodes = {1}, .Currents = {"R1"}, .MathLabels = {"M1V"}});
+    CHECK(first
+          == GUI::TraceFits{.IsNewResult = true,
+                            .HaveVoltagesChanged = true,
+                            .HaveCurrentsChanged = true,
+                            .HasMathChanged = true});
+    CHECK(fit.TakeFits(1, {.Nodes = {1}, .Currents = {"R1"}, .MathLabels = {"M1V"}}) == GUI::TraceFits{});
+    // Only the currents changed, so only their axis fits
+    CHECK(fit.TakeFits(1, {.Nodes = {1}, .Currents = {"R1", "C1"}, .MathLabels = {"M1V"}})
+          == GUI::TraceFits{.IsNewResult = false,
+                            .HaveVoltagesChanged = false,
+                            .HaveCurrentsChanged = true,
+                            .HasMathChanged = false});
+}
+
+TEST_CASE("Something besides the result can ask every axis to fit, and the traces are still kept", "[trace_fit]") {
+    GUI::TraceFitState fit;
+    CHECK(fit.TakeFits(1, {.Nodes = {1}, .Currents = {}, .MathLabels = {}}).IsNewResult);
+    const GUI::TraceFits forced = fit.TakeFits(1, {.Nodes = {1}, .Currents = {}, .MathLabels = {}}, true);
+    CHECK(forced.IsNewResult);
+    CHECK_FALSE(forced.HaveVoltagesChanged);
+    // The version was taken even though the fit was forced, so the same version is not new afterwards
+    CHECK_FALSE(fit.TakeFits(1, {.Nodes = {1}, .Currents = {}, .MathLabels = {}}).IsNewResult);
+}
+
 TEST_CASE("Traces kept outside a fit state follow the same rule", "[trace_fit]") {
     std::vector<std::string> shown;
     CHECK(GUI::TakeTracesChanged(shown, {"R1", "C1"}));

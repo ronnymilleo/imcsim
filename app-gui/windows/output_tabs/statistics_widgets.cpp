@@ -12,6 +12,7 @@
 #include "spice/spice_value.h"
 #include <algorithm>
 #include <cfloat>
+#include <cmath>
 #include <format>
 
 namespace GUI {
@@ -82,6 +83,53 @@ void DrawCursorTable(const CursorReadings &readings) {
 }
 
 } // namespace
+
+/**
+ * @brief   The readings of the cursors for the table beside the statistics: where each one is, and how far apart they
+ *          are.
+ * @param[in] cursors    The cursors of the plot.
+ * @param[in] unit       Unit of the X axis, such as "s".
+ * @param[in] distances  How far apart the cursors are, in the terms the plot reads best, such as their difference.
+ * @return  A and B, then the distances; empty while the cursors are hidden, so the table is left out.
+ */
+CursorReadings ReadCursors(const PlotCursors &cursors, const char *unit, const std::vector<CursorReading> &distances) {
+    if (!cursors.Shown) {
+        return {};
+    }
+    CursorReadings readings = {{"A", FormatQuantity(cursors.A, unit)}, {"B", FormatQuantity(cursors.B, unit)}};
+    readings.insert(readings.end(), distances.begin(), distances.end());
+    return readings;
+}
+
+/**
+ * @brief   How far apart the cursors are on a linear axis.
+ * @param[in] cursors  The cursors of the plot.
+ * @param[in] unit     Unit of the X axis.
+ * @return  B-A, negative when B is before A.
+ */
+CursorReading ReadCursorDifference(const PlotCursors &cursors, const char *unit) {
+    return {"B-A", FormatQuantity(cursors.B - cursors.A, unit)};
+}
+
+/**
+ * @brief   The frequency of a period that spans the cursors, on a time axis.
+ * @param[in] cursors  The cursors of the plot.
+ * @return  1/(B-A) in hertz, or no value while both cursors are at the same time.
+ */
+CursorReading ReadCursorFrequency(const PlotCursors &cursors) {
+    return {"1/(B-A)",
+            cursors.B != cursors.A ? FormatQuantity(1.0 / std::abs(cursors.B - cursors.A), "Hz")
+                                   : std::string(NO_VALUE)};
+}
+
+/**
+ * @brief   How far apart the cursors are on a logarithmic frequency axis.
+ * @param[in] cursors  The cursors of the plot.
+ * @return  B/A in decades, or no value while A is not above zero.
+ */
+CursorReading ReadCursorDecades(const PlotCursors &cursors) {
+    return {"B/A", cursors.A > 0.0 ? FormatFixed(std::log10(cursors.B / cursors.A), " dec") : std::string(NO_VALUE)};
+}
 
 /**
  * @brief   Writes a measured value with four significant digits, a SPICE suffix and its unit, such as "4.700kOhm".

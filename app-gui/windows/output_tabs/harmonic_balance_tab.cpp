@@ -244,16 +244,7 @@ void HarmonicBalanceTab::DrawSpectrumPlot(const Core::HarmonicBalance &result,
     if (result.Frequencies.empty()) {
         return;
     }
-    const std::size_t version = m_Results.GetHarmonicBalanceVersion();
-    const bool scale_changed = std::exchange(m_DrawnScale, m_Scale) != m_Scale;
-    const bool unit_changed =
-        std::exchange(m_DrawnAmplitudeUnit, m_Preferences.HarmonicAmplitudes) != m_Preferences.HarmonicAmplitudes;
-    const bool new_result = m_SpectrumFit.TakeNewResult(version) || scale_changed || unit_changed;
-    const bool nodes_changed =
-        m_SpectrumFit.TakeNodesChanged(ListMeasuredNodes(result.NodePhasors.size(), m_Schematic));
-    const bool currents_changed =
-        m_SpectrumFit.TakeCurrentsChanged(ListMeasuredCurrentNames(result.CurrentWaveforms, m_Schematic));
-    SetNextFits(new_result, nodes_changed, currents_changed);
+    SetNextFits(TakeSpectrumFits(result));
 
     if (!BeginTracePlot("##hb_spectrum", ImVec2(-1.0f, height))) {
         return;
@@ -329,13 +320,7 @@ void HarmonicBalanceTab::DrawWaveformPlot(const Core::HarmonicBalance &result,
     if (waveforms.Times.empty()) {
         return;
     }
-    const bool cycles_changed = std::exchange(m_DrawnCycles, m_Cycles) != m_Cycles;
-    const bool new_result = m_WaveformFit.TakeNewResult(m_Results.GetHarmonicBalanceVersion()) || cycles_changed;
-    const bool nodes_changed =
-        m_WaveformFit.TakeNodesChanged(ListMeasuredNodes(result.NodeWaveforms.size(), m_Schematic));
-    const bool currents_changed =
-        m_WaveformFit.TakeCurrentsChanged(ListMeasuredCurrentNames(result.CurrentWaveforms, m_Schematic));
-    SetNextFits(new_result, nodes_changed, currents_changed);
+    SetNextFits(TakeWaveformFits(result));
 
     if (!BeginTracePlot("##hb_waveform", ImVec2(-1.0f, height))) {
         return;
@@ -450,6 +435,38 @@ void HarmonicBalanceTab::DrawStatistics(const Core::HarmonicBalance &result) {
         }
         ImGui::EndTable();
     }
+}
+
+/**
+ * @brief   Tells which axes of the spectrum fit this frame: all of them for a new result and for another scale or unit
+ *          of the amplitudes, since the old range means nothing in the new one.
+ * @param[in] result  The result shown.
+ * @return  The axes that fit; what the plot shows is kept for the next frame.
+ */
+TraceFits HarmonicBalanceTab::TakeSpectrumFits(const Core::HarmonicBalance &result) {
+    const bool scale_changed = std::exchange(m_DrawnScale, m_Scale) != m_Scale;
+    const bool unit_changed =
+        std::exchange(m_DrawnAmplitudeUnit, m_Preferences.HarmonicAmplitudes) != m_Preferences.HarmonicAmplitudes;
+    return m_SpectrumFit.TakeFits(m_Results.GetHarmonicBalanceVersion(),
+                                  {.Nodes = ListMeasuredNodes(result.NodePhasors.size(), m_Schematic),
+                                   .Currents = ListMeasuredCurrentNames(result.CurrentWaveforms, m_Schematic),
+                                   .MathLabels = {}},
+                                  scale_changed || unit_changed);
+}
+
+/**
+ * @brief   Tells which axes of the waveforms fit this frame: all of them for a new result and for another number of
+ *          cycles, which changes the time axis.
+ * @param[in] result  The result shown.
+ * @return  The axes that fit; what the plot shows is kept for the next frame.
+ */
+TraceFits HarmonicBalanceTab::TakeWaveformFits(const Core::HarmonicBalance &result) {
+    const bool cycles_changed = std::exchange(m_DrawnCycles, m_Cycles) != m_Cycles;
+    return m_WaveformFit.TakeFits(m_Results.GetHarmonicBalanceVersion(),
+                                  {.Nodes = ListMeasuredNodes(result.NodeWaveforms.size(), m_Schematic),
+                                   .Currents = ListMeasuredCurrentNames(result.CurrentWaveforms, m_Schematic),
+                                   .MathLabels = {}},
+                                  cycles_changed);
 }
 
 } // namespace GUI
