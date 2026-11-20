@@ -41,6 +41,16 @@ struct IndexRange {
     std::size_t Count = 0;
 };
 
+/**
+ * @struct  SelectedItems
+ * @brief   The parts and wires a selection picks, in index order, for copying them out of the schematic.
+ */
+struct SelectedItems {
+    /// Parts of the schematic, which stay owned by it.
+    std::vector<const UIElement *> Elements;
+    std::vector<UIWire> Wires;
+};
+
 Selection MakeRangeSelection(IndexRange elements, IndexRange wires);
 Selection PickAt(const std::vector<std::unique_ptr<UIElement>> &elements,
                  const std::vector<UIWire> &wires,
@@ -54,6 +64,11 @@ Selection PickNode(const std::vector<UIWire> &wires, const Connectivity &connect
 Selection PickAll(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires);
 Selection Toggled(const Selection &current, const Selection &picked);
 Selection Joined(const Selection &current, const Selection &picked);
+
+// Selected items
+SelectedItems CollectSelected(const std::vector<std::unique_ptr<UIElement>> &elements,
+                              const std::vector<UIWire> &wires,
+                              const Selection &selection);
 
 } // namespace GUI
 

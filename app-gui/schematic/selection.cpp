@@ -168,4 +168,24 @@ Selection Joined(const Selection &current, const Selection &picked) {
     return result;
 }
 
+/**
+ * @brief   Lists the parts and wires a selection picks.
+ * @param[in] elements   Parts of the schematic.
+ * @param[in] wires      Wires of the schematic.
+ * @param[in] selection  What is picked, by index into both lists.
+ * @return  Pointers to the picked parts and copies of the picked wires, in index order.
+ */
+SelectedItems CollectSelected(const std::vector<std::unique_ptr<UIElement>> &elements,
+                              const std::vector<UIWire> &wires,
+                              const Selection &selection) {
+    SelectedItems selected;
+    for (const std::size_t index : selection.Elements) {
+        selected.Elements.push_back(elements[index].get());
+    }
+    for (const std::size_t index : selection.Wires) {
+        selected.Wires.push_back(wires[index]);
+    }
+    return selected;
+}
+
 } // namespace GUI

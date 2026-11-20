@@ -258,15 +258,8 @@ std::expected<SavedSubcircuit, std::string> DrawDefinition(const std::vector<std
                                                            const Selection &selection,
                                                            const std::vector<SavedSubcircuit> &definitions,
                                                            SavedSubcircuit definition) {
-    std::vector<const UIElement *> copied_elements;
-    for (const std::size_t index : selection.Elements) {
-        copied_elements.push_back(elements[index].get());
-    }
-    std::vector<UIWire> copied_wires;
-    for (const std::size_t index : selection.Wires) {
-        copied_wires.push_back(wires[index]);
-    }
-    auto copied = CopyContent(copied_elements, copied_wires, definitions);
+    const SelectedItems selected = CollectSelected(elements, wires, selection);
+    auto copied = CopyContent(selected.Elements, selected.Wires, definitions);
     if (!copied) {
         return std::unexpected(copied.error());
     }
