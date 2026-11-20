@@ -151,7 +151,10 @@ void SParameterStability::DrawFactorPlot(PlotSpan &view, const bool is_fitting, 
     limit_spec.LineWeight = MARKER_LINE_WEIGHT;
     limit_spec.Flags = ImPlotInfLinesFlags_Horizontal;
     ImPlot::PlotInfLines("1, stable above", &STABILITY_LIMIT, 1, limit_spec);
-    MarkCircleFrequency();
+    if (const std::optional<std::size_t> picked = PickCircleFrequencyByClick()) {
+        m_CircleFrequency = *picked;
+    }
+    PlotCircleFrequencyLine();
     DrawMetricsTooltip();
     ImPlot::EndPlot();
 }
@@ -193,32 +196,47 @@ void SParameterStability::DrawGainPlot(PlotSpan &view, const bool is_fitting, co
                          static_cast<int>(count),
                          spec);
     }
-    MarkCircleFrequency();
+    if (const std::optional<std::size_t> picked = PickCircleFrequencyByClick()) {
+        m_CircleFrequency = *picked;
+    }
+    PlotCircleFrequencyLine();
     DrawMetricsTooltip();
     ImPlot::EndPlot();
 }
 
 /**
- * @brief   Draws a vertical line at the frequency of the stability circles on the plot being built, and lets a click on
- *          the plot move it to the swept frequency nearest to the pointer.
- * @details The factor and gain plots share this, so the Smith chart circles follow whichever one is clicked. The click
- *          moves the circles even while they are hidden, so they are already there when the checkbox is turned on.
+ * @brief   Reads a click on the plot being built, which moves the stability circles to the swept frequency nearest to
+ *          the pointer.
+ * @details The factor and gain plots share this, so the Smith chart circles follow whichever one is clicked; only the
+ *          hovered plot reads the click. It moves the circles even while they are hidden, so they are already there
+ *          when the checkbox is turned on.
+ * @return  The index of the frequency clicked, or none without a click on this plot.
  * @note    Call it between BeginPlot and EndPlot.
  */
-void SParameterStability::MarkCircleFrequency() {
-    if (m_Curves.Frequencies.empty()) {
-        return;
+std::optional<std::size_t> SParameterStability::PickCircleFrequencyByClick() const {
+    if (m_Curves.Frequencies.empty() || !ImPlot::IsPlotHovered()) {
+        return std::nullopt;
     }
-    m_CircleFrequency = std::min(m_CircleFrequency, m_Curves.Frequencies.size() - 1);
     // A press also starts a pan, so only a release that did not drag counts as a click
     const ImGuiIO &io = ImGui::GetIO();
     const bool is_click =
         ImGui::IsMouseReleased(ImGuiMouseButton_Left)
         && io.MouseDragMaxDistanceSqr[ImGuiMouseButton_Left] <= io.MouseDragThreshold * io.MouseDragThreshold;
-    if (ImPlot::IsPlotHovered() && is_click) {
-        m_CircleFrequency = FindNearestFrequency(m_Curves.Frequencies, ImPlot::GetPlotMousePos().x);
+    if (!is_click) {
+        return std::nullopt;
     }
-    const double circle_frequency = m_Curves.Frequencies[m_CircleFrequency];
+    return FindNearestFrequency(m_Curves.Frequencies, ImPlot::GetPlotMousePos().x);
+}
+
+/**
+ * @brief   Draws a vertical line at the frequency of the stability circles on the plot being built.
+ * @note    Call it between BeginPlot and EndPlot.
+ */
+void SParameterStability::PlotCircleFrequencyLine() const {
+    if (m_Curves.Frequencies.empty()) {
+        return;
+    }
+    const double circle_frequency = m_Curves.Frequencies[std::min(m_CircleFrequency, m_Curves.Frequencies.size() - 1)];
     ImPlotSpec spec;
     spec.LineColor = ToImVec4(SOURCE_CIRCLE_COLOR);
     spec.LineWeight = MARKER_LINE_WEIGHT;

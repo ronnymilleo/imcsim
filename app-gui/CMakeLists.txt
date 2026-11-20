@@ -187,6 +187,7 @@ add_library(imcsim-gui-lib
             windows/app_window.cpp
             windows/block_dialog.cpp
             windows/block_navigator.cpp
+            windows/canvas_pointer.cpp
             windows/clipboard_actions.cpp
             windows/dock_layout.cpp
             windows/editor_canvas_drawing.cpp
@@ -203,6 +204,7 @@ add_library(imcsim-gui-lib
             windows/output_tabs/cursor_widgets.cpp
             windows/output_tabs/dc_sweep_tab.cpp
             windows/output_tabs/harmonic_balance_tab.cpp
+            windows/output_tabs/logic_lane_plot.cpp
             windows/output_tabs/monte_carlo_tab.cpp
             windows/output_tabs/noise_tab.cpp
             windows/output_tabs/operating_point_tab.cpp
@@ -210,6 +212,7 @@ add_library(imcsim-gui-lib
             windows/output_tabs/plot_widgets.cpp
             windows/output_tabs/pole_zero_tab.cpp
             windows/output_tabs/result_tables.cpp
+            windows/output_tabs/s_parameter_choices.cpp
             windows/output_tabs/s_parameter_smith.cpp
             windows/output_tabs/s_parameter_stability.cpp
             windows/output_tabs/s_parameter_tab.cpp

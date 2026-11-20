@@ -215,12 +215,10 @@ TEST_CASE("Library models and the parts that use them come back from a file", "[
 
 TEST_CASE("A library model that differs from one of the same name joins under a name of its own", "[spice_import]") {
     GUI::Schematic schematic;
-    std::vector<std::unique_ptr<GUI::UIElement>> no_parts;
-    std::vector<GUI::SavedSubcircuit> no_blocks;
-    CHECK(schematic.MergeLibraryModels({*Core::ReadLibraryModel(".model 1N4148 D(IS=2.52n)")}, no_parts, no_blocks)
+    CHECK(schematic.MergeLibraryModels({*Core::ReadLibraryModel(".model 1N4148 D(IS=2.52n)")})
           == std::vector<std::string>{"1N4148"});
     // The same model again adds nothing
-    CHECK(schematic.MergeLibraryModels({*Core::ReadLibraryModel(".model 1N4148 D(IS=2.52n)")}, no_parts, no_blocks)
+    CHECK(schematic.MergeLibraryModels({*Core::ReadLibraryModel(".model 1N4148 D(IS=2.52n)")})
           == std::vector<std::string>{"1N4148"});
     REQUIRE(schematic.GetLibraryModels().size() == 1);
 

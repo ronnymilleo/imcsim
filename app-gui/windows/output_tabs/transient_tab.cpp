@@ -15,6 +15,7 @@
 #include "schematic/probing.h"
 #include "spice/spice_value.h"
 #include "windows/output_tabs/cursor_widgets.h"
+#include "windows/output_tabs/logic_lane_plot.h"
 #include "windows/output_tabs/plot_widgets.h"
 #include "windows/output_tabs/statistics_widgets.h"
 #include "windows/output_tabs/step_widgets.h"
@@ -22,6 +23,7 @@
 #include <array>
 #include <expected>
 #include <format>
+#include <iterator>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -47,66 +49,6 @@ float GetWindowSizeWidth() {
 constexpr float WINDOW_SIZE_DRAG_SPEED = 20.0f;
 /// The instant of the transient shown on the schematic.
 constexpr ImU32 PLAYHEAD_COLOR = IM_COL32(255, 96, 96, 255);
-/// Height of the plot of logic lanes for its axis, in font sizes.
-constexpr float LANE_PLOT_MARGIN = 3.5f;
-/// Height of each lane of the plot, in font sizes.
-constexpr float LANE_ROW_HEIGHT = 2.2f;
-/// Most of the room the plot of logic lanes may take.
-constexpr float MAX_LANE_SHARE = 0.6f;
-/// Room around the digit of a bit label, in font sizes.
-constexpr float BIT_BOX_PADDING = 0.25f;
-/// Corner rounding of the box of a bit label.
-constexpr float BIT_BOX_ROUNDING = 3.0f;
-/// How far the ends of a value of a bus slant in, in font sizes, as a logic analyzer draws a change of a bus.
-constexpr float BUS_SLANT = 0.3f;
-/// How much of the lane color fills a value of a bus that is unknown.
-constexpr float UNKNOWN_BUS_FILL_ALPHA = 0.25f;
-
-/**
- * @brief   The measured nodes of a result that logic parts are connected to, which the transient plots as lanes.
- */
-std::vector<LogicNode> ListMeasuredLogicNodes(const std::vector<LogicNode> &logic_nodes,
-                                              const std::size_t node_count,
-                                              const Schematic &schematic) {
-    std::vector<LogicNode> measured;
-    for (const LogicNode &logic_node : logic_nodes) {
-        if (static_cast<std::size_t>(logic_node.Node) < node_count
-            && schematic.GetMeasurements().IsVoltageMeasured(logic_node.Node)) {
-            measured.push_back(logic_node);
-        }
-    }
-    return measured;
-}
-
-/**
- * @struct  PlotHeights
- * @brief   The heights of the analog plot and of the plot of logic lanes under it, in pixels.
- */
-struct PlotHeights {
-    float Analog = 0.0f;
-    float Lanes = 0.0f;
-};
-
-/**
- * @brief   Splits the room left in the window between the analog plot and the plot of logic lanes.
- * @details The lanes take a row each, up to a share of the room, and the analog plot takes the rest; a plot alone takes
- *          all of it.
- */
-PlotHeights GetPlotHeights(const std::size_t lane_count, const bool has_analog_plot) {
-    if (lane_count == 0 || !has_analog_plot) {
-        const float height = PlotHeight(1);
-        return {.Analog = height, .Lanes = height};
-    }
-    const float font_size = ImGui::GetFontSize();
-    const float available = ImGui::GetContentRegionAvail().y;
-    const float lane_height =
-        std::clamp(font_size * (LANE_PLOT_MARGIN + static_cast<float>(lane_count) * LANE_ROW_HEIGHT),
-                   font_size * MIN_PLOT_HEIGHT,
-                   available * MAX_LANE_SHARE);
-    const float analog_height =
-        std::max(font_size * MIN_PLOT_HEIGHT, available - lane_height - ImGui::GetStyle().ItemSpacing.y * 2.0f);
-    return {.Analog = analog_height, .Lanes = lane_height};
-}
 
 /**
  * @brief   The instant of the transient shown on the schematic, as a line along the plot.
@@ -119,109 +61,6 @@ void DrawPlayhead(TransientPlayback &playback, const double from, const double t
         playback.Time = std::clamp(time, from, to);
         playback.Playing = false;
     }
-}
-
-/**
- * @brief   Writes 0, 1 or X in a box at the middle of every cell of a lane that has room for it, within what the plot
- *          shows, so zooming out drops the labels that no longer fit.
- */
-void DrawBitValues(const std::vector<LogicSegment> &cells, const std::size_t lane_position, const ImU32 color) {
-    const ImPlotRange view = ImPlot::GetPlotLimits().X;
-    const double middle = static_cast<double>(lane_position) * LANE_STRIDE + LANE_HIGH_OFFSET / 2.0;
-    const float pixel_y = ImPlot::PlotToPixels(view.Min, middle).y;
-    const float padding = ImGui::GetFontSize() * BIT_BOX_PADDING;
-    ImDrawList *draw_list = ImPlot::GetPlotDrawList();
-    ImPlot::PushPlotClipRect();
-    for (const LogicSegment &cell : cells) {
-        const double from = std::max(cell.From, view.Min);
-        const double to = std::min(cell.To, view.Max);
-        if (to <= from) {
-            continue;
-        }
-        const char *text = GetLogicStateName(cell.State);
-        const ImVec2 text_size = ImGui::CalcTextSize(text);
-        const float left = ImPlot::PlotToPixels(from, middle).x;
-        const float right = ImPlot::PlotToPixels(to, middle).x;
-        const ImVec2 box_size = text_size + ImVec2(padding, padding) * 2.0f;
-        if (right - left < box_size.x + padding) {
-            continue;
-        }
-        const ImVec2 box_min((left + right - box_size.x) / 2.0f, pixel_y - box_size.y / 2.0f);
-        draw_list->AddRectFilled(box_min, box_min + box_size, ImGui::GetColorU32(ImGuiCol_FrameBg), BIT_BOX_ROUNDING);
-        draw_list->AddRect(box_min, box_min + box_size, color, BIT_BOX_ROUNDING);
-        draw_list->AddText(box_min + ImVec2(padding, padding), ImGui::GetColorU32(ImGuiCol_Text), text);
-    }
-    ImPlot::PopPlotClipRect();
-}
-
-/**
- * @brief   Draws one value of a bus between two pixel columns of its lane: a band whose ends slant in to its middle,
- *          shaded while the value is unknown, with the value written in it when it fits.
- */
-void DrawBusValue(ImDrawList *draw_list,
-                  const float left,
-                  const float right,
-                  const float top,
-                  const float bottom,
-                  const std::string &text,
-                  const bool is_unknown,
-                  const ImU32 color) {
-    const float middle = (top + bottom) / 2.0f;
-    const float slant = std::min(ImGui::GetFontSize() * BUS_SLANT, (right - left) / 2.0f);
-    const std::array<ImVec2, 6> band = {ImVec2(left, middle),
-                                        ImVec2(left + slant, top),
-                                        ImVec2(right - slant, top),
-                                        ImVec2(right, middle),
-                                        ImVec2(right - slant, bottom),
-                                        ImVec2(left + slant, bottom)};
-    if (is_unknown) {
-        ImVec4 fill = ImGui::ColorConvertU32ToFloat4(color);
-        fill.w *= UNKNOWN_BUS_FILL_ALPHA;
-        draw_list->AddConvexPolyFilled(band.data(),
-                                       static_cast<int>(band.size()),
-                                       ImGui::ColorConvertFloat4ToU32(fill));
-    }
-    draw_list->AddPolyline(band.data(), static_cast<int>(band.size()), color, ImDrawFlags_Closed, 1.5f);
-    const ImVec2 text_size = ImGui::CalcTextSize(text.c_str());
-    // The text sits across the middle, where the band is widest, so it may reach into the slanted ends
-    if (right - left >= text_size.x + slant) {
-        draw_list->AddText({(left + right - text_size.x) / 2.0f, middle - text_size.y / 2.0f},
-                           ImGui::GetColorU32(ImGuiCol_Text),
-                           text.c_str());
-    }
-}
-
-/**
- * @brief   Draws the lane of a bus: one band per value within what the plot shows, so a value too short to see at the
- *          zoom is a sliver and its text is left out.
- */
-void DrawBusLane(const Core::Transient &transient,
-                 const BusLane &lane,
-                 const std::size_t lane_position,
-                 const ImU32 color) {
-    const std::vector<LogicSignal> bits = GetBusSignals(lane, transient.NodeVoltages);
-    const ImPlotRange view = ImPlot::GetPlotLimits().X;
-    const double base = static_cast<double>(lane_position) * LANE_STRIDE;
-    const float top = ImPlot::PlotToPixels(view.Min, base + LANE_HIGH_OFFSET).y;
-    const float bottom = ImPlot::PlotToPixels(view.Min, base + LANE_LOW_OFFSET).y;
-    ImDrawList *draw_list = ImPlot::GetPlotDrawList();
-    ImPlot::PushPlotClipRect();
-    for (const BusSegment &segment : FindBusSegments(transient.Times, bits)) {
-        const double from = std::max(segment.From, view.Min);
-        const double to = std::min(segment.To, view.Max);
-        if (to <= from) {
-            continue;
-        }
-        DrawBusValue(draw_list,
-                     ImPlot::PlotToPixels(from, base).x,
-                     ImPlot::PlotToPixels(to, base).x,
-                     top,
-                     bottom,
-                     FormatBusValue(segment.Value, lane.Bits.size(), lane.Format),
-                     !segment.Value,
-                     color);
-    }
-    ImPlot::PopPlotClipRect();
 }
 
 } // namespace
@@ -250,6 +89,8 @@ void TransientTab::Draw(const FrameResults &frame) {
         ImGui::TextDisabled("No transient for the current circuit; pick it beside Run in the editor");
         return;
     }
+    // One build of the circuit serves the plots and the statistics of the frame
+    const LaneLayout layout = FindLaneLayout(m_Schematic, frame.TransientWindow->NodeVoltages.size(), m_ShowLogicLanes);
     DrawWithStatistics(
         [&] {
             if (const auto &steps = m_Results.GetTransientSteps()) {
@@ -267,14 +108,14 @@ void TransientTab::Draw(const FrameResults &frame) {
             const bool has_playback = !shown.Times.empty();
             const float playback_height = has_playback ? ImGui::GetFrameHeightWithSpacing() : 0.0f;
             if (ImGui::BeginChild("transient_plots", ImVec2(0.0f, -playback_height))) {
-                DrawPlots(shown, frame.TransientMath, frame.StepWindows);
+                DrawPlots(shown, frame.TransientMath, frame.StepWindows, layout);
             }
             ImGui::EndChild();
             if (has_playback) {
                 DrawPlaybackBar(m_Playback, shown.Times.front(), shown.Times.back());
             }
         },
-        [&] { DrawStatistics(*frame.TransientWindow, frame.TransientMath); });
+        [&] { DrawStatistics(*frame.TransientWindow, frame.TransientMath, layout); });
 }
 
 /**
@@ -282,20 +123,13 @@ void TransientTab::Draw(const FrameResults &frame) {
  * @return  The span between the cursors, or what the plot shows, or the whole run before the plot was first drawn,
  *          clipped to the run from the earlier end; an empty span without a transient.
  */
-PlotSpan TransientTab::GetMeasuredSpan() const {
+PlotSpan TransientTab::GetClippedMeasuredSpan() const {
     const auto &transient = m_Results.GetTransient();
     if (!transient || transient->Times.empty()) {
         return {};
     }
-    const PlotSpan measured = MeasuredSpan(m_Cursors, m_View);
-    const double run_start = transient->Times.front();
-    const double run_stop = transient->Times.back();
-    const double from = std::max(std::min(measured.From, measured.To), run_start);
-    const double to = std::min(std::max(measured.From, measured.To), run_stop);
-    if (!(from < to)) {
-        return {.From = run_start, .To = run_stop};
-    }
-    return {.From = from, .To = to};
+    return ClipSpanToRun(MeasuredSpan(m_Cursors, m_View),
+                         {.From = transient->Times.front(), .To = transient->Times.back()});
 }
 
 /**
@@ -317,19 +151,22 @@ bool TransientTab::CanExport(const FrameResults &frame) const {
 ExportFigure TransientTab::BuildFigure(const FrameResults &frame, const bool is_whole_run) const {
     if (const auto &transient = m_Results.GetTransient(); is_whole_run && transient) {
         static const std::vector<MathTrace> no_math;
+        const LaneLayout layout = FindLaneLayout(m_Schematic, transient->NodeVoltages.size(), m_ShowLogicLanes);
         return BuildTransientFigure(*transient,
                                     frame.WholeRunMath != nullptr ? frame.WholeRunMath->Traces : no_math,
-                                    FindMeasuredLanes(transient->NodeVoltages.size()),
-                                    FindShownBuses(transient->NodeVoltages.size()),
+                                    layout.Signals,
+                                    layout.Buses,
                                     m_Schematic,
                                     m_ShowBitValues,
                                     {.From = transient->Times.front(), .To = transient->Times.back()});
     }
     if (frame.TransientWindow) {
+        const LaneLayout layout =
+            FindLaneLayout(m_Schematic, frame.TransientWindow->NodeVoltages.size(), m_ShowLogicLanes);
         return BuildTransientFigure(*frame.TransientWindow,
                                     frame.TransientMath,
-                                    FindMeasuredLanes(frame.TransientWindow->NodeVoltages.size()),
-                                    FindShownBuses(frame.TransientWindow->NodeVoltages.size()),
+                                    layout.Signals,
+                                    layout.Buses,
                                     m_Schematic,
                                     m_ShowBitValues,
                                     m_View);
@@ -342,35 +179,34 @@ ExportFigure TransientTab::BuildFigure(const FrameResults &frame, const bool is_
  *          the Output window takes the front as its first chunk arrives, or was stopped and keeps the points it made.
  * @details A live run has no stop time to reach: stopped, it is paused, and goes on or is dropped from here.
  */
-void TransientTab::DrawIncompleteNote(const Core::Transient &transient) {
+void TransientTab::DrawRunControls(const Core::Transient &transient) {
     if (m_Controls.IsLive()) {
-        DrawLiveNote(transient);
+        DrawLiveRunControls(transient);
         return;
     }
     const std::string reached = std::format("simulated up to {}s of {}s",
                                             Core::FormatValue(transient.Times.back()),
                                             Core::FormatValue(m_Schematic.GetSimulationSettings().Transient.StopTime));
-    if (m_Controls.IsRunning()) {
-        ImGui::BeginDisabled(m_Controls.IsStopping());
-        if (ImGui::Button("Stop")) {
-            m_Controls.StopRun();
-        }
-        ImGui::EndDisabled();
-        ImGui::SameLine();
-        ImGui::TextDisabled("%s",
-                            std::format("{}, {}", m_Controls.IsStopping() ? "Stopping" : "Running", reached).c_str());
-    } else {
+    if (!m_Controls.IsRunning()) {
         ImGui::TextDisabled("%s", std::format("Stopped, {}", reached).c_str());
+        return;
     }
+    ImGui::BeginDisabled(m_Controls.IsStopping());
+    if (ImGui::Button("Stop")) {
+        m_Controls.StopRun();
+    }
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    ImGui::TextDisabled("%s", std::format("{}, {}", m_Controls.IsStopping() ? "Stopping" : "Running", reached).c_str());
 }
 
 /**
  * @brief   Stop pauses a live run, which then goes on with Continue or ends with Discard.
  */
-void TransientTab::DrawLiveNote(const Core::Transient &transient) {
+void TransientTab::DrawLiveRunControls(const Core::Transient &transient) {
     const bool is_paused = m_Controls.IsLivePaused();
     ImGui::BeginDisabled(m_Controls.IsStopping());
-    if (is_paused ? ImGui::Button("Continue") : ImGui::Button("Stop")) {
+    if (ImGui::Button(is_paused ? "Continue" : "Stop")) {
         if (is_paused) {
             m_Controls.ContinueLive();
         } else {
@@ -396,27 +232,33 @@ void TransientTab::DrawLiveNote(const Core::Transient &transient) {
  * @details While the run goes on, the window can follow its newest points. The schematic plays the same window.
  */
 void TransientTab::DrawWindowControls(const Core::Transient &shown) {
-    TransientWindow &window = m_Playback.Window;
-    const std::size_t total_points = window.GetTotalPoints();
-    const bool has_span = window.GetSpan().has_value();
     if (shown.Times.empty()) {
         return;
     }
-    // A run too short to cut into windows has no window size or scroll bar, only its range and the cursors
-    const bool has_window = !((!has_span && total_points <= static_cast<std::size_t>(MIN_WINDOW_POINTS))
-                              || (has_span && window.GetWindow().Count >= total_points));
+    const TransientWindow &window = m_Playback.Window;
+    const WindowAvailability availability =
+        GetWindowAvailability(window.GetTotalPoints(), window.GetSpan().has_value(), window.GetWindow().Count);
     const float width = ImGui::GetContentRegionAvail().x;
-    const std::string span =
-        std::format("{}s to {}s", Core::FormatValue(shown.Times.front()), Core::FormatValue(shown.Times.back()));
+    DrawWindowHeaderRow(shown, availability.HasSize, width);
+    if (availability.HasScrollbar) {
+        DrawWindowScrollbar(width);
+    }
+}
+
+/**
+ * @brief   The row over the plot: Follow while the run goes on, the range shown, and at the right end the cursor toggle
+ *          and the size of the window; in a narrow window those go one after the other on rows of their own rather
+ *          than over the range.
+ */
+void TransientTab::DrawWindowHeaderRow(const Core::Transient &shown, const bool has_size, const float width) {
     const ImVec2 row_start = ImGui::GetCursorPos();
     if (m_Controls.IsRunning()) {
+        TransientWindow &window = m_Playback.Window;
         bool follows = window.DoesFollow();
         if (ImGui::Checkbox("Follow", &follows)) {
             window.SetFollow(follows);
         }
         ImGui::SetItemTooltip("Keep the window on the newest points of the run");
-    }
-    if (m_Controls.IsRunning()) {
         ImGui::SameLine(0.0f, ImGui::GetFontSize());
     } else {
         ImGui::SetCursorPos(row_start);
@@ -424,12 +266,10 @@ void TransientTab::DrawWindowControls(const Core::Transient &shown) {
     ImGui::AlignTextToFramePadding();
     ImGui::TextDisabled("Range");
     ImGui::SameLine();
-    ImGui::TextUnformatted(span.c_str());
-    // A live run is seen a stop time at a time, so its window has no size to pick
-    const bool has_size = has_window && !has_span;
+    ImGui::TextUnformatted(
+        std::format("{}s to {}s", Core::FormatValue(shown.Times.front()), Core::FormatValue(shown.Times.back()))
+            .c_str());
     const float size_width = has_size ? GetWindowSizeWidth() + ImGui::GetFontSize() : 0.0f;
-    // At the right end of the row; in a narrow window, one after the other on rows of their own rather than over the
-    // range
     ImGui::SameLine();
     const float right_edge = row_start.x + width;
     if (ImGui::GetCursorPosX() + ImGui::GetFontSize() + GetCursorToggleWidth() + size_width <= right_edge) {
@@ -439,20 +279,24 @@ void TransientTab::DrawWindowControls(const Core::Transient &shown) {
             ImGui::SetCursorPosX(right_edge - GetWindowSizeWidth());
             DrawWindowSize();
         }
-    } else {
-        ImGui::NewLine();
-        DrawCursorCheckbox(m_Cursors);
-        if (has_size) {
-            ImGui::SameLine(0.0f, ImGui::GetFontSize());
-            if (ImGui::GetCursorPosX() + GetWindowSizeWidth() > right_edge) {
-                ImGui::NewLine();
-            }
-            DrawWindowSize();
-        }
-    }
-    if (!has_window || window.GetWindow().Count >= total_points) {
         return;
     }
+    ImGui::NewLine();
+    DrawCursorCheckbox(m_Cursors);
+    if (has_size) {
+        ImGui::SameLine(0.0f, ImGui::GetFontSize());
+        if (ImGui::GetCursorPosX() + GetWindowSizeWidth() > right_edge) {
+            ImGui::NewLine();
+        }
+        DrawWindowSize();
+    }
+}
+
+/**
+ * @brief   The scroll bar that moves the window along the run, as wide as the plot.
+ */
+void TransientTab::DrawWindowScrollbar(const float width) {
+    TransientWindow &window = m_Playback.Window;
     const ImRect bar(ImGui::GetCursorScreenPos(),
                      ImGui::GetCursorScreenPos() + ImVec2(width, ImGui::GetStyle().ScrollbarSize));
     ImGui::ItemSize(bar);
@@ -462,7 +306,7 @@ void TransientTab::DrawWindowControls(const Core::Transient &shown) {
                            ImGuiAxis_X,
                            &first,
                            static_cast<ImS64>(window.GetWindow().Count),
-                           static_cast<ImS64>(total_points))) {
+                           static_cast<ImS64>(window.GetTotalPoints()))) {
         window.SetFirst(static_cast<std::size_t>(first));
     }
     ImGui::SetItemTooltip("Drag to move the window along the run");
@@ -504,15 +348,14 @@ void TransientTab::DrawWindowSize() {
  */
 void TransientTab::DrawPlots(const Core::Transient &transient,
                              const std::vector<MathTrace> &math,
-                             const std::optional<StepFamily<Core::Transient>> &steps) {
+                             const std::optional<StepFamily<Core::Transient>> &steps,
+                             const LaneLayout &layout) {
     if (!transient.IsComplete) {
-        DrawIncompleteNote(transient);
+        DrawRunControls(transient);
     }
     DrawWindowControls(transient);
-    const std::vector<LogicNode> lanes = FindMeasuredLanes(transient.NodeVoltages.size());
-    const std::vector<BusLane> buses = FindShownBuses(transient.NodeVoltages.size());
-    const std::size_t lane_count = lanes.size() + buses.size();
-    std::vector<int> lane_nodes = ListNodes(lanes);
+    const std::size_t lane_count = layout.GetCount();
+    std::vector<int> lane_nodes = ListNodes(layout.Signals);
     ShownTraces shown{.Nodes = ListMeasuredNodes(transient.NodeVoltages.size(), m_Schematic, lane_nodes),
                       .Currents = ListMeasuredCurrents(transient.Currents, m_Schematic),
                       .MathLabels = ListMathLabels(math)};
@@ -528,7 +371,7 @@ void TransientTab::DrawPlots(const Core::Transient &transient,
         if (fits.IsNewResult) {
             ImPlot::SetNextAxisToFit(ImAxis_X1);
         }
-        DrawLogicLanes(transient, buses, lanes, heights.Lanes);
+        DrawLogicLanes(transient, layout, heights.Lanes);
     }
 }
 
@@ -609,9 +452,10 @@ std::vector<PlottedTrace> TransientTab::PlotAnalogTraces(const Core::Transient &
                                                          const AnalogPlan &plan) {
     std::vector<StepTraces> step_traces;
     if (steps) {
-        for (const Core::Transient &step : steps->Results) {
-            step_traces.push_back({&step.Times, &step.NodeVoltages, &step.Currents});
-        }
+        step_traces = MakeStepTraces(steps->Results,
+                                     &Core::Transient::Times,
+                                     &Core::Transient::NodeVoltages,
+                                     &Core::Transient::Currents);
         PlotOtherSteps(step_traces, steps->Selected, m_Schematic, plan.ShowsCurrents, plan.LaneNodes);
     }
     std::vector<PlottedTrace> plotted;
@@ -632,68 +476,21 @@ std::vector<PlottedTrace> TransientTab::PlotAnalogTraces(const Core::Transient &
 }
 
 /**
- * @brief   Each lane is a trace between its low and high levels, named on the axis, with a state read at the cursor.
- * @details A lane the circuit drives to a voltage between the thresholds is drawn halfway between low and high.
+ * @brief   The plot of logic lanes: the buses on top, the signals under them, the bit values when asked, and the
+ * cursors and the playhead over them.
  */
-void TransientTab::DrawLogicLanes(const Core::Transient &transient,
-                                  const std::vector<BusLane> &buses,
-                                  const std::vector<LogicNode> &lanes,
-                                  const float height) {
+void TransientTab::DrawLogicLanes(const Core::Transient &transient, const LaneLayout &layout, const float height) {
     if (!ImPlot::BeginPlot("##transient_logic",
                            ImVec2(-1.0f, height),
                            ImPlotFlags_NoLegend | ImPlotFlags_NoMouseText)) {
         return;
     }
-    // The buses take the top lanes and the signals the ones below, each lane at a height counted from the bottom
-    const std::size_t lane_count = buses.size() + lanes.size();
-    const auto position_of = [&](const std::size_t lane) { return lane_count - 1 - lane; };
-    const auto top = static_cast<double>(lane_count - 1) * LANE_STRIDE + LANE_HIGH_OFFSET + LANE_MARGIN;
-    ImPlot::SetupAxes("Time",
-                      "",
-                      ImPlotAxisFlags_None,
-                      ImPlotAxisFlags_Lock | ImPlotAxisFlags_NoGridLines | ImPlotAxisFlags_NoTickMarks);
-    ImPlot::SetupAxisLimits(ImAxis_Y1, LANE_LOW_OFFSET - LANE_MARGIN, top, ImPlotCond_Always);
-    ImPlot::SetupAxisLinks(ImAxis_X1, &m_View.From, &m_View.To);
-    ImPlot::SetupAxisFormat(ImAxis_X1, FormatAxisValue, const_cast<char *>("s"));
-    // The first lane is on top, and each is named at its middle
-    std::vector<double> positions;
-    std::vector<std::string> names;
-    for (std::size_t lane = 0; lane < lane_count; ++lane) {
-        positions.push_back(static_cast<double>(position_of(lane)) * LANE_STRIDE + LANE_HIGH_OFFSET / 2.0);
-        names.push_back(lane < buses.size()
-                            ? buses[lane].Name
-                            : GetVoltageLabel(m_Schematic.GetConnectivity(), lanes[lane - buses.size()].Node));
-    }
-    std::vector<const char *> labels;
-    for (const std::string &name : names) {
-        labels.push_back(name.c_str());
-    }
-    ImPlot::SetupAxisTicks(ImAxis_Y1, positions.data(), static_cast<int>(positions.size()), labels.data());
-    for (std::size_t bus = 0; bus < buses.size(); ++bus) {
-        DrawBusLane(transient, buses[bus], position_of(bus), GetNodeColor(buses[bus].Bits.front().Node));
-    }
-    std::vector<PlottedTrace> plotted;
-    for (std::size_t lane = 0; lane < lanes.size(); ++lane) {
-        const LogicNode &node = lanes[lane];
-        const std::vector<double> &voltages = transient.NodeVoltages[static_cast<std::size_t>(node.Node)];
-        const std::vector<double> heights = BuildLane(voltages, node.LogicLevel, position_of(buses.size() + lane));
-        const ImU32 color = GetNodeColor(node.Node);
-        ImPlotSpec spec;
-        spec.LineColor = ImGui::ColorConvertU32ToFloat4(color);
-        const std::string &name = names[buses.size() + lane];
-        ImPlot::PlotLine(name.c_str(), transient.Times.data(), heights.data(), static_cast<int>(heights.size()), spec);
-        plotted.push_back({name, &voltages, "V", color, node.LogicLevel});
-    }
+    const std::vector<std::string> names = ListLaneNames(layout, m_Schematic.GetConnectivity());
+    SetupLaneAxes(names, m_View);
+    DrawBusLanes(transient, layout);
+    const std::vector<PlottedTrace> plotted = PlotSignalLanes(transient, layout, names);
     if (m_ShowBitValues) {
-        std::vector<LogicSignal> signals;
-        for (const LogicNode &node : lanes) {
-            signals.push_back({transient.NodeVoltages[static_cast<std::size_t>(node.Node)], node.LogicLevel});
-        }
-        const ImPlotRange view = ImPlot::GetPlotLimits().X;
-        const auto cells = FindBitCells(transient.Times, signals, view.Min, view.Max);
-        for (std::size_t lane = 0; lane < lanes.size(); ++lane) {
-            DrawBitValues(cells[lane], position_of(buses.size() + lane), GetNodeColor(lanes[lane].Node));
-        }
+        DrawBitValueLabels(transient, layout);
     }
     DrawTimeMarkers(transient, plotted);
     KeepVisibleTime();
@@ -723,42 +520,17 @@ void TransientTab::KeepVisibleTime() {
 }
 
 /**
- * @brief   The logic signals the plot shows as lanes: the measured nodes of logic parts, unless lanes are turned off.
- */
-std::vector<LogicNode> TransientTab::FindMeasuredLanes(const std::size_t node_count) const {
-    if (!m_ShowLogicLanes) {
-        return {};
-    }
-    return ListMeasuredLogicNodes(FindLogicNodes(m_Schematic.BuildCircuit()), node_count, m_Schematic);
-}
-
-/**
- * @brief   The buses the plot shows as lanes over the signals: those shown whose bits all name a node of the result,
- *          unless lanes are turned off.
- */
-std::vector<BusLane> TransientTab::FindShownBuses(const std::size_t node_count) const {
-    if (!m_ShowLogicLanes) {
-        return {};
-    }
-    const NetResolver find_node = [this](const std::string_view net) {
-        return m_Schematic.GetConnectivity().FindNodeOfNet(net);
-    };
-    return ResolveBusLanes(m_Schematic.GetMeasurements().GetBuses(),
-                           FindLogicNodes(m_Schematic.BuildCircuit()),
-                           find_node,
-                           node_count);
-}
-
-/**
  * @brief   Like the measurements of an oscilloscope, for every shown trace; with the cursors, also the value of each
  *          trace at both and their difference, and the time between them with its frequency.
  */
-void TransientTab::DrawStatistics(const Core::Transient &transient, const std::vector<MathTrace> &math) {
+void TransientTab::DrawStatistics(const Core::Transient &transient,
+                                  const std::vector<MathTrace> &math,
+                                  const LaneLayout &layout) {
     const PlotCursors &cursors = m_Cursors;
     const CursorReadings cursor_readings =
         ReadCursors(cursors, "s", {ReadCursorDifference(cursors, "s"), ReadCursorFrequency(cursors)});
     DrawStatisticsHeader(cursors.Shown ? "Between the cursors" : "Over the visible time");
-    if (!FindLogicNodes(m_Schematic.BuildCircuit()).empty()) {
+    if (layout.HasLogicParts) {
         ImGui::SameLine(0.0f, ImGui::GetFontSize());
         ImGui::Checkbox("Logic lanes", &m_ShowLogicLanes);
         ImGui::SetItemTooltip("Plot the signals of gates and flip-flops as lanes under the analog traces");
@@ -770,9 +542,9 @@ void TransientTab::DrawStatistics(const Core::Transient &transient, const std::v
         }
     }
     std::vector<PlottedTrace> traces = ListTraces(transient.NodeVoltages, transient.Currents, m_Schematic, "V", "A");
-    for (const MathTrace &trace : math) {
-        traces.push_back({trace.Label, &trace.Values, trace.Unit.c_str(), trace.Color});
-    }
+    std::ranges::transform(math, std::back_inserter(traces), [](const MathTrace &trace) {
+        return ToPlottedTrace(trace);
+    });
     if (traces.empty()) {
         ImGui::TextDisabled("Measure a trace to see its statistics");
         return;
@@ -805,6 +577,24 @@ AnalogPlan PlanAnalog(const ShownTraces &shown,
             .HasVoltages = has_voltages,
             .HasLanes = has_lanes,
             .IsShown = has_voltages || shows_currents || !math.empty() || !has_lanes};
+}
+
+/**
+ * @brief   Tells what the window controls offer for a run of some points.
+ * @param[in] total_points  Points of the whole run.
+ * @param[in] has_span      Whether the window is a span of time, as a live run has, rather than a count of points.
+ * @param[in] window_count  Points in the window now.
+ * @return  No size or scroll bar for a run too short to cut into windows, or whose window holds it all; a live run has
+ *          no size to pick, since it is seen a stop time at a time, and a scroll bar only while it is longer than that.
+ */
+WindowAvailability
+GetWindowAvailability(const std::size_t total_points, const bool has_span, const std::size_t window_count) {
+    const bool is_too_short =
+        has_span ? window_count >= total_points : total_points <= static_cast<std::size_t>(MIN_WINDOW_POINTS);
+    if (is_too_short) {
+        return {.HasScrollbar = false, .HasSize = false};
+    }
+    return {.HasScrollbar = window_count < total_points, .HasSize = !has_span};
 }
 
 } // namespace GUI

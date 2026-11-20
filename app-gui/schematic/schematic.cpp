@@ -51,11 +51,7 @@ void RenameCurrentReferences(std::vector<std::unique_ptr<UIElement>> &elements,
  */
 void AddMissingPinMarkers(Schematic &content, const std::vector<SavedSubcircuitPin> &pins) {
     for (const SavedSubcircuitPin &pin : pins) {
-        const bool has_marker = std::ranges::any_of(content.GetElements(), [&](const auto &element) {
-            return Core::IsSubcircuitPin(element->GetComponent().GetType())
-                && element->GetTerminals().front() == pin.Point;
-        });
-        if (!has_marker) {
+        if (FindPinMarker(content.GetElements(), pin.Point) == nullptr) {
             auto marker = CreateElement(Core::ComponentType::PIN, pin.Point, Rotation::R0);
             static_cast<Core::NetLabel &>(marker->GetComponent()).SetNet(pin.Name);
             content.AddElement(std::move(marker));
@@ -317,19 +313,14 @@ std::expected<std::vector<Schematic::SubcircuitPinCandidate>, std::string> Schem
  *          the other way. It counts as an edit, which CommitUndoStep() makes one undo step.
  */
 bool Schematic::SetPinMarkerSide(const GridPoint point, const Core::PinSide side) {
-    for (auto &element : m_Elements) {
-        if (!Core::IsSubcircuitPin(element->GetComponent().GetType()) || element->GetTerminals().front() != point) {
-            continue;
-        }
-        if (GetMarkerSide(*element) == side) {
-            return false;
-        }
-        element->SetRotation(GetSideRotation(side));
-        element->SetMirrored(false);
-        MarkModified();
-        return true;
+    UIElement *marker = FindPinMarker(m_Elements, point);
+    if (marker == nullptr || GetMarkerSide(*marker) == side) {
+        return false;
     }
-    return false;
+    marker->SetRotation(GetSideRotation(side));
+    marker->SetMirrored(false);
+    MarkModified();
+    return true;
 }
 
 /**
@@ -464,6 +455,16 @@ std::vector<std::string> Schematic::MergeSubcircuits(std::vector<SavedSubcircuit
 }
 
 /**
+ * @brief   Adds definitions that come without parts of their own, such as the blocks of a SPICE library.
+ * @param[in] definitions  Definitions to add, with the blocks those place.
+ * @return  The name each definition has here, in the order they came, as MergeSubcircuits() with instances gives.
+ */
+std::vector<std::string> Schematic::MergeSubcircuits(std::vector<SavedSubcircuit> definitions) {
+    std::vector<std::unique_ptr<UIElement>> no_instances;
+    return MergeSubcircuits(std::move(definitions), no_instances);
+}
+
+/**
  * @brief   Adds device models from a library or a paste, so the parts that name them have them.
  * @param[in]     models       Models to add.
  * @param[in,out] elements     Parts that came with them, pointed at the new name of a renamed model.
@@ -480,6 +481,17 @@ std::vector<std::string> Schematic::MergeLibraryModels(std::vector<Core::Library
         MarkModified();
     }
     return std::move(merged.Names);
+}
+
+/**
+ * @brief   Adds device models that come without parts or blocks of their own, such as those of a SPICE library.
+ * @param[in] models  Models to add.
+ * @return  The name each model has here, in order, as MergeLibraryModels() with parts gives.
+ */
+std::vector<std::string> Schematic::MergeLibraryModels(std::vector<Core::LibraryModel> models) {
+    std::vector<std::unique_ptr<UIElement>> no_parts;
+    std::vector<SavedSubcircuit> no_blocks;
+    return MergeLibraryModels(std::move(models), no_parts, no_blocks);
 }
 
 /**

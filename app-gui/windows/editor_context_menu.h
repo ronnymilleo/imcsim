@@ -13,6 +13,7 @@
 #include "schematic/probing.h"
 #include "schematic/schematic.h"
 #include "schematic/simulation_settings.h"
+#include "windows/canvas_pointer.h"
 #include "windows/part_picker.h"
 #include "windows/part_popover.h"
 #include <optional>
@@ -38,12 +39,7 @@ struct ContextMenuServices {
 class EditorContextMenu {
 public:
     // Opening
-    void HandleRightClick(Schematic &schematic,
-                          EditorMode &mode,
-                          const ViewTransform &view,
-                          float zoom,
-                          bool hovered,
-                          PartPopover &popover);
+    void HandleRightClick(Schematic &schematic, EditorMode &mode, const CanvasPointer &pointer, PartPopover &popover);
 
     // Drawing
     std::optional<EditorCommand>

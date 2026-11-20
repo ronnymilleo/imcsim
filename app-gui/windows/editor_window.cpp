@@ -296,18 +296,19 @@ std::optional<LivePart> EditorWindow::FindHoveredLivePart(const ImVec2 origin) c
  */
 void EditorWindow::HandleCanvasInput(const CanvasFrame &frame) {
     const bool took_mouse = m_Live.HandleInput(m_Navigator.GetShown(), frame.HoveredLivePart);
-    const SelectionInput selection = {.Shown = m_Navigator.GetShown(),
-                                      .Mode = m_Mode,
-                                      .Popover = m_Popover,
-                                      .View = frame.View,
-                                      .Zoom = m_View.GetZoom(),
-                                      .IsHovered = frame.IsHovered && !took_mouse,
-                                      .WasPopupOpenLastFrame = m_PopupOpenLastFrame};
+    const SelectionInput selection = {
+        .Shown = m_Navigator.GetShown(),
+        .Mode = m_Mode,
+        .Popover = m_Popover,
+        .Pointer = {.View = frame.View, .Zoom = m_View.GetZoom(), .IsHovered = frame.IsHovered && !took_mouse},
+        .WasPopupOpenLastFrame = m_PopupOpenLastFrame};
     for (const EditorCommand command : HandleSelectionInput(selection)) {
         RunCommand(command);
     }
-    m_ContextMenu
-        .HandleRightClick(m_Navigator.GetShown(), m_Mode, frame.View, m_View.GetZoom(), frame.IsHovered, m_Popover);
+    m_ContextMenu.HandleRightClick(m_Navigator.GetShown(),
+                                   m_Mode,
+                                   {.View = frame.View, .Zoom = m_View.GetZoom(), .IsHovered = frame.IsHovered},
+                                   m_Popover);
     m_Popover.HandleValueTyping(m_PartEditor);
 }
 
@@ -357,11 +358,10 @@ void EditorWindow::DrawSchematicLayers(const CanvasFrame &frame, SchematicCanvas
 }
 
 /**
- * @brief   The keys that start a mode, then the input of the mode the editor is in, which may switch to another.
+ * @brief   The input of the mode the editor is in, which may switch to another.
  * @details Previews go over the schematic, so the mode handles its clicks after it is drawn.
  */
 void EditorWindow::HandleModeInput(const CanvasFrame &frame, SchematicCanvas &canvas) {
-    HandleModeKeys();
     const ModeInput input = {.Root = m_RootSchematic,
                              .Blocks = m_Navigator.GetSession(),
                              .Overlays = m_Overlays,
@@ -370,31 +370,11 @@ void EditorWindow::HandleModeInput(const CanvasFrame &frame, SchematicCanvas &ca
                              .Files = m_Files,
                              .UserPreferences = m_Preferences,
                              .Canvas = canvas,
-                             .View = frame.View,
-                             .Zoom = m_View.GetZoom(),
-                             .IsHovered = frame.IsHovered,
+                             .Pointer = {.View = frame.View, .Zoom = m_View.GetZoom(), .IsHovered = frame.IsHovered},
                              .IsWireVerticalFirst = m_WireVerticalFirst};
     std::optional<EditorMode> next = std::visit([&](auto &mode) { return HandleMode(mode, input); }, m_Mode);
     if (next) {
         SetMode(std::move(*next));
-    }
-}
-
-/**
- * @brief   W starts drawing wires, P probing and L placing a net label, while the editor has the focus.
- */
-void EditorWindow::HandleModeKeys() {
-    if (!ImGui::IsWindowFocused()) {
-        return;
-    }
-    if (ImGui::IsKeyPressed(ImGuiKey_W)) {
-        SetMode(WiringMode{});
-    }
-    if (ImGui::IsKeyPressed(ImGuiKey_P)) {
-        SetMode(ProbingMode{});
-    }
-    if (ImGui::IsKeyPressed(ImGuiKey_L) && !ImGui::GetIO().KeyCtrl) {
-        SetMode(PlacingMode{.Type = Core::ComponentType::NET_LABEL});
     }
 }
 
@@ -472,12 +452,8 @@ const ResultStore &EditorWindow::GetShownResults() const {
  *          parts.
  */
 void EditorWindow::ImportSpiceBlocks(SpiceImportResult imported) {
-    // A library brings no parts of its own, which the merges would point at a renamed model or block
-    std::vector<std::unique_ptr<UIElement>> no_parts;
-    std::vector<SavedSubcircuit> no_blocks;
-    const std::vector<std::string> models =
-        m_RootSchematic.MergeLibraryModels(std::move(imported.Models), no_parts, no_blocks);
-    const std::vector<std::string> names = m_RootSchematic.MergeSubcircuits(std::move(imported.Blocks), no_parts);
+    const std::vector<std::string> models = m_RootSchematic.MergeLibraryModels(std::move(imported.Models));
+    const std::vector<std::string> names = m_RootSchematic.MergeSubcircuits(std::move(imported.Blocks));
     m_RootSchematic.CommitUndoStep();
     if (!names.empty()) {
         SetMode(PlacingMode{.Type = Core::ComponentType::SUBCIRCUIT, .Block = names.front()});
@@ -549,10 +525,7 @@ void EditorWindow::RunCommand(const EditorCommand command) {
         RequestQuit();
         break;
     case EditorCommand::RUN:
-        // Like the Run button of the analysis settings, the key never stops a run
-        if (m_Controls.GetRunAction() != RunAction::STOP) {
-            m_Controls.PressRun();
-        }
+        m_Controls.PressRunKey();
         break;
     case EditorCommand::UNDO:
         m_Navigator.GetShown().Undo();
@@ -588,6 +561,18 @@ void EditorWindow::RunCommand(const EditorCommand command) {
         break;
     case EditorCommand::DELETE_SELECTION:
         m_Navigator.GetShown().DeleteSelection();
+        break;
+    case EditorCommand::START_SELECTING:
+        SetMode(SelectingMode{});
+        break;
+    case EditorCommand::START_WIRING:
+        SetMode(WiringMode{});
+        break;
+    case EditorCommand::START_PROBING:
+        SetMode(ProbingMode{});
+        break;
+    case EditorCommand::PLACE_NET_LABEL:
+        SetMode(PlacingMode{.Type = Core::ComponentType::NET_LABEL});
         break;
     case EditorCommand::FIT:
         m_View.RequestFit();

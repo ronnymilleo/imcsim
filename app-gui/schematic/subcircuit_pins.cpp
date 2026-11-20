@@ -1,10 +1,12 @@
 /**
  * @file    subcircuit_pins.cpp
- * @brief   Checks the pins of a block definition, tells the edge each one goes on and hands them to its instances.
+ * @brief   Checks the pins of a block definition, finds and names their markers, tells the edge each one goes on
+ *          and hands them to its instances.
  */
 
 #include "schematic/subcircuit_pins.h"
 
+#include "circuit/components/net_label.h"
 #include "circuit/components/subcircuit_pin.h"
 #include <algorithm>
 #include <map>
@@ -48,6 +50,46 @@ std::optional<std::string> CheckPinNodes(const Connectivity &connectivity,
 }
 
 /**
+ * @brief   Finds the pin marker whose terminal is on a point.
+ * @param[in] elements  Contents of a block.
+ * @param[in] point     Point of a pin.
+ * @return  The marker, which belongs to the contents, or null when no marker is on the point.
+ */
+UIElement *FindPinMarker(const std::vector<std::unique_ptr<UIElement>> &elements, const GridPoint point) {
+    const auto marker = std::ranges::find_if(elements, [point](const std::unique_ptr<UIElement> &element) {
+        return Core::IsSubcircuitPin(element->GetComponent().GetType()) && element->GetTerminals().front() == point;
+    });
+    return marker == elements.end() ? nullptr : marker->get();
+}
+
+/**
+ * @brief   Names every pin marker of a block after the pin on the point of its terminal.
+ * @param[in] elements  Contents of a block, whose markers take the names; the list stays, the parts change.
+ * @param[in] pins      Pins of the block, each at the point of its marker.
+ * @return  Whether any marker changed its name; the reason when a marker has no pin, with the markers before it
+ *          already named.
+ */
+std::expected<bool, std::string> NameMarkersAfterPins(const std::vector<std::unique_ptr<UIElement>> &elements,
+                                                      const std::vector<SavedSubcircuitPin> &pins) {
+    bool is_changed = false;
+    for (const auto &element : elements) {
+        if (!Core::IsSubcircuitPin(element->GetComponent().GetType())) {
+            continue;
+        }
+        const auto pin = std::ranges::find(pins, element->GetTerminals().front(), &SavedSubcircuitPin::Point);
+        if (pin == pins.end()) {
+            return std::unexpected("Every pin marker needs a block pin name");
+        }
+        auto &marker = static_cast<Core::NetLabel &>(element->GetComponent());
+        if (marker.GetNet() != pin->Name) {
+            marker.SetNet(pin->Name);
+            is_changed = true;
+        }
+    }
+    return is_changed;
+}
+
+/**
  * @brief   Tells the edge of the block a pin marker puts its pin on.
  * @param[in] marker  A pin marker, as placed in the block.
  * @return  The edge its arrow comes from, since the arrow points from the block's edge into the circuit: the left for
@@ -73,12 +115,8 @@ Core::PinSide GetMarkerSide(const UIElement &marker) {
  */
 std::optional<Core::PinSide> FindMarkerSide(const std::vector<std::unique_ptr<UIElement>> &elements,
                                             const GridPoint point) {
-    for (const auto &element : elements) {
-        if (Core::IsSubcircuitPin(element->GetComponent().GetType()) && element->GetTerminals().front() == point) {
-            return GetMarkerSide(*element);
-        }
-    }
-    return std::nullopt;
+    const UIElement *marker = FindPinMarker(elements, point);
+    return marker == nullptr ? std::nullopt : std::optional(GetMarkerSide(*marker));
 }
 
 /**

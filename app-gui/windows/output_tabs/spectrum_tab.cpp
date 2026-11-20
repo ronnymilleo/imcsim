@@ -306,7 +306,7 @@ std::vector<SpectrumTrace> MakeSpectrumTraces(std::vector<PlottedTrace> &sources
                           .Densities = {}});
     }
     for (const MathTrace &trace : math) {
-        sources.push_back({trace.Label, &trace.Values, trace.Unit.c_str(), trace.Color});
+        sources.push_back(ToPlottedTrace(trace));
         traces.push_back({.Label = trace.Label,
                           .Unit = trace.Unit,
                           .Axis = trace.Axis,

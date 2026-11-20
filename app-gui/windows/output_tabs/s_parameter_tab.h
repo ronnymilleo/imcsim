@@ -15,6 +15,7 @@
 #include "results/result_store.h"
 #include "schematic/schematic.h"
 #include "simulation/simulation_results.h"
+#include "windows/output_tabs/s_parameter_choices.h"
 #include "windows/output_tabs/s_parameter_smith.h"
 #include "windows/output_tabs/s_parameter_stability.h"
 #include "windows/output_tabs/touchstone_export_control.h"
@@ -22,16 +23,6 @@
 #include <vector>
 
 namespace GUI {
-
-/**
- * @enum    SParameterView
- * @brief   What the tab draws: the Smith chart, the magnitude and phase plots or the stability of a two-port.
- */
-enum class SParameterView {
-    SMITH,
-    MAGNITUDE_PHASE,
-    STABILITY
-};
 
 /**
  * @class   SParameterTab
@@ -61,13 +52,7 @@ private:
     const ResultStore &m_Results;
 
     // Choices
-    /// The entries of S the magnitude and phase plots show.
-    SParameterSelection m_Selection;
-    /// The entries the Smith chart shows, which starts from the reflections.
-    SParameterSelection m_SmithSelection;
-    /// The entries of Z and of Y that the magnitude and phase plots show, each kept apart from S.
-    SParameterSelection m_ImpedanceSelection;
-    SParameterSelection m_AdmittanceSelection;
+    SParameterSelections m_Selections;
     SParameterQuantity m_Quantity = SParameterQuantity::S;
     /// The view the user chose for S, which Z and Y leave alone and S gets back.
     SParameterView m_Display = SParameterView::SMITH;
@@ -88,8 +73,7 @@ private:
     // Result
     void StartResult(const Core::SParameters &result);
     SParameterView GetDisplayedView(const Core::SParameters &result) const;
-    SParameterSelection &GetShownSelection(SParameterView view);
-    const SParameterSelection &GetShownSelection(SParameterView view) const;
+    SParameterBody GetBody(const Core::SParameters &result, SParameterView view) const;
 
     // Controls
     void DrawControls(const Core::SParameters &result, PlotExporter &exporter, SParameterView view);

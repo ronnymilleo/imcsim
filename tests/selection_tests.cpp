@@ -89,3 +89,11 @@ TEST_CASE("PickAll takes every element and wire", "[selection]") {
     const std::vector<GUI::UIWire> wires = {{{2, 0}, {10, 0}}};
     CHECK(GUI::PickAll(elements, wires) == GUI::Selection{.Elements = {0, 1}, .Wires = {0}});
 }
+
+TEST_CASE("The items of a selection are the parts and wires it picks, in index order", "[selection]") {
+    const auto elements = TwoResistors();
+    const std::vector<GUI::UIWire> wires = {{{2, 0}, {10, 0}}, {{0, 4}, {0, 8}}};
+    const GUI::SelectedItems selected = GUI::CollectSelected(elements, wires, {.Elements = {1}, .Wires = {1}});
+    CHECK(selected.Elements == std::vector<const GUI::UIElement *>{elements[1].get()});
+    CHECK(selected.Wires == std::vector<GUI::UIWire>{wires[1]});
+}

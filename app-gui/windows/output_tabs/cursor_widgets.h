@@ -22,6 +22,7 @@ void DrawCursorReadout(const std::vector<double> &xs,
                        const std::vector<PlottedTrace> &plotted);
 void DrawCursors(PlotCursors &cursors, bool logarithmic);
 PlotSpan MeasuredSpan(const PlotCursors &cursors, const PlotSpan &view);
+PlotSpan ClipSpanToRun(const PlotSpan &span, const PlotSpan &run);
 std::optional<PlotCursors> GetShownCursors(const PlotCursors &cursors);
 float GetCursorToggleWidth();
 void DrawCursorToggle(PlotCursors &cursors, float right_edge);

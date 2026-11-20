@@ -87,6 +87,14 @@ TEST_CASE("A name that is no source is refused, and so is a source that cannot d
     CHECK(Nodalys::FindSourceByName(compiled, "R1").has_value());
 }
 
+TEST_CASE("A source is found by its name in any case, as SPICE reads names", "[nodalys][analysis_preamble]") {
+    Nodalys::Circuit circuit = ParseCircuit(DIVIDER);
+    const Nodalys::CompiledCircuit &compiled = circuit.Impl().Compiled();
+    const auto source = Nodalys::FindSourceByName(compiled, "v1");
+    REQUIRE(source.has_value());
+    CHECK(*source == compiled.SourcesByName.at("V1"));
+}
+
 TEST_CASE("The operating point of a divider is solved and its convergence reported", "[nodalys][analysis_preamble]") {
     Nodalys::Circuit circuit = ParseCircuit(DIVIDER);
     Nodalys::CompiledCircuit &compiled = circuit.Impl().Compiled();

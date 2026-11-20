@@ -5,9 +5,9 @@
 
 #include "schematic/block_session.h"
 
-#include "circuit/components/net_label.h"
 #include "schematic/block_nesting.h"
 #include "schematic/free_name.h"
+#include "schematic/subcircuit_pins.h"
 #include <algorithm>
 #include <functional>
 #include <set>
@@ -183,21 +183,30 @@ std::expected<void, std::string> BlockSession::Open(const std::string &name) {
 }
 
 /**
- * @brief   Closes the innermost open block, applying it to the document or dropping its changes.
- * @details Applied, it is one undo step of the document, and the blocks still open take it too, since they may hold
- *          instances of it. When it cannot be applied it stays open.
- * @param[in] apply  Whether to apply the contents and the settings, or drop them.
- * @return  Nothing once a block closed, so the editor shows the level above it; the reason otherwise, which
- *          ReportError() can show: no block is open, or the block cannot be applied and stays open.
+ * @brief   Applies the innermost open block to the document and closes it.
+ * @details It is one undo step of the document, and the blocks still open take it too, since they may hold instances
+ *          of it. When it cannot be applied it stays open.
+ * @return  Nothing once it closed, so the editor shows the level above it; the reason otherwise, which ReportError()
+ *          can show: no block is open, or the block cannot be applied and stays open.
  */
-std::expected<void, std::string> BlockSession::Close(const bool apply) {
+std::expected<void, std::string> BlockSession::ApplyAndClose() {
     if (!IsOpen()) {
         return std::unexpected("No block is open");
     }
-    if (apply) {
-        if (auto applied = ApplyInnermost(); !applied) {
-            return applied;
-        }
+    if (auto applied = ApplyInnermost(); !applied) {
+        return applied;
+    }
+    LeaveInnermost();
+    return {};
+}
+
+/**
+ * @brief   Closes the innermost open block and drops the changes made in it.
+ * @return  Nothing once it closed, so the editor shows the level above it; the reason when no block is open.
+ */
+std::expected<void, std::string> BlockSession::DiscardAndClose() {
+    if (!IsOpen()) {
+        return std::unexpected("No block is open");
     }
     LeaveInnermost();
     return {};
@@ -254,43 +263,31 @@ std::expected<void, std::string> BlockSession::SyncPins() {
 
 /**
  * @brief   Names the pin markers of the open block after the pins of the settings, which sit on the same points.
- * @return  False, with the reason in GetError(), when a marker has no pin.
+ * @return  Nothing once the markers are named; the reason when a marker has no pin.
  */
-bool BlockSession::ApplyPinNames() {
+std::expected<void, std::string> BlockSession::ApplyPinNames() {
     Schematic &content = *m_OpenBlocks.back().Content;
-    const std::vector<SavedSubcircuitPin> &pins = m_OpenBlocks.back().Settings.Pins;
-    for (auto &element : content.GetElements()) {
-        if (!Core::IsSubcircuitPin(element->GetComponent().GetType())) {
-            continue;
-        }
-        const GridPoint point = element->GetTerminals().front();
-        const auto pin = std::ranges::find(pins, point, &SavedSubcircuitPin::Point);
-        if (pin == pins.end()) {
-            m_Error = "Every pin marker needs a block pin name";
-            return false;
-        }
-        auto &marker = static_cast<Core::NetLabel &>(element->GetComponent());
-        if (marker.GetNet() != pin->Name) {
-            marker.SetNet(pin->Name);
-            content.MarkModified();
-        }
+    const auto named = NameMarkersAfterPins(content.GetElements(), m_OpenBlocks.back().Settings.Pins);
+    if (!named) {
+        return std::unexpected(named.error());
     }
-    return true;
+    if (*named) {
+        content.MarkModified();
+    }
+    return {};
 }
 
 /**
  * @brief   Makes a block of the selection of the document from the settings, as one undo step.
- * @return  True when it was made; false leaves the reason in GetError().
+ * @return  Nothing once it was made; the reason otherwise, with the document unchanged.
  */
-bool BlockSession::CreateBlock() {
-    auto created = m_Root.CreateSubcircuitFromSelection(m_NewBlock.Name, m_NewBlock.Pins, m_NewBlock.Parameters);
-    if (!created) {
-        m_Error = created.error();
-        return false;
+std::expected<void, std::string> BlockSession::CreateBlock() {
+    if (auto created = m_Root.CreateSubcircuitFromSelection(m_NewBlock.Name, m_NewBlock.Pins, m_NewBlock.Parameters);
+        !created) {
+        return created;
     }
     m_Root.CommitUndoStep();
-    m_Error.clear();
-    return true;
+    return {};
 }
 
 /**
@@ -316,16 +313,31 @@ std::vector<Core::SubcircuitParameter> &BlockSession::GetParameters() {
     return GetShownSettings().Parameters;
 }
 
-std::string &BlockSession::GetError() {
+const std::string &BlockSession::GetError() const {
     return m_Error;
 }
 
 /**
+ * @brief   Shows a reason in the settings dialog, such as why its button could not apply the settings.
+ * @param[in] reason  The reason, as the methods of the session return it.
+ */
+void BlockSession::ShowError(std::string reason) {
+    m_Error = std::move(reason);
+}
+
+/**
+ * @brief   Takes the reason off the settings dialog, once what failed has worked.
+ */
+void BlockSession::ClearError() {
+    m_Error.clear();
+}
+
+/**
  * @brief   Shows why something the editor asked for failed, in the settings dialog, which opens on the next frame.
- * @param[in] reason  The reason, as Open(), Close() or SyncPins() return it.
+ * @param[in] reason  The reason, as Open(), ApplyAndClose() or SyncPins() return it.
  */
 void BlockSession::ReportError(std::string reason) {
-    m_Error = std::move(reason);
+    ShowError(std::move(reason));
     m_IsDialogRequested = true;
 }
 

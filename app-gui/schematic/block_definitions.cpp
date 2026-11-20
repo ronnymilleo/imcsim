@@ -48,20 +48,33 @@ struct TerminalMoves {
 };
 
 /**
- * @brief   Brings one instance of a definition that changed up to date, and notes where its wires go.
+ * @struct  InstanceTerminals
+ * @brief   The terminals of an instance before its definition changed, which its wires are still on.
  */
-void RefreshInstance(UIElement &element,
-                     const SavedSubcircuit &definition,
-                     const std::vector<std::string> &old_names,
-                     const std::vector<std::optional<std::size_t>> &matches,
-                     TerminalMoves &moves) {
-    auto &instance = static_cast<Core::SubcircuitInstance &>(element.GetComponent());
-    const std::vector<std::string> instance_pins = instance.GetPins();
-    const std::vector<GridPoint> old_terminals = element.GetTerminals();
-    std::vector<GridPoint> old_inwards;
-    for (std::size_t terminal = 0; terminal < old_terminals.size(); ++terminal) {
-        old_inwards.push_back(element.GetTerminalInward(terminal));
+struct InstanceTerminals {
+    std::vector<GridPoint> Points;
+    /// The direction from each terminal into the box, which tells the edge it is on.
+    std::vector<GridPoint> Inwards;
+    /// The pin of each terminal, by name, in terminal order.
+    std::vector<std::string> PinNames;
+};
+
+InstanceTerminals CaptureTerminals(const UIElement &element) {
+    InstanceTerminals terminals;
+    terminals.Points = element.GetTerminals();
+    for (std::size_t terminal = 0; terminal < terminals.Points.size(); ++terminal) {
+        terminals.Inwards.push_back(element.GetTerminalInward(terminal));
     }
+    terminals.PinNames = static_cast<const Core::SubcircuitInstance &>(element.GetComponent()).GetPins();
+    return terminals;
+}
+
+/**
+ * @brief   Gives an instance the pins of the definition as it is now, and keeps the overrides of the parameters it
+ * still has.
+ */
+void UpdateInstance(UIElement &element, const SavedSubcircuit &definition) {
+    auto &instance = static_cast<Core::SubcircuitInstance &>(element.GetComponent());
     const auto overrides = instance.GetParameters();
     instance.ClearParameters();
     for (const auto &[parameter, value] : overrides) {
@@ -70,9 +83,33 @@ void RefreshInstance(UIElement &element,
         }
     }
     ApplyDefinitionPins(instance, definition);
-    const std::vector<GridPoint> new_terminals = element.GetTerminals();
-    KeepOffBlock(moves.Blocks, static_cast<const UISubcircuit &>(element));
+}
 
+/**
+ * @brief   Whether a pin went to another edge of its block, so stretching its wires could run them along the box.
+ */
+bool IsPinMovedToOtherEdge(const GridPoint old_point,
+                           const GridPoint new_point,
+                           const GridPoint old_inward,
+                           const GridPoint new_inward) {
+    return old_point != new_point && new_inward != old_inward;
+}
+
+/**
+ * @brief   Plans what happens to the wires on the terminals of one instance that was just updated.
+ * @param[in] element    The instance, already updated.
+ * @param[in] before     Its terminals before the update.
+ * @param[in] old_names  Names of the pins of the definition as they were.
+ * @param[in] matches    For each new pin, the index in old_names of the old pin it continues, if any.
+ * @return  The terminals whose wires follow them, those whose wires go, and the pins that need a new route; the
+ *          obstacles are left for the caller.
+ */
+TerminalMoves PlanTerminalMoves(const UIElement &element,
+                                const InstanceTerminals &before,
+                                const std::vector<std::string> &old_names,
+                                const std::vector<std::optional<std::size_t>> &matches) {
+    TerminalMoves moves;
+    const std::vector<GridPoint> new_terminals = element.GetTerminals();
     std::set<std::size_t> kept_terminals;
     for (std::size_t new_index = 0; new_index < matches.size(); ++new_index) {
         const std::optional<std::size_t> old_pin = matches[new_index];
@@ -80,26 +117,66 @@ void RefreshInstance(UIElement &element,
             continue;
         }
         // The terminal the old pin had on this instance, found by its name in case the instance is behind
-        const auto found = std::ranges::find(instance_pins, old_names[*old_pin]);
-        if (found == instance_pins.end()) {
+        const auto found = std::ranges::find(before.PinNames, old_names[*old_pin]);
+        if (found == before.PinNames.end()) {
             continue;
         }
-        const auto terminal = static_cast<std::size_t>(found - instance_pins.begin());
+        const auto terminal = static_cast<std::size_t>(found - before.PinNames.begin());
         kept_terminals.insert(terminal);
-        const GridPoint old_point = old_terminals[terminal];
+        const GridPoint old_point = before.Points[terminal];
         const GridPoint new_point = new_terminals[new_index];
-        if (old_point != new_point && element.GetTerminalInward(new_index) != old_inwards[terminal]) {
+        if (IsPinMovedToOtherEdge(old_point,
+                                  new_point,
+                                  before.Inwards[terminal],
+                                  element.GetTerminalInward(new_index))) {
             moves.Rerouted.push_back({.Block = &element, .OldPoint = old_point, .NewPoint = new_point});
         } else {
             moves.OldPoints.push_back(old_point);
             moves.NewPoints.push_back(new_point);
         }
     }
-    for (std::size_t terminal = 0; terminal < old_terminals.size(); ++terminal) {
+    for (std::size_t terminal = 0; terminal < before.Points.size(); ++terminal) {
         if (!kept_terminals.contains(terminal)) {
-            moves.Removed.push_back(old_terminals[terminal]);
+            moves.Removed.push_back(before.Points[terminal]);
         }
     }
+    return moves;
+}
+
+/**
+ * @brief   Adds the moves of one instance to those of the others.
+ */
+void AppendMoves(TerminalMoves &total, TerminalMoves instance) {
+    std::ranges::move(instance.OldPoints, std::back_inserter(total.OldPoints));
+    std::ranges::move(instance.NewPoints, std::back_inserter(total.NewPoints));
+    std::ranges::move(instance.Removed, std::back_inserter(total.Removed));
+    std::ranges::move(instance.Rerouted, std::back_inserter(total.Rerouted));
+}
+
+/**
+ * @brief   Moves the wires on the terminals of the instances as planned: those of pins that went away go, the others
+ *          follow their terminals, and a pin on another edge gets a new wire around the box.
+ */
+void ApplyTerminalMoves(const std::vector<std::unique_ptr<UIElement>> &elements,
+                        std::vector<UIWire> &wires,
+                        const TerminalMoves &moves) {
+    std::erase_if(wires, [&](const UIWire &wire) {
+        return std::ranges::contains(moves.Removed, wire.GetStart())
+            || std::ranges::contains(moves.Removed, wire.GetEnd());
+    });
+    wires = FollowTerminals(wires, moves.OldPoints, moves.NewPoints);
+    if (moves.Rerouted.empty()) {
+        return;
+    }
+    std::vector<WireLink> links;
+    for (const ReroutedPin &pin : moves.Rerouted) {
+        if (const std::optional<GridPoint> start = DetachFromBox(wires, pin.OldPoint, *pin.Block)) {
+            links.push_back({.From = *start, .To = pin.NewPoint});
+        } else {
+            wires = FollowTerminals(wires, {pin.OldPoint}, {pin.NewPoint});
+        }
+    }
+    std::ranges::copy(RouteLinks(elements, wires, moves.Blocks, links), std::back_inserter(wires));
 }
 
 } // namespace
@@ -258,27 +335,15 @@ std::expected<SavedSubcircuit, std::string> DrawDefinition(const std::vector<std
                                                            const Selection &selection,
                                                            const std::vector<SavedSubcircuit> &definitions,
                                                            SavedSubcircuit definition) {
-    std::vector<const UIElement *> copied_elements;
-    for (const std::size_t index : selection.Elements) {
-        copied_elements.push_back(elements[index].get());
-    }
-    std::vector<UIWire> copied_wires;
-    for (const std::size_t index : selection.Wires) {
-        copied_wires.push_back(wires[index]);
-    }
-    auto copied = CopyContent(copied_elements, copied_wires, definitions);
+    const SelectedItems selected = CollectSelected(elements, wires, selection);
+    auto copied = CopyContent(selected.Elements, selected.Wires, definitions);
     if (!copied) {
         return std::unexpected(copied.error());
     }
     definition.Elements = std::move(copied->Elements);
     definition.Wires = std::move(copied->Wires);
-    for (auto &element : definition.Elements) {
-        if (!Core::IsSubcircuitPin(element->GetComponent().GetType())) {
-            continue;
-        }
-        const GridPoint point = element->GetTerminals().front();
-        const auto pin = std::ranges::find(definition.Pins, point, &SavedSubcircuitPin::Point);
-        static_cast<Core::NetLabel &>(element->GetComponent()).SetNet(pin->Name);
+    if (auto named = NameMarkersAfterPins(definition.Elements, definition.Pins); !named) {
+        return std::unexpected(named.error());
     }
     if (const std::optional<std::string> problem =
             CheckPinNodes(Connectivity(definition.Elements, definition.Wires), definition.Pins)) {
@@ -345,29 +410,17 @@ void RefreshInstancesIn(std::vector<std::unique_ptr<UIElement>> &elements,
                         const std::vector<std::optional<std::size_t>> &matches) {
     TerminalMoves moves;
     for (auto &element : elements) {
-        if (element->GetComponent().GetType() == Core::ComponentType::SUBCIRCUIT
-            && static_cast<const Core::SubcircuitInstance &>(element->GetComponent()).GetDefinitionName()
-                   == definition.Name) {
-            RefreshInstance(*element, definition, old_names, matches, moves);
+        if (element->GetComponent().GetType() != Core::ComponentType::SUBCIRCUIT
+            || static_cast<const Core::SubcircuitInstance &>(element->GetComponent()).GetDefinitionName()
+                   != definition.Name) {
+            continue;
         }
+        const InstanceTerminals before = CaptureTerminals(*element);
+        UpdateInstance(*element, definition);
+        AppendMoves(moves, PlanTerminalMoves(*element, before, old_names, matches));
+        KeepOffBlock(moves.Blocks, static_cast<const UISubcircuit &>(*element));
     }
-    std::erase_if(wires, [&](const UIWire &wire) {
-        return std::ranges::contains(moves.Removed, wire.GetStart())
-            || std::ranges::contains(moves.Removed, wire.GetEnd());
-    });
-    wires = FollowTerminals(wires, moves.OldPoints, moves.NewPoints);
-    if (moves.Rerouted.empty()) {
-        return;
-    }
-    std::vector<WireLink> links;
-    for (const ReroutedPin &pin : moves.Rerouted) {
-        if (const std::optional<GridPoint> start = DetachFromBox(wires, pin.OldPoint, *pin.Block)) {
-            links.push_back({.From = *start, .To = pin.NewPoint});
-        } else {
-            wires = FollowTerminals(wires, {pin.OldPoint}, {pin.NewPoint});
-        }
-    }
-    std::ranges::copy(RouteLinks(elements, wires, moves.Blocks, links), std::back_inserter(wires));
+    ApplyTerminalMoves(elements, wires, moves);
 }
 
 } // namespace GUI

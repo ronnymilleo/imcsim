@@ -83,7 +83,7 @@ void BlockNavigator::EditSelectedBlock() {
  */
 void BlockNavigator::ApplyAndLeaveBlock() {
     EndDragOfShown();
-    FinishLevelChange(m_Session.Close(true));
+    FinishLevelChange(m_Session.ApplyAndClose());
 }
 
 /**
@@ -91,7 +91,7 @@ void BlockNavigator::ApplyAndLeaveBlock() {
  */
 void BlockNavigator::DiscardAndLeaveBlock() {
     EndDragOfShown();
-    FinishLevelChange(m_Session.Close(false));
+    FinishLevelChange(m_Session.DiscardAndClose());
 }
 
 /**

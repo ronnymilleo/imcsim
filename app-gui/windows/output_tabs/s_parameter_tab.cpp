@@ -67,24 +67,24 @@ void SParameterTab::Draw(PlotExporter &exporter) {
     }
     const SParameterView view = GetDisplayedView(*result);
     DrawControls(*result, exporter, view);
-    if (m_Quantity != SParameterQuantity::S
-        && CountAbsentFrequencies(*result, m_Quantity) == result->Frequencies.size()) {
+    switch (GetBody(*result, view)) {
+    case SParameterBody::NO_FREQUENCY:
         ShowWrapped(DescribeAbsentFrequencies(*result, m_Quantity));
-        return;
-    }
-    if (view == SParameterView::STABILITY) {
+        break;
+    case SParameterBody::NOTHING_CHECKED:
+        ImGui::TextDisabled("Check an entry of the matrix to plot it");
+        break;
+    case SParameterBody::STABILITY:
         m_Stability.Draw(m_View, m_IsFitting);
         m_IsFitting = false;
-        return;
-    }
-    if (GetShownSelection(view).ListShown().empty()) {
-        ImGui::TextDisabled("Check an entry of the matrix to plot it");
-        return;
-    }
-    if (view == SParameterView::SMITH) {
-        m_Smith.Draw(*result, GetShownSelection(view).ListShown(), m_Stability, m_IsFitting);
-    } else {
+        break;
+    case SParameterBody::SMITH:
+        m_Smith.Draw(*result, m_Selections.Get(m_Quantity, view).ListShown(), m_Stability, m_IsFitting);
+        break;
+    case SParameterBody::MAGNITUDE_PHASE:
+    default:
         DrawMagnitudePhase(*result, view);
+        break;
     }
 }
 
@@ -98,12 +98,8 @@ bool SParameterTab::CanExport() const {
     if (!result) {
         return false;
     }
-    if (m_Quantity != SParameterQuantity::S
-        && CountAbsentFrequencies(*result, m_Quantity) == result->Frequencies.size()) {
-        return false;
-    }
-    const SParameterView view = GetDisplayedView(*result);
-    return view == SParameterView::STABILITY || !GetShownSelection(view).ListShown().empty();
+    const SParameterBody body = GetBody(*result, GetDisplayedView(*result));
+    return body != SParameterBody::NO_FREQUENCY && body != SParameterBody::NOTHING_CHECKED;
 }
 
 /**
@@ -124,7 +120,7 @@ ExportFigure SParameterTab::BuildFigure(const bool is_table) const {
         return is_table ? BuildStabilityTableFigure(sweep)
                         : BuildStabilityFigure(sweep, ExportRange{.From = m_View.From, .To = m_View.To});
     }
-    const std::vector<SParameterEntry> entries = GetShownSelection(view).ListShown();
+    const std::vector<SParameterEntry> entries = m_Selections.Get(m_Quantity, view).ListShown();
     if (m_Quantity != SParameterQuantity::S) {
         return is_table ? BuildMatrixTableFigure(*result, entries, m_Quantity)
                         : BuildMatrixMagnitudePhaseFigure(*result,
@@ -149,11 +145,8 @@ ExportFigure SParameterTab::BuildFigure(const bool is_table) const {
  */
 void SParameterTab::StartResult(const Core::SParameters &result) {
     m_IsFitting = true;
-    if (m_Selection.GetPortCount() != result.GetPortCount()) {
-        m_Selection.Reset(result.GetPortCount());
-        m_SmithSelection.ResetToReflections(result.GetPortCount());
-        m_ImpedanceSelection.Reset(result.GetPortCount());
-        m_AdmittanceSelection.Reset(result.GetPortCount());
+    if (m_Selections.GetPortCount() != result.GetPortCount()) {
+        m_Selections.Reset(result.GetPortCount());
     }
     if (!IsQuantityAvailable(result, m_Quantity)) {
         m_Quantity = SParameterQuantity::S;
@@ -177,30 +170,10 @@ SParameterView SParameterTab::GetDisplayedView(const Core::SParameters &result) 
 }
 
 /**
- * @brief   The entries of the view shown: each view of S, and Z, and Y, keeps its own choice.
+ * @brief   What the body draws for the view shown, as ChooseBody() decides it from the entries checked.
  */
-SParameterSelection &SParameterTab::GetShownSelection(const SParameterView view) {
-    switch (m_Quantity) {
-    case SParameterQuantity::Z:
-        return m_ImpedanceSelection;
-    case SParameterQuantity::Y:
-        return m_AdmittanceSelection;
-    case SParameterQuantity::S:
-    default:
-        return view == SParameterView::SMITH ? m_SmithSelection : m_Selection;
-    }
-}
-
-const SParameterSelection &SParameterTab::GetShownSelection(const SParameterView view) const {
-    switch (m_Quantity) {
-    case SParameterQuantity::Z:
-        return m_ImpedanceSelection;
-    case SParameterQuantity::Y:
-        return m_AdmittanceSelection;
-    case SParameterQuantity::S:
-    default:
-        return view == SParameterView::SMITH ? m_SmithSelection : m_Selection;
-    }
+SParameterBody SParameterTab::GetBody(const Core::SParameters &result, const SParameterView view) const {
+    return ChooseBody(result, m_Quantity, view, !m_Selections.Get(m_Quantity, view).ListShown().empty());
 }
 
 /**
@@ -216,7 +189,7 @@ void SParameterTab::DrawControls(const Core::SParameters &result, PlotExporter &
     }
     if (view == SParameterView::MAGNITUDE_PHASE && m_Quantity != SParameterQuantity::S) {
         const std::string absent = DescribeAbsentFrequencies(result, m_Quantity);
-        if (!absent.empty() && CountAbsentFrequencies(result, m_Quantity) < result.Frequencies.size()) {
+        if (!absent.empty() && !AreAllFrequenciesAbsent(result, m_Quantity)) {
             ShowWrapped(absent);
         }
     }
@@ -316,14 +289,14 @@ void SParameterTab::DrawSelection(const Core::SParameters &result, const SParame
     const int port_count = result.GetPortCount();
     for (int row = 1; row <= port_count; ++row) {
         for (int column = 1; column <= port_count; ++column) {
-            bool is_shown = GetShownSelection(view).IsShown(row, column);
+            bool is_shown = m_Selections.Get(m_Quantity, view).IsShown(row, column);
             if (column > 1) {
                 ImGui::SameLine();
             }
             if (ImGui::Checkbox(
                     std::format("{}##entry_{}_{}", GetMatrixEntryName({row, column}, m_Quantity), row, column).c_str(),
                     &is_shown)) {
-                GetShownSelection(view).SetShown(row, column, is_shown);
+                m_Selections.Get(m_Quantity, view).SetShown(row, column, is_shown);
                 m_IsFitting = true;
             }
         }
@@ -334,7 +307,7 @@ void SParameterTab::DrawSelection(const Core::SParameters &result, const SParame
  * @brief   The magnitude plot over the phase plot, sharing the frequency axis.
  */
 void SParameterTab::DrawMagnitudePhase(const Core::SParameters &result, const SParameterView view) {
-    const std::vector<SParameterEntry> entries = GetShownSelection(view).ListShown();
+    const std::vector<SParameterEntry> entries = m_Selections.Get(m_Quantity, view).ListShown();
     // Worked out once, so the plots share the room instead of the second taking what the first left
     const float height = PlotHeight(2);
     DrawBodePlot(result, entries, false, height);

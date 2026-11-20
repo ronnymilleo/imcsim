@@ -175,7 +175,6 @@ private:
     void DrawCanvas(const CanvasFrame &frame);
     void DrawSchematicLayers(const CanvasFrame &frame, SchematicCanvas &canvas);
     void HandleModeInput(const CanvasFrame &frame, SchematicCanvas &canvas);
-    void HandleModeKeys();
     void DrawCanvasOverlays(const CanvasFrame &frame);
     std::optional<TimeSpan> GetWindowSpan() const;
     std::optional<double> GetShownInstant() const;

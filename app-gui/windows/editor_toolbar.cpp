@@ -11,7 +11,6 @@
 #include "spice/spice_value.h"
 #include "windows/tool_icons.h"
 #include <algorithm>
-#include <array>
 #include <format>
 #include <string>
 #include <utility>
@@ -144,20 +143,23 @@ private:
 std::optional<EditorMode> DrawToolButtons(const EditorMode &mode) {
     ToolButtonRow row;
     std::optional<EditorMode> picked;
-    if (row.Draw(
-            {.Id = "##select", .Icon = ToolIcon::SELECT, .IsActive = IsSelecting(mode), .Tooltip = "Select (Esc)"})) {
+    if (row.Draw({.Id = "##select",
+                  .Icon = ToolIcon::SELECT,
+                  .IsActive = IsSelecting(mode),
+                  .Tooltip = NameWithShortcut("Select", EditorCommand::START_SELECTING)})) {
         picked = SelectingMode{};
     }
     if (row.Draw({.Id = "##wire",
                   .Icon = ToolIcon::WIRE,
                   .IsActive = std::holds_alternative<WiringMode>(mode),
-                  .Tooltip = "Wire (W)"})) {
+                  .Tooltip = NameWithShortcut("Wire", EditorCommand::START_WIRING)})) {
         picked = WiringMode{};
     }
-    if (row.Draw({.Id = "##probe",
-                  .Icon = ToolIcon::PROBE,
-                  .IsActive = std::holds_alternative<ProbingMode>(mode),
-                  .Tooltip = "Probe (P): pick what the plots measure"})) {
+    if (row.Draw(
+            {.Id = "##probe",
+             .Icon = ToolIcon::PROBE,
+             .IsActive = std::holds_alternative<ProbingMode>(mode),
+             .Tooltip = NameWithShortcut("Probe", EditorCommand::START_PROBING) + ": pick what the plots measure"})) {
         picked = ProbingMode{};
     }
     return picked;
@@ -337,11 +339,11 @@ void EditorToolbar::DrawAnalysisButton() {
         ImGui::Separator();
         m_SettingsPanel.DrawSettings();
         ImGui::Separator();
-        // The popup has the focus, so F5 is checked here too; like the shortcut, it never stops a run
-        const RunAction action = m_Controls.GetRunAction();
-        if (PrimaryButton(GetRunButtonLabel(action).c_str())
-            || (action != RunAction::STOP && ImGui::IsKeyPressed(ImGuiKey_F5, false))) {
+        // The popup has the focus, so the run key is read here too
+        if (PrimaryButton(GetRunButtonLabel(m_Controls.GetRunAction()).c_str())) {
             m_Controls.PressRun();
+            ImGui::CloseCurrentPopup();
+        } else if (ImGui::IsKeyChordPressed(GetShortcutChord(EditorCommand::RUN)) && m_Controls.PressRunKey()) {
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();

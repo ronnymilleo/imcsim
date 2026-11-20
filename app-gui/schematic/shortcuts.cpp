@@ -68,6 +68,17 @@ constexpr std::array SHORTCUTS = {
                    .Chord = ImGuiMod_Ctrl | ImGuiKey_V,
                    .Label = IMCSIM_SHORTCUT "V",
                    .Scope = Scope::CANVAS},
+    EditorShortcut{.Command = EditorCommand::START_WIRING, .Chord = ImGuiKey_W, .Label = "W", .Scope = Scope::CANVAS},
+    EditorShortcut{.Command = EditorCommand::START_PROBING, .Chord = ImGuiKey_P, .Label = "P", .Scope = Scope::CANVAS},
+    EditorShortcut{.Command = EditorCommand::PLACE_NET_LABEL,
+                   .Chord = ImGuiKey_L,
+                   .Label = "L",
+                   .Scope = Scope::CANVAS},
+    // Each mode reads Esc itself, to leave it or to clear the selection
+    EditorShortcut{.Command = EditorCommand::START_SELECTING,
+                   .Chord = ImGuiKey_Escape,
+                   .Label = "Esc",
+                   .Scope = Scope::SELECTING},
     EditorShortcut{.Command = EditorCommand::ROTATE, .Chord = ImGuiKey_R, .Label = "R", .Scope = Scope::SELECTING},
     EditorShortcut{.Command = EditorCommand::MIRROR, .Chord = ImGuiKey_M, .Label = "M", .Scope = Scope::SELECTING},
     EditorShortcut{.Command = EditorCommand::FLIP,
@@ -113,6 +124,16 @@ const char *GetShortcutLabel(const EditorCommand command) {
         return shortcut.Command == command && shortcut.Label != nullptr;
     });
     return found == SHORTCUTS.end() ? nullptr : found->Label;
+}
+
+/**
+ * @brief   The keys of a command, for a place that reads them itself, such as a popup that has the focus.
+ * @param[in] command  Any command.
+ * @return  The chord of its first shortcut, or ImGuiKey_None, which no key press matches, for a command without one.
+ */
+ImGuiKeyChord GetShortcutChord(const EditorCommand command) {
+    const auto found = std::ranges::find(SHORTCUTS, command, &EditorShortcut::Command);
+    return found == SHORTCUTS.end() ? ImGuiKeyChord{ImGuiKey_None} : found->Chord;
 }
 
 /**

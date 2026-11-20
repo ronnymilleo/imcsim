@@ -95,24 +95,20 @@ void DrawCanvasItems(const ContextMenuServices &services,
  * @brief   A right click while selecting selects what is under the cursor and opens the menu of what it can do.
  * @param[in,out] schematic  Schematic on show, whose selection takes what the click landed on.
  * @param[in,out] mode       The mode of the editor; nothing happens outside selecting.
- * @param[in]     view       Pan and zoom of the canvas.
- * @param[in]     zoom       Pixels per grid unit.
- * @param[in]     hovered    Whether the cursor is over the canvas.
+ * @param[in]     pointer    Where the mouse is over the canvas.
  * @param[in,out] popover    Properties popover, placed so the Properties item opens it where a double click would.
  */
 void EditorContextMenu::HandleRightClick(Schematic &schematic,
                                          EditorMode &mode,
-                                         const ViewTransform &view,
-                                         const float zoom,
-                                         const bool hovered,
+                                         const CanvasPointer &pointer,
                                          PartPopover &popover) {
-    if (!IsSelecting(mode) || !hovered || !ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+    if (!IsSelecting(mode) || !pointer.IsHovered || !ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
         return;
     }
-    const ImVec2 cursor_world = view.ToWorld(ImGui::GetIO().MousePos);
+    const ImVec2 cursor_world = pointer.GetWorldPosition();
     // Right click keeps a group when it lands on one of its items; anywhere else it selects what is under the cursor
     const Selection picked =
-        PickAt(schematic.GetElements(), schematic.GetWires(), cursor_world, WIRE_PICK_DISTANCE / zoom);
+        PickAt(schematic.GetElements(), schematic.GetWires(), cursor_world, pointer.GetPickTolerance());
     const Selection current = {schematic.GetSelection().Elements, schematic.GetSelection().Wires};
     if (picked.Empty() || Joined(current, picked) != current) {
         ApplySelection(schematic, mode, picked);
@@ -121,7 +117,7 @@ void EditorContextMenu::HandleRightClick(Schematic &schematic,
                                      schematic.GetWires(),
                                      schematic.GetConnectivity(),
                                      cursor_world,
-                                     WIRE_PICK_DISTANCE / zoom);
+                                     pointer.GetPickTolerance());
     popover.Place();
     ImGui::OpenPopup(CONTEXT_MENU);
 }

@@ -46,13 +46,13 @@ std::optional<std::string> CheckOutputNode(const CompiledCircuit &compiled, cons
 }
 
 /**
- * @brief   Finds a source of the circuit by its name.
+ * @brief   Finds a source of the circuit by its name, in any case, as SPICE reads names.
  * @param[in] compiled  Compiled circuit with the sources by name.
  * @param[in] name      Name of the source.
  * @return  The source, which belongs to the circuit, or the refusal when there is none of that name.
  */
 std::expected<Device *, std::string> FindSourceByName(const CompiledCircuit &compiled, const std::string_view name) {
-    const auto found = compiled.SourcesByName.find(std::string(name));
+    const auto found = compiled.SourcesByName.find(name);
     if (found == compiled.SourcesByName.end()) {
         return std::unexpected(std::format("The circuit has no source named {}", name));
     }

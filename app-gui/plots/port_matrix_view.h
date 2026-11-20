@@ -45,6 +45,7 @@ std::optional<std::complex<double>> ReadMatrixValue(const Core::SParameters &res
 
 // Absent frequencies
 std::size_t CountAbsentFrequencies(const Core::SParameters &result, SParameterQuantity quantity);
+bool AreAllFrequenciesAbsent(const Core::SParameters &result, SParameterQuantity quantity);
 std::string DescribeAbsentFrequencies(const Core::SParameters &result, SParameterQuantity quantity);
 
 // Curves

@@ -66,6 +66,7 @@ add_executable(imcsim-tests
             logarithmic_level_tests.cpp
             logic_bus_definition_tests.cpp
             logic_bus_tests.cpp
+            logic_lane_plot_tests.cpp
             logic_outputs_tests.cpp
             logic_trace_tests.cpp
             math_channel_definition_tests.cpp
@@ -109,6 +110,7 @@ add_executable(imcsim-tests
             run_repeat_tests.cpp
             run_report_tests.cpp
             run_status_tests.cpp
+            s_parameter_choices_tests.cpp
             s_parameter_ports_tests.cpp
             s_parameter_view_tests.cpp
             s_parameters_tests.cpp
@@ -139,6 +141,7 @@ add_executable(imcsim-tests
             standard_values_tests.cpp
             statistics_table_tests.cpp
             statistics_widgets_tests.cpp
+            step_widgets_tests.cpp
             stepped_circuit_tests.cpp
             subcircuit_tests.cpp
             svg_writer_tests.cpp

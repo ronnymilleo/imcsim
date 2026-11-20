@@ -173,6 +173,17 @@ TEST_CASE("A current-controlled source built in code finds its control source wh
     CHECK_THAT(std::abs(point->NodeVoltages[3]), WithinAbs(2.0, 1e-6));
 }
 
+TEST_CASE("Two sources whose names differ only in case are refused as one name used twice", "[nodalys][parser]") {
+    Nodalys::CircuitBuilder builder;
+    builder.AddVdc("V1", 1, 0, 1.0);
+    builder.AddResistor("R1", 1, 0, 1e3);
+    builder.AddVdc("v1", 2, 0, 2.0);
+    builder.AddResistor("R2", 2, 0, 1e3);
+    const auto circuit = builder.Build();
+    REQUIRE_FALSE(circuit.has_value());
+    CHECK(circuit.error() == "v1: another source of the circuit has the same name");
+}
+
 TEST_CASE("A current-controlled source whose control is not a voltage source is refused, with both names",
           "[nodalys][parser]") {
     SECTION("A control source the netlist does not have") {
