@@ -34,6 +34,23 @@ bool Selection::Empty() const {
 }
 
 /**
+ * @brief   Picks consecutive elements and wires, such as those a paste just added.
+ * @param[in] elements  Indices of the elements to pick.
+ * @param[in] wires     Indices of the wires to pick.
+ * @return  Every index of both ranges; an empty range picks nothing of its kind.
+ */
+Selection MakeRangeSelection(const IndexRange elements, const IndexRange wires) {
+    Selection picked;
+    for (std::size_t index = elements.First; index < elements.First + elements.Count; ++index) {
+        picked.Elements.insert(index);
+    }
+    for (std::size_t index = wires.First; index < wires.First + wires.Count; ++index) {
+        picked.Wires.insert(index);
+    }
+    return picked;
+}
+
+/**
  * @brief   Picks what is under a point: one element or, when there is none, one wire.
  * @param[in] elements        Parts of the schematic.
  * @param[in] wires           Wires of the schematic.
@@ -115,14 +132,7 @@ Selection PickNode(const std::vector<UIWire> &wires, const Connectivity &connect
  * @return  All of them.
  */
 Selection PickAll(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires) {
-    Selection picked;
-    for (std::size_t index = 0; index < elements.size(); ++index) {
-        picked.Elements.insert(index);
-    }
-    for (std::size_t index = 0; index < wires.size(); ++index) {
-        picked.Wires.insert(index);
-    }
-    return picked;
+    return MakeRangeSelection({.First = 0, .Count = elements.size()}, {.First = 0, .Count = wires.size()});
 }
 
 /**

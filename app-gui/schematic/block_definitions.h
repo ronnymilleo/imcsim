@@ -19,6 +19,7 @@
 #include <memory>
 #include <optional>
 #include <set>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -32,6 +33,15 @@ namespace GUI {
 struct SubcircuitPinCandidate {
     GridPoint Point;
     std::string SuggestedName;
+};
+
+/**
+ * @struct  CopiedContent
+ * @brief   Parts and wires copied so they share nothing with the ones they came from.
+ */
+struct CopiedContent {
+    std::vector<std::unique_ptr<UIElement>> Elements;
+    std::vector<UIWire> Wires;
 };
 
 // Checking
@@ -56,9 +66,11 @@ std::expected<SavedSubcircuit, std::string> DrawDefinition(const std::vector<std
                                                            const Selection &selection,
                                                            const std::vector<SavedSubcircuit> &definitions,
                                                            SavedSubcircuit definition);
+std::expected<CopiedContent, std::string> CopyContent(std::span<const UIElement *const> elements,
+                                                      const std::vector<UIWire> &wires,
+                                                      std::span<const SavedSubcircuit> definitions);
 std::string DescribeDefinition(const SavedSubcircuit &definition);
 std::vector<SavedSubcircuit> CopyDefinitions(const std::vector<SavedSubcircuit> &definitions);
-std::string FindFreeName(const std::string &name, const std::vector<SavedSubcircuit> &definitions);
 
 // Instances
 void RefreshInstancesIn(std::vector<std::unique_ptr<UIElement>> &elements,

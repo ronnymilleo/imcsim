@@ -6,12 +6,55 @@
 #include "schematic/selection_editing.h"
 
 #include "schematic/group_editing.h"
+#include <algorithm>
 #include <cstddef>
+#include <iterator>
+#include <memory>
 #include <set>
 #include <utility>
 #include <vector>
 
 namespace GUI {
+
+namespace {
+
+/**
+ * @brief   The terminals of some parts, in the order of the parts.
+ */
+std::vector<GridPoint> ListTerminals(const std::vector<std::unique_ptr<UIElement>> &elements,
+                                     const std::set<std::size_t> &indices) {
+    std::vector<GridPoint> terminals;
+    for (const std::size_t index : indices) {
+        std::ranges::copy(elements[index]->GetTerminals(), std::back_inserter(terminals));
+    }
+    return terminals;
+}
+
+/**
+ * @brief   The terminals of a move of some parts, before it: where those of the parts that move are, and those of the
+ *          parts that stay; the new terminals are left for after the move.
+ */
+TerminalMove StartTerminalMove(const std::vector<std::unique_ptr<UIElement>> &elements,
+                               const std::set<std::size_t> &moved) {
+    TerminalMove terminals;
+    for (std::size_t index = 0; index < elements.size(); ++index) {
+        std::ranges::copy(elements[index]->GetTerminals(),
+                          std::back_inserter(moved.contains(index) ? terminals.Old : terminals.Fixed));
+    }
+    return terminals;
+}
+
+/**
+ * @brief   Puts the dragged parts where they started, moved by the delta.
+ */
+void MoveDraggedElements(Schematic &schematic, const GroupDrag &drag, const GridPoint delta) {
+    std::size_t position_index = 0;
+    for (const std::size_t index : drag.Elements) {
+        schematic.GetElement(index).SetPosition(drag.StartPositions[position_index++] + delta);
+    }
+}
+
+} // namespace
 
 /**
  * @brief   A drag keeps the positions of the items it moves, so deleting, cutting or undoing waits until it ends.
@@ -34,15 +77,10 @@ GroupDrag MakeDrag(const Schematic &schematic, const GridPoint cursor, std::opti
     drag.StartWires = schematic.GetWires();
     drag.CollapseTo = std::move(collapse_to);
     const auto &elements = schematic.GetElements();
-    for (std::size_t index = 0; index < elements.size(); ++index) {
-        const std::vector<GridPoint> terminals = elements[index]->GetTerminals();
-        if (drag.Elements.contains(index)) {
-            drag.StartPositions.push_back(elements[index]->GetPosition());
-            drag.StartTerminals.insert(drag.StartTerminals.end(), terminals.begin(), terminals.end());
-        } else {
-            drag.FixedTerminals.insert(drag.FixedTerminals.end(), terminals.begin(), terminals.end());
-        }
+    for (const std::size_t index : drag.Elements) {
+        drag.StartPositions.push_back(elements[index]->GetPosition());
     }
+    drag.StartTerminals = StartTerminalMove(elements, drag.Elements);
     if (drag.Elements.empty() && drag.Wires.size() == 1) {
         const UIWire &wire = drag.StartWires[*drag.Wires.begin()];
         drag.SlidesVertically = wire.GetStart().Y == wire.GetEnd().Y;
@@ -76,17 +114,11 @@ void UpdateDrag(Schematic &schematic, EditorMode &mode, const GridPoint cursor) 
         drag.CollapseTo.reset();
     }
 
-    std::vector<GridPoint> new_terminals;
-    std::size_t position_index = 0;
-    for (const std::size_t index : drag.Elements) {
-        UIElement &element = schematic.GetElement(index);
-        element.SetPosition(drag.StartPositions[position_index++] + delta);
-        const std::vector<GridPoint> terminals = element.GetTerminals();
-        new_terminals.insert(new_terminals.end(), terminals.begin(), terminals.end());
-    }
+    MoveDraggedElements(schematic, drag, delta);
+    TerminalMove terminals = drag.StartTerminals;
+    terminals.New = ListTerminals(schematic.GetElements(), drag.Elements);
     const PointTransform translation = {.Type = PointTransform::Kind::TRANSLATE, .Delta = delta, .Pivot = {}};
-    MovedWires moved =
-        MoveGroup(drag.StartWires, drag.Wires, drag.StartTerminals, new_terminals, drag.FixedTerminals, translation);
+    MovedWires moved = MoveGroup(drag.StartWires, drag.Wires, terminals, translation);
     schematic.SetWires(std::move(moved.Wires));
     schematic.SetSelection({.Elements = drag.Elements, .Wires = std::move(moved.Selected)});
     schematic.MarkModified();
@@ -119,9 +151,11 @@ void ApplySelection(Schematic &schematic, EditorMode &mode, const Selection &sel
 }
 
 /**
- * @brief   A drag belongs to the selection, so it ends with it, and so does a selection box.
+ * @brief   Deselects everything, as Esc does, and ends what was being done with the selection: a drag belongs to the
+ *          selection, so it ends with it, and so does a selection box.
+ * @details Schematic::ClearSelection() only deselects; this is the one the editor calls.
  */
-void ClearSelection(Schematic &schematic, EditorMode &mode) {
+void CancelSelection(Schematic &schematic, EditorMode &mode) {
     EndDrag(schematic, mode);
     if (auto *selecting = std::get_if<SelectingMode>(&mode)) {
         selecting->Box.reset();
@@ -162,23 +196,13 @@ void TransformSelection(Schematic &schematic,
                                       .Delta = {},
                                       .Pivot = FindPivot(elements, schematic.GetWires(), selected)};
 
-    std::vector<GridPoint> old_terminals;
-    std::vector<GridPoint> new_terminals;
-    std::vector<GridPoint> fixed_terminals;
-    for (std::size_t index = 0; index < elements.size(); ++index) {
-        const std::vector<GridPoint> before = elements[index]->GetTerminals();
-        if (!selected.Elements.contains(index)) {
-            fixed_terminals.insert(fixed_terminals.end(), before.begin(), before.end());
-            continue;
-        }
-        old_terminals.insert(old_terminals.end(), before.begin(), before.end());
+    TerminalMove terminals = StartTerminalMove(elements, selected.Elements);
+    for (const std::size_t index : selected.Elements) {
         TransformElement(schematic.GetElement(index), transform);
-        const std::vector<GridPoint> after = elements[index]->GetTerminals();
-        new_terminals.insert(new_terminals.end(), after.begin(), after.end());
     }
+    terminals.New = ListTerminals(elements, selected.Elements);
     if (!keep_wires) {
-        MovedWires moved =
-            MoveGroup(schematic.GetWires(), selected.Wires, old_terminals, new_terminals, fixed_terminals, transform);
+        MovedWires moved = MoveGroup(schematic.GetWires(), selected.Wires, terminals, transform);
         schematic.SetWires(std::move(moved.Wires));
         schematic.SetSelection({.Elements = selected.Elements, .Wires = std::move(moved.Selected)});
     }

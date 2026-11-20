@@ -7,12 +7,15 @@
 #include "schematic/spice_import.h"
 
 #include "circuit/components/subcircuit.h"
+#include "schematic/free_name.h"
 #include "spice/spice_text.h"
 #include <algorithm>
 #include <array>
 #include <cctype>
 #include <format>
+#include <functional>
 #include <set>
+#include <string_view>
 #include <utility>
 
 namespace GUI {
@@ -70,13 +73,12 @@ std::string MakeIdentifier(const std::string_view text, const std::string_view f
  */
 std::vector<SavedSubcircuitPin> SuggestSpicePins(const Core::LibrarySubcircuit &subcircuit) {
     std::vector<SavedSubcircuitPin> pins;
-    std::set<std::string> names;
+    std::set<std::string, std::less<>> names;
     for (const std::string &port : subcircuit.Ports) {
-        const std::string base = MakeIdentifier(port, "P");
-        std::string name = base;
-        for (int suffix = 2; !names.insert(name).second; ++suffix) {
-            name = std::format("{}_{}", base, suffix);
-        }
+        std::string name = FindFreeName(MakeIdentifier(port, "P"), [&names](const std::string_view candidate) {
+            return names.contains(candidate);
+        });
+        names.insert(name);
         pins.push_back({.Name = std::move(name), .Point = {}, .Side = SuggestSide(port)});
     }
     return pins;

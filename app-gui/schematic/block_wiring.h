@@ -45,10 +45,10 @@ std::optional<GridPoint> DetachFromBox(std::vector<UIWire> &wires, GridPoint old
 
 // Routing
 void KeepOffBlock(RoutingObstacles &obstacles, const UISubcircuit &block);
-std::vector<std::optional<std::vector<UIWire>>> RouteLinks(const std::vector<std::unique_ptr<UIElement>> &elements,
-                                                           const std::vector<UIWire> &wires,
-                                                           const RoutingObstacles &obstacles,
-                                                           const std::vector<WireLink> &links);
+std::vector<UIWire> RouteLinks(const std::vector<std::unique_ptr<UIElement>> &elements,
+                               const std::vector<UIWire> &wires,
+                               const RoutingObstacles &obstacles,
+                               const std::vector<WireLink> &links);
 
 } // namespace GUI
 

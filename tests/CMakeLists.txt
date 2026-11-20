@@ -18,6 +18,7 @@ add_executable(imcsim-tests
             block_library_tests.cpp
             block_nesting_tests.cpp
             block_session_tests.cpp
+            block_wiring_tests.cpp
             canvas_view_tests.cpp
             check_ac_sweep_tests.cpp
             check_dc_sweep_tests.cpp
@@ -45,6 +46,7 @@ add_executable(imcsim-tests
             engine_cross_validation_tests.cpp
             examples_tests.cpp
             file_json_tests.cpp
+            free_name_tests.cpp
             fuse_blow_tracker_tests.cpp
             fuse_tests.cpp
             glow_falloff_tests.cpp

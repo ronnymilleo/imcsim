@@ -266,8 +266,7 @@ std::expected<SavedSubcircuit, std::string> DrawDefinition(const std::vector<std
     for (const std::size_t index : selection.Wires) {
         copied_wires.push_back(wires[index]);
     }
-    // The blocks the selection places go along, so their instances read back
-    auto copied = LoadSchematic(SaveParts(copied_elements, copied_wires, definitions));
+    auto copied = CopyContent(copied_elements, copied_wires, definitions);
     if (!copied) {
         return std::unexpected(copied.error());
     }
@@ -289,6 +288,25 @@ std::expected<SavedSubcircuit, std::string> DrawDefinition(const std::vector<std
 }
 
 /**
+ * @brief   Copies parts and wires into ones that share nothing with them, as the contents of a block need.
+ * @details The copy goes through the text of a file, which copies the parts deeply; the blocks they place go along,
+ *          so their instances read back.
+ * @param[in] elements     Parts to copy, which stay as they are.
+ * @param[in] wires        Wires to copy.
+ * @param[in] definitions  Blocks the parts may place.
+ * @return  The copies, in the same order; the reason when the text cannot be read back.
+ */
+std::expected<CopiedContent, std::string> CopyContent(const std::span<const UIElement *const> elements,
+                                                      const std::vector<UIWire> &wires,
+                                                      const std::span<const SavedSubcircuit> definitions) {
+    auto loaded = LoadSchematic(SaveParts(elements, wires, definitions));
+    if (!loaded) {
+        return std::unexpected(loaded.error());
+    }
+    return CopiedContent{.Elements = std::move(loaded->Elements), .Wires = std::move(loaded->Wires)};
+}
+
+/**
  * @brief   Writes a definition as text, so two definitions of one name can be told equal or not.
  * @param[in] definition  The definition to describe.
  * @return  The text of a file that holds only that definition.
@@ -305,21 +323,6 @@ std::string DescribeDefinition(const SavedSubcircuit &definition) {
 std::vector<SavedSubcircuit> CopyDefinitions(const std::vector<SavedSubcircuit> &definitions) {
     auto loaded = LoadSchematic(SaveSchematic({}, {}, {}, {}, definitions));
     return loaded ? std::move(loaded->Subcircuits) : std::vector<SavedSubcircuit>{};
-}
-
-/**
- * @brief   Finds a name no definition has yet, from the one a pasted definition came with.
- * @param[in] name         The name the pasted definition came with.
- * @param[in] definitions  The definitions already here.
- * @return  The name with a suffix such as "_2", the first that is free.
- */
-std::string FindFreeName(const std::string &name, const std::vector<SavedSubcircuit> &definitions) {
-    for (int suffix = 2;; ++suffix) {
-        std::string candidate = std::format("{}_{}", name, suffix);
-        if (!std::ranges::contains(definitions, candidate, &SavedSubcircuit::Name)) {
-            return candidate;
-        }
-    }
 }
 
 /**
@@ -364,16 +367,7 @@ void RefreshInstancesIn(std::vector<std::unique_ptr<UIElement>> &elements,
             wires = FollowTerminals(wires, {pin.OldPoint}, {pin.NewPoint});
         }
     }
-    const auto routed = RouteLinks(elements, wires, moves.Blocks, links);
-    for (std::size_t index = 0; index < links.size(); ++index) {
-        if (const std::optional<std::vector<UIWire>> &path = routed[index]) {
-            std::ranges::copy(*path, std::back_inserter(wires));
-        } else {
-            const GridPoint bend = {links[index].To.X, links[index].From.Y};
-            wires.emplace_back(links[index].From, bend);
-            wires.emplace_back(bend, links[index].To);
-        }
-    }
+    std::ranges::copy(RouteLinks(elements, wires, moves.Blocks, links), std::back_inserter(wires));
 }
 
 } // namespace GUI

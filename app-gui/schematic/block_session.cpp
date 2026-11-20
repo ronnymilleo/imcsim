@@ -7,11 +7,57 @@
 
 #include "circuit/components/net_label.h"
 #include "schematic/block_nesting.h"
+#include "schematic/free_name.h"
 #include <algorithm>
+#include <functional>
 #include <set>
+#include <span>
+#include <string_view>
 #include <utility>
 
 namespace GUI {
+
+namespace {
+
+/// The name a new block is offered first, numbered as "block_2" and so on when blocks have it.
+constexpr std::string_view NEW_BLOCK_NAME = "block";
+
+/**
+ * @brief   One pin per marker the selection offers, named as the marker suggests.
+ */
+std::vector<SavedSubcircuitPin> PinsFromCandidates(const std::vector<SubcircuitPinCandidate> &candidates) {
+    std::vector<SavedSubcircuitPin> pins;
+    for (const SubcircuitPinCandidate &candidate : candidates) {
+        pins.push_back({candidate.SuggestedName, candidate.Point});
+    }
+    return pins;
+}
+
+/**
+ * @brief   Whether applying an open block would change the document: its contents were edited, or its settings differ
+ *          from its definition there.
+ * @details A block opened and closed without a change leaves the document unmodified, so this is false then.
+ */
+bool IsBlockChanged(const OpenBlock &block, const std::vector<SavedSubcircuit> &definitions) {
+    const BlockSettings &settings = block.Settings;
+    const auto definition = std::ranges::find(definitions, settings.Name, &SavedSubcircuit::Name);
+    return block.Content->IsModified() || definition == definitions.end() || definition->Pins != settings.Pins
+        || definition->Parameters != settings.Parameters;
+}
+
+/**
+ * @brief   Applies a change the document took to the copies of it that some open blocks hold.
+ * @details Every copy holds the same blocks as the document, so the change the document took applies to them alike,
+ *          and a refusal there could only repeat one the document already gave; the result is not looked at.
+ */
+void PropagateToOpenBlocks(const std::span<OpenBlock> blocks,
+                           const std::function<std::expected<void, std::string>(Schematic &)> &update) {
+    for (OpenBlock &block : blocks) {
+        static_cast<void>(update(*block.Content));
+    }
+}
+
+} // namespace
 
 /**
  * @brief   Starts a session on the document, with no block open.
@@ -107,22 +153,13 @@ void BlockSession::RequestCreate() {
     if (IsOpen()) {
         return;
     }
-    auto candidates = m_Root.GetSubcircuitPinCandidates();
-    m_NewBlock.Name = "block";
-    while (std::ranges::find(m_Root.GetSubcircuits(), m_NewBlock.Name, &SavedSubcircuit::Name)
-           != m_Root.GetSubcircuits().end()) {
-        m_NewBlock.Name += "_2";
-    }
-    m_NewBlock.Pins.clear();
+    const auto candidates = m_Root.GetSubcircuitPinCandidates();
+    m_NewBlock.Name = FindFreeName(NEW_BLOCK_NAME, [this](const std::string_view name) {
+        return std::ranges::contains(m_Root.GetSubcircuits(), name, &SavedSubcircuit::Name);
+    });
+    m_NewBlock.Pins = candidates ? PinsFromCandidates(*candidates) : std::vector<SavedSubcircuitPin>{};
     m_NewBlock.Parameters.clear();
-    m_Error.clear();
-    if (candidates) {
-        for (const auto &candidate : *candidates) {
-            m_NewBlock.Pins.push_back({candidate.SuggestedName, candidate.Point});
-        }
-    } else {
-        m_Error = candidates.error();
-    }
+    m_Error = candidates ? std::string{} : candidates.error();
     m_IsDialogRequested = true;
 }
 
@@ -130,70 +167,40 @@ void BlockSession::RequestCreate() {
  * @brief   Opens a block of the document one level down: the way back up keeps the path, and the block it leaves keeps
  *          its settings until the editor comes back to it.
  * @param[in] name  A block of the document.
- * @return  True when it opened; false leaves the reason in GetError() and asks for the dialog.
+ * @return  Nothing once it opened; the reason otherwise, with nothing opened, which ReportError() can show.
  * @note    The block must have drawn contents, so a SPICE block is not opened here.
  */
-bool BlockSession::Open(const std::string &name) {
+std::expected<void, std::string> BlockSession::Open(const std::string &name) {
     auto content = m_Root.OpenSubcircuit(name);
     if (!content) {
-        m_Error = content.error();
-        m_IsDialogRequested = true;
-        return false;
+        return std::unexpected(content.error());
     }
     const SavedSubcircuit *definition = FindDefinition(name);
     m_OpenBlocks.push_back(
         {.Content = std::move(*content),
          .Settings = {.Name = name, .Pins = definition->Pins, .Parameters = definition->Parameters}});
-    return true;
+    return {};
 }
 
 /**
  * @brief   Closes the innermost open block, applying it to the document or dropping its changes.
  * @details Applied, it is one undo step of the document, and the blocks still open take it too, since they may hold
- *          instances of it. When it cannot be applied it stays open with the reason.
+ *          instances of it. When it cannot be applied it stays open.
  * @param[in] apply  Whether to apply the contents and the settings, or drop them.
- * @return  True when a block closed, so the editor shows the level above it.
+ * @return  Nothing once a block closed, so the editor shows the level above it; the reason otherwise, which
+ *          ReportError() can show: no block is open, or the block cannot be applied and stays open.
  */
-bool BlockSession::Close(const bool apply) {
+std::expected<void, std::string> BlockSession::Close(const bool apply) {
     if (!IsOpen()) {
-        return false;
+        return std::unexpected("No block is open");
     }
-    const OpenBlock &block = m_OpenBlocks.back();
-    const BlockSettings &settings = block.Settings;
     if (apply) {
-        if (!SyncPins()) {
-            m_IsDialogRequested = true;
-            return false;
-        }
-        // A block opened and closed without a change leaves the document unmodified
-        const auto definition = std::ranges::find(m_Root.GetSubcircuits(), settings.Name, &SavedSubcircuit::Name);
-        const bool is_changed = block.Content->IsModified() || definition == m_Root.GetSubcircuits().end()
-                             || definition->Pins != settings.Pins || definition->Parameters != settings.Parameters;
-        if (is_changed) {
-            auto updated = m_Root.UpdateSubcircuit(settings.Name, *block.Content, settings.Pins, settings.Parameters);
-            if (!updated) {
-                m_Error = updated.error();
-                m_IsDialogRequested = true;
-                return false;
-            }
-            m_Root.CommitUndoStep();
-            // Every copy holds the same blocks as the document, so they take it as the document did
-            for (std::size_t level = 0; level + 1 < m_OpenBlocks.size(); ++level) {
-                static_cast<void>(m_OpenBlocks[level].Content->UpdateSubcircuit(settings.Name,
-                                                                                *block.Content,
-                                                                                settings.Pins,
-                                                                                settings.Parameters));
-            }
+        if (auto applied = ApplyInnermost(); !applied) {
+            return applied;
         }
     }
-    std::string closed_name = settings.Name;
-    m_OpenBlocks.pop_back();
-    if (!IsOpen()) {
-        // Back at the schematic the dialog has no pins or parameters to offer until a block is made, and the name
-        // stays the one last shown
-        m_NewBlock = {.Name = std::move(closed_name), .Pins = {}, .Parameters = {}};
-    }
-    return true;
+    LeaveInnermost();
+    return {};
 }
 
 /**
@@ -210,22 +217,21 @@ BlockSession::ApplySpiceUpdate(const std::string &name,
     }
     m_Root.CommitUndoStep();
     // The open blocks hold copies of it, whose instances follow it as the document's do
-    for (OpenBlock &block : m_OpenBlocks) {
-        static_cast<void>(block.Content->UpdateSpiceSubcircuit(name, pins, parameters));
-    }
+    PropagateToOpenBlocks(m_OpenBlocks,
+                          [&](Schematic &copy) { return copy.UpdateSpiceSubcircuit(name, pins, parameters); });
     return {};
 }
 
 /**
  * @brief   Brings the pins of the settings in step with the pin markers of the open block: pins whose marker is gone
  *          drop out, the order of the others stays, and new markers join at the end.
- * @return  False, with the reason in GetError(), when the markers cannot be read.
+ * @return  Nothing once the pins follow the markers; the reason when the markers cannot be read, with the pins
+ *          unchanged, which ReportError() can show.
  */
-bool BlockSession::SyncPins() {
+std::expected<void, std::string> BlockSession::SyncPins() {
     auto markers = m_OpenBlocks.back().Content->GetSubcircuitPinMarkers();
     if (!markers) {
-        m_Error = markers.error();
-        return false;
+        return std::unexpected(markers.error());
     }
     BlockSettings &settings = m_OpenBlocks.back().Settings;
     std::vector<SavedSubcircuitPin> synchronized;
@@ -243,7 +249,7 @@ bool BlockSession::SyncPins() {
         }
     }
     settings.Pins = std::move(synchronized);
-    return true;
+    return {};
 }
 
 /**
@@ -315,6 +321,15 @@ std::string &BlockSession::GetError() {
 }
 
 /**
+ * @brief   Shows why something the editor asked for failed, in the settings dialog, which opens on the next frame.
+ * @param[in] reason  The reason, as Open(), Close() or SyncPins() return it.
+ */
+void BlockSession::ReportError(std::string reason) {
+    m_Error = std::move(reason);
+    m_IsDialogRequested = true;
+}
+
+/**
  * @brief   Asks for the settings dialog to open on the next frame.
  */
 void BlockSession::RequestDialog() {
@@ -326,6 +341,44 @@ void BlockSession::RequestDialog() {
  */
 bool BlockSession::TakeDialogRequest() {
     return std::exchange(m_IsDialogRequested, false);
+}
+
+/**
+ * @brief   Applies the innermost open block to the document as one undo step, and to the blocks open around it, which
+ *          may hold instances of it.
+ * @return  Nothing once applied, or when nothing changed; the reason otherwise, with the document unchanged.
+ */
+std::expected<void, std::string> BlockSession::ApplyInnermost() {
+    if (auto synced = SyncPins(); !synced) {
+        return synced;
+    }
+    const OpenBlock &block = m_OpenBlocks.back();
+    if (!IsBlockChanged(block, m_Root.GetSubcircuits())) {
+        return {};
+    }
+    const BlockSettings &settings = block.Settings;
+    const auto update = [&](Schematic &target) {
+        return target.UpdateSubcircuit(settings.Name, *block.Content, settings.Pins, settings.Parameters);
+    };
+    if (auto updated = update(m_Root); !updated) {
+        return updated;
+    }
+    m_Root.CommitUndoStep();
+    PropagateToOpenBlocks(std::span(m_OpenBlocks).first(m_OpenBlocks.size() - 1), update);
+    return {};
+}
+
+/**
+ * @brief   Drops the innermost open block, so the level above it is shown.
+ * @details Back at the schematic the dialog has no pins or parameters to offer until a block is made, and the name
+ *          stays the one last shown.
+ */
+void BlockSession::LeaveInnermost() {
+    std::string closed_name = std::move(m_OpenBlocks.back().Settings.Name);
+    m_OpenBlocks.pop_back();
+    if (!IsOpen()) {
+        m_NewBlock = {.Name = std::move(closed_name), .Pins = {}, .Parameters = {}};
+    }
 }
 
 /**

@@ -43,7 +43,7 @@ void SwitchMode(EditorMode &current, EditorMode next, Schematic &schematic, cons
         placing != nullptr && !placing->Block.empty() && !blocks.CanPlaceBlock(placing->Block)) {
         return;
     }
-    ClearSelection(schematic, current);
+    CancelSelection(schematic, current);
     if (std::holds_alternative<WiringMode>(next) && std::holds_alternative<WiringMode>(current)) {
         return;
     }
@@ -122,14 +122,10 @@ std::optional<std::string> PlacePastedGroup(Schematic &root, BlockSession &block
     for (const UIWire &wire : group.Wires) {
         schematic.AddWire(wire.GetStart(), wire.GetEnd());
     }
-    Selection pasted;
-    for (std::size_t index = first_element; index < schematic.GetElements().size(); ++index) {
-        pasted.Elements.insert(index);
-    }
-    for (std::size_t index = first_wire; index < schematic.GetWires().size(); ++index) {
-        pasted.Wires.insert(index);
-    }
-    schematic.SetSelection(std::move(pasted));
+    // A wire of no length is not added, so the wires added are counted rather than taken from the group
+    schematic.SetSelection(
+        MakeRangeSelection({.First = first_element, .Count = schematic.GetElements().size() - first_element},
+                           {.First = first_wire, .Count = schematic.GetWires().size() - first_wire}));
     return std::nullopt;
 }
 

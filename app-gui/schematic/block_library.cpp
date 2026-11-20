@@ -9,9 +9,11 @@
 #include "schematic/block_definitions.h"
 #include "schematic/block_nesting.h"
 #include "schematic/connectivity.h"
+#include "schematic/free_name.h"
 #include "schematic/subcircuit_pins.h"
 #include <algorithm>
 #include <format>
+#include <string_view>
 #include <utility>
 
 namespace GUI {
@@ -33,18 +35,6 @@ std::shared_ptr<Core::SubcircuitDefinition> BuildDefinition(const SavedSubcircui
     }
     definition->Body = BuildCircuit(saved.Elements, connectivity);
     return definition;
-}
-
-/**
- * @brief   The first name such as "1N4148_2" that no model has yet, for a model that differs from one of its name.
- */
-std::string FindFreeModelName(const std::string &name, const std::vector<Core::LibraryModel> &models) {
-    for (int suffix = 2;; ++suffix) {
-        std::string candidate = std::format("{}_{}", name, suffix);
-        if (!std::ranges::contains(models, candidate, &Core::LibraryModel::Name)) {
-            return candidate;
-        }
-    }
 }
 
 void RenameModelUsers(std::vector<std::unique_ptr<UIElement>> &users,
@@ -166,8 +156,9 @@ BlockLibrary::UpdateDrawn(const std::string &name,
     if (auto valid = ValidateExpressions(elements, parameters); !valid) {
         return std::unexpected(valid.error());
     }
-    // The text of a file copies the parts deeply; the blocks they place go along, so their instances read back
-    auto copied = LoadSchematic(SaveSchematic(elements, wires, {}, {}, m_Subcircuits));
+    std::vector<const UIElement *> parts(elements.size());
+    std::ranges::transform(elements, parts.begin(), &std::unique_ptr<UIElement>::get);
+    auto copied = CopyContent(parts, wires, m_Subcircuits);
     if (!copied) {
         return std::unexpected(copied.error());
     }
@@ -237,7 +228,9 @@ MergeResult BlockLibrary::MergeSubcircuits(std::vector<SavedSubcircuit> definiti
         }
         if (existing != m_Subcircuits.end()) {
             const std::string old_name = definition.Name;
-            definition.Name = FindFreeName(old_name, m_Subcircuits);
+            definition.Name = FindFreeName(old_name, [this](const std::string_view candidate) {
+                return std::ranges::contains(m_Subcircuits, candidate, &SavedSubcircuit::Name);
+            });
             RenameBlockInstances(instances, old_name, definition.Name);
             for (SavedSubcircuit &other : definitions) {
                 RenameBlockInstances(other.Elements, old_name, definition.Name);
@@ -270,7 +263,9 @@ MergeResult BlockLibrary::MergeLibraryModels(std::vector<Core::LibraryModel> mod
             continue;
         }
         if (existing != m_LibraryModels.end()) {
-            const std::string free_name = FindFreeModelName(model.Name, m_LibraryModels);
+            const std::string free_name = FindFreeName(model.Name, [this](const std::string_view candidate) {
+                return std::ranges::contains(m_LibraryModels, candidate, &Core::LibraryModel::Name);
+            });
             RenameModelUsers(elements, model.Name, free_name);
             for (SavedSubcircuit &definition : definitions) {
                 RenameModelUsers(definition.Elements, model.Name, free_name);

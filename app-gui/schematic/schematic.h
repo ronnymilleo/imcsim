@@ -31,6 +31,8 @@
 
 namespace GUI {
 
+class UISubcircuit;
+
 /**
  * @class   Schematic
  * @brief   The circuit being edited, owned by the application and shared by the windows that show or edit it.
@@ -228,7 +230,11 @@ private:
 
     void InvalidateDerivedData();
     void FollowDefinitionChange(const DefinitionChange &change);
-    void WireNewBlock(const std::vector<GridPoint> &old_points);
+    std::expected<void, std::string> CheckNewBlock(const std::string &name,
+                                                   const std::vector<SavedSubcircuitPin> &pins,
+                                                   const std::vector<Core::SubcircuitParameter> &parameters) const;
+    void PlaceBlockInstance(std::unique_ptr<UIElement> instance, const std::vector<GridPoint> &old_points);
+    void WireNewBlock(const UISubcircuit &block, const std::vector<GridPoint> &old_points);
     std::string TakeSnapshot() const;
     void RestoreSnapshot(const std::string &snapshot);
     void ResetHistory();
