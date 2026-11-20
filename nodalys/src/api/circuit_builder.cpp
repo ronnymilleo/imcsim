@@ -233,13 +233,20 @@ std::optional<NodeId> ReadExpressionNode(const std::string &text) {
 }
 
 /**
- * @brief   Finds the voltage source an expression reads the current of, whatever the case of the name.
+ * @brief   Finds the voltage source that an element reads the current of, whatever the case of the name, since SPICE
+ *          names are case-insensitive.
+ * @details Both the i(Vx) inputs of a behavioral source and the control of a CCCS or CCVS go through here, so the two
+ *          read a source by the same rule, the one ngspice follows.
+ * @param[in] sources  Sources of the circuit by name.
+ * @param[in] name     Name of the source, in any case.
+ * @return  The voltage source, which belongs to the circuit, or null when no source has that name or the source of
+ *          that name is not a voltage source.
  */
-VoltageSourceDevice *FindVoltageSource(const std::map<std::string, Device *> &sources, const std::string &name) {
+const VoltageSourceDevice *FindVoltageSource(const std::map<std::string, Device *> &sources, const std::string &name) {
     const std::string wanted = ToLower(name);
     for (const auto &[source_name, device] : sources) {
-        if (source_name == name || ToLower(source_name) == wanted) {
-            return dynamic_cast<VoltageSourceDevice *>(device);
+        if (ToLower(source_name) == wanted) {
+            return dynamic_cast<const VoltageSourceDevice *>(device);
         }
     }
     return nullptr;
@@ -1166,21 +1173,6 @@ private:
     }
 
     /**
-     * @brief   Finds the branch unknown of the voltage source that a current-controlled source reads.
-     * @param[in] source_name  Name of the controlling source, as written, so the case matters.
-     * @return  The branch, or nothing when no voltage source has that name.
-     */
-    std::optional<int> ResolveControlBranch(const std::string &source_name) const {
-        const auto it = m_Compiled.SourcesByName.find(source_name);
-        if (it != m_Compiled.SourcesByName.end()) {
-            if (const auto *source = dynamic_cast<const VoltageSourceDevice *>(it->second)) {
-                return source->GetBranch();
-            }
-        }
-        return std::nullopt;
-    }
-
-    /**
      * @brief   Maps the five terminals of an op-amp to their unknowns.
      */
     OpAmpTerminals MapOpAmpTerminals(NodeId out, NodeId in_pos, NodeId in_neg, NodeId vcc_pos, NodeId vcc_neg) const {
@@ -1478,14 +1470,14 @@ private:
 
     void BindControlBranches() {
         for (const PendingControl &control : m_PendingControls) {
-            const std::optional<int> branch = ResolveControlBranch(control.Source);
-            if (!branch) {
+            const VoltageSourceDevice *source = FindVoltageSource(m_Compiled.SourcesByName, control.Source);
+            if (source == nullptr) {
                 m_Errors.push_back(std::format("{}: its control source {} is not a voltage source of the circuit",
                                                control.Owner,
                                                control.Source));
                 continue;
             }
-            control.Bind(*branch);
+            control.Bind(source->GetBranch());
         }
         m_PendingControls.clear();
     }

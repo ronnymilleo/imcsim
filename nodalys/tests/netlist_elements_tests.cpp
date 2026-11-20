@@ -145,6 +145,34 @@ TEST_CASE("A current-controlled source finds its control source on a later line 
     CHECK_THAT(std::abs(point->NodeVoltages[3]), WithinAbs(2.0, 1e-6));
 }
 
+TEST_CASE("A current-controlled source and a behavioral source find their voltage source whatever the case",
+          "[nodalys][parser]") {
+    // Vsense carries the 1 mA that V1 drives through R1, and each reader turns it into 2 V on its 1k load
+    const std::string_view element =
+        GENERATE(as<std::string_view>{}, "F1 3 0 VSENSE 2", "H1 3 0 vsense 2k", "B1 3 0 V=2k*i(VSENSE)");
+    CAPTURE(element);
+    const auto parsed = Nodalys::ParseNetlist(
+        std::format("* case\n{}\nRload 3 0 1k\nV1 1 0 1\nR1 1 2 1k\nVsense 2 0 0\n.op\n.end\n", element));
+    REQUIRE(parsed.has_value());
+    const auto point = Nodalys::ComputeOperatingPoint(parsed->CircuitInstance);
+    REQUIRE(point.has_value());
+    CHECK_THAT(std::abs(point->NodeVoltages[3]), WithinAbs(2.0, 1e-6));
+}
+
+TEST_CASE("A current-controlled source built in code finds its control source whatever the case", "[nodalys][parser]") {
+    Nodalys::CircuitBuilder builder;
+    builder.AddVdc("V1", 1, 0, 1.0);
+    builder.AddResistor("R1", 1, 2, 1e3);
+    builder.AddVdc("Vsense", 2, 0, 0.0);
+    builder.AddCccs("F1", 3, 0, "VSENSE", 2.0);
+    builder.AddResistor("Rload", 3, 0, 1e3);
+    const auto circuit = builder.Build();
+    REQUIRE(circuit.has_value());
+    const auto point = Nodalys::ComputeOperatingPoint(*circuit);
+    REQUIRE(point.has_value());
+    CHECK_THAT(std::abs(point->NodeVoltages[3]), WithinAbs(2.0, 1e-6));
+}
+
 TEST_CASE("A current-controlled source whose control is not a voltage source is refused, with both names",
           "[nodalys][parser]") {
     SECTION("A control source the netlist does not have") {
