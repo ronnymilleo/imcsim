@@ -35,7 +35,7 @@ enum class ShortcutScope {
     VIEW,
     /// While the editor window itself has the focus and no text field takes the keys.
     CANVAS,
-    /// Read by the selecting mode itself, whatever other modifier is held; listed here for their labels.
+    /// Read by the modes themselves, whatever other modifier is held; listed here for their labels.
     SELECTING
 };
 

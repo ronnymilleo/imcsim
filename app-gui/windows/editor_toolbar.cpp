@@ -143,20 +143,23 @@ private:
 std::optional<EditorMode> DrawToolButtons(const EditorMode &mode) {
     ToolButtonRow row;
     std::optional<EditorMode> picked;
-    if (row.Draw(
-            {.Id = "##select", .Icon = ToolIcon::SELECT, .IsActive = IsSelecting(mode), .Tooltip = "Select (Esc)"})) {
+    if (row.Draw({.Id = "##select",
+                  .Icon = ToolIcon::SELECT,
+                  .IsActive = IsSelecting(mode),
+                  .Tooltip = NameWithShortcut("Select", EditorCommand::START_SELECTING)})) {
         picked = SelectingMode{};
     }
     if (row.Draw({.Id = "##wire",
                   .Icon = ToolIcon::WIRE,
                   .IsActive = std::holds_alternative<WiringMode>(mode),
-                  .Tooltip = "Wire (W)"})) {
+                  .Tooltip = NameWithShortcut("Wire", EditorCommand::START_WIRING)})) {
         picked = WiringMode{};
     }
-    if (row.Draw({.Id = "##probe",
-                  .Icon = ToolIcon::PROBE,
-                  .IsActive = std::holds_alternative<ProbingMode>(mode),
-                  .Tooltip = "Probe (P): pick what the plots measure"})) {
+    if (row.Draw(
+            {.Id = "##probe",
+             .Icon = ToolIcon::PROBE,
+             .IsActive = std::holds_alternative<ProbingMode>(mode),
+             .Tooltip = NameWithShortcut("Probe", EditorCommand::START_PROBING) + ": pick what the plots measure"})) {
         picked = ProbingMode{};
     }
     return picked;

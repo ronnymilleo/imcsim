@@ -93,3 +93,10 @@ TEST_CASE("Only the document and editing keys take the global route", "[shortcut
     CHECK(GUI::GetShortcutRoute(ShortcutScope::VIEW) == ImGuiInputFlags_None);
     CHECK(GUI::GetShortcutRoute(ShortcutScope::CANVAS) == ImGuiInputFlags_None);
 }
+
+TEST_CASE("The keys that start a mode are named from the table", "[shortcuts]") {
+    CHECK(GUI::NameWithShortcut("Wire", GUI::EditorCommand::START_WIRING) == "Wire (W)");
+    CHECK(GUI::NameWithShortcut("Probe", GUI::EditorCommand::START_PROBING) == "Probe (P)");
+    CHECK(GUI::NameWithShortcut("Select", GUI::EditorCommand::START_SELECTING) == "Select (Esc)");
+    CHECK(GUI::GetShortcutChord(GUI::EditorCommand::PLACE_NET_LABEL) == ImGuiKey_L);
+}

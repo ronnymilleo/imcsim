@@ -45,6 +45,11 @@ enum class EditorCommand {
     PASTE,
     SELECT_ALL,
     DELETE_SELECTION,
+    // Modes
+    START_SELECTING,
+    START_WIRING,
+    START_PROBING,
+    PLACE_NET_LABEL,
     // View
     FIT,
     // Blocks
