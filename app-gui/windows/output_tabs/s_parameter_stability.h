@@ -12,6 +12,7 @@
 #include "results/two_port_metrics.h"
 #include "simulation/simulation_results.h"
 #include <cstddef>
+#include <optional>
 #include <string>
 
 namespace GUI {
@@ -45,7 +46,8 @@ private:
     // Plots
     void DrawFactorPlot(PlotSpan &view, bool is_fitting, float height);
     void DrawGainPlot(PlotSpan &view, bool is_fitting, float height);
-    void MarkCircleFrequency();
+    std::optional<std::size_t> PickCircleFrequencyByClick() const;
+    void PlotCircleFrequencyLine() const;
     void DrawMetricsTooltip() const;
 };
 
