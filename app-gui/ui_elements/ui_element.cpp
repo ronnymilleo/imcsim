@@ -13,6 +13,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <format>
+#include <numbers>
 #include <optional>
 #include <string>
 #include <utility>
@@ -25,6 +26,26 @@ namespace {
 constexpr float LABEL_OFFSET = 1.0f;
 /// Room, in grid units, between the symbol bounds and the outline that marks it.
 constexpr float OUTLINE_PADDING = 0.15f;
+/// Half the length of each bar of a plus or minus sign on a symbol.
+constexpr float SIGN_HALF_SIZE = 0.15f;
+/// Straight pieces each half circle of a coil is drawn with.
+constexpr int SEGMENTS_PER_TURN = 8;
+
+/**
+ * @brief   The two corners of the base of an arrow head, in local grid units.
+ * @param[in] tip        Point of the arrow.
+ * @param[in] direction  Direction the arrow points to; it does not need to be normalized.
+ * @param[in] head       Size of the head.
+ * @return  The corner to the left of the arrow, looking along it on screen, then the one to its right.
+ */
+std::array<ImVec2, 2> GetArrowHeadCorners(const ImVec2 tip, const ImVec2 direction, const ArrowHead head) {
+    const float length = std::hypot(direction.x, direction.y);
+    const ImVec2 along = {direction.x / length, direction.y / length};
+    const ImVec2 across = {-along.y, along.x};
+    const ImVec2 base = {tip.x - along.x * head.Length, tip.y - along.y * head.Length};
+    return {ImVec2{base.x + across.x * head.HalfWidth, base.y + across.y * head.HalfWidth},
+            ImVec2{base.x - across.x * head.HalfWidth, base.y - across.y * head.HalfWidth}};
+}
 
 } // namespace
 
@@ -162,16 +183,41 @@ void UIElement::SetMirrored(const bool mirrored) {
 }
 
 /**
+ * @brief   Converts a point of the symbol to world units: mirrored, then rotated, then moved to the position.
+ * @param[in] local  Point in local grid units.
+ * @return  The point in world grid units.
+ */
+ImVec2 UIElement::LocalToWorld(const ImVec2 local) const {
+    return ToVec2(m_Position) + Rotate(ImVec2{m_Mirrored ? -local.x : local.x, local.y}, m_Rotation);
+}
+
+/**
+ * @brief   Converts a grid point of the symbol to world units: mirrored, then rotated, then moved to the position.
+ * @param[in] local  Point in local grid units.
+ * @return  The point in world grid units, exact on the grid.
+ */
+GridPoint UIElement::LocalToWorld(const GridPoint local) const {
+    return m_Position + Rotate(GridPoint{m_Mirrored ? -local.X : local.X, local.Y}, m_Rotation);
+}
+
+/**
+ * @brief   Converts a world point to the local grid units of the symbol, undoing LocalToWorld().
+ * @param[in] world  Point in world grid units.
+ * @return  The point in local grid units.
+ */
+ImVec2 UIElement::WorldToLocal(const ImVec2 world) const {
+    const ImVec2 local = Rotate(world - ToVec2(m_Position), InverseRotation(m_Rotation));
+    return {m_Mirrored ? -local.x : local.x, local.y};
+}
+
+/**
  * @brief   Returns the terminals of the element on the grid, after mirroring, rotation and translation.
  * @return  Connection points in world units, where wires can attach.
  */
 std::vector<GridPoint> UIElement::GetTerminals() const {
     std::vector<GridPoint> terminals = GetLocalTerminals();
     for (GridPoint &terminal : terminals) {
-        if (m_Mirrored) {
-            terminal.X = -terminal.X;
-        }
-        terminal = m_Position + Rotate(terminal, m_Rotation);
+        terminal = LocalToWorld(terminal);
     }
     return terminals;
 }
@@ -182,11 +228,8 @@ std::vector<GridPoint> UIElement::GetTerminals() const {
  * @return  A unit step along the X or Y axis, mirrored and rotated with the element.
  */
 GridPoint UIElement::GetTerminalInward(const std::size_t terminal) const {
-    GridPoint inward = GetLocalTerminalInward(terminal);
-    if (m_Mirrored) {
-        inward.X = -inward.X;
-    }
-    return Rotate(inward, m_Rotation);
+    // A direction does not move with the element, so its position is taken off again
+    return LocalToWorld(GetLocalTerminalInward(terminal)) - m_Position;
 }
 
 /**
@@ -195,10 +238,7 @@ GridPoint UIElement::GetTerminalInward(const std::size_t terminal) const {
  * @return  True when the position is inside the symbol bounds, terminals included.
  */
 bool UIElement::Contains(const ImVec2 world_pos) const {
-    ImVec2 local = Rotate(world_pos - ToVec2(m_Position), InverseRotation(m_Rotation));
-    if (m_Mirrored) {
-        local.x = -local.x;
-    }
+    const ImVec2 local = WorldToLocal(world_pos);
     const LocalBounds bounds = GetLocalBounds();
     return local.x >= bounds.Min.x && local.x <= bounds.Max.x && local.y >= bounds.Min.y && local.y <= bounds.Max.y;
 }
@@ -210,12 +250,9 @@ bool UIElement::Contains(const ImVec2 world_pos) const {
 WorldBounds UIElement::GetWorldBounds() const {
     const LocalBounds bounds = GetLocalBounds();
     WorldBounds world_bounds = {.Min = {FLT_MAX, FLT_MAX}, .Max = {-FLT_MAX, -FLT_MAX}};
-    for (ImVec2 corner :
+    for (const ImVec2 corner :
          {bounds.Min, ImVec2{bounds.Max.x, bounds.Min.y}, bounds.Max, ImVec2{bounds.Min.x, bounds.Max.y}}) {
-        if (m_Mirrored) {
-            corner.x = -corner.x;
-        }
-        const ImVec2 world = ToVec2(m_Position) + Rotate(corner, m_Rotation);
+        const ImVec2 world = LocalToWorld(corner);
         world_bounds.Min = {std::min(world_bounds.Min.x, world.x), std::min(world_bounds.Min.y, world.y)};
         world_bounds.Max = {std::max(world_bounds.Max.x, world.x), std::max(world_bounds.Max.y, world.y)};
     }
@@ -331,7 +368,168 @@ void UIElement::DrawLabel(SchematicCanvas &canvas,
  * @return  Position in screen pixels.
  */
 ImVec2 UIElement::LocalToScreen(const ViewTransform &view, const float x, const float y) const {
-    return view.ToScreen(ToVec2(m_Position) + Rotate(ImVec2{m_Mirrored ? -x : x, y}, m_Rotation));
+    return view.ToScreen(LocalToWorld(ImVec2{x, y}));
+}
+
+/**
+ * @brief   Converts a point of the symbol, in local grid units, to screen pixels.
+ * @param[in] view   Transform of the current frame.
+ * @param[in] local  Point before mirroring and rotation.
+ * @return  Position in screen pixels.
+ */
+ImVec2 UIElement::LocalToScreen(const ViewTransform &view, const ImVec2 local) const {
+    return LocalToScreen(view, local.x, local.y);
+}
+
+/**
+ * @brief   How long a length of the symbol is on screen, such as the radius of a circle drawn on it.
+ * @param[in] view    Transform of the current frame.
+ * @param[in] length  Length in local grid units.
+ * @return  The length in pixels; rotation and mirroring do not change it.
+ */
+float UIElement::LocalLengthToScreen(const ViewTransform &view, const float length) const {
+    const ImVec2 unit = LocalToScreen(view, 1.0f, 0.0f) - LocalToScreen(view, 0.0f, 0.0f);
+    return std::hypot(unit.x, unit.y) * length;
+}
+
+/**
+ * @brief   Draws the outline of a circle on the symbol, such as a contact or a bubble.
+ * @param[in,out] canvas        Where it is drawn: the editor window or an exported image.
+ * @param[in]     view          Transform of the current frame.
+ * @param[in]     local_center  Center of the circle, in local grid units.
+ * @param[in]     local_radius  Radius of the circle, in local grid units.
+ * @param[in]     color         Line color.
+ */
+void UIElement::DrawCircleAt(SchematicCanvas &canvas,
+                             const ViewTransform &view,
+                             const ImVec2 local_center,
+                             const float local_radius,
+                             const ImU32 color) const {
+    canvas.AddCircle(LocalToScreen(view, local_center),
+                     LocalLengthToScreen(view, local_radius),
+                     color,
+                     0,
+                     LINE_THICKNESS);
+}
+
+/**
+ * @brief   Draws a plus or a minus sign on the symbol, such as the polarity of a source; the bars stay along the local
+ *          axes, so the sign turns with the element.
+ * @param[in,out] canvas        Where it is drawn: the editor window or an exported image.
+ * @param[in]     view          Transform of the current frame.
+ * @param[in]     local_center  Middle of the sign, in local grid units.
+ * @param[in]     is_plus       True for a plus, false for a minus.
+ * @param[in]     color         Line color.
+ */
+void UIElement::DrawSign(SchematicCanvas &canvas,
+                         const ViewTransform &view,
+                         const ImVec2 local_center,
+                         const bool is_plus,
+                         const ImU32 color) const {
+    canvas.AddLine(LocalToScreen(view, local_center.x - SIGN_HALF_SIZE, local_center.y),
+                   LocalToScreen(view, local_center.x + SIGN_HALF_SIZE, local_center.y),
+                   color,
+                   LINE_THICKNESS);
+    if (is_plus) {
+        canvas.AddLine(LocalToScreen(view, local_center.x, local_center.y - SIGN_HALF_SIZE),
+                       LocalToScreen(view, local_center.x, local_center.y + SIGN_HALF_SIZE),
+                       color,
+                       LINE_THICKNESS);
+    }
+}
+
+/**
+ * @brief   Draws an open arrow head, two lines that meet at the tip.
+ * @param[in,out] canvas           Where it is drawn: the editor window or an exported image.
+ * @param[in]     view             Transform of the current frame.
+ * @param[in]     local_tip        Point of the arrow, in local grid units.
+ * @param[in]     local_direction  Direction the arrow points to, in local grid units; it does not need to be
+ *                                 normalized.
+ * @param[in]     head             Size of the head.
+ * @param[in]     color            Line color.
+ */
+void UIElement::DrawArrowHead(SchematicCanvas &canvas,
+                              const ViewTransform &view,
+                              const ImVec2 local_tip,
+                              const ImVec2 local_direction,
+                              const ArrowHead head,
+                              const ImU32 color) const {
+    const ImVec2 tip = LocalToScreen(view, local_tip);
+    for (const ImVec2 corner : GetArrowHeadCorners(local_tip, local_direction, head)) {
+        canvas.AddLine(LocalToScreen(view, corner), tip, color, LINE_THICKNESS);
+    }
+}
+
+/**
+ * @brief   Draws an arrow: a line with an open head at its tip.
+ * @param[in,out] canvas       Where it is drawn: the editor window or an exported image.
+ * @param[in]     view         Transform of the current frame.
+ * @param[in]     local_start  Tail of the arrow, in local grid units.
+ * @param[in]     local_tip    Point of the arrow, in local grid units.
+ * @param[in]     head         Size of the head.
+ * @param[in]     color        Line color.
+ */
+void UIElement::DrawArrow(SchematicCanvas &canvas,
+                          const ViewTransform &view,
+                          const ImVec2 local_start,
+                          const ImVec2 local_tip,
+                          const ArrowHead head,
+                          const ImU32 color) const {
+    canvas.AddLine(LocalToScreen(view, local_start), LocalToScreen(view, local_tip), color, LINE_THICKNESS);
+    DrawArrowHead(canvas, view, local_tip, local_tip - local_start, head, color);
+}
+
+/**
+ * @brief   Draws a filled arrow head, such as the one on an emitter.
+ * @param[in,out] canvas           Where it is drawn: the editor window or an exported image.
+ * @param[in]     view             Transform of the current frame.
+ * @param[in]     local_tip        Point of the arrow, in local grid units.
+ * @param[in]     local_direction  Direction the arrow points to, in local grid units; it does not need to be
+ *                                 normalized.
+ * @param[in]     head             Size of the head.
+ * @param[in]     color            Fill color.
+ */
+void UIElement::DrawFilledArrowHead(SchematicCanvas &canvas,
+                                    const ViewTransform &view,
+                                    const ImVec2 local_tip,
+                                    const ImVec2 local_direction,
+                                    const ArrowHead head,
+                                    const ImU32 color) const {
+    const std::array<ImVec2, 2> corners = GetArrowHeadCorners(local_tip, local_direction, head);
+    canvas.AddTriangleFilled(LocalToScreen(view, local_tip),
+                             LocalToScreen(view, corners[0]),
+                             LocalToScreen(view, corners[1]),
+                             color);
+}
+
+/**
+ * @brief   Draws the turns of a coil, each its own polyline, sampled in local coordinates so the arcs follow the
+ * element rotation instead of using PathArcTo.
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     coil    Where the turns go and which way they bulge.
+ * @param[in]     color   Line color.
+ * @details Turns are separate polylines: joining them would put a near 180 degree corner where two turns meet, and
+ *          ImGui extends such miter joins into visible spikes.
+ */
+void UIElement::DrawCoilTurns(SchematicCanvas &canvas,
+                              const ViewTransform &view,
+                              const CoilTurns &coil,
+                              const ImU32 color) const {
+    const float radius = coil.TurnRadius;
+    std::array<ImVec2, SEGMENTS_PER_TURN + 1> points;
+    for (int turn = 0; turn < coil.TurnCount; ++turn) {
+        const ImVec2 center = coil.Start + coil.Axis * (radius + 2.0f * radius * static_cast<float>(turn));
+        for (int segment = 0; segment <= SEGMENTS_PER_TURN; ++segment) {
+            // Sweep from the start of the turn (angle pi) to its end (angle 0), through the side it bulges to
+            const float angle = std::numbers::pi_v<float>
+                              * (1.0f - static_cast<float>(segment) / static_cast<float>(SEGMENTS_PER_TURN));
+            points[static_cast<std::size_t>(segment)] = LocalToScreen(view,
+                                                                      center + coil.Axis * (radius * std::cos(angle))
+                                                                          + coil.Bulge * (radius * std::sin(angle)));
+        }
+        canvas.AddPolyline(points.data(), static_cast<int>(points.size()), color, ImDrawFlags_None, LINE_THICKNESS);
+    }
 }
 
 /**

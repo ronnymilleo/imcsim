@@ -13,26 +13,12 @@ namespace GUI {
 
 namespace {
 
-/// The diamond reaches this far from the middle along both axes.
-constexpr float DIAMOND_RADIUS = 0.8f;
 /// Control leads stop short of the diamond, which they do not touch.
 constexpr float CONTROL_LEAD_END = -1.2f;
-constexpr float SIGN_HALF_SIZE = 0.15f;
-/// Distance of the signs inside the diamond above and below its middle.
-constexpr float INNER_SIGN_OFFSET = 0.4f;
 /// Plus sign beside the control leads.
 constexpr ImVec2 CONTROL_PLUS_SIGN = {-1.6f, -1.4f};
 /// Minus sign beside the control leads.
 constexpr ImVec2 CONTROL_MINUS_SIGN = {-1.6f, 1.4f};
-constexpr float ARROW_HALF_LENGTH = 0.45f;
-constexpr float ARROW_HEAD_LENGTH = 0.2f;
-constexpr float ARROW_HEAD_HALF_WIDTH = 0.15f;
-constexpr float LABEL_OFFSET_X = 1.1f;
-constexpr float LABEL_OFFSET_Y = 0.5f;
-
-bool SetsVoltage(const Core::ComponentType type) {
-    return type == Core::ComponentType::VCVS || type == Core::ComponentType::CCVS;
-}
 
 } // namespace
 
@@ -45,15 +31,14 @@ bool SetsVoltage(const Core::ComponentType type) {
 UIControlledSource::UIControlledSource(const Core::ComponentType type,
                                        const GridPoint position,
                                        const Rotation rotation)
-    : UIElement(std::make_unique<Core::ControlledSource>(type), position, rotation) {
+    : UIDependentSource(std::make_unique<Core::ControlledSource>(type), position, rotation) {
 }
 
 /**
  * @brief   The output leads reach the diamond; the control leads end short of it, with their polarity beside them.
  */
 void UIControlledSource::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
-    canvas.AddLine(LocalToScreen(view, 0, -2), LocalToScreen(view, 0, -DIAMOND_RADIUS), color, LINE_THICKNESS);
-    canvas.AddLine(LocalToScreen(view, 0, DIAMOND_RADIUS), LocalToScreen(view, 0, 2), color, LINE_THICKNESS);
+    UIDependentSource::DrawTerminals(canvas, view, color);
     if (Core::IsCurrentControlled(GetComponent().GetType())) {
         return;
     }
@@ -61,36 +46,6 @@ void UIControlledSource::DrawTerminals(SchematicCanvas &canvas, const ViewTransf
     canvas.AddLine(LocalToScreen(view, -2, 1), LocalToScreen(view, CONTROL_LEAD_END, 1), color, LINE_THICKNESS);
     DrawSign(canvas, view, CONTROL_PLUS_SIGN, true, color);
     DrawSign(canvas, view, CONTROL_MINUS_SIGN, false, color);
-}
-
-/**
- * @brief   A source that sets a voltage shows its polarity, + toward terminal 1; one that sets a current shows the way
- *          it pushes it, from terminal 1 to terminal 2 through itself, as SPICE does.
- */
-void UIControlledSource::DrawSymbol(SchematicCanvas &canvas,
-                                    const ViewTransform &view,
-                                    const ImU32 color,
-                                    SymbolStyle /*style*/) const {
-    const ImVec2 diamond[4] = {LocalToScreen(view, 0, -DIAMOND_RADIUS),
-                               LocalToScreen(view, DIAMOND_RADIUS, 0),
-                               LocalToScreen(view, 0, DIAMOND_RADIUS),
-                               LocalToScreen(view, -DIAMOND_RADIUS, 0)};
-    canvas.AddPolyline(diamond, 4, color, ImDrawFlags_Closed, LINE_THICKNESS);
-    if (SetsVoltage(GetComponent().GetType())) {
-        DrawSign(canvas, view, {0.0f, -INNER_SIGN_OFFSET}, true, color);
-        DrawSign(canvas, view, {0.0f, INNER_SIGN_OFFSET}, false, color);
-        return;
-    }
-    const ImVec2 tip = LocalToScreen(view, 0, ARROW_HALF_LENGTH);
-    canvas.AddLine(LocalToScreen(view, 0, -ARROW_HALF_LENGTH), tip, color, LINE_THICKNESS);
-    canvas.AddLine(LocalToScreen(view, -ARROW_HEAD_HALF_WIDTH, ARROW_HALF_LENGTH - ARROW_HEAD_LENGTH),
-                   tip,
-                   color,
-                   LINE_THICKNESS);
-    canvas.AddLine(LocalToScreen(view, ARROW_HEAD_HALF_WIDTH, ARROW_HALF_LENGTH - ARROW_HEAD_LENGTH),
-                   tip,
-                   color,
-                   LINE_THICKNESS);
 }
 
 /**
@@ -104,8 +59,7 @@ void UIControlledSource::DrawLabels(SchematicCanvas &canvas, const ViewTransform
         const std::string &current = source.GetControllingCurrent();
         gain += std::format("·I({})", current.empty() ? "?" : current);
     }
-    DrawLabel(canvas, view, {LABEL_OFFSET_X, -LABEL_OFFSET_Y}, {1.0f, 0.0f}, source.GetName(), color);
-    DrawLabel(canvas, view, {LABEL_OFFSET_X, LABEL_OFFSET_Y}, {1.0f, 0.0f}, gain, color);
+    DrawNameAndValue(canvas, view, gain, color);
 }
 
 /**
@@ -114,10 +68,11 @@ void UIControlledSource::DrawLabels(SchematicCanvas &canvas, const ViewTransform
  *          (-2, -1) and control - at (-2, 1).
  */
 std::vector<GridPoint> UIControlledSource::GetLocalTerminals() const {
-    if (Core::IsCurrentControlled(GetComponent().GetType())) {
-        return {{0, -2}, {0, 2}};
+    std::vector<GridPoint> terminals = UIDependentSource::GetLocalTerminals();
+    if (!Core::IsCurrentControlled(GetComponent().GetType())) {
+        terminals.insert(terminals.end(), {{-2, -1}, {-2, 1}});
     }
-    return {{0, -2}, {0, 2}, {-2, -1}, {-2, 1}};
+    return terminals;
 }
 
 /**
@@ -129,25 +84,16 @@ LocalBounds UIControlledSource::GetLocalBounds() const {
     return {{left, -2.0f}, {DIAMOND_RADIUS, 2.0f}};
 }
 
-const Core::ControlledSource &UIControlledSource::GetSource() const {
-    return static_cast<const Core::ControlledSource &>(GetComponent());
+/**
+ * @brief   A VCVS and a CCVS set a voltage, a VCCS and a CCCS a current.
+ */
+bool UIControlledSource::SetsVoltage() const {
+    const Core::ComponentType type = GetComponent().GetType();
+    return type == Core::ComponentType::VCVS || type == Core::ComponentType::CCVS;
 }
 
-void UIControlledSource::DrawSign(SchematicCanvas &canvas,
-                                  const ViewTransform &view,
-                                  const ImVec2 center,
-                                  const bool plus,
-                                  const ImU32 color) const {
-    canvas.AddLine(LocalToScreen(view, center.x - SIGN_HALF_SIZE, center.y),
-                   LocalToScreen(view, center.x + SIGN_HALF_SIZE, center.y),
-                   color,
-                   LINE_THICKNESS);
-    if (plus) {
-        canvas.AddLine(LocalToScreen(view, center.x, center.y - SIGN_HALF_SIZE),
-                       LocalToScreen(view, center.x, center.y + SIGN_HALF_SIZE),
-                       color,
-                       LINE_THICKNESS);
-    }
+const Core::ControlledSource &UIControlledSource::GetSource() const {
+    return static_cast<const Core::ControlledSource &>(GetComponent());
 }
 
 } // namespace GUI

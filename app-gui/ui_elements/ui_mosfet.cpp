@@ -63,9 +63,9 @@ void UIMOSFET::DrawSymbol(SchematicCanvas &canvas,
     canvas.AddLine(LocalToScreen(view, 1, 0), LocalToScreen(view, 1, CONTACT_Y), color, LINE_THICKNESS);
 
     if (GetComponent().GetType() == Core::ComponentType::NMOS) {
-        DrawArrowHead(canvas, view, {NMOS_ARROW_TIP_X, 0.0f}, {-1.0f, 0.0f}, color);
+        DrawFilledArrowHead(canvas, view, {NMOS_ARROW_TIP_X, 0.0f}, {-1.0f, 0.0f}, ARROW_HEAD, color);
     } else {
-        DrawArrowHead(canvas, view, {PMOS_ARROW_TIP_X, 0.0f}, {1.0f, 0.0f}, color);
+        DrawFilledArrowHead(canvas, view, {PMOS_ARROW_TIP_X, 0.0f}, {1.0f, 0.0f}, ARROW_HEAD, color);
     }
 }
 

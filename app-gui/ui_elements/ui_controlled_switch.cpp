@@ -8,7 +8,6 @@
 #include "circuit/components/relay.h"
 #include "circuit/components/voltage_controlled_switch.h"
 #include "spice/spice_value.h"
-#include <cmath>
 #include <format>
 #include <memory>
 
@@ -28,7 +27,6 @@ constexpr float BAR_HALF_LENGTH = 1.0f;
 constexpr float COIL_HALF_WIDTH = 0.4f;
 /// Half the height of the coil.
 constexpr float COIL_HALF_HEIGHT = 0.8f;
-constexpr float SIGN_HALF_SIZE = 0.15f;
 constexpr ImVec2 CONTROL_PLUS_SIGN = {-1.7f, -1.4f};
 constexpr ImVec2 CONTROL_MINUS_SIGN = {-1.7f, 1.4f};
 constexpr float DASH_LENGTH = 0.2f;
@@ -91,11 +89,8 @@ void UIControlledSwitch::DrawSymbol(SchematicCanvas &canvas,
                                     const ImU32 color,
                                     const SymbolStyle /*style*/) const {
     // The contact, drawn open
-    const ImVec2 origin = LocalToScreen(view, 0, 0);
-    const ImVec2 unit = LocalToScreen(view, 1, 0) - origin;
-    const float radius = std::hypot(unit.x, unit.y) * CONTACT_RADIUS;
-    canvas.AddCircle(LocalToScreen(view, 0, -CONTACT_Y), radius, color, 0, LINE_THICKNESS);
-    canvas.AddCircle(LocalToScreen(view, 0, CONTACT_Y), radius, color, 0, LINE_THICKNESS);
+    DrawCircleAt(canvas, view, {0.0f, -CONTACT_Y}, CONTACT_RADIUS, color);
+    DrawCircleAt(canvas, view, {0.0f, CONTACT_Y}, CONTACT_RADIUS, color);
     canvas.AddLine(LocalToScreen(view, 0, CONTACT_Y - CONTACT_RADIUS),
                    LocalToScreen(view, LEVER_TIP.x, LEVER_TIP.y),
                    color,
@@ -151,23 +146,6 @@ LocalBounds UIControlledSwitch::GetLocalBounds() const {
 
 bool UIControlledSwitch::IsRelay() const {
     return GetComponent().GetType() == Core::ComponentType::RELAY;
-}
-
-void UIControlledSwitch::DrawSign(SchematicCanvas &canvas,
-                                  const ViewTransform &view,
-                                  const ImVec2 center,
-                                  const bool plus,
-                                  const ImU32 color) const {
-    canvas.AddLine(LocalToScreen(view, center.x - SIGN_HALF_SIZE, center.y),
-                   LocalToScreen(view, center.x + SIGN_HALF_SIZE, center.y),
-                   color,
-                   LINE_THICKNESS);
-    if (plus) {
-        canvas.AddLine(LocalToScreen(view, center.x, center.y - SIGN_HALF_SIZE),
-                       LocalToScreen(view, center.x, center.y + SIGN_HALF_SIZE),
-                       color,
-                       LINE_THICKNESS);
-    }
 }
 
 void UIControlledSwitch::DrawDashedLine(SchematicCanvas &canvas,

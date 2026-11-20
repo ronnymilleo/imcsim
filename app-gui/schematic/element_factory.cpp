@@ -13,13 +13,14 @@
 #include "ui_elements/ui_controlled_switch.h"
 #include "ui_elements/ui_current_source.h"
 #include "ui_elements/ui_diode.h"
+#include "ui_elements/ui_flip_flop.h"
 #include "ui_elements/ui_fuse.h"
+#include "ui_elements/ui_gate.h"
 #include "ui_elements/ui_ground.h"
 #include "ui_elements/ui_inductor.h"
 #include "ui_elements/ui_initial_voltage.h"
 #include "ui_elements/ui_logic_input.h"
 #include "ui_elements/ui_logic_output.h"
-#include "ui_elements/ui_logic_part.h"
 #include "ui_elements/ui_mosfet.h"
 #include "ui_elements/ui_net_label.h"
 #include "ui_elements/ui_nodeset.h"
@@ -178,11 +179,12 @@ CreateElement(const Core::ComponentType type, const GridPoint position, const Ro
     case Core::ComponentType::XOR:
     case Core::ComponentType::XNOR:
     case Core::ComponentType::BUFFER:
+        return std::make_unique<UIGate>(type, position, rotation);
     case Core::ComponentType::D_FLIP_FLOP:
     case Core::ComponentType::JK_FLIP_FLOP:
     case Core::ComponentType::T_FLIP_FLOP:
     case Core::ComponentType::SR_FLIP_FLOP:
-        return std::make_unique<UILogicPart>(type, position, rotation);
+        return std::make_unique<UIFlipFlop>(type, position, rotation);
     case Core::ComponentType::CLOCK:
         return std::make_unique<UIClock>(position, rotation);
     case Core::ComponentType::LOGIC_INPUT:

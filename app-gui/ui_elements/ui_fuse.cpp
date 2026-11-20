@@ -27,12 +27,6 @@ constexpr float FLASH_INNER_RADIUS = 0.5f;
 constexpr float FLASH_OUTER_RADIUS = 1.4f;
 constexpr ImU32 OPAQUE_ALPHA = 255;
 
-ImU32 GetBlownColor(const ImU32 alpha) {
-    ImVec4 color = GetErrorTextColor();
-    color.w = static_cast<float>(alpha) / 255.0f;
-    return ImGui::ColorConvertFloat4ToU32(color);
-}
-
 } // namespace
 
 /**
@@ -70,7 +64,7 @@ void UIFuse::DrawSymbol(SchematicCanvas &canvas,
                        LINE_THICKNESS);
         return;
     }
-    const ImU32 blown_color = GetBlownColor(OPAQUE_ALPHA);
+    const ImU32 blown_color = ReplaceAlpha(ImGui::ColorConvertFloat4ToU32(GetErrorTextColor()), OPAQUE_ALPHA);
     for (const float side : {-1.0f, 1.0f}) {
         canvas.AddLine(LocalToScreen(view, side * BODY_HALF_LENGTH, 0),
                        LocalToScreen(view, side * GAP_HALF_LENGTH, 0),
@@ -90,7 +84,12 @@ void UIFuse::DrawSymbol(SchematicCanvas &canvas,
 void UIFuse::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     DrawLabel(canvas, view, {0.0f, -RATING_OFFSET_Y}, {0.0f, -1.0f}, GetComponent().GetName(), color);
     if (m_IsBlown) {
-        DrawLabel(canvas, view, {0.0f, RATING_OFFSET_Y}, {0.0f, 1.0f}, "blown", GetBlownColor(OPAQUE_ALPHA));
+        DrawLabel(canvas,
+                  view,
+                  {0.0f, RATING_OFFSET_Y},
+                  {0.0f, 1.0f},
+                  "blown",
+                  ReplaceAlpha(ImGui::ColorConvertFloat4ToU32(GetErrorTextColor()), OPAQUE_ALPHA));
         return;
     }
     const double rated_current = static_cast<const Core::Fuse &>(GetComponent()).GetParameters().RatedCurrent;
@@ -104,7 +103,8 @@ void UIFuse::DrawFlash(SchematicCanvas &canvas, const ViewTransform &view) const
     if (m_FlashLevel <= 0.0f) {
         return;
     }
-    const ImU32 color = GetBlownColor(static_cast<ImU32>(m_FlashLevel * static_cast<float>(OPAQUE_ALPHA)));
+    const ImU32 color = ReplaceAlpha(ImGui::ColorConvertFloat4ToU32(GetErrorTextColor()),
+                                     static_cast<ImU32>(m_FlashLevel * static_cast<float>(OPAQUE_ALPHA)));
     for (int ray = 0; ray < FLASH_RAY_COUNT; ++ray) {
         const float angle = 2.0f * std::numbers::pi_v<float> * static_cast<float>(ray) / FLASH_RAY_COUNT;
         const float reach = FLASH_INNER_RADIUS + (FLASH_OUTER_RADIUS - FLASH_INNER_RADIUS) * (1.0f - m_FlashLevel);

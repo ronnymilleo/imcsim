@@ -29,6 +29,7 @@ add_executable(imcsim-tests
             circuit_tests.cpp
             clipboard_tests.cpp
             code_models.cpp
+            color_legend_tests.cpp
             component_tests.cpp
             connectivity_tests.cpp
             controlled_sources_tests.cpp
@@ -36,6 +37,7 @@ add_executable(imcsim-tests
             current_flow_tests.cpp
             cursor_widgets_tests.cpp
             default_backend.cpp
+            displayed_state_tests.cpp
             dock_layout_tests.cpp
             editor_command_tests.cpp
             editor_mode_tests.cpp
@@ -43,15 +45,19 @@ add_executable(imcsim-tests
             engine_cross_validation_tests.cpp
             examples_tests.cpp
             file_json_tests.cpp
+            fuse_blow_tracker_tests.cpp
             fuse_tests.cpp
+            glow_falloff_tests.cpp
             group_editing_tests.cpp
             harmonic_balance_samples_tests.cpp
             harmonic_balance_view_tests.cpp
             heat_glow_tests.cpp
             helpers_tests.cpp
+            hovered_value_tests.cpp
             initial_voltages_tests.cpp
             led_glow_tests.cpp
             live_change_tests.cpp
+            live_current_tests.cpp
             live_input_tests.cpp
             live_run_plan_tests.cpp
             logarithmic_level_tests.cpp
@@ -68,6 +74,7 @@ add_executable(imcsim-tests
             nodalys_benchmark_tests.cpp
             nodalys_in_use.cpp
             node_index_tests.cpp
+            node_readouts_tests.cpp
             nodeset_tests.cpp
             nonlinear_tests.cpp
             op_amp_tests.cpp
@@ -75,6 +82,7 @@ add_executable(imcsim-tests
             parameter_step_settings_tests.cpp
             parameter_step_tests.cpp
             part_catalog_tests.cpp
+            part_heat_tests.cpp
             part_names_tests.cpp
             part_properties_tests.cpp
             placement_editing_tests.cpp
@@ -134,6 +142,7 @@ add_executable(imcsim-tests
             switches_tests.cpp
             text_fitting_tests.cpp
             theme_contrast_tests.cpp
+            theme_tests.cpp
             touchstone_tests.cpp
             trace_fit_state_tests.cpp
             trace_math_tests.cpp
@@ -144,6 +153,7 @@ add_executable(imcsim-tests
             transient_window_tests.cpp
             truth_table_tests.cpp
             ui_element_tests.cpp
+            ui_source_tests.cpp
             ui_wire_tests.cpp
             undo_history_tests.cpp
             voltage_probes_tests.cpp

@@ -51,7 +51,7 @@ void UILogicOutput::DrawReading(SchematicCanvas &canvas,
  * @brief   The lead goes up from the terminal to the box, with an arrow that points into it.
  */
 void UILogicOutput::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
-    DrawLead(canvas, view, color);
+    UILogicBox::DrawTerminals(canvas, view, color);
     canvas.AddTriangleFilled(LocalToScreen(view, -ARROW_HALF_WIDTH, BOX_BOTTOM + ARROW_HALF_WIDTH * 2.0f),
                              LocalToScreen(view, ARROW_HALF_WIDTH, BOX_BOTTOM + ARROW_HALF_WIDTH * 2.0f),
                              LocalToScreen(view, 0.0f, BOX_BOTTOM),

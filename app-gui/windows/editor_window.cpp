@@ -338,7 +338,7 @@ void EditorWindow::DrawSchematicLayers(const CanvasFrame &frame, SchematicCanvas
     if (m_Preferences.ShowTerminalNumbers) {
         DrawTerminalNumbers(canvas, view, *m_Schematic, SCREEN_TERMINAL_RING_SCALE);
     }
-    m_Overlays.DrawNodeVoltages(draw_list, view, *m_Schematic);
+    m_Overlays.DrawNodeVoltages(draw_list, view, *m_Schematic, zoom);
     DrawMeasurementMarkers(canvas, view, *m_Schematic);
     DrawSelectionBox(draw_list, view, m_Mode);
 }

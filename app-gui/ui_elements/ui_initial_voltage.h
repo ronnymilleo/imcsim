@@ -6,7 +6,7 @@
 #ifndef IMCSIM_UI_INITIAL_VOLTAGE_H
 #define IMCSIM_UI_INITIAL_VOLTAGE_H
 
-#include "ui_elements/ui_element.h"
+#include "ui_elements/ui_single_terminal_element.h"
 
 namespace GUI {
 
@@ -16,19 +16,17 @@ namespace GUI {
  * @details The terminal is at the foot of the lead, so a wire reaches it like it reaches a supply or a net label. The
  *          square is the only closed shape on a lead apart from the logic box, which is larger and holds a digit.
  */
-class UIInitialVoltage : public UIElement {
+class UIInitialVoltage : public UISingleTerminalElement {
 public:
     UIInitialVoltage(GridPoint position, Rotation rotation);
     ~UIInitialVoltage() override = default;
 
 protected:
-    void DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const override;
     void DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color, SymbolStyle style) const override;
     void DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const override;
 
-    std::vector<GridPoint> GetLocalTerminals() const override;
-    GridPoint GetLocalTerminalInward(std::size_t terminal) const override;
     LocalBounds GetLocalBounds() const override;
+    ImVec2 GetLeadEnd() const override;
 };
 
 } // namespace GUI

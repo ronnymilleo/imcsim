@@ -37,11 +37,18 @@ add_library(imcsim-gui-lib
             base/trace_swatch.cpp
             base/value_field.cpp
             canvas/schematic_canvas.cpp
+            overlays/color_legend.cpp
+            overlays/displayed_state.cpp
+            overlays/fuse_blow_tracker.cpp
             overlays/fuse_flash.cpp
+            overlays/glow_falloff.cpp
             overlays/glow_renderer.cpp
             overlays/heat_glow.cpp
+            overlays/hovered_value.cpp
             overlays/led_glow.cpp
             overlays/live_current.cpp
+            overlays/node_readouts.cpp
+            overlays/part_heat.cpp
             overlays/readout_placement.cpp
             overlays/schematic_overlays.cpp
             plots/harmonic_balance_view.cpp
@@ -147,16 +154,18 @@ add_library(imcsim-gui-lib
             ui_elements/ui_controlled_source.cpp
             ui_elements/ui_controlled_switch.cpp
             ui_elements/ui_current_source.cpp
+            ui_elements/ui_dependent_source.cpp
             ui_elements/ui_diode.cpp
             ui_elements/ui_element.cpp
+            ui_elements/ui_flip_flop.cpp
             ui_elements/ui_fuse.cpp
+            ui_elements/ui_gate.cpp
             ui_elements/ui_ground.cpp
             ui_elements/ui_inductor.cpp
             ui_elements/ui_initial_voltage.cpp
             ui_elements/ui_logic_box.cpp
             ui_elements/ui_logic_input.cpp
             ui_elements/ui_logic_output.cpp
-            ui_elements/ui_logic_part.cpp
             ui_elements/ui_mosfet.cpp
             ui_elements/ui_net_label.cpp
             ui_elements/ui_nodeset.cpp
@@ -164,6 +173,7 @@ add_library(imcsim-gui-lib
             ui_elements/ui_potentiometer.cpp
             ui_elements/ui_resistor.cpp
             ui_elements/ui_seven_segment.cpp
+            ui_elements/ui_single_terminal_element.cpp
             ui_elements/ui_source.cpp
             ui_elements/ui_subcircuit.cpp
             ui_elements/ui_subcircuit_pin.cpp

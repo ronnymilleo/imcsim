@@ -25,7 +25,7 @@ flowchart TD
     app_core[app-core]
     nodalys[nodalys]
     app_core -->|4| nodalys
-    app_gui -->|310| app_core
+    app_gui -->|315| app_core
 ```
 
 ## app-core
@@ -70,11 +70,11 @@ flowchart TD
     app_gui_analysis -->|17| app_gui_schematic
     app_gui_canvas -->|1| app_gui_base
     app_gui_overlays -->|1| app_gui_analysis
-    app_gui_overlays -->|8| app_gui_base
+    app_gui_overlays -->|9| app_gui_base
     app_gui_overlays -->|2| app_gui_canvas
-    app_gui_overlays -->|15| app_gui_results
-    app_gui_overlays -->|5| app_gui_schematic
-    app_gui_overlays -->|6| app_gui_ui_elements
+    app_gui_overlays -->|24| app_gui_results
+    app_gui_overlays -->|14| app_gui_schematic
+    app_gui_overlays -->|11| app_gui_ui_elements
     app_gui_plots -->|10| app_gui_base
     app_gui_plots -->|14| app_gui_results
     app_gui_plots -->|8| app_gui_schematic
@@ -89,7 +89,7 @@ flowchart TD
     app_gui_root -->|9| app_gui_windows
     app_gui_schematic -->|23| app_gui_base
     app_gui_schematic -->|1| app_gui_canvas
-    app_gui_schematic -->|65| app_gui_ui_elements
+    app_gui_schematic -->|66| app_gui_ui_elements
     app_gui_ui_elements -->|7| app_gui_base
     app_gui_ui_elements -->|2| app_gui_canvas
     app_gui_windows -->|12| app_gui_analysis

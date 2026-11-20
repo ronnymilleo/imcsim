@@ -24,11 +24,7 @@ constexpr float BAR_HALF_WIDTHS[] = {0.8f, 0.5f, 0.2f};
  * @param[in] rotation  Orientation on the grid.
  */
 UIGround::UIGround(const GridPoint position, const Rotation rotation)
-    : UIElement(std::make_unique<Core::Ground>(), position, rotation) {
-}
-
-void UIGround::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
-    canvas.AddLine(LocalToScreen(view, 0, 0), LocalToScreen(view, 0, LEAD_LENGTH), color, LINE_THICKNESS);
+    : UISingleTerminalElement(std::make_unique<Core::Ground>(), position, rotation) {
 }
 
 void UIGround::DrawSymbol(SchematicCanvas &canvas,
@@ -48,12 +44,15 @@ void UIGround::DrawSymbol(SchematicCanvas &canvas,
 void UIGround::DrawLabels(SchematicCanvas & /*canvas*/, const ViewTransform & /*view*/, ImU32 /*color*/) const {
 }
 
-std::vector<GridPoint> UIGround::GetLocalTerminals() const {
-    return {{0, 0}};
-}
-
 LocalBounds UIGround::GetLocalBounds() const {
     return {{-0.8f, 0.0f}, {0.8f, 1.6f}};
+}
+
+/**
+ * @brief   The lead goes down from the terminal to the bars.
+ */
+ImVec2 UIGround::GetLeadEnd() const {
+    return {0.0f, LEAD_LENGTH};
 }
 
 } // namespace GUI

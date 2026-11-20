@@ -6,7 +6,6 @@
 #include "ui_elements/ui_switch.h"
 
 #include "circuit/components/switch.h"
-#include <cmath>
 #include <memory>
 
 namespace GUI {
@@ -40,11 +39,8 @@ void UISwitch::DrawSymbol(SchematicCanvas &canvas,
                           const ViewTransform &view,
                           const ImU32 color,
                           const SymbolStyle /*style*/) const {
-    const ImVec2 origin = LocalToScreen(view, 0, 0);
-    const ImVec2 unit = LocalToScreen(view, 1, 0) - origin;
-    const float radius = std::hypot(unit.x, unit.y) * CONTACT_RADIUS;
-    canvas.AddCircle(LocalToScreen(view, -CONTACT_X, 0), radius, color, 0, LINE_THICKNESS);
-    canvas.AddCircle(LocalToScreen(view, CONTACT_X, 0), radius, color, 0, LINE_THICKNESS);
+    DrawCircleAt(canvas, view, {-CONTACT_X, 0.0f}, CONTACT_RADIUS, color);
+    DrawCircleAt(canvas, view, {CONTACT_X, 0.0f}, CONTACT_RADIUS, color);
 
     if (!IsPushButton()) {
         // The lever swings from the first contact, down onto the second when closed

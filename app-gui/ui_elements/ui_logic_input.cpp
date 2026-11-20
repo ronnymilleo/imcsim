@@ -25,10 +25,6 @@ UILogicInput::UILogicInput(const GridPoint position, const Rotation rotation)
     : UILogicBox(std::make_unique<Core::LogicInput>(), position, rotation) {
 }
 
-void UILogicInput::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
-    DrawLead(canvas, view, color);
-}
-
 /**
  * @brief   The box shows the level the part drives, 1 when high and 0 when low.
  */

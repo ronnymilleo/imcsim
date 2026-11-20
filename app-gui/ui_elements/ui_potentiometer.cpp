@@ -16,8 +16,7 @@ namespace {
 
 /// The arrow points down at the body, whose top edge is at y = -0.4.
 constexpr float ARROW_TIP_Y = -0.45f;
-constexpr float ARROW_HEAD_LENGTH = 0.3f;
-constexpr float ARROW_HEAD_HALF_WIDTH = 0.15f;
+constexpr ArrowHead ARROW_HEAD = {.Length = 0.3f, .HalfWidth = 0.15f};
 /// The label hangs below the body.
 constexpr float LABEL_OFFSET_Y = 0.7f;
 
@@ -40,16 +39,7 @@ void UIPotentiometer::DrawSymbol(SchematicCanvas &canvas,
                                  const ImU32 color,
                                  const SymbolStyle style) const {
     UIResistor::DrawSymbol(canvas, view, color, style);
-    const ImVec2 tip = LocalToScreen(view, 0, ARROW_TIP_Y);
-    canvas.AddLine(LocalToScreen(view, 0, -2), tip, color, LINE_THICKNESS);
-    canvas.AddLine(LocalToScreen(view, -ARROW_HEAD_HALF_WIDTH, ARROW_TIP_Y - ARROW_HEAD_LENGTH),
-                   tip,
-                   color,
-                   LINE_THICKNESS);
-    canvas.AddLine(LocalToScreen(view, ARROW_HEAD_HALF_WIDTH, ARROW_TIP_Y - ARROW_HEAD_LENGTH),
-                   tip,
-                   color,
-                   LINE_THICKNESS);
+    DrawArrow(canvas, view, {0.0f, -2.0f}, {0.0f, ARROW_TIP_Y}, ARROW_HEAD, color);
 }
 
 /**

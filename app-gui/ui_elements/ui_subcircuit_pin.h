@@ -6,7 +6,7 @@
 #ifndef IMCSIM_UI_SUBCIRCUIT_PIN_H
 #define IMCSIM_UI_SUBCIRCUIT_PIN_H
 
-#include "ui_elements/ui_element.h"
+#include "ui_elements/ui_single_terminal_element.h"
 
 namespace GUI {
 
@@ -17,19 +17,17 @@ namespace GUI {
  *          and the terminal. The pin goes on the edge the arrow comes from: an arrow pointing right puts it on the left
  *          of the block's box, one pointing down on its top.
  */
-class UISubcircuitPin : public UIElement {
+class UISubcircuitPin : public UISingleTerminalElement {
 public:
     UISubcircuitPin(GridPoint position, Rotation rotation);
     ~UISubcircuitPin() override = default;
 
 protected:
-    void DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const override;
     void DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color, SymbolStyle style) const override;
     void DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const override;
 
-    std::vector<GridPoint> GetLocalTerminals() const override;
-    GridPoint GetLocalTerminalInward(std::size_t terminal) const override;
     LocalBounds GetLocalBounds() const override;
+    ImVec2 GetLeadEnd() const override;
 };
 
 } // namespace GUI

@@ -6,7 +6,7 @@
 #ifndef IMCSIM_UI_CLOCK_H
 #define IMCSIM_UI_CLOCK_H
 
-#include "ui_elements/ui_element.h"
+#include "ui_elements/ui_single_terminal_element.h"
 
 namespace GUI {
 
@@ -17,19 +17,17 @@ namespace GUI {
  *          ground. The frequency and the duty cycle are written beside the box, so the symbol stays the same at every
  *          setting.
  */
-class UIClock : public UIElement {
+class UIClock : public UISingleTerminalElement {
 public:
     UIClock(GridPoint position, Rotation rotation);
     ~UIClock() override = default;
 
 protected:
-    void DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const override;
     void DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color, SymbolStyle style) const override;
     void DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const override;
 
-    std::vector<GridPoint> GetLocalTerminals() const override;
-    GridPoint GetLocalTerminalInward(std::size_t terminal) const override;
     LocalBounds GetLocalBounds() const override;
+    ImVec2 GetLeadEnd() const override;
 };
 
 } // namespace GUI

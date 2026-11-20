@@ -109,14 +109,11 @@ std::vector<GridPoint> UISubcircuit::GetNameLabelPoints() const {
     // The names are drawn half a unit past the bounds and are shorter than a unit, so each covers one row
     for (const int row : {-half_height - 1, half_height + 1}) {
         for (int column = -half_width; column <= half_width; ++column) {
-            GridPoint point = {column, row};
+            const GridPoint point = {column, row};
             if (std::ranges::contains(ways_out, point)) {
                 continue;
             }
-            if (IsMirrored()) {
-                point.X = -point.X;
-            }
-            points.push_back(GetPosition() + Rotate(point, GetRotation()));
+            points.push_back(LocalToWorld(point));
         }
     }
     return points;
