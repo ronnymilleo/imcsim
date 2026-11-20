@@ -92,3 +92,9 @@ TEST_CASE("A finished run says so, with what it made and how long it took", "[ru
     CHECK(done.Detail.find("time steps in") != std::string::npos);
     CHECK_FALSE(done.TakesWholeLine);
 }
+
+TEST_CASE("The Run button names the key of the Run command, except Stop, which the key never does", "[run_status]") {
+    CHECK(GUI::GetRunButtonLabel(GUI::RunAction::RUN) == "Run (F5)");
+    CHECK(GUI::GetRunButtonLabel(GUI::RunAction::CONTINUE) == "Continue (F5)");
+    CHECK(GUI::GetRunButtonLabel(GUI::RunAction::STOP) == "Stop");
+}

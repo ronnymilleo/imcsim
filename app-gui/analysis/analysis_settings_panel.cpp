@@ -189,13 +189,12 @@ AnalysisSettingsPanel::AnalysisSettingsPanel(Schematic &schematic)
 void AnalysisSettingsPanel::DrawAnalysisPicker() {
     SimulationSettings settings = m_Schematic.GetSimulationSettings();
     const std::set<Core::ComponentType> parts = ListPartTypes(m_Schematic);
-    for (std::size_t index = 0; index < ANALYSIS_COUNT; ++index) {
+    for (const Analysis analysis : ALL_ANALYSES) {
         const std::optional<std::string> unsupported =
-            Core::FindUnsupported(Core::GetBackend(), parts, ToKind(static_cast<Analysis>(index)));
+            Core::FindUnsupported(Core::GetBackend(), parts, ToKind(analysis));
         ImGui::BeginDisabled(unsupported.has_value());
-        if (ImGui::RadioButton(GetAnalysisName(static_cast<Analysis>(index)),
-                               static_cast<std::size_t>(settings.Selected) == index)) {
-            settings.Selected = static_cast<Analysis>(index);
+        if (ImGui::RadioButton(GetAnalysisName(analysis), settings.Selected == analysis)) {
+            settings.Selected = analysis;
         }
         ImGui::EndDisabled();
         if (unsupported) {

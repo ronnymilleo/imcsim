@@ -117,4 +117,13 @@ SavedSubcircuit MakeSpiceBlock(const Core::LibrarySubcircuit &subcircuit, std::v
     return block;
 }
 
+/**
+ * @brief   Tells how many device models an import added, when it added no block to place.
+ * @param[in] count  Number of models imported.
+ * @return  Text such as "1 device model imported" or "3 device models imported".
+ */
+std::string DescribeImportedModels(const std::size_t count) {
+    return std::format("{} device model{} imported", count, count == 1 ? "" : "s");
+}
+
 } // namespace GUI

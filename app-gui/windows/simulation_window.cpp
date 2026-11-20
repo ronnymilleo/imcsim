@@ -28,13 +28,7 @@ void SimulationWindow::Draw() {
     m_SettingsPanel.DrawAnalysisPicker();
     ImGui::Separator();
     m_SettingsPanel.DrawSettings();
-    const char *label = "Run (F5)";
-    if (m_Controls.GetRunAction() == RunAction::STOP) {
-        label = "Stop";
-    } else if (m_Controls.GetRunAction() == RunAction::CONTINUE) {
-        label = "Continue (F5)";
-    }
-    if (PrimaryButton(label)) {
+    if (PrimaryButton(GetRunButtonLabel(m_Controls.GetRunAction()).c_str())) {
         m_Controls.PressRun();
     }
     ImGui::Separator();

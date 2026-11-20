@@ -12,6 +12,7 @@
 #include "simulation/monte_carlo.h"
 #include "simulation/simulation_backend.h"
 #include "simulation/simulator.h"
+#include <array>
 #include <cstddef>
 #include <optional>
 #include <string>
@@ -38,6 +39,16 @@ enum class Analysis {
 };
 
 constexpr std::size_t ANALYSIS_COUNT = 11;
+
+/// Every analysis, in the order of the enum, for the lists that show them all; built from the count, so a new analysis
+/// joins it.
+constexpr std::array<Analysis, ANALYSIS_COUNT> ALL_ANALYSES = [] {
+    std::array<Analysis, ANALYSIS_COUNT> analyses{};
+    for (std::size_t index = 0; index < ANALYSIS_COUNT; ++index) {
+        analyses[index] = static_cast<Analysis>(index);
+    }
+    return analyses;
+}();
 
 /**
  * @enum    SensitivityKind

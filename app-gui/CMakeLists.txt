@@ -186,6 +186,8 @@ add_library(imcsim-gui-lib
             ui_elements/ui_wire.cpp
             windows/app_window.cpp
             windows/block_dialog.cpp
+            windows/block_navigator.cpp
+            windows/clipboard_actions.cpp
             windows/dock_layout.cpp
             windows/editor_canvas_drawing.cpp
             windows/editor_context_menu.cpp
@@ -231,9 +233,13 @@ add_library(imcsim-gui-lib
             windows/part_rail.cpp
             windows/preferences_window.cpp
             windows/properties_window.cpp
+            windows/selection_input.cpp
             windows/simulation_window.cpp
-            windows/spice_block_dialog.cpp
+            windows/spice_import_dialog.cpp
+            windows/spice_pin_table.cpp
+            windows/spice_settings_dialog.cpp
             windows/tool_icons.cpp
+            windows/turn_keys.cpp
 )
 
 target_include_directories(imcsim-gui-lib

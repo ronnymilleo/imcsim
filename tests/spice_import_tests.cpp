@@ -260,3 +260,8 @@ TEST_CASE("A copied part takes the library model it uses along", "[spice_import]
     REQUIRE(group->Elements.size() == 1);
     CHECK(group->Elements[0]->GetComponent().GetLibraryModel() == "1N4148");
 }
+
+TEST_CASE("The message of an import of models alone counts them, in the singular for one", "[spice_import]") {
+    CHECK(GUI::DescribeImportedModels(1) == "1 device model imported");
+    CHECK(GUI::DescribeImportedModels(3) == "3 device models imported");
+}

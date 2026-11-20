@@ -9,6 +9,7 @@
 
 #include "circuit/spice_library.h"
 #include "schematic/schematic_file.h"
+#include <cstddef>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -25,6 +26,9 @@ std::optional<std::string> CheckSpicePins(const std::vector<SavedSubcircuitPin> 
 
 // Blocks
 SavedSubcircuit MakeSpiceBlock(const Core::LibrarySubcircuit &subcircuit, std::vector<SavedSubcircuitPin> pins);
+
+// Messages
+std::string DescribeImportedModels(std::size_t count);
 
 } // namespace GUI
 
