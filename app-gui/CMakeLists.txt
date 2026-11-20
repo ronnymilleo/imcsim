@@ -187,6 +187,7 @@ add_library(imcsim-gui-lib
             windows/app_window.cpp
             windows/block_dialog.cpp
             windows/block_navigator.cpp
+            windows/canvas_pointer.cpp
             windows/clipboard_actions.cpp
             windows/dock_layout.cpp
             windows/editor_canvas_drawing.cpp

@@ -10,6 +10,7 @@
 #include "schematic/editor_command.h"
 #include "schematic/editor_mode.h"
 #include "schematic/schematic.h"
+#include "windows/canvas_pointer.h"
 #include "windows/part_popover.h"
 #include <vector>
 
@@ -25,11 +26,8 @@ struct SelectionInput {
     /// The mode of the editor, which holds the box and the drag while it is selecting.
     EditorMode &Mode;
     PartPopover &Popover;
-    const ViewTransform &View;
-    /// Pixels per grid unit.
-    float Zoom;
-    /// Whether the cursor is over the canvas and no live part took the mouse.
-    bool IsHovered;
+    /// Where the mouse is; it is not hovering when a live part took the mouse.
+    CanvasPointer Pointer;
     /// ImGui closes a popup on Esc before the frame starts, so an Esc that closed one leaves the selection alone.
     bool WasPopupOpenLastFrame;
 };

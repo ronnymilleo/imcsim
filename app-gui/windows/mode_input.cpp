@@ -30,8 +30,8 @@ std::optional<MeasurementTarget> FindTargetAt(const ModeInput &input) {
     return FindMeasurementTarget(schematic.GetElements(),
                                  schematic.GetWires(),
                                  schematic.GetConnectivity(),
-                                 input.View.ToWorld(ImGui::GetIO().MousePos),
-                                 WIRE_PICK_DISTANCE / input.Zoom);
+                                 input.Pointer.GetWorldPosition(),
+                                 input.Pointer.GetPickTolerance());
 }
 
 /**
@@ -40,7 +40,7 @@ std::optional<MeasurementTarget> FindTargetAt(const ModeInput &input) {
  */
 bool WantsToLeaveMode(const ModeInput &input) {
     return (ImGui::IsWindowFocused() && ImGui::IsKeyPressed(ImGuiKey_Escape))
-        || (input.IsHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right));
+        || (input.Pointer.IsHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right));
 }
 
 /**
@@ -59,15 +59,15 @@ void TurnPlacementBy(PlacingMode &mode, const PointTransform::Kind kind) {
  */
 void DrawWirePreview(const WiringMode &mode, const ModeInput &input, const GridPoint cursor) {
     if (!mode.Start) {
-        const ImVec2 cursor_on_screen = input.View.ToScreen(ToVec2(cursor));
+        const ImVec2 cursor_on_screen = input.Pointer.View.ToScreen(ToVec2(cursor));
         const ImVec2 half_size = {WIRE_CURSOR_HALF_SIZE, WIRE_CURSOR_HALF_SIZE};
         ImGui::GetWindowDrawList()->AddRect(cursor_on_screen - half_size,
                                             cursor_on_screen + half_size,
                                             GetPreviewColor());
     } else {
         const GridPoint corner = FindWireCorner(*mode.Start, cursor, input.IsWireVerticalFirst);
-        UIWire(*mode.Start, corner).Draw(input.Canvas, input.View, GetPreviewColor());
-        UIWire(corner, cursor).Draw(input.Canvas, input.View, GetPreviewColor());
+        UIWire(*mode.Start, corner).Draw(input.Canvas, input.Pointer.View, GetPreviewColor());
+        UIWire(corner, cursor).Draw(input.Canvas, input.Pointer.View, GetPreviewColor());
     }
 }
 
@@ -78,7 +78,7 @@ void DrawWirePreview(const WiringMode &mode, const ModeInput &input, const GridP
  *          part is drawn where the cursor is; here, hovering a wire or a part shows its value on display.
  */
 std::optional<EditorMode> HandleMode(SelectingMode &mode, const ModeInput &input) {
-    if (!input.IsHovered || mode.Drag || !input.Overlays.GetDisplayed()) {
+    if (!input.Pointer.IsHovered || mode.Drag || !input.Overlays.GetDisplayed()) {
         return std::nullopt;
     }
     if (const std::optional<MeasurementTarget> target = FindTargetAt(input)) {
@@ -102,17 +102,17 @@ std::optional<EditorMode> HandleMode(PlacingMode &mode, const ModeInput &input) 
             TurnPlacementBy(mode, *turn);
         }
     }
-    if (!input.IsHovered) {
+    if (!input.Pointer.IsHovered) {
         return std::nullopt;
     }
 
     Schematic &schematic = input.Blocks.GetShown();
-    const GridPoint position = Snap(input.View.ToWorld(ImGui::GetIO().MousePos));
+    const GridPoint position = Snap(input.Pointer.GetWorldPosition());
     std::unique_ptr<UIElement> preview = MakePlacementPreview(mode, position, schematic, input.Root.GetSubcircuits());
     if (!preview) {
         return SelectingMode{};
     }
-    preview->Draw(input.Canvas, input.View, GetPreviewColor(), input.UserPreferences.Symbols);
+    preview->Draw(input.Canvas, input.Pointer.View, GetPreviewColor(), input.UserPreferences.Symbols);
     if (!ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         return std::nullopt;
     }
@@ -140,14 +140,14 @@ std::optional<EditorMode> HandleMode(WiringMode &mode, const ModeInput &input) {
             return StopWire(mode) ? std::optional<EditorMode>(SelectingMode{}) : std::nullopt;
         }
     }
-    if (!input.IsHovered) {
+    if (!input.Pointer.IsHovered) {
         return std::nullopt;
     }
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
         return StopWire(mode) ? std::optional<EditorMode>(SelectingMode{}) : std::nullopt;
     }
 
-    const GridPoint cursor = Snap(input.View.ToWorld(ImGui::GetIO().MousePos));
+    const GridPoint cursor = Snap(input.Pointer.GetWorldPosition());
     DrawWirePreview(mode, input, cursor);
     if (!ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         return std::nullopt;
@@ -167,7 +167,7 @@ std::optional<EditorMode> HandleMode(ProbingMode & /*mode*/, const ModeInput &in
     if (WantsToLeaveMode(input)) {
         return SelectingMode{};
     }
-    if (!input.IsHovered) {
+    if (!input.Pointer.IsHovered) {
         return std::nullopt;
     }
 
@@ -217,16 +217,16 @@ std::optional<EditorMode> HandleMode(PastingMode &mode, const ModeInput &input) 
             TransformGroup(group, {.Type = *turn, .Delta = {}, .Pivot = {}});
         }
     }
-    if (!input.IsHovered) {
+    if (!input.Pointer.IsHovered) {
         return std::nullopt;
     }
 
-    MovePivotTo(group, Snap(input.View.ToWorld(ImGui::GetIO().MousePos)));
+    MovePivotTo(group, Snap(input.Pointer.GetWorldPosition()));
     for (const UIWire &wire : group.Wires) {
-        wire.Draw(input.Canvas, input.View, GetPreviewColor());
+        wire.Draw(input.Canvas, input.Pointer.View, GetPreviewColor());
     }
     for (const auto &element : group.Elements) {
-        element->Draw(input.Canvas, input.View, GetPreviewColor(), input.UserPreferences.Symbols);
+        element->Draw(input.Canvas, input.Pointer.View, GetPreviewColor(), input.UserPreferences.Symbols);
     }
     if (!ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         return std::nullopt;

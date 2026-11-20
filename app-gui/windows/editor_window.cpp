@@ -296,18 +296,19 @@ std::optional<LivePart> EditorWindow::FindHoveredLivePart(const ImVec2 origin) c
  */
 void EditorWindow::HandleCanvasInput(const CanvasFrame &frame) {
     const bool took_mouse = m_Live.HandleInput(m_Navigator.GetShown(), frame.HoveredLivePart);
-    const SelectionInput selection = {.Shown = m_Navigator.GetShown(),
-                                      .Mode = m_Mode,
-                                      .Popover = m_Popover,
-                                      .View = frame.View,
-                                      .Zoom = m_View.GetZoom(),
-                                      .IsHovered = frame.IsHovered && !took_mouse,
-                                      .WasPopupOpenLastFrame = m_PopupOpenLastFrame};
+    const SelectionInput selection = {
+        .Shown = m_Navigator.GetShown(),
+        .Mode = m_Mode,
+        .Popover = m_Popover,
+        .Pointer = {.View = frame.View, .Zoom = m_View.GetZoom(), .IsHovered = frame.IsHovered && !took_mouse},
+        .WasPopupOpenLastFrame = m_PopupOpenLastFrame};
     for (const EditorCommand command : HandleSelectionInput(selection)) {
         RunCommand(command);
     }
-    m_ContextMenu
-        .HandleRightClick(m_Navigator.GetShown(), m_Mode, frame.View, m_View.GetZoom(), frame.IsHovered, m_Popover);
+    m_ContextMenu.HandleRightClick(m_Navigator.GetShown(),
+                                   m_Mode,
+                                   {.View = frame.View, .Zoom = m_View.GetZoom(), .IsHovered = frame.IsHovered},
+                                   m_Popover);
     m_Popover.HandleValueTyping(m_PartEditor);
 }
 
@@ -369,9 +370,7 @@ void EditorWindow::HandleModeInput(const CanvasFrame &frame, SchematicCanvas &ca
                              .Files = m_Files,
                              .UserPreferences = m_Preferences,
                              .Canvas = canvas,
-                             .View = frame.View,
-                             .Zoom = m_View.GetZoom(),
-                             .IsHovered = frame.IsHovered,
+                             .Pointer = {.View = frame.View, .Zoom = m_View.GetZoom(), .IsHovered = frame.IsHovered},
                              .IsWireVerticalFirst = m_WireVerticalFirst};
     std::optional<EditorMode> next = std::visit([&](auto &mode) { return HandleMode(mode, input); }, m_Mode);
     if (next) {

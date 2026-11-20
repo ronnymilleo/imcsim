@@ -24,7 +24,7 @@ void HandleClick(const SelectionInput &input, SelectingMode &selecting, const Im
     Schematic &schematic = input.Shown;
     const bool shift = ImGui::GetIO().KeyShift;
     const Selection picked =
-        PickAt(schematic.GetElements(), schematic.GetWires(), cursor_world, WIRE_PICK_DISTANCE / input.Zoom);
+        PickAt(schematic.GetElements(), schematic.GetWires(), cursor_world, input.Pointer.GetPickTolerance());
     const Selection current = schematic.GetSelection();
     if (picked.Empty()) {
         // Empty canvas starts a box; with Shift it adds to what is selected, otherwise it starts over
@@ -141,11 +141,11 @@ std::vector<EditorCommand> HandleSelectionInput(const SelectionInput &input) {
         return {};
     }
     std::vector<EditorCommand> commands;
-    const ImVec2 cursor_world = input.View.ToWorld(ImGui::GetIO().MousePos);
-    if (input.IsHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+    const ImVec2 cursor_world = input.Pointer.GetWorldPosition();
+    if (input.Pointer.IsHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         HandleClick(input, *selecting, cursor_world);
     }
-    if (input.IsHovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+    if (input.Pointer.IsHovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
         if (const std::optional<EditorCommand> command = HandleDoubleClick(input)) {
             commands.push_back(*command);
         }
