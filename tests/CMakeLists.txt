@@ -155,6 +155,7 @@ add_executable(imcsim-tests
             transient_tab_tests.cpp
             transient_window_tests.cpp
             truth_table_tests.cpp
+            turn_keys_tests.cpp
             ui_element_tests.cpp
             ui_source_tests.cpp
             ui_wire_tests.cpp

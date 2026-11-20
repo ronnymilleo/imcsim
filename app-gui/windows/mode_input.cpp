@@ -11,6 +11,7 @@
 #include "schematic/probing.h"
 #include "schematic/schematic_drawing.h"
 #include "schematic/selection.h"
+#include "windows/turn_keys.h"
 #include <format>
 #include <string>
 #include <utility>
@@ -43,19 +44,13 @@ bool WantsToLeaveMode(const ModeInput &input) {
 }
 
 /**
- * @brief   Turns or mirrors the pasted group by the keys pressed this frame.
+ * @brief   Turns the part being placed as a turning key asks: a quarter turn, or a mirror.
  */
-void TurnPastedGroup(PastedGroup &group) {
-    if (ImGui::IsKeyPressed(ImGuiKey_R)) {
-        TransformGroup(group, {.Type = PointTransform::Kind::QUARTER_TURN, .Delta = {}, .Pivot = {}});
-    }
-    if (ImGui::IsKeyPressed(ImGuiKey_M)) {
-        const bool top_to_bottom = ImGui::GetIO().KeyShift;
-        TransformGroup(
-            group,
-            {.Type = top_to_bottom ? PointTransform::Kind::MIRROR_TOP_BOTTOM : PointTransform::Kind::MIRROR_LEFT_RIGHT,
-             .Delta = {},
-             .Pivot = {}});
+void TurnPlacementBy(PlacingMode &mode, const PointTransform::Kind kind) {
+    if (kind == PointTransform::Kind::QUARTER_TURN) {
+        TurnPlacement(mode);
+    } else {
+        MirrorPlacement(mode, kind == PointTransform::Kind::MIRROR_TOP_BOTTOM);
     }
 }
 
@@ -103,11 +98,8 @@ std::optional<EditorMode> HandleMode(PlacingMode &mode, const ModeInput &input) 
     }
     // Keyboard shortcuts only apply while the editor has focus, so typing elsewhere does not trigger them
     if (ImGui::IsWindowFocused()) {
-        if (ImGui::IsKeyPressed(ImGuiKey_R)) {
-            TurnPlacement(mode);
-        }
-        if (ImGui::IsKeyPressed(ImGuiKey_M)) {
-            MirrorPlacement(mode, ImGui::GetIO().KeyShift);
+        if (const std::optional<PointTransform::Kind> turn = ReadTurnKey()) {
+            TurnPlacementBy(mode, *turn);
         }
     }
     if (!input.IsHovered) {
@@ -221,7 +213,9 @@ std::optional<EditorMode> HandleMode(PastingMode &mode, const ModeInput &input) 
     }
     PastedGroup &group = mode.Group;
     if (ImGui::IsWindowFocused()) {
-        TurnPastedGroup(group);
+        if (const std::optional<PointTransform::Kind> turn = ReadTurnKey()) {
+            TransformGroup(group, {.Type = *turn, .Delta = {}, .Pivot = {}});
+        }
     }
     if (!input.IsHovered) {
         return std::nullopt;

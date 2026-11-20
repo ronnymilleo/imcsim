@@ -16,6 +16,7 @@
 #include "windows/editor_canvas_drawing.h"
 #include "windows/editor_status_bar.h"
 #include "windows/mode_input.h"
+#include "windows/turn_keys.h"
 #include <algorithm>
 #include <format>
 #include <utility>
@@ -698,16 +699,12 @@ void EditorWindow::UpdateSelectionDrag(SelectingMode &selecting, const ImVec2 cu
  *          shortcut of the table would not.
  */
 void EditorWindow::HandleSelectionKeys() {
-    if (ImGui::IsKeyPressed(ImGuiKey_R)) {
-        RunTurnKey(PointTransform::Kind::QUARTER_TURN);
+    if (const std::optional<PointTransform::Kind> turn = ReadTurnKey()) {
+        RunTurnKey(*turn);
     }
     const bool enter = ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false);
     if (enter && m_Schematic->GetSelectedElement() != nullptr && !ImGui::IsAnyItemActive()) {
         m_Popover.Open();
-    }
-    if (ImGui::IsKeyPressed(ImGuiKey_M)) {
-        RunTurnKey(ImGui::GetIO().KeyShift ? PointTransform::Kind::MIRROR_TOP_BOTTOM
-                                           : PointTransform::Kind::MIRROR_LEFT_RIGHT);
     }
     if (ImGui::IsKeyPressed(ImGuiKey_Delete)) {
         RunCommand(EditorCommand::DELETE_SELECTION);
