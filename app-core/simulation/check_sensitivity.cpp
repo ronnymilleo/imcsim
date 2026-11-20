@@ -7,9 +7,8 @@
 
 #include "circuit/circuit.h"
 #include "simulation/analysis_settings.h"
-#include "simulation/analysis_sources.h"
+#include "simulation/check_analysis_ports.h"
 #include "simulation/check_frequency_range.h"
-#include <format>
 #include <optional>
 #include <string>
 
@@ -23,10 +22,7 @@ namespace Core {
  * @note    ngspice answers a node that does not exist with zeros and no error, so the node is checked here.
  */
 std::optional<std::string> CheckSensitivitySettings(const Circuit &circuit, const SensitivitySettings &settings) {
-    if (settings.OutputNode < 1 || settings.OutputNode >= circuit.GetNodeCount()) {
-        return "Pick the output node; ground has no sensitivity";
-    }
-    return std::nullopt;
+    return CheckOutputNode(circuit, settings.OutputNode, "sensitivity");
 }
 
 /**
@@ -40,17 +36,10 @@ std::optional<std::string> CheckACSensitivitySettings(const Circuit &circuit, co
             CheckFrequencyRange(settings.StartFrequency, settings.StopFrequency, settings.PointsPerDecade)) {
         return error;
     }
-    if (settings.OutputNode < 1 || settings.OutputNode >= circuit.GetNodeCount()) {
-        return "Pick the output node; ground has no sensitivity";
+    if (std::optional<std::string> error = CheckOutputNode(circuit, settings.OutputNode, "sensitivity")) {
+        return error;
     }
-    if (settings.InputSource.empty()) {
-        return "An AC sensitivity analysis needs an AC source as its input; select a voltage or current source and "
-               "set it to AC";
-    }
-    if (FindNoiseInput(circuit, settings.InputSource) == nullptr) {
-        return std::format("The input source {} is not a voltage or current source set to AC", settings.InputSource);
-    }
-    return std::nullopt;
+    return CheckAcInput(circuit, settings.InputSource, "An AC sensitivity analysis");
 }
 
 } // namespace Core

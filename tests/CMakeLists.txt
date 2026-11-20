@@ -21,6 +21,7 @@ add_executable(imcsim-tests
             block_wiring_tests.cpp
             canvas_view_tests.cpp
             check_ac_sweep_tests.cpp
+            check_analysis_ports_tests.cpp
             check_dc_sweep_tests.cpp
             check_harmonic_balance_tests.cpp
             check_transient_tests.cpp
