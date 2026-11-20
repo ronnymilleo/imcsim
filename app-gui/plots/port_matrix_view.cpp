@@ -157,6 +157,16 @@ std::size_t CountAbsentFrequencies(const Core::SParameters &result, const SParam
 }
 
 /**
+ * @brief   Tells whether a matrix exists at no frequency of the sweep, so nothing of it can be drawn.
+ * @param[in] result    Result of the sweep.
+ * @param[in] quantity  Scattering, impedance or admittance.
+ * @return  True for Z or Y missing at every frequency; false for S, which always exists, and for an empty sweep.
+ */
+bool AreAllFrequenciesAbsent(const Core::SParameters &result, const SParameterQuantity quantity) {
+    return !result.Frequencies.empty() && CountAbsentFrequencies(result, quantity) == result.Frequencies.size();
+}
+
+/**
  * @brief   Words the frequencies at which a matrix is missing.
  * @param[in] result    Result of the sweep.
  * @param[in] quantity  Impedance or admittance.
@@ -170,7 +180,7 @@ std::string DescribeAbsentFrequencies(const Core::SParameters &result, const SPa
         return "";
     }
     const bool is_impedance = quantity == SParameterQuantity::Z;
-    if (absent == result.Frequencies.size()) {
+    if (AreAllFrequenciesAbsent(result, quantity)) {
         return is_impedance ? "This circuit has no finite impedance matrix at any frequency of the sweep, as when the "
                               "ports are joined by a series element and nothing else goes to ground: leaving one port "
                               "open then leaves the other one's voltage undefined."

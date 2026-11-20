@@ -211,6 +211,7 @@ add_library(imcsim-gui-lib
             windows/output_tabs/plot_widgets.cpp
             windows/output_tabs/pole_zero_tab.cpp
             windows/output_tabs/result_tables.cpp
+            windows/output_tabs/s_parameter_choices.cpp
             windows/output_tabs/s_parameter_smith.cpp
             windows/output_tabs/s_parameter_stability.cpp
             windows/output_tabs/s_parameter_tab.cpp

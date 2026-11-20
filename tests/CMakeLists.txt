@@ -109,6 +109,7 @@ add_executable(imcsim-tests
             run_repeat_tests.cpp
             run_report_tests.cpp
             run_status_tests.cpp
+            s_parameter_choices_tests.cpp
             s_parameter_ports_tests.cpp
             s_parameter_view_tests.cpp
             s_parameters_tests.cpp

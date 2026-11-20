@@ -116,12 +116,15 @@ TEST_CASE("The missing frequencies are counted and worded", "[port_matrix_view]"
     // Without matrices nothing is counted, since the quantity is not offered
     CHECK(GUI::CountAbsentFrequencies(MakeResult(false, false), GUI::SParameterQuantity::Z) == 0);
     CHECK(GUI::CountAbsentFrequencies(partly, GUI::SParameterQuantity::S) == 0);
+    CHECK_FALSE(GUI::AreAllFrequenciesAbsent(partly, GUI::SParameterQuantity::Z));
 }
 
 TEST_CASE("A matrix that exists nowhere says why, for impedance and for admittance", "[port_matrix_view]") {
     Core::SParameters result = MakeResult(false);
     result.ImpedanceMatrices.assign(3, std::nullopt);
     result.AdmittanceMatrices.assign(3, std::nullopt);
+    CHECK(GUI::AreAllFrequenciesAbsent(result, GUI::SParameterQuantity::Z));
+    CHECK_FALSE(GUI::AreAllFrequenciesAbsent(result, GUI::SParameterQuantity::S));
     CHECK_THAT(GUI::DescribeAbsentFrequencies(result, GUI::SParameterQuantity::Z),
                ContainsSubstring("no finite impedance matrix at any frequency"));
     CHECK_THAT(GUI::DescribeAbsentFrequencies(result, GUI::SParameterQuantity::Z), ContainsSubstring("series element"));
