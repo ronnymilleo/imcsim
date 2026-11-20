@@ -243,12 +243,13 @@ void KeepOffBlock(RoutingObstacles &obstacles, const UISubcircuit &block) {
  * @param[in] wires      The wires already there.
  * @param[in] obstacles  Boxes and points no wire may cross, such as the blocks the wires go to.
  * @param[in] links      Where each wire starts and ends.
- * @return  The wires of each link, in order, or none for a link that found no route.
+ * @return  The wires of every link, in order. A link that finds no route bends once instead, as it always can, so
+ *          its two wires may cross what the others keep off; a bend that lands on an end gives a wire of no length.
  */
-std::vector<std::optional<std::vector<UIWire>>> RouteLinks(const std::vector<std::unique_ptr<UIElement>> &elements,
-                                                           const std::vector<UIWire> &wires,
-                                                           const RoutingObstacles &obstacles,
-                                                           const std::vector<WireLink> &links) {
+std::vector<UIWire> RouteLinks(const std::vector<std::unique_ptr<UIElement>> &elements,
+                               const std::vector<UIWire> &wires,
+                               const RoutingObstacles &obstacles,
+                               const std::vector<WireLink> &links) {
     // Every start is kept off too, so no route runs over the point another one starts from
     std::vector<GridPoint> blocked = obstacles.Points;
     for (const auto &element : elements) {
@@ -260,19 +261,19 @@ std::vector<std::optional<std::vector<UIWire>>> RouteLinks(const std::vector<std
         grid.BlockArea({static_cast<int>(std::ceil(box.Min.x)), static_cast<int>(std::ceil(box.Min.y))},
                        {static_cast<int>(std::floor(box.Max.x)), static_cast<int>(std::floor(box.Max.y))});
     }
-    std::vector<std::optional<std::vector<UIWire>>> routed;
+    std::vector<UIWire> routed;
     for (const WireLink &link : links) {
         const std::optional<std::vector<GridPoint>> path = grid.Route(link.From, link.To);
         if (!path) {
-            routed.emplace_back();
+            const GridPoint bend = {link.To.X, link.From.Y};
+            routed.emplace_back(link.From, bend);
+            routed.emplace_back(bend, link.To);
             continue;
         }
-        std::vector<UIWire> segments;
         for (std::size_t index = 1; index < path->size(); ++index) {
-            segments.emplace_back((*path)[index - 1], (*path)[index]);
-            grid.AddWire(segments.back());
+            routed.emplace_back((*path)[index - 1], (*path)[index]);
+            grid.AddWire(routed.back());
         }
-        routed.emplace_back(std::move(segments));
     }
     return routed;
 }

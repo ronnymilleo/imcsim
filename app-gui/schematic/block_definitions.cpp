@@ -367,16 +367,7 @@ void RefreshInstancesIn(std::vector<std::unique_ptr<UIElement>> &elements,
             wires = FollowTerminals(wires, {pin.OldPoint}, {pin.NewPoint});
         }
     }
-    const auto routed = RouteLinks(elements, wires, moves.Blocks, links);
-    for (std::size_t index = 0; index < links.size(); ++index) {
-        if (const std::optional<std::vector<UIWire>> &path = routed[index]) {
-            std::ranges::copy(*path, std::back_inserter(wires));
-        } else {
-            const GridPoint bend = {links[index].To.X, links[index].From.Y};
-            wires.emplace_back(links[index].From, bend);
-            wires.emplace_back(bend, links[index].To);
-        }
-    }
+    std::ranges::copy(RouteLinks(elements, wires, moves.Blocks, links), std::back_inserter(wires));
 }
 
 } // namespace GUI

@@ -346,20 +346,9 @@ std::expected<void, std::string>
 Schematic::CreateSubcircuitFromSelection(std::string name,
                                          std::vector<SavedSubcircuitPin> pins,
                                          std::vector<Core::SubcircuitParameter> parameters) {
-    if (auto valid = m_Blocks.CheckNewName(name); !valid) {
-        return std::unexpected(valid.error());
+    if (auto valid = CheckNewBlock(name, pins, parameters); !valid) {
+        return valid;
     }
-    auto candidates = GetSubcircuitPinCandidates();
-    if (!candidates) {
-        return std::unexpected(candidates.error());
-    }
-    if (auto valid = CheckPinChoice(*candidates, pins); !valid) {
-        return std::unexpected(valid.error());
-    }
-    if (auto valid = ValidateMetadata(pins, parameters); !valid) {
-        return std::unexpected(valid.error());
-    }
-
     SavedSubcircuit made;
     made.Name = std::move(name);
     made.Pins = std::move(pins);
@@ -380,10 +369,7 @@ Schematic::CreateSubcircuitFromSelection(std::string name,
 
     DeleteSelection();
     m_Blocks.AddSubcircuit(std::move(definition));
-    MoveToFreeSpot(static_cast<UISubcircuit &>(*instance_element), old_points, m_Elements, m_Wires);
-    AddElement(std::move(instance_element));
-    WireNewBlock(old_points);
-    SelectElement(m_Elements.size() - 1);
+    PlaceBlockInstance(std::move(instance_element), old_points);
     return {};
 }
 
@@ -892,30 +878,54 @@ void Schematic::FollowDefinitionChange(const DefinitionChange &change) {
 }
 
 /**
- * @brief   Wires the terminals of a block just made, the last element, to the points where its pin markers were.
+ * @brief   Checks that a block can be made from the selection with these settings, before anything changes.
+ * @return  Nothing when the name is free, every selected marker has one pin and the names are unique identifiers;
+ *          the reason otherwise.
+ */
+std::expected<void, std::string>
+Schematic::CheckNewBlock(const std::string &name,
+                         const std::vector<SavedSubcircuitPin> &pins,
+                         const std::vector<Core::SubcircuitParameter> &parameters) const {
+    if (auto valid = m_Blocks.CheckNewName(name); !valid) {
+        return valid;
+    }
+    const auto candidates = GetSubcircuitPinCandidates();
+    if (!candidates) {
+        return std::unexpected(candidates.error());
+    }
+    if (auto valid = CheckPinChoice(*candidates, pins); !valid) {
+        return valid;
+    }
+    return ValidateMetadata(pins, parameters);
+}
+
+/**
+ * @brief   Puts the instance of a block just made where it has room, wires it to the points where its pin markers
+ *          were, and selects it.
+ */
+void Schematic::PlaceBlockInstance(std::unique_ptr<UIElement> instance, const std::vector<GridPoint> &old_points) {
+    auto &block = static_cast<UISubcircuit &>(*instance);
+    MoveToFreeSpot(block, old_points, m_Elements, m_Wires);
+    AddElement(std::move(instance));
+    WireNewBlock(block, old_points);
+    SelectElement(m_Elements.size() - 1);
+}
+
+/**
+ * @brief   Wires the terminals of a block just placed to the points where its pin markers were.
  * @details Each wire goes around the box from the edge its pin is on, clear of the other wires and terminals; one
  *          that finds no route bends once instead, as it can always do.
  */
-void Schematic::WireNewBlock(const std::vector<GridPoint> &old_points) {
-    const UIElement &instance = *m_Elements.back();
-    const std::vector<GridPoint> new_points = instance.GetTerminals();
+void Schematic::WireNewBlock(const UISubcircuit &block, const std::vector<GridPoint> &old_points) {
+    const std::vector<GridPoint> new_points = block.GetTerminals();
     std::vector<WireLink> links;
     for (std::size_t index = 0; index < new_points.size(); ++index) {
         links.push_back({.From = old_points[index], .To = new_points[index]});
     }
-    RoutingObstacles block;
-    KeepOffBlock(block, static_cast<const UISubcircuit &>(instance));
-    const auto routed = RouteLinks(m_Elements, m_Wires, block, links);
-    for (std::size_t index = 0; index < links.size(); ++index) {
-        if (const std::optional<std::vector<UIWire>> &path = routed[index]) {
-            for (const UIWire &wire : *path) {
-                AddWire(wire.GetStart(), wire.GetEnd());
-            }
-            continue;
-        }
-        const GridPoint bend = {links[index].To.X, links[index].From.Y};
-        AddWire(links[index].From, bend);
-        AddWire(bend, links[index].To);
+    RoutingObstacles obstacles;
+    KeepOffBlock(obstacles, block);
+    for (const UIWire &wire : RouteLinks(m_Elements, m_Wires, obstacles, links)) {
+        AddWire(wire.GetStart(), wire.GetEnd());
     }
 }
 

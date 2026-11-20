@@ -18,6 +18,7 @@ add_executable(imcsim-tests
             block_library_tests.cpp
             block_nesting_tests.cpp
             block_session_tests.cpp
+            block_wiring_tests.cpp
             canvas_view_tests.cpp
             check_ac_sweep_tests.cpp
             check_dc_sweep_tests.cpp
