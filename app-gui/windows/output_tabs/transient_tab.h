@@ -17,6 +17,7 @@
 #include "results/result_store.h"
 #include "schematic/schematic.h"
 #include "windows/output_tabs/frame_results.h"
+#include "windows/output_tabs/logic_lane_plot.h"
 #include "windows/output_tabs/plot_widgets.h"
 #include <cstddef>
 #include <optional>
@@ -109,7 +110,8 @@ private:
     // Plots
     void DrawPlots(const Core::Transient &transient,
                    const std::vector<MathTrace> &math,
-                   const std::optional<StepFamily<Core::Transient>> &steps);
+                   const std::optional<StepFamily<Core::Transient>> &steps,
+                   const LaneLayout &layout);
     TraceFits TakeAnalogFits(const Core::Transient &transient, ShownTraces shown);
     void DrawAnalog(const Core::Transient &transient,
                     const std::vector<MathTrace> &math,
@@ -121,17 +123,12 @@ private:
                                                const std::vector<MathTrace> &math,
                                                const std::optional<StepFamily<Core::Transient>> &steps,
                                                const AnalogPlan &plan);
-    void DrawLogicLanes(const Core::Transient &transient,
-                        const std::vector<BusLane> &buses,
-                        const std::vector<LogicNode> &lanes,
-                        float height);
+    void DrawLogicLanes(const Core::Transient &transient, const LaneLayout &layout, float height);
     void DrawTimeMarkers(const Core::Transient &transient, const std::vector<PlottedTrace> &plotted);
     void KeepVisibleTime();
-    std::vector<LogicNode> FindMeasuredLanes(std::size_t node_count) const;
-    std::vector<BusLane> FindShownBuses(std::size_t node_count) const;
 
     // Statistics
-    void DrawStatistics(const Core::Transient &transient, const std::vector<MathTrace> &math);
+    void DrawStatistics(const Core::Transient &transient, const std::vector<MathTrace> &math, const LaneLayout &layout);
 };
 
 // Window

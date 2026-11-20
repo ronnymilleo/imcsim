@@ -66,6 +66,7 @@ add_executable(imcsim-tests
             logarithmic_level_tests.cpp
             logic_bus_definition_tests.cpp
             logic_bus_tests.cpp
+            logic_lane_plot_tests.cpp
             logic_outputs_tests.cpp
             logic_trace_tests.cpp
             math_channel_definition_tests.cpp
