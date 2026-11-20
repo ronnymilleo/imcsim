@@ -27,3 +27,14 @@ TEST_CASE("The statistics measure between the cursors while they are shown, othe
     cursors.Shown = false;
     CHECK(GUI::MeasuredSpan(cursors, view).To == 10.0);
 }
+
+TEST_CASE("A measured span is kept within the run, earlier end first", "[cursor_widgets]") {
+    const GUI::PlotSpan run{.From = 0.0, .To = 10.0};
+    const GUI::PlotSpan reversed = GUI::ClipSpanToRun({.From = 12.0, .To = 4.0}, run);
+    CHECK(reversed.From == 4.0);
+    CHECK(reversed.To == 10.0);
+    // A span outside the run measures the whole run
+    const GUI::PlotSpan outside = GUI::ClipSpanToRun({.From = 20.0, .To = 30.0}, run);
+    CHECK(outside.From == 0.0);
+    CHECK(outside.To == 10.0);
+}

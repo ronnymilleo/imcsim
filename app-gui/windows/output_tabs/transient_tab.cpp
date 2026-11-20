@@ -282,20 +282,13 @@ void TransientTab::Draw(const FrameResults &frame) {
  * @return  The span between the cursors, or what the plot shows, or the whole run before the plot was first drawn,
  *          clipped to the run from the earlier end; an empty span without a transient.
  */
-PlotSpan TransientTab::GetMeasuredSpan() const {
+PlotSpan TransientTab::GetClippedMeasuredSpan() const {
     const auto &transient = m_Results.GetTransient();
     if (!transient || transient->Times.empty()) {
         return {};
     }
-    const PlotSpan measured = MeasuredSpan(m_Cursors, m_View);
-    const double run_start = transient->Times.front();
-    const double run_stop = transient->Times.back();
-    const double from = std::max(std::min(measured.From, measured.To), run_start);
-    const double to = std::min(std::max(measured.From, measured.To), run_stop);
-    if (!(from < to)) {
-        return {.From = run_start, .To = run_stop};
-    }
-    return {.From = from, .To = to};
+    return ClipSpanToRun(MeasuredSpan(m_Cursors, m_View),
+                         {.From = transient->Times.front(), .To = transient->Times.back()});
 }
 
 /**
@@ -342,35 +335,34 @@ ExportFigure TransientTab::BuildFigure(const FrameResults &frame, const bool is_
  *          the Output window takes the front as its first chunk arrives, or was stopped and keeps the points it made.
  * @details A live run has no stop time to reach: stopped, it is paused, and goes on or is dropped from here.
  */
-void TransientTab::DrawIncompleteNote(const Core::Transient &transient) {
+void TransientTab::DrawRunControls(const Core::Transient &transient) {
     if (m_Controls.IsLive()) {
-        DrawLiveNote(transient);
+        DrawLiveRunControls(transient);
         return;
     }
     const std::string reached = std::format("simulated up to {}s of {}s",
                                             Core::FormatValue(transient.Times.back()),
                                             Core::FormatValue(m_Schematic.GetSimulationSettings().Transient.StopTime));
-    if (m_Controls.IsRunning()) {
-        ImGui::BeginDisabled(m_Controls.IsStopping());
-        if (ImGui::Button("Stop")) {
-            m_Controls.StopRun();
-        }
-        ImGui::EndDisabled();
-        ImGui::SameLine();
-        ImGui::TextDisabled("%s",
-                            std::format("{}, {}", m_Controls.IsStopping() ? "Stopping" : "Running", reached).c_str());
-    } else {
+    if (!m_Controls.IsRunning()) {
         ImGui::TextDisabled("%s", std::format("Stopped, {}", reached).c_str());
+        return;
     }
+    ImGui::BeginDisabled(m_Controls.IsStopping());
+    if (ImGui::Button("Stop")) {
+        m_Controls.StopRun();
+    }
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    ImGui::TextDisabled("%s", std::format("{}, {}", m_Controls.IsStopping() ? "Stopping" : "Running", reached).c_str());
 }
 
 /**
  * @brief   Stop pauses a live run, which then goes on with Continue or ends with Discard.
  */
-void TransientTab::DrawLiveNote(const Core::Transient &transient) {
+void TransientTab::DrawLiveRunControls(const Core::Transient &transient) {
     const bool is_paused = m_Controls.IsLivePaused();
     ImGui::BeginDisabled(m_Controls.IsStopping());
-    if (is_paused ? ImGui::Button("Continue") : ImGui::Button("Stop")) {
+    if (ImGui::Button(is_paused ? "Continue" : "Stop")) {
         if (is_paused) {
             m_Controls.ContinueLive();
         } else {
@@ -396,27 +388,33 @@ void TransientTab::DrawLiveNote(const Core::Transient &transient) {
  * @details While the run goes on, the window can follow its newest points. The schematic plays the same window.
  */
 void TransientTab::DrawWindowControls(const Core::Transient &shown) {
-    TransientWindow &window = m_Playback.Window;
-    const std::size_t total_points = window.GetTotalPoints();
-    const bool has_span = window.GetSpan().has_value();
     if (shown.Times.empty()) {
         return;
     }
-    // A run too short to cut into windows has no window size or scroll bar, only its range and the cursors
-    const bool has_window = !((!has_span && total_points <= static_cast<std::size_t>(MIN_WINDOW_POINTS))
-                              || (has_span && window.GetWindow().Count >= total_points));
+    const TransientWindow &window = m_Playback.Window;
+    const WindowAvailability availability =
+        GetWindowAvailability(window.GetTotalPoints(), window.GetSpan().has_value(), window.GetWindow().Count);
     const float width = ImGui::GetContentRegionAvail().x;
-    const std::string span =
-        std::format("{}s to {}s", Core::FormatValue(shown.Times.front()), Core::FormatValue(shown.Times.back()));
+    DrawWindowHeaderRow(shown, availability.HasSize, width);
+    if (availability.HasScrollbar) {
+        DrawWindowScrollbar(width);
+    }
+}
+
+/**
+ * @brief   The row over the plot: Follow while the run goes on, the range shown, and at the right end the cursor toggle
+ *          and the size of the window; in a narrow window those go one after the other on rows of their own rather
+ *          than over the range.
+ */
+void TransientTab::DrawWindowHeaderRow(const Core::Transient &shown, const bool has_size, const float width) {
     const ImVec2 row_start = ImGui::GetCursorPos();
     if (m_Controls.IsRunning()) {
+        TransientWindow &window = m_Playback.Window;
         bool follows = window.DoesFollow();
         if (ImGui::Checkbox("Follow", &follows)) {
             window.SetFollow(follows);
         }
         ImGui::SetItemTooltip("Keep the window on the newest points of the run");
-    }
-    if (m_Controls.IsRunning()) {
         ImGui::SameLine(0.0f, ImGui::GetFontSize());
     } else {
         ImGui::SetCursorPos(row_start);
@@ -424,12 +422,10 @@ void TransientTab::DrawWindowControls(const Core::Transient &shown) {
     ImGui::AlignTextToFramePadding();
     ImGui::TextDisabled("Range");
     ImGui::SameLine();
-    ImGui::TextUnformatted(span.c_str());
-    // A live run is seen a stop time at a time, so its window has no size to pick
-    const bool has_size = has_window && !has_span;
+    ImGui::TextUnformatted(
+        std::format("{}s to {}s", Core::FormatValue(shown.Times.front()), Core::FormatValue(shown.Times.back()))
+            .c_str());
     const float size_width = has_size ? GetWindowSizeWidth() + ImGui::GetFontSize() : 0.0f;
-    // At the right end of the row; in a narrow window, one after the other on rows of their own rather than over the
-    // range
     ImGui::SameLine();
     const float right_edge = row_start.x + width;
     if (ImGui::GetCursorPosX() + ImGui::GetFontSize() + GetCursorToggleWidth() + size_width <= right_edge) {
@@ -439,20 +435,24 @@ void TransientTab::DrawWindowControls(const Core::Transient &shown) {
             ImGui::SetCursorPosX(right_edge - GetWindowSizeWidth());
             DrawWindowSize();
         }
-    } else {
-        ImGui::NewLine();
-        DrawCursorCheckbox(m_Cursors);
-        if (has_size) {
-            ImGui::SameLine(0.0f, ImGui::GetFontSize());
-            if (ImGui::GetCursorPosX() + GetWindowSizeWidth() > right_edge) {
-                ImGui::NewLine();
-            }
-            DrawWindowSize();
-        }
-    }
-    if (!has_window || window.GetWindow().Count >= total_points) {
         return;
     }
+    ImGui::NewLine();
+    DrawCursorCheckbox(m_Cursors);
+    if (has_size) {
+        ImGui::SameLine(0.0f, ImGui::GetFontSize());
+        if (ImGui::GetCursorPosX() + GetWindowSizeWidth() > right_edge) {
+            ImGui::NewLine();
+        }
+        DrawWindowSize();
+    }
+}
+
+/**
+ * @brief   The scroll bar that moves the window along the run, as wide as the plot.
+ */
+void TransientTab::DrawWindowScrollbar(const float width) {
+    TransientWindow &window = m_Playback.Window;
     const ImRect bar(ImGui::GetCursorScreenPos(),
                      ImGui::GetCursorScreenPos() + ImVec2(width, ImGui::GetStyle().ScrollbarSize));
     ImGui::ItemSize(bar);
@@ -462,7 +462,7 @@ void TransientTab::DrawWindowControls(const Core::Transient &shown) {
                            ImGuiAxis_X,
                            &first,
                            static_cast<ImS64>(window.GetWindow().Count),
-                           static_cast<ImS64>(total_points))) {
+                           static_cast<ImS64>(window.GetTotalPoints()))) {
         window.SetFirst(static_cast<std::size_t>(first));
     }
     ImGui::SetItemTooltip("Drag to move the window along the run");
@@ -506,7 +506,7 @@ void TransientTab::DrawPlots(const Core::Transient &transient,
                              const std::vector<MathTrace> &math,
                              const std::optional<StepFamily<Core::Transient>> &steps) {
     if (!transient.IsComplete) {
-        DrawIncompleteNote(transient);
+        DrawRunControls(transient);
     }
     DrawWindowControls(transient);
     const std::vector<LogicNode> lanes = FindMeasuredLanes(transient.NodeVoltages.size());
@@ -805,6 +805,24 @@ AnalogPlan PlanAnalog(const ShownTraces &shown,
             .HasVoltages = has_voltages,
             .HasLanes = has_lanes,
             .IsShown = has_voltages || shows_currents || !math.empty() || !has_lanes};
+}
+
+/**
+ * @brief   Tells what the window controls offer for a run of some points.
+ * @param[in] total_points  Points of the whole run.
+ * @param[in] has_span      Whether the window is a span of time, as a live run has, rather than a count of points.
+ * @param[in] window_count  Points in the window now.
+ * @return  No size or scroll bar for a run too short to cut into windows, or whose window holds it all; a live run has
+ *          no size to pick, since it is seen a stop time at a time, and a scroll bar only while it is longer than that.
+ */
+WindowAvailability
+GetWindowAvailability(const std::size_t total_points, const bool has_span, const std::size_t window_count) {
+    const bool is_too_short =
+        has_span ? window_count >= total_points : total_points <= static_cast<std::size_t>(MIN_WINDOW_POINTS);
+    if (is_too_short) {
+        return {.HasScrollbar = false, .HasSize = false};
+    }
+    return {.HasScrollbar = window_count < total_points, .HasSize = !has_span};
 }
 
 } // namespace GUI

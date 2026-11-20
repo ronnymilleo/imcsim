@@ -116,6 +116,21 @@ PlotSpan MeasuredSpan(const PlotCursors &cursors, const PlotSpan &view) {
 }
 
 /**
+ * @brief   Keeps a span within a run, from its earlier end, as the cursors may sit in either order or past the run.
+ * @param[in] span  The span measured, such as between the cursors.
+ * @param[in] run   The first and last instants of the run.
+ * @return  The part of the span inside the run, earlier end first; the whole run when nothing of the span is in it.
+ */
+PlotSpan ClipSpanToRun(const PlotSpan &span, const PlotSpan &run) {
+    const double from = std::max(std::min(span.From, span.To), run.From);
+    const double to = std::min(std::max(span.From, span.To), run.To);
+    if (!(from < to)) {
+        return run;
+    }
+    return {.From = from, .To = to};
+}
+
+/**
  * @brief   The cursors the statistics read the traces at.
  * @param[in] cursors  The cursors of the plot.
  * @return  The cursors while they are shown, otherwise no value.

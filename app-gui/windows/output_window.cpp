@@ -527,7 +527,7 @@ void OutputWindow::DrawTab(const PlotTab tab, const FrameResults &frame) {
         break;
     case PlotTab::SPECTRUM:
         // The spectrum goes over the stretch the transient statistics measure
-        m_SpectrumTab.Draw(frame, m_TransientTab.GetMeasuredSpan());
+        m_SpectrumTab.Draw(frame, m_TransientTab.GetClippedMeasuredSpan());
         break;
     case PlotTab::AC_SWEEP:
         m_ACSweepTab.Draw(frame);

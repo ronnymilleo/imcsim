@@ -43,3 +43,19 @@ TEST_CASE("A math channel keeps the analog plot, and on the voltage axis counts 
     CHECK(on_third_axis.IsShown);
     CHECK_FALSE(on_third_axis.HasVoltages);
 }
+
+TEST_CASE("A run too short to cut into windows has no window size or scroll bar", "[transient_tab]") {
+    const auto short_run = static_cast<std::size_t>(GUI::MIN_WINDOW_POINTS);
+    CHECK(GUI::GetWindowAvailability(short_run, false, short_run) == GUI::WindowAvailability{});
+    // A longer run picks the size of its window, and scrolls once the window is shorter than the run
+    CHECK(GUI::GetWindowAvailability(short_run * 4, false, short_run * 4)
+          == GUI::WindowAvailability{.HasScrollbar = false, .HasSize = true});
+    CHECK(GUI::GetWindowAvailability(short_run * 4, false, short_run)
+          == GUI::WindowAvailability{.HasScrollbar = true, .HasSize = true});
+}
+
+TEST_CASE("A live run has no window size, and scrolls only while it is longer than its window", "[transient_tab]") {
+    CHECK(GUI::GetWindowAvailability(100, true, 100) == GUI::WindowAvailability{});
+    CHECK(GUI::GetWindowAvailability(300, true, 100)
+          == GUI::WindowAvailability{.HasScrollbar = true, .HasSize = false});
+}

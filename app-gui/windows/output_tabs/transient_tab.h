@@ -26,6 +26,19 @@
 namespace GUI {
 
 /**
+ * @struct  WindowAvailability
+ * @brief   What the controls of the window of points offer for the run shown.
+ */
+struct WindowAvailability {
+    /// Whether a scroll bar moves the window along the run, which is longer than the window.
+    bool HasScrollbar = false;
+    /// Whether the user picks how many points the window holds.
+    bool HasSize = false;
+
+    bool operator==(const WindowAvailability &) const = default;
+};
+
+/**
  * @struct  AnalogPlan
  * @brief   What the analog plot of a transient shows in a frame, worked out once from the traces and the lanes.
  */
@@ -56,7 +69,7 @@ public:
     TransientTab(Schematic &schematic, ResultStore &results, AnalysisControls &controls, TransientPlayback &playback);
 
     void Draw(const FrameResults &frame);
-    PlotSpan GetMeasuredSpan() const;
+    PlotSpan GetClippedMeasuredSpan() const;
 
     // Export
     bool CanExport(const FrameResults &frame) const;
@@ -86,9 +99,11 @@ private:
     bool m_ShowBitValues = false;
 
     // Notes and window
-    void DrawIncompleteNote(const Core::Transient &transient);
-    void DrawLiveNote(const Core::Transient &transient);
+    void DrawRunControls(const Core::Transient &transient);
+    void DrawLiveRunControls(const Core::Transient &transient);
     void DrawWindowControls(const Core::Transient &shown);
+    void DrawWindowHeaderRow(const Core::Transient &shown, bool has_size, float width);
+    void DrawWindowScrollbar(float width);
     void DrawWindowSize();
 
     // Plots
@@ -118,6 +133,9 @@ private:
     // Statistics
     void DrawStatistics(const Core::Transient &transient, const std::vector<MathTrace> &math);
 };
+
+// Window
+WindowAvailability GetWindowAvailability(std::size_t total_points, bool has_span, std::size_t window_count);
 
 // Analog plot
 AnalogPlan
