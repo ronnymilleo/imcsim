@@ -41,6 +41,7 @@
 #include "windows/part_rail.h"
 #include "windows/spice_block_dialog.h"
 #include <cstddef>
+#include <expected>
 #include <filesystem>
 #include <memory>
 #include <optional>
@@ -188,10 +189,12 @@ private:
     const ResultStore &GetShownResults() const;
     bool LeaveSubcircuitForDocument();
     bool ReturnToLevel(std::size_t depth);
-    void ShowSchematic();
-    void OfferBlockParameters();
+    void EnterShownSchematic();
+    void SyncBlockParametersToPartEditor();
     void RequestEditSelectedSubcircuit();
-    void FinishSubcircuitEditing(bool apply);
+    void ApplyAndLeaveBlock();
+    void DiscardAndLeaveBlock();
+    void FinishLevelChange(const std::expected<void, std::string> &changed);
     void ApplySpiceBlockResult(SpiceBlockResult result);
 
     // Clipboard

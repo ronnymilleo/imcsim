@@ -86,7 +86,7 @@ void EditorWindow::Update() {
     RunPressedShortcuts(ShortcutScope::EDITING);
     m_Files.DrawPopups();
     if (DrawBlockDialog(m_Blocks)) {
-        OfferBlockParameters();
+        SyncBlockParametersToPartEditor();
     }
     if (std::optional<SpiceBlockResult> result = m_SpiceDialog.Draw()) {
         ApplySpiceBlockResult(std::move(*result));
@@ -469,7 +469,7 @@ bool EditorWindow::LeaveSubcircuitForDocument() {
 bool EditorWindow::ReturnToLevel(const std::size_t depth) {
     while (m_Blocks.GetOpenBlocks().size() > depth) {
         const std::size_t open = m_Blocks.GetOpenBlocks().size();
-        FinishSubcircuitEditing(true);
+        ApplyAndLeaveBlock();
         if (m_Blocks.GetOpenBlocks().size() == open) {
             return false;
         }
@@ -482,7 +482,7 @@ bool EditorWindow::ReturnToLevel(const std::size_t depth) {
  * @details A drag belongs to the schematic it started on, and a part or a group on its way would land in the other one,
  *          so both end first.
  */
-void EditorWindow::ShowSchematic() {
+void EditorWindow::EnterShownSchematic() {
     EndDrag(*m_Schematic, m_Mode);
     if (std::holds_alternative<PlacingMode>(m_Mode) || std::holds_alternative<PastingMode>(m_Mode)) {
         m_Mode = SelectingMode{};
@@ -490,7 +490,7 @@ void EditorWindow::ShowSchematic() {
     m_Schematic = &m_Blocks.GetShown();
     m_PartEditor.SetSchematic(*m_Schematic);
     if (IsEditingSubcircuit()) {
-        OfferBlockParameters();
+        SyncBlockParametersToPartEditor();
     } else {
         m_PartEditor.SetBlockParameters({});
     }
@@ -500,9 +500,10 @@ void EditorWindow::ShowSchematic() {
 }
 
 /**
- * @brief   The parts of the block can follow the parameters in the settings, as they stand.
+ * @brief   Gives the part editor the names of the parameters in the settings of the open block, as they stand, so its
+ *          parts can follow them.
  */
-void EditorWindow::OfferBlockParameters() {
+void EditorWindow::SyncBlockParametersToPartEditor() {
     std::vector<std::string> names;
     for (const Core::SubcircuitParameter &parameter : m_Blocks.GetParameters()) {
         names.push_back(parameter.Name);
@@ -525,23 +526,33 @@ void EditorWindow::RequestEditSelectedSubcircuit() {
         m_SpiceDialog.OpenSettings(*definition);
         return;
     }
-    if (const auto opened = m_Blocks.Open(*name); !opened) {
-        m_Blocks.ReportError(opened.error());
-        return;
-    }
-    ShowSchematic();
+    FinishLevelChange(m_Blocks.Open(*name));
 }
 
 /**
- * @brief   Closes the innermost open block, applying it to the document or dropping its changes, and shows the level
- *          above it; a block that cannot be applied stays open, with the reason in the block dialog.
+ * @brief   Applies the innermost open block to the document and shows the level above it; a block that cannot be
+ *          applied stays open, with the reason in the block dialog.
  */
-void EditorWindow::FinishSubcircuitEditing(const bool apply) {
-    if (const auto closed = m_Blocks.Close(apply); !closed) {
-        m_Blocks.ReportError(closed.error());
+void EditorWindow::ApplyAndLeaveBlock() {
+    FinishLevelChange(m_Blocks.Close(true));
+}
+
+/**
+ * @brief   Drops the changes of the innermost open block and shows the level above it.
+ */
+void EditorWindow::DiscardAndLeaveBlock() {
+    FinishLevelChange(m_Blocks.Close(false));
+}
+
+/**
+ * @brief   Shows the level a block was opened or closed to, or tells in the block dialog why it was not.
+ */
+void EditorWindow::FinishLevelChange(const std::expected<void, std::string> &changed) {
+    if (!changed) {
+        m_Blocks.ReportError(changed.error());
         return;
     }
-    ShowSchematic();
+    EnterShownSchematic();
 }
 
 /**
@@ -878,10 +889,10 @@ void EditorWindow::RunCommand(const EditorCommand command) {
         m_Blocks.RequestDialog();
         break;
     case EditorCommand::APPLY_BLOCK:
-        FinishSubcircuitEditing(true);
+        ApplyAndLeaveBlock();
         break;
     case EditorCommand::DISCARD_BLOCK:
-        FinishSubcircuitEditing(false);
+        DiscardAndLeaveBlock();
         break;
     default:
         break;
