@@ -10,6 +10,7 @@
 #include "schematic/placement_editing.h"
 #include "schematic/schematic_drawing.h"
 #include "schematic/selection_editing.h"
+#include "schematic/spice_import.h"
 #include "schematic/wire_editing.h"
 #include "windows/block_dialog.h"
 #include "windows/clipboard_actions.h"
@@ -18,7 +19,6 @@
 #include "windows/mode_input.h"
 #include "windows/selection_input.h"
 #include <algorithm>
-#include <format>
 #include <utility>
 
 namespace GUI {
@@ -59,7 +59,7 @@ EditorWindow::EditorWindow(Schematic &schematic,
                .PlaceGroup = [this](PastedGroup group) { SetMode(PastingMode{.Group = std::move(group)}); },
                .OpenSpiceLibrary =
                    [this](std::string file_name, Core::SpiceLibrary library) {
-                       m_SpiceDialog.OpenImport(std::move(file_name), std::move(library));
+                       m_SpiceImport.Open(std::move(file_name), std::move(library));
                    }}),
       m_Toolbar(controls, settings_panel, schematic), m_PartPicker(preferences), m_PartRail(preferences),
       m_Overlays(glow_renderer, playback, preferences) {
@@ -90,8 +90,11 @@ void EditorWindow::Update() {
     if (DrawBlockDialog(m_Blocks)) {
         SyncBlockParametersToPartEditor();
     }
-    if (std::optional<SpiceBlockResult> result = m_SpiceDialog.Draw()) {
-        ApplySpiceBlockResult(std::move(*result));
+    if (std::optional<SpiceImportResult> imported = m_SpiceImport.Draw()) {
+        ImportSpiceBlocks(std::move(*imported));
+    }
+    if (const std::optional<SpiceSettingsResult> settings = m_SpiceSettings.Draw()) {
+        UpdateSpiceBlock(*settings);
     }
 }
 
@@ -534,7 +537,7 @@ void EditorWindow::RequestEditSelectedSubcircuit() {
     }
     const SavedSubcircuit *definition = m_Blocks.FindDefinition(*name);
     if (definition != nullptr && definition->Spice) {
-        m_SpiceDialog.OpenSettings(*definition);
+        m_SpiceSettings.Open(*definition);
         return;
     }
     FinishLevelChange(m_Blocks.Open(*name));
@@ -567,30 +570,31 @@ void EditorWindow::FinishLevelChange(const std::expected<void, std::string> &cha
 }
 
 /**
- * @brief   Imported blocks join the schematic as one undo step and the first one starts placing, so it lands where the
- *          user clicks; new settings of a block reach every instance of it.
+ * @brief   Imported blocks and models join the document as one undo step, and the first block starts placing, so it
+ *          lands where the user clicks; models alone are only told about, since they show in the Model choice of the
+ *          parts.
  */
-void EditorWindow::ApplySpiceBlockResult(SpiceBlockResult result) {
-    if (!result.Imported.empty() || !result.Models.empty()) {
-        std::vector<std::unique_ptr<UIElement>> no_parts;
-        std::vector<SavedSubcircuit> no_blocks;
-        const std::vector<std::string> models =
-            m_RootSchematic.MergeLibraryModels(std::move(result.Models), no_parts, no_blocks);
-        const std::vector<std::string> names = m_RootSchematic.MergeSubcircuits(std::move(result.Imported), no_parts);
-        m_RootSchematic.CommitUndoStep();
-        if (!names.empty()) {
-            SetMode(PlacingMode{.Type = Core::ComponentType::SUBCIRCUIT, .Block = names.front()});
-        } else {
-            m_Files.QueueMessages(
-                std::format("{} device model{} imported", models.size(), models.size() == 1 ? "" : "s"),
-                {"Select a diode or a transistor and pick the model in its Model choice"});
-        }
+void EditorWindow::ImportSpiceBlocks(SpiceImportResult imported) {
+    // A library brings no parts of its own, which the merges would point at a renamed model or block
+    std::vector<std::unique_ptr<UIElement>> no_parts;
+    std::vector<SavedSubcircuit> no_blocks;
+    const std::vector<std::string> models =
+        m_RootSchematic.MergeLibraryModels(std::move(imported.Models), no_parts, no_blocks);
+    const std::vector<std::string> names = m_RootSchematic.MergeSubcircuits(std::move(imported.Blocks), no_parts);
+    m_RootSchematic.CommitUndoStep();
+    if (!names.empty()) {
+        SetMode(PlacingMode{.Type = Core::ComponentType::SUBCIRCUIT, .Block = names.front()});
         return;
     }
-    if (!result.UpdatedName) {
-        return;
-    }
-    const auto updated = m_Blocks.ApplySpiceUpdate(*result.UpdatedName, result.Pins, result.Parameters);
+    m_Files.QueueMessages(DescribeImportedModels(models.size()),
+                          {"Select a diode or a transistor and pick the model in its Model choice"});
+}
+
+/**
+ * @brief   New settings of a block kept as SPICE text reach every instance of it, or tell why they could not.
+ */
+void EditorWindow::UpdateSpiceBlock(const SpiceSettingsResult &settings) {
+    const auto updated = m_Blocks.ApplySpiceUpdate(settings.Name, settings.Pins, settings.Parameters);
     if (!updated) {
         m_Files.QueueMessages("Could not change the SPICE block", {updated.error()});
     }

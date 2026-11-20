@@ -39,7 +39,8 @@
 #include "windows/part_picker.h"
 #include "windows/part_popover.h"
 #include "windows/part_rail.h"
-#include "windows/spice_block_dialog.h"
+#include "windows/spice_import_dialog.h"
+#include "windows/spice_settings_dialog.h"
 #include <cstddef>
 #include <expected>
 #include <filesystem>
@@ -132,7 +133,9 @@ private:
     /// The blocks open, from the outermost to the one shown, and the settings of the dialog that edits them.
     BlockSession m_Blocks;
     /// Imports SPICE libraries and sets up the pins of the blocks they become.
-    SpiceBlockDialog m_SpiceDialog;
+    SpiceImportDialog m_SpiceImport;
+    /// Changes the pins and parameter defaults of a block kept as SPICE text.
+    SpiceSettingsDialog m_SpiceSettings;
     AnalysisControls &m_Controls;
     AnalysisSettingsPanel &m_SettingsPanel;
     PartEditor &m_PartEditor;
@@ -195,7 +198,8 @@ private:
     void ApplyAndLeaveBlock();
     void DiscardAndLeaveBlock();
     void FinishLevelChange(const std::expected<void, std::string> &changed);
-    void ApplySpiceBlockResult(SpiceBlockResult result);
+    void ImportSpiceBlocks(SpiceImportResult imported);
+    void UpdateSpiceBlock(const SpiceSettingsResult &settings);
 
     // Commands and shortcuts
     void HandleCommandRequest();

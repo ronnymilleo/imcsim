@@ -1,18 +1,16 @@
 /**
- * @file    spice_block_dialog.cpp
- * @brief   The dialogs of blocks kept as SPICE text: picking what to import from a library, and their pin settings.
+ * @file    spice_import_dialog.cpp
+ * @brief   The dialog that picks what to import from a SPICE library and sets up the pins of the blocks it becomes.
  */
 
-#include "windows/spice_block_dialog.h"
+#include "windows/spice_import_dialog.h"
 
 #include "base/theme.h"
 #include "imgui.h"
-#include "misc/cpp/imgui_stdlib.h"
 #include "schematic/spice_import.h"
-#include "schematic/subcircuit_pins.h"
 #include "spice/spice_value.h"
+#include "windows/spice_pin_table.h"
 #include <algorithm>
-#include <array>
 #include <cfloat>
 #include <format>
 #include <utility>
@@ -21,41 +19,9 @@ namespace GUI {
 
 namespace {
 
-constexpr const char *IMPORT_POPUP = "Import SPICE library";
-constexpr const char *SETTINGS_POPUP = "SPICE block";
-// Widths in font sizes, so the dialogs follow the font
-constexpr float PORT_COLUMN_WIDTH = 6.0f;
-constexpr float NAME_FIELD_WIDTH = 8.0f;
-constexpr float SIDE_FIELD_WIDTH = 6.0f;
+constexpr const char *POPUP = "Import SPICE library";
+/// Tallest the list of subcircuits grows before it scrolls, in font sizes.
 constexpr float LIST_HEIGHT = 24.0f;
-constexpr float TEXT_WIDTH = 36.0f;
-constexpr float TEXT_HEIGHT = 12.0f;
-
-/**
- * @brief   One row per port: the port as the text names it, the pin name and the edge of the box it goes on.
- */
-void DrawPinTable(std::vector<SavedSubcircuitPin> &pins, const std::vector<std::string> &ports) {
-    const float font_size = ImGui::GetFontSize();
-    for (std::size_t index = 0; index < pins.size() && index < ports.size(); ++index) {
-        ImGui::PushID(static_cast<int>(index));
-        ImGui::AlignTextToFramePadding();
-        ImGui::TextDisabled("%s", ports[index].c_str());
-        ImGui::SameLine(font_size * PORT_COLUMN_WIDTH);
-        ImGui::SetNextItemWidth(font_size * NAME_FIELD_WIDTH);
-        ImGui::InputText("##name", &pins[index].Name);
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(font_size * SIDE_FIELD_WIDTH);
-        if (ImGui::BeginCombo("##side", GetPinSideName(pins[index].Side))) {
-            for (const Core::PinSide side : PIN_SIDES) {
-                if (ImGui::Selectable(GetPinSideName(side), side == pins[index].Side)) {
-                    pins[index].Side = side;
-                }
-            }
-            ImGui::EndCombo();
-        }
-        ImGui::PopID();
-    }
-}
 
 std::string DescribeParameters(const std::vector<Core::SubcircuitParameter> &parameters) {
     std::string text;
@@ -75,8 +41,7 @@ std::string DescribeParameters(const std::vector<Core::SubcircuitParameter> &par
  * @param[in] library    What ReadSpiceLibrary() read from it.
  * @note    A library of one subcircuit has it picked already.
  */
-void SpiceBlockDialog::OpenImport(std::string file_name, Core::SpiceLibrary library) {
-    m_Mode = Mode::IMPORT;
+void SpiceImportDialog::Open(std::string file_name, Core::SpiceLibrary library) {
     m_FileName = std::move(file_name);
     m_Warnings = std::move(library.Warnings);
     m_Choices.clear();
@@ -93,41 +58,17 @@ void SpiceBlockDialog::OpenImport(std::string file_name, Core::SpiceLibrary libr
 }
 
 /**
- * @brief   Opens the dialog on the pins and parameters of a block kept as SPICE text.
- * @param[in] definition  The block; one that is not SPICE text opens nothing.
- */
-void SpiceBlockDialog::OpenSettings(const SavedSubcircuit &definition) {
-    if (!definition.Spice) {
-        return;
-    }
-    m_Mode = Mode::SETTINGS;
-    m_BlockName = definition.Name;
-    m_Ports = definition.Spice->Ports;
-    m_Pins = definition.Pins;
-    m_Parameters = definition.Parameters;
-    m_Text = definition.Spice->Text;
-    m_Error.clear();
-    m_IsOpenRequested = true;
-}
-
-/**
- * @brief   Draws the open dialog, if any.
- * @return  What the user confirmed, in the frame they confirm it; no value otherwise.
+ * @brief   Draws the dialog while it is open: every subcircuit of the library with a box to pick it, a picked one with
+ *          its pins to name and place, and the device models.
+ * @return  What the user picked, in the frame they confirm it; no value otherwise.
  * @note    Call it every frame from the same place, outside any window, so the popup opens where it is drawn.
  */
-std::optional<SpiceBlockResult> SpiceBlockDialog::Draw() {
+std::optional<SpiceImportResult> SpiceImportDialog::Draw() {
     if (std::exchange(m_IsOpenRequested, false)) {
-        ImGui::OpenPopup(m_Mode == Mode::IMPORT ? IMPORT_POPUP : SETTINGS_POPUP);
+        ImGui::OpenPopup(POPUP);
     }
-    return m_Mode == Mode::IMPORT ? DrawImport() : DrawSettings();
-}
-
-/**
- * @brief   Every subcircuit of the library with a box to pick it; a picked one shows its pins to name and place.
- */
-std::optional<SpiceBlockResult> SpiceBlockDialog::DrawImport() {
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (!ImGui::BeginPopupModal(IMPORT_POPUP, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (!ImGui::BeginPopupModal(POPUP, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         return std::nullopt;
     }
     const float font_size = ImGui::GetFontSize();
@@ -153,7 +94,7 @@ std::optional<SpiceBlockResult> SpiceBlockDialog::DrawImport() {
         ImGui::TextColored(GetErrorTextColor(), "%s", m_Error.c_str());
     }
 
-    std::optional<SpiceBlockResult> result;
+    std::optional<SpiceImportResult> result;
     const bool is_any_chosen = std::ranges::any_of(m_Choices, &Choice::IsChosen)
                             || std::ranges::any_of(m_AreModelsChosen, [](const char chosen) { return chosen != 0; });
     ImGui::BeginDisabled(!is_any_chosen);
@@ -176,7 +117,7 @@ std::optional<SpiceBlockResult> SpiceBlockDialog::DrawImport() {
  * @brief   A subcircuit of the library with a box to pick it; once picked, what the vendor says of its ports, its
  *          parameters, its warnings and its pins to name and place.
  */
-void SpiceBlockDialog::DrawSubcircuitChoice(Choice &choice) {
+void SpiceImportDialog::DrawSubcircuitChoice(Choice &choice) {
     ImGui::Checkbox(choice.Subcircuit.Name.c_str(), &choice.IsChosen);
     if (!choice.IsChosen) {
         return;
@@ -194,14 +135,14 @@ void SpiceBlockDialog::DrawSubcircuitChoice(Choice &choice) {
     for (const std::string &warning : choice.Subcircuit.Warnings) {
         ImGui::TextColored(GetWarningTextColor(), "%s", warning.c_str());
     }
-    DrawPinTable(choice.Pins, choice.Subcircuit.Ports);
+    DrawSpicePinTable(choice.Pins, choice.Subcircuit.Ports);
     ImGui::Unindent();
 }
 
 /**
  * @brief   The device models of the library, each with a box to pick it.
  */
-void SpiceBlockDialog::DrawModelChoices() {
+void SpiceImportDialog::DrawModelChoices() {
     if (m_Models.empty()) {
         return;
     }
@@ -223,8 +164,8 @@ void SpiceBlockDialog::DrawModelChoices() {
  * @brief   The picked subcircuits as blocks and the picked models; no value when a pin name cannot be kept, which
  *          m_Error tells.
  */
-std::optional<SpiceBlockResult> SpiceBlockDialog::TakeChosen() {
-    SpiceBlockResult imported;
+std::optional<SpiceImportResult> SpiceImportDialog::TakeChosen() {
+    SpiceImportResult imported;
     for (const Choice &choice : m_Choices) {
         if (!choice.IsChosen) {
             continue;
@@ -233,7 +174,7 @@ std::optional<SpiceBlockResult> SpiceBlockDialog::TakeChosen() {
             m_Error = std::format("{}: {}", choice.Subcircuit.Name, *problem);
             return std::nullopt;
         }
-        imported.Imported.push_back(MakeSpiceBlock(choice.Subcircuit, choice.Pins));
+        imported.Blocks.push_back(MakeSpiceBlock(choice.Subcircuit, choice.Pins));
     }
     for (std::size_t index = 0; index < m_Models.size(); ++index) {
         if (m_AreModelsChosen[index] != 0) {
@@ -241,58 +182,6 @@ std::optional<SpiceBlockResult> SpiceBlockDialog::TakeChosen() {
         }
     }
     return imported;
-}
-
-/**
- * @brief   The pins and parameter defaults of the block, and its text, which stays as it came.
- */
-std::optional<SpiceBlockResult> SpiceBlockDialog::DrawSettings() {
-    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (!ImGui::BeginPopupModal(SETTINGS_POPUP, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        return std::nullopt;
-    }
-    const float font_size = ImGui::GetFontSize();
-    ImGui::TextUnformatted(std::format("{}, SPICE text from a library", m_BlockName).c_str());
-    ImGui::SeparatorText("Pins: port, name and edge");
-    DrawPinTable(m_Pins, m_Ports);
-    if (!m_Parameters.empty()) {
-        ImGui::SeparatorText("Parameter defaults");
-        for (std::size_t index = 0; index < m_Parameters.size(); ++index) {
-            ImGui::PushID(static_cast<int>(index));
-            ImGui::SetNextItemWidth(font_size * NAME_FIELD_WIDTH);
-            ImGui::InputDouble(m_Parameters[index].Name.c_str(), &m_Parameters[index].DefaultValue, 0.0, 0.0, "%g");
-            ImGui::PopID();
-        }
-    }
-    ImGui::SeparatorText("Text");
-    ImGui::PushFont(GetMonospaceFont(), 0.0f);
-    ImGui::InputTextMultiline("##text",
-                              &m_Text,
-                              {font_size * TEXT_WIDTH, font_size * TEXT_HEIGHT},
-                              ImGuiInputTextFlags_ReadOnly);
-    ImGui::PopFont();
-    if (!m_Error.empty()) {
-        ImGui::TextColored(GetErrorTextColor(), "%s", m_Error.c_str());
-    }
-
-    std::optional<SpiceBlockResult> result;
-    if (ImGui::Button("Apply")) {
-        if (const std::optional<std::string> problem = CheckSpicePins(m_Pins)) {
-            m_Error = *problem;
-        } else {
-            result = SpiceBlockResult{.Imported = {},
-                                      .UpdatedName = m_BlockName,
-                                      .Pins = m_Pins,
-                                      .Parameters = m_Parameters};
-            ImGui::CloseCurrentPopup();
-        }
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Cancel")) {
-        ImGui::CloseCurrentPopup();
-    }
-    ImGui::EndPopup();
-    return result;
 }
 
 } // namespace GUI

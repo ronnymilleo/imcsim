@@ -234,7 +234,9 @@ add_library(imcsim-gui-lib
             windows/properties_window.cpp
             windows/selection_input.cpp
             windows/simulation_window.cpp
-            windows/spice_block_dialog.cpp
+            windows/spice_import_dialog.cpp
+            windows/spice_pin_table.cpp
+            windows/spice_settings_dialog.cpp
             windows/tool_icons.cpp
             windows/turn_keys.cpp
 )
