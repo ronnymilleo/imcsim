@@ -116,6 +116,16 @@ const char *GetShortcutLabel(const EditorCommand command) {
 }
 
 /**
+ * @brief   The keys of a command, for a place that reads them itself, such as a popup that has the focus.
+ * @param[in] command  Any command.
+ * @return  The chord of its first shortcut, or ImGuiKey_None, which no key press matches, for a command without one.
+ */
+ImGuiKeyChord GetShortcutChord(const EditorCommand command) {
+    const auto found = std::ranges::find(SHORTCUTS, command, &EditorShortcut::Command);
+    return found == SHORTCUTS.end() ? ImGuiKeyChord{ImGuiKey_None} : found->Chord;
+}
+
+/**
  * @brief   Names a command with its keys after it, as a tooltip shows it.
  * @param[in] name     What the command does, such as "Undo".
  * @param[in] command  The command, whose keys are named.

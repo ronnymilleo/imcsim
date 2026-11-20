@@ -105,6 +105,19 @@ void AnalysisControls::PressRun() {
 }
 
 /**
+ * @brief   Does what the run key (F5) does: what the Run button does, except that the key never stops a run, so a
+ *          press meant to start one cannot end the one that just began.
+ * @return  True when it ran or continued; false while a run goes on, which the key leaves alone.
+ */
+bool AnalysisControls::PressRunKey() {
+    if (GetRunAction() == RunAction::STOP) {
+        return false;
+    }
+    PressRun();
+    return true;
+}
+
+/**
  * @brief   Takes in the result of the run that ended, stops a run whose circuit was edited, hands a live run the parts
  *          the user changed and starts the run asked for while a paused live run held the worker. Call it every frame.
  */

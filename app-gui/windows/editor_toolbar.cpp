@@ -336,11 +336,11 @@ void EditorToolbar::DrawAnalysisButton() {
         ImGui::Separator();
         m_SettingsPanel.DrawSettings();
         ImGui::Separator();
-        // The popup has the focus, so F5 is checked here too; like the shortcut, it never stops a run
-        const RunAction action = m_Controls.GetRunAction();
-        if (PrimaryButton(GetRunButtonLabel(action).c_str())
-            || (action != RunAction::STOP && ImGui::IsKeyPressed(ImGuiKey_F5, false))) {
+        // The popup has the focus, so the run key is read here too
+        if (PrimaryButton(GetRunButtonLabel(m_Controls.GetRunAction()).c_str())) {
             m_Controls.PressRun();
+            ImGui::CloseCurrentPopup();
+        } else if (ImGui::IsKeyChordPressed(GetShortcutChord(EditorCommand::RUN)) && m_Controls.PressRunKey()) {
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();

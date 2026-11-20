@@ -545,10 +545,7 @@ void EditorWindow::RunCommand(const EditorCommand command) {
         RequestQuit();
         break;
     case EditorCommand::RUN:
-        // Like the Run button of the analysis settings, the key never stops a run
-        if (m_Controls.GetRunAction() != RunAction::STOP) {
-            m_Controls.PressRun();
-        }
+        m_Controls.PressRunKey();
         break;
     case EditorCommand::UNDO:
         m_Navigator.GetShown().Undo();

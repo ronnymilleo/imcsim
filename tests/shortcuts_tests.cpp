@@ -37,6 +37,12 @@ TEST_CASE("A command with two chords is named by the one the menu shows", "[shor
     CHECK(LabelOf(GUI::EditorCommand::REDO) == IMCSIM_SHORTCUT "Y");
 }
 
+TEST_CASE("The keys of a command come from the table, and a command without keys has none", "[shortcuts]") {
+    CHECK(GUI::GetShortcutChord(GUI::EditorCommand::RUN) == ImGuiKey_F5);
+    CHECK(GUI::GetShortcutChord(GUI::EditorCommand::REDO) == (ImGuiMod_Ctrl | ImGuiKey_Y));
+    CHECK(GUI::GetShortcutChord(GUI::EditorCommand::IMPORT) == ImGuiKey_None);
+}
+
 TEST_CASE("A command without keys has no label, and its tooltip is its name alone", "[shortcuts]") {
     CHECK(GUI::GetShortcutLabel(GUI::EditorCommand::IMPORT) == nullptr);
     CHECK(GUI::GetShortcutLabel(GUI::EditorCommand::EDIT_BLOCK) == nullptr);

@@ -67,6 +67,7 @@ struct EditorShortcut {
 // Table
 std::span<const EditorShortcut> GetEditorShortcuts();
 const char *GetShortcutLabel(EditorCommand command);
+ImGuiKeyChord GetShortcutChord(EditorCommand command);
 std::string NameWithShortcut(std::string_view name, EditorCommand command);
 
 // Scopes

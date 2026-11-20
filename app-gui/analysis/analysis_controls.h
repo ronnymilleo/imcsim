@@ -61,6 +61,7 @@ public:
     void StopRun();
     RunAction GetRunAction() const;
     void PressRun();
+    bool PressRunKey();
     void Update();
     bool IsRunning() const;
     bool IsStopping() const;

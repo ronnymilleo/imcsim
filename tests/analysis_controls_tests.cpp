@@ -820,6 +820,9 @@ TEST_CASE("Stopping a live run pauses it with its points, Continue takes it on a
 
     controls.RunSelected();
     CHECK(controls.GetRunAction() == GUI::RunAction::STOP);
+    // The run key never stops a run, whatever the Run button would do
+    CHECK_FALSE(controls.PressRunKey());
+    CHECK(controls.IsRunning());
     REQUIRE(UpdateUntil(controls, [&] { return ReachedTime(results) > 2e-3; }));
     controls.StopRun();
     CHECK(controls.IsLivePaused());
@@ -834,7 +837,8 @@ TEST_CASE("Stopping a live run pauses it with its points, Continue takes it on a
     REQUIRE(results.GetTransient().has_value());
     CHECK_FALSE(results.GetTransient()->IsComplete);
 
-    controls.PressRun();
+    // The key continues a paused run, as the button does
+    CHECK(controls.PressRunKey());
     CHECK_FALSE(controls.IsLivePaused());
     CHECK(controls.IsRunning());
     REQUIRE(UpdateUntil(controls, [&] { return ReachedTime(results) > paused_at + 1e-3; }));
