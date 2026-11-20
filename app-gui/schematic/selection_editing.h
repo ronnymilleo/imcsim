@@ -25,7 +25,7 @@ void EndDrag(Schematic &schematic, EditorMode &mode);
 
 // Selecting
 void ApplySelection(Schematic &schematic, EditorMode &mode, const Selection &selection);
-void ClearSelection(Schematic &schematic, EditorMode &mode);
+void CancelSelection(Schematic &schematic, EditorMode &mode);
 void SelectAll(Schematic &schematic, EditorMode &mode);
 
 // Turning

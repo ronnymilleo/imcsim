@@ -43,7 +43,7 @@ void SwitchMode(EditorMode &current, EditorMode next, Schematic &schematic, cons
         placing != nullptr && !placing->Block.empty() && !blocks.CanPlaceBlock(placing->Block)) {
         return;
     }
-    ClearSelection(schematic, current);
+    CancelSelection(schematic, current);
     if (std::holds_alternative<WiringMode>(next) && std::holds_alternative<WiringMode>(current)) {
         return;
     }

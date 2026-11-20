@@ -666,7 +666,7 @@ void EditorWindow::HandleSelectionClick(SelectingMode &selecting, const ImVec2 c
     if (picked.Empty()) {
         // Empty canvas starts a box; with Shift it adds to what is selected, otherwise it starts over
         if (!shift) {
-            ClearSelection(*m_Schematic, m_Mode);
+            CancelSelection(*m_Schematic, m_Mode);
         }
         selecting.Box = SelectionBox{.Start = cursor_world, .Base = shift ? current : Selection{}};
     } else if (shift) {
@@ -752,7 +752,7 @@ void EditorWindow::HandleSelectionKeys() {
         RunCommand(EditorCommand::DELETE_SELECTION);
     }
     if (ImGui::IsKeyPressed(ImGuiKey_Escape) && !m_PopupOpenLastFrame) {
-        ClearSelection(*m_Schematic, m_Mode);
+        CancelSelection(*m_Schematic, m_Mode);
     }
 }
 

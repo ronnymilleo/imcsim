@@ -87,7 +87,7 @@ TEST_CASE("Replacing or clearing the selection ends the drag, and clearing drops
     CHECK(schematic.GetSelection().Wires == std::set<std::size_t>{0});
 
     std::get<GUI::SelectingMode>(mode).Box = GUI::SelectionBox{.Start = {0.0f, 0.0f}, .Base = {}};
-    GUI::ClearSelection(schematic, mode);
+    GUI::CancelSelection(schematic, mode);
     CHECK_FALSE(std::get<GUI::SelectingMode>(mode).Box);
     CHECK_FALSE(schematic.HasSelection());
 }

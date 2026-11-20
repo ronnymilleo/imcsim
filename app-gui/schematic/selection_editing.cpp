@@ -119,9 +119,11 @@ void ApplySelection(Schematic &schematic, EditorMode &mode, const Selection &sel
 }
 
 /**
- * @brief   A drag belongs to the selection, so it ends with it, and so does a selection box.
+ * @brief   Deselects everything, as Esc does, and ends what was being done with the selection: a drag belongs to the
+ *          selection, so it ends with it, and so does a selection box.
+ * @details Schematic::ClearSelection() only deselects; this is the one the editor calls.
  */
-void ClearSelection(Schematic &schematic, EditorMode &mode) {
+void CancelSelection(Schematic &schematic, EditorMode &mode) {
     EndDrag(schematic, mode);
     if (auto *selecting = std::get_if<SelectingMode>(&mode)) {
         selecting->Box.reset();
