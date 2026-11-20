@@ -153,9 +153,7 @@ void ACSweepTab::DrawPlot(const Core::ACSweep &sweep, const BodePlot &plot, cons
     const auto &steps = m_Results.GetACSweepSteps();
     std::vector<StepTraces> step_traces;
     if (steps) {
-        for (const Core::ACSweep &step : steps->Results) {
-            step_traces.push_back({&step.Frequencies, &(step.*plot.Nodes), &(step.*plot.Currents)});
-        }
+        step_traces = MakeStepTraces(steps->Results, &Core::ACSweep::Frequencies, plot.Nodes, plot.Currents);
         PlotOtherSteps(step_traces, steps->Selected, m_Schematic, fits.ShowsCurrents, {});
     }
     std::vector<PlottedTrace> plotted;
@@ -204,7 +202,7 @@ void ACSweepTab::DrawStatistics(const Core::ACSweep &sweep, const ACMathTraces &
         ListTraces(sweep.NodePhasesDegrees, sweep.CurrentPhasesDegrees, m_Schematic, " deg", " deg");
     for (std::size_t index = 0; index < math.Magnitudes.size(); ++index) {
         const MathTrace &magnitude = math.Magnitudes[index];
-        magnitudes.push_back({magnitude.Label, &magnitude.Values, " dB", magnitude.Color});
+        magnitudes.push_back(ToPlottedTrace(magnitude, " dB"));
         phases.push_back({magnitude.Label, &math.Phases[index].Values, " deg", magnitude.Color});
     }
     if (magnitudes.empty()) {

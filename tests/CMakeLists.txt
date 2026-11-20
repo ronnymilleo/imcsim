@@ -141,6 +141,7 @@ add_executable(imcsim-tests
             standard_values_tests.cpp
             statistics_table_tests.cpp
             statistics_widgets_tests.cpp
+            step_widgets_tests.cpp
             stepped_circuit_tests.cpp
             subcircuit_tests.cpp
             svg_writer_tests.cpp

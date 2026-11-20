@@ -23,6 +23,7 @@
 #include <array>
 #include <expected>
 #include <format>
+#include <iterator>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -451,9 +452,10 @@ std::vector<PlottedTrace> TransientTab::PlotAnalogTraces(const Core::Transient &
                                                          const AnalogPlan &plan) {
     std::vector<StepTraces> step_traces;
     if (steps) {
-        for (const Core::Transient &step : steps->Results) {
-            step_traces.push_back({&step.Times, &step.NodeVoltages, &step.Currents});
-        }
+        step_traces = MakeStepTraces(steps->Results,
+                                     &Core::Transient::Times,
+                                     &Core::Transient::NodeVoltages,
+                                     &Core::Transient::Currents);
         PlotOtherSteps(step_traces, steps->Selected, m_Schematic, plan.ShowsCurrents, plan.LaneNodes);
     }
     std::vector<PlottedTrace> plotted;
@@ -540,9 +542,9 @@ void TransientTab::DrawStatistics(const Core::Transient &transient,
         }
     }
     std::vector<PlottedTrace> traces = ListTraces(transient.NodeVoltages, transient.Currents, m_Schematic, "V", "A");
-    for (const MathTrace &trace : math) {
-        traces.push_back({trace.Label, &trace.Values, trace.Unit.c_str(), trace.Color});
-    }
+    std::ranges::transform(math, std::back_inserter(traces), [](const MathTrace &trace) {
+        return ToPlottedTrace(trace);
+    });
     if (traces.empty()) {
         ImGui::TextDisabled("Measure a trace to see its statistics");
         return;

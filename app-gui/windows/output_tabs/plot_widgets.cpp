@@ -352,6 +352,17 @@ void FitMathAxes(const std::vector<MathTrace> &math) {
 }
 
 /**
+ * @brief   A math channel as the cursor readout and the statistics list it.
+ * @param[in] trace  The channel, which must outlive the trace.
+ * @param[in] unit   Unit the values read in, such as " dB" for the magnitudes of an AC sweep, or null for the unit of
+ *                   the channel.
+ * @return  The trace, pointing into the channel.
+ */
+PlottedTrace ToPlottedTrace(const MathTrace &trace, const char *unit) {
+    return {trace.Label, &trace.Values, unit != nullptr ? unit : trace.Unit.c_str(), trace.Color};
+}
+
+/**
  * @brief   Plots the math channels on their axes; division by zero leaves NaN samples, which are skipped instead of
  *          breaking the line.
  * @param[in]     xs            X values of the samples.
@@ -373,10 +384,8 @@ void PlotMath(const std::vector<double> &xs,
         spec.LineWeight = MATH_LINE_WEIGHT;
         spec.Flags = ImPlotLineFlags_SkipNaN;
         ImPlot::PlotLine(trace.Label.c_str(), xs.data(), trace.Values.data(), static_cast<int>(xs.size()), spec);
-        plotted.push_back({trace.Label + suffix,
-                           &trace.Values,
-                           readout_unit != nullptr ? readout_unit : trace.Unit.c_str(),
-                           trace.Color});
+        plotted.push_back(ToPlottedTrace(trace, readout_unit));
+        plotted.back().Label += suffix;
     }
     ImPlot::SetAxes(ImAxis_X1, ImAxis_Y1);
 }

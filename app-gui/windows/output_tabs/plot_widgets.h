@@ -87,6 +87,7 @@ std::vector<PlottedTrace> ListTraces(const std::vector<std::vector<double>> &nod
 // Math channels
 void SetupMathAxes(const std::vector<MathTrace> &math, bool current_axis_ready, const std::string &third_unit);
 void FitMathAxes(const std::vector<MathTrace> &math);
+PlottedTrace ToPlottedTrace(const MathTrace &trace, const char *unit = nullptr);
 void PlotMath(const std::vector<double> &xs,
               const std::vector<MathTrace> &math,
               const std::string &suffix,
