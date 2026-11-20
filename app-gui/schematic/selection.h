@@ -32,6 +32,16 @@ struct Selection {
     bool operator==(const Selection &) const = default;
 };
 
+/**
+ * @struct  IndexRange
+ * @brief   Consecutive indices into a list, such as the items just added to it.
+ */
+struct IndexRange {
+    std::size_t First = 0;
+    std::size_t Count = 0;
+};
+
+Selection MakeRangeSelection(IndexRange elements, IndexRange wires);
 Selection PickAt(const std::vector<std::unique_ptr<UIElement>> &elements,
                  const std::vector<UIWire> &wires,
                  ImVec2 world_pos,

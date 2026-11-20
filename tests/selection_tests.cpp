@@ -76,6 +76,14 @@ TEST_CASE("Toggling flips picked items and joining adds them", "[selection]") {
     CHECK(GUI::Joined(current, picked) == GUI::Selection{.Elements = {0, 1, 3}, .Wires = {2, 4}});
 }
 
+TEST_CASE("A range selection picks the consecutive items it names, and nothing of a kind with no items",
+          "[selection]") {
+    CHECK(GUI::MakeRangeSelection({.First = 2, .Count = 3}, {.First = 1, .Count = 1})
+          == GUI::Selection{.Elements = {2, 3, 4}, .Wires = {1}});
+    CHECK(GUI::MakeRangeSelection({.First = 5, .Count = 0}, {.First = 0, .Count = 2})
+          == GUI::Selection{.Elements = {}, .Wires = {0, 1}});
+}
+
 TEST_CASE("PickAll takes every element and wire", "[selection]") {
     const auto elements = TwoResistors();
     const std::vector<GUI::UIWire> wires = {{{2, 0}, {10, 0}}};
