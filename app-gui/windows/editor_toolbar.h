@@ -52,9 +52,10 @@ private:
     const Schematic &m_RootSchematic;
 
     // Simulation
+    void DrawRunControls(float run_left, float row_top, bool is_editing_block);
+    void DrawRunButton();
     void DrawAnalysisButton();
     void DrawLiveToggle();
-    void DrawRunButton();
 };
 
 } // namespace GUI
