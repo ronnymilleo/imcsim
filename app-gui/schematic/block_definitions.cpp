@@ -272,13 +272,8 @@ std::expected<SavedSubcircuit, std::string> DrawDefinition(const std::vector<std
     }
     definition.Elements = std::move(copied->Elements);
     definition.Wires = std::move(copied->Wires);
-    for (auto &element : definition.Elements) {
-        if (!Core::IsSubcircuitPin(element->GetComponent().GetType())) {
-            continue;
-        }
-        const GridPoint point = element->GetTerminals().front();
-        const auto pin = std::ranges::find(definition.Pins, point, &SavedSubcircuitPin::Point);
-        static_cast<Core::NetLabel &>(element->GetComponent()).SetNet(pin->Name);
+    if (auto named = NameMarkersAfterPins(definition.Elements, definition.Pins); !named) {
+        return std::unexpected(named.error());
     }
     if (const std::optional<std::string> problem =
             CheckPinNodes(Connectivity(definition.Elements, definition.Wires), definition.Pins)) {

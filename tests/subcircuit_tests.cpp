@@ -603,6 +603,35 @@ TEST_CASE("A pin goes on the edge its marker's arrow comes from", "[subcircuit]"
     CHECK(std::string_view(GUI::GetPinSideName(Core::PinSide::BOTTOM)) == "bottom");
 }
 
+TEST_CASE("The marker of a pin is the one whose terminal is on the pin's point", "[subcircuit]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 0}, GUI::Rotation::R0));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::PIN, {-4, 0}, GUI::Rotation::R0));
+    CHECK(GUI::FindPinMarker(elements, {-4, 0}) == elements[1].get());
+    // A part that is no marker is not found, even on the point of one of its terminals
+    CHECK(GUI::FindPinMarker(elements, elements[0]->GetTerminals().front()) == nullptr);
+}
+
+TEST_CASE("Pin markers take the names of the pins on their points, and a marker without a pin is refused",
+          "[subcircuit]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::PIN, {-4, 0}, GUI::Rotation::R0));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::PIN, {4, 0}, GUI::Rotation::R180));
+    const std::vector<GUI::SavedSubcircuitPin> pins = {{"IN", {-4, 0}}, {"OUT", {4, 0}}};
+    const auto named = GUI::NameMarkersAfterPins(elements, pins);
+    REQUIRE(named);
+    CHECK(*named);
+    CHECK(static_cast<const Core::NetLabel &>(elements[1]->GetComponent()).GetNet() == "OUT");
+    // Named once already, the second pass changes nothing
+    const auto again = GUI::NameMarkersAfterPins(elements, pins);
+    REQUIRE(again);
+    CHECK_FALSE(*again);
+
+    const auto refused = GUI::NameMarkersAfterPins(elements, {pins.front()});
+    REQUIRE_FALSE(refused);
+    CHECK(refused.error() == "Every pin marker needs a block pin name");
+}
+
 TEST_CASE("Renaming a pin keeps the wires of every instance on it", "[subcircuit]") {
     GUI::Schematic schematic;
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 0}, GUI::Rotation::R0));

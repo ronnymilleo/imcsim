@@ -51,11 +51,7 @@ void RenameCurrentReferences(std::vector<std::unique_ptr<UIElement>> &elements,
  */
 void AddMissingPinMarkers(Schematic &content, const std::vector<SavedSubcircuitPin> &pins) {
     for (const SavedSubcircuitPin &pin : pins) {
-        const bool has_marker = std::ranges::any_of(content.GetElements(), [&](const auto &element) {
-            return Core::IsSubcircuitPin(element->GetComponent().GetType())
-                && element->GetTerminals().front() == pin.Point;
-        });
-        if (!has_marker) {
+        if (FindPinMarker(content.GetElements(), pin.Point) == nullptr) {
             auto marker = CreateElement(Core::ComponentType::PIN, pin.Point, Rotation::R0);
             static_cast<Core::NetLabel &>(marker->GetComponent()).SetNet(pin.Name);
             content.AddElement(std::move(marker));
@@ -317,19 +313,14 @@ std::expected<std::vector<Schematic::SubcircuitPinCandidate>, std::string> Schem
  *          the other way. It counts as an edit, which CommitUndoStep() makes one undo step.
  */
 bool Schematic::SetPinMarkerSide(const GridPoint point, const Core::PinSide side) {
-    for (auto &element : m_Elements) {
-        if (!Core::IsSubcircuitPin(element->GetComponent().GetType()) || element->GetTerminals().front() != point) {
-            continue;
-        }
-        if (GetMarkerSide(*element) == side) {
-            return false;
-        }
-        element->SetRotation(GetSideRotation(side));
-        element->SetMirrored(false);
-        MarkModified();
-        return true;
+    UIElement *marker = FindPinMarker(m_Elements, point);
+    if (marker == nullptr || GetMarkerSide(*marker) == side) {
+        return false;
     }
-    return false;
+    marker->SetRotation(GetSideRotation(side));
+    marker->SetMirrored(false);
+    MarkModified();
+    return true;
 }
 
 /**

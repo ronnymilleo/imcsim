@@ -226,8 +226,9 @@ TEST_CASE("The pin markers of a block take the names of its pins, and every mark
     CHECK(marker.GetNet() == "SIGNAL");
 
     session.GetPins().clear();
-    CHECK_FALSE(session.ApplyPinNames());
-    CHECK(session.GetError() == "Every pin marker needs a block pin name");
+    const auto refused = session.ApplyPinNames();
+    REQUIRE_FALSE(refused);
+    CHECK(refused.error() == "Every pin marker needs a block pin name");
 }
 
 TEST_CASE("Pins follow the markers of the open block: the order stays and new markers join at the end",

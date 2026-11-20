@@ -78,13 +78,15 @@ public:
 
     // Settings of the dialog
     [[nodiscard]] std::expected<void, std::string> SyncPins();
-    bool ApplyPinNames();
-    bool CreateBlock();
+    [[nodiscard]] std::expected<void, std::string> ApplyPinNames();
+    [[nodiscard]] std::expected<void, std::string> CreateBlock();
     void RestoreSettings();
     std::string &GetName();
     std::vector<SavedSubcircuitPin> &GetPins();
     std::vector<Core::SubcircuitParameter> &GetParameters();
-    std::string &GetError();
+    const std::string &GetError() const;
+    void ShowError(std::string reason);
+    void ClearError();
     void ReportError(std::string reason);
     void RequestDialog();
     bool TakeDialogRequest();
