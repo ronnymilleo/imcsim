@@ -183,21 +183,30 @@ std::expected<void, std::string> BlockSession::Open(const std::string &name) {
 }
 
 /**
- * @brief   Closes the innermost open block, applying it to the document or dropping its changes.
- * @details Applied, it is one undo step of the document, and the blocks still open take it too, since they may hold
- *          instances of it. When it cannot be applied it stays open.
- * @param[in] apply  Whether to apply the contents and the settings, or drop them.
- * @return  Nothing once a block closed, so the editor shows the level above it; the reason otherwise, which
- *          ReportError() can show: no block is open, or the block cannot be applied and stays open.
+ * @brief   Applies the innermost open block to the document and closes it.
+ * @details It is one undo step of the document, and the blocks still open take it too, since they may hold instances
+ *          of it. When it cannot be applied it stays open.
+ * @return  Nothing once it closed, so the editor shows the level above it; the reason otherwise, which ReportError()
+ *          can show: no block is open, or the block cannot be applied and stays open.
  */
-std::expected<void, std::string> BlockSession::Close(const bool apply) {
+std::expected<void, std::string> BlockSession::ApplyAndClose() {
     if (!IsOpen()) {
         return std::unexpected("No block is open");
     }
-    if (apply) {
-        if (auto applied = ApplyInnermost(); !applied) {
-            return applied;
-        }
+    if (auto applied = ApplyInnermost(); !applied) {
+        return applied;
+    }
+    LeaveInnermost();
+    return {};
+}
+
+/**
+ * @brief   Closes the innermost open block and drops the changes made in it.
+ * @return  Nothing once it closed, so the editor shows the level above it; the reason when no block is open.
+ */
+std::expected<void, std::string> BlockSession::DiscardAndClose() {
+    if (!IsOpen()) {
+        return std::unexpected("No block is open");
     }
     LeaveInnermost();
     return {};
@@ -325,7 +334,7 @@ void BlockSession::ClearError() {
 
 /**
  * @brief   Shows why something the editor asked for failed, in the settings dialog, which opens on the next frame.
- * @param[in] reason  The reason, as Open(), Close() or SyncPins() return it.
+ * @param[in] reason  The reason, as Open(), ApplyAndClose() or SyncPins() return it.
  */
 void BlockSession::ReportError(std::string reason) {
     ShowError(std::move(reason));

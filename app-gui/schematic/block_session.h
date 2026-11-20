@@ -71,7 +71,8 @@ public:
     const SavedSubcircuit *FindDefinition(const std::string &name) const;
     void RequestCreate();
     [[nodiscard]] std::expected<void, std::string> Open(const std::string &name);
-    [[nodiscard]] std::expected<void, std::string> Close(bool apply);
+    [[nodiscard]] std::expected<void, std::string> ApplyAndClose();
+    [[nodiscard]] std::expected<void, std::string> DiscardAndClose();
     std::expected<void, std::string> ApplySpiceUpdate(const std::string &name,
                                                       const std::vector<SavedSubcircuitPin> &pins,
                                                       const std::vector<Core::SubcircuitParameter> &parameters);

@@ -81,7 +81,7 @@ TEST_CASE("A block cannot be placed inside itself or inside a block it contains"
     // Outer places inner, so placing it inside inner would make a cycle
     CHECK_FALSE(session.CanPlaceBlock("outer"));
     CHECK(session.ListPlaceableBlocks().empty());
-    REQUIRE(session.Close(false));
+    REQUIRE(session.DiscardAndClose());
 
     REQUIRE(session.Open("outer"));
     CHECK_FALSE(session.CanPlaceBlock("outer"));
@@ -108,13 +108,13 @@ TEST_CASE("Opening a block shows its contents with its pins, and closing it goes
     REQUIRE(session.Open("inner"));
     CHECK(session.GetOpenBlocks().size() == 2);
     CHECK(session.GetName() == "inner");
-    CHECK(session.Close(false));
+    CHECK(session.DiscardAndClose());
     CHECK(session.GetName() == "outer");
     CHECK(session.GetPins()[0].Name == "CHANGED");
-    CHECK(session.Close(false));
+    CHECK(session.DiscardAndClose());
     CHECK_FALSE(session.IsOpen());
     CHECK(&session.GetShown() == &schematic);
-    const auto closed = session.Close(false);
+    const auto closed = session.DiscardAndClose();
     REQUIRE_FALSE(closed);
     CHECK(closed.error() == "No block is open");
 }
@@ -129,7 +129,7 @@ TEST_CASE("A block that cannot be applied stays open and says why, and the dialo
     // A second marker named IN gives two pins one name
     AddMarker(session.GetShown(), {0, 4}, "IN", GUI::Rotation::R90);
 
-    const auto closed = session.Close(true);
+    const auto closed = session.ApplyAndClose();
     REQUIRE_FALSE(closed);
     CHECK(closed.error() == "Subcircuit pin names must be unique identifiers");
     CHECK(session.IsOpen());
@@ -161,7 +161,7 @@ TEST_CASE("Applying a block reaches the blocks open around it, which hold instan
     REQUIRE(session.Open("outer"));
     REQUIRE(session.Open("inner"));
     session.GetShown().AddElement(GUI::CreateElement(Core::ComponentType::CAPACITOR, {0, 6}, GUI::Rotation::R0));
-    REQUIRE(session.Close(true));
+    REQUIRE(session.ApplyAndClose());
 
     // The contents of outer, shown now, hold their own copy of inner, which took the new part too
     CHECK(FindDefinition(session.GetShown(), "inner").Elements.size() == parts + 1);
@@ -173,7 +173,7 @@ TEST_CASE("A block opened and closed without a change leaves the document unmodi
     schematic.MarkSaved({});
     GUI::BlockSession session(schematic);
     REQUIRE(session.Open("inner"));
-    REQUIRE(session.Close(true));
+    REQUIRE(session.ApplyAndClose());
     CHECK_FALSE(schematic.IsModified());
 }
 
@@ -187,13 +187,13 @@ TEST_CASE("Applying a block puts its new contents in the document as one undo st
 
     REQUIRE(session.Open("inner"));
     session.GetShown().AddElement(GUI::CreateElement(Core::ComponentType::CAPACITOR, {0, 6}, GUI::Rotation::R0));
-    REQUIRE(session.Close(false));
+    REQUIRE(session.DiscardAndClose());
     CHECK(FindDefinition(schematic, "inner").Elements.size() == parts);
     CHECK_FALSE(schematic.IsModified());
 
     REQUIRE(session.Open("inner"));
     session.GetShown().AddElement(GUI::CreateElement(Core::ComponentType::CAPACITOR, {0, 6}, GUI::Rotation::R0));
-    REQUIRE(session.Close(true));
+    REQUIRE(session.ApplyAndClose());
     CHECK(FindDefinition(schematic, "inner").Elements.size() == parts + 1);
     CHECK(schematic.IsModified());
     CHECK(schematic.CanUndo());
