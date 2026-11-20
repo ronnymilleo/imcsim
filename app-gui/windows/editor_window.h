@@ -16,7 +16,6 @@
 #include "overlays/schematic_overlays.h"
 #include "results/playback.h"
 #include "results/result_store.h"
-#include "schematic/block_session.h"
 #include "schematic/canvas_view.h"
 #include "schematic/clipboard.h"
 #include "schematic/editor_command.h"
@@ -31,6 +30,7 @@
 #include "schematic/wire_editing.h"
 #include "ui_elements/ui_element.h"
 #include "windows/app_window.h"
+#include "windows/block_navigator.h"
 #include "windows/editor_context_menu.h"
 #include "windows/editor_menus.h"
 #include "windows/editor_toolbar.h"
@@ -40,9 +40,7 @@
 #include "windows/part_popover.h"
 #include "windows/part_rail.h"
 #include "windows/spice_import_dialog.h"
-#include "windows/spice_settings_dialog.h"
 #include <cstddef>
-#include <expected>
 #include <filesystem>
 #include <memory>
 #include <optional>
@@ -61,10 +59,11 @@ namespace GUI {
  *          from the EditorToolbar, their keys, or the PartPicker that Space opens, which only ask for them; a status
  *          bar lists the keys of each mode.
  * Schematics are saved to and opened from JSON files by its SchematicFileActions, the colors of a result are drawn by
- * its SchematicOverlays, and where it looks is kept by its CanvasView. The blocks it has open are a BlockSession, and
- * the input of each mode, the menus, the properties popover and the context menu live in modules of their own. The root
- * schematic belongs to the application. While a subcircuit is open, this window edits a temporary document and applies
- * it back to the root as one undo step; it otherwise keeps interaction state such as the current mode and drag.
+ * its SchematicOverlays, and where it looks is kept by its CanvasView. Its BlockNavigator moves it into and out of
+ * blocks, and the input of each mode, the menus, the properties popover and the context menu live in modules of their
+ * own. The root schematic belongs to the application. While a subcircuit is open, this window edits a temporary
+ * document and applies it back to the root as one undo step; it otherwise keeps interaction state such as the current
+ * mode and drag.
  */
 class EditorWindow : public AppWindow {
 public:
@@ -125,17 +124,12 @@ private:
     };
 
     Schematic &m_RootSchematic;
-    Schematic *m_Schematic;
     /// The results of the root schematic, the only one an analysis runs on.
     const ResultStore &m_RootResults;
     /// What the editor shows of the results while a block is open: none, since a block has no run of its own.
     const ResultStore m_NoResults{};
-    /// The blocks open, from the outermost to the one shown, and the settings of the dialog that edits them.
-    BlockSession m_Blocks;
     /// Imports SPICE libraries and sets up the pins of the blocks they become.
     SpiceImportDialog m_SpiceImport;
-    /// Changes the pins and parameter defaults of a block kept as SPICE text.
-    SpiceSettingsDialog m_SpiceSettings;
     AnalysisControls &m_Controls;
     AnalysisSettingsPanel &m_SettingsPanel;
     PartEditor &m_PartEditor;
@@ -153,6 +147,8 @@ private:
 
     /// What clicks and keys on the canvas do now.
     EditorMode m_Mode;
+    /// The level on show, the document or an open block, which the mode, the overlays and the view follow.
+    BlockNavigator m_Navigator;
     /// Whether wires go up or down before they turn, kept from one wire to the next.
     bool m_WireVerticalFirst = false;
     /// Live runs: what the mouse does to the parts set by hand, and the push button it holds.
@@ -188,18 +184,8 @@ private:
     void SetMode(EditorMode mode);
 
     // Blocks
-    bool IsEditingSubcircuit() const;
     const ResultStore &GetShownResults() const;
-    bool LeaveSubcircuitForDocument();
-    bool ReturnToLevel(std::size_t depth);
-    void EnterShownSchematic();
-    void SyncBlockParametersToPartEditor();
-    void RequestEditSelectedSubcircuit();
-    void ApplyAndLeaveBlock();
-    void DiscardAndLeaveBlock();
-    void FinishLevelChange(const std::expected<void, std::string> &changed);
     void ImportSpiceBlocks(SpiceImportResult imported);
-    void UpdateSpiceBlock(const SpiceSettingsResult &settings);
 
     // Commands and shortcuts
     void HandleCommandRequest();
