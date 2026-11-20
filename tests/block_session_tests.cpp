@@ -209,8 +209,7 @@ TEST_CASE("The blocks open take the definitions the document gained", "[block_se
     // A paste into the block brings a block definition to the document first
     std::vector<GUI::SavedSubcircuit> brought(1);
     brought.front().Name = "brought";
-    std::vector<std::unique_ptr<GUI::UIElement>> no_parts;
-    schematic.MergeSubcircuits(std::move(brought), no_parts);
+    schematic.MergeSubcircuits(std::move(brought));
     session.SyncDefinitions();
     CHECK(session.GetShown().GetSubcircuits().size() == 2);
 }
@@ -276,8 +275,7 @@ TEST_CASE("A new block takes a free name and offers the pins of the selection", 
     // The numbering goes on from the bare name, as for pasted blocks
     std::vector<GUI::SavedSubcircuit> brought(1);
     brought.front().Name = "block_2";
-    std::vector<std::unique_ptr<GUI::UIElement>> no_parts;
-    schematic.MergeSubcircuits(std::move(brought), no_parts);
+    schematic.MergeSubcircuits(std::move(brought));
     session.RequestCreate();
     CHECK(session.GetName() == "block_3");
 }

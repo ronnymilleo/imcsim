@@ -472,12 +472,8 @@ const ResultStore &EditorWindow::GetShownResults() const {
  *          parts.
  */
 void EditorWindow::ImportSpiceBlocks(SpiceImportResult imported) {
-    // A library brings no parts of its own, which the merges would point at a renamed model or block
-    std::vector<std::unique_ptr<UIElement>> no_parts;
-    std::vector<SavedSubcircuit> no_blocks;
-    const std::vector<std::string> models =
-        m_RootSchematic.MergeLibraryModels(std::move(imported.Models), no_parts, no_blocks);
-    const std::vector<std::string> names = m_RootSchematic.MergeSubcircuits(std::move(imported.Blocks), no_parts);
+    const std::vector<std::string> models = m_RootSchematic.MergeLibraryModels(std::move(imported.Models));
+    const std::vector<std::string> names = m_RootSchematic.MergeSubcircuits(std::move(imported.Blocks));
     m_RootSchematic.CommitUndoStep();
     if (!names.empty()) {
         SetMode(PlacingMode{.Type = Core::ComponentType::SUBCIRCUIT, .Block = names.front()});

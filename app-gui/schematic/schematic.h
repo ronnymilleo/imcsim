@@ -107,11 +107,13 @@ public:
                                                            const std::vector<Core::SubcircuitParameter> &parameters);
     std::vector<std::string> MergeSubcircuits(std::vector<SavedSubcircuit> definitions,
                                               std::vector<std::unique_ptr<UIElement>> &instances);
+    std::vector<std::string> MergeSubcircuits(std::vector<SavedSubcircuit> definitions);
 
     // Library models
     std::vector<std::string> MergeLibraryModels(std::vector<Core::LibraryModel> models,
                                                 std::vector<std::unique_ptr<UIElement>> &elements,
                                                 std::vector<SavedSubcircuit> &definitions);
+    std::vector<std::string> MergeLibraryModels(std::vector<Core::LibraryModel> models);
     void CopyDefinitionsFrom(const Schematic &library, std::string_view left_out = {});
 
     // Selection

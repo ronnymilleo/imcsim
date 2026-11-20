@@ -455,6 +455,16 @@ std::vector<std::string> Schematic::MergeSubcircuits(std::vector<SavedSubcircuit
 }
 
 /**
+ * @brief   Adds definitions that come without parts of their own, such as the blocks of a SPICE library.
+ * @param[in] definitions  Definitions to add, with the blocks those place.
+ * @return  The name each definition has here, in the order they came, as MergeSubcircuits() with instances gives.
+ */
+std::vector<std::string> Schematic::MergeSubcircuits(std::vector<SavedSubcircuit> definitions) {
+    std::vector<std::unique_ptr<UIElement>> no_instances;
+    return MergeSubcircuits(std::move(definitions), no_instances);
+}
+
+/**
  * @brief   Adds device models from a library or a paste, so the parts that name them have them.
  * @param[in]     models       Models to add.
  * @param[in,out] elements     Parts that came with them, pointed at the new name of a renamed model.
@@ -471,6 +481,17 @@ std::vector<std::string> Schematic::MergeLibraryModels(std::vector<Core::Library
         MarkModified();
     }
     return std::move(merged.Names);
+}
+
+/**
+ * @brief   Adds device models that come without parts or blocks of their own, such as those of a SPICE library.
+ * @param[in] models  Models to add.
+ * @return  The name each model has here, in order, as MergeLibraryModels() with parts gives.
+ */
+std::vector<std::string> Schematic::MergeLibraryModels(std::vector<Core::LibraryModel> models) {
+    std::vector<std::unique_ptr<UIElement>> no_parts;
+    std::vector<SavedSubcircuit> no_blocks;
+    return MergeLibraryModels(std::move(models), no_parts, no_blocks);
 }
 
 /**
