@@ -11,7 +11,6 @@
 #include "spice/spice_value.h"
 #include "windows/tool_icons.h"
 #include <algorithm>
-#include <array>
 #include <format>
 #include <string>
 #include <utility>
