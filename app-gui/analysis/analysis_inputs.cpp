@@ -239,4 +239,56 @@ std::string DescribeMissingInputSource(const std::string_view analysis) {
     return std::format("{} needs an input source; add {}", analysis, Core::SWEEPABLE_SOURCES);
 }
 
+/**
+ * @brief   Picks the AC source that a noise or AC sensitivity analysis runs with.
+ * @param[in] circuit   Circuit to analyze.
+ * @param[in] stored    Source the settings name, which may be empty or gone.
+ * @param[in] analysis  The analysis as the subject of the sentence, such as "A noise analysis".
+ * @return  The stored source, or the first AC source when it is not one; the refusal when the circuit has none.
+ */
+std::expected<std::string, std::string>
+ResolveAcInput(const Core::Circuit &circuit, const std::string &stored, const std::string_view analysis) {
+    const std::vector<std::string> sources = Core::GetNoiseInputSources(circuit);
+    if (sources.empty()) {
+        return std::unexpected(DescribeMissingACInput(analysis));
+    }
+    return ResolveOptionalInput(stored, sources);
+}
+
+/**
+ * @brief   Picks the source that a transfer function or pole-zero analysis runs with.
+ * @param[in] circuit   Circuit to analyze.
+ * @param[in] stored    Source the settings name, which may be empty or gone.
+ * @param[in] analysis  The analysis as the subject of the sentence, such as "A pole-zero analysis".
+ * @return  The stored source, or the first one that can be the input when it is not one; the refusal when the circuit
+ *          has none.
+ */
+std::expected<std::string, std::string>
+ResolveSweepableInput(const Core::Circuit &circuit, const std::string &stored, const std::string_view analysis) {
+    const std::vector<std::string> sources = Core::GetTransferFunctionInputSources(circuit);
+    if (sources.empty()) {
+        return std::unexpected(DescribeMissingInputSource(analysis));
+    }
+    return ResolveOptionalInput(stored, sources);
+}
+
+/**
+ * @brief   Picks the node a small-signal analysis measures.
+ * @param[in]     point      Output point the settings keep, if any.
+ * @param[in]     circuit    Circuit to analyze.
+ * @param[in,out] schematic  Schematic whose connectivity maps the point to a node.
+ * @param[in]     subject    The analysis as the subject of the sentence, such as "the noise".
+ * @return  The node, as ResolveOutputNode() picks it; the refusal when the circuit has no node to measure.
+ */
+std::expected<int, std::string> ResolveRequiredOutput(const std::optional<GridPoint> &point,
+                                                      const Core::Circuit &circuit,
+                                                      Schematic &schematic,
+                                                      const std::string_view subject) {
+    const std::optional<int> node = ResolveOutputNode(point, circuit, schematic);
+    if (!node) {
+        return std::unexpected(DescribeMissingOutputNode(subject));
+    }
+    return *node;
+}
+
 } // namespace GUI

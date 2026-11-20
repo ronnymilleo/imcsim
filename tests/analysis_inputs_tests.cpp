@@ -170,3 +170,30 @@ TEST_CASE("A missing input or output is told in a sentence about the analysis th
     CHECK(GUI::DescribeMissingInputSource("A pole-zero analysis")
           == std::format("A pole-zero analysis needs an input source; add {}", Core::SWEEPABLE_SOURCES));
 }
+
+TEST_CASE("The ports of a small-signal analysis come back resolved, or with the sentence that refuses them",
+          "[analysis_inputs]") {
+    GUI::Schematic schematic;
+    OpenRCFilter(schematic);
+    const Core::Circuit circuit = schematic.BuildCircuit();
+    // The filter's source can be swept, and a stored name that left the circuit gives way to it
+    const auto swept = GUI::ResolveSweepableInput(circuit, "Vgone", "A pole-zero analysis");
+    REQUIRE(swept.has_value());
+    CHECK_FALSE(swept->empty());
+    const auto output = GUI::ResolveRequiredOutput(std::nullopt, circuit, schematic, "the noise");
+    REQUIRE(output.has_value());
+    CHECK(schematic.GetMeasurements().IsVoltageMeasured(*output));
+
+    // A circuit of a lone resistor has no source to drive and no node to measure
+    Core::Resistor resistor;
+    Core::Ground ground;
+    Core::Circuit bare;
+    bare.Add(resistor, {0, 0});
+    bare.Add(ground, {0});
+    GUI::Schematic empty;
+    CHECK(GUI::ResolveAcInput(bare, "", "A noise analysis").error() == GUI::DescribeMissingACInput("A noise analysis"));
+    CHECK(GUI::ResolveSweepableInput(bare, "", "A pole-zero analysis").error()
+          == GUI::DescribeMissingInputSource("A pole-zero analysis"));
+    CHECK(GUI::ResolveRequiredOutput(std::nullopt, bare, empty, "the noise").error()
+          == GUI::DescribeMissingOutputNode("the noise"));
+}

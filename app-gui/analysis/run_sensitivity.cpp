@@ -22,9 +22,9 @@ void AnalysisControls::RunSensitivityAnalysis(const Core::Circuit &circuit) {
         RunACSensitivityAnalysis(circuit);
         return;
     }
-    const std::optional<int> output = ResolveOutputNode(settings.SensitivityOutput, circuit, m_Schematic);
+    const auto output = ResolveRequiredOutput(settings.SensitivityOutput, circuit, m_Schematic, "the sensitivity");
     if (!output) {
-        Refuse(Analysis::SENSITIVITY, DescribeMissingOutputNode("the sensitivity"));
+        Refuse(Analysis::SENSITIVITY, output.error());
         return;
     }
     const Core::SensitivitySettings run_settings{.OutputNode = *output};
@@ -39,19 +39,14 @@ void AnalysisControls::RunSensitivityAnalysis(const Core::Circuit &circuit) {
 
 void AnalysisControls::RunACSensitivityAnalysis(const Core::Circuit &circuit) {
     const SimulationSettings &settings = m_Schematic.GetSimulationSettings();
-    const std::vector<std::string> sources = Core::GetNoiseInputSources(circuit);
-    if (sources.empty()) {
-        Refuse(Analysis::SENSITIVITY, DescribeMissingACInput("An AC sensitivity analysis"));
-        return;
-    }
-    const std::optional<int> output = ResolveOutputNode(settings.SensitivityOutput, circuit, m_Schematic);
-    if (!output) {
-        Refuse(Analysis::SENSITIVITY, DescribeMissingOutputNode("the sensitivity"));
+    const auto input = ResolveAcInput(circuit, settings.ACSensitivitySource, "An AC sensitivity analysis");
+    const auto output = ResolveRequiredOutput(settings.SensitivityOutput, circuit, m_Schematic, "the sensitivity");
+    if (!input || !output) {
+        Refuse(Analysis::SENSITIVITY, !input ? input.error() : output.error());
         return;
     }
     const Core::ACSensitivitySettings run_settings{.OutputNode = *output,
-                                                   .InputSource =
-                                                       ResolveOptionalInput(settings.ACSensitivitySource, sources),
+                                                   .InputSource = *input,
                                                    .StartFrequency = settings.ACSensitivityRange.StartFrequency,
                                                    .StopFrequency = settings.ACSensitivityRange.StopFrequency,
                                                    .PointsPerDecade = settings.ACSensitivityRange.PointsPerDecade};
