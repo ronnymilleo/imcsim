@@ -232,6 +232,7 @@ add_library(imcsim-gui-lib
             windows/part_rail.cpp
             windows/preferences_window.cpp
             windows/properties_window.cpp
+            windows/selection_input.cpp
             windows/simulation_window.cpp
             windows/spice_block_dialog.cpp
             windows/tool_icons.cpp

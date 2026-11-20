@@ -16,7 +16,7 @@
 #include "windows/editor_canvas_drawing.h"
 #include "windows/editor_status_bar.h"
 #include "windows/mode_input.h"
-#include "windows/turn_keys.h"
+#include "windows/selection_input.h"
 #include <algorithm>
 #include <format>
 #include <utility>
@@ -296,7 +296,16 @@ std::optional<LivePart> EditorWindow::FindHoveredLivePart(const ImVec2 origin) c
  */
 void EditorWindow::HandleCanvasInput(const CanvasFrame &frame) {
     const bool took_mouse = m_Live.HandleInput(*m_Schematic, frame.HoveredLivePart);
-    HandleSelection(frame.View, frame.IsHovered && !took_mouse);
+    const SelectionInput selection = {.Shown = *m_Schematic,
+                                      .Mode = m_Mode,
+                                      .Popover = m_Popover,
+                                      .View = frame.View,
+                                      .Zoom = m_View.GetZoom(),
+                                      .IsHovered = frame.IsHovered && !took_mouse,
+                                      .WasPopupOpenLastFrame = m_PopupOpenLastFrame};
+    for (const EditorCommand command : HandleSelectionInput(selection)) {
+        RunCommand(command);
+    }
     m_ContextMenu.HandleRightClick(*m_Schematic, m_Mode, frame.View, m_View.GetZoom(), frame.IsHovered, m_Popover);
     m_Popover.HandleValueTyping(m_PartEditor);
 }
@@ -584,143 +593,6 @@ void EditorWindow::ApplySpiceBlockResult(SpiceBlockResult result) {
     const auto updated = m_Blocks.ApplySpiceUpdate(*result.UpdatedName, result.Pins, result.Parameters);
     if (!updated) {
         m_Files.QueueMessages("Could not change the SPICE block", {updated.error()});
-    }
-}
-
-/**
- * @brief   Handles selection mode, active while not placing, wiring or probing: a click selects an element or a wire,
- *          Shift+click adds or removes one, a drag on empty canvas selects what the box touches, and a double click on
- *          a wire selects its whole node. Dragging the selection moves it, a single wire sliding across itself, with
- *          the wires around it following. R rotates the selection, M mirrors it left to right and Shift+M top to
- *          bottom, both about its center, and holding Alt leaves the wires where they are; Delete removes the
- *          selection and Esc clears it.
- */
-void EditorWindow::HandleSelection(const ViewTransform &view, const bool hovered) {
-    auto *selecting = std::get_if<SelectingMode>(&m_Mode);
-    if (selecting == nullptr) {
-        return;
-    }
-    const ImVec2 cursor_world = view.ToWorld(ImGui::GetIO().MousePos);
-    if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-        HandleSelectionClick(*selecting, cursor_world);
-    }
-    if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
-        HandleSelectionDoubleClick();
-    }
-    UpdateSelectionBox(*selecting, cursor_world);
-    UpdateSelectionDrag(*selecting, cursor_world);
-    if (ImGui::IsWindowFocused()) {
-        HandleSelectionKeys();
-    }
-}
-
-/**
- * @brief   A click picks what is under the cursor: empty canvas starts a box, an item selects it or, with Shift,
- * toggles it, and an item of a selected group keeps the group so it can be dragged.
- */
-void EditorWindow::HandleSelectionClick(SelectingMode &selecting, const ImVec2 cursor_world) {
-    const bool shift = ImGui::GetIO().KeyShift;
-    const Selection picked = PickAt(m_Schematic->GetElements(),
-                                    m_Schematic->GetWires(),
-                                    cursor_world,
-                                    WIRE_PICK_DISTANCE / m_View.GetZoom());
-    const Selection current = {m_Schematic->GetSelection().Elements, m_Schematic->GetSelection().Wires};
-    if (picked.Empty()) {
-        // Empty canvas starts a box; with Shift it adds to what is selected, otherwise it starts over
-        if (!shift) {
-            CancelSelection(*m_Schematic, m_Mode);
-        }
-        selecting.Box = SelectionBox{.Start = cursor_world, .Base = shift ? current : Selection{}};
-    } else if (shift) {
-        ApplySelection(*m_Schematic, m_Mode, Toggled(current, picked));
-    } else if (Joined(current, picked) == current) {
-        // Part of a group: keep the group so it can be dragged, and collapse to the item if it is only a click
-        selecting.Drag = MakeDrag(*m_Schematic, Snap(cursor_world), picked);
-    } else {
-        ApplySelection(*m_Schematic, m_Mode, picked);
-        selecting.Drag = MakeDrag(*m_Schematic, Snap(cursor_world), std::nullopt);
-    }
-}
-
-/**
- * @brief   A double click opens the properties of the selected part, or the contents of a block, or selects the whole
- *          node of a wire.
- */
-void EditorWindow::HandleSelectionDoubleClick() {
-    if (m_Schematic->GetSelectedElement() != nullptr) {
-        EndDrag(*m_Schematic, m_Mode);
-        if (m_Schematic->GetSelectedElement()->GetComponent().GetType() == Core::ComponentType::SUBCIRCUIT) {
-            RequestEditSelectedSubcircuit();
-        } else {
-            m_Popover.Open();
-        }
-    } else if (m_Schematic->GetSelection().Elements.empty() && m_Schematic->GetSelection().Wires.size() == 1) {
-        const Selection node = PickNode(m_Schematic->GetWires(),
-                                        m_Schematic->GetConnectivity(),
-                                        *m_Schematic->GetSelection().Wires.begin());
-        EndDrag(*m_Schematic, m_Mode);
-        ApplySelection(*m_Schematic, m_Mode, node);
-    }
-}
-
-/**
- * @brief   While the mouse button is down the selection box takes in what it touches; it ends when the button comes up.
- */
-void EditorWindow::UpdateSelectionBox(SelectingMode &selecting, const ImVec2 cursor_world) {
-    if (!selecting.Box) {
-        return;
-    }
-    if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
-        const Selection inside =
-            PickInRectangle(m_Schematic->GetElements(), m_Schematic->GetWires(), selecting.Box->Start, cursor_world);
-        ApplySelection(*m_Schematic, m_Mode, Joined(selecting.Box->Base, inside));
-    } else {
-        selecting.Box.reset();
-    }
-}
-
-/**
- * @brief   While the mouse button is down the drag follows the cursor; it ends when the button comes up.
- */
-void EditorWindow::UpdateSelectionDrag(SelectingMode &selecting, const ImVec2 cursor_world) {
-    if (!selecting.Drag) {
-        return;
-    }
-    if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
-        UpdateDrag(*m_Schematic, m_Mode, Snap(cursor_world));
-    } else {
-        EndDrag(*m_Schematic, m_Mode);
-    }
-}
-
-/**
- * @brief   R rotates the selection, M mirrors it, Enter opens its properties, Delete removes it and Esc clears it.
- * @details R, M and Delete ask for the commands of the Edit menu; they work whatever other modifier is held, which a
- *          shortcut of the table would not.
- */
-void EditorWindow::HandleSelectionKeys() {
-    if (const std::optional<PointTransform::Kind> turn = ReadTurnKey()) {
-        RunTurnKey(*turn);
-    }
-    const bool enter = ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false);
-    if (enter && m_Schematic->GetSelectedElement() != nullptr && !ImGui::IsAnyItemActive()) {
-        m_Popover.Open();
-    }
-    if (ImGui::IsKeyPressed(ImGuiKey_Delete)) {
-        RunCommand(EditorCommand::DELETE_SELECTION);
-    }
-    if (ImGui::IsKeyPressed(ImGuiKey_Escape) && !m_PopupOpenLastFrame) {
-        CancelSelection(*m_Schematic, m_Mode);
-    }
-}
-
-/**
- * @brief   Runs the turning command of a key of the selecting mode; holding Alt keeps the wires where they are.
- */
-void EditorWindow::RunTurnKey(const PointTransform::Kind kind) {
-    const TurnRequest turn = {.Kind = kind, .IsKeepingWires = ImGui::GetIO().KeyAlt};
-    if (const std::optional<EditorCommand> command = GetTurnCommand(turn)) {
-        RunCommand(*command);
     }
 }
 

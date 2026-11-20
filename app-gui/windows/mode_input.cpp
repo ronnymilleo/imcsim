@@ -74,7 +74,7 @@ void DrawWirePreview(const WiringMode &mode, const ModeInput &input, const GridP
 } // namespace
 
 /**
- * @brief   Selecting handles its clicks before the schematic is drawn (EditorWindow::HandleSelection()), so a dragged
+ * @brief   Selecting handles its clicks before the schematic is drawn (HandleSelectionInput()), so a dragged
  *          part is drawn where the cursor is; here, hovering a wire or a part shows its value on display.
  */
 std::optional<EditorMode> HandleMode(SelectingMode &mode, const ModeInput &input) {

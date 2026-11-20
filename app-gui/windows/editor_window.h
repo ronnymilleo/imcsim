@@ -197,15 +197,6 @@ private:
     void FinishLevelChange(const std::expected<void, std::string> &changed);
     void ApplySpiceBlockResult(SpiceBlockResult result);
 
-    // Selection and dragging
-    void HandleSelection(const ViewTransform &view, bool hovered);
-    void HandleSelectionClick(SelectingMode &selecting, ImVec2 cursor_world);
-    void HandleSelectionDoubleClick();
-    void UpdateSelectionBox(SelectingMode &selecting, ImVec2 cursor_world);
-    void UpdateSelectionDrag(SelectingMode &selecting, ImVec2 cursor_world);
-    void HandleSelectionKeys();
-    void RunTurnKey(PointTransform::Kind kind);
-
     // Commands and shortcuts
     void HandleCommandRequest();
     void RunPressedShortcuts(ShortcutScope scope);
