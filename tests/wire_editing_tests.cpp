@@ -144,7 +144,7 @@ TEST_CASE("Points are moved by a translation, a quarter turn and the two mirrors
 
 TEST_CASE("Sliding a segment stretches the wires that meet it at right angles", "[wire_editing]") {
     const std::vector<GUI::UIWire> wires{{{0, -4}, {0, 0}}, {{0, 0}, {4, 0}}, {{4, 0}, {4, -4}}};
-    const GUI::MovedWires moved = GUI::MoveGroup(wires, {1}, {}, {}, {}, Translation(0, 2));
+    const GUI::MovedWires moved = GUI::MoveGroup(wires, {1}, {}, Translation(0, 2));
 
     REQUIRE(moved.Wires.size() == 3);
     CHECK(HasWire(moved.Wires, {0, -4}, {0, 2}));
@@ -156,7 +156,7 @@ TEST_CASE("Sliding a segment stretches the wires that meet it at right angles", 
 
 TEST_CASE("Sliding a segment bends the wires that continue it", "[wire_editing]") {
     const std::vector<GUI::UIWire> wires{{{0, 0}, {2, 0}}, {{2, 0}, {6, 0}}, {{6, 0}, {8, 0}}};
-    const GUI::MovedWires moved = GUI::MoveGroup(wires, {1}, {}, {}, {}, Translation(0, 2));
+    const GUI::MovedWires moved = GUI::MoveGroup(wires, {1}, {}, Translation(0, 2));
 
     // The neighbors jog next to their fixed ends and join the moved segment into one run
     REQUIRE(moved.Wires.size() == 3);
@@ -168,7 +168,7 @@ TEST_CASE("Sliding a segment bends the wires that continue it", "[wire_editing]"
 
 TEST_CASE("A wire that ends on the middle of a moved segment goes with it", "[wire_editing]") {
     const std::vector<GUI::UIWire> wires{{{0, 0}, {6, 0}}, {{3, 0}, {3, -4}}};
-    const GUI::MovedWires moved = GUI::MoveGroup(wires, {0}, {}, {}, {}, Translation(0, 2));
+    const GUI::MovedWires moved = GUI::MoveGroup(wires, {0}, {}, Translation(0, 2));
 
     CHECK(HasWire(moved.Wires, {0, 2}, {6, 2}));
     CHECK(HasWire(moved.Wires, {3, -4}, {3, 2}));
@@ -177,7 +177,8 @@ TEST_CASE("A wire that ends on the middle of a moved segment goes with it", "[wi
 
 TEST_CASE("A moved wire that ended on a part that stays keeps it connected", "[wire_editing]") {
     const std::vector<GUI::UIWire> wires{{{0, 0}, {4, 0}}};
-    const GUI::MovedWires moved = GUI::MoveGroup(wires, {0}, {}, {}, {{0, 0}}, Translation(0, 2));
+    const GUI::MovedWires moved =
+        GUI::MoveGroup(wires, {0}, {.Old = {}, .New = {}, .Fixed = {{0, 0}}}, Translation(0, 2));
 
     REQUIRE(moved.Wires.size() == 2);
     CHECK(HasWire(moved.Wires, {0, 0}, {0, 2}));
@@ -189,7 +190,8 @@ TEST_CASE("A moved wire that ended on a part that stays keeps it connected", "[w
 TEST_CASE("A wire from a part that stays keeps its end on that part while a segment slides", "[wire_editing]") {
     // The part at (0, 0) stays; the selected segment starts on its terminal and a wire also ends there
     const std::vector<GUI::UIWire> wires{{{-4, 0}, {0, 0}}, {{0, 0}, {4, 0}}};
-    const GUI::MovedWires moved = GUI::MoveGroup(wires, {1}, {}, {}, {{0, 0}}, Translation(0, 2));
+    const GUI::MovedWires moved =
+        GUI::MoveGroup(wires, {1}, {.Old = {}, .New = {}, .Fixed = {{0, 0}}}, Translation(0, 2));
 
     CHECK(HasWire(moved.Wires, {-4, 0}, {0, 0}));
     CHECK(HasWire(moved.Wires, {0, 0}, {0, 2}));
@@ -199,7 +201,8 @@ TEST_CASE("A wire from a part that stays keeps its end on that part while a segm
 TEST_CASE("A part that stays and touches a moved wire in the middle stays connected", "[wire_editing]") {
     // A ground at (4, 0) hangs on a rail that slides down
     const std::vector<GUI::UIWire> wires{{{0, 0}, {8, 0}}};
-    const GUI::MovedWires moved = GUI::MoveGroup(wires, {0}, {}, {}, {{4, 0}}, Translation(0, 2));
+    const GUI::MovedWires moved =
+        GUI::MoveGroup(wires, {0}, {.Old = {}, .New = {}, .Fixed = {{4, 0}}}, Translation(0, 2));
 
     CHECK(HasWire(moved.Wires, {0, 2}, {8, 2}));
     CHECK(HasWire(moved.Wires, {4, 0}, {4, 2}));
@@ -209,7 +212,7 @@ TEST_CASE("A part that stays and touches a moved wire in the middle stays connec
 
 TEST_CASE("A moved wire that ended on the middle of another wire stays connected to it", "[wire_editing]") {
     const std::vector<GUI::UIWire> wires{{{0, 0}, {8, 0}}, {{4, 0}, {4, 4}}};
-    const GUI::MovedWires moved = GUI::MoveGroup(wires, {1}, {}, {}, {}, Translation(2, 0));
+    const GUI::MovedWires moved = GUI::MoveGroup(wires, {1}, {}, Translation(2, 0));
 
     CHECK(HasWire(moved.Wires, {0, 0}, {8, 0}));
     CHECK(HasWire(moved.Wires, {4, 0}, {6, 0}));
@@ -219,8 +222,10 @@ TEST_CASE("A moved wire that ended on the middle of another wire stays connected
 TEST_CASE("Parts and wires move together and the wires around them follow", "[wire_editing]") {
     // A part with terminals at (0, 0) and (4, 0) moves one unit up with the wire between its terminal and a corner
     const std::vector<GUI::UIWire> wires{{{-4, 0}, {0, 0}}, {{4, 0}, {4, 4}}};
-    const GUI::MovedWires moved =
-        GUI::MoveGroup(wires, {1}, {{0, 0}, {4, 0}}, {{0, -1}, {4, -1}}, {}, Translation(0, -1));
+    const GUI::MovedWires moved = GUI::MoveGroup(wires,
+                                                 {1},
+                                                 {.Old = {{0, 0}, {4, 0}}, .New = {{0, -1}, {4, -1}}, .Fixed = {}},
+                                                 Translation(0, -1));
 
     CHECK(HasWire(moved.Wires, {-4, -1}, {0, -1}));
     CHECK(HasWire(moved.Wires, {4, -1}, {4, 3}));
@@ -231,7 +236,7 @@ TEST_CASE("A selection turned about a point turns its wires and keeps the others
     // The selected wire runs right of the pivot; another wire continues it to the right
     const std::vector<GUI::UIWire> wires{{{2, 0}, {6, 0}}, {{6, 0}, {10, 0}}};
     const GUI::PointTransform turn = {.Type = GUI::PointTransform::Kind::QUARTER_TURN, .Delta = {}, .Pivot = {0, 0}};
-    const GUI::MovedWires moved = GUI::MoveGroup(wires, {0}, {}, {}, {}, turn);
+    const GUI::MovedWires moved = GUI::MoveGroup(wires, {0}, {}, turn);
 
     // (2, 0)-(6, 0) becomes (0, 2)-(0, 6), and the other wire follows its end to (0, 6) with a bend at its fixed end
     CHECK(IsSelected(moved, {0, 2}, {0, 6}));
@@ -245,7 +250,7 @@ TEST_CASE("A selection mirrored about a point swaps its sides", "[wire_editing]"
     const GUI::PointTransform mirror = {.Type = GUI::PointTransform::Kind::MIRROR_LEFT_RIGHT,
                                         .Delta = {},
                                         .Pivot = {5, 0}};
-    const GUI::MovedWires moved = GUI::MoveGroup(wires, {0}, {}, {}, {}, mirror);
+    const GUI::MovedWires moved = GUI::MoveGroup(wires, {0}, {}, mirror);
 
     REQUIRE(moved.Wires.size() == 1);
     CHECK(HasWire(moved.Wires, {8, 0}, {6, 0}));
