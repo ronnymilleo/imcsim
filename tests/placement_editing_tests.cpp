@@ -174,7 +174,7 @@ TEST_CASE("A group that places the block being edited is refused inside that blo
     CHECK(blocks.GetShown().GetElements().size() == parts);
 
     // On the document the same group is fine
-    blocks.Close(false);
+    REQUIRE(blocks.Close(false));
     GUI::PastedGroup again;
     again.Elements.push_back(MakeInstance("inner"));
     CHECK_FALSE(GUI::PlacePastedGroup(schematic, blocks, again));

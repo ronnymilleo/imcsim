@@ -525,19 +525,23 @@ void EditorWindow::RequestEditSelectedSubcircuit() {
         m_SpiceDialog.OpenSettings(*definition);
         return;
     }
-    if (m_Blocks.Open(*name)) {
-        ShowSchematic();
+    if (const auto opened = m_Blocks.Open(*name); !opened) {
+        m_Blocks.ReportError(opened.error());
+        return;
     }
+    ShowSchematic();
 }
 
 /**
  * @brief   Closes the innermost open block, applying it to the document or dropping its changes, and shows the level
- *          above it.
+ *          above it; a block that cannot be applied stays open, with the reason in the block dialog.
  */
 void EditorWindow::FinishSubcircuitEditing(const bool apply) {
-    if (m_Blocks.Close(apply)) {
-        ShowSchematic();
+    if (const auto closed = m_Blocks.Close(apply); !closed) {
+        m_Blocks.ReportError(closed.error());
+        return;
     }
+    ShowSchematic();
 }
 
 /**
@@ -868,7 +872,9 @@ void EditorWindow::RunCommand(const EditorCommand command) {
         RequestEditSelectedSubcircuit();
         break;
     case EditorCommand::OPEN_BLOCK_SETTINGS:
-        m_Blocks.SyncPins();
+        if (const auto synced = m_Blocks.SyncPins(); !synced) {
+            m_Blocks.ReportError(synced.error());
+        }
         m_Blocks.RequestDialog();
         break;
     case EditorCommand::APPLY_BLOCK:

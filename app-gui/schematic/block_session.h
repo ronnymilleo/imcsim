@@ -70,14 +70,14 @@ public:
     static std::optional<std::string> FindBlockName(const UIElement *element);
     const SavedSubcircuit *FindDefinition(const std::string &name) const;
     void RequestCreate();
-    bool Open(const std::string &name);
-    bool Close(bool apply);
+    [[nodiscard]] std::expected<void, std::string> Open(const std::string &name);
+    [[nodiscard]] std::expected<void, std::string> Close(bool apply);
     std::expected<void, std::string> ApplySpiceUpdate(const std::string &name,
                                                       const std::vector<SavedSubcircuitPin> &pins,
                                                       const std::vector<Core::SubcircuitParameter> &parameters);
 
     // Settings of the dialog
-    bool SyncPins();
+    [[nodiscard]] std::expected<void, std::string> SyncPins();
     bool ApplyPinNames();
     bool CreateBlock();
     void RestoreSettings();
@@ -85,6 +85,7 @@ public:
     std::vector<SavedSubcircuitPin> &GetPins();
     std::vector<Core::SubcircuitParameter> &GetParameters();
     std::string &GetError();
+    void ReportError(std::string reason);
     void RequestDialog();
     bool TakeDialogRequest();
 
@@ -99,6 +100,8 @@ private:
     std::string m_Error;
     bool m_IsDialogRequested = false;
 
+    std::expected<void, std::string> ApplyInnermost();
+    void LeaveInnermost();
     BlockSettings &GetShownSettings();
 };
 
