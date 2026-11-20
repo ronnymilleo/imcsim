@@ -615,6 +615,13 @@ TEST_CASE("Analyses have names, and all of them are counted", "[analysis_control
     CHECK(static_cast<std::size_t>(GUI::Analysis::HARMONIC_BALANCE) + 1 == GUI::ANALYSIS_COUNT);
 }
 
+TEST_CASE("The list of every analysis runs in the order of the enum, from the operating point to harmonic balance",
+          "[analysis_controls]") {
+    CHECK(GUI::ALL_ANALYSES.front() == GUI::Analysis::OPERATING_POINT);
+    CHECK(GUI::ALL_ANALYSES[1] == GUI::Analysis::TRANSIENT);
+    CHECK(GUI::ALL_ANALYSES.back() == GUI::Analysis::HARMONIC_BALANCE);
+}
+
 TEST_CASE("Each analysis is the backend analysis of the same name, and the sensitivity its DC kind",
           "[analysis_controls]") {
     CHECK(GUI::ToKind(GUI::Analysis::OPERATING_POINT) == Core::AnalysisKind::OPERATING_POINT);

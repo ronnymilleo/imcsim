@@ -69,17 +69,7 @@ void DrawDropdownArrow(const ImVec2 center) {
  */
 float AnalysisButtonWidth() {
     float widest = 0.0f;
-    for (const Analysis analysis : {Analysis::OPERATING_POINT,
-                                    Analysis::TRANSIENT,
-                                    Analysis::AC_SWEEP,
-                                    Analysis::DC_SWEEP,
-                                    Analysis::NOISE,
-                                    Analysis::TRANSFER_FUNCTION,
-                                    Analysis::SENSITIVITY,
-                                    Analysis::POLE_ZERO,
-                                    Analysis::S_PARAMETERS,
-                                    Analysis::TRUTH_TABLE,
-                                    Analysis::HARMONIC_BALANCE}) {
+    for (const Analysis analysis : ALL_ANALYSES) {
         widest = std::max(widest, ImGui::CalcTextSize(GetAnalysisName(analysis)).x);
     }
     return widest + ImGui::GetStyle().FramePadding.x * 2.0f + ImGui::GetFontSize();
