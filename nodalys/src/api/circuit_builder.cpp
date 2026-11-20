@@ -233,23 +233,17 @@ std::optional<NodeId> ReadExpressionNode(const std::string &text) {
 }
 
 /**
- * @brief   Finds the voltage source that an element reads the current of, whatever the case of the name, since SPICE
- *          names are case-insensitive.
+ * @brief   Finds the voltage source that an element reads the current of.
  * @details Both the i(Vx) inputs of a behavioral source and the control of a CCCS or CCVS go through here, so the two
- *          read a source by the same rule, the one ngspice follows.
+ *          read a source by the same rule; the map ignores case, as SPICE names do.
  * @param[in] sources  Sources of the circuit by name.
  * @param[in] name     Name of the source, in any case.
  * @return  The voltage source, which belongs to the circuit, or null when no source has that name or the source of
  *          that name is not a voltage source.
  */
-const VoltageSourceDevice *FindVoltageSource(const std::map<std::string, Device *> &sources, const std::string &name) {
-    const std::string wanted = ToLower(name);
-    for (const auto &[source_name, device] : sources) {
-        if (ToLower(source_name) == wanted) {
-            return dynamic_cast<const VoltageSourceDevice *>(device);
-        }
-    }
-    return nullptr;
+const VoltageSourceDevice *FindVoltageSource(const DevicesByName &sources, const std::string_view name) {
+    const auto found = sources.find(name);
+    return found == sources.end() ? nullptr : dynamic_cast<const VoltageSourceDevice *>(found->second);
 }
 
 /**
@@ -1168,7 +1162,10 @@ private:
         source->SetBreakpoints(std::move(spec.Breakpoints));
         source->SetSeedCallback(std::move(spec.SetSeed));
         Device *device = AddDevice(std::move(source));
-        m_Compiled.SourcesByName[name] = device;
+        // SPICE names ignore case, so "V1" and "v1" are the same source and the second one is a duplicate
+        if (!m_Compiled.SourcesByName.try_emplace(name, device).second) {
+            m_Errors.push_back(std::format("{}: another source of the circuit has the same name", name));
+        }
         RegisterElement(name, device);
     }
 

@@ -1,6 +1,6 @@
 /**
  * @file    text_case_tests.cpp
- * @brief   Unit tests for changing the case of ASCII text, as SPICE reads names, keys and words without regard to case.
+ * @brief   Unit tests for changing and comparing the case of ASCII text, as SPICE reads names, keys and words.
  */
 
 #include <catch2/catch_test_macros.hpp>
@@ -20,4 +20,13 @@ TEST_CASE("Changing the case of a text touches the ASCII letters only", "[text_c
                            "f")
           == "4.7\xC2\xB5"
              "F");
+}
+
+TEST_CASE("Names that differ only in case are one name, and others keep their order", "[text_case]") {
+    const Nodalys::CaseInsensitiveLess less;
+    CHECK_FALSE(less("Vin", "VIN"));
+    CHECK_FALSE(less("VIN", "Vin"));
+    CHECK(less("v1", "V2"));
+    CHECK(less("R", "r1"));
+    CHECK_FALSE(less("V2", "v1"));
 }
