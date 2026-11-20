@@ -186,6 +186,7 @@ add_library(imcsim-gui-lib
             ui_elements/ui_wire.cpp
             windows/app_window.cpp
             windows/block_dialog.cpp
+            windows/clipboard_actions.cpp
             windows/dock_layout.cpp
             windows/editor_canvas_drawing.cpp
             windows/editor_context_menu.cpp

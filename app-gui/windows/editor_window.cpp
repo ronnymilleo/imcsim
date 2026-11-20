@@ -12,6 +12,7 @@
 #include "schematic/selection_editing.h"
 #include "schematic/wire_editing.h"
 #include "windows/block_dialog.h"
+#include "windows/clipboard_actions.h"
 #include "windows/editor_canvas_drawing.h"
 #include "windows/editor_status_bar.h"
 #include "windows/mode_input.h"
@@ -54,7 +55,7 @@ EditorWindow::EditorWindow(Schematic &schematic,
               preferences,
               {.StopEditing = [this] { GUI::StopEditing(*m_Schematic, m_Mode); },
                .FrameSchematic = [this] { m_View.RequestDefaultFrame(); },
-               .PlaceGroup = [this](PastedGroup group) { StartPastingGroup(std::move(group)); },
+               .PlaceGroup = [this](PastedGroup group) { SetMode(PastingMode{.Group = std::move(group)}); },
                .OpenSpiceLibrary =
                    [this](std::string file_name, Core::SpiceLibrary library) {
                        m_SpiceDialog.OpenImport(std::move(file_name), std::move(library));
@@ -586,57 +587,6 @@ void EditorWindow::ApplySpiceBlockResult(SpiceBlockResult result) {
 }
 
 /**
- * @brief   The selection goes to the clipboard as text in the format of the files, so another copy of the program can
- *          paste it.
- */
-void EditorWindow::CopySelected() {
-    if (!IsSelecting(m_Mode) || !m_Schematic->HasSelection()) {
-        return;
-    }
-    const Selection selection = {m_Schematic->GetSelection().Elements, m_Schematic->GetSelection().Wires};
-    ImGui::SetClipboardText(CopySelection(m_Schematic->GetElements(),
-                                          m_Schematic->GetWires(),
-                                          selection,
-                                          m_Schematic->GetSubcircuits(),
-                                          m_Schematic->GetLibraryModels())
-                                .c_str());
-}
-
-/**
- * @brief   The selection goes to the clipboard, as CopySelected() puts it, and leaves the schematic.
- */
-void EditorWindow::CutSelected() {
-    if (!IsSelecting(m_Mode) || !m_Schematic->HasSelection()) {
-        return;
-    }
-    CopySelected();
-    m_Schematic->DeleteSelection();
-}
-
-/**
- * @brief   Reads the clipboard and, when it holds a schematic, places it.
- * @details Text that is not a schematic is left alone.
- */
-void EditorWindow::StartPasting() {
-    const char *text = ImGui::GetClipboardText();
-    if (text == nullptr) {
-        return;
-    }
-    auto group = ParseCopiedSchematic(text);
-    if (!group) {
-        return;
-    }
-    StartPastingGroup(std::move(*group));
-}
-
-/**
- * @brief   Leaves every other mode, so the group is the only thing to place.
- */
-void EditorWindow::StartPastingGroup(PastedGroup group) {
-    SetMode(PastingMode{.Group = std::move(group)});
-}
-
-/**
  * @brief   Handles selection mode, active while not placing, wiring or probing: a click selects an element or a wire,
  *          Shift+click adds or removes one, a drag on empty canvas selects what the box touches, and a double click on
  *          a wire selects its whole node. Dragging the selection moves it, a single wire sliding across itself, with
@@ -859,13 +809,19 @@ void EditorWindow::RunCommand(const EditorCommand command) {
         RunTurnCommand(command);
         break;
     case EditorCommand::CUT:
-        CutSelected();
+        if (IsSelecting(m_Mode)) {
+            CutSelectionToClipboard(*m_Schematic);
+        }
         break;
     case EditorCommand::COPY:
-        CopySelected();
+        if (IsSelecting(m_Mode)) {
+            CopySelectionToClipboard(*m_Schematic);
+        }
         break;
     case EditorCommand::PASTE:
-        StartPasting();
+        if (std::optional<PastedGroup> group = ReadClipboardGroup()) {
+            SetMode(PastingMode{.Group = std::move(*group)});
+        }
         break;
     case EditorCommand::SELECT_ALL:
         SelectAll(*m_Schematic, m_Mode);

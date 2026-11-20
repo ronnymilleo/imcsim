@@ -197,12 +197,6 @@ private:
     void FinishLevelChange(const std::expected<void, std::string> &changed);
     void ApplySpiceBlockResult(SpiceBlockResult result);
 
-    // Clipboard
-    void CopySelected();
-    void CutSelected();
-    void StartPasting();
-    void StartPastingGroup(PastedGroup group);
-
     // Selection and dragging
     void HandleSelection(const ViewTransform &view, bool hovered);
     void HandleSelectionClick(SelectingMode &selecting, ImVec2 cursor_world);

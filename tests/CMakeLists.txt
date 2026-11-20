@@ -28,6 +28,7 @@ add_executable(imcsim-tests
             circuit_copy_tests.cpp
             circuit_snapshot_tests.cpp
             circuit_tests.cpp
+            clipboard_actions_tests.cpp
             clipboard_tests.cpp
             code_models.cpp
             color_legend_tests.cpp
