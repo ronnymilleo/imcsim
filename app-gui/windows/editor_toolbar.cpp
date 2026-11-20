@@ -5,6 +5,7 @@
 
 #include "windows/editor_toolbar.h"
 
+#include "analysis/run_status.h"
 #include "base/theme.h"
 #include "schematic/shortcuts.h"
 #include "spice/spice_value.h"
@@ -219,27 +220,12 @@ std::string DescribeRunAction(const AnalysisControls &controls, const Analysis s
         return std::format("Stop the {} run", GetAnalysisName(*running));
     }
     if (action == RunAction::CONTINUE) {
-        return "Continue the live run from where it stopped (F5)";
+        return NameWithShortcut("Continue the live run from where it stopped", EditorCommand::RUN);
     }
     if (controls.IsLiveModeOn() && !controls.FindLiveObstacle()) {
-        return std::format("Run {} live (F5)", GetAnalysisName(selected));
+        return NameWithShortcut(std::format("Run {} live", GetAnalysisName(selected)), EditorCommand::RUN);
     }
-    return std::format("Run {} (F5)", GetAnalysisName(selected));
-}
-
-/**
- * @brief   The label of the Run button at the foot of the analysis settings.
- */
-const char *GetRunButtonLabel(const RunAction action) {
-    switch (action) {
-    case RunAction::STOP:
-        return "Stop";
-    case RunAction::CONTINUE:
-        return "Continue (F5)";
-    case RunAction::RUN:
-    default:
-        return "Run (F5)";
-    }
+    return NameWithShortcut(std::format("Run {}", GetAnalysisName(selected)), EditorCommand::RUN);
 }
 
 } // namespace
@@ -353,7 +339,7 @@ void EditorToolbar::DrawAnalysisButton() {
         ImGui::Separator();
         // The popup has the focus, so F5 is checked here too; like the shortcut, it never stops a run
         const RunAction action = m_Controls.GetRunAction();
-        if (PrimaryButton(GetRunButtonLabel(action))
+        if (PrimaryButton(GetRunButtonLabel(action).c_str())
             || (action != RunAction::STOP && ImGui::IsKeyPressed(ImGuiKey_F5, false))) {
             m_Controls.PressRun();
             ImGui::CloseCurrentPopup();

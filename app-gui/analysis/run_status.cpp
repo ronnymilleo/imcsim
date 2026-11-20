@@ -1,7 +1,7 @@
 /**
  * @file    run_status.cpp
  * @brief   The text of the run status in the status bar of the editor, what the last run reported, or how far a run in
- *          progress is, and the full report of the last run of an analysis.
+ *          progress is, the label of the Run button, and the full report of the last run of an analysis.
  */
 
 #include "analysis/run_status.h"
@@ -9,6 +9,7 @@
 #include "base/text_fitting.h"
 #include "base/theme.h"
 #include "imgui.h"
+#include "schematic/shortcuts.h"
 #include "spice/spice_value.h"
 #include <format>
 #include <string>
@@ -55,6 +56,24 @@ std::string DescribeRunCost(const std::optional<double> seconds,
         return std::format("{} time steps in {}", transient->Times.size(), time);
     }
     return time;
+}
+
+/**
+ * @brief   The label of the Run button at the foot of the analysis settings, with the key that presses it.
+ * @param[in] action  What the button does now.
+ * @return  "Run" or "Continue" with the key of the Run command, such as "Run (F5)"; "Stop" alone, since the key never
+ *          stops a run.
+ */
+std::string GetRunButtonLabel(const RunAction action) {
+    switch (action) {
+    case RunAction::STOP:
+        return "Stop";
+    case RunAction::CONTINUE:
+        return NameWithShortcut("Continue", EditorCommand::RUN);
+    case RunAction::RUN:
+    default:
+        return NameWithShortcut("Run", EditorCommand::RUN);
+    }
 }
 
 /**
