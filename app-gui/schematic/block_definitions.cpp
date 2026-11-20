@@ -266,8 +266,7 @@ std::expected<SavedSubcircuit, std::string> DrawDefinition(const std::vector<std
     for (const std::size_t index : selection.Wires) {
         copied_wires.push_back(wires[index]);
     }
-    // The blocks the selection places go along, so their instances read back
-    auto copied = LoadSchematic(SaveParts(copied_elements, copied_wires, definitions));
+    auto copied = CopyContent(copied_elements, copied_wires, definitions);
     if (!copied) {
         return std::unexpected(copied.error());
     }
@@ -286,6 +285,25 @@ std::expected<SavedSubcircuit, std::string> DrawDefinition(const std::vector<std
         return std::unexpected(*problem);
     }
     return definition;
+}
+
+/**
+ * @brief   Copies parts and wires into ones that share nothing with them, as the contents of a block need.
+ * @details The copy goes through the text of a file, which copies the parts deeply; the blocks they place go along,
+ *          so their instances read back.
+ * @param[in] elements     Parts to copy, which stay as they are.
+ * @param[in] wires        Wires to copy.
+ * @param[in] definitions  Blocks the parts may place.
+ * @return  The copies, in the same order; the reason when the text cannot be read back.
+ */
+std::expected<CopiedContent, std::string> CopyContent(const std::span<const UIElement *const> elements,
+                                                      const std::vector<UIWire> &wires,
+                                                      const std::span<const SavedSubcircuit> definitions) {
+    auto loaded = LoadSchematic(SaveParts(elements, wires, definitions));
+    if (!loaded) {
+        return std::unexpected(loaded.error());
+    }
+    return CopiedContent{.Elements = std::move(loaded->Elements), .Wires = std::move(loaded->Wires)};
 }
 
 /**

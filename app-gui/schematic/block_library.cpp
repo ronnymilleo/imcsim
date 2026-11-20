@@ -166,8 +166,9 @@ BlockLibrary::UpdateDrawn(const std::string &name,
     if (auto valid = ValidateExpressions(elements, parameters); !valid) {
         return std::unexpected(valid.error());
     }
-    // The text of a file copies the parts deeply; the blocks they place go along, so their instances read back
-    auto copied = LoadSchematic(SaveSchematic(elements, wires, {}, {}, m_Subcircuits));
+    std::vector<const UIElement *> parts(elements.size());
+    std::ranges::transform(elements, parts.begin(), &std::unique_ptr<UIElement>::get);
+    auto copied = CopyContent(parts, wires, m_Subcircuits);
     if (!copied) {
         return std::unexpected(copied.error());
     }
