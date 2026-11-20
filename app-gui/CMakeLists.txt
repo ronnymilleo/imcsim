@@ -120,6 +120,7 @@ add_library(imcsim-gui-lib
             schematic/file_source_fields.cpp
             schematic/file_subcircuits.cpp
             schematic/file_wires.cpp
+            schematic/free_name.cpp
             schematic/group_editing.cpp
             schematic/live_input.cpp
             schematic/logic_bus_definition.cpp

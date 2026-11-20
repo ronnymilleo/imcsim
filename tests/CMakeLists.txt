@@ -45,6 +45,7 @@ add_executable(imcsim-tests
             engine_cross_validation_tests.cpp
             examples_tests.cpp
             file_json_tests.cpp
+            free_name_tests.cpp
             fuse_blow_tracker_tests.cpp
             fuse_tests.cpp
             glow_falloff_tests.cpp

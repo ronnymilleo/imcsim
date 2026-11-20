@@ -326,21 +326,6 @@ std::vector<SavedSubcircuit> CopyDefinitions(const std::vector<SavedSubcircuit> 
 }
 
 /**
- * @brief   Finds a name no definition has yet, from the one a pasted definition came with.
- * @param[in] name         The name the pasted definition came with.
- * @param[in] definitions  The definitions already here.
- * @return  The name with a suffix such as "_2", the first that is free.
- */
-std::string FindFreeName(const std::string &name, const std::vector<SavedSubcircuit> &definitions) {
-    for (int suffix = 2;; ++suffix) {
-        std::string candidate = std::format("{}_{}", name, suffix);
-        if (!std::ranges::contains(definitions, candidate, &SavedSubcircuit::Name)) {
-            return candidate;
-        }
-    }
-}
-
-/**
  * @brief   Brings the instances of a definition that changed up to date among some parts: their pins and edges, the
  *          overrides of the parameters it still has, and the wires on their terminals, which follow the pins that go
  *          on and are removed from the pins that went away.

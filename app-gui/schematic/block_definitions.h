@@ -71,7 +71,6 @@ std::expected<CopiedContent, std::string> CopyContent(std::span<const UIElement 
                                                       std::span<const SavedSubcircuit> definitions);
 std::string DescribeDefinition(const SavedSubcircuit &definition);
 std::vector<SavedSubcircuit> CopyDefinitions(const std::vector<SavedSubcircuit> &definitions);
-std::string FindFreeName(const std::string &name, const std::vector<SavedSubcircuit> &definitions);
 
 // Instances
 void RefreshInstancesIn(std::vector<std::unique_ptr<UIElement>> &elements,
