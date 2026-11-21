@@ -62,9 +62,9 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   a Touchstone `.sNp` file, and for a two-port its stability (K, mu, MAG and MSG, source and load stability circles)
 - A truth table of a digital circuit: every combination of the chosen logic inputs and the 0, 1 or X it gives at the
   measured outputs
-- Two simulation engines, picked in Edit > Preferences > Simulation: ngspice, the default, and Nodalys, a solver written
-  for imcsim from published circuit theory and tested against closed-form results and against ngspice on every
-  example. Nodalys runs every analysis of ngspice, with temperature, fuses, behavioral sources, blocks imported from
+- Two simulation engines, picked in Edit > Preferences > Simulation: Nodalys, the default, and ngspice. Nodalys is a
+  solver written for imcsim from published circuit theory and tested against closed-form results and against ngspice
+  on every example. Nodalys runs every analysis of ngspice, with temperature, fuses, behavioral sources, blocks imported from
   SPICE libraries and seedable noise and random sources, and what it does not cover is refused with the reason (see the
   [user guide](docs/user_guide.md#choosing-the-simulation-engine)). It also comes as `nodalys`, a command line that
   reads SPICE netlists

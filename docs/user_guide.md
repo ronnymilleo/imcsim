@@ -1040,10 +1040,10 @@ the Run report says how many. The table is not exported as a figure, like the op
 
 imcsim solves circuits with one of two engines, picked in Edit > Preferences > Simulation (the **Backend** choice):
 
-- **ngspice** is the reference simulator, the open-source successor of Berkeley SPICE, used as a shared library. It is
-  the default. Logic gates and flip-flops run as its digital models, with X states, and its results are the ones the
-  rest of this guide describes.
-- **Nodalys** is the solver built into imcsim. It reads the circuit directly, with no netlist, and runs every analysis
+- **ngspice** is the reference simulator, the open-source successor of Berkeley SPICE, used as a shared library. Logic
+  gates and flip-flops run as its digital models, with X states, and its results are the ones the rest of this guide
+  describes.
+- **Nodalys** is the solver built into imcsim, and the default. It reads the circuit directly, with no netlist, and runs every analysis
   of ngspice plus the harmonic balance and the AC kind of the sensitivity, which ngspice cannot. Its logic gates and flip-flops are continuous (a smooth
   step of the inputs, with no X states), so an AC sweep or a noise analysis sees through them, and a run is repeatable
   from its seed even for white and 1/f noise.

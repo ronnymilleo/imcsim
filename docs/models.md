@@ -80,7 +80,7 @@ elements, so the results are those of ngspice with the models below. Some things
 
 ### Nodalys
 
-Edit > Preferences > Simulation picks the engine. ngspice is the default; Nodalys is the solver built into imcsim
+Edit > Preferences > Simulation picks the engine. Nodalys, the default, is the solver built into imcsim
 ([its documentation](nodalys/README.md)), which takes the circuit directly, with no netlist, and runs the same
 analyses plus the harmonic balance (the user guide has a section on choosing the engine). It simulates the parts with
 the same models as above (Shockley diode, Gummel-Poon transistor, level 1 MOSFET, ideal and Boyle op-amps), and differs

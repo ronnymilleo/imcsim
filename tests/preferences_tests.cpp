@@ -20,7 +20,7 @@ TEST_CASE("Preferences load back unchanged from the file they save", "[preferenc
     preferences.SetEffectOn(GUI::LiveEffect::LOGIC_LIGHTS, true);
     preferences.ValueSeries = Core::ValueSeries::E24;
     preferences.BringOutputToFront = false;
-    preferences.Engine = GUI::SimulationEngine::NODALYS;
+    preferences.Engine = GUI::SimulationEngine::NGSPICE;
     preferences.RerunOnEdit = true;
     preferences.RerunDelaySeconds = 1.5;
     preferences.HarmonicAmplitudes = GUI::HarmonicAmplitudeUnit::RMS;
@@ -31,7 +31,7 @@ TEST_CASE("Preferences load back unchanged from the file they save", "[preferenc
     CHECK_FALSE(loaded.Choices.IsEffectOn(GUI::LiveEffect::CURRENT_FLOW));
 }
 
-TEST_CASE("A new user gets the first theme, plain wires, no effects but the fuse flash and any value",
+TEST_CASE("A new user gets the first theme, plain wires, no effects but the fuse flash, any value and Nodalys",
           "[preferences]") {
     const GUI::Preferences preferences;
     CHECK(preferences.Theme == GUI::GetThemes().front().Name);
@@ -39,6 +39,7 @@ TEST_CASE("A new user gets the first theme, plain wires, no effects but the fuse
     CHECK_FALSE(preferences.IsEffectOn(GUI::LiveEffect::CURRENT_FLOW));
     CHECK(preferences.ValueSeries == Core::ValueSeries::FREE);
     CHECK(preferences.BringOutputToFront);
+    CHECK(preferences.Engine == GUI::SimulationEngine::NODALYS);
     CHECK_FALSE(preferences.RerunOnEdit);
     CHECK(preferences.RerunDelaySeconds == GUI::DEFAULT_RERUN_DELAY_SECONDS);
     // A file with none of the keys, as one from a later version that renamed them all, keeps every default
@@ -100,11 +101,11 @@ TEST_CASE("The simulation engine is kept by the name its backend gives itself, a
     CHECK(std::string(GUI::GetSimulationEngineName(GUI::SimulationEngine::NGSPICE)) == "ngspice");
     CHECK(std::string(GUI::GetSimulationEngineName(GUI::SimulationEngine::NODALYS)) == "Nodalys");
 
-    const GUI::LoadedPreferences nodalys = GUI::LoadPreferences(R"({"simulation_backend": "Nodalys"})");
-    CHECK(nodalys.Warnings.empty());
-    CHECK(nodalys.Choices.Engine == GUI::SimulationEngine::NODALYS);
+    const GUI::LoadedPreferences ngspice = GUI::LoadPreferences(R"({"simulation_backend": "ngspice"})");
+    CHECK(ngspice.Warnings.empty());
+    CHECK(ngspice.Choices.Engine == GUI::SimulationEngine::NGSPICE);
 
     const GUI::LoadedPreferences unknown = GUI::LoadPreferences(R"({"simulation_backend": "Xyce"})");
     CHECK(unknown.Warnings.size() == 1);
-    CHECK(unknown.Choices.Engine == GUI::SimulationEngine::NGSPICE);
+    CHECK(unknown.Choices.Engine == GUI::SimulationEngine::NODALYS);
 }
