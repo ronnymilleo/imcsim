@@ -7,7 +7,9 @@
 #include "nodalys/circuit_builder.h"
 #include "nodalys/expression.h"
 #include "parser/model_cards.h"
+#include "parser/netlist_context.h"
 #include "parser/netlist_deck.h"
+#include "parser/netlist_directives.h"
 #include "parser/netlist_nodes.h"
 #include "parser/netlist_subcircuits.h"
 #include "parser/source_waveforms.h"
@@ -34,70 +36,6 @@ namespace Nodalys {
 
 namespace {
 
-struct IcAssignment {
-    std::string_view Lhs;
-    std::string_view Rhs;
-};
-
-std::expected<IcAssignment, std::string>
-NextIcAssignment(const std::vector<std::string> &tokens, std::size_t &index, std::string_view line) {
-    const std::size_t eq = tokens[index].find('=');
-    if (eq != std::string::npos) {
-        const std::string_view lhs = std::string_view(tokens[index]).substr(0, eq);
-        std::string_view rhs = std::string_view(tokens[index]).substr(eq + 1);
-        if (rhs.empty()) {
-            if (index + 1 >= tokens.size()) {
-                return std::unexpected(std::format("Missing voltage after '=' in .ic: '{}'", line));
-            }
-            rhs = tokens[++index];
-        }
-        return IcAssignment{.Lhs = lhs, .Rhs = rhs};
-    }
-    if (index + 1 < tokens.size() && tokens[index + 1].starts_with('=')) {
-        const std::string_view lhs = tokens[index];
-        if (tokens[index + 1].size() > 1) {
-            return IcAssignment{.Lhs = lhs, .Rhs = std::string_view(tokens[++index]).substr(1)};
-        }
-        if (index + 2 >= tokens.size()) {
-            return std::unexpected(std::format("Missing voltage after '=' in .ic: '{}'", line));
-        }
-        const std::string_view rhs = tokens[index + 2];
-        index += 2;
-        return IcAssignment{.Lhs = lhs, .Rhs = rhs};
-    }
-    return std::unexpected(std::format("Malformed entry '{}' in .ic: '{}'", tokens[index], line));
-}
-
-/// Parses a `.ic` or `.nodeset` directive such as `.ic v(1)=5 v(out) = 0` and records each node voltage, as the
-/// initial voltage of the node or as its nodeset.
-std::expected<void, std::string> ParseNodeVoltageDirective(const std::vector<std::string> &tokens,
-                                                           std::string_view line,
-                                                           const NetlistNodes &nodes,
-                                                           CircuitBuilder &builder,
-                                                           const bool is_nodeset) {
-    for (std::size_t i = 1; i < tokens.size(); ++i) {
-        const auto assignment = NextIcAssignment(tokens, i, line);
-        if (!assignment) {
-            return std::unexpected(assignment.error());
-        }
-        const std::string_view lhs = assignment->Lhs;
-        if (lhs.size() <= 3 || (lhs[0] != 'v' && lhs[0] != 'V') || lhs[1] != '(' || lhs.back() != ')') {
-            return std::unexpected(std::format("Expected v(node)=value in .ic, got '{}': '{}'", lhs, line));
-        }
-        const std::string_view node_name = lhs.substr(2, lhs.size() - 3);
-        const auto voltage = ParseSpiceNumber(assignment->Rhs);
-        if (!voltage) {
-            return std::unexpected(std::format("Invalid voltage '{}' in .ic: '{}'", assignment->Rhs, line));
-        }
-        if (is_nodeset) {
-            builder.SetNodeset(nodes.Resolve(node_name), *voltage);
-        } else {
-            builder.SetInitialVoltage(nodes.Resolve(node_name), *voltage);
-        }
-    }
-    return {};
-}
-
 // Helper to extract numbers inside parentheses: "PULSE(0 5 1u 1u ...)" -> vector of numbers
 std::vector<double> ExtractParenthesizedValues(std::string_view token) {
     const std::size_t open = token.find('(');
@@ -114,187 +52,6 @@ std::vector<double> ExtractParenthesizedValues(std::string_view token) {
         }
     }
     return vals;
-}
-
-// Parses V(node) or V(pos, neg)
-std::pair<std::string, std::string> ParseVoltageNodes(std::string_view s) {
-    s = TrimSpaces(s);
-    const std::string upper = ToUpper(s);
-    if (upper.starts_with("V(") && upper.ends_with(")")) {
-        const std::string_view inner = s.substr(2, s.size() - 3);
-        const auto comma = inner.find(',');
-        if (comma != std::string_view::npos) {
-            return {std::string(TrimSpaces(inner.substr(0, comma))), std::string(TrimSpaces(inner.substr(comma + 1)))};
-        }
-        return {std::string(TrimSpaces(inner)), "0"};
-    }
-    return {std::string(s), "0"};
-}
-
-/// The names of the independent sources of the circuit lines that have an AC magnitude, which is what drives an AC
-/// sensitivity. Sources inside a block are not seen: a block's own sources have no AC to name from outside.
-std::vector<std::string> FindAcSources(const std::vector<DeckLine> &circuit_lines) {
-    std::vector<std::string> names;
-    for (const DeckLine &line : circuit_lines) {
-        const std::vector<std::string> &tokens = line.Tokens;
-        if (tokens.size() < 3) {
-            continue;
-        }
-        const char kind = static_cast<char>(std::toupper(static_cast<unsigned char>(tokens[0].front())));
-        if (kind != 'V' && kind != 'I') {
-            continue;
-        }
-        for (std::size_t index = 3; index + 1 < tokens.size(); ++index) {
-            if (ToUpper(tokens[index]) == "AC") {
-                if (ParseSpiceNumber(tokens[index + 1]).value_or(1.0) != 0.0) {
-                    names.push_back(tokens[0]);
-                }
-                break;
-            }
-        }
-    }
-    return names;
-}
-
-/// The sweep of an `.ac`, `.noise` or `.sens ... ac` directive as it is written.
-struct FrequencySweepWords {
-    FrequencySweepType Type = FrequencySweepType::DECADE;
-    int Points = 0;
-    double StartFrequency = 0.0;
-    double StopFrequency = 0.0;
-};
-
-/// Where the sweep of `.sens <out_var> AC <type> <np> <fstart> <fstop>` starts among the tokens.
-constexpr std::size_t FIRST_AC_SENSITIVITY_SWEEP_TOKEN = 3;
-
-/// The words that follow the sweep type, which are the points, the start and the stop.
-constexpr std::size_t SWEEP_NUMBER_COUNT = 3;
-
-std::optional<FrequencySweepType> FindSweepType(const std::string &word) {
-    const std::string upper = ToUpper(word);
-    if (upper == "DEC") {
-        return FrequencySweepType::DECADE;
-    }
-    if (upper == "OCT") {
-        return FrequencySweepType::OCTAVE;
-    }
-    if (upper == "LIN") {
-        return FrequencySweepType::LINEAR;
-    }
-    return std::nullopt;
-}
-
-/**
- * @brief   Reads `[DEC|OCT|LIN] <np> <fstart> <fstop>` from the tokens of a directive.
- * @details The point count is a whole number of at least 1 and the range needs 0 < fstart <= fstop, for a linear
- *          sweep too: the engine solves at each frequency as it is asked, and a zero start has no meaning for the
- *          noise of a part that falls with frequency. ngspice accepts a start of 0 in a linear sweep; this reader
- *          does not.
- * @param[in] tokens             Tokens of the directive.
- * @param[in] first_token        Index of the sweep type, or of the point count when the type is optional and absent.
- * @param[in] is_type_required   True when the type word must be there, as in `.sens ac`; otherwise a missing one is a
- *                               sweep by decade.
- * @param[in] directive          Name used in the messages, such as ".ac".
- * @param[in] line               Text of the directive, quoted in the messages.
- * @return  The sweep, or the message that tells what is wrong with it.
- */
-std::expected<FrequencySweepWords, std::string> ReadFrequencySweep(const std::vector<std::string> &tokens,
-                                                                   const std::size_t first_token,
-                                                                   const bool is_type_required,
-                                                                   const std::string_view directive,
-                                                                   const std::string_view line) {
-    FrequencySweepWords sweep;
-    std::size_t number_token = first_token;
-    if (first_token >= tokens.size()) {
-        return std::unexpected(std::format("Malformed {} directive: '{}'", directive, line));
-    }
-    const std::optional<FrequencySweepType> type = FindSweepType(tokens[first_token]);
-    if (type) {
-        sweep.Type = *type;
-        ++number_token;
-    } else if (is_type_required) {
-        return std::unexpected(std::format("Unknown sweep type '{}' in {}, use dec, oct or lin: '{}'",
-                                           tokens[first_token],
-                                           directive,
-                                           line));
-    }
-    if (tokens.size() < number_token + SWEEP_NUMBER_COUNT) {
-        return std::unexpected(std::format("Malformed {} directive: '{}'", directive, line));
-    }
-    const std::optional<double> points = ParseSpiceNumber(tokens[number_token]);
-    if (!points || *points < 1.0 || std::floor(*points) != *points
-        || *points > static_cast<double>(std::numeric_limits<int>::max())) {
-        return std::unexpected(
-            std::format("Invalid number of points in {}, it must be a whole number of at least 1: '{}'",
-                        directive,
-                        line));
-    }
-    sweep.Points = static_cast<int>(*points);
-    const std::optional<double> start = ParseSpiceNumber(tokens[number_token + 1]);
-    const std::optional<double> stop = ParseSpiceNumber(tokens[number_token + 2]);
-    if (!start || !stop || *start <= 0.0 || *stop < *start) {
-        return std::unexpected(
-            std::format("Invalid frequency range in {}, it needs 0 < fstart <= fstop: '{}'", directive, line));
-    }
-    sweep.StartFrequency = *start;
-    sweep.StopFrequency = *stop;
-    return sweep;
-}
-
-/// The input of an AC sensitivity: the ngspice syntax names none, so it is the one source with an AC magnitude.
-std::expected<std::string, std::string> FindAcSensitivityInput(const std::vector<DeckLine> &circuit_lines) {
-    const std::vector<std::string> sources = FindAcSources(circuit_lines);
-    if (sources.empty()) {
-        return std::unexpected("No source has an AC magnitude, so .sens ac has no input; give one source 'AC 1'");
-    }
-    if (sources.size() > 1) {
-        std::string names;
-        for (const std::string &name : sources) {
-            names += (names.empty() ? "" : ", ") + name;
-        }
-        return std::unexpected(std::format("More than one source has an AC magnitude ({}), so .sens ac cannot tell "
-                                           "its input; leave AC on one source only",
-                                           names));
-    }
-    return sources.front();
-}
-
-/// Reads the rest of `.sens <out_var> AC [DEC|OCT|LIN] <np> <fstart> <fstop>` after the output nodes, and picks the
-/// input source.
-std::expected<AcSensitivityConfig, std::string> ParseAcSensitivity(const std::vector<std::string> &tokens,
-                                                                   const NodeId positive,
-                                                                   const NodeId negative,
-                                                                   const std::vector<DeckLine> &circuit_lines,
-                                                                   const std::string_view line) {
-    constexpr std::size_t TOKENS_WITH_SWEEP_TYPE = 7;
-    if (tokens.size() != TOKENS_WITH_SWEEP_TYPE) {
-        return std::unexpected("Malformed .sens ac directive, expected '.sens <out_var> ac dec|oct|lin <np> <fstart> "
-                               "<fstop>'");
-    }
-    const std::expected<FrequencySweepWords, std::string> sweep =
-        ReadFrequencySweep(tokens, FIRST_AC_SENSITIVITY_SWEEP_TOKEN, true, ".sens ac", line);
-    if (!sweep) {
-        return std::unexpected(sweep.error());
-    }
-    AcSensitivityConfig cfg;
-    cfg.SweepType = sweep->Type;
-    cfg.PointsPerDecade = sweep->Points;
-    cfg.StartFrequency = sweep->StartFrequency;
-    cfg.StopFrequency = sweep->StopFrequency;
-    if (positive == GROUND_NODE) {
-        return std::unexpected("The output of .sens ac must have a node other than ground as its positive one");
-    }
-    if (positive == negative) {
-        return std::unexpected("The two output nodes of .sens ac are the same node");
-    }
-    cfg.OutputPositiveNode = positive;
-    cfg.OutputNegativeNode = negative;
-    const std::expected<std::string, std::string> input = FindAcSensitivityInput(circuit_lines);
-    if (!input) {
-        return std::unexpected(input.error());
-    }
-    cfg.InputSource = *input;
-    return cfg;
 }
 
 /// The kind and the text of the expression of a B element line, `B1 n+ n- V=<expression>`; the text is taken from
@@ -347,11 +104,6 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
     ParsedNetlist result;
     result.Title = deck->Title;
     result.Diagnostics = std::move(deck->Diagnostics);
-    // .options may follow the .tran it applies to, so the method is applied once the whole deck is read
-    std::optional<IntegrationMethod> integration_method;
-    double temperature_celsius = 27.0;
-    double nominal_celsius = 27.0;
-    std::optional<unsigned int> random_seed;
     const std::vector<DeckLine> &circuit_lines = deck->CircuitLines;
     const std::vector<std::string> &definition_lines = deck->DefinitionLines;
     const std::map<std::string, ParsedModel> &models = deck->Models;
@@ -366,22 +118,8 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
         const std::string &line = deck_line.Text;
         const std::string &name = tokens[0];
         if (name.front() == '.') {
-            const std::string dir = ToUpper(name);
-            if ((dir == ".TF" || dir == ".NOISE") && tokens.size() >= 2) {
-                const auto [pos_str, neg_str] = ParseVoltageNodes(tokens[1]);
-                nodes.Register(pos_str);
-                nodes.Register(neg_str);
-            } else if (dir == ".PZ") {
-                if (tokens.size() >= 5) {
-                    nodes.Register(tokens[1]);
-                    nodes.Register(tokens[2]);
-                    nodes.Register(tokens[3]);
-                    nodes.Register(tokens[4]);
-                } else if (tokens.size() >= 2) {
-                    const auto [pos_str, neg_str] = ParseVoltageNodes(tokens[1]);
-                    nodes.Register(pos_str);
-                    nodes.Register(neg_str);
-                }
+            for (const std::string &node_name : ListDirectiveNodes(deck_line)) {
+                nodes.Register(node_name);
             }
             continue;
         }
@@ -485,13 +223,13 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
 
     // Subcircuits come first, since their internal nodes (X1.MID) are named by the directives that follow, wherever
     // those stand in the netlist
-    struct BlockSource {
-        std::string Name;
-        NodeId Positive;
-        NodeId Negative;
-    };
-
-    std::vector<BlockSource> block_sources;
+    DeckContext context{.Result = result,
+                        .Builder = builder,
+                        .Nodes = nodes,
+                        .Lines = *deck,
+                        .BlockSources = {},
+                        .Settings = {}};
+    std::vector<BlockSource> &block_sources = context.BlockSources;
     const InstanceObservers observers{
         .OnInternalNode = [&nodes](const std::string &name, const NodeId node) { nodes.Bind(name, node); },
         .OnSource = [&block_sources](const std::string &name,
@@ -526,290 +264,9 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
         const std::string &line = deck_line.Text;
         const std::string name = tokens[0];
 
-        // Directives
         if (name.front() == '.') {
-            const std::string dir = ToUpper(name);
-            if (dir == ".OP") {
-                result.Analyses.push_back({AnalysisKind::OPERATING_POINT, std::monostate{}});
-            } else if (dir == ".TRAN") {
-                // .TRAN <tstep> <tstop> [<tstart> [<tmax>]] [uic]
-                if (tokens.size() < 3) {
-                    return std::unexpected(std::format("Malformed .tran directive: '{}'", line));
-                }
-                TransientConfig cfg;
-                cfg.TimeStep = ParseSpiceNumber(tokens[1]).value_or(0.0);
-                cfg.StopTime = ParseSpiceNumber(tokens[2]).value_or(0.0);
-                if (tokens.size() >= 4 && !ToUpper(tokens[3]).contains("UIC")) {
-                    // tstart ignored or tmax
-                    if (tokens.size() >= 5) {
-                        cfg.MaxStep = ParseSpiceNumber(tokens[4]).value_or(cfg.TimeStep);
-                    }
-                }
-                for (const auto &tok : tokens) {
-                    if (ToUpper(tok) == "UIC") {
-                        cfg.UseInitialConditions = true;
-                    }
-                }
-                if (cfg.MaxStep <= 0.0) {
-                    cfg.MaxStep = cfg.TimeStep;
-                }
-                result.Analyses.push_back({AnalysisKind::TRANSIENT, cfg});
-            } else if (dir == ".DC") {
-                // .DC <src> <start> <stop> <step> [<src2> <start2> <stop2> <step2>]
-                if (tokens.size() < 5) {
-                    return std::unexpected(std::format("Malformed .dc directive: '{}'", line));
-                }
-                DcSweepConfig cfg;
-                cfg.SweptSource = tokens[1];
-                cfg.SweptStart = ParseSpiceNumber(tokens[2]).value_or(0.0);
-                cfg.SweptStop = ParseSpiceNumber(tokens[3]).value_or(0.0);
-                cfg.SweptStep = ParseSpiceNumber(tokens[4]).value_or(0.0);
-                if (tokens.size() >= 9) {
-                    cfg.SteppedSource = tokens[5];
-                    cfg.SteppedStart = ParseSpiceNumber(tokens[6]).value_or(0.0);
-                    cfg.SteppedStop = ParseSpiceNumber(tokens[7]).value_or(0.0);
-                    cfg.SteppedStep = ParseSpiceNumber(tokens[8]).value_or(0.0);
-                }
-                result.Analyses.push_back({AnalysisKind::DC_SWEEP, cfg});
-            } else if (dir == ".AC") {
-                // .AC [DEC|OCT|LIN] <np> <fstart> <fstop>
-                if (tokens.size() < 4) {
-                    return std::unexpected(std::format("Malformed .ac directive: '{}'", line));
-                }
-                const std::expected<FrequencySweepWords, std::string> sweep =
-                    ReadFrequencySweep(tokens, 1, false, ".ac", line);
-                if (!sweep) {
-                    return std::unexpected(sweep.error());
-                }
-                AcSweepConfig cfg;
-                cfg.SweepType = sweep->Type;
-                cfg.PointsPerDecade = sweep->Points;
-                cfg.StartFrequency = sweep->StartFrequency;
-                cfg.StopFrequency = sweep->StopFrequency;
-                result.Analyses.push_back({AnalysisKind::AC_SWEEP, cfg});
-            } else if (dir == ".TF") {
-                // .TF <out_var> <in_src>
-                if (tokens.size() < 3) {
-                    return std::unexpected(std::format("Malformed .tf directive: '{}'", line));
-                }
-                TransferFunctionConfig cfg;
-                const auto [pos_str, neg_str] = ParseVoltageNodes(tokens[1]);
-                cfg.OutputPositiveNode = nodes.Resolve(pos_str);
-                cfg.OutputNegativeNode = nodes.Resolve(neg_str);
-                cfg.InputSource = tokens[2];
-                result.Analyses.push_back({AnalysisKind::TRANSFER_FUNCTION, cfg});
-            } else if (dir == ".NOISE") {
-                // .NOISE <out_var> <in_src> [DEC|OCT|LIN] <np> <fstart> <fstop>
-                if (tokens.size() < 6) {
-                    return std::unexpected(std::format("Malformed .noise directive: '{}'", line));
-                }
-                NoiseConfig cfg;
-                const auto [pos_str, neg_str] = ParseVoltageNodes(tokens[1]);
-                cfg.OutputPositiveNode = nodes.Resolve(pos_str);
-                cfg.OutputNegativeNode = nodes.Resolve(neg_str);
-                cfg.InputSource = tokens[2];
-                const std::expected<FrequencySweepWords, std::string> sweep =
-                    ReadFrequencySweep(tokens, 3, false, ".noise", line);
-                if (!sweep) {
-                    return std::unexpected(sweep.error());
-                }
-                cfg.SweepType = sweep->Type;
-                cfg.PointsPerDecade = sweep->Points;
-                cfg.StartFrequency = sweep->StartFrequency;
-                cfg.StopFrequency = sweep->StopFrequency;
-                result.Analyses.push_back({AnalysisKind::NOISE, cfg});
-            } else if (dir == ".SP") {
-                // .SP [DEC|OCT|LIN] <np> <fstart> <fstop>
-                if (tokens.size() < 4) {
-                    return std::unexpected(std::format("Malformed .sp directive: '{}'", line));
-                }
-                SParameterConfig cfg;
-                int start_idx = 1;
-                const std::string scale_type = ToUpper(tokens[1]);
-                if (scale_type == "DEC") {
-                    cfg.SweepType = FrequencySweepType::DECADE;
-                    start_idx = 2;
-                } else if (scale_type == "OCT") {
-                    cfg.SweepType = FrequencySweepType::OCTAVE;
-                    start_idx = 2;
-                } else if (scale_type == "LIN") {
-                    cfg.SweepType = FrequencySweepType::LINEAR;
-                    start_idx = 2;
-                }
-                cfg.Points = static_cast<int>(ParseSpiceNumber(tokens[start_idx]).value_or(10));
-                cfg.StartFrequency = ParseSpiceNumber(tokens[start_idx + 1]).value_or(1e6);
-                cfg.StopFrequency = ParseSpiceNumber(tokens[start_idx + 2]).value_or(1e9);
-                result.Analyses.push_back({AnalysisKind::S_PARAMETERS, cfg});
-            } else if (dir == ".PZ") {
-                // .PZ <out_var> <in_src> [POL|ZER|PZ]
-                // or .PZ <in_pos> <in_neg> <out_pos> <out_neg> [VOL|CUR] [POL|ZER|PZ]
-                if (tokens.size() < 3) {
-                    return std::unexpected(std::format("Malformed .pz directive: '{}'", line));
-                }
-                PoleZeroConfig cfg;
-                if (tokens.size() >= 6) {
-                    const std::string in_pos = tokens[1];
-                    const std::string in_neg = tokens[2];
-                    const std::string out_pos = tokens[3];
-                    cfg.OutputNode = nodes.Resolve(out_pos);
-                    // Search circuit_lines for a source connected between in_pos and in_neg
-                    for (const DeckLine &cand_line : circuit_lines) {
-                        const std::vector<std::string> &cand_toks = cand_line.Tokens;
-                        if (cand_toks.size() >= 3) {
-                            const char fc =
-                                static_cast<char>(std::toupper(static_cast<unsigned char>(cand_toks[0].front())));
-                            if (fc == 'V' || fc == 'I') {
-                                if ((cand_toks[1] == in_pos && cand_toks[2] == in_neg)
-                                    || (cand_toks[1] == in_neg && cand_toks[2] == in_pos)) {
-                                    cfg.InputSource = cand_toks[0];
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    for (const BlockSource &source : block_sources) {
-                        if (!cfg.InputSource.empty()) {
-                            break;
-                        }
-                        const NodeId in_positive = nodes.Resolve(in_pos);
-                        const NodeId in_negative = nodes.Resolve(in_neg);
-                        if ((source.Positive == in_positive && source.Negative == in_negative)
-                            || (source.Positive == in_negative && source.Negative == in_positive)) {
-                            cfg.InputSource = source.Name;
-                        }
-                    }
-                    if (cfg.InputSource.empty()) {
-                        return std::unexpected(
-                            std::format("Could not find source between nodes '{}' and '{}' for .pz", in_pos, in_neg));
-                    }
-                    if (tokens.size() >= 7) {
-                        const std::string type = ToUpper(tokens[6]);
-                        if (type == "POL") {
-                            cfg.FindZeros = false;
-                        } else if (type == "ZER") {
-                            cfg.FindPoles = false;
-                        }
-                    }
-                } else {
-                    const auto [pos_str, neg_str] = ParseVoltageNodes(tokens[1]);
-                    cfg.OutputNode = nodes.Resolve(pos_str);
-                    cfg.InputSource = tokens[2];
-                    if (tokens.size() >= 4) {
-                        const std::string type = ToUpper(tokens[3]);
-                        if (type == "POL") {
-                            cfg.FindZeros = false;
-                        } else if (type == "ZER") {
-                            cfg.FindPoles = false;
-                        }
-                    }
-                }
-                result.Analyses.push_back({AnalysisKind::POLE_ZERO, cfg});
-            } else if (dir == ".SENS") {
-                // .SENS <out_var> (e.g. .sens v(out) or .sens v(out, ref))
-                // .SENS <out_var> AC [DEC|OCT|LIN] <np> <fstart> <fstop>
-                if (tokens.size() < 2) {
-                    return std::unexpected(std::format("Malformed .sens directive: '{}'", line));
-                }
-                const auto [pos_str, neg_str] = ParseVoltageNodes(tokens[1]);
-                const NodeId positive = nodes.Resolve(pos_str);
-                const NodeId negative = nodes.Resolve(neg_str);
-                if (tokens.size() >= 3 && ToUpper(tokens[2]) == "AC") {
-                    const std::expected<AcSensitivityConfig, std::string> cfg =
-                        ParseAcSensitivity(tokens, positive, negative, circuit_lines, line);
-                    if (!cfg) {
-                        return std::unexpected(std::format("{}: '{}'", cfg.error(), line));
-                    }
-                    result.Analyses.push_back({AnalysisKind::AC_SENSITIVITY, *cfg});
-                } else {
-                    SensitivityConfig cfg;
-                    cfg.OutputPositiveNode = positive;
-                    cfg.OutputNegativeNode = negative;
-                    result.Analyses.push_back({AnalysisKind::SENSITIVITY, cfg});
-                }
-            } else if (dir == ".HB") {
-                // .HB <f0> <harmonics> [samples=<M>]
-                if (tokens.size() < 3) {
-                    return std::unexpected(std::format("Malformed .hb directive: '{}'", line));
-                }
-                const auto f0_opt = ParseSpiceNumber(tokens[1]);
-                if (!f0_opt || *f0_opt <= 0.0) {
-                    return std::unexpected(std::format("Invalid fundamental frequency in .hb directive: '{}'", line));
-                }
-                const auto harm_opt = ParseSpiceNumber(tokens[2]);
-                if (!harm_opt || *harm_opt < 0.0 || std::floor(*harm_opt) != *harm_opt) {
-                    return std::unexpected(std::format("Invalid harmonic count in .hb directive: '{}'", line));
-                }
-                HarmonicBalanceConfig cfg;
-                cfg.FundamentalFrequency = *f0_opt;
-                cfg.Harmonics = static_cast<int>(*harm_opt);
-                for (std::size_t k = 3; k < tokens.size(); ++k) {
-                    const std::string tok_upper = ToUpper(tokens[k]);
-                    if (tok_upper.starts_with("SAMPLES=")) {
-                        const auto samp_opt = ParseSpiceNumber(std::string_view{tokens[k]}.substr(8));
-                        if (!samp_opt || *samp_opt <= 0.0 || std::floor(*samp_opt) != *samp_opt) {
-                            return std::unexpected(
-                                std::format("Invalid samples parameter in .hb directive: '{}'", line));
-                        }
-                        cfg.Samples = static_cast<int>(*samp_opt);
-                    } else {
-                        return std::unexpected(
-                            std::format("Unexpected token '{}' in .hb directive: '{}'", tokens[k], line));
-                    }
-                }
-                result.Analyses.push_back({AnalysisKind::HARMONIC_BALANCE, cfg});
-            } else if (dir == ".OPTIONS") {
-                for (std::size_t i = 1; i < tokens.size(); ++i) {
-                    const auto eq = tokens[i].find('=');
-                    if (eq != std::string::npos) {
-                        const std::string opt_name = ToUpper(tokens[i].substr(0, eq));
-                        if (opt_name == "METHOD") {
-                            const std::string method_name = ToUpper(tokens[i].substr(eq + 1));
-                            if (method_name == "GEAR") {
-                                integration_method = IntegrationMethod::GEAR2;
-                            } else if (method_name == "TRAP" || method_name == "TRAPEZOIDAL") {
-                                integration_method = IntegrationMethod::TRAPEZOIDAL;
-                            } else {
-                                return std::unexpected(std::format("Unknown integration method '{}' in .options: '{}'",
-                                                                   method_name,
-                                                                   line));
-                            }
-                            continue;
-                        }
-                        const auto opt_val = ParseSpiceNumber(tokens[i].substr(eq + 1));
-                        if (opt_val) {
-                            if (opt_name == "RELTOL") {
-                                result.Options.RelTol = *opt_val;
-                            } else if (opt_name == "VNTOL") {
-                                result.Options.VoltageAbsTol = *opt_val;
-                            } else if (opt_name == "ABSTOL") {
-                                result.Options.CurrentAbsTol = *opt_val;
-                            } else if (opt_name == "GMIN") {
-                                result.Options.Gmin = *opt_val;
-                            } else if (opt_name == "MAXITER" || opt_name == "ITL1") {
-                                result.Options.MaxIterations = static_cast<int>(*opt_val);
-                            } else if (opt_name == "TEMP") {
-                                temperature_celsius = *opt_val;
-                            } else if (opt_name == "TNOM") {
-                                nominal_celsius = *opt_val;
-                            } else if (opt_name == "SEED") {
-                                random_seed = static_cast<unsigned int>(std::max(0.0, *opt_val));
-                            }
-                        }
-                    }
-                }
-            } else if (dir == ".TEMP") {
-                if (tokens.size() >= 2) {
-                    if (const auto temp_val = ParseSpiceNumber(tokens[1])) {
-                        temperature_celsius = *temp_val;
-                    } else {
-                        return std::unexpected(std::format("Invalid temperature '{}' in .temp: '{}'", tokens[1], line));
-                    }
-                }
-            } else if (dir == ".IC" || dir == ".NODESET") {
-                if (const auto ic_res = ParseNodeVoltageDirective(tokens, line, nodes, builder, dir == ".NODESET");
-                    !ic_res) {
-                    return std::unexpected(ic_res.error());
-                }
+            if (auto read = ReadDirective(context, deck_line); !read) {
+                return std::unexpected(read.error());
             }
             continue;
         }
@@ -1310,25 +767,12 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
         }
     }
 
-    builder.SetTemperature(temperature_celsius, nominal_celsius);
+    ApplyDeckSettings(context.Settings, builder, result.Analyses);
     auto circuit_res = builder.Build();
     if (!circuit_res) {
         return std::unexpected(circuit_res.error());
     }
     result.CircuitInstance = std::move(*circuit_res);
-
-    if (integration_method || random_seed) {
-        for (ParsedAnalysis &analysis : result.Analyses) {
-            if (auto *transient = std::get_if<TransientConfig>(&analysis.Config)) {
-                if (integration_method) {
-                    transient->Method = *integration_method;
-                }
-                if (random_seed) {
-                    transient->Seed = *random_seed;
-                }
-            }
-        }
-    }
 
     // If no analysis was specified, default to .OP
     if (result.Analyses.empty()) {
