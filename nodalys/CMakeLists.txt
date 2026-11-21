@@ -58,6 +58,7 @@ add_library(nodalys STATIC
     src/linear/root_refinement.cpp
     src/mna/mna_system.cpp
     src/newton/newton.cpp
+    src/parser/classified_lines.cpp
     src/parser/element_arguments.cpp
     src/parser/expression_references.cpp
     src/parser/model_cards.cpp

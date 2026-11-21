@@ -5,6 +5,7 @@
 
 #include "nodalys/subcircuit_text.h"
 
+#include "parser/classified_lines.h"
 #include "parser/spice_text.h"
 #include "parser/subcircuit_elements.h"
 #include "parser/subcircuit_lines.h"
@@ -28,17 +29,6 @@ using Result = std::expected<void, std::string>;
 constexpr int MAX_NESTING_DEPTH = 16;
 
 /**
- * @struct  ClassifiedLines
- * @brief   The lines of a text sorted by what they do, since the parameters and models come before the elements that
- *          use them whatever the order they are written in.
- */
-struct ClassifiedLines {
-    std::vector<std::vector<std::string>> Parameters;
-    std::vector<std::vector<std::string>> Models;
-    std::vector<std::string> Elements;
-};
-
-/**
  * @brief   The message of a line the engine cannot simulate, with the subcircuit it is in.
  */
 std::string Refuse(const ExpansionContext &context, const std::string_view line, const std::string_view reason) {
@@ -48,86 +38,28 @@ std::string Refuse(const ExpansionContext &context, const std::string_view line,
                        reason);
 }
 
-/**
- * @brief   Reads the .subckt line of a nested definition: its name, its ports and its parameters with their defaults.
- */
-std::expected<TextSubcircuit, std::string> ReadSubcircuitHeader(const std::vector<std::string> &tokens) {
-    if (tokens.size() < 2) {
-        return std::unexpected("a .subckt line needs a name");
-    }
-    TextSubcircuit subcircuit;
-    subcircuit.Name = tokens[1];
-    std::size_t index = 2;
-    while (index < tokens.size() && !IsParameterStart(tokens[index])) {
-        subcircuit.Ports.push_back(tokens[index]);
-        ++index;
-    }
-    for (auto &[name, text] : SplitParameterTokens(tokens, index)) {
-        if (text.empty()) {
-            return std::unexpected(std::format("the parameter {} has no default value", name));
-        }
-        subcircuit.Parameters.emplace_back(std::move(name), std::move(text));
-    }
-    return subcircuit;
-}
-
-/**
- * @brief   Tells how many lines a nested .subckt takes, from the line after its header to its .ends.
- * @return  The number of lines of its body, or none when it never closes.
- */
-std::optional<std::size_t> FindBodyLength(const std::vector<std::string> &lines, const std::size_t first) {
-    int depth = 1;
-    for (std::size_t index = first; index < lines.size(); ++index) {
-        const std::vector<std::string> tokens = SplitTokens(lines[index]);
-        const std::string directive = tokens.empty() ? std::string() : ToUpper(tokens[0]);
-        if (directive == ".SUBCKT") {
-            ++depth;
-        } else if (directive == ".ENDS" && --depth == 0) {
-            return index - first;
-        }
-    }
-    return std::nullopt;
-}
-
 Result ExpandScope(TextScope &scope, const std::vector<std::string> &lines, int depth);
 
 /**
- * @brief   Sorts the lines of a text and registers its nested subcircuits.
+ * @brief   Makes the subcircuits written in a text known to its scope, which the X lines of the scope and of the
+ *          subcircuits defined in it look them up from.
  */
-std::expected<ClassifiedLines, std::string> ClassifyLines(TextScope &scope, const std::vector<std::string> &lines) {
-    const ExpansionContext &context = scope.GetContext();
-    ClassifiedLines classified;
-    for (std::size_t index = 0; index < lines.size(); ++index) {
-        const std::vector<std::string> tokens = SplitTokens(lines[index]);
-        const std::string directive = ToUpper(tokens[0]);
-        if (directive == ".SUBCKT") {
-            auto subcircuit = ReadSubcircuitHeader(tokens);
-            const std::optional<std::size_t> length = FindBodyLength(lines, index + 1);
-            if (!subcircuit) {
-                return std::unexpected(Refuse(context, lines[index], "is not understood: " + subcircuit.error()));
-            }
-            if (!length) {
-                return std::unexpected(Refuse(context, lines[index], "starts a subcircuit that has no .ends"));
-            }
-            subcircuit->Lines.assign(lines.begin() + static_cast<std::ptrdiff_t>(index + 1),
-                                     lines.begin() + static_cast<std::ptrdiff_t>(index + 1 + *length));
-            subcircuit->DefinedIn = &scope;
-            const std::string key = ToUpper(subcircuit->Name);
-            scope.AddSubcircuit(key, std::move(*subcircuit));
-            index += *length + 1;
-        } else if (directive == ".PARAM") {
-            classified.Parameters.push_back(tokens);
-        } else if (directive == ".MODEL") {
-            classified.Models.push_back(tokens);
-        } else if (directive == ".END") {
-            continue;
-        } else if (directive.starts_with('.')) {
-            return std::unexpected(Refuse(context, lines[index], "uses a directive that Nodalys does not read"));
-        } else {
-            classified.Elements.push_back(lines[index]);
-        }
+void RegisterSubcircuits(TextScope &scope, std::vector<TextSubcircuit> subcircuits) {
+    for (TextSubcircuit &subcircuit : subcircuits) {
+        subcircuit.DefinedIn = &scope;
+        const std::string key = ToUpper(subcircuit.Name);
+        scope.AddSubcircuit(key, std::move(subcircuit));
     }
-    return classified;
+}
+
+/**
+ * @brief   Makes the voltage sources of a text known to its scope before any element is added, so a controlled source
+ *          or an expression can read the current of one written after it.
+ */
+void RegisterVoltageSources(TextScope &scope, const std::vector<std::string> &names) {
+    for (const std::string &name : names) {
+        scope.AddSourceName(ToUpper(name), name);
+    }
 }
 
 /**
@@ -205,10 +137,10 @@ Result SetInstanceParameters(const TextScope &caller,
 /**
  * @brief   Expands an X line: a nested subcircuit of the text, with its own nodes, parameters and models.
  */
-Result
-ExpandInstance(TextScope &scope, const std::string &line, const std::vector<std::string> &tokens, const int depth) {
+Result ExpandInstance(TextScope &scope, const TextElement &element, const int depth) {
     const ExpansionContext &context = scope.GetContext();
-    const std::optional<InstanceLine> call = SplitInstanceLine(tokens);
+    const std::string &line = element.Line;
+    const std::optional<InstanceLine> call = SplitInstanceLine(element.Tokens);
     if (!call) {
         return std::unexpected(Refuse(context, line, "is not written X<name> <nodes> <subcircuit>"));
     }
@@ -232,7 +164,7 @@ ExpandInstance(TextScope &scope, const std::string &line, const std::vector<std:
     if (depth >= MAX_NESTING_DEPTH) {
         return std::unexpected(Refuse(context, line, "nests subcircuits too deeply; one of them places itself"));
     }
-    TextScope instance(scope.GetContext(), subcircuit->DefinedIn, scope.MakeName(tokens[0]));
+    TextScope instance(scope.GetContext(), subcircuit->DefinedIn, scope.MakeName(element.Tokens[0]));
     if (const Result set =
             SetInstanceParameters(scope, instance, *subcircuit, line, SplitParameterTokens(call->ParameterTokens, 0));
         !set) {
@@ -249,27 +181,25 @@ ExpandInstance(TextScope &scope, const std::string &line, const std::vector<std:
  */
 Result ExpandScope(TextScope &scope, const std::vector<std::string> &lines, const int depth) {
     const ExpansionContext &context = scope.GetContext();
-    const auto classified = ClassifyLines(scope, lines);
+    auto classified = ClassifyLines(lines);
     if (!classified) {
-        return std::unexpected(classified.error());
+        return std::unexpected(Refuse(context, classified.error().Line, classified.error().Reason));
     }
+    RegisterSubcircuits(scope, std::move(classified->Subcircuits));
+    RegisterVoltageSources(scope, classified->VoltageSources);
     if (const Result parameters = DefineParameters(scope, classified->Parameters); !parameters) {
         return parameters;
     }
     if (const Result models = DefineModels(scope, classified->Models); !models) {
         return models;
     }
-    for (const std::string &line : classified->Elements) {
-        NoteVoltageSource(scope, SplitTokens(line));
-    }
-    for (const std::string &line : classified->Elements) {
-        const std::vector<std::string> tokens = SplitTokens(line);
-        if (std::toupper(static_cast<unsigned char>(tokens[0].front())) == 'X') {
-            if (const Result expanded = ExpandInstance(scope, line, tokens, depth); !expanded) {
+    for (const TextElement &element : classified->Elements) {
+        if (std::toupper(static_cast<unsigned char>(element.Tokens[0].front())) == 'X') {
+            if (const Result expanded = ExpandInstance(scope, element, depth); !expanded) {
                 return expanded;
             }
-        } else if (const Result added = AddTextElement(scope, line, tokens); !added) {
-            return std::unexpected(Refuse(context, line, "cannot be simulated: " + added.error()));
+        } else if (const Result added = AddTextElement(scope, element.Line, element.Tokens); !added) {
+            return std::unexpected(Refuse(context, element.Line, "cannot be simulated: " + added.error()));
         }
     }
     return {};

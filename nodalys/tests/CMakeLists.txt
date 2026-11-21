@@ -10,6 +10,7 @@ add_executable(nodalys-tests
     analysis_preamble_tests.cpp
     behavioral_device_tests.cpp
     bjt_device_tests.cpp
+    classified_lines_tests.cpp
     expression_tests.cpp
     fft_tests.cpp
     frequency_sweep_tests.cpp

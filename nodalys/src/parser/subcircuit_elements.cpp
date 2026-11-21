@@ -497,18 +497,6 @@ const std::map<char, Handler> &GetHandlers() {
 } // namespace
 
 /**
- * @brief   Remembers the name of a voltage source line, so that a controlled source or an expression of the same
- *          scope can read its current, even when it is written before the source.
- * @param[in,out] scope   Scope the line is in.
- * @param[in]     tokens  Tokens of the line.
- */
-void NoteVoltageSource(TextScope &scope, const std::vector<std::string> &tokens) {
-    if (!tokens.empty() && std::toupper(static_cast<unsigned char>(tokens[0].front())) == 'V') {
-        scope.AddSourceName(ToUpper(tokens[0]), tokens[0]);
-    }
-}
-
-/**
  * @brief   Adds one element line to the circuit: R, C, L, V, I, E, G, H, F, B, D, Q, M or S.
  * @details Any other element letter, and any option the element has no use for, is refused with the reason, since a
  *          line dropped without a word would change the circuit without anyone knowing.

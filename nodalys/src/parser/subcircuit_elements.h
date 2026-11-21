@@ -18,7 +18,6 @@ namespace Nodalys {
 // Elements
 std::expected<void, std::string>
 AddTextElement(TextScope &scope, std::string_view line, const std::vector<std::string> &tokens);
-void NoteVoltageSource(TextScope &scope, const std::vector<std::string> &tokens);
 
 } // namespace Nodalys
 
