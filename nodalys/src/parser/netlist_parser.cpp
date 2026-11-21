@@ -7,6 +7,7 @@
 #include "nodalys/circuit_builder.h"
 #include "nodalys/expression.h"
 #include "parser/model_cards.h"
+#include "parser/netlist_deck.h"
 #include "parser/netlist_nodes.h"
 #include "parser/netlist_subcircuits.h"
 #include "parser/source_waveforms.h"
@@ -32,82 +33,6 @@
 namespace Nodalys {
 
 namespace {
-
-std::string_view Trim(std::string_view s) {
-    while (!s.empty() && std::isspace(static_cast<unsigned char>(s.front()))) {
-        s.remove_prefix(1);
-    }
-    while (!s.empty() && std::isspace(static_cast<unsigned char>(s.back()))) {
-        s.remove_suffix(1);
-    }
-    return s;
-}
-
-std::vector<std::string> TokenizeLine(std::string_view line) {
-    std::vector<std::string> tokens;
-    std::size_t i = 0;
-    const std::size_t n = line.size();
-
-    while (i < n) {
-        // Skip whitespace and commas
-        while (i < n && (std::isspace(static_cast<unsigned char>(line[i])) || line[i] == ',')) {
-            ++i;
-        }
-        if (i >= n) {
-            break;
-        }
-
-        // Inline comments: ; or $
-        if (line[i] == ';' || line[i] == '$') {
-            break;
-        }
-
-        // Parenthesized tokens, e.g. PULSE(...) or SIN(...) or model param list (...)
-        if (line[i] == '(') {
-            std::size_t start = i;
-            int depth = 0;
-            while (i < n) {
-                if (line[i] == '(') {
-                    ++depth;
-                } else if (line[i] == ')') {
-                    --depth;
-                    if (depth == 0) {
-                        ++i;
-                        break;
-                    }
-                }
-                ++i;
-            }
-            tokens.emplace_back(line.substr(start, i - start));
-            continue;
-        }
-
-        std::size_t start = i;
-        while (i < n && !std::isspace(static_cast<unsigned char>(line[i])) && line[i] != ',' && line[i] != ';'
-               && line[i] != '$') {
-            if (line[i] == '(') {
-                // e.g. SIN(...) attached to name
-                int depth = 0;
-                while (i < n) {
-                    if (line[i] == '(') {
-                        ++depth;
-                    } else if (line[i] == ')') {
-                        --depth;
-                        if (depth == 0) {
-                            ++i;
-                            break;
-                        }
-                    }
-                    ++i;
-                }
-                break;
-            }
-            ++i;
-        }
-        tokens.emplace_back(line.substr(start, i - start));
-    }
-    return tokens;
-}
 
 struct IcAssignment {
     std::string_view Lhs;
@@ -182,7 +107,7 @@ std::vector<double> ExtractParenthesizedValues(std::string_view token) {
         return vals;
     }
     const std::string inner(token.substr(open + 1, close - open - 1));
-    const auto toks = TokenizeLine(inner);
+    const auto toks = SplitTokens(inner);
     for (const auto &t : toks) {
         if (const auto num = ParseSpiceNumber(t)) {
             vals.push_back(*num);
@@ -193,25 +118,25 @@ std::vector<double> ExtractParenthesizedValues(std::string_view token) {
 
 // Parses V(node) or V(pos, neg)
 std::pair<std::string, std::string> ParseVoltageNodes(std::string_view s) {
-    s = Trim(s);
+    s = TrimSpaces(s);
     const std::string upper = ToUpper(s);
     if (upper.starts_with("V(") && upper.ends_with(")")) {
         const std::string_view inner = s.substr(2, s.size() - 3);
         const auto comma = inner.find(',');
         if (comma != std::string_view::npos) {
-            return {std::string(Trim(inner.substr(0, comma))), std::string(Trim(inner.substr(comma + 1)))};
+            return {std::string(TrimSpaces(inner.substr(0, comma))), std::string(TrimSpaces(inner.substr(comma + 1)))};
         }
-        return {std::string(Trim(inner)), "0"};
+        return {std::string(TrimSpaces(inner)), "0"};
     }
     return {std::string(s), "0"};
 }
 
 /// The names of the independent sources of the circuit lines that have an AC magnitude, which is what drives an AC
 /// sensitivity. Sources inside a block are not seen: a block's own sources have no AC to name from outside.
-std::vector<std::string> FindAcSources(const std::vector<std::string> &circuit_lines) {
+std::vector<std::string> FindAcSources(const std::vector<DeckLine> &circuit_lines) {
     std::vector<std::string> names;
-    for (const std::string &line : circuit_lines) {
-        const std::vector<std::string> tokens = TokenizeLine(line);
+    for (const DeckLine &line : circuit_lines) {
+        const std::vector<std::string> &tokens = line.Tokens;
         if (tokens.size() < 3) {
             continue;
         }
@@ -317,7 +242,7 @@ std::expected<FrequencySweepWords, std::string> ReadFrequencySweep(const std::ve
 }
 
 /// The input of an AC sensitivity: the ngspice syntax names none, so it is the one source with an AC magnitude.
-std::expected<std::string, std::string> FindAcSensitivityInput(const std::vector<std::string> &circuit_lines) {
+std::expected<std::string, std::string> FindAcSensitivityInput(const std::vector<DeckLine> &circuit_lines) {
     const std::vector<std::string> sources = FindAcSources(circuit_lines);
     if (sources.empty()) {
         return std::unexpected("No source has an AC magnitude, so .sens ac has no input; give one source 'AC 1'");
@@ -339,7 +264,7 @@ std::expected<std::string, std::string> FindAcSensitivityInput(const std::vector
 std::expected<AcSensitivityConfig, std::string> ParseAcSensitivity(const std::vector<std::string> &tokens,
                                                                    const NodeId positive,
                                                                    const NodeId negative,
-                                                                   const std::vector<std::string> &circuit_lines,
+                                                                   const std::vector<DeckLine> &circuit_lines,
                                                                    const std::string_view line) {
     constexpr std::size_t TOKENS_WITH_SWEEP_TYPE = 7;
     if (tokens.size() != TOKENS_WITH_SWEEP_TYPE) {
@@ -394,18 +319,18 @@ std::optional<BehavioralLine> SplitBehavioralLine(std::string_view line) {
     if (const std::size_t comment = rest.find_first_of(";$"); comment != std::string_view::npos) {
         rest = rest.substr(0, comment);
     }
-    rest = Trim(rest);
+    rest = TrimSpaces(rest);
     if (rest.size() < 2
         || (std::toupper(static_cast<unsigned char>(rest.front())) != 'V'
             && std::toupper(static_cast<unsigned char>(rest.front())) != 'I')) {
         return std::nullopt;
     }
     const bool is_voltage = std::toupper(static_cast<unsigned char>(rest.front())) == 'V';
-    rest = Trim(rest.substr(1));
+    rest = TrimSpaces(rest.substr(1));
     if (rest.empty() || rest.front() != '=') {
         return std::nullopt;
     }
-    rest = Trim(rest.substr(1));
+    rest = TrimSpaces(rest.substr(1));
     if (rest.empty()) {
         return std::nullopt;
     }
@@ -415,203 +340,30 @@ std::optional<BehavioralLine> SplitBehavioralLine(std::string_view line) {
 } // namespace
 
 std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_text) {
-    // 1. Split into raw lines and handle continuation lines ('+')
-    std::vector<std::string> logical_lines;
-    {
-        std::istringstream stream{std::string(netlist_text)};
-        std::string raw_line;
-        while (std::getline(stream, raw_line)) {
-            // Trim CR
-            if (!raw_line.empty() && raw_line.back() == '\r') {
-                raw_line.pop_back();
-            }
-            std::string_view trimmed = Trim(raw_line);
-            if (trimmed.empty()) {
-                continue;
-            }
-            if (trimmed.front() == '+') {
-                trimmed.remove_prefix(1);
-                if (!logical_lines.empty()) {
-                    logical_lines.back().push_back(' ');
-                    logical_lines.back().append(trimmed);
-                } else {
-                    logical_lines.emplace_back(trimmed);
-                }
-            } else {
-                logical_lines.emplace_back(trimmed);
-            }
-        }
+    std::expected<Deck, std::string> deck = ReadDeck(netlist_text);
+    if (!deck) {
+        return std::unexpected(deck.error());
     }
-
-    if (logical_lines.empty()) {
-        return std::unexpected("The netlist is empty");
-    }
-
     ParsedNetlist result;
+    result.Title = deck->Title;
+    result.Diagnostics = std::move(deck->Diagnostics);
     // .options may follow the .tran it applies to, so the method is applied once the whole deck is read
     std::optional<IntegrationMethod> integration_method;
     double temperature_celsius = 27.0;
     double nominal_celsius = 27.0;
     std::optional<unsigned int> random_seed;
-    // SPICE standard: first line is circuit title
-    result.Title = logical_lines.front();
+    const std::vector<DeckLine> &circuit_lines = deck->CircuitLines;
+    const std::vector<std::string> &definition_lines = deck->DefinitionLines;
+    const std::map<std::string, ParsedModel> &models = deck->Models;
 
-    // 2. First pass: Collect .model definitions and the lines the subcircuits are placed from
-    std::map<std::string, ParsedModel> models;
-    std::vector<std::string> circuit_lines;
-    // The .subckt blocks, .model cards and .param lines, which every X line is placed over
-    std::vector<std::string> definition_lines;
-
-    int subcircuit_depth = 0;
-    std::string open_subcircuit_name;
-
-    for (std::size_t line_idx = 1; line_idx < logical_lines.size(); ++line_idx) {
-        const std::string &line = logical_lines[line_idx];
-        std::string_view trimmed = Trim(line);
-        if (trimmed.empty() || trimmed.front() == '*' || trimmed.front() == ';') {
-            continue; // comment
-        }
-
-        const auto tokens = TokenizeLine(line);
-        if (tokens.empty()) {
-            continue;
-        }
-
-        const std::string directive = ToUpper(tokens[0]);
-
-        if (directive == ".SUBCKT") {
-            if (tokens.size() < 2) {
-                return std::unexpected(std::format("Malformed .subckt directive on line {}", line_idx + 1));
-            }
-            if (subcircuit_depth == 0) {
-                open_subcircuit_name = tokens[1];
-            }
-            ++subcircuit_depth;
-            definition_lines.push_back(line);
-            continue;
-        }
-
-        if (directive == ".ENDS") {
-            if (subcircuit_depth > 0) {
-                --subcircuit_depth;
-                definition_lines.push_back(line);
-            }
-            continue;
-        }
-
-        if (subcircuit_depth > 0) {
-            definition_lines.push_back(line);
-            continue;
-        }
-
-        if (directive == ".PARAM") {
-            definition_lines.push_back(line);
-            continue;
-        }
-
-        if (directive == ".MODEL") {
-            if (tokens.size() < 3) {
-                return std::unexpected(std::format("Malformed .model directive on line {}", line_idx + 1));
-            }
-            const std::string model_name = ToUpper(tokens[1]);
-            std::string type_str = ToUpper(tokens[2]);
-            // Type might have parameters directly attached: "D(IS=1e-15...)"
-            std::string params_str;
-            const auto paren_pos = type_str.find('(');
-            if (paren_pos != std::string::npos) {
-                params_str = type_str.substr(paren_pos);
-                type_str = type_str.substr(0, paren_pos);
-            }
-
-            ParsedModel model;
-            if (type_str == "D") {
-                model.Kind = ParsedModel::ModelKind::DIODE;
-            } else if (type_str == "NPN") {
-                model.Kind = ParsedModel::ModelKind::BJT_NPN;
-            } else if (type_str == "PNP") {
-                model.Kind = ParsedModel::ModelKind::BJT_PNP;
-            } else if (type_str == "NMOS") {
-                model.Kind = ParsedModel::ModelKind::MOSFET_NMOS;
-            } else if (type_str == "PMOS") {
-                model.Kind = ParsedModel::ModelKind::MOSFET_PMOS;
-            } else if (type_str == "SW" || type_str == "VSWITCH") {
-                model.Kind = ParsedModel::ModelKind::SWITCH;
-            } else {
-                result.Diagnostics.push_back(
-                    {std::format("Unsupported .model type '{}' in model '{}'", type_str, model_name)});
-            }
-
-            // Collect all remaining tokens as parameters
-            std::string all_params = params_str;
-            for (std::size_t p = 3; p < tokens.size(); ++p) {
-                all_params.push_back(' ');
-                all_params.append(tokens[p]);
-            }
-
-            // Parse parameter key=value pairs
-            std::size_t pos = 0;
-            const std::size_t plen = all_params.size();
-            while (pos < plen) {
-                while (pos < plen
-                       && (std::isspace(static_cast<unsigned char>(all_params[pos])) || all_params[pos] == '('
-                           || all_params[pos] == ')' || all_params[pos] == ',')) {
-                    ++pos;
-                }
-                if (pos >= plen) {
-                    break;
-                }
-                const std::size_t kstart = pos;
-                while (pos < plen
-                       && (std::isalnum(static_cast<unsigned char>(all_params[pos])) || all_params[pos] == '_')) {
-                    ++pos;
-                }
-                const std::string key = ToUpper(all_params.substr(kstart, pos - kstart));
-                while (pos < plen && std::isspace(static_cast<unsigned char>(all_params[pos]))) {
-                    ++pos;
-                }
-                if (pos < plen && all_params[pos] == '=') {
-                    ++pos;
-                    while (pos < plen && std::isspace(static_cast<unsigned char>(all_params[pos]))) {
-                        ++pos;
-                    }
-                    const std::size_t vstart = pos;
-                    while (pos < plen && !std::isspace(static_cast<unsigned char>(all_params[pos]))
-                           && all_params[pos] != ')' && all_params[pos] != ',') {
-                        ++pos;
-                    }
-                    const std::string val_str = all_params.substr(vstart, pos - vstart);
-                    if (const auto num = ParseSpiceNumber(val_str)) {
-                        model.Params[key] = *num;
-                    }
-                }
-            }
-
-            models[model_name] = std::move(model);
-            definition_lines.push_back(line);
-            continue;
-        }
-
-        if (directive == ".END") {
-            break;
-        }
-
-        circuit_lines.push_back(line);
-    }
-
-    if (subcircuit_depth > 0) {
-        return std::unexpected(std::format("The subcircuit '{}' has no .ends", open_subcircuit_name));
-    }
     // 4. Parse components and analyses using CircuitBuilder
     CircuitBuilder builder;
     NetlistNodes nodes;
 
     // Pre-scan all circuit_lines to discover and register all circuit nodes
-    for (const auto &line : circuit_lines) {
-        const auto tokens = TokenizeLine(line);
-        if (tokens.empty()) {
-            continue;
-        }
-
+    for (const DeckLine &deck_line : circuit_lines) {
+        const std::vector<std::string> &tokens = deck_line.Tokens;
+        const std::string &line = deck_line.Text;
         const std::string &name = tokens[0];
         if (name.front() == '.') {
             const std::string dir = ToUpper(name);
@@ -634,13 +386,10 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
             continue;
         }
 
-        const auto dot_pos = name.rfind('.');
-        const std::string_view base_name =
-            (dot_pos != std::string::npos) ? std::string_view(name).substr(dot_pos + 1) : std::string_view(name);
-        if (base_name.empty()) {
+        const char first_char = GetElementLetter(name);
+        if (first_char == '\0') {
             continue;
         }
-        const char first_char = static_cast<char>(std::toupper(static_cast<unsigned char>(base_name.front())));
 
         switch (first_char) {
         case 'R':
@@ -704,7 +453,7 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
         }
 
         case 'X':
-            if (const std::optional<InstanceLine> instance = SplitInstanceLine(SplitTokens(line))) {
+            if (const std::optional<InstanceLine> instance = SplitInstanceLine(tokens)) {
                 for (const std::string &node_name : instance->NodeNames) {
                     nodes.Register(node_name);
                 }
@@ -748,9 +497,9 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
         .OnSource = [&block_sources](const std::string &name,
                                      const NodeId positive,
                                      const NodeId negative) { block_sources.push_back({name, positive, negative}); }};
-    for (const auto &line : circuit_lines) {
-        const auto tokens = TokenizeLine(line);
-        if (tokens.empty() || std::toupper(static_cast<unsigned char>(tokens[0].front())) != 'X') {
+    for (const DeckLine &deck_line : circuit_lines) {
+        const std::string &line = deck_line.Text;
+        if (std::toupper(static_cast<unsigned char>(deck_line.Tokens.front().front())) != 'X') {
             continue;
         }
         const auto added = AddNetlistInstance(
@@ -772,12 +521,9 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
         }
     }
 
-    for (const auto &line : circuit_lines) {
-        const auto tokens = TokenizeLine(line);
-        if (tokens.empty()) {
-            continue;
-        }
-
+    for (const DeckLine &deck_line : circuit_lines) {
+        const std::vector<std::string> &tokens = deck_line.Tokens;
+        const std::string &line = deck_line.Text;
         const std::string name = tokens[0];
 
         // Directives
@@ -907,8 +653,8 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                     const std::string out_pos = tokens[3];
                     cfg.OutputNode = nodes.Resolve(out_pos);
                     // Search circuit_lines for a source connected between in_pos and in_neg
-                    for (const auto &cand_line : circuit_lines) {
-                        const auto cand_toks = TokenizeLine(cand_line);
+                    for (const DeckLine &cand_line : circuit_lines) {
+                        const std::vector<std::string> &cand_toks = cand_line.Tokens;
                         if (cand_toks.size() >= 3) {
                             const char fc =
                                 static_cast<char>(std::toupper(static_cast<unsigned char>(cand_toks[0].front())));
@@ -1068,13 +814,10 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
             continue;
         }
 
-        const auto dot_pos = name.rfind('.');
-        const std::string_view base_name =
-            (dot_pos != std::string::npos) ? std::string_view(name).substr(dot_pos + 1) : std::string_view(name);
-        if (base_name.empty()) {
+        const char first_char = GetElementLetter(name);
+        if (first_char == '\0') {
             continue;
         }
-        const char first_char = static_cast<char>(std::toupper(static_cast<unsigned char>(base_name.front())));
 
         // Circuit Components
         switch (first_char) {

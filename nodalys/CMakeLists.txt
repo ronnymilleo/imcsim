@@ -59,6 +59,7 @@ add_library(nodalys STATIC
     src/mna/mna_system.cpp
     src/newton/newton.cpp
     src/parser/model_cards.cpp
+    src/parser/netlist_deck.cpp
     src/parser/netlist_nodes.cpp
     src/parser/netlist_parser.cpp
     src/parser/netlist_subcircuits.cpp

@@ -22,6 +22,7 @@ add_executable(nodalys-tests
     json_exporter_tests.cpp
     linear_tests.cpp
     mosfet_device_tests.cpp
+    netlist_deck_tests.cpp
     netlist_elements_tests.cpp
     netlist_nodes_tests.cpp
     netlist_subcircuits_tests.cpp
