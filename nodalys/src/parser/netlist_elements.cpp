@@ -650,35 +650,6 @@ ElementResult SkipInstance(DeckContext & /*context*/, const DeckLine & /*line*/)
     return {};
 }
 
-/**
- * @struct  ElementReader
- * @brief   The function that reads the elements of one letter.
- */
-struct ElementReader {
-    char Letter;
-    ElementResult (*Read)(DeckContext &, const DeckLine &);
-};
-
-constexpr auto ELEMENT_READERS = std::to_array<ElementReader>({
-    {'R', ReadResistor},
-    {'C', ReadCapacitor},
-    {'L', ReadInductor},
-    {'V', ReadSource},
-    {'I', ReadSource},
-    {'P', ReadPort},
-    {'E', ReadVcvs},
-    {'G', ReadVccs},
-    {'H', ReadCcvs},
-    {'F', ReadCccs},
-    {'B', ReadBehavioral},
-    {'D', ReadDiode},
-    {'Q', ReadBjt},
-    {'M', ReadMosfet},
-    {'S', ReadSwitch},
-    {'U', ReadLogicGate},
-    {'X', SkipInstance},
-});
-
 // Nodes of each kind of element
 
 /**
@@ -715,7 +686,8 @@ std::vector<std::string> ListBehavioralNodes(const DeckLine &line) {
 /**
  * @brief   The nodes of a U line: every token before the kind of gate and the first NAME=VALUE.
  */
-std::vector<std::string> ListGateNodes(const std::vector<std::string> &tokens) {
+std::vector<std::string> ListGateNodes(const DeckLine &line) {
+    const std::vector<std::string> &tokens = line.Tokens;
     std::vector<std::string> nodes;
     for (std::size_t index = FIRST_NODE; index < tokens.size(); ++index) {
         if (tokens[index].find('=') != std::string::npos || FindLogicGateType(tokens[index])) {
@@ -726,6 +698,64 @@ std::vector<std::string> ListGateNodes(const std::vector<std::string> &tokens) {
     return nodes;
 }
 
+std::vector<std::string> ListTwoNodes(const DeckLine &line) {
+    return ListFirstNodes(line.Tokens, 2);
+}
+
+std::vector<std::string> ListThreeNodes(const DeckLine &line) {
+    return ListFirstNodes(line.Tokens, 3);
+}
+
+std::vector<std::string> ListFourNodes(const DeckLine &line) {
+    return ListFirstNodes(line.Tokens, 4);
+}
+
+std::vector<std::string> ListInstanceNodes(const DeckLine &line) {
+    const std::optional<InstanceLine> instance = SplitInstanceLine(line.Tokens);
+    return instance ? instance->NodeNames : std::vector<std::string>{};
+}
+
+/**
+ * @struct  ElementReader
+ * @brief   What the engine knows of the elements of one letter: how to list the nodes of a line before they are
+ *          numbered, and how to read it.
+ */
+struct ElementReader {
+    char Letter;
+    std::vector<std::string> (*ListNodes)(const DeckLine &);
+    ElementResult (*Read)(DeckContext &, const DeckLine &);
+};
+
+constexpr auto ELEMENT_READERS = std::to_array<ElementReader>({
+    {'R', ListTwoNodes, ReadResistor},
+    {'C', ListTwoNodes, ReadCapacitor},
+    {'L', ListTwoNodes, ReadInductor},
+    {'V', ListTwoNodes, ReadSource},
+    {'I', ListTwoNodes, ReadSource},
+    {'P', ListTwoNodes, ReadPort},
+    {'E', ListFourNodes, ReadVcvs},
+    {'G', ListFourNodes, ReadVccs},
+    {'H', ListTwoNodes, ReadCcvs},
+    {'F', ListTwoNodes, ReadCccs},
+    {'B', ListBehavioralNodes, ReadBehavioral},
+    {'D', ListTwoNodes, ReadDiode},
+    {'Q', ListThreeNodes, ReadBjt},
+    {'M', ListFourNodes, ReadMosfet},
+    {'S', ListFourNodes, ReadSwitch},
+    {'U', ListGateNodes, ReadLogicGate},
+    {'X', ListInstanceNodes, SkipInstance},
+});
+
+/**
+ * @brief   The reader of the elements of a line, by the letter of its name.
+ * @return  The reader, or null for a letter the engine has no element for.
+ */
+const ElementReader *FindElementReader(const DeckLine &line) {
+    const auto reader =
+        std::ranges::find(ELEMENT_READERS, GetElementLetter(line.Tokens.front()), &ElementReader::Letter);
+    return reader == ELEMENT_READERS.end() ? nullptr : &*reader;
+}
+
 } // namespace
 
 /**
@@ -734,37 +764,8 @@ std::vector<std::string> ListGateNodes(const std::vector<std::string> &tokens) {
  * @return  Its nodes as written; none for a kind of element the engine does not read.
  */
 std::vector<std::string> ListElementNodes(const DeckLine &line) {
-    const std::vector<std::string> &tokens = line.Tokens;
-    switch (GetElementLetter(tokens.front())) {
-    case 'R':
-    case 'C':
-    case 'L':
-    case 'V':
-    case 'I':
-    case 'D':
-    case 'P':
-    case 'H':
-    case 'F':
-        return ListFirstNodes(tokens, 2);
-    case 'Q':
-        return ListFirstNodes(tokens, 3);
-    case 'M':
-    case 'S':
-    case 'E':
-    case 'G':
-        return ListFirstNodes(tokens, 4);
-    case 'B':
-        return ListBehavioralNodes(line);
-    case 'X':
-        if (const std::optional<InstanceLine> instance = SplitInstanceLine(tokens)) {
-            return instance->NodeNames;
-        }
-        return {};
-    case 'U':
-        return ListGateNodes(tokens);
-    default:
-        return {};
-    }
+    const ElementReader *reader = FindElementReader(line);
+    return reader == nullptr ? std::vector<std::string>{} : reader->ListNodes(line);
 }
 
 /**
@@ -775,12 +776,11 @@ std::vector<std::string> ListElementNodes(const DeckLine &line) {
  *          the reason the line cannot be read otherwise.
  */
 std::expected<void, std::string> ReadElement(DeckContext &context, const DeckLine &line) {
-    const char letter = GetElementLetter(line.Tokens.front());
-    if (letter == '\0') {
+    if (GetElementLetter(line.Tokens.front()) == '\0') {
         return {};
     }
-    const auto reader = std::ranges::find(ELEMENT_READERS, letter, &ElementReader::Letter);
-    if (reader == ELEMENT_READERS.end()) {
+    const ElementReader *reader = FindElementReader(line);
+    if (reader == nullptr) {
         context.Result.Diagnostics.push_back({std::format("Ignored unrecognized device line: '{}'", line.Text)});
         return {};
     }

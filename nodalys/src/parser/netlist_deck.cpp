@@ -66,6 +66,48 @@ std::expected<void, std::string> ReadModelLine(const DeckLine &line, Deck &deck)
     return {};
 }
 
+/**
+ * @struct  OpenBlocks
+ * @brief   The .subckt blocks open at a line of the netlist, whose lines are definitions until their .ends.
+ */
+struct OpenBlocks {
+    int Depth = 0;
+    /// The name of the outermost open block, for the message when the netlist never closes it.
+    std::string OutermostName;
+};
+
+/**
+ * @brief   Puts one line where it belongs: among the definitions, the models or the circuit lines.
+ * @return  Whether reading goes on, false at .end; the reason a .subckt or .model line cannot be read otherwise.
+ */
+std::expected<bool, std::string> SortLine(DeckLine line, OpenBlocks &blocks, Deck &deck) {
+    const std::string word = ToUpper(line.Tokens.front());
+    if (word == ".SUBCKT") {
+        if (line.Tokens.size() < 2) {
+            return std::unexpected(std::format("Malformed .subckt directive: '{}'", line.Text));
+        }
+        if (blocks.Depth++ == 0) {
+            blocks.OutermostName = line.Tokens[1];
+        }
+    } else if (word == ".ENDS") {
+        if (blocks.Depth == 0) {
+            return true;
+        }
+        --blocks.Depth;
+    } else if (word == ".MODEL" && blocks.Depth == 0) {
+        if (auto read = ReadModelLine(line, deck); !read) {
+            return std::unexpected(read.error());
+        }
+    } else if (word == ".END" && blocks.Depth == 0) {
+        return false;
+    } else if (blocks.Depth == 0 && word != ".PARAM") {
+        deck.CircuitLines.push_back(std::move(line));
+        return true;
+    }
+    deck.DefinitionLines.push_back(std::move(line.Text));
+    return true;
+}
+
 } // namespace
 
 /**
@@ -84,43 +126,23 @@ std::expected<Deck, std::string> ReadDeck(const std::string_view text) {
     }
     Deck deck;
     deck.Title = title;
-    int subcircuit_depth = 0;
-    std::string open_subcircuit;
+    OpenBlocks blocks;
     for (std::string &text_line : SplitLogicalLines(body)) {
         DeckLine line{.Text = std::move(text_line), .Tokens = {}};
         line.Tokens = SplitTokens(line.Text);
         if (line.Tokens.empty()) {
             continue;
         }
-        const std::string word = ToUpper(line.Tokens.front());
-        if (word == ".SUBCKT") {
-            if (line.Tokens.size() < 2) {
-                return std::unexpected(std::format("Malformed .subckt directive: '{}'", line.Text));
-            }
-            if (subcircuit_depth++ == 0) {
-                open_subcircuit = line.Tokens[1];
-            }
-            deck.DefinitionLines.push_back(line.Text);
-        } else if (word == ".ENDS") {
-            if (subcircuit_depth > 0) {
-                --subcircuit_depth;
-                deck.DefinitionLines.push_back(line.Text);
-            }
-        } else if (subcircuit_depth > 0 || word == ".PARAM") {
-            deck.DefinitionLines.push_back(line.Text);
-        } else if (word == ".MODEL") {
-            if (auto read = ReadModelLine(line, deck); !read) {
-                return std::unexpected(read.error());
-            }
-            deck.DefinitionLines.push_back(line.Text);
-        } else if (word == ".END") {
+        const std::expected<bool, std::string> is_read_on = SortLine(std::move(line), blocks, deck);
+        if (!is_read_on) {
+            return std::unexpected(is_read_on.error());
+        }
+        if (!*is_read_on) {
             break;
-        } else {
-            deck.CircuitLines.push_back(std::move(line));
         }
     }
-    if (subcircuit_depth > 0) {
-        return std::unexpected(std::format("The subcircuit '{}' has no .ends", open_subcircuit));
+    if (blocks.Depth > 0) {
+        return std::unexpected(std::format("The subcircuit '{}' has no .ends", blocks.OutermostName));
     }
     return deck;
 }
