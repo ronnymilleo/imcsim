@@ -50,6 +50,9 @@ std::expected<Deck, std::string> ReadDeck(std::string_view text);
 // Element names
 char GetElementLetter(std::string_view name);
 
+// Diagnostics
+void AddUniqueDiagnostic(std::vector<DiagnosticMessage> &diagnostics, const std::string &text);
+
 } // namespace Nodalys
 
 #endif // NODALYS_PARSER_NETLIST_DECK_H

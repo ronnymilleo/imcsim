@@ -7,6 +7,7 @@
 
 #include "nodalys/expression.h"
 #include "parser/expression_references.h"
+#include "parser/source_line.h"
 #include "parser/source_waveforms.h"
 #include "parser/spice_number.h"
 #include "parser/spice_text.h"
@@ -56,31 +57,37 @@ FindOptionValue(const std::vector<std::string> &tokens, const std::size_t first,
 }
 
 /**
- * @brief   The numbers inside the parentheses of a waveform word such as "PULSE(0 5 1u 1u)".
- * @details A word that is not a number is left out, so the waveform takes its default for it.
- */
-std::vector<double> ReadParenthesizedValues(const std::string_view token) {
-    const std::size_t open = token.find('(');
-    const std::size_t close = token.rfind(')');
-    std::vector<double> values;
-    if (open == std::string_view::npos || close == std::string_view::npos || close <= open) {
-        return values;
-    }
-    for (const std::string &word : SplitTokens(token.substr(open + 1, close - open - 1))) {
-        if (const std::optional<double> number = ParseSpiceNumber(word)) {
-            values.push_back(*number);
-        }
-    }
-    return values;
-}
-
-/**
  * @brief   The model an element names, by the name it writes, in any case.
  * @return  The card, or null when the netlist has none of that name, which leaves the device at its defaults.
  */
 const ParsedModel *FindModel(const DeckContext &context, const std::string &name) {
     const auto found = context.Lines.Models.find(ToUpper(name));
     return found == context.Lines.Models.end() ? nullptr : &found->second;
+}
+
+/**
+ * @brief   The device parameters a line takes from the model it names, and a diagnostic, once for each model, that
+ * names the parameters of its card that the device does not read.
+ * @param[in,out] context  Netlist being read, which collects the diagnostic.
+ * @param[in]     name     Model name as the line writes it.
+ * @param[in]     build    Builds the parameters of the device from the card, such as BuildDiodeParameters.
+ * @return  The device parameters, at the defaults of the device when the netlist has no such model.
+ */
+template <typename T>
+T ReadModelParameters(DeckContext &context,
+                      const std::string &name,
+                      BuiltParameters<T> (*const build)(const ParsedModel &model)) {
+    const ParsedModel *model = FindModel(context, name);
+    if (model == nullptr) {
+        return T{};
+    }
+    BuiltParameters<T> built = build(*model);
+    if (const std::string ignored = ListIgnoredParameters(*model, built.ReadKeys); !ignored.empty()) {
+        AddUniqueDiagnostic(
+            context.Result.Diagnostics,
+            std::format("Nodalys does not read the parameters {} of the model {}", ignored, ToUpper(name)));
+    }
+    return std::move(built.Parameters);
 }
 
 /**
@@ -313,52 +320,38 @@ std::size_t ReadPortWord(const std::vector<std::string> &tokens, const std::size
  * @brief   What a V or I line gives after its nodes.
  */
 struct SourceWords {
-    SourceLevels Levels;
-    SourceWaveform Waveform = SourceWaveform::NONE;
-    std::string WaveformToken;
+    SourceValues Values;
     PortWords Port;
     /// Whether a port option made the line an S-parameter port.
     bool IsPort = false;
 };
 
 /**
+ * @brief   Reads a number of a source line of a netlist, a literal with its scale suffix.
+ */
+std::expected<double, std::string> ReadLiteral(const std::string_view text) {
+    if (const std::optional<double> value = ParseSpiceNumber(text)) {
+        return *value;
+    }
+    return std::unexpected(std::format("'{}' is not a number", text));
+}
+
+/**
  * @brief   Reads "[DC <value>] [AC <magnitude> [<phase>]] [<waveform>(...)] [<value>]" and the port options.
+ * @details What the line does not know is skipped, as the netlist has always read it; the subcircuit text refuses it.
  */
 SourceWords ReadSourceWords(const std::vector<std::string> &tokens) {
     constexpr std::size_t FIRST_AFTER_NODES = 3;
     SourceWords words;
-    std::size_t index = FIRST_AFTER_NODES;
-    while (index < tokens.size()) {
-        if (const std::size_t used = ReadPortWord(tokens, index, words.Port); used > 0) {
+    SourceLineReader reader(tokens, FIRST_AFTER_NODES, ReadLiteral, SourceWordPolicy::SKIP_UNKNOWN);
+    while (!reader.IsAtEnd()) {
+        if (const std::size_t used = ReadPortWord(tokens, reader.GetIndex(), words.Port); used > 0) {
             words.IsPort = true;
-            index += used;
+            reader.Skip(used);
             continue;
         }
-        const std::string upper = ToUpper(tokens[index]);
-        const bool has_next = index + 1 < tokens.size();
-        if (upper == "DC" && has_next) {
-            words.Levels.Dc = ParseSpiceNumber(tokens[index + 1]).value_or(0.0);
-            index += 2;
-            continue;
-        }
-        if (upper == "AC" && has_next) {
-            words.Levels.AcMagnitude = ParseSpiceNumber(tokens[index + 1]).value_or(1.0);
-            index += 2;
-            if (index < tokens.size()) {
-                if (const std::optional<double> phase = ParseSpiceNumber(tokens[index])) {
-                    words.Levels.AcPhaseDegrees = *phase;
-                    ++index;
-                }
-            }
-            continue;
-        }
-        if (const SourceWaveform waveform = FindSourceWaveform(tokens[index]); waveform != SourceWaveform::NONE) {
-            words.Waveform = waveform;
-            words.WaveformToken = tokens[index];
-        } else if (const std::optional<double> value = ParseSpiceNumber(tokens[index])) {
-            words.Levels.Dc = *value;
-        }
-        ++index;
+        // A line that skips what it does not know never fails
+        static_cast<void>(reader.ReadWord(words.Values));
     }
     return words;
 }
@@ -387,9 +380,9 @@ ElementResult ReadSource(DeckContext &context, const DeckLine &line) {
                       GetElementLetter(name) == 'V',
                       positive,
                       context.Nodes.Resolve(tokens[2]),
-                      words.Waveform,
-                      ReadParenthesizedValues(words.WaveformToken),
-                      words.Levels);
+                      words.Values.Waveform,
+                      words.Values.WaveformValues,
+                      words.Values.Levels);
     return {};
 }
 
@@ -539,11 +532,10 @@ ElementResult ReadDiode(DeckContext &context, const DeckLine &line) {
     if (tokens.size() < 4) {
         return std::unexpected(std::format("Malformed diode: '{}'", line.Text));
     }
-    const ParsedModel *model = FindModel(context, tokens[3]);
     context.Builder.AddDiode(tokens.front(),
                              context.Nodes.Resolve(tokens[1]),
                              context.Nodes.Resolve(tokens[2]),
-                             model != nullptr ? BuildDiodeParameters(*model) : DiodeParameters{},
+                             ReadModelParameters(context, tokens[3], BuildDiodeParameters),
                              ReadArea(tokens, 4));
     return {};
 }
@@ -563,7 +555,7 @@ ElementResult ReadBjt(DeckContext &context, const DeckLine &line) {
                            nodes.Resolve(tokens[2]),
                            nodes.Resolve(tokens[3]),
                            model == nullptr || model->Kind != ParsedModel::ModelKind::BJT_PNP,
-                           model != nullptr ? BuildBjtParameters(*model) : BjtParameters{},
+                           ReadModelParameters(context, tokens[4], BuildBjtParameters),
                            ReadArea(tokens, 5));
     return {};
 }
@@ -578,7 +570,7 @@ ElementResult ReadMosfet(DeckContext &context, const DeckLine &line) {
         return std::unexpected(std::format("Malformed MOSFET: '{}'", line.Text));
     }
     const ParsedModel *model = FindModel(context, tokens[5]);
-    MosfetParameters parameters = model != nullptr ? BuildMosfetParameters(*model) : MosfetParameters{};
+    MosfetParameters parameters = ReadModelParameters(context, tokens[5], BuildMosfetParameters);
     parameters.Length = FindOptionValue(tokens, FIRST_OPTION, "L").value_or(parameters.Length);
     parameters.Width = FindOptionValue(tokens, FIRST_OPTION, "W").value_or(parameters.Width);
     const NetlistNodes &nodes = context.Nodes;
@@ -600,14 +592,13 @@ ElementResult ReadSwitch(DeckContext &context, const DeckLine &line) {
     if (tokens.size() < 6) {
         return std::unexpected(std::format("Malformed switch: '{}'", line.Text));
     }
-    const ParsedModel *model = FindModel(context, tokens[5]);
     const NetlistNodes &nodes = context.Nodes;
     context.Builder.AddVoltageControlledSwitch(tokens.front(),
                                                nodes.Resolve(tokens[1]),
                                                nodes.Resolve(tokens[2]),
                                                nodes.Resolve(tokens[3]),
                                                nodes.Resolve(tokens[4]),
-                                               model != nullptr ? BuildSwitchParameters(*model) : SwitchParameters{});
+                                               ReadModelParameters(context, tokens[5], BuildSwitchParameters));
     return {};
 }
 

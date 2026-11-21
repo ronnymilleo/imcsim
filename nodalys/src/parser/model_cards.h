@@ -46,15 +46,29 @@ struct ModelCardWords {
     std::vector<std::string> Assignments;
 };
 
+/**
+ * @struct  BuiltParameters
+ * @brief   The parameters of a device built from a .model card, with the names of the card parameters it read.
+ */
+template <typename T>
+struct BuiltParameters {
+    T Parameters;
+    /// Upper-case names of the parameters the card gives and the device took, so the others can be reported.
+    std::set<std::string> ReadKeys;
+};
+
 // Cards
 std::optional<ModelCardWords> SplitModelCard(const std::vector<std::string> &tokens);
 std::optional<ParsedModel::ModelKind> FindModelKind(std::string_view type);
 
-// Device parameters; a parameter the device reads is added to read_keys when it is given
-DiodeParameters BuildDiodeParameters(const ParsedModel &model, std::set<std::string> *read_keys = nullptr);
-BjtParameters BuildBjtParameters(const ParsedModel &model, std::set<std::string> *read_keys = nullptr);
-MosfetParameters BuildMosfetParameters(const ParsedModel &model, std::set<std::string> *read_keys = nullptr);
-SwitchParameters BuildSwitchParameters(const ParsedModel &model, std::set<std::string> *read_keys = nullptr);
+// Device parameters
+BuiltParameters<DiodeParameters> BuildDiodeParameters(const ParsedModel &model);
+BuiltParameters<BjtParameters> BuildBjtParameters(const ParsedModel &model);
+BuiltParameters<MosfetParameters> BuildMosfetParameters(const ParsedModel &model);
+BuiltParameters<SwitchParameters> BuildSwitchParameters(const ParsedModel &model);
+
+// Ignored parameters
+std::string ListIgnoredParameters(const ParsedModel &model, const std::set<std::string> &read_keys);
 
 } // namespace Nodalys
 

@@ -10,6 +10,7 @@ add_executable(nodalys-tests
     analysis_preamble_tests.cpp
     behavioral_device_tests.cpp
     bjt_device_tests.cpp
+    classified_lines_tests.cpp
     expression_tests.cpp
     fft_tests.cpp
     frequency_sweep_tests.cpp
@@ -34,6 +35,9 @@ add_executable(nodalys-tests
     random_draws_tests.cpp
     raw_plot_tests.cpp
     sens_analysis_tests.cpp
+    source_line_tests.cpp
+    source_waveforms_tests.cpp
+    spice_values_tests.cpp
     subcircuit_text_tests.cpp
     smooth_logic_tests.cpp
     solution_readout_tests.cpp

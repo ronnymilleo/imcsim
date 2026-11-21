@@ -58,6 +58,8 @@ add_library(nodalys STATIC
     src/linear/root_refinement.cpp
     src/mna/mna_system.cpp
     src/newton/newton.cpp
+    src/parser/classified_lines.cpp
+    src/parser/element_arguments.cpp
     src/parser/expression_references.cpp
     src/parser/model_cards.cpp
     src/parser/netlist_deck.cpp
@@ -66,11 +68,13 @@ add_library(nodalys STATIC
     src/parser/netlist_nodes.cpp
     src/parser/netlist_parser.cpp
     src/parser/netlist_subcircuits.cpp
+    src/parser/source_line.cpp
     src/parser/source_waveforms.cpp
     src/parser/spice_number.cpp
     src/parser/spice_text.cpp
     src/parser/spice_values.cpp
     src/parser/subcircuit_elements.cpp
+    src/parser/subcircuit_expansion.cpp
     src/parser/subcircuit_lines.cpp
     src/parser/subcircuit_models.cpp
     src/parser/subcircuit_scope.cpp

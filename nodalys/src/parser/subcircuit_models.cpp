@@ -103,13 +103,7 @@ void ReportIgnoredParameters(ExpansionContext &context,
     if (!context.ReportedModels.insert(ToUpper(model.Name)).second) {
         return;
     }
-    std::string ignored;
-    for (const auto &[key, value] : model.Card.Params) {
-        if (key != "LEVEL" && !read_keys.contains(key)) {
-            ignored += ignored.empty() ? key : ", " + key;
-        }
-    }
-    if (!ignored.empty()) {
+    if (const std::string ignored = ListIgnoredParameters(model.Card, read_keys); !ignored.empty()) {
         context.Warnings.push_back(std::format("Nodalys does not read the parameters {} of the model {} in the "
                                                "subcircuit {}",
                                                ignored,

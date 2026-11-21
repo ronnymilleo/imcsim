@@ -13,7 +13,6 @@
 #include "parser/netlist_nodes.h"
 #include "parser/netlist_subcircuits.h"
 
-#include <algorithm>
 #include <cctype>
 #include <string>
 #include <string_view>
@@ -42,16 +41,6 @@ NetlistNodes RegisterCircuitNodes(const Deck &deck) {
 }
 
 /**
- * @brief   Adds a diagnostic unless the netlist already has the same one, as every instance of a block repeats the
- *          warnings of its definition.
- */
-void AddUniqueDiagnostic(std::vector<DiagnosticMessage> &diagnostics, const std::string &text) {
-    if (!std::ranges::contains(diagnostics, text, &DiagnosticMessage::Text)) {
-        diagnostics.push_back({text});
-    }
-}
-
-/**
  * @brief   Places every X line, before the other lines are read, since the directives may name the internal nodes of
  *          an instance (X1.MID) and its sources, wherever they stand in the netlist.
  */
@@ -69,7 +58,7 @@ std::expected<void, std::string> PlaceSubcircuitInstances(DeckContext &context) 
         const auto added = AddNetlistInstance(
             context.Builder,
             context.Lines.DefinitionLines,
-            line.Text,
+            line,
             [&context](const std::string_view name) { return context.Nodes.Resolve(name); },
             observers);
         if (!added) {
