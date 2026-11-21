@@ -7,6 +7,7 @@
 
 #include "nodalys/expression.h"
 #include "parser/expression_references.h"
+#include "parser/source_line.h"
 #include "parser/source_waveforms.h"
 #include "parser/spice_number.h"
 #include "parser/spice_text.h"
@@ -53,25 +54,6 @@ FindOptionValue(const std::vector<std::string> &tokens, const std::size_t first,
         }
     }
     return value;
-}
-
-/**
- * @brief   The numbers inside the parentheses of a waveform word such as "PULSE(0 5 1u 1u)".
- * @details A word that is not a number is left out, so the waveform takes its default for it.
- */
-std::vector<double> ReadParenthesizedValues(const std::string_view token) {
-    const std::size_t open = token.find('(');
-    const std::size_t close = token.rfind(')');
-    std::vector<double> values;
-    if (open == std::string_view::npos || close == std::string_view::npos || close <= open) {
-        return values;
-    }
-    for (const std::string &word : SplitTokens(token.substr(open + 1, close - open - 1))) {
-        if (const std::optional<double> number = ParseSpiceNumber(word)) {
-            values.push_back(*number);
-        }
-    }
-    return values;
 }
 
 /**
@@ -313,52 +295,38 @@ std::size_t ReadPortWord(const std::vector<std::string> &tokens, const std::size
  * @brief   What a V or I line gives after its nodes.
  */
 struct SourceWords {
-    SourceLevels Levels;
-    SourceWaveform Waveform = SourceWaveform::NONE;
-    std::string WaveformToken;
+    SourceValues Values;
     PortWords Port;
     /// Whether a port option made the line an S-parameter port.
     bool IsPort = false;
 };
 
 /**
+ * @brief   Reads a number of a source line of a netlist, a literal with its scale suffix.
+ */
+std::expected<double, std::string> ReadLiteral(const std::string_view text) {
+    if (const std::optional<double> value = ParseSpiceNumber(text)) {
+        return *value;
+    }
+    return std::unexpected(std::format("'{}' is not a number", text));
+}
+
+/**
  * @brief   Reads "[DC <value>] [AC <magnitude> [<phase>]] [<waveform>(...)] [<value>]" and the port options.
+ * @details What the line does not know is skipped, as the netlist has always read it; the subcircuit text refuses it.
  */
 SourceWords ReadSourceWords(const std::vector<std::string> &tokens) {
     constexpr std::size_t FIRST_AFTER_NODES = 3;
     SourceWords words;
-    std::size_t index = FIRST_AFTER_NODES;
-    while (index < tokens.size()) {
-        if (const std::size_t used = ReadPortWord(tokens, index, words.Port); used > 0) {
+    SourceLineReader reader(tokens, FIRST_AFTER_NODES, ReadLiteral, SourceWordPolicy::SKIP_UNKNOWN);
+    while (!reader.IsAtEnd()) {
+        if (const std::size_t used = ReadPortWord(tokens, reader.GetIndex(), words.Port); used > 0) {
             words.IsPort = true;
-            index += used;
+            reader.Skip(used);
             continue;
         }
-        const std::string upper = ToUpper(tokens[index]);
-        const bool has_next = index + 1 < tokens.size();
-        if (upper == "DC" && has_next) {
-            words.Levels.Dc = ParseSpiceNumber(tokens[index + 1]).value_or(0.0);
-            index += 2;
-            continue;
-        }
-        if (upper == "AC" && has_next) {
-            words.Levels.AcMagnitude = ParseSpiceNumber(tokens[index + 1]).value_or(1.0);
-            index += 2;
-            if (index < tokens.size()) {
-                if (const std::optional<double> phase = ParseSpiceNumber(tokens[index])) {
-                    words.Levels.AcPhaseDegrees = *phase;
-                    ++index;
-                }
-            }
-            continue;
-        }
-        if (const SourceWaveform waveform = FindSourceWaveform(tokens[index]); waveform != SourceWaveform::NONE) {
-            words.Waveform = waveform;
-            words.WaveformToken = tokens[index];
-        } else if (const std::optional<double> value = ParseSpiceNumber(tokens[index])) {
-            words.Levels.Dc = *value;
-        }
-        ++index;
+        // A line that skips what it does not know never fails
+        static_cast<void>(reader.ReadWord(words.Values));
     }
     return words;
 }
@@ -387,9 +355,9 @@ ElementResult ReadSource(DeckContext &context, const DeckLine &line) {
                       GetElementLetter(name) == 'V',
                       positive,
                       context.Nodes.Resolve(tokens[2]),
-                      words.Waveform,
-                      ReadParenthesizedValues(words.WaveformToken),
-                      words.Levels);
+                      words.Values.Waveform,
+                      words.Values.WaveformValues,
+                      words.Values.Levels);
     return {};
 }
 

@@ -6,7 +6,9 @@
 #include "parser/subcircuit_elements.h"
 
 #include "nodalys/expression.h"
+#include "parser/element_arguments.h"
 #include "parser/expression_references.h"
+#include "parser/source_line.h"
 #include "parser/source_waveforms.h"
 #include "parser/spice_text.h"
 #include "parser/spice_values.h"
@@ -30,90 +32,7 @@ namespace {
 
 using Result = std::expected<void, std::string>;
 
-/// The index of the first node of an element line, after its name.
-constexpr std::size_t FIRST_NODE_INDEX = 1;
-constexpr std::size_t TWO_TERMINAL_VALUE_INDEX = 3;
-
-/**
- * @struct  ElementLine
- * @brief   An element line as the handlers read it.
- */
-struct ElementLine {
-    /// The scope the line is in, which evaluates its values, names its nodes and leads to the expansion.
-    TextScope &Scope;
-    std::string_view Text;
-    const std::vector<std::string> &Tokens;
-    /// The element letter in upper case, such as 'V', which tells a handler that reads two letters which one it has.
-    char Letter;
-    /// The name the element has in the circuit, with the instance it sits in.
-    std::string Name;
-
-    NodeId ResolveNode(std::size_t position) const;
-    CircuitBuilder &GetBuilder() const;
-};
-
-/**
- * @struct  Arguments
- * @brief   The tokens of an element after its nodes: those written as a bare value or word, and the NAME=VALUE ones.
- */
-struct Arguments {
-    std::vector<std::string> Positional;
-    std::map<std::string, std::string> Options;
-};
-
 using Handler = Result (*)(const ElementLine &element);
-
-Arguments SplitArguments(const std::vector<std::string> &tokens, const std::size_t first) {
-    Arguments arguments;
-    for (std::size_t index = first; index < tokens.size(); ++index) {
-        const std::size_t equals = tokens[index].find('=');
-        const bool is_option = equals != std::string::npos && equals > 0 && tokens[index].front() != '{'
-                            && tokens[index].front() != '\'' && tokens[index].find('(') > equals;
-        if (is_option) {
-            arguments.Options[ToUpper(tokens[index].substr(0, equals))] = tokens[index].substr(equals + 1);
-        } else {
-            arguments.Positional.push_back(tokens[index]);
-        }
-    }
-    return arguments;
-}
-
-/**
- * @brief   Refuses an option the element has no use for, so that none is dropped without a word.
- */
-Result CheckOptions(const Arguments &arguments, const std::initializer_list<std::string_view> allowed) {
-    for (const auto &[key, value] : arguments.Options) {
-        if (std::ranges::find(allowed, key) == allowed.end()) {
-            return std::unexpected(std::format("the option {}= is not simulated", key));
-        }
-    }
-    return {};
-}
-
-Result CheckPositionalCount(const Arguments &arguments, const std::size_t most) {
-    if (arguments.Positional.size() > most) {
-        return std::unexpected(std::format("'{}' is not understood here", arguments.Positional[most]));
-    }
-    return {};
-}
-
-Result CheckNodeCount(const ElementLine &element, const std::size_t count) {
-    if (element.Tokens.size() < FIRST_NODE_INDEX + count) {
-        return std::unexpected(std::format("it needs {} nodes", count));
-    }
-    return {};
-}
-
-/**
- * @brief   The node at a position of the line, counted from its first node, which the scope makes when it is new.
- */
-NodeId ElementLine::ResolveNode(const std::size_t position) const {
-    return Scope.ResolveNode(Tokens[FIRST_NODE_INDEX + position]);
-}
-
-CircuitBuilder &ElementLine::GetBuilder() const {
-    return Scope.GetContext().Builder;
-}
 
 /**
  * @brief   The value of a two-terminal element and its initial condition.
@@ -207,111 +126,19 @@ Result AddStorageLine(const ElementLine &element) {
 }
 
 /**
- * @struct  SourceValues
- * @brief   What an independent source line gives: its DC value, its small-signal magnitude and phase, and its
- *          waveform with the numbers in the parentheses.
- */
-struct SourceValues {
-    SourceLevels Levels;
-    SourceWaveform Waveform = SourceWaveform::NONE;
-    std::vector<double> WaveformValues;
-};
-
-Result ReadInto(const TextScope &scope, const std::string &text, double &target) {
-    const auto value = scope.Evaluate(text);
-    if (!value) {
-        return std::unexpected(value.error());
-    }
-    target = *value;
-    return {};
-}
-
-/**
- * @brief   Reads the magnitude after the word AC, at index, and the phase when a value follows it.
- */
-Result
-ReadAcValues(const TextScope &scope, const std::vector<std::string> &tokens, std::size_t &index, SourceValues &values) {
-    Result done = ReadInto(scope, tokens[index + 1], values.Levels.AcMagnitude);
-    index += 2;
-    if (done && index < tokens.size() && scope.Evaluate(tokens[index])) {
-        done = ReadInto(scope, tokens[index], values.Levels.AcPhaseDegrees);
-        ++index;
-    }
-    return done;
-}
-
-/**
- * @brief   Reads the numbers inside the parentheses of a waveform, each one a literal or an expression of the
- *          parameters the scope sees.
- */
-Result ReadWaveformValues(const TextScope &scope, const std::string &token, std::vector<double> &values) {
-    const std::size_t open = token.find('(');
-    const std::size_t close = token.rfind(')');
-    if (close == std::string::npos || close < open) {
-        return std::unexpected(std::format("the waveform '{}' has no closing parenthesis", token));
-    }
-    for (const std::string &text : SplitTokens(std::string_view(token).substr(open + 1, close - open - 1))) {
-        const auto value = scope.Evaluate(text);
-        if (!value) {
-            return std::unexpected(value.error());
-        }
-        values.push_back(*value);
-    }
-    return {};
-}
-
-/**
- * @brief   Reads the word of a source line at index, with the value that belongs to it, and moves index past them.
- * @return  Nothing, or why the word cannot be simulated: anything but a DC value, an AC value or a waveform.
- */
-Result ReadSourceWord(const TextScope &scope,
-                      const std::vector<std::string> &tokens,
-                      std::size_t &index,
-                      SourceValues &values) {
-    const std::string upper = ToUpper(tokens[index]);
-    const bool has_next = index + 1 < tokens.size();
-    if (upper == "DC" && has_next) {
-        index += 2;
-        return ReadInto(scope, tokens[index - 1], values.Levels.Dc);
-    }
-    if (upper.starts_with("DC=")) {
-        ++index;
-        return ReadInto(scope, tokens[index - 1].substr(3), values.Levels.Dc);
-    }
-    if (upper == "AC" && has_next) {
-        return ReadAcValues(scope, tokens, index, values);
-    }
-    if (const SourceWaveform waveform = FindSourceWaveform(tokens[index]); waveform != SourceWaveform::NONE) {
-        values.Waveform = waveform;
-        values.WaveformValues.clear();
-        ++index;
-        return ReadWaveformValues(scope, tokens[index - 1], values.WaveformValues);
-    }
-    if (index == TWO_TERMINAL_VALUE_INDEX && tokens[index].find('(') == std::string::npos) {
-        ++index;
-        return ReadInto(scope, tokens[index - 1], values.Levels.Dc);
-    }
-    const std::string word = tokens[index].substr(0, tokens[index].find('('));
-    return std::unexpected(std::format("the source word or option '{}' is not simulated inside a "
-                                       "subcircuit kept as text; only DC and AC values and the waveforms are",
-                                       word));
-}
-
-/**
- * @brief   Reads "[DC] value [AC magnitude [phase]]" and a waveform such as PULSE or SIN of a source line.
+ * @brief   Reads "[DC] value [AC magnitude [phase]]" and a waveform such as PULSE or SIN of a source line, each number
+ * a literal or an expression of the parameters the scope sees, refusing any word it does not know.
  */
 std::expected<SourceValues, std::string> ReadSource(const ElementLine &element) {
     if (const Result nodes = CheckNodeCount(element, 2); !nodes) {
         return std::unexpected(nodes.error());
     }
-    SourceValues values;
-    std::size_t index = TWO_TERMINAL_VALUE_INDEX;
-    while (index < element.Tokens.size()) {
-        if (const Result done = ReadSourceWord(element.Scope, element.Tokens, index, values); !done) {
-            return std::unexpected(done.error());
-        }
-    }
-    return values;
+    const TextScope &scope = element.Scope;
+    return ReadSourceLine(
+        element.Tokens,
+        TWO_TERMINAL_VALUE_INDEX,
+        [&scope](const std::string_view text) { return scope.Evaluate(text); },
+        SourceWordPolicy::REFUSE_UNKNOWN);
 }
 
 /**

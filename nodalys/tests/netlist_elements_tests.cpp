@@ -101,6 +101,16 @@ TEST_CASE("A source waveform in a netlist drives the transient, as a voltage or 
     }
 }
 
+TEST_CASE("A source in a netlist takes its DC value in every form, DC= included", "[nodalys][parser]") {
+    const std::string source = GENERATE(as<std::string>{}, "V1 1 0 5", "V1 1 0 DC 5", "V1 1 0 DC=5", "V1 1 0 dc=5");
+    CAPTURE(source);
+    const auto parsed = Nodalys::ParseNetlist(std::format("* dc\n{}\nR1 1 0 1k\n.op\n.end\n", source));
+    REQUIRE(parsed.has_value());
+    const auto point = Nodalys::ComputeOperatingPoint(parsed->CircuitInstance);
+    REQUIRE(point.has_value());
+    CHECK_THAT(point->NodeVoltages[1], WithinAbs(5.0, 1e-9));
+}
+
 TEST_CASE("Controlled sources in a netlist follow their controlling voltage or current", "[nodalys][parser]") {
     // V1 holds node 1 at 2 V and drives 2 mA through R1, which Vsense measures on its way to ground
     const std::string_view control = "* controlled\nV1 1 0 2\nR1 1 2 1k\nVsense 2 0 0\n";

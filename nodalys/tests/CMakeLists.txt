@@ -34,6 +34,7 @@ add_executable(nodalys-tests
     random_draws_tests.cpp
     raw_plot_tests.cpp
     sens_analysis_tests.cpp
+    source_line_tests.cpp
     subcircuit_text_tests.cpp
     smooth_logic_tests.cpp
     solution_readout_tests.cpp
