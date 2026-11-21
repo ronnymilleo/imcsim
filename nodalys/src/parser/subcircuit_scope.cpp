@@ -14,14 +14,6 @@
 
 namespace Nodalys {
 
-namespace {
-
-bool IsGroundName(const std::string &upper_name) {
-    return upper_name.empty() || upper_name == "0" || upper_name == "GND";
-}
-
-} // namespace
-
 /**
  * @param[in] parent  Scope the definition of this instance sits in, or null for the instance the expansion starts from.
  *                    It must outlive this scope.

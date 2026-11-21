@@ -75,6 +75,17 @@ std::size_t SkipSeparators(const std::string_view line, std::size_t index) {
     return index;
 }
 
+/**
+ * @brief   Whether the separators before next sit inside an assignment, as in "R = 1k", so they split nothing.
+ * @param[in] line   The line.
+ * @param[in] next   Index of the first character after the separators.
+ * @param[in] token  The token so far, before the separators.
+ */
+bool IsAssignmentGap(const std::string_view line, const std::size_t next, const std::string &token) {
+    const bool is_before_equals = next < line.size() && line[next] == '=';
+    return !token.empty() && (is_before_equals || token.ends_with('='));
+}
+
 void FlushToken(std::string &token, std::vector<std::string> &tokens) {
     if (!token.empty()) {
         tokens.push_back(std::move(token));
@@ -95,6 +106,14 @@ std::string_view TrimSpaces(std::string_view text) {
         text.remove_suffix(1);
     }
     return text;
+}
+
+/**
+ * @brief   Tells whether a node name is ground, as ngspice reads it: 0, or GND, which it takes for 0.
+ * @param[in] upper_name  Node name in upper case; an empty name is ground too.
+ */
+bool IsGroundName(const std::string_view upper_name) {
+    return upper_name.empty() || upper_name == "0" || upper_name == "GND";
 }
 
 /**
@@ -135,34 +154,23 @@ std::vector<std::string> SplitTokens(const std::string_view line) {
     std::vector<std::string> tokens;
     std::string token;
     Grouping grouping;
-    for (std::size_t index = 0; index < line.size(); ++index) {
+    std::size_t index = 0;
+    while (index < line.size()) {
         const char character = line[index];
         grouping.Follow(character);
         if (!IsSeparator(character) || grouping.IsOpen()) {
             token.push_back(character);
+            ++index;
             continue;
         }
-        // Spaces around an equals sign belong to the assignment
         const std::size_t next = SkipSeparators(line, index);
-        const bool is_before_equals = next < line.size() && line[next] == '=';
-        const bool is_after_equals = token.ends_with('=');
-        if (!token.empty() && (is_before_equals || is_after_equals)) {
-            index = next - 1;
-        } else {
+        if (!IsAssignmentGap(line, next, token)) {
             FlushToken(token, tokens);
         }
+        index = next;
     }
     FlushToken(token, tokens);
     return tokens;
-}
-
-/**
- * @brief   Tells whether a token starts the parameters of a .subckt or an X line: the PARAMS: word or a NAME=VALUE.
- * @param[in] token  Token of the line, after its nodes.
- */
-bool IsParameterStart(const std::string &token) {
-    return ToUpper(token).starts_with(PARAMETER_LIST_MARK)
-        || (token.find('=') != std::string::npos && token.front() != '{' && token.front() != '\'');
 }
 
 } // namespace Nodalys

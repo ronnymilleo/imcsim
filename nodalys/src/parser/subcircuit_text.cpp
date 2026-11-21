@@ -7,6 +7,7 @@
 
 #include "parser/spice_text.h"
 #include "parser/subcircuit_elements.h"
+#include "parser/subcircuit_lines.h"
 #include "parser/subcircuit_models.h"
 #include "parser/subcircuit_scope.h"
 #include "text/text_case.h"
@@ -45,27 +46,6 @@ std::string Refuse(const ExpansionContext &context, const std::string_view line,
                        context.SubcircuitName,
                        line,
                        reason);
-}
-
-/**
- * @brief   Splits the NAME=VALUE tokens that follow the nodes of a line, skipping the PARAMS: word.
- */
-std::vector<std::pair<std::string, std::string>> SplitParameterTokens(const std::vector<std::string> &tokens,
-                                                                      const std::size_t first) {
-    std::vector<std::pair<std::string, std::string>> parameters;
-    for (std::size_t index = first; index < tokens.size(); ++index) {
-        std::string token = tokens[index];
-        if (ToUpper(token).starts_with(PARAMETER_LIST_MARK)) {
-            token.erase(0, PARAMETER_LIST_MARK.size());
-        }
-        if (token.empty()) {
-            continue;
-        }
-        const std::size_t equals = token.find('=');
-        parameters.emplace_back(ToUpper(token.substr(0, equals)),
-                                equals == std::string::npos ? std::string() : token.substr(equals + 1));
-    }
-    return parameters;
 }
 
 /**
@@ -231,15 +211,11 @@ Result ExpandInstance(ExpansionContext &context,
                       const std::string &line,
                       const std::vector<std::string> &tokens,
                       const int depth) {
-    constexpr std::size_t FIRST_AFTER_NAME = 2;
-    std::size_t parameters_start = FIRST_AFTER_NAME;
-    while (parameters_start < tokens.size() && !IsParameterStart(tokens[parameters_start])) {
-        ++parameters_start;
-    }
-    if (parameters_start <= FIRST_AFTER_NAME) {
+    const std::optional<InstanceLine> call = SplitInstanceLine(tokens);
+    if (!call) {
         return std::unexpected(Refuse(context, line, "is not written X<name> <nodes> <subcircuit>"));
     }
-    const std::string &subcircuit_name = tokens[parameters_start - 1];
+    const std::string &subcircuit_name = call->SubcircuitName;
     const TextSubcircuit *subcircuit = scope.FindSubcircuit(ToUpper(subcircuit_name));
     if (subcircuit == nullptr) {
         return std::unexpected(
@@ -247,7 +223,7 @@ Result ExpandInstance(ExpansionContext &context,
                    line,
                    std::format("uses the subcircuit {}, which the text does not define", subcircuit_name)));
     }
-    const std::size_t node_count = parameters_start - 1 - 1;
+    const std::size_t node_count = call->NodeNames.size();
     if (node_count != subcircuit->Ports.size()) {
         return std::unexpected(Refuse(context,
                                       line,
@@ -265,12 +241,12 @@ Result ExpandInstance(ExpansionContext &context,
                                                  instance,
                                                  *subcircuit,
                                                  line,
-                                                 SplitParameterTokens(tokens, parameters_start));
+                                                 SplitParameterTokens(call->ParameterTokens, 0));
         !set) {
         return set;
     }
     for (std::size_t port = 0; port < node_count; ++port) {
-        instance.MapNode(ToUpper(subcircuit->Ports[port]), scope.ResolveNode(context, tokens[1 + port]));
+        instance.MapNode(ToUpper(subcircuit->Ports[port]), scope.ResolveNode(context, call->NodeNames[port]));
     }
     return ExpandScope(context, instance, subcircuit->Lines, depth + 1);
 }
