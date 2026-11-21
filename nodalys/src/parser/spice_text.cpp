@@ -173,13 +173,4 @@ std::vector<std::string> SplitTokens(const std::string_view line) {
     return tokens;
 }
 
-/**
- * @brief   Tells whether a token starts the parameters of a .subckt or an X line: the PARAMS: word or a NAME=VALUE.
- * @param[in] token  Token of the line, after its nodes.
- */
-bool IsParameterStart(const std::string &token) {
-    return ToUpper(token).starts_with(PARAMETER_LIST_MARK)
-        || (token.find('=') != std::string::npos && token.front() != '{' && token.front() != '\'');
-}
-
 } // namespace Nodalys

@@ -7,10 +7,10 @@
 
 #include "nodalys/expression.h"
 #include "parser/expression_references.h"
-#include "parser/netlist_subcircuits.h"
 #include "parser/source_waveforms.h"
 #include "parser/spice_number.h"
 #include "parser/spice_text.h"
+#include "parser/subcircuit_lines.h"
 #include "text/text_case.h"
 
 #include <algorithm>

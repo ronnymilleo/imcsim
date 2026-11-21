@@ -7,6 +7,7 @@
 
 #include "nodalys/subcircuit_text.h"
 #include "parser/spice_text.h"
+#include "parser/subcircuit_lines.h"
 
 #include <cstddef>
 #include <format>
@@ -24,28 +25,6 @@ std::string PortName(const std::size_t position) {
 }
 
 } // namespace
-
-/**
- * @brief   Splits an X line into its nodes, the subcircuit it calls and its parameters.
- * @param[in] tokens  The tokens of the line, as SplitTokens() gives them.
- * @return  The parts, or none when the line is not written X<name> <nodes> <subcircuit>.
- */
-std::optional<InstanceLine> SplitInstanceLine(const std::vector<std::string> &tokens) {
-    std::size_t parameters_start = FIRST_NODE_INDEX + 1;
-    while (parameters_start < tokens.size() && !IsParameterStart(tokens[parameters_start])) {
-        ++parameters_start;
-    }
-    // At least the name of the subcircuit has to sit between the name of the instance and the parameters
-    if (parameters_start <= FIRST_NODE_INDEX + 1) {
-        return std::nullopt;
-    }
-    InstanceLine instance;
-    const auto nodes_end = tokens.begin() + static_cast<std::ptrdiff_t>(parameters_start - 1);
-    instance.NodeNames.assign(tokens.begin() + static_cast<std::ptrdiff_t>(FIRST_NODE_INDEX), nodes_end);
-    instance.SubcircuitName = *nodes_end;
-    instance.ParameterTokens.assign(tokens.begin() + static_cast<std::ptrdiff_t>(parameters_start), tokens.end());
-    return instance;
-}
 
 /**
  * @brief   Adds the elements of one X line of a netlist to the circuit being built.
