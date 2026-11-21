@@ -108,27 +108,41 @@ struct PassiveValues {
     double InitialCondition = 0.0;
 };
 
-std::expected<PassiveValues, std::string> ReadPassive(const TextScope &scope,
-                                                      const ElementLine &element,
-                                                      const std::string_view value_option,
-                                                      const bool has_initial) {
+/**
+ * @brief   The text of the value of a two-terminal element: its NAME=VALUE option, such as R=1k, or else the word after
+ *          its nodes.
+ */
+std::optional<std::string> FindValueText(const Arguments &arguments, const std::string_view value_option) {
+    if (const auto option = arguments.Options.find(std::string(value_option)); option != arguments.Options.end()) {
+        return option->second;
+    }
+    if (!arguments.Positional.empty()) {
+        return arguments.Positional.front();
+    }
+    return std::nullopt;
+}
+
+/**
+ * @brief   Reads the value of a resistor, capacitor or inductor and, when the element has one, its initial condition.
+ * @param[in] scope    Scope of the element, which evaluates its values.
+ * @param[in] element  The element line.
+ * @param[in] options  The options the element takes; the first is the one that may give its value, such as "R", and
+ *                     an element that keeps an initial condition lists "IC" too.
+ */
+std::expected<PassiveValues, std::string>
+ReadPassive(const TextScope &scope, const ElementLine &element, const std::initializer_list<std::string_view> options) {
     if (const Result nodes = CheckNodeCount(element, 2); !nodes) {
         return std::unexpected(nodes.error());
     }
     const Arguments arguments = SplitArguments(element.Tokens, TWO_TERMINAL_VALUE_INDEX);
-    if (const Result checked =
-            has_initial ? CheckOptions(arguments, {value_option, "IC"}) : CheckOptions(arguments, {value_option});
-        !checked) {
+    if (const Result checked = CheckOptions(arguments, options); !checked) {
         return std::unexpected(checked.error());
     }
     if (const Result counted = CheckPositionalCount(arguments, 1); !counted) {
         return std::unexpected(counted.error());
     }
-    const auto option = arguments.Options.find(std::string(value_option));
-    const std::string *text = option != arguments.Options.end() ? &option->second
-                            : !arguments.Positional.empty()     ? &arguments.Positional.front()
-                                                                : nullptr;
-    if (text == nullptr) {
+    const std::optional<std::string> text = FindValueText(arguments, *options.begin());
+    if (!text) {
         return std::unexpected("it has no value");
     }
     PassiveValues values;
@@ -137,6 +151,7 @@ std::expected<PassiveValues, std::string> ReadPassive(const TextScope &scope,
         return std::unexpected(value.error());
     }
     values.Value = *value;
+    // CheckOptions has refused IC on an element that does not take it
     if (const auto initial = arguments.Options.find("IC"); initial != arguments.Options.end()) {
         const auto condition = scope.Evaluate(initial->second);
         if (!condition) {
@@ -148,7 +163,7 @@ std::expected<PassiveValues, std::string> ReadPassive(const TextScope &scope,
 }
 
 Result AddResistorLine(ExpansionContext &context, TextScope &scope, const ElementLine &element) {
-    const auto values = ReadPassive(scope, element, "R", false);
+    const auto values = ReadPassive(scope, element, {"R"});
     if (!values) {
         return std::unexpected(values.error());
     }
@@ -160,7 +175,7 @@ Result AddResistorLine(ExpansionContext &context, TextScope &scope, const Elemen
 }
 
 Result AddCapacitorLine(ExpansionContext &context, TextScope &scope, const ElementLine &element) {
-    const auto values = ReadPassive(scope, element, "C", true);
+    const auto values = ReadPassive(scope, element, {"C", "IC"});
     if (!values) {
         return std::unexpected(values.error());
     }
@@ -173,7 +188,7 @@ Result AddCapacitorLine(ExpansionContext &context, TextScope &scope, const Eleme
 }
 
 Result AddInductorLine(ExpansionContext &context, TextScope &scope, const ElementLine &element) {
-    const auto values = ReadPassive(scope, element, "L", true);
+    const auto values = ReadPassive(scope, element, {"L", "IC"});
     if (!values) {
         return std::unexpected(values.error());
     }
