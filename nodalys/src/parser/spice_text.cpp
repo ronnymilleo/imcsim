@@ -75,6 +75,17 @@ std::size_t SkipSeparators(const std::string_view line, std::size_t index) {
     return index;
 }
 
+/**
+ * @brief   Whether the separators before next sit inside an assignment, as in "R = 1k", so they split nothing.
+ * @param[in] line   The line.
+ * @param[in] next   Index of the first character after the separators.
+ * @param[in] token  The token so far, before the separators.
+ */
+bool IsAssignmentGap(const std::string_view line, const std::size_t next, const std::string &token) {
+    const bool is_before_equals = next < line.size() && line[next] == '=';
+    return !token.empty() && (is_before_equals || token.ends_with('='));
+}
+
 void FlushToken(std::string &token, std::vector<std::string> &tokens) {
     if (!token.empty()) {
         tokens.push_back(std::move(token));
@@ -143,22 +154,20 @@ std::vector<std::string> SplitTokens(const std::string_view line) {
     std::vector<std::string> tokens;
     std::string token;
     Grouping grouping;
-    for (std::size_t index = 0; index < line.size(); ++index) {
+    std::size_t index = 0;
+    while (index < line.size()) {
         const char character = line[index];
         grouping.Follow(character);
         if (!IsSeparator(character) || grouping.IsOpen()) {
             token.push_back(character);
+            ++index;
             continue;
         }
-        // Spaces around an equals sign belong to the assignment
         const std::size_t next = SkipSeparators(line, index);
-        const bool is_before_equals = next < line.size() && line[next] == '=';
-        const bool is_after_equals = token.ends_with('=');
-        if (!token.empty() && (is_before_equals || is_after_equals)) {
-            index = next - 1;
-        } else {
+        if (!IsAssignmentGap(line, next, token)) {
             FlushToken(token, tokens);
         }
+        index = next;
     }
     FlushToken(token, tokens);
     return tokens;
