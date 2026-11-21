@@ -121,8 +121,10 @@ std::string GetMatrixEntryName(const SParameterEntry &entry, const SParameterQua
  * @param[in] quantity   Scattering, impedance or admittance.
  * @return  The value; none for Z and Y where the circuit has no finite matrix, or the backend gave none.
  */
-std::optional<std::complex<double>> ReadMatrixValue(const Core::SParameters &result, const std::size_t frequency,
-                                                    const SParameterEntry &entry, const SParameterQuantity quantity) {
+std::optional<std::complex<double>> ReadMatrixValue(const Core::SParameters &result,
+                                                    const std::size_t frequency,
+                                                    const SParameterEntry &entry,
+                                                    const SParameterQuantity quantity) {
     switch (quantity) {
     case SParameterQuantity::Z:
         return result.GetImpedance(frequency, entry.Row, entry.Column);
@@ -155,6 +157,16 @@ std::size_t CountAbsentFrequencies(const Core::SParameters &result, const SParam
 }
 
 /**
+ * @brief   Tells whether a matrix exists at no frequency of the sweep, so nothing of it can be drawn.
+ * @param[in] result    Result of the sweep.
+ * @param[in] quantity  Scattering, impedance or admittance.
+ * @return  True for Z or Y missing at every frequency; false for S, which always exists, and for an empty sweep.
+ */
+bool AreAllFrequenciesAbsent(const Core::SParameters &result, const SParameterQuantity quantity) {
+    return !result.Frequencies.empty() && CountAbsentFrequencies(result, quantity) == result.Frequencies.size();
+}
+
+/**
  * @brief   Words the frequencies at which a matrix is missing.
  * @param[in] result    Result of the sweep.
  * @param[in] quantity  Impedance or admittance.
@@ -168,7 +180,7 @@ std::string DescribeAbsentFrequencies(const Core::SParameters &result, const SPa
         return "";
     }
     const bool is_impedance = quantity == SParameterQuantity::Z;
-    if (absent == result.Frequencies.size()) {
+    if (AreAllFrequenciesAbsent(result, quantity)) {
         return is_impedance ? "This circuit has no finite impedance matrix at any frequency of the sweep, as when the "
                               "ports are joined by a series element and nothing else goes to ground: leaving one port "
                               "open then leaves the other one's voltage undefined."
@@ -177,7 +189,9 @@ std::string DescribeAbsentFrequencies(const Core::SParameters &result, const SPa
                               "voltage of the other.";
     }
     return std::format("{} has no finite value at {} of {} frequencies, so its curves have gaps there.",
-                       is_impedance ? "Z" : "Y", absent, result.Frequencies.size());
+                       is_impedance ? "Z" : "Y",
+                       absent,
+                       result.Frequencies.size());
 }
 
 /**
@@ -188,8 +202,8 @@ std::string DescribeAbsentFrequencies(const Core::SParameters &result, const SPa
  * @return  Decibels for S; ohms or siemens for Z and Y, which a logarithmic axis plots, so a zero or a missing matrix
  *          reads as not a number, where the curve breaks.
  */
-std::vector<double> ListMatrixMagnitudes(const Core::SParameters &result, const SParameterEntry &entry,
-                                         const SParameterQuantity quantity) {
+std::vector<double>
+ListMatrixMagnitudes(const Core::SParameters &result, const SParameterEntry &entry, const SParameterQuantity quantity) {
     if (quantity == SParameterQuantity::S) {
         return ListMagnitudesDecibels(result, entry);
     }
@@ -209,8 +223,8 @@ std::vector<double> ListMatrixMagnitudes(const Core::SParameters &result, const 
  * @param[in] quantity  Scattering, impedance or admittance.
  * @return  Degrees from -180 to 180; not a number where a matrix is missing.
  */
-std::vector<double> ListMatrixAngles(const Core::SParameters &result, const SParameterEntry &entry,
-                                     const SParameterQuantity quantity) {
+std::vector<double>
+ListMatrixAngles(const Core::SParameters &result, const SParameterEntry &entry, const SParameterQuantity quantity) {
     if (quantity == SParameterQuantity::S) {
         return ListAnglesDegrees(result, entry);
     }
@@ -257,8 +271,10 @@ ExportRange FindDecadeRange(const std::vector<std::vector<double>> &traces) {
  * @return  The entry and frequency, the magnitude and angle, and the real and imaginary parts; or that the matrix has
  *          no finite value at that frequency.
  */
-std::vector<std::string> DescribeMatrixReading(const Core::SParameters &result, const std::size_t frequency,
-                                               const SParameterEntry &entry, const SParameterQuantity quantity) {
+std::vector<std::string> DescribeMatrixReading(const Core::SParameters &result,
+                                               const std::size_t frequency,
+                                               const SParameterEntry &entry,
+                                               const SParameterQuantity quantity) {
     if (quantity == SParameterQuantity::S) {
         return DescribeReading(ReadEntry(result, frequency, entry));
     }
@@ -272,11 +288,46 @@ std::vector<std::string> DescribeMatrixReading(const Core::SParameters &result, 
                                     quantity == SParameterQuantity::Z ? "impedance" : "admittance"));
         return lines;
     }
-    lines.push_back(std::format("{:.{}g} {} at {:.{}g} deg", std::abs(*value), READING_DIGITS, unit,
-                                Core::ToDegrees(*value), READING_DIGITS));
-    lines.push_back(std::format("{:.{}g} {} j{:.{}g} {}", value->real(), READING_DIGITS,
-                                value->imag() < 0.0 ? "-" : "+", std::abs(value->imag()), READING_DIGITS, unit));
+    lines.push_back(std::format("{:.{}g} {} at {:.{}g} deg",
+                                std::abs(*value),
+                                READING_DIGITS,
+                                unit,
+                                Core::ToDegrees(*value),
+                                READING_DIGITS));
+    lines.push_back(std::format("{:.{}g} {} j{:.{}g} {}",
+                                value->real(),
+                                READING_DIGITS,
+                                value->imag() < 0.0 ? "-" : "+",
+                                std::abs(value->imag()),
+                                READING_DIGITS,
+                                unit));
     return lines;
+}
+
+/**
+ * @brief   Joins the readings of several entries at one frequency into the text of a tooltip.
+ * @param[in] result     Result of the sweep.
+ * @param[in] frequency  Index of the frequency.
+ * @param[in] entries    Entries to read.
+ * @param[in] quantity   Scattering, impedance or admittance.
+ * @return  The lines of each entry, as DescribeMatrixReading() words them, with a blank line between entries; empty
+ *          without entries.
+ */
+std::string DescribeMatrixReadings(const Core::SParameters &result,
+                                   const std::size_t frequency,
+                                   const std::vector<SParameterEntry> &entries,
+                                   const SParameterQuantity quantity) {
+    std::string text;
+    for (const SParameterEntry &entry : entries) {
+        for (const std::string &line : DescribeMatrixReading(result, frequency, entry, quantity)) {
+            text += (text.empty() ? "" : "\n") + line;
+        }
+        text += "\n";
+    }
+    if (!text.empty()) {
+        text.pop_back();
+    }
+    return text;
 }
 
 /**
@@ -334,7 +385,8 @@ ExportFigure BuildMatrixMagnitudePhaseFigure(const Core::SParameters &result,
  * @return  One panel with two series per entry, real then imaginary, in ohms or siemens, with the cells of a frequency
  *          without a matrix empty. The table of S is the one of the Smith figure.
  */
-ExportFigure BuildMatrixTableFigure(const Core::SParameters &result, const std::vector<SParameterEntry> &entries,
+ExportFigure BuildMatrixTableFigure(const Core::SParameters &result,
+                                    const std::vector<SParameterEntry> &entries,
                                     const SParameterQuantity quantity) {
     ExportFigure figure = MakeFigure(result);
     ExportPanel panel{.Title = "Table", .YAxes = {{.Name = "Value", .Unit = GetQuantityUnit(quantity)}}};

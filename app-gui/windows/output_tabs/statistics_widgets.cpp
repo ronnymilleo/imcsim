@@ -12,6 +12,7 @@
 #include "spice/spice_value.h"
 #include <algorithm>
 #include <cfloat>
+#include <cmath>
 #include <format>
 
 namespace GUI {
@@ -59,7 +60,9 @@ void DrawCursorTable(const CursorReadings &readings) {
     if (ImGui::GetContentRegionAvail().x < table_width) {
         ImGui::NewLine();
     }
-    if (!ImGui::BeginTable("cursor_readings", 2, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_RowBg,
+    if (!ImGui::BeginTable("cursor_readings",
+                           2,
+                           ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_RowBg,
                            {table_width, 0.0f})) {
         return;
     }
@@ -80,6 +83,53 @@ void DrawCursorTable(const CursorReadings &readings) {
 }
 
 } // namespace
+
+/**
+ * @brief   The readings of the cursors for the table beside the statistics: where each one is, and how far apart they
+ *          are.
+ * @param[in] cursors    The cursors of the plot.
+ * @param[in] unit       Unit of the X axis, such as "s".
+ * @param[in] distances  How far apart the cursors are, in the terms the plot reads best, such as their difference.
+ * @return  A and B, then the distances; empty while the cursors are hidden, so the table is left out.
+ */
+CursorReadings ReadCursors(const PlotCursors &cursors, const char *unit, const std::vector<CursorReading> &distances) {
+    if (!cursors.Shown) {
+        return {};
+    }
+    CursorReadings readings = {{"A", FormatQuantity(cursors.A, unit)}, {"B", FormatQuantity(cursors.B, unit)}};
+    readings.insert(readings.end(), distances.begin(), distances.end());
+    return readings;
+}
+
+/**
+ * @brief   How far apart the cursors are on a linear axis.
+ * @param[in] cursors  The cursors of the plot.
+ * @param[in] unit     Unit of the X axis.
+ * @return  B-A, negative when B is before A.
+ */
+CursorReading ReadCursorDifference(const PlotCursors &cursors, const char *unit) {
+    return {"B-A", FormatQuantity(cursors.B - cursors.A, unit)};
+}
+
+/**
+ * @brief   The frequency of a period that spans the cursors, on a time axis.
+ * @param[in] cursors  The cursors of the plot.
+ * @return  1/(B-A) in hertz, or no value while both cursors are at the same time.
+ */
+CursorReading ReadCursorFrequency(const PlotCursors &cursors) {
+    return {"1/(B-A)",
+            cursors.B != cursors.A ? FormatQuantity(1.0 / std::abs(cursors.B - cursors.A), "Hz")
+                                   : std::string(NO_VALUE)};
+}
+
+/**
+ * @brief   How far apart the cursors are on a logarithmic frequency axis.
+ * @param[in] cursors  The cursors of the plot.
+ * @return  B/A in decades, or no value while A is not above zero.
+ */
+CursorReading ReadCursorDecades(const PlotCursors &cursors) {
+    return {"B/A", cursors.A > 0.0 ? FormatFixed(std::log10(cursors.B / cursors.A), " dec") : std::string(NO_VALUE)};
+}
 
 /**
  * @brief   Writes a measured value with four significant digits, a SPICE suffix and its unit, such as "4.700kOhm".
@@ -129,7 +179,8 @@ void DrawMeasuredValue(const char *name, const double value, const double scale,
     }
     DrawStatistic(name, std::format("~0{}", unit));
     ImGui::SetItemTooltip(
-        "%s", std::format("{}{}, negligible next to the trace", Core::FormatMeasurement(value), unit).c_str());
+        "%s",
+        std::format("{}{}, negligible next to the trace", Core::FormatMeasurement(value), unit).c_str());
 }
 
 /**
@@ -161,7 +212,9 @@ void DrawStatisticsHeader(const char *span_text) {
  * @note    The table is as wide as its widest cells, and the statistics panel scrolls sideways when the traces do not
  *          fit.
  */
-void DrawTraceTable(const char *id, const std::vector<PlottedTrace> &traces, const std::vector<StatisticsRow> &rows,
+void DrawTraceTable(const char *id,
+                    const std::vector<PlottedTrace> &traces,
+                    const std::vector<StatisticsRow> &rows,
                     const CursorReadings &cursor_readings) {
     const auto measure = [](const std::string &text) { return ImGui::CalcTextSize(text.c_str()).x; };
     // Each column is as wide as its widest text, so the table width is known before it begins
@@ -185,7 +238,9 @@ void DrawTraceTable(const char *id, const std::vector<PlottedTrace> &traces, con
     for (const float width : widths) {
         table_width += width + padding;
     }
-    if (!ImGui::BeginTable(id, static_cast<int>(widths.size()), ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_RowBg,
+    if (!ImGui::BeginTable(id,
+                           static_cast<int>(widths.size()),
+                           ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_RowBg,
                            {table_width, 0.0f})) {
         return;
     }
@@ -241,7 +296,9 @@ void DrawWithStatistics(const std::function<void()> &draw_plots, const std::func
     }
     ImGui::EndChild();
     ImGui::SetNextWindowSizeConstraints({0.0f, 0.0f}, {FLT_MAX, max_height});
-    if (ImGui::BeginChild("statistics", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY,
+    if (ImGui::BeginChild("statistics",
+                          ImVec2(0.0f, 0.0f),
+                          ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY,
                           ImGuiWindowFlags_HorizontalScrollbar)) {
         draw_statistics();
     }

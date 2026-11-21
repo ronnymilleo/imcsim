@@ -20,20 +20,29 @@ namespace Nodalys {
  */
 class MosfetDevice : public Device {
 public:
-    MosfetDevice(int drain, int gate, int source, int internal_drain, int internal_source, MosfetParameters parameters,
+    MosfetDevice(int drain,
+                 int gate,
+                 int source,
+                 int internal_drain,
+                 int internal_source,
+                 MosfetParameters parameters,
                  bool pmos);
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     void StampAc(MnaSystem &reactive, const std::vector<double> &x_dc) const override;
+
     bool IsLinear() const override { return false; }
+
     void StampCharge(MnaSystem &sys, const std::vector<double> &x) const override;
     bool Limit(std::vector<double> &x_new, const std::vector<double> &x_old) const override;
-    void SeedOperatingPoint(std::vector<double> &x) const override;
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
     double TerminalCharge(int terminal, const std::vector<double> &x) const override;
-    std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
-                                           const std::vector<std::complex<double>> &x_ac, double omega) const override;
-    double OutputNoiseVariance(const std::vector<double> &x_dc, const std::vector<std::complex<double>> &adjoint,
+    std::complex<double> AcTerminalCurrent(int terminal,
+                                           const std::vector<double> &x_dc,
+                                           const std::vector<std::complex<double>> &x_ac,
+                                           double omega) const override;
+    double OutputNoiseVariance(const std::vector<double> &x_dc,
+                               const std::vector<std::complex<double>> &adjoint,
                                double frequency_hz) const override;
     bool HasTransientState() const override;
     void AcceptStep(const std::vector<double> &x) override;
@@ -46,12 +55,30 @@ private:
         double Gm;      ///< Transconductance $\partial I / \partial v_{gs,\text{eff}} \ge 0$.
         double Gds;     ///< Output conductance $\partial I / \partial v_{ds,\text{eff}} \ge 0$.
     };
+
+    /// The channel in the frame where the drain sits at the higher potential, after the source and drain swap.
+    struct ChannelState {
+        int Drain;          ///< Node acting as the drain; the intrinsic source when the channel is reversed.
+        int Source;         ///< Node acting as the source; the intrinsic drain when the channel is reversed.
+        bool IsReversed;    ///< Whether the source and drain swapped roles because $v_{ds}$ has the wrong sign.
+        double Polarity;    ///< $+1$ for NMOS and $-1$ for PMOS.
+        Channel Conduction; ///< Current and conductances in the effective frame.
+    };
+
+    /// The two terminals of the body-drain diode, in the direction it conducts.
+    struct BodyDiodeNodes {
+        int Anode;
+        int Cathode;
+    };
+
     /// Recomputes the parameters at the temperature, from the ones given at the nominal temperature.
     void ApplyTemperature(const ThermalConditions &thermal);
     /// Evaluates the level-1 channel equations for nonnegative effective $v_{ds} \ge 0$.
     Channel Evaluate(double vgs_eff, double vds_eff) const;
-    double Vgs(const std::vector<double> &x) const;
-    double Vds(const std::vector<double> &x) const;
+    /// Finds which terminal acts as the drain at the solution `x` and evaluates the channel in that frame.
+    ChannelState EvaluateChannel(const std::vector<double> &x) const;
+    /// Finds the anode and the cathode of the body-drain diode, which depend on the polarity.
+    BodyDiodeNodes GetBodyDiodeNodes() const;
 
     int m_Drain;
     int m_Gate;

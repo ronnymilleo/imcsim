@@ -46,11 +46,16 @@ public:
     std::optional<ExportChoice> DrawPopup(const std::string &plot_name, bool can_export, bool has_longer_run);
 
     // Saving
-    void Start(ExportFigure figure, ExportFormat format, const std::optional<std::filesystem::path> &schematic_path,
+    void Start(ExportFigure figure,
+               ExportFormat format,
+               const std::optional<std::filesystem::path> &schematic_path,
                const std::string &file_suffix);
-    void StartText(std::string csv, const std::optional<std::filesystem::path> &schematic_path,
+    void StartText(std::string csv,
+                   const std::optional<std::filesystem::path> &schematic_path,
                    const std::string &file_suffix);
-    void StartTouchstone(std::string text, int port_count, const std::optional<std::filesystem::path> &schematic_path,
+    void StartTouchstone(std::string text,
+                         int port_count,
+                         const std::optional<std::filesystem::path> &schematic_path,
                          const std::string &file_suffix);
     void Update();
     void DrawError();

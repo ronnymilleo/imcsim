@@ -66,7 +66,8 @@ std::optional<std::string> DescribeMode(const EditorMode &mode) {
  * @param[in] selected_count  How many parts and wires are selected.
  * @return  The hint for a live run, for one part, for one wire, for several items, or for an empty selection.
  */
-std::string DescribeSelecting(const bool is_live, const std::optional<std::string> &selected_part,
+std::string DescribeSelecting(const bool is_live,
+                              const std::optional<std::string> &selected_part,
                               const std::size_t selected_count) {
     if (is_live) {
         return "Live: click a switch or logic input to flip it, hold a push button down, turn a potentiometer with the "
@@ -109,7 +110,7 @@ std::string DescribeEditorHint(const EditorMode &mode, Schematic &schematic, con
         selected_part =
             component.GetName().empty() ? std::string(GetPartName(component.GetType())) : component.GetName();
     }
-    const std::size_t count = schematic.GetSelectedElements().size() + schematic.GetSelectedWires().size();
+    const std::size_t count = schematic.GetSelection().Elements.size() + schematic.GetSelection().Wires.size();
     return DescribeSelecting(is_live, selected_part, count);
 }
 
@@ -153,8 +154,8 @@ GridPoint FindWireCorner(const GridPoint start, const GridPoint cursor, const bo
  * @param[in]     is_on_terminal     Whether the point clicked is a terminal of a part.
  * @return  The two pieces to add to the schematic, or none for the first click and for one that only ends the wire.
  */
-std::vector<UIWire> ClickWire(WiringMode &mode, const GridPoint cursor, const bool is_vertical_first,
-                              const bool is_on_terminal) {
+std::vector<UIWire>
+ClickWire(WiringMode &mode, const GridPoint cursor, const bool is_vertical_first, const bool is_on_terminal) {
     if (!mode.Start) {
         mode.Start = cursor;
         return {};

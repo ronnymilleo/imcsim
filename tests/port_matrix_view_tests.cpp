@@ -39,10 +39,14 @@ Core::SParameters MakeResult(const bool is_middle_absent, const bool has_matrice
             result.ImpedanceMatrices.emplace_back(std::nullopt);
             result.AdmittanceMatrices.emplace_back(std::nullopt);
         } else {
-            result.ImpedanceMatrices.emplace_back(std::vector<Complex>{Complex(10.0 * scale, 5.0), Complex(1.0, 0.0),
-                                                                       Complex(2.0, 0.0), Complex(20.0, -5.0)});
-            result.AdmittanceMatrices.emplace_back(std::vector<Complex>{Complex(0.01 * scale, 0.0), Complex(0.001, 0.0),
-                                                                        Complex(0.002, 0.0), Complex(0.02, 0.0)});
+            result.ImpedanceMatrices.emplace_back(std::vector<Complex>{Complex(10.0 * scale, 5.0),
+                                                                       Complex(1.0, 0.0),
+                                                                       Complex(2.0, 0.0),
+                                                                       Complex(20.0, -5.0)});
+            result.AdmittanceMatrices.emplace_back(std::vector<Complex>{Complex(0.01 * scale, 0.0),
+                                                                        Complex(0.001, 0.0),
+                                                                        Complex(0.002, 0.0),
+                                                                        Complex(0.02, 0.0)});
         }
     }
     return result;
@@ -107,17 +111,20 @@ TEST_CASE("The missing frequencies are counted and worded", "[port_matrix_view]"
     CHECK(GUI::DescribeAbsentFrequencies(MakeResult(false), GUI::SParameterQuantity::Z).empty());
     const Core::SParameters partly = MakeResult(true);
     CHECK(GUI::CountAbsentFrequencies(partly, GUI::SParameterQuantity::Z) == 1);
-    CHECK(GUI::DescribeAbsentFrequencies(partly, GUI::SParameterQuantity::Z) ==
-          "Z has no finite value at 1 of 3 frequencies, so its curves have gaps there.");
+    CHECK(GUI::DescribeAbsentFrequencies(partly, GUI::SParameterQuantity::Z)
+          == "Z has no finite value at 1 of 3 frequencies, so its curves have gaps there.");
     // Without matrices nothing is counted, since the quantity is not offered
     CHECK(GUI::CountAbsentFrequencies(MakeResult(false, false), GUI::SParameterQuantity::Z) == 0);
     CHECK(GUI::CountAbsentFrequencies(partly, GUI::SParameterQuantity::S) == 0);
+    CHECK_FALSE(GUI::AreAllFrequenciesAbsent(partly, GUI::SParameterQuantity::Z));
 }
 
 TEST_CASE("A matrix that exists nowhere says why, for impedance and for admittance", "[port_matrix_view]") {
     Core::SParameters result = MakeResult(false);
     result.ImpedanceMatrices.assign(3, std::nullopt);
     result.AdmittanceMatrices.assign(3, std::nullopt);
+    CHECK(GUI::AreAllFrequenciesAbsent(result, GUI::SParameterQuantity::Z));
+    CHECK_FALSE(GUI::AreAllFrequenciesAbsent(result, GUI::SParameterQuantity::S));
     CHECK_THAT(GUI::DescribeAbsentFrequencies(result, GUI::SParameterQuantity::Z),
                ContainsSubstring("no finite impedance matrix at any frequency"));
     CHECK_THAT(GUI::DescribeAbsentFrequencies(result, GUI::SParameterQuantity::Z), ContainsSubstring("series element"));
@@ -136,6 +143,15 @@ TEST_CASE("The reading of an entry of Z gives its magnitude, angle and parts, or
     const std::vector<std::string> absent = GUI::DescribeMatrixReading(result, 1, {1, 1}, GUI::SParameterQuantity::Y);
     REQUIRE(absent.size() == 2);
     CHECK(absent[1] == "No finite admittance matrix at this frequency");
+}
+
+TEST_CASE("The readings of several entries are joined with a blank line between entries", "[port_matrix_view]") {
+    const Core::SParameters result = MakeResult(false);
+    const std::string text = GUI::DescribeMatrixReadings(result, 0, {{1, 1}, {2, 2}}, GUI::SParameterQuantity::Z);
+    CHECK(text
+          == "Z11 at 1MHz\n11.18 Ohm at 26.57 deg\n10 + j5 Ohm\n\n"
+             "Z22 at 1MHz\n20.62 Ohm at -14.04 deg\n20 - j5 Ohm");
+    CHECK(GUI::DescribeMatrixReadings(result, 0, {}, GUI::SParameterQuantity::Z).empty());
 }
 
 TEST_CASE("The magnitude and phase figure of Z has a logarithmic axis in ohms and a gap where it is absent",
@@ -164,10 +180,11 @@ TEST_CASE("The table of Z lists the real and imaginary parts and leaves the abse
     const Core::SParameters result = MakeResult(true);
     const GUI::ExportFigure figure = GUI::BuildMatrixTableFigure(result, {{1, 1}}, GUI::SParameterQuantity::Z);
     const std::string csv = GUI::RenderCsv(figure);
-    CHECK(csv == "Frequency (Hz),Z11 real (Ohm),Z11 imaginary (Ohm)\n"
-                 "1e+06,10,5\n"
-                 "1e+07,,\n"
-                 "1e+08,30,5\n");
+    CHECK(csv
+          == "Frequency (Hz),Z11 real (Ohm),Z11 imaginary (Ohm)\n"
+             "1e+06,10,5\n"
+             "1e+07,,\n"
+             "1e+08,30,5\n");
     const std::string admittance =
         GUI::RenderCsv(GUI::BuildMatrixTableFigure(result, {{2, 1}}, GUI::SParameterQuantity::Y));
     CHECK_THAT(admittance, ContainsSubstring("Y21 real (S),Y21 imaginary (S)"));

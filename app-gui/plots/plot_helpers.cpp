@@ -115,8 +115,11 @@ std::size_t FindWidestSpread(const std::vector<const std::vector<double> *> &cur
  *          and dashing those whole segments would take all the memory. Segments with a coordinate that is not
  *          finite are skipped.
  */
-std::vector<LineSegment> SplitIntoDashes(const std::span<const ImVec2> points, const float dash_length,
-                                         const float gap_length, const ImVec2 clip_min, const ImVec2 clip_max) {
+std::vector<LineSegment> SplitIntoDashes(const std::span<const ImVec2> points,
+                                         const float dash_length,
+                                         const float gap_length,
+                                         const ImVec2 clip_min,
+                                         const ImVec2 clip_max) {
     std::vector<LineSegment> dashes;
     const double period = static_cast<double>(dash_length) + gap_length;
     // Distance already covered in the current dash-and-gap period
@@ -132,10 +135,10 @@ std::vector<LineSegment> SplitIntoDashes(const std::span<const ImVec2> points, c
         }
         double first = 0.0;
         double last = 1.0;
-        const bool visible = ClipEdge(delta_x, start.X - clip_min.x, first, last) &&
-                             ClipEdge(-delta_x, clip_max.x - start.X, first, last) &&
-                             ClipEdge(delta_y, start.Y - clip_min.y, first, last) &&
-                             ClipEdge(-delta_y, clip_max.y - start.Y, first, last);
+        const bool visible = ClipEdge(delta_x, start.X - clip_min.x, first, last)
+                          && ClipEdge(-delta_x, clip_max.x - start.X, first, last)
+                          && ClipEdge(delta_y, start.Y - clip_min.y, first, last)
+                          && ClipEdge(-delta_y, clip_max.y - start.Y, first, last);
         if (!visible) {
             phase = std::fmod(phase + length, period);
             continue;

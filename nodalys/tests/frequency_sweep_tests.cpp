@@ -8,6 +8,8 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
+#include "analyses/frequency_sweep.h"
+
 #include <nodalys/nodalys.h>
 
 #include <format>
@@ -54,8 +56,9 @@ std::vector<double> NoiseGrid(const std::string &directive) {
 
 std::vector<double> AcSensitivityGrid(const std::string &directive) {
     const Nodalys::ParsedNetlist parsed = Parse(RC_PARTS, directive);
-    const auto result = Nodalys::ComputeAcSensitivity(
-        parsed.CircuitInstance, std::get<Nodalys::AcSensitivityConfig>(parsed.Analyses[0].Config));
+    const auto result =
+        Nodalys::ComputeAcSensitivity(parsed.CircuitInstance,
+                                      std::get<Nodalys::AcSensitivityConfig>(parsed.Analyses[0].Config));
     REQUIRE(result.has_value());
     return result->Frequencies;
 }
@@ -82,12 +85,12 @@ std::string FindRefusal(const std::string &directive) {
 }
 
 /// Four points per decade from 100 Hz to 5 kHz, which stops short of 5 kHz: the last point is not above the stop.
-const std::vector<double> DECADE_GRID_UNEVEN_END = {100.0,  177.82794100389228, 316.22776601683796, 562.34132519034910,
-                                                    1000.0, 1778.2794100389228, 3162.2776601683795};
+const std::vector<double> DECADE_GRID_UNEVEN_END =
+    {100.0, 177.82794100389228, 316.22776601683796, 562.34132519034910, 1000.0, 1778.2794100389228, 3162.2776601683795};
 
 /// Three points per decade from 100 Hz to 10 kHz, both ends on the grid.
-const std::vector<double> DECADE_GRID_BOTH_ENDS = {
-    100.0, 215.44346900318837, 464.15888336127790, 1000.0, 2154.4346900318837, 4641.5888336127790, 10000.0};
+const std::vector<double> DECADE_GRID_BOTH_ENDS =
+    {100.0, 215.44346900318837, 464.15888336127790, 1000.0, 2154.4346900318837, 4641.5888336127790, 10000.0};
 
 } // namespace
 
@@ -159,4 +162,16 @@ TEST_CASE("The .ac and .noise directives refuse a bad sweep and quote the line",
         CHECK(refuse("dec 10 100 abc").contains("frequency range"));
         CHECK(refuse("dec 10 100").contains("Malformed"));
     }
+}
+
+TEST_CASE("A sweep range needs a start above zero, a stop not below it and at least one point",
+          "[nodalys][frequency_sweep]") {
+    CHECK(Nodalys::IsValidSweepRange(100.0, 10e3, 5));
+    // A sweep of one frequency has its start equal to its stop
+    CHECK(Nodalys::IsValidSweepRange(1e3, 1e3, 1));
+    CHECK_FALSE(Nodalys::IsValidSweepRange(0.0, 10e3, 5));
+    CHECK_FALSE(Nodalys::IsValidSweepRange(-1.0, 10e3, 5));
+    CHECK_FALSE(Nodalys::IsValidSweepRange(10e3, 100.0, 5));
+    CHECK_FALSE(Nodalys::IsValidSweepRange(100.0, 10e3, 0));
+    CHECK_FALSE(Nodalys::IsValidSweepRange(100.0, 10e3, -3));
 }

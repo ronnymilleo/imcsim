@@ -8,11 +8,12 @@
 
 #include "analysis/analysis_controls.h"
 #include "base/helpers.h"
-#include "schematic/canvas_view.h"
+#include "schematic/editor_command.h"
 #include "schematic/editor_mode.h"
 #include "schematic/probing.h"
 #include "schematic/schematic.h"
 #include "schematic/simulation_settings.h"
+#include "windows/canvas_pointer.h"
 #include "windows/part_picker.h"
 #include "windows/part_popover.h"
 #include <optional>
@@ -21,14 +22,13 @@ namespace GUI {
 
 /**
  * @struct  ContextMenuServices
- * @brief   What the items of the context menu act on, which the editor owns.
+ * @brief   What the items of the context menu act on, which the editor owns; the items that edit the schematic or
+ *          move the view ask the editor for a command instead.
  */
 struct ContextMenuServices {
     Schematic &Shown;
-    EditorMode &Mode;
     AnalysisControls &Controls;
     PartPicker &Picker;
-    CanvasView &View;
     PartPopover &Popover;
 };
 
@@ -39,11 +39,11 @@ struct ContextMenuServices {
 class EditorContextMenu {
 public:
     // Opening
-    void HandleRightClick(Schematic &schematic, EditorMode &mode, const ViewTransform &view, float zoom, bool hovered,
-                          PartPopover &popover);
+    void HandleRightClick(Schematic &schematic, EditorMode &mode, const CanvasPointer &pointer, PartPopover &popover);
 
     // Drawing
-    bool Draw(const ContextMenuServices &services, Analysis selected_analysis, bool is_editing_block);
+    std::optional<EditorCommand>
+    Draw(const ContextMenuServices &services, Analysis selected_analysis, bool is_editing_block);
 
 private:
     /// What the right click was on, for the measure item of the menu.

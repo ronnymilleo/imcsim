@@ -10,15 +10,20 @@
 #include "plots/plot_types.h"
 #include "results/playback.h"
 #include "windows/output_tabs/plot_widgets.h"
+#include <optional>
 #include <vector>
 
 namespace GUI {
 
 // Cursors
-void DrawCursorReadout(const std::vector<double> &xs, const char *x_unit, bool logarithmic,
+void DrawCursorReadout(const std::vector<double> &xs,
+                       const char *x_unit,
+                       bool logarithmic,
                        const std::vector<PlottedTrace> &plotted);
 void DrawCursors(PlotCursors &cursors, bool logarithmic);
 PlotSpan MeasuredSpan(const PlotCursors &cursors, const PlotSpan &view);
+PlotSpan ClipSpanToRun(const PlotSpan &span, const PlotSpan &run);
+std::optional<PlotCursors> GetShownCursors(const PlotCursors &cursors);
 float GetCursorToggleWidth();
 void DrawCursorToggle(PlotCursors &cursors, float right_edge);
 void DrawCursorCheckbox(PlotCursors &cursors);

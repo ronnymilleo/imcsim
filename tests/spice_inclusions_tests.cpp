@@ -41,8 +41,9 @@ bool HasWarning(const std::vector<std::string> &warnings, const std::string_view
 
 TEST_CASE("An included file takes the place of its line, found from the folder of the file that names it",
           "[spice_inclusions]") {
-    const auto read = MakeReader({{"/lib/main.lib", ".include \"models/diode.mod\"\n"
-                                                    ".subckt CLAMP A B\nD1 A B DX\n.ends\n"},
+    const auto read = MakeReader({{"/lib/main.lib",
+                                   ".include \"models/diode.mod\"\n"
+                                   ".subckt CLAMP A B\nD1 A B DX\n.ends\n"},
                                   {"/lib/models/diode.mod", ".model DX D(IS=1e-14)\n"}});
     const Core::SpiceLibrary library = Core::ReadSpiceLibraryFile("/lib/main.lib", read);
     CHECK(library.Warnings.empty());
@@ -56,8 +57,9 @@ TEST_CASE("An included file takes the place of its line, found from the folder o
 
 TEST_CASE("A .lib line with a section reads only that section of the file", "[spice_inclusions]") {
     const auto read = MakeReader({{"/lib/main.lib", ".lib corners.lib TYP\n.subckt LOAD A B\nR1 A B {RVAL}\n.ends\n"},
-                                  {"/lib/corners.lib", ".lib FAST\n.param RVAL=900\n.endl FAST\n"
-                                                       ".lib TYP\n.param RVAL=1k\n.endl TYP\n"}});
+                                  {"/lib/corners.lib",
+                                   ".lib FAST\n.param RVAL=900\n.endl FAST\n"
+                                   ".lib TYP\n.param RVAL=1k\n.endl TYP\n"}});
     const Core::SpiceLibrary library = Core::ReadSpiceLibraryFile("/lib/main.lib", read);
     CHECK(library.Warnings.empty());
     const Core::LibrarySubcircuit *load = Find(library, "LOAD");
@@ -69,8 +71,9 @@ TEST_CASE("A .lib line with a section reads only that section of the file", "[sp
 TEST_CASE("A section may include another section of its own file", "[spice_inclusions]") {
     // Vendors split a corner into sections of one file that name each other
     const auto read = MakeReader({{"/lib/main.lib", ".lib parts.lib TYP\n"},
-                                  {"/lib/parts.lib", ".lib TYP\n.lib 'parts.lib' MODELS\n.subckt CELL A\nD1 A 0 DC\n"
-                                                     ".ends\n.endl\n.lib MODELS\n.model DC D(IS=2e-14)\n.endl\n"}});
+                                  {"/lib/parts.lib",
+                                   ".lib TYP\n.lib 'parts.lib' MODELS\n.subckt CELL A\nD1 A 0 DC\n"
+                                   ".ends\n.endl\n.lib MODELS\n.model DC D(IS=2e-14)\n.endl\n"}});
     const Core::SpiceLibrary library = Core::ReadSpiceLibraryFile("/lib/main.lib", read);
     CHECK(library.Warnings.empty());
     const Core::LibrarySubcircuit *cell = Find(library, "CELL");
@@ -106,8 +109,9 @@ TEST_CASE("The sections of the file picked are all read, without their markers",
 }
 
 TEST_CASE("Missing files, missing sections and loops are reported where they are written", "[spice_inclusions]") {
-    const auto read = MakeReader({{"/lib/a.lib", ".include b.lib\n.include gone.lib\n.lib b.lib NONE\n"
-                                                 ".subckt KEEP A\nR1 A 0 1k\n.ends\n"},
+    const auto read = MakeReader({{"/lib/a.lib",
+                                   ".include b.lib\n.include gone.lib\n.lib b.lib NONE\n"
+                                   ".subckt KEEP A\nR1 A 0 1k\n.ends\n"},
                                   {"/lib/b.lib", "* b includes a again\n.include a.lib\n"}});
     const Core::SpiceLibrary library = Core::ReadSpiceLibraryFile("/lib/a.lib", read);
     CHECK(HasWarning(library.Warnings, "Line 2 of b.lib: a.lib includes itself"));

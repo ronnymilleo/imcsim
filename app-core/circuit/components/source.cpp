@@ -104,6 +104,14 @@ bool Source::IsValidAC(const ACParameters &ac) const {
 }
 
 /**
+ * @brief   Returns the magnitude the source drives in an AC sweep.
+ * @return  The AC magnitude of an AC source, zero for any other waveform, which sits at zero in a sweep.
+ */
+double Source::GetACMagnitude() const {
+    return m_Type == SourceType::AC ? m_AC.Magnitude : 0.0;
+}
+
+/**
  * @brief   Returns the shape of the pulse.
  * @return  Levels in the unit of the source and times in seconds.
  */
@@ -127,8 +135,8 @@ void Source::SetPulse(const PulseParameters &pulse) {
  *          then never reaches its full shape.
  */
 bool Source::IsValidPulse(const PulseParameters &pulse) const {
-    return pulse.Delay >= 0.0 && pulse.RiseTime >= 0.0 && pulse.FallTime >= 0.0 && pulse.Width >= 0.0 &&
-           pulse.Period > 0.0;
+    return pulse.Delay >= 0.0 && pulse.RiseTime >= 0.0 && pulse.FallTime >= 0.0 && pulse.Width >= 0.0
+        && pulse.Period > 0.0;
 }
 
 /**
@@ -154,8 +162,8 @@ void Source::SetEXP(const EXPParameters &exp) {
  *          are positive. Levels can be any value.
  */
 bool Source::IsValidEXP(const EXPParameters &exp) const {
-    return exp.RiseDelay >= 0.0 && exp.FallDelay >= exp.RiseDelay && exp.RiseTimeConstant > 0.0 &&
-           exp.FallTimeConstant > 0.0;
+    return exp.RiseDelay >= 0.0 && exp.FallDelay >= exp.RiseDelay && exp.RiseTimeConstant > 0.0
+        && exp.FallTimeConstant > 0.0;
 }
 
 /**
@@ -390,10 +398,15 @@ const char *GetSourceTypeName(const Source::SourceType type) {
  * @return  The matching type, or no value for an unknown name.
  */
 std::optional<Source::SourceType> ParseSourceType(const std::string_view text) {
-    for (const Source::SourceType type :
-         {Source::SourceType::DC, Source::SourceType::AC, Source::SourceType::PULSE, Source::SourceType::EXP,
-          Source::SourceType::SFFM, Source::SourceType::AM, Source::SourceType::PWL, Source::SourceType::NOISE,
-          Source::SourceType::RANDOM}) {
+    for (const Source::SourceType type : {Source::SourceType::DC,
+                                          Source::SourceType::AC,
+                                          Source::SourceType::PULSE,
+                                          Source::SourceType::EXP,
+                                          Source::SourceType::SFFM,
+                                          Source::SourceType::AM,
+                                          Source::SourceType::PWL,
+                                          Source::SourceType::NOISE,
+                                          Source::SourceType::RANDOM}) {
         if (text == GetSourceTypeName(type)) {
             return type;
         }
@@ -427,8 +440,10 @@ const char *GetRandomDistributionName(const RandomDistribution distribution) {
  * @return  The matching distribution, or no value for an unknown name.
  */
 std::optional<RandomDistribution> ParseRandomDistribution(const std::string_view text) {
-    for (const RandomDistribution distribution : {RandomDistribution::UNIFORM, RandomDistribution::GAUSSIAN,
-                                                  RandomDistribution::EXPONENTIAL, RandomDistribution::POISSON}) {
+    for (const RandomDistribution distribution : {RandomDistribution::UNIFORM,
+                                                  RandomDistribution::GAUSSIAN,
+                                                  RandomDistribution::EXPONENTIAL,
+                                                  RandomDistribution::POISSON}) {
         if (text == GetRandomDistributionName(distribution)) {
             return distribution;
         }

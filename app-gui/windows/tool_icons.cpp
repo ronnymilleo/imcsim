@@ -37,17 +37,29 @@ struct IconPlacement {
 };
 
 void DrawSelectIcon(const IconPlacement &icon) {
-    const std::array<ImVec2, 7> arrow = {icon.Point(-0.3f, -0.45f), icon.Point(-0.3f, 0.3f),  icon.Point(-0.12f, 0.13f),
-                                         icon.Point(0.02f, 0.43f),  icon.Point(0.14f, 0.37f), icon.Point(0.0f, 0.08f),
+    const std::array<ImVec2, 7> arrow = {icon.Point(-0.3f, -0.45f),
+                                         icon.Point(-0.3f, 0.3f),
+                                         icon.Point(-0.12f, 0.13f),
+                                         icon.Point(0.02f, 0.43f),
+                                         icon.Point(0.14f, 0.37f),
+                                         icon.Point(0.0f, 0.08f),
                                          icon.Point(0.22f, 0.08f)};
-    icon.DrawList->AddPolyline(arrow.data(), static_cast<int>(arrow.size()), icon.Color, ImDrawFlags_Closed,
+    icon.DrawList->AddPolyline(arrow.data(),
+                               static_cast<int>(arrow.size()),
+                               icon.Color,
+                               ImDrawFlags_Closed,
                                LINE_THICKNESS);
 }
 
 void DrawWireIcon(const IconPlacement &icon) {
-    const std::array<ImVec2, 4> wire = {icon.Point(-0.4f, 0.3f), icon.Point(0.0f, 0.3f), icon.Point(0.0f, -0.3f),
+    const std::array<ImVec2, 4> wire = {icon.Point(-0.4f, 0.3f),
+                                        icon.Point(0.0f, 0.3f),
+                                        icon.Point(0.0f, -0.3f),
                                         icon.Point(0.4f, -0.3f)};
-    icon.DrawList->AddPolyline(wire.data(), static_cast<int>(wire.size()), icon.Color, ImDrawFlags_None,
+    icon.DrawList->AddPolyline(wire.data(),
+                               static_cast<int>(wire.size()),
+                               icon.Color,
+                               ImDrawFlags_None,
                                LINE_THICKNESS);
     icon.DrawList->AddCircleFilled(wire.front(), icon.Size * 0.08f, icon.Color);
     icon.DrawList->AddCircleFilled(wire.back(), icon.Size * 0.08f, icon.Color);
@@ -69,9 +81,13 @@ void DrawFitIcon(const IconPlacement &icon) {
         for (const float y : {-CORNER, CORNER}) {
             const float inward_x = x < 0.0f ? ARM : -ARM;
             const float inward_y = y < 0.0f ? ARM : -ARM;
-            const std::array<ImVec2, 3> corner = {icon.Point(x + inward_x, y), icon.Point(x, y),
+            const std::array<ImVec2, 3> corner = {icon.Point(x + inward_x, y),
+                                                  icon.Point(x, y),
                                                   icon.Point(x, y + inward_y)};
-            icon.DrawList->AddPolyline(corner.data(), static_cast<int>(corner.size()), icon.Color, ImDrawFlags_None,
+            icon.DrawList->AddPolyline(corner.data(),
+                                       static_cast<int>(corner.size()),
+                                       icon.Color,
+                                       ImDrawFlags_None,
                                        LINE_THICKNESS);
         }
     }
@@ -91,7 +107,8 @@ void DrawUndoIcon(const IconPlacement &icon) {
     icon.DrawList->PathStroke(icon.Color, ImDrawFlags_None, LINE_THICKNESS);
     icon.DrawList->AddTriangleFilled(icon.Point(middle.x - radius, middle.y + 0.22f),
                                      icon.Point(middle.x - radius - 0.14f, middle.y - 0.02f),
-                                     icon.Point(middle.x - radius + 0.14f, middle.y - 0.02f), icon.Color);
+                                     icon.Point(middle.x - radius + 0.14f, middle.y - 0.02f),
+                                     icon.Color);
 }
 
 } // namespace
@@ -137,7 +154,10 @@ ImVec2 GetItemCenter() {
  * @param[in] size       Side of its unit square, in pixels.
  * @param[in] color      Color of its lines.
  */
-void DrawToolIcon(ImDrawList *draw_list, const ToolIcon icon, const ImVec2 center, const float size,
+void DrawToolIcon(ImDrawList *draw_list,
+                  const ToolIcon icon,
+                  const ImVec2 center,
+                  const float size,
                   const ImU32 color) {
     const IconPlacement placement{.DrawList = draw_list,
                                   .Center = center,
@@ -146,8 +166,10 @@ void DrawToolIcon(ImDrawList *draw_list, const ToolIcon icon, const ImVec2 cente
                                   .Flip = icon == ToolIcon::REDO ? -1.0f : 1.0f};
     switch (icon) {
     case ToolIcon::RUN:
-        draw_list->AddTriangleFilled(placement.Point(-0.25f, -0.35f), placement.Point(0.35f, 0.0f),
-                                     placement.Point(-0.25f, 0.35f), color);
+        draw_list->AddTriangleFilled(placement.Point(-0.25f, -0.35f),
+                                     placement.Point(0.35f, 0.0f),
+                                     placement.Point(-0.25f, 0.35f),
+                                     color);
         break;
     case ToolIcon::STOP:
         draw_list->AddRectFilled(placement.Point(-0.28f, -0.28f), placement.Point(0.28f, 0.28f), color);
@@ -181,7 +203,10 @@ void DrawToolIcon(ImDrawList *draw_list, const ToolIcon icon, const ImVec2 cente
  * @param[in] size       Side of the square the symbol fits in, in pixels.
  * @param[in] style      The symbol standard the schematic uses.
  */
-void DrawPartIcon(ImDrawList *draw_list, const Core::ComponentType type, const ImVec2 center, const float size,
+void DrawPartIcon(ImDrawList *draw_list,
+                  const Core::ComponentType type,
+                  const ImVec2 center,
+                  const float size,
                   const SymbolStyle style) {
     DrawListCanvas canvas(draw_list);
     CreateElement(type, {0, 0}, Rotation::R0)->DrawIcon(canvas, center, size, GetIconColor(true), style);
@@ -196,7 +221,9 @@ void DrawPartIcon(ImDrawList *draw_list, const Core::ComponentType type, const I
  * @return  True on the frame the row is clicked.
  * @note    Push an ID first when the list holds the same part twice.
  */
-bool SelectablePartRow(const Core::ComponentType type, const bool is_selected, const float width,
+bool SelectablePartRow(const Core::ComponentType type,
+                       const bool is_selected,
+                       const float width,
                        const SymbolStyle style) {
     const float row_height = GetToolButtonSide();
     const ImVec2 start = ImGui::GetCursorScreenPos();
@@ -206,7 +233,8 @@ bool SelectablePartRow(const Core::ComponentType type, const bool is_selected, c
     ImDrawList *draw_list = ImGui::GetWindowDrawList();
     DrawPartIcon(draw_list, type, start + ImVec2(row_height, row_height) / 2.0f, row_height * ICON_SCALE, style);
     const float text_y = (row_height - ImGui::GetTextLineHeight()) / 2.0f;
-    draw_list->AddText(start + ImVec2(row_height + ImGui::GetStyle().ItemSpacing.x, text_y), GetIconColor(true),
+    draw_list->AddText(start + ImVec2(row_height + ImGui::GetStyle().ItemSpacing.x, text_y),
+                       GetIconColor(true),
                        GetPartName(type));
     return clicked;
 }

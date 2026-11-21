@@ -30,7 +30,9 @@ std::vector<double> MakeLinearSweep(const double start_frequency, const double s
     return frequencies;
 }
 
-std::vector<double> MakeLogarithmicSweep(const double base, const double start_frequency, const double stop_frequency,
+std::vector<double> MakeLogarithmicSweep(const double base,
+                                         const double start_frequency,
+                                         const double stop_frequency,
                                          const int points_per_step) {
     std::vector<double> frequencies;
     for (int index = 0;; ++index) {
@@ -50,6 +52,18 @@ std::vector<double> MakeLogarithmicSweep(const double base, const double start_f
 } // namespace
 
 /**
+ * @brief   Tells whether a frequency range and its point count can make a sweep.
+ * @param[in] start_frequency  First frequency in hertz.
+ * @param[in] stop_frequency   Last frequency in hertz.
+ * @param[in] points           Points per decade or octave, or in all of a linear sweep.
+ * @return  False when the start is not above 0, the stop is below the start or there is no point; a value that is
+ *          not a number passes, as the comparisons that refuse a range say nothing about it.
+ */
+bool IsValidSweepRange(const double start_frequency, const double stop_frequency, const int points) {
+    return !(start_frequency <= 0.0 || stop_frequency < start_frequency || points <= 0);
+}
+
+/**
  * @brief   Lists the frequencies of a sweep, from the start up to the stop.
  * @details A logarithmic sweep multiplies the frequency by a fixed ratio and ends at the last point not above the
  *          stop, which is included only when the grid reaches it; a linear one spaces the points evenly and always
@@ -62,8 +76,10 @@ std::vector<double> MakeLogarithmicSweep(const double base, const double start_f
  * @return  The frequencies in ascending order.
  * @note    The caller checks the range and the point count, each analysis in its own words.
  */
-std::vector<double> MakeFrequencySweep(const FrequencySweepType sweep_type, const double start_frequency,
-                                       const double stop_frequency, const int points) {
+std::vector<double> MakeFrequencySweep(const FrequencySweepType sweep_type,
+                                       const double start_frequency,
+                                       const double stop_frequency,
+                                       const int points) {
     switch (sweep_type) {
     case FrequencySweepType::LINEAR:
         return MakeLinearSweep(start_frequency, stop_frequency, points);

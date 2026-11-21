@@ -69,18 +69,28 @@ std::string EscapeXml(const std::string_view text) {
  * @param[in] background    Color that fills the whole area under the elements; none leaves it transparent.
  * @return  The SVG document.
  */
-std::string SvgWriter::Finish(const SvgPoint corner, const double width, const double height,
+std::string SvgWriter::Finish(const SvgPoint corner,
+                              const double width,
+                              const double height,
                               const std::optional<ExportColor> background) const {
     std::string document =
         std::format("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
                     "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{}\" height=\"{}\" viewBox=\"{} {} {} {}\" "
                     "font-family=\"{}\">\n",
-                    FormatCoordinate(width), FormatCoordinate(height), FormatCoordinate(corner.X),
-                    FormatCoordinate(corner.Y), FormatCoordinate(width), FormatCoordinate(height), FONT_FAMILY);
+                    FormatCoordinate(width),
+                    FormatCoordinate(height),
+                    FormatCoordinate(corner.X),
+                    FormatCoordinate(corner.Y),
+                    FormatCoordinate(width),
+                    FormatCoordinate(height),
+                    FONT_FAMILY);
     if (background) {
         document += std::format("<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" fill=\"{}\"/>\n",
-                                FormatCoordinate(corner.X), FormatCoordinate(corner.Y), FormatCoordinate(width),
-                                FormatCoordinate(height), FormatColor(*background));
+                                FormatCoordinate(corner.X),
+                                FormatCoordinate(corner.Y),
+                                FormatCoordinate(width),
+                                FormatCoordinate(height),
+                                FormatColor(*background));
     }
     return document + m_Body + "</svg>\n";
 }
@@ -93,11 +103,18 @@ std::string SvgWriter::Finish(const SvgPoint corner, const double width, const d
  * @param[in] fill      Fill color.
  * @param[in] opacity   Fill opacity, from 0 to 1.
  */
-void SvgWriter::Rectangle(const SvgPoint corner, const double width, const double height, const ExportColor fill,
+void SvgWriter::Rectangle(const SvgPoint corner,
+                          const double width,
+                          const double height,
+                          const ExportColor fill,
                           const double opacity) {
     m_Body += std::format("<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" fill=\"{}\"{}/>\n",
-                          FormatCoordinate(corner.X), FormatCoordinate(corner.Y), FormatCoordinate(width),
-                          FormatCoordinate(height), FormatColor(fill), FormatOpacity("fill-opacity", opacity));
+                          FormatCoordinate(corner.X),
+                          FormatCoordinate(corner.Y),
+                          FormatCoordinate(width),
+                          FormatCoordinate(height),
+                          FormatColor(fill),
+                          FormatOpacity("fill-opacity", opacity));
 }
 
 /**
@@ -108,11 +125,18 @@ void SvgWriter::Rectangle(const SvgPoint corner, const double width, const doubl
  * @param[in] width     Stroke width in pixels.
  * @param[in] opacity   Stroke opacity, from 0 to 1.
  */
-void SvgWriter::Line(const SvgPoint start, const SvgPoint end, const ExportColor color, const double width,
+void SvgWriter::Line(const SvgPoint start,
+                     const SvgPoint end,
+                     const ExportColor color,
+                     const double width,
                      const double opacity) {
     m_Body += std::format("<line x1=\"{}\" y1=\"{}\" x2=\"{}\" y2=\"{}\" stroke=\"{}\" stroke-width=\"{}\"{}/>\n",
-                          FormatCoordinate(start.X), FormatCoordinate(start.Y), FormatCoordinate(end.X),
-                          FormatCoordinate(end.Y), FormatColor(color), FormatCoordinate(width),
+                          FormatCoordinate(start.X),
+                          FormatCoordinate(start.Y),
+                          FormatCoordinate(end.X),
+                          FormatCoordinate(end.Y),
+                          FormatColor(color),
+                          FormatCoordinate(width),
                           FormatOpacity("stroke-opacity", opacity));
 }
 
@@ -124,11 +148,16 @@ void SvgWriter::Line(const SvgPoint start, const SvgPoint end, const ExportColor
  * @param[in] dash_pattern  SVG dash lengths such as "8 5"; empty for a solid line.
  * @param[in] closed        Joins the last point back to the first.
  */
-void SvgWriter::Polyline(const std::vector<SvgPoint> &points, const ExportColor color, const double width,
-                         const std::string &dash_pattern, const bool closed) {
+void SvgWriter::Polyline(const std::vector<SvgPoint> &points,
+                         const ExportColor color,
+                         const double width,
+                         const std::string &dash_pattern,
+                         const bool closed) {
     m_Body += std::format("<{} fill=\"none\" stroke=\"{}\" stroke-width=\"{}\" stroke-linejoin=\"round\" "
                           "stroke-linecap=\"round\"",
-                          closed ? "polygon" : "polyline", FormatColor(color), FormatCoordinate(width));
+                          closed ? "polygon" : "polyline",
+                          FormatColor(color),
+                          FormatCoordinate(width));
     if (!dash_pattern.empty()) {
         m_Body += std::format(" stroke-dasharray=\"{}\"", dash_pattern);
     }
@@ -153,8 +182,11 @@ void SvgWriter::Polygon(const std::vector<SvgPoint> &points, const ExportColor f
  */
 void SvgWriter::Circle(const SvgPoint center, const double radius, const ExportColor color, const double width) {
     m_Body += std::format("<circle cx=\"{}\" cy=\"{}\" r=\"{}\" fill=\"none\" stroke=\"{}\" stroke-width=\"{}\"/>\n",
-                          FormatCoordinate(center.X), FormatCoordinate(center.Y), FormatCoordinate(radius),
-                          FormatColor(color), FormatCoordinate(width));
+                          FormatCoordinate(center.X),
+                          FormatCoordinate(center.Y),
+                          FormatCoordinate(radius),
+                          FormatColor(color),
+                          FormatCoordinate(width));
 }
 
 /**
@@ -164,8 +196,11 @@ void SvgWriter::Circle(const SvgPoint center, const double radius, const ExportC
  * @param[in] fill      Fill color.
  */
 void SvgWriter::FilledCircle(const SvgPoint center, const double radius, const ExportColor fill) {
-    m_Body += std::format("<circle cx=\"{}\" cy=\"{}\" r=\"{}\" fill=\"{}\"/>\n", FormatCoordinate(center.X),
-                          FormatCoordinate(center.Y), FormatCoordinate(radius), FormatColor(fill));
+    m_Body += std::format("<circle cx=\"{}\" cy=\"{}\" r=\"{}\" fill=\"{}\"/>\n",
+                          FormatCoordinate(center.X),
+                          FormatCoordinate(center.Y),
+                          FormatCoordinate(radius),
+                          FormatColor(fill));
 }
 
 /**
@@ -177,12 +212,19 @@ void SvgWriter::FilledCircle(const SvgPoint center, const double radius, const E
  * @param[in] anchor    Whether the point is the start, the middle or the end of the text.
  * @param[in] vertical  Turns the text a quarter turn counter-clockwise, to read bottom to top.
  */
-void SvgWriter::Text(const SvgPoint baseline, const std::string_view text, const double font_size,
-                     const ExportColor color, const TextAnchor anchor, const bool vertical) {
+void SvgWriter::Text(const SvgPoint baseline,
+                     const std::string_view text,
+                     const double font_size,
+                     const ExportColor color,
+                     const TextAnchor anchor,
+                     const bool vertical) {
     const char *anchor_name = anchor == TextAnchor::START ? "start" : anchor == TextAnchor::MIDDLE ? "middle" : "end";
     m_Body += std::format("<text x=\"{}\" y=\"{}\" font-size=\"{}\" fill=\"{}\" text-anchor=\"{}\"",
-                          FormatCoordinate(baseline.X), FormatCoordinate(baseline.Y), FormatCoordinate(font_size),
-                          FormatColor(color), anchor_name);
+                          FormatCoordinate(baseline.X),
+                          FormatCoordinate(baseline.Y),
+                          FormatCoordinate(font_size),
+                          FormatColor(color),
+                          anchor_name);
     if (vertical) {
         m_Body +=
             std::format(" transform=\"rotate(-90 {} {})\"", FormatCoordinate(baseline.X), FormatCoordinate(baseline.Y));
@@ -200,8 +242,12 @@ void SvgWriter::BeginClip(const SvgPoint corner, const double width, const doubl
     const std::string id = std::format("clip{}", m_NextClip++);
     m_Body += std::format("<clipPath id=\"{}\"><rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\"/></clipPath>\n"
                           "<g clip-path=\"url(#{})\">\n",
-                          id, FormatCoordinate(corner.X), FormatCoordinate(corner.Y), FormatCoordinate(width),
-                          FormatCoordinate(height), id);
+                          id,
+                          FormatCoordinate(corner.X),
+                          FormatCoordinate(corner.Y),
+                          FormatCoordinate(width),
+                          FormatCoordinate(height),
+                          id);
 }
 
 /**

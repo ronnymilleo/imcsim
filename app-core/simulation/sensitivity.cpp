@@ -7,8 +7,8 @@
 
 #include "circuit/components/controlled_source.h"
 #include "circuit/components/source.h"
+#include "spice/spice_text.h"
 #include <algorithm>
-#include <cctype>
 #include <cmath>
 #include <format>
 #include <optional>
@@ -24,16 +24,6 @@ namespace {
 constexpr std::string_view SCALE_SUFFIX = "_scale";
 /// Vector of the change of a controlled source per unit of its gain.
 constexpr std::string_view GAIN_SUFFIX = "_gain";
-
-std::string ToLower(std::string text) {
-    std::ranges::transform(text, text.begin(), [](const unsigned char character) { return std::tolower(character); });
-    return text;
-}
-
-std::string ToUpper(std::string text) {
-    std::ranges::transform(text, text.begin(), [](const unsigned char character) { return std::toupper(character); });
-    return text;
-}
 
 std::optional<double> Find(const SensitivityVectors &vectors, const std::string &name) {
     const auto found = vectors.find(name);
@@ -155,16 +145,16 @@ bool IsPlacedInside(const std::vector<std::string> &segments) {
     return segments.size() >= 2 && std::ranges::none_of(segments, has_dash);
 }
 
-std::optional<InnerElement> ReadInnerElement(const std::string &vector_name, const std::string &instance,
-                                             const SensitivityVectors &vectors) {
+std::optional<InnerElement>
+ReadInnerElement(const std::string &vector_name, const std::string &instance, const SensitivityVectors &vectors) {
     if (vector_name.ends_with(SCALE_SUFFIX) || vector_name.ends_with(GAIN_SUFFIX)) {
         return std::nullopt;
     }
     std::size_t prefix_length = 0;
     char type_letter = '\0';
     // ngspice prefixes subcircuit element vectors with "<type>." (e.g. "r.x1.r1"); Nodalys uses "<instance>.<part>"
-    if (vector_name.size() > 2 && vector_name[1] == '.' &&
-        std::string_view("rcl").find(vector_name[0]) != std::string_view::npos) {
+    if (vector_name.size() > 2 && vector_name[1] == '.'
+        && std::string_view("rcl").find(vector_name[0]) != std::string_view::npos) {
         prefix_length = 2;
         type_letter = vector_name[0];
     }
@@ -174,15 +164,17 @@ std::optional<InnerElement> ReadInnerElement(const std::string &vector_name, con
         return std::nullopt;
     }
     if (type_letter == '\0') {
-        if (segments.back().empty() ||
-            std::string_view("rcl").find(segments.back().front()) == std::string_view::npos) {
+        if (segments.back().empty()
+            || std::string_view("rcl").find(segments.back().front()) == std::string_view::npos) {
             return std::nullopt;
         }
         type_letter = segments.back().front();
     }
     const std::string path = ToUpper(vector_name.substr(prefix_length + instance.size() + 1));
-    return InnerElement{
-        .Path = path, .Unit = InnerUnit(type_letter), .Absolute = vectors.at(vector_name), .Normalized = *scale};
+    return InnerElement{.Path = path,
+                        .Unit = InnerUnit(type_letter),
+                        .Absolute = vectors.at(vector_name),
+                        .Normalized = *scale};
 }
 
 /**
@@ -197,9 +189,9 @@ std::optional<PartSensitivity> MakeBlockPart(const Component &part, const Sensit
         if (!element) {
             continue;
         }
-        const bool is_better = !largest || std::abs(element->Normalized) > std::abs(largest->Normalized) ||
-                               (std::abs(element->Normalized) == std::abs(largest->Normalized) &&
-                                element->Unit == "Ohm" && largest->Unit != "Ohm");
+        const bool is_better = !largest || std::abs(element->Normalized) > std::abs(largest->Normalized)
+                            || (std::abs(element->Normalized) == std::abs(largest->Normalized) && element->Unit == "Ohm"
+                                && largest->Unit != "Ohm");
         if (is_better) {
             largest = element;
         }
@@ -245,9 +237,9 @@ std::optional<PartSensitivity> MakePartSensitivity(const Component &part, const 
  *          elements, so they are not in this set.
  */
 bool HasSensitivity(const ComponentType type) {
-    return type == ComponentType::RESISTOR || type == ComponentType::CAPACITOR || type == ComponentType::INDUCTOR ||
-           type == ComponentType::VOLTAGE_SOURCE || type == ComponentType::VCC ||
-           type == ComponentType::CURRENT_SOURCE || IsControlledSource(type);
+    return type == ComponentType::RESISTOR || type == ComponentType::CAPACITOR || type == ComponentType::INDUCTOR
+        || type == ComponentType::VOLTAGE_SOURCE || type == ComponentType::VCC || type == ComponentType::CURRENT_SOURCE
+        || IsControlledSource(type);
 }
 
 /**

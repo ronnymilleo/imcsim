@@ -5,6 +5,7 @@
 
 #include "analyses/analyses.h"
 
+#include "analyses/analysis_preamble.h"
 #include "analyses/pz_checks.h"
 #include "devices/devices.h"
 #include "linear/qz.h"
@@ -21,35 +22,29 @@ namespace {
 
 /**
  * @brief   Builds the system G x + C dx/dt = B u, y = L x of the circuit linearized at an operating point.
- * @param[in] compiled  Compiled circuit, whose matrix holds the Jacobian of the operating point just solved.
- * @param[in] x_dc      The operating point.
+ * @param[in] compiled     Compiled circuit, whose matrix holds the Jacobian of the operating point just solved.
+ * @param[in] x_dc         The operating point.
  * @param[in] output_node  Node whose voltage is the output.
- * @param[in] voltage_source  The input when it is a voltage source, or null.
- * @param[in] current_source  The input when it is a current source, or null.
+ * @param[in] input        The source that is the input.
+ * @return  The linearized system.
  */
-SmallSignalSystem BuildSmallSignalSystem(CompiledCircuit &compiled, const std::vector<double> &x_dc,
-                                         const int output_node, const VoltageSourceDevice *voltage_source,
-                                         const CurrentSourceDevice *current_source) {
+SmallSignalSystem BuildSmallSignalSystem(CompiledCircuit &compiled,
+                                         const std::vector<double> &x_dc,
+                                         const int output_node,
+                                         const InputSource &input) {
     const int size = compiled.System->GetSize();
-    std::vector<bool> node_flags(static_cast<std::size_t>(size), false);
-    for (int i = 0; i < size; ++i) {
-        node_flags[static_cast<std::size_t>(i)] = compiled.System->IsNodeUnknown(i);
-    }
-    MnaSystem reactive(std::move(node_flags));
-    for (const std::unique_ptr<Device> &device : compiled.Devices) {
-        device->StampAc(reactive, x_dc);
-    }
+    const MnaSystem reactive = BuildReactiveSystem(compiled, x_dc);
 
     SmallSignalSystem system{.Conductance = compiled.System->Matrix(),
                              .Reactive = reactive.Matrix(),
                              .Input = std::vector<double>(static_cast<std::size_t>(size), 0.0),
                              .Output = std::vector<double>(static_cast<std::size_t>(size), 0.0)};
-    if (voltage_source != nullptr) {
-        system.Input[static_cast<std::size_t>(voltage_source->GetBranch())] = 1.0;
+    if (input.IsVoltage()) {
+        system.Input[static_cast<std::size_t>(input.Voltage->GetBranch())] = 1.0;
     } else {
         system.IsCurrentInput = true;
-        system.PortPositive = current_source->GetNodeA();
-        system.PortNegative = current_source->GetNodeB();
+        system.PortPositive = input.Current->GetNodeA();
+        system.PortNegative = input.Current->GetNodeB();
         if (system.PortPositive >= 0) {
             system.Input[static_cast<std::size_t>(system.PortPositive)] = -1.0;
         }
@@ -64,7 +59,9 @@ SmallSignalSystem BuildSmallSignalSystem(CompiledCircuit &compiled, const std::v
     return system;
 }
 
-/// The poles: the finite generalized eigenvalues of (G, -C), where det(G + sC) = 0.
+/**
+ * @brief   The poles: the finite generalized eigenvalues of (G, -C), where det(G + sC) = 0.
+ */
 std::vector<std::complex<double>> FindPoles(const SmallSignalSystem &system) {
     const std::size_t size = system.Input.size();
     DenseMatrix negative_reactive(size, size);
@@ -111,35 +108,31 @@ std::vector<std::complex<double>> FindZeros(const SmallSignalSystem &system) {
  * @param[in,out] messages  Optional list receiving diagnostic lines.
  * @return  Result containing the complex poles and zeros in rad/s, or an error description.
  */
-std::expected<PoleZeroResult, std::string> ComputePoleZero(CompiledCircuit &compiled, const PoleZeroConfig &settings,
+std::expected<PoleZeroResult, std::string> ComputePoleZero(CompiledCircuit &compiled,
+                                                           const PoleZeroConfig &settings,
                                                            const ConvergenceOptions &options,
                                                            std::vector<DiagnosticMessage> *messages) {
 
     const int out_node = settings.OutputNode;
-    if (out_node <= 0 || out_node >= compiled.CircuitNodeCount) {
-        return std::unexpected(std::format("The circuit has no output node {}", out_node));
+    if (const std::optional<std::string> refusal = CheckOutputNode(compiled, out_node)) {
+        return std::unexpected(*refusal);
+    }
+    const std::expected<InputSource, std::string> input =
+        ResolveInputSource(compiled, settings.InputSource, "a pole-zero analysis");
+    if (!input) {
+        return std::unexpected(input.error());
     }
 
-    const auto source_it = compiled.SourcesByName.find(settings.InputSource);
-    if (source_it == compiled.SourcesByName.end()) {
-        return std::unexpected(std::format("The circuit has no source named {}", settings.InputSource));
+    const std::expected<std::vector<double>, std::string> x_dc =
+        SolveOperatingPoint(compiled,
+                            options,
+                            "Nodalys found no operating point to linearize the pole-zero analysis around",
+                            messages);
+    if (!x_dc) {
+        return std::unexpected(x_dc.error());
     }
 
-    const auto *voltage_source = dynamic_cast<VoltageSourceDevice *>(source_it->second);
-    const auto *current_source = dynamic_cast<CurrentSourceDevice *>(source_it->second);
-    if (voltage_source == nullptr && current_source == nullptr) {
-        return std::unexpected(std::format("The source {} cannot drive a pole-zero analysis", settings.InputSource));
-    }
-
-    std::vector<double> x_dc(static_cast<std::size_t>(compiled.System->GetSize()), 0.0);
-    const NewtonOutcome outcome = SolveNewton(*compiled.System, compiled.Devices, x_dc, TimeContext{}, options);
-    if (!outcome.Converged) {
-        return std::unexpected(
-            DescribeFailure("Nodalys found no operating point to linearize the pole-zero analysis around", outcome));
-    }
-    DescribeOutcome(outcome, "operating point", messages);
-
-    const SmallSignalSystem system = BuildSmallSignalSystem(compiled, x_dc, out_node, voltage_source, current_source);
+    const SmallSignalSystem system = BuildSmallSignalSystem(compiled, *x_dc, out_node, *input);
 
     PoleZeroResult result;
     if (settings.FindPoles) {

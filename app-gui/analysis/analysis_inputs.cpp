@@ -1,12 +1,15 @@
 /**
  * @file    analysis_inputs.cpp
- * @brief   What an analysis takes from the circuit and the stored settings: the sources, nodes and inputs it runs with.
+ * @brief   What an analysis takes from the circuit and the stored settings: the sources, nodes and inputs it runs with,
+ *          and what to say when the circuit lacks one.
  */
 
 #include "analysis/analysis_inputs.h"
 
+#include "schematic/probing.h"
 #include "simulation/analysis_sources.h"
 #include <algorithm>
+#include <format>
 
 namespace GUI {
 
@@ -28,9 +31,9 @@ std::vector<int> ListHeldNodes(const Core::Circuit &circuit) {
     std::vector<int> nodes;
     for (const Core::CircuitEntry &entry : circuit.GetEntries()) {
         const Core::ComponentType type = entry.Part->GetType();
-        if (type == Core::ComponentType::VCC || type == Core::ComponentType::LOGIC_INPUT ||
-            type == Core::ComponentType::CLOCK ||
-            (type == Core::ComponentType::VOLTAGE_SOURCE && entry.Nodes[1] == 0)) {
+        if (type == Core::ComponentType::VCC || type == Core::ComponentType::LOGIC_INPUT
+            || type == Core::ComponentType::CLOCK
+            || (type == Core::ComponentType::VOLTAGE_SOURCE && entry.Nodes[1] == 0)) {
             nodes.push_back(entry.Nodes[0]);
         } else if (type == Core::ComponentType::VOLTAGE_SOURCE && entry.Nodes[0] == 0) {
             nodes.push_back(entry.Nodes[1]);
@@ -66,7 +69,8 @@ std::vector<SweepSource> ListSweepSources(const Core::Circuit &circuit) {
  * @return  The stored name when the circuit still offers it, else the preferred source or the last one if there are
  *          fewer. The stored name is kept in the settings, so the choice comes back with its source.
  */
-const std::string &ResolveSweepSource(const Core::SweepRange &range, const std::vector<SweepSource> &sources,
+const std::string &ResolveSweepSource(const Core::SweepRange &range,
+                                      const std::vector<SweepSource> &sources,
                                       const std::size_t preferred_index) {
     if (std::ranges::contains(sources, range.Source, &SweepSource::Name)) {
         return range.Source;
@@ -94,8 +98,8 @@ std::string ResolveOptionalInput(const std::string &stored, const std::vector<st
  *          most likely the output the user looks at; else the last node that none holds. No value when the circuit
  *          has no node besides ground.
  */
-std::optional<int> ResolveOutputNode(const std::optional<GridPoint> &point, const Core::Circuit &circuit,
-                                     Schematic &schematic) {
+std::optional<int>
+ResolveOutputNode(const std::optional<GridPoint> &point, const Core::Circuit &circuit, Schematic &schematic) {
     if (point) {
         if (const std::optional<int> node = schematic.GetConnectivity().GetNode(*point); node && *node > 0) {
             return node;
@@ -103,7 +107,7 @@ std::optional<int> ResolveOutputNode(const std::optional<GridPoint> &point, cons
     }
     const std::vector<int> held = ListHeldNodes(circuit);
     for (int node = 1; node < circuit.GetNodeCount(); ++node) {
-        if (schematic.IsVoltageMeasured(node) && !std::ranges::contains(held, node)) {
+        if (schematic.GetMeasurements().IsVoltageMeasured(node) && !std::ranges::contains(held, node)) {
             return node;
         }
     }
@@ -124,11 +128,26 @@ std::optional<int> ResolveOutputNode(const std::optional<GridPoint> &point, cons
 std::vector<int> ListMeasuredNodes(const Core::Circuit &circuit, const Schematic &schematic) {
     std::vector<int> nodes;
     for (int node = 1; node < circuit.GetNodeCount(); ++node) {
-        if (schematic.IsVoltageMeasured(node)) {
+        if (schematic.GetMeasurements().IsVoltageMeasured(node)) {
             nodes.push_back(node);
         }
     }
     return nodes;
+}
+
+/**
+ * @brief   Names the nodes a truth table reads, as the plots label them.
+ * @param[in] connectivity  Connectivity whose net labels name the nodes.
+ * @param[in] nodes         Nodes to name, such as those ListMeasuredNodes() finds.
+ * @return  The labels joined by commas, such as "V(out), V(2)"; empty when there are no nodes.
+ */
+std::string FormatMeasuredNodeLabels(const Connectivity &connectivity, const std::vector<int> &nodes) {
+    std::string labels;
+    for (const int node : nodes) {
+        labels += labels.empty() ? "" : ", ";
+        labels += GetVoltageLabel(connectivity, node);
+    }
+    return labels;
 }
 
 /**
@@ -149,6 +168,31 @@ std::vector<std::string> ResolveTruthTableInputs(const std::vector<std::string> 
 }
 
 /**
+ * @brief   Turns one logic input of a truth table on or off.
+ * @param[in] available  Logic inputs the circuit has, in circuit order.
+ * @param[in] chosen     Inputs varied now, as ResolveTruthTableInputs() picks them.
+ * @param[in] name       Input the user turned on or off.
+ * @param[in] is_on      Whether it is now varied.
+ * @return  The inputs to store, in circuit order; no value when it would leave none, since a table of no inputs has no
+ *          rows to show.
+ */
+std::optional<std::vector<std::string>> ToggleTruthTableInput(const std::vector<std::string> &available,
+                                                              const std::vector<std::string> &chosen,
+                                                              const std::string &name,
+                                                              const bool is_on) {
+    std::vector<std::string> changed;
+    for (const std::string &candidate : available) {
+        if (candidate == name ? is_on : std::ranges::contains(chosen, candidate)) {
+            changed.push_back(candidate);
+        }
+    }
+    if (changed.empty()) {
+        return std::nullopt;
+    }
+    return changed;
+}
+
+/**
  * @brief   Names the unit of the values a stepped analysis gives a parameter.
  * @param[in] circuit  Circuit with the part.
  * @param[in] part     Name of the stepped part, or empty for the temperature.
@@ -165,6 +209,86 @@ std::string GetParameterUnit(const Core::Circuit &circuit, const std::string &pa
         }
     }
     return "";
+}
+
+/**
+ * @brief   Tells the user an analysis has no node to measure, as in a circuit without connected parts.
+ * @param[in] analysis  The analysis as the subject of the sentence, such as "the noise".
+ * @return  The message, such as "Connect some parts: the noise needs a node to measure".
+ */
+std::string DescribeMissingOutputNode(const std::string_view analysis) {
+    return std::format("Connect some parts: {} needs a node to measure", analysis);
+}
+
+/**
+ * @brief   Tells the user an analysis driven through an AC source has none.
+ * @param[in] analysis  The analysis as the subject of the sentence, such as "A noise analysis".
+ * @return  The message, which says how to make a source AC.
+ */
+std::string DescribeMissingACInput(const std::string_view analysis) {
+    return std::format("{} needs an AC source as its input; select a voltage or current source and set it to AC",
+                       analysis);
+}
+
+/**
+ * @brief   Tells the user an analysis measured from an input source has none.
+ * @param[in] analysis  The analysis as the subject of the sentence, such as "A pole-zero analysis".
+ * @return  The message, which lists the sources that can be the input.
+ */
+std::string DescribeMissingInputSource(const std::string_view analysis) {
+    return std::format("{} needs an input source; add {}", analysis, Core::SWEEPABLE_SOURCES);
+}
+
+/**
+ * @brief   Picks the AC source that a noise or AC sensitivity analysis runs with.
+ * @param[in] circuit   Circuit to analyze.
+ * @param[in] stored    Source the settings name, which may be empty or gone.
+ * @param[in] analysis  The analysis as the subject of the sentence, such as "A noise analysis".
+ * @return  The stored source, or the first AC source when it is not one; the refusal when the circuit has none.
+ */
+std::expected<std::string, std::string>
+ResolveAcInput(const Core::Circuit &circuit, const std::string &stored, const std::string_view analysis) {
+    const std::vector<std::string> sources = Core::GetNoiseInputSources(circuit);
+    if (sources.empty()) {
+        return std::unexpected(DescribeMissingACInput(analysis));
+    }
+    return ResolveOptionalInput(stored, sources);
+}
+
+/**
+ * @brief   Picks the source that a transfer function or pole-zero analysis runs with.
+ * @param[in] circuit   Circuit to analyze.
+ * @param[in] stored    Source the settings name, which may be empty or gone.
+ * @param[in] analysis  The analysis as the subject of the sentence, such as "A pole-zero analysis".
+ * @return  The stored source, or the first one that can be the input when it is not one; the refusal when the circuit
+ *          has none.
+ */
+std::expected<std::string, std::string>
+ResolveSweepableInput(const Core::Circuit &circuit, const std::string &stored, const std::string_view analysis) {
+    const std::vector<std::string> sources = Core::GetTransferFunctionInputSources(circuit);
+    if (sources.empty()) {
+        return std::unexpected(DescribeMissingInputSource(analysis));
+    }
+    return ResolveOptionalInput(stored, sources);
+}
+
+/**
+ * @brief   Picks the node a small-signal analysis measures.
+ * @param[in]     point      Output point the settings keep, if any.
+ * @param[in]     circuit    Circuit to analyze.
+ * @param[in,out] schematic  Schematic whose connectivity maps the point to a node.
+ * @param[in]     subject    The analysis as the subject of the sentence, such as "the noise".
+ * @return  The node, as ResolveOutputNode() picks it; the refusal when the circuit has no node to measure.
+ */
+std::expected<int, std::string> ResolveRequiredOutput(const std::optional<GridPoint> &point,
+                                                      const Core::Circuit &circuit,
+                                                      Schematic &schematic,
+                                                      const std::string_view subject) {
+    const std::optional<int> node = ResolveOutputNode(point, circuit, schematic);
+    if (!node) {
+        return std::unexpected(DescribeMissingOutputNode(subject));
+    }
+    return *node;
 }
 
 } // namespace GUI

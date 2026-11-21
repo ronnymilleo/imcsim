@@ -76,8 +76,8 @@ double GetFourKt(const ThermalConditions &thermal) {
  * @return  Electron-volts, from the Varshni law $E_g = 1.16 - 7.02\cdot10^{-4} T^2 / (T + 1108)$.
  */
 double GetBandGap(const double temperature_kelvin) {
-    return BAND_GAP_AT_ZERO_KELVIN -
-           (BAND_GAP_SLOPE * temperature_kelvin * temperature_kelvin) / (temperature_kelvin + BAND_GAP_OFFSET_KELVIN);
+    return BAND_GAP_AT_ZERO_KELVIN
+         - (BAND_GAP_SLOPE * temperature_kelvin * temperature_kelvin) / (temperature_kelvin + BAND_GAP_OFFSET_KELVIN);
 }
 
 /**
@@ -88,7 +88,8 @@ double GetBandGap(const double temperature_kelvin) {
  * @return  The exponent of the growth factor; a diode or leakage current divides it by its emission coefficient
  *          before taking the exponential, and the factor is exactly 1 at the nominal temperature.
  */
-double GetSaturationCurrentLogRatio(const ThermalConditions &thermal, const double energy_gap,
+double GetSaturationCurrentLogRatio(const ThermalConditions &thermal,
+                                    const double energy_gap,
                                     const double saturation_current_exponent) {
     const double ratio = thermal.TemperatureKelvin / thermal.NominalKelvin;
     return (ratio - 1.0) * energy_gap / GetThermalVoltage(thermal) + saturation_current_exponent * std::log(ratio);
@@ -105,8 +106,8 @@ double GetJunctionPotential(const ThermalConditions &thermal, const double poten
         return potential_at_nominal;
     }
     const double reference_ratio = thermal.TemperatureKelvin / REFERENCE_TEMPERATURE_KELVIN;
-    return reference_ratio * GetReferencePotential(thermal, potential_at_nominal) +
-           GetPotentialShift(thermal.TemperatureKelvin);
+    return reference_ratio * GetReferencePotential(thermal, potential_at_nominal)
+         + GetPotentialShift(thermal.TemperatureKelvin);
 }
 
 /**
@@ -117,23 +118,28 @@ double GetJunctionPotential(const ThermalConditions &thermal, const double poten
  * @param[in] grading_coefficient    Grading coefficient `M` of the junction.
  * @return  Farads; the given capacitance itself at the nominal temperature.
  */
-double GetJunctionCapacitance(const ThermalConditions &thermal, const double capacitance_at_nominal,
-                              const double potential_at_nominal, const double grading_coefficient) {
+double GetJunctionCapacitance(const ThermalConditions &thermal,
+                              const double capacitance_at_nominal,
+                              const double potential_at_nominal,
+                              const double grading_coefficient) {
     if (IsNominal(thermal)) {
         return capacitance_at_nominal;
     }
     const double reference_potential = GetReferencePotential(thermal, potential_at_nominal);
     const double old_ratio = (potential_at_nominal - reference_potential) / reference_potential;
     const double at_reference =
-        capacitance_at_nominal /
-        (1.0 + grading_coefficient *
-                   (CAPACITANCE_TEMPERATURE_COEFFICIENT * (thermal.NominalKelvin - REFERENCE_TEMPERATURE_KELVIN) -
-                    old_ratio));
+        capacitance_at_nominal
+        / (1.0
+           + grading_coefficient
+                 * (CAPACITANCE_TEMPERATURE_COEFFICIENT * (thermal.NominalKelvin - REFERENCE_TEMPERATURE_KELVIN)
+                    - old_ratio));
     const double potential = GetJunctionPotential(thermal, potential_at_nominal);
     const double new_ratio = (potential - reference_potential) / reference_potential;
-    return at_reference * (1.0 + grading_coefficient * (CAPACITANCE_TEMPERATURE_COEFFICIENT *
-                                                            (thermal.TemperatureKelvin - REFERENCE_TEMPERATURE_KELVIN) -
-                                                        new_ratio));
+    return at_reference
+         * (1.0
+            + grading_coefficient
+                  * (CAPACITANCE_TEMPERATURE_COEFFICIENT * (thermal.TemperatureKelvin - REFERENCE_TEMPERATURE_KELVIN)
+                     - new_ratio));
 }
 
 } // namespace Nodalys

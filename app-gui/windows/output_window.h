@@ -66,7 +66,10 @@ namespace GUI {
  */
 class OutputWindow : public AppWindow {
 public:
-    OutputWindow(Schematic &schematic, ResultStore &results, AnalysisControls &controls, TransientPlayback &playback,
+    OutputWindow(Schematic &schematic,
+                 ResultStore &results,
+                 AnalysisControls &controls,
+                 TransientPlayback &playback,
                  Preferences &preferences);
     ~OutputWindow() override = default;
 

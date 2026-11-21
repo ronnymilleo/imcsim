@@ -47,15 +47,18 @@ struct Bench {
  * @brief   Puts a text between the nodes 1 and 2 of a 10 V source, with a resistor to ground on node 2 when asked,
  *          and solves the operating point.
  */
-Bench Solve(const std::string &body, const std::vector<std::string> &ports = {"IN", "OUT"},
-            const std::map<std::string, double> &parameters = {}, const double load_ohms = 0.0) {
+Bench Solve(const std::string &body,
+            const std::vector<std::string> &ports = {"IN", "OUT"},
+            const std::map<std::string, double> &parameters = {},
+            const double load_ohms = 0.0) {
     Bench bench;
     bench.Builder.AddVdc("V1", 1, 0, 10.0);
     if (load_ohms > 0.0) {
         bench.Builder.AddResistor("RLOAD", 2, 0, load_ohms);
     }
     const Nodalys::SubcircuitText text{.Name = "BLOCK", .Ports = ports, .Body = body};
-    const auto added = Nodalys::AddSubcircuitText(bench.Builder, text,
+    const auto added = Nodalys::AddSubcircuitText(bench.Builder,
+                                                  text,
                                                   {.Prefix = "X1", .PortNodes = {1, 2}, .Parameters = parameters});
     if (!added) {
         bench.Failure = added.error();
@@ -241,7 +244,8 @@ TEST_CASE("Controlled and behavioral sources of the text read the nodes and curr
     Nodalys::CircuitBuilder builder(3);
     builder.AddVdc("V1", 1, 0, 10.0);
     const Nodalys::SubcircuitText text{.Name = "SRC", .Ports = {"IN", "OUT"}, .Body = body};
-    REQUIRE(Nodalys::AddSubcircuitText(builder, text,
+    REQUIRE(Nodalys::AddSubcircuitText(builder,
+                                       text,
                                        {.Prefix = "X1", .PortNodes = {1, 2}, .Parameters = {{"GAIN", 0.5}}}));
     auto circuit = builder.Build();
     REQUIRE(circuit.has_value());
@@ -437,8 +441,9 @@ TEST_CASE("A source of the text with any waveform gives the signal of the same s
 
         Nodalys::CircuitBuilder builder{2};
         // Added before the load, as in the netlist: the draws of a noise source follow the index of its device
-        const Nodalys::SubcircuitText text{
-            .Name = "BLOCK", .Ports = {"IN"}, .Body = std::format("{}1 IN 0 {}\n", kind, waveform)};
+        const Nodalys::SubcircuitText text{.Name = "BLOCK",
+                                           .Ports = {"IN"},
+                                           .Body = std::format("{}1 IN 0 {}\n", kind, waveform)};
         REQUIRE(Nodalys::AddSubcircuitText(builder, text, {.Prefix = "X1", .PortNodes = {1}}).has_value());
         builder.AddResistor("RLOAD", 1, 0, LOAD_OHMS);
         auto circuit = builder.Build();
@@ -468,10 +473,13 @@ TEST_CASE("The numbers of a waveform in the text may be expressions of the param
     const Nodalys::TransientConfig config{.StopTime = STOP_TIME, .TimeStep = TIME_STEP};
     Nodalys::CircuitBuilder builder{2};
     builder.AddResistor("RLOAD", 1, 0, 1e3);
-    const Nodalys::SubcircuitText text{
-        .Name = "BLOCK", .Ports = {"IN"}, .Body = "V1 IN 0 PULSE(0 {VHIGH} 0 1n 1n {2 * TON} 100u)\n"};
+    const Nodalys::SubcircuitText text{.Name = "BLOCK",
+                                       .Ports = {"IN"},
+                                       .Body = "V1 IN 0 PULSE(0 {VHIGH} 0 1n 1n {2 * TON} 100u)\n"};
     REQUIRE(Nodalys::AddSubcircuitText(
-                builder, text, {.Prefix = "X1", .PortNodes = {1}, .Parameters = {{"VHIGH", HIGH_VOLTS}, {"TON", 4e-6}}})
+                builder,
+                text,
+                {.Prefix = "X1", .PortNodes = {1}, .Parameters = {{"VHIGH", HIGH_VOLTS}, {"TON", 4e-6}}})
                 .has_value());
     auto circuit = builder.Build();
     REQUIRE(circuit.has_value());

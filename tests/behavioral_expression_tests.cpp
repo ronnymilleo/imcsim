@@ -52,8 +52,8 @@ TEST_CASE("An expression reads its voltages by net and its currents by name, in 
     const auto references = Core::ParseBehavioralExpression("2*V(IN) + v( IN , OUT ) - 1k*I(Q1.C)");
     REQUIRE(references);
     REQUIRE(references->size() == 3);
-    CHECK((*references)[0] ==
-          Core::BehavioralReference{.Type = Kind::VOLTAGE, .Names = {"IN"}, .Start = 2, .Length = 5});
+    CHECK((*references)[0]
+          == Core::BehavioralReference{.Type = Kind::VOLTAGE, .Names = {"IN"}, .Start = 2, .Length = 5});
     CHECK((*references)[1].Names == std::vector<std::string>{"IN", "OUT"});
     CHECK((*references)[2].Type == Kind::CURRENT);
     CHECK((*references)[2].Names == std::vector<std::string>{"Q1.C"});

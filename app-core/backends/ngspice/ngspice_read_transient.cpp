@@ -11,10 +11,9 @@
 #include "simulation/simulation_results.h"
 #include <cstddef>
 #include <expected>
-#include <format>
-#include <ngspice/sharedspice.h>
 #include <optional>
 #include <string>
+#include <utility>
 
 namespace Core {
 
@@ -47,24 +46,12 @@ std::expected<Transient, std::string> ReadTransientPoints(const Circuit &circuit
     result.Times = RealPart(*time, first_point);
     // time points to the record that the next lookup overwrites, so later vectors are checked against this length
     const std::size_t length = static_cast<std::size_t>(time->v_length);
-    result.NodeVoltages.resize(static_cast<std::size_t>(circuit.GetNodeCount()));
-    result.NodeVoltages[0].assign(result.Times.size(), 0.0);
-    for (int node = 1; node < circuit.GetNodeCount(); ++node) {
-        const pvector_info vector = FindVector(std::format("v({})", node));
-        if (vector == nullptr || static_cast<std::size_t>(vector->v_length) != length) {
-            return std::unexpected(std::format("ngspice returned no voltages for node {}", node));
-        }
-        result.NodeVoltages[static_cast<std::size_t>(node)] = RealPart(*vector, first_point);
+    auto vectors = ReadNodeAndCurrentVectors(circuit, length, first_point);
+    if (!vectors) {
+        return std::unexpected(vectors.error());
     }
-    for (const CircuitEntry &entry : circuit.GetEntries()) {
-        for (const CurrentVector &current : CurrentVectors(*entry.Part)) {
-            const pvector_info vector = FindVector(current.VectorName);
-            if (vector == nullptr || static_cast<std::size_t>(vector->v_length) != length) {
-                return std::unexpected(std::format("ngspice returned no currents for {}", current.TraceName));
-            }
-            result.Currents.push_back({current.TraceName, RealPart(*vector, first_point)});
-        }
-    }
+    result.NodeVoltages = std::move(vectors->NodeVoltages);
+    result.Currents = std::move(vectors->Currents);
     return result;
 }
 

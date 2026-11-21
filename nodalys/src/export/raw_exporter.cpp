@@ -5,416 +5,317 @@
 
 #include "nodalys/exporters.h"
 
+#include "export/raw_plot.h"
+
 #include <algorithm>
 #include <cmath>
+#include <complex>
 #include <format>
 #include <numbers>
-#include <sstream>
 
 namespace Nodalys {
 
 namespace {
 
-std::string CurrentDateString() {
-    return "Mon Nov  9 22:00:00 2026";
+/**
+ * @brief   Reads a series at a point, or zero where the series stops short of it.
+ */
+template <typename T>
+T SampleAt(const std::vector<T> &series, const std::size_t point) {
+    return point < series.size() ? series[point] : T{};
+}
+
+/**
+ * @brief   Adds the voltage of every node but ground, which is the first of the series.
+ */
+template <typename Series>
+void AddNodeVariables(RawPlot &plot, const Series &nodes) {
+    for (std::size_t node = 1; node < nodes.size(); ++node) {
+        plot.AddVariable(std::format("v({})", node), "voltage");
+    }
+}
+
+/**
+ * @brief   Adds the current of every component, named after it.
+ */
+template <typename Components>
+void AddCurrentVariables(RawPlot &plot, const Components &components) {
+    for (const auto &component : components) {
+        plot.AddVariable(std::format("i({})", component.Name), "current");
+    }
+}
+
+/**
+ * @brief   Adds the real values of every node but ground and of every component at one point.
+ */
+void AddRealSamples(RawPlot &plot,
+                    const std::vector<std::vector<double>> &nodes,
+                    const std::vector<ComponentTrace> &components,
+                    const std::size_t point) {
+    for (std::size_t node = 1; node < nodes.size(); ++node) {
+        plot.AddReal(SampleAt(nodes[node], point));
+    }
+    for (const ComponentTrace &component : components) {
+        plot.AddReal(SampleAt(component.Values, point));
+    }
+}
+
+/**
+ * @brief   Converts a magnitude in decibels and a phase in degrees to the complex value they stand for.
+ */
+std::complex<double> PhasorFromDecibels(const double magnitude_decibels, const double phase_degrees) {
+    const double magnitude = std::pow(10.0, magnitude_decibels / 20.0);
+    const double phase_radians = phase_degrees * (std::numbers::pi / 180.0);
+    return {magnitude * std::cos(phase_radians), magnitude * std::sin(phase_radians)};
+}
+
+/**
+ * @brief   Builds a plot of voltages and currents against time, as the transient and the waveform of a harmonic
+ *          balance both write it.
+ */
+RawPlot MakeTimePlot(std::string plotname,
+                     const std::vector<double> &times,
+                     const std::vector<std::vector<double>> &nodes,
+                     const std::vector<ComponentTrace> &components) {
+    RawPlot plot(std::move(plotname), false);
+    plot.AddVariable("time", "time");
+    AddNodeVariables(plot, nodes);
+    AddCurrentVariables(plot, components);
+    for (std::size_t pt = 0; pt < times.size(); ++pt) {
+        plot.BeginPoint();
+        plot.AddReal(times[pt]);
+        AddRealSamples(plot, nodes, components, pt);
+    }
+    return plot;
 }
 
 } // namespace
 
+/**
+ * @brief   Writes an operating point as one point of node voltages and component currents.
+ * @param[in] result  Result to write.
+ * @param[in] title   Title of the simulation, written in the header.
+ * @return  The text of the rawfile.
+ */
 std::string ExportRaw(const OperatingPointResult &result, std::string_view title) {
-    std::ostringstream ss;
-    ss << "Title: " << title << "\n";
-    ss << "Date: " << CurrentDateString() << "\n";
-    ss << "Plotname: Operating Point\n";
-    ss << "Flags: real\n";
+    RawPlot plot("Operating Point", false);
+    AddNodeVariables(plot, result.NodeVoltages);
+    AddCurrentVariables(plot, result.Currents);
 
-    const std::size_t num_nodes = result.NodeVoltages.size() > 1 ? result.NodeVoltages.size() - 1 : 0;
-    const std::size_t num_currents = result.Currents.size();
-    const std::size_t num_vars = num_nodes + num_currents;
-
-    ss << "No. Variables: " << num_vars << "\n";
-    ss << "No. Points: 1\n";
-    ss << "Variables:\n";
-
-    std::size_t var_idx = 0;
+    plot.BeginPoint();
     for (std::size_t node = 1; node < result.NodeVoltages.size(); ++node) {
-        ss << "\t" << var_idx++ << "\tv(" << node << ")\tvoltage\n";
+        plot.AddReal(result.NodeVoltages[node]);
     }
-    for (const auto &cur : result.Currents) {
-        ss << "\t" << var_idx++ << "\ti(" << cur.Name << ")\tcurrent\n";
+    for (const ComponentCurrent &component : result.Currents) {
+        plot.AddReal(component.Current);
     }
-
-    ss << "Values:\n";
-    bool first = true;
-    for (std::size_t node = 1; node < result.NodeVoltages.size(); ++node) {
-        if (first) {
-            ss << "0\t" << std::format("{:.15e}\n", result.NodeVoltages[node]);
-            first = false;
-        } else {
-            ss << "\t" << std::format("{:.15e}\n", result.NodeVoltages[node]);
-        }
-    }
-    for (const auto &cur : result.Currents) {
-        if (first) {
-            ss << "0\t" << std::format("{:.15e}\n", cur.Current);
-            first = false;
-        } else {
-            ss << "\t" << std::format("{:.15e}\n", cur.Current);
-        }
-    }
-    return ss.str();
+    return plot.ToText(title);
 }
 
+/**
+ * @brief   Writes a transient as time, node voltages and component currents at each time point.
+ * @param[in] result  Result to write.
+ * @param[in] title   Title of the simulation, written in the header.
+ * @return  The text of the rawfile.
+ */
 std::string ExportRaw(const TransientResult &result, std::string_view title) {
-    std::ostringstream ss;
-    ss << "Title: " << title << "\n";
-    ss << "Date: " << CurrentDateString() << "\n";
-    ss << "Plotname: Transient Analysis\n";
-    ss << "Flags: real\n";
-
-    const std::size_t num_nodes = result.NodeVoltages.size() > 1 ? result.NodeVoltages.size() - 1 : 0;
-    const std::size_t num_currents = result.Currents.size();
-    const std::size_t num_vars = 1 + num_nodes + num_currents;
-    const std::size_t num_points = result.Times.size();
-
-    ss << "No. Variables: " << num_vars << "\n";
-    ss << "No. Points: " << num_points << "\n";
-    ss << "Variables:\n";
-
-    std::size_t var_idx = 0;
-    ss << "\t" << var_idx++ << "\ttime\ttime\n";
-    for (std::size_t node = 1; node < result.NodeVoltages.size(); ++node) {
-        ss << "\t" << var_idx++ << "\tv(" << node << ")\tvoltage\n";
-    }
-    for (const auto &cur : result.Currents) {
-        ss << "\t" << var_idx++ << "\ti(" << cur.Name << ")\tcurrent\n";
-    }
-
-    ss << "Values:\n";
-    for (std::size_t pt = 0; pt < num_points; ++pt) {
-        ss << pt << "\t" << std::format("{:.15e}\n", result.Times[pt]);
-        for (std::size_t node = 1; node < result.NodeVoltages.size(); ++node) {
-            const double v = (pt < result.NodeVoltages[node].size()) ? result.NodeVoltages[node][pt] : 0.0;
-            ss << "\t" << std::format("{:.15e}\n", v);
-        }
-        for (const auto &cur : result.Currents) {
-            const double i = (pt < cur.Values.size()) ? cur.Values[pt] : 0.0;
-            ss << "\t" << std::format("{:.15e}\n", i);
-        }
-    }
-    return ss.str();
+    return MakeTimePlot("Transient Analysis", result.Times, result.NodeVoltages, result.Currents).ToText(title);
 }
 
+/**
+ * @brief   Writes a DC sweep as the swept value, node voltages and component currents, one curve after the other.
+ * @param[in] result  Result to write.
+ * @param[in] title   Title of the simulation, written in the header.
+ * @return  The text of the rawfile.
+ */
 std::string ExportRaw(const DcSweepResult &result, std::string_view title) {
-    std::ostringstream ss;
-    ss << "Title: " << title << "\n";
-    ss << "Date: " << CurrentDateString() << "\n";
-    ss << "Plotname: DC transfer characteristic\n";
-    ss << "Flags: real\n";
-
+    RawPlot plot("DC transfer characteristic", false);
     if (result.Curves.empty() || result.SweptValues.empty()) {
-        ss << "No. Variables: 0\nNo. Points: 0\nVariables:\nValues:\n";
-        return ss.str();
+        return plot.ToText(title);
     }
 
-    const auto &first_curve = result.Curves.front();
-    const std::size_t num_nodes = first_curve.NodeVoltages.size() > 1 ? first_curve.NodeVoltages.size() - 1 : 0;
-    const std::size_t num_currents = first_curve.Currents.size();
-    const std::size_t num_vars = 1 + num_nodes + num_currents;
-    const std::size_t num_points = result.SweptValues.size() * result.Curves.size();
+    const DcSweepCurve &first_curve = result.Curves.front();
+    plot.AddVariable(result.SweptSource, result.SweptUnit.empty() ? "voltage" : result.SweptUnit);
+    AddNodeVariables(plot, first_curve.NodeVoltages);
+    AddCurrentVariables(plot, first_curve.Currents);
 
-    ss << "No. Variables: " << num_vars << "\n";
-    ss << "No. Points: " << num_points << "\n";
-    ss << "Variables:\n";
-
-    std::size_t var_idx = 0;
-    ss << "\t" << var_idx++ << "\t" << result.SweptSource << "\t"
-       << (result.SweptUnit.empty() ? "voltage" : result.SweptUnit) << "\n";
-    for (std::size_t node = 1; node < first_curve.NodeVoltages.size(); ++node) {
-        ss << "\t" << var_idx++ << "\tv(" << node << ")\tvoltage\n";
-    }
-    for (const auto &cur : first_curve.Currents) {
-        ss << "\t" << var_idx++ << "\ti(" << cur.Name << ")\tcurrent\n";
-    }
-
-    ss << "Values:\n";
-    std::size_t global_idx = 0;
-    for (const auto &curve : result.Curves) {
+    for (const DcSweepCurve &curve : result.Curves) {
         for (std::size_t pt = 0; pt < result.SweptValues.size(); ++pt) {
-            ss << global_idx++ << "\t" << std::format("{:.15e}\n", result.SweptValues[pt]);
-            for (std::size_t node = 1; node < curve.NodeVoltages.size(); ++node) {
-                const double v = (pt < curve.NodeVoltages[node].size()) ? curve.NodeVoltages[node][pt] : 0.0;
-                ss << "\t" << std::format("{:.15e}\n", v);
-            }
-            for (const auto &cur : curve.Currents) {
-                const double i = (pt < cur.Values.size()) ? cur.Values[pt] : 0.0;
-                ss << "\t" << std::format("{:.15e}\n", i);
-            }
+            plot.BeginPoint();
+            plot.AddReal(result.SweptValues[pt]);
+            AddRealSamples(plot, curve.NodeVoltages, curve.Currents, pt);
         }
     }
-    return ss.str();
+    return plot.ToText(title);
 }
 
+/**
+ * @brief   Writes an AC sweep as complex values, turning the magnitudes and phases back into real and imaginary parts.
+ * @param[in] result  Result to write.
+ * @param[in] title   Title of the simulation, written in the header.
+ * @return  The text of the rawfile.
+ */
 std::string ExportRaw(const AcSweepResult &result, std::string_view title) {
-    std::ostringstream ss;
-    ss << "Title: " << title << "\n";
-    ss << "Date: " << CurrentDateString() << "\n";
-    ss << "Plotname: AC Analysis\n";
-    ss << "Flags: complex\n";
+    RawPlot plot("AC Analysis", true);
+    plot.AddVariable("frequency", "frequency");
+    AddNodeVariables(plot, result.NodeMagnitudesDecibels);
+    AddCurrentVariables(plot, result.CurrentMagnitudesDecibels);
 
-    const std::size_t num_nodes =
-        result.NodeMagnitudesDecibels.size() > 1 ? result.NodeMagnitudesDecibels.size() - 1 : 0;
-    const std::size_t num_currents = result.CurrentMagnitudesDecibels.size();
-    const std::size_t num_vars = 1 + num_nodes + num_currents;
-    const std::size_t num_points = result.Frequencies.size();
-
-    ss << "No. Variables: " << num_vars << "\n";
-    ss << "No. Points: " << num_points << "\n";
-    ss << "Variables:\n";
-
-    std::size_t var_idx = 0;
-    ss << "\t" << var_idx++ << "\tfrequency\tfrequency\n";
-    for (std::size_t node = 1; node < result.NodeMagnitudesDecibels.size(); ++node) {
-        ss << "\t" << var_idx++ << "\tv(" << node << ")\tvoltage\n";
-    }
-    for (const auto &cur : result.CurrentMagnitudesDecibels) {
-        ss << "\t" << var_idx++ << "\ti(" << cur.Name << ")\tcurrent\n";
-    }
-
-    ss << "Values:\n";
-    for (std::size_t pt = 0; pt < num_points; ++pt) {
-        // frequency has 0 imaginary part
-        ss << pt << "\t" << std::format("{:.15e},{:.15e}\n", result.Frequencies[pt], 0.0);
+    for (std::size_t pt = 0; pt < result.Frequencies.size(); ++pt) {
+        plot.BeginPoint();
+        plot.AddComplex({result.Frequencies[pt], 0.0});
         for (std::size_t node = 1; node < result.NodeMagnitudesDecibels.size(); ++node) {
-            const double db = result.NodeMagnitudesDecibels[node][pt];
-            const double deg = result.NodePhasesDegrees[node][pt];
-            const double mag = std::pow(10.0, db / 20.0);
-            const double rad = deg * (std::numbers::pi / 180.0);
-            const double re = mag * std::cos(rad);
-            const double im = mag * std::sin(rad);
-            ss << "\t" << std::format("{:.15e},{:.15e}\n", re, im);
+            plot.AddComplex(
+                PhasorFromDecibels(result.NodeMagnitudesDecibels[node][pt], result.NodePhasesDegrees[node][pt]));
         }
         for (std::size_t c = 0; c < result.CurrentMagnitudesDecibels.size(); ++c) {
-            const double db = result.CurrentMagnitudesDecibels[c].Values[pt];
-            const double deg = result.CurrentPhasesDegrees[c].Values[pt];
-            const double mag = std::pow(10.0, db / 20.0);
-            const double rad = deg * (std::numbers::pi / 180.0);
-            const double re = mag * std::cos(rad);
-            const double im = mag * std::sin(rad);
-            ss << "\t" << std::format("{:.15e},{:.15e}\n", re, im);
+            plot.AddComplex(PhasorFromDecibels(result.CurrentMagnitudesDecibels[c].Values[pt],
+                                               result.CurrentPhasesDegrees[c].Values[pt]));
         }
     }
-    return ss.str();
+    return plot.ToText(title);
 }
 
+/**
+ * @brief   Writes S-parameters as one complex variable for each pair of ports.
+ * @param[in] result  Result to write.
+ * @param[in] title   Title of the simulation, written in the header.
+ * @return  The text of the rawfile.
+ */
 std::string ExportRaw(const SParameterResult &result, std::string_view title) {
-    std::ostringstream ss;
-    ss << "Title: " << title << "\n";
-    ss << "Date: " << CurrentDateString() << "\n";
-    ss << "Plotname: S-Parameter Analysis\n";
-    ss << "Flags: complex\n";
-
+    RawPlot plot("S-Parameter Analysis", true);
     const int ports = result.GetPortCount();
-    const std::size_t num_vars = 1 + static_cast<std::size_t>(ports * ports);
-    const std::size_t num_points = result.Frequencies.size();
-
-    ss << "No. Variables: " << num_vars << "\n";
-    ss << "No. Points: " << num_points << "\n";
-    ss << "Variables:\n";
-
-    std::size_t var_idx = 0;
-    ss << "\t" << var_idx++ << "\tfrequency\tfrequency\n";
+    plot.AddVariable("frequency", "frequency");
     for (int i = 1; i <= ports; ++i) {
         for (int j = 1; j <= ports; ++j) {
-            ss << "\t" << var_idx++ << "\ts_" << i << "_" << j << "\tS-parameter\n";
+            plot.AddVariable(std::format("s_{}_{}", i, j), "S-parameter");
         }
     }
 
-    ss << "Values:\n";
-    for (std::size_t pt = 0; pt < num_points; ++pt) {
-        ss << pt << "\t" << std::format("{:.15e},{:.15e}\n", result.Frequencies[pt], 0.0);
+    for (std::size_t pt = 0; pt < result.Frequencies.size(); ++pt) {
+        plot.BeginPoint();
+        plot.AddComplex({result.Frequencies[pt], 0.0});
         for (int i = 1; i <= ports; ++i) {
             for (int j = 1; j <= ports; ++j) {
-                const auto s = result.Get(pt, i, j);
-                ss << "\t" << std::format("{:.15e},{:.15e}\n", s.real(), s.imag());
+                plot.AddComplex(result.Get(pt, i, j));
             }
         }
     }
-    return ss.str();
+    return plot.ToText(title);
 }
 
+/**
+ * @brief   Writes the poles and the zeros as two complex variables, the shorter list padded with zeros.
+ * @param[in] result  Result to write.
+ * @param[in] title   Title of the simulation, written in the header.
+ * @return  The text of the rawfile.
+ */
 std::string ExportRaw(const PoleZeroResult &result, std::string_view title) {
-    std::ostringstream ss;
-    ss << "Title: " << title << "\n";
-    ss << "Date: " << CurrentDateString() << "\n";
-    ss << "Plotname: Pole-Zero Analysis\n";
-    ss << "Flags: complex\n";
+    constexpr std::string_view PADDING_CELL = "0.0,0.0";
+
+    RawPlot plot("Pole-Zero Analysis", true);
+    plot.AddVariable("pole", "complex");
+    plot.AddVariable("zero", "complex");
 
     const std::size_t num_points = std::max(result.Poles.size(), result.Zeros.size());
-    ss << "No. Variables: 2\n";
-    ss << "No. Points: " << num_points << "\n";
-    ss << "Variables:\n";
-    ss << "\t0\tpole\tcomplex\n";
-    ss << "\t1\tzero\tcomplex\n";
-    ss << "Values:\n";
     for (std::size_t pt = 0; pt < num_points; ++pt) {
-        ss << pt << "\t";
+        plot.BeginPoint();
         if (pt < result.Poles.size()) {
-            ss << std::format("{:.15e},{:.15e}\n", result.Poles[pt].real(), result.Poles[pt].imag());
+            plot.AddComplex(result.Poles[pt]);
         } else {
-            ss << "0.0,0.0\n";
+            plot.AddText(PADDING_CELL);
         }
         if (pt < result.Zeros.size()) {
-            ss << "\t" << std::format("{:.15e},{:.15e}\n", result.Zeros[pt].real(), result.Zeros[pt].imag());
+            plot.AddComplex(result.Zeros[pt]);
         } else {
-            ss << "\t0.0,0.0\n";
+            plot.AddText(PADDING_CELL);
         }
     }
-    return ss.str();
+    return plot.ToText(title);
 }
 
+/**
+ * @brief   Writes a DC sensitivity as one point with one variable for each sensitivity vector.
+ * @param[in] result  Result to write.
+ * @param[in] title   Title of the simulation, written in the header.
+ * @return  The text of the rawfile.
+ */
 std::string ExportRaw(const SensitivityResult &result, std::string_view title) {
-    std::ostringstream ss;
-    ss << "Title: " << title << "\n";
-    ss << "Date: " << CurrentDateString() << "\n";
-    ss << "Plotname: DC Sensitivity Analysis\n";
-    ss << "Flags: real\n";
-    ss << "No. Variables: " << result.Vectors.size() << "\n";
-    ss << "No. Points: 1\n";
-    ss << "Variables:\n";
-
-    std::size_t var_idx = 0;
-    for (const auto &[name, val] : result.Vectors) {
-        (void)val;
-        ss << "\t" << var_idx++ << "\t" << name << "\tvoltage\n";
+    RawPlot plot("DC Sensitivity Analysis", false);
+    for (const auto &[name, value] : result.Vectors) {
+        (void)value;
+        plot.AddVariable(name, "voltage");
     }
 
-    ss << "Values:\n";
-    bool first = true;
-    for (const auto &[name, val] : result.Vectors) {
+    plot.BeginPoint();
+    for (const auto &[name, value] : result.Vectors) {
         (void)name;
-        if (first) {
-            ss << "0\t" << std::format("{:.15e}\n", val);
-            first = false;
-        } else {
-            ss << "\t" << std::format("{:.15e}\n", val);
-        }
+        plot.AddReal(value);
     }
-    return ss.str();
+    return plot.ToText(title);
 }
 
+/**
+ * @brief   Writes an AC sensitivity as the output and the derivative of each element at every frequency.
+ * @param[in] result  Result to write.
+ * @param[in] title   Title of the simulation, written in the header.
+ * @return  The text of the rawfile.
+ */
 std::string ExportRaw(const AcSensitivityResult &result, std::string_view title) {
-    std::ostringstream ss;
-    ss << "Title: " << title << "\n";
-    ss << "Date: " << CurrentDateString() << "\n";
-    ss << "Plotname: AC Sensitivity Analysis\n";
-    ss << "Flags: complex\n";
-    ss << "No. Variables: " << 2 + result.Elements.size() << "\n";
-    ss << "No. Points: " << result.Frequencies.size() << "\n";
-    ss << "Variables:\n";
+    RawPlot plot("AC Sensitivity Analysis", true);
 
     // The output is named as the user writes it in the directive, v(out) or v(out,ref)
     const std::string output_name = result.OutputNegativeNode == 0
-                                        ? std::format("v({})", result.OutputPositiveNode)
-                                        : std::format("v({},{})", result.OutputPositiveNode, result.OutputNegativeNode);
-    std::size_t var_idx = 0;
-    ss << "\t" << var_idx++ << "\tfrequency\tfrequency\n";
-    ss << "\t" << var_idx++ << "\t" << output_name << "\tvoltage\n";
+                                      ? std::format("v({})", result.OutputPositiveNode)
+                                      : std::format("v({},{})", result.OutputPositiveNode, result.OutputNegativeNode);
+    plot.AddVariable("frequency", "frequency");
+    plot.AddVariable(output_name, "voltage");
     for (const AcElementSensitivity &element : result.Elements) {
-        ss << "\t" << var_idx++ << "\t" << element.Name << "\tvoltage\n";
+        plot.AddVariable(element.Name, "voltage");
     }
 
-    ss << "Values:\n";
     for (std::size_t pt = 0; pt < result.Frequencies.size(); ++pt) {
-        ss << pt << "\t" << std::format("{:.15e},{:.15e}\n", result.Frequencies[pt], 0.0);
-        ss << "\t" << std::format("{:.15e},{:.15e}\n", result.Output[pt].real(), result.Output[pt].imag());
+        plot.BeginPoint();
+        plot.AddComplex({result.Frequencies[pt], 0.0});
+        plot.AddComplex(result.Output[pt]);
         for (const AcElementSensitivity &element : result.Elements) {
-            ss << "\t"
-               << std::format("{:.15e},{:.15e}\n", element.Derivatives[pt].real(), element.Derivatives[pt].imag());
+            plot.AddComplex(element.Derivatives[pt]);
         }
     }
-    return ss.str();
+    return plot.ToText(title);
 }
 
+/**
+ * @brief   Writes a harmonic balance as two plots: the spectrum, and the waveform when one was reconstructed.
+ * @param[in] result  Result to write.
+ * @param[in] title   Title of the simulation, written in the header.
+ * @return  The text of the rawfile, with the plot of the waveform after the plot of the spectrum.
+ */
 std::string ExportRaw(const HarmonicBalanceResult &result, std::string_view title) {
-    std::ostringstream ss;
-    const std::string date_str = CurrentDateString();
-
-    const std::size_t num_nodes = result.NodePhasors.size() > 1 ? result.NodePhasors.size() - 1 : 0;
-    const std::size_t num_currents = result.CurrentPhasors.size();
-    const std::size_t num_vars = 1 + num_nodes + num_currents;
-    const std::size_t num_freq_pts = result.Frequencies.size();
-
     // Plot 1: Complex harmonic spectrum
-    ss << "Title: " << title << "\n";
-    ss << "Date: " << date_str << "\n";
-    ss << "Plotname: Harmonic Balance Spectrum\n";
-    ss << "Flags: complex\n";
-    ss << "No. Variables: " << num_vars << "\n";
-    ss << "No. Points: " << num_freq_pts << "\n";
-    ss << "Variables:\n";
+    RawPlot spectrum("Harmonic Balance Spectrum", true);
+    spectrum.AddVariable("frequency", "frequency");
+    AddNodeVariables(spectrum, result.NodePhasors);
+    AddCurrentVariables(spectrum, result.CurrentPhasors);
 
-    std::size_t var_idx = 0;
-    ss << "\t" << var_idx++ << "\tfrequency\tfrequency\n";
-    for (std::size_t node = 1; node < result.NodePhasors.size(); ++node) {
-        ss << "\t" << var_idx++ << "\tv(" << node << ")\tvoltage\n";
-    }
-    for (const auto &cur : result.CurrentPhasors) {
-        ss << "\t" << var_idx++ << "\ti(" << cur.Name << ")\tcurrent\n";
-    }
-
-    ss << "Values:\n";
-    for (std::size_t pt = 0; pt < num_freq_pts; ++pt) {
-        ss << pt << "\t" << std::format("{:.15e},{:.15e}\n", result.Frequencies[pt], 0.0);
+    for (std::size_t pt = 0; pt < result.Frequencies.size(); ++pt) {
+        spectrum.BeginPoint();
+        spectrum.AddComplex({result.Frequencies[pt], 0.0});
         for (std::size_t node = 1; node < result.NodePhasors.size(); ++node) {
-            const auto p =
-                (pt < result.NodePhasors[node].size()) ? result.NodePhasors[node][pt] : std::complex<double>{};
-            ss << "\t" << std::format("{:.15e},{:.15e}\n", p.real(), p.imag());
+            spectrum.AddComplex(SampleAt(result.NodePhasors[node], pt));
         }
-        for (const auto &cur : result.CurrentPhasors) {
-            const auto p = (pt < cur.Phasors.size()) ? cur.Phasors[pt] : std::complex<double>{};
-            ss << "\t" << std::format("{:.15e},{:.15e}\n", p.real(), p.imag());
+        for (const ComponentPhasors &component : result.CurrentPhasors) {
+            spectrum.AddComplex(SampleAt(component.Phasors, pt));
         }
     }
+    std::string text = spectrum.ToText(title);
 
     // Plot 2: Reconstructed periodic waveform
     if (!result.Times.empty()) {
-        const std::size_t wf_nodes = result.NodeWaveforms.size() > 1 ? result.NodeWaveforms.size() - 1 : 0;
-        const std::size_t wf_currents = result.CurrentWaveforms.size();
-        const std::size_t wf_vars = 1 + wf_nodes + wf_currents;
-
-        ss << "Title: " << title << "\n";
-        ss << "Date: " << date_str << "\n";
-        ss << "Plotname: Harmonic Balance Waveform\n";
-        ss << "Flags: real\n";
-        ss << "No. Variables: " << wf_vars << "\n";
-        ss << "No. Points: " << result.Times.size() << "\n";
-        ss << "Variables:\n";
-
-        var_idx = 0;
-        ss << "\t" << var_idx++ << "\ttime\ttime\n";
-        for (std::size_t node = 1; node < result.NodeWaveforms.size(); ++node) {
-            ss << "\t" << var_idx++ << "\tv(" << node << ")\tvoltage\n";
-        }
-        for (const auto &cur : result.CurrentWaveforms) {
-            ss << "\t" << var_idx++ << "\ti(" << cur.Name << ")\tcurrent\n";
-        }
-
-        ss << "Values:\n";
-        for (std::size_t pt = 0; pt < result.Times.size(); ++pt) {
-            ss << pt << "\t" << std::format("{:.15e}\n", result.Times[pt]);
-            for (std::size_t node = 1; node < result.NodeWaveforms.size(); ++node) {
-                const double val = (pt < result.NodeWaveforms[node].size()) ? result.NodeWaveforms[node][pt] : 0.0;
-                ss << "\t" << std::format("{:.15e}\n", val);
-            }
-            for (const auto &cur : result.CurrentWaveforms) {
-                const double val = (pt < cur.Values.size()) ? cur.Values[pt] : 0.0;
-                ss << "\t" << std::format("{:.15e}\n", val);
-            }
-        }
+        text += MakeTimePlot("Harmonic Balance Waveform", result.Times, result.NodeWaveforms, result.CurrentWaveforms)
+                    .ToText(title);
     }
-
-    return ss.str();
+    return text;
 }
 
 } // namespace Nodalys

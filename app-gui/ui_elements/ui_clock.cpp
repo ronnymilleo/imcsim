@@ -44,23 +44,24 @@ constexpr float LABEL_OFFSET = 0.3f;
  * @param[in] rotation  Orientation on the grid.
  */
 UIClock::UIClock(const GridPoint position, const Rotation rotation)
-    : UIElement(std::make_unique<Core::Clock>(), position, rotation) {
+    : UISingleTerminalElement(std::make_unique<Core::Clock>(), position, rotation) {
 }
 
-void UIClock::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
-    canvas.AddLine(LocalToScreen(view, 0, 0), LocalToScreen(view, 0, BOX_BOTTOM), color, LINE_THICKNESS);
-}
-
-void UIClock::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
+void UIClock::DrawSymbol(SchematicCanvas &canvas,
+                         const ViewTransform &view,
+                         const ImU32 color,
                          const SymbolStyle /*style*/) const {
-    const std::array<ImVec2, 4> box = {
-        LocalToScreen(view, -BOX_HALF_WIDTH, BOX_TOP), LocalToScreen(view, BOX_HALF_WIDTH, BOX_TOP),
-        LocalToScreen(view, BOX_HALF_WIDTH, BOX_BOTTOM), LocalToScreen(view, -BOX_HALF_WIDTH, BOX_BOTTOM)};
+    const std::array<ImVec2, 4> box = {LocalToScreen(view, -BOX_HALF_WIDTH, BOX_TOP),
+                                       LocalToScreen(view, BOX_HALF_WIDTH, BOX_TOP),
+                                       LocalToScreen(view, BOX_HALF_WIDTH, BOX_BOTTOM),
+                                       LocalToScreen(view, -BOX_HALF_WIDTH, BOX_BOTTOM)};
     canvas.AddPolyline(box.data(), static_cast<int>(box.size()), color, ImDrawFlags_Closed, LINE_THICKNESS);
-    const std::array<ImVec2, 6> wave = {
-        LocalToScreen(view, WAVE_LEFT, WAVE_LOW),   LocalToScreen(view, FIRST_RISE, WAVE_LOW),
-        LocalToScreen(view, FIRST_RISE, WAVE_HIGH), LocalToScreen(view, FIRST_FALL, WAVE_HIGH),
-        LocalToScreen(view, FIRST_FALL, WAVE_LOW),  LocalToScreen(view, WAVE_RIGHT, WAVE_LOW)};
+    const std::array<ImVec2, 6> wave = {LocalToScreen(view, WAVE_LEFT, WAVE_LOW),
+                                        LocalToScreen(view, FIRST_RISE, WAVE_LOW),
+                                        LocalToScreen(view, FIRST_RISE, WAVE_HIGH),
+                                        LocalToScreen(view, FIRST_FALL, WAVE_HIGH),
+                                        LocalToScreen(view, FIRST_FALL, WAVE_LOW),
+                                        LocalToScreen(view, WAVE_RIGHT, WAVE_LOW)};
     canvas.AddPolyline(wave.data(), static_cast<int>(wave.size()), color, ImDrawFlags_None, LINE_THICKNESS);
 }
 
@@ -75,19 +76,15 @@ void UIClock::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, con
     DrawLabel(canvas, view, {BOX_HALF_WIDTH + LABEL_OFFSET, BOX_MIDDLE}, {1.0f, 0.0f}, description, color);
 }
 
-std::vector<GridPoint> UIClock::GetLocalTerminals() const {
-    return {{0, 0}};
+LocalBounds UIClock::GetLocalBounds() const {
+    return {{-BOX_HALF_WIDTH, BOX_TOP}, {BOX_HALF_WIDTH, 0.0f}};
 }
 
 /**
- * @brief   The terminal is at the origin and its lead goes up to the box.
+ * @brief   The lead goes up from the terminal to the box.
  */
-GridPoint UIClock::GetLocalTerminalInward(std::size_t /*terminal*/) const {
-    return {0, -1};
-}
-
-LocalBounds UIClock::GetLocalBounds() const {
-    return {{-BOX_HALF_WIDTH, BOX_TOP}, {BOX_HALF_WIDTH, 0.0f}};
+ImVec2 UIClock::GetLeadEnd() const {
+    return {0.0f, BOX_BOTTOM};
 }
 
 } // namespace GUI

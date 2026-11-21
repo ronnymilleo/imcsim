@@ -70,8 +70,9 @@ std::expected<ParameterCircuit, std::string> ApplyParameter(const Circuit &circu
         return candidate.Part->GetName() == parameter->Part && IsSteppable(candidate.Part->GetType());
     });
     if (entry == circuit.GetEntries().end()) {
-        return std::unexpected(std::format(
-            "The stepped part {} is not a resistor, capacitor or inductor in the circuit", parameter->Part));
+        return std::unexpected(
+            std::format("The stepped part {} is not a resistor, capacitor or inductor in the circuit",
+                        parameter->Part));
     }
     if (parameter->Value <= 0.0) {
         return std::unexpected(std::format("{} must stay positive in every step", parameter->Part));

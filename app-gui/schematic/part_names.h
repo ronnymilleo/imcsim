@@ -17,8 +17,8 @@
 namespace GUI {
 
 // Checking
-std::optional<std::string> CheckPartName(const std::vector<std::unique_ptr<UIElement>> &elements, std::size_t index,
-                                         std::string_view name);
+std::optional<std::string>
+CheckPartName(const std::vector<std::unique_ptr<UIElement>> &elements, std::size_t index, std::string_view name);
 
 // Following a rename
 std::string RenameCurrent(std::string_view current, std::string_view old_name, std::string_view new_name);

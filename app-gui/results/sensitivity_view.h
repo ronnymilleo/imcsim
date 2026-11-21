@@ -42,7 +42,9 @@ struct SensitivityRow {
 };
 
 // Labels
-std::string FormatSensitivityPartLabel(Core::ComponentType type, const std::string &name, const std::string &element,
+std::string FormatSensitivityPartLabel(Core::ComponentType type,
+                                       const std::string &name,
+                                       const std::string &element,
                                        std::optional<double> value);
 
 // Heat colors

@@ -29,7 +29,8 @@ std::optional<std::string> CheckTruthTableSettings(const Circuit &circuit, const
     }
     if (settings.Inputs.size() > MAX_TRUTH_TABLE_INPUTS) {
         return std::format("A truth table varies at most {} inputs, which is {} runs; clear some",
-                           MAX_TRUTH_TABLE_INPUTS, 1u << MAX_TRUTH_TABLE_INPUTS);
+                           MAX_TRUTH_TABLE_INPUTS,
+                           1u << MAX_TRUTH_TABLE_INPUTS);
     }
     for (std::size_t index = 0; index < settings.Inputs.size(); ++index) {
         const std::string &name = settings.Inputs[index];

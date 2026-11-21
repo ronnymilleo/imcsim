@@ -113,7 +113,8 @@ struct Rectifier {
 };
 
 /// Runs a check on ngspice and then on Nodalys.
-template <typename Check> void OnBothEngines(Check check) {
+template <typename Check>
+void OnBothEngines(Check check) {
     check();
     const TestSupport::NodalysInUse nodalys_in_use;
     check();

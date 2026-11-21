@@ -156,8 +156,10 @@ TEST_CASE("A pair on the imaginary axis has no finite quality factor", "[pole_ze
 
 TEST_CASE("Poles and zeros are listed by growing natural frequency, poles first", "[pole_zero]") {
     const LowPass filter;
-    const Core::PoleZero result = Core::BuildPoleZero(filter.Circuit, {.OutputNode = 2, .InputSource = "Vin1"},
-                                                      {{-3e3, 0.0}, {-1e2, 0.0}}, {{-7e5, 0.0}, {-5e4, 0.0}});
+    const Core::PoleZero result = Core::BuildPoleZero(filter.Circuit,
+                                                      {.OutputNode = 2, .InputSource = "Vin1"},
+                                                      {{-3e3, 0.0}, {-1e2, 0.0}},
+                                                      {{-7e5, 0.0}, {-5e4, 0.0}});
     REQUIRE(result.Roots.size() == 4);
     CHECK(result.Roots[0].Real == -1e2);
     CHECK(result.Roots[1].Real == -3e3);
@@ -169,8 +171,10 @@ TEST_CASE("Poles and zeros are listed by growing natural frequency, poles first"
 TEST_CASE("A pole and a zero at the same place cancel and are counted", "[pole_zero]") {
     const LowPass filter;
     // The zero at -1.0004e4 is within a thousandth of the pole, the one at -2e4 is not
-    const Core::PoleZero result = Core::BuildPoleZero(filter.Circuit, {.OutputNode = 2, .InputSource = "Vin1"},
-                                                      {{-1e4, 0.0}, {-3e3, 0.0}}, {{-1.0004e4, 0.0}, {-2e4, 0.0}});
+    const Core::PoleZero result = Core::BuildPoleZero(filter.Circuit,
+                                                      {.OutputNode = 2, .InputSource = "Vin1"},
+                                                      {{-1e4, 0.0}, {-3e3, 0.0}},
+                                                      {{-1.0004e4, 0.0}, {-2e4, 0.0}});
     CHECK(result.CancelledPairs == 1);
     CHECK(CountRoots(result, true) == 1);
     CHECK(FindRoot(result, true).Real == -3e3);
@@ -180,7 +184,8 @@ TEST_CASE("A pole and a zero at the same place cancel and are counted", "[pole_z
 
 TEST_CASE("A cancelling conjugate pair counts once, and roots at the origin cancel", "[pole_zero]") {
     const LowPass filter;
-    const Core::PoleZero result = Core::BuildPoleZero(filter.Circuit, {.OutputNode = 2, .InputSource = "Vin1"},
+    const Core::PoleZero result = Core::BuildPoleZero(filter.Circuit,
+                                                      {.OutputNode = 2, .InputSource = "Vin1"},
                                                       {{-5e3, 2e4}, {-5e3, -2e4}, {0.0, 0.0}},
                                                       {{-5e3, 2e4}, {-5e3, -2e4}, {0.0, 0.0}, {-1e5, 0.0}});
     CHECK(result.CancelledPairs == 2);
@@ -288,7 +293,8 @@ TEST_CASE("ngspice finds no poles through logic parts, and the analysis is refus
         Core::FindUnsupported(Core::GetBackend(), {Core::ComponentType::AND}, Core::AnalysisKind::POLE_ZERO);
     REQUIRE(reason.has_value());
     CHECK(reason->contains("digital"));
-    CHECK_FALSE(Core::FindUnsupported(Core::GetBackend(), {Core::ComponentType::RESISTOR, Core::ComponentType::NPN},
+    CHECK_FALSE(Core::FindUnsupported(Core::GetBackend(),
+                                      {Core::ComponentType::RESISTOR, Core::ComponentType::NPN},
                                       Core::AnalysisKind::POLE_ZERO)
                     .has_value());
     CHECK(Core::GetAnalysisKindName(Core::AnalysisKind::POLE_ZERO) == "pole-zero");

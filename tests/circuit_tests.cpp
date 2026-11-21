@@ -64,12 +64,13 @@ TEST_CASE("ToSpiceNetlist writes one line per component and leaves ground out", 
     circuit.Add(inductor, {2, 0});
     circuit.Add(ground, {0});
 
-    CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
-                                      "V1 1 0 DC 5\n"
-                                      "R1 1 2 2.2Meg\n"
-                                      "C1 2 0 100n\n"
-                                      "L1 2 0 1m\n"
-                                      ".end\n");
+    CHECK(circuit.ToSpiceNetlist()
+          == "* imcsim netlist\n"
+             "V1 1 0 DC 5\n"
+             "R1 1 2 2.2Meg\n"
+             "C1 2 0 100n\n"
+             "L1 2 0 1m\n"
+             ".end\n");
 }
 
 TEST_CASE("ToSpiceNetlist writes the initial condition of a capacitor and an inductor", "[circuit]") {
@@ -85,10 +86,11 @@ TEST_CASE("ToSpiceNetlist writes the initial condition of a capacitor and an ind
     circuit.Add(capacitor, {2, 0});
     circuit.Add(inductor, {2, 0});
 
-    CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
-                                      "C1 2 0 100n IC=5\n"
-                                      "L1 2 0 1m IC=2m\n"
-                                      ".end\n");
+    CHECK(circuit.ToSpiceNetlist()
+          == "* imcsim netlist\n"
+             "C1 2 0 100n IC=5\n"
+             "L1 2 0 1m IC=2m\n"
+             ".end\n");
 }
 
 TEST_CASE("HasInitialConditions looks for a part with an initial condition", "[circuit]") {
@@ -113,9 +115,10 @@ TEST_CASE("ToSpiceNetlist writes a voltage source between its two nodes, positiv
     Core::Circuit circuit;
     circuit.Add(source, {2, 1});
 
-    CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
-                                      "Vin1 2 1 DC 12\n"
-                                      ".end\n");
+    CHECK(circuit.ToSpiceNetlist()
+          == "* imcsim netlist\n"
+             "Vin1 2 1 DC 12\n"
+             ".end\n");
 }
 
 TEST_CASE("ToSpiceNetlist writes an AC source for every analysis at once", "[circuit]") {
@@ -128,9 +131,10 @@ TEST_CASE("ToSpiceNetlist writes an AC source for every analysis at once", "[cir
     circuit.Add(source, {1, 0});
 
     // The AC sweep magnitude is apart from the amplitude of the sine
-    CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
-                                      "Vin1 1 0 DC 500m AC 250m SIN(500m 2 50)\n"
-                                      ".end\n");
+    CHECK(circuit.ToSpiceNetlist()
+          == "* imcsim netlist\n"
+             "Vin1 1 0 DC 500m AC 250m SIN(500m 2 50)\n"
+             ".end\n");
 }
 
 TEST_CASE("ToSpiceNetlist writes a pulse source starting at its low level", "[circuit]") {
@@ -148,9 +152,10 @@ TEST_CASE("ToSpiceNetlist writes a pulse source starting at its low level", "[ci
     Core::Circuit circuit;
     circuit.Add(source, {1, 0});
 
-    CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
-                                      "Vin1 1 0 DC -1 PULSE(-1 3.3 1m 10n 20n 500u 2m)\n"
-                                      ".end\n");
+    CHECK(circuit.ToSpiceNetlist()
+          == "* imcsim netlist\n"
+             "Vin1 1 0 DC -1 PULSE(-1 3.3 1m 10n 20n 500u 2m)\n"
+             ".end\n");
 }
 
 TEST_CASE("ToSpiceNetlist writes an exponential source starting from its first value", "[circuit]") {
@@ -167,9 +172,10 @@ TEST_CASE("ToSpiceNetlist writes an exponential source starting from its first v
     Core::Circuit circuit;
     circuit.Add(source, {1, 0});
 
-    CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
-                                      "Vin1 1 0 DC -1 EXP(-1 3.3 1m 10u 5m 20u)\n"
-                                      ".end\n");
+    CHECK(circuit.ToSpiceNetlist()
+          == "* imcsim netlist\n"
+             "Vin1 1 0 DC -1 EXP(-1 3.3 1m 10u 5m 20u)\n"
+             ".end\n");
 }
 
 TEST_CASE("ToSpiceNetlist writes a single-frequency FM source from its offset", "[circuit]") {
@@ -182,9 +188,10 @@ TEST_CASE("ToSpiceNetlist writes a single-frequency FM source from its offset", 
     Core::Circuit circuit;
     circuit.Add(source, {1, 0});
 
-    CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
-                                      "Vin1 1 0 DC 500m SFFM(500m 2 1k 5 100)\n"
-                                      ".end\n");
+    CHECK(circuit.ToSpiceNetlist()
+          == "* imcsim netlist\n"
+             "Vin1 1 0 DC 500m SFFM(500m 2 1k 5 100)\n"
+             ".end\n");
 }
 
 TEST_CASE("ToSpiceNetlist writes an amplitude-modulated source with a suppressed carrier", "[circuit]") {
@@ -198,9 +205,10 @@ TEST_CASE("ToSpiceNetlist writes an amplitude-modulated source with a suppressed
     circuit.Add(source, {1, 0});
 
     // The modulation offset of ngspice stays 0, so the offset sits on the two multiplied sines
-    CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
-                                      "Vin1 1 0 DC 500m AM(500m 0 2 200 10k 1m)\n"
-                                      ".end\n");
+    CHECK(circuit.ToSpiceNetlist()
+          == "* imcsim netlist\n"
+             "Vin1 1 0 DC 500m AM(500m 0 2 200 10k 1m)\n"
+             ".end\n");
 }
 
 TEST_CASE("ToSpiceNetlist writes the piecewise linear points from its first value", "[circuit]") {
@@ -212,9 +220,10 @@ TEST_CASE("ToSpiceNetlist writes the piecewise linear points from its first valu
     Core::Circuit circuit;
     circuit.Add(source, {0, 3});
 
-    CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
-                                      "I1 0 3 DC 0 PWL(0 0 1m 5m 2m 0)\n"
-                                      ".end\n");
+    CHECK(circuit.ToSpiceNetlist()
+          == "* imcsim netlist\n"
+             "I1 0 3 DC 0 PWL(0 0 1m 5m 2m 0)\n"
+             ".end\n");
 }
 
 TEST_CASE("ToSpiceNetlist writes a noise with its offset and every part that is on", "[circuit]") {
@@ -233,9 +242,10 @@ TEST_CASE("ToSpiceNetlist writes a noise with its offset and every part that is 
     Core::Circuit circuit;
     circuit.Add(source, {1, 0});
 
-    CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
-                                      "Vn1 1 0 DC 2 TRNOISE(1m 10u 1 2m 5m 1m 3m)\n"
-                                      ".end\n");
+    CHECK(circuit.ToSpiceNetlist()
+          == "* imcsim netlist\n"
+             "Vn1 1 0 DC 2 TRNOISE(1m 10u 1 2m 5m 1m 3m)\n"
+             ".end\n");
 }
 
 TEST_CASE("ToSpiceNetlist writes 0 for the noise parts that are off, and no step without white or 1/f noise",
@@ -247,24 +257,27 @@ TEST_CASE("ToSpiceNetlist writes 0 for the noise parts that are off, and no step
     source.SetNoise({.WhiteAmplitude = 1e-6, .TimeStep = 1e-6, .FlickerExponent = 1.5, .CaptureTime = 2e-3});
     Core::Circuit white;
     white.Add(source, {0, 3});
-    CHECK(white.ToSpiceNetlist() == "* imcsim netlist\n"
-                                    "In1 0 3 DC 0 TRNOISE(1u 1u 0 0 0 0 0)\n"
-                                    ".end\n");
+    CHECK(white.ToSpiceNetlist()
+          == "* imcsim netlist\n"
+             "In1 0 3 DC 0 TRNOISE(1u 1u 0 0 0 0 0)\n"
+             ".end\n");
 
     // Only the telegraph signal: ngspice reads it with no step, and a step would only add points
     source.SetNoise({.WhiteAmplitude = 0.0, .TimeStep = 1e-6, .TelegraphAmplitude = 1e-6});
     Core::Circuit telegraph;
     telegraph.Add(source, {0, 3});
-    CHECK(telegraph.ToSpiceNetlist() == "* imcsim netlist\n"
-                                        "In1 0 3 DC 0 TRNOISE(0 0 0 0 1u 1m 1m)\n"
-                                        ".end\n");
+    CHECK(telegraph.ToSpiceNetlist()
+          == "* imcsim netlist\n"
+             "In1 0 3 DC 0 TRNOISE(0 0 0 0 1u 1m 1m)\n"
+             ".end\n");
 
     source.SetNoise({.WhiteAmplitude = 0.0});
     Core::Circuit off;
     off.Add(source, {0, 3});
-    CHECK(off.ToSpiceNetlist() == "* imcsim netlist\n"
-                                  "In1 0 3 DC 0 TRNOISE(0 0 0 0 0 0 0)\n"
-                                  ".end\n");
+    CHECK(off.ToSpiceNetlist()
+          == "* imcsim netlist\n"
+             "In1 0 3 DC 0 TRNOISE(0 0 0 0 0 0 0)\n"
+             ".end\n");
 }
 
 TEST_CASE("ToSpiceNetlist writes random values with the type number of the distribution and the offset as the DC value",
@@ -279,13 +292,14 @@ TEST_CASE("ToSpiceNetlist writes random values with the type number of the distr
                       .Second = 2.0});
     Core::Circuit circuit;
     circuit.Add(source, {1, 0});
-    CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
-                                      "Vr1 1 0 DC 2 TRRANDOM(1 100u 1m 500m 0)\n"
-                                      ".end\n");
+    CHECK(circuit.ToSpiceNetlist()
+          == "* imcsim netlist\n"
+             "Vr1 1 0 DC 2 TRRANDOM(1 100u 1m 500m 0)\n"
+             ".end\n");
 
-    for (const auto &[distribution, number] :
-         {std::pair{Core::RandomDistribution::GAUSSIAN, 2}, std::pair{Core::RandomDistribution::EXPONENTIAL, 3},
-          std::pair{Core::RandomDistribution::POISSON, 4}}) {
+    for (const auto &[distribution, number] : {std::pair{Core::RandomDistribution::GAUSSIAN, 2},
+                                               std::pair{Core::RandomDistribution::EXPONENTIAL, 3},
+                                               std::pair{Core::RandomDistribution::POISSON, 4}}) {
         source.SetRandom({.Distribution = distribution, .TimeStep = 1e-6, .Delay = 0.0, .First = 1.0, .Second = 0.0});
         Core::Circuit other;
         other.Add(source, {1, 0});
@@ -298,14 +312,16 @@ TEST_CASE("ToSpiceNetlist writes a current source like a voltage source, under i
     source.SetName("I1");
     Core::Circuit circuit;
     circuit.Add(source, {0, 3});
-    CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
-                                      "I1 0 3 DC 1m\n"
-                                      ".end\n");
+    CHECK(circuit.ToSpiceNetlist()
+          == "* imcsim netlist\n"
+             "I1 0 3 DC 1m\n"
+             ".end\n");
 
     source.SetSourceType(Core::CurrentSource::SourceType::AC);
-    CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
-                                      "I1 0 3 DC 0 AC 1 SIN(0 1m 1k)\n"
-                                      ".end\n");
+    CHECK(circuit.ToSpiceNetlist()
+          == "* imcsim netlist\n"
+             "I1 0 3 DC 0 AC 1 SIN(0 1m 1k)\n"
+             ".end\n");
 }
 
 TEST_CASE("ToSpiceNetlist writes a clock as a pulse with its own short edges", "[circuit]") {
@@ -315,9 +331,10 @@ TEST_CASE("ToSpiceNetlist writes a clock as a pulse with its own short edges", "
     Core::Circuit circuit;
     circuit.Add(clock, {1});
     // Period 1 ms, an edge of 1 us, and a flat top of 0.25 ms - 1 us = 249 us, so the duty reads as 0.25
-    CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
-                                      "V1 1 0 DC 0 PULSE(0 3.3 1m 1u 1u 249u 1m)\n"
-                                      ".end\n");
+    CHECK(circuit.ToSpiceNetlist()
+          == "* imcsim netlist\n"
+             "V1 1 0 DC 0 PULSE(0 3.3 1m 1u 1u 249u 1m)\n"
+             ".end\n");
 }
 
 TEST_CASE("ToSpiceNetlist writes a logic input as a DC source to ground", "[circuit]") {
@@ -326,13 +343,15 @@ TEST_CASE("ToSpiceNetlist writes a logic input as a DC source to ground", "[circ
     input.SetParameters({.LogicLevel = 3.3});
     Core::Circuit circuit;
     circuit.Add(input, {2});
-    CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
-                                      "V1 2 0 DC 0\n"
-                                      ".end\n");
+    CHECK(circuit.ToSpiceNetlist()
+          == "* imcsim netlist\n"
+             "V1 2 0 DC 0\n"
+             ".end\n");
     input.SetHigh(true);
-    CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
-                                      "V1 2 0 DC 3.3\n"
-                                      ".end\n");
+    CHECK(circuit.ToSpiceNetlist()
+          == "* imcsim netlist\n"
+             "V1 2 0 DC 3.3\n"
+             ".end\n");
 }
 
 TEST_CASE("A clock and a logic input carry their branch current for a controlled source", "[circuit]") {
@@ -374,10 +393,11 @@ TEST_CASE("ToSpiceNetlist writes the analysis right before .end", "[circuit]") {
     resistor.SetName("R1");
     Core::Circuit circuit;
     circuit.Add(resistor, {1, 0});
-    CHECK(circuit.ToSpiceNetlist(".op") == "* imcsim netlist\n"
-                                           "R1 1 0 1k\n"
-                                           ".op\n"
-                                           ".end\n");
+    CHECK(circuit.ToSpiceNetlist(".op")
+          == "* imcsim netlist\n"
+             "R1 1 0 1k\n"
+             ".op\n"
+             ".end\n");
 }
 
 TEST_CASE("HasGround looks for a ground component", "[circuit]") {
@@ -401,16 +421,17 @@ TEST_CASE("ToSpiceNetlist writes diodes from anode to cathode and each model onc
     circuit.Add(first, {1, 2});
     circuit.Add(second, {2, 0});
     circuit.Add(led, {1, 0});
-    CHECK(circuit.ToSpiceNetlist(".op") == "* imcsim netlist\n"
-                                           "D1 1 2 D1N4148\n"
-                                           "D2 2 0 D1N4148\n"
-                                           "D3 1 0 DLEDRED\n"
-                                           ".model D1N4148 D(IS=2.52e-09 N=1.752 RS=0.568 BV=100 IBV=0.0001 "
-                                           "CJO=4e-12 VJ=1 M=0.4 TT=2e-08)\n"
-                                           ".model DLEDRED D(IS=1.255e-17 N=2 RS=2 BV=5 IBV=1e-05 CJO=4e-11 VJ=1 M=0.5 "
-                                           "TT=0)\n"
-                                           ".op\n"
-                                           ".end\n");
+    CHECK(circuit.ToSpiceNetlist(".op")
+          == "* imcsim netlist\n"
+             "D1 1 2 D1N4148\n"
+             "D2 2 0 D1N4148\n"
+             "D3 1 0 DLEDRED\n"
+             ".model D1N4148 D(IS=2.52e-09 N=1.752 RS=0.568 BV=100 IBV=0.0001 "
+             "CJO=4e-12 VJ=1 M=0.4 TT=2e-08)\n"
+             ".model DLEDRED D(IS=1.255e-17 N=2 RS=2 BV=5 IBV=1e-05 CJO=4e-11 VJ=1 M=0.5 "
+             "TT=0)\n"
+             ".op\n"
+             ".end\n");
 }
 
 TEST_CASE("ToSpiceNetlist puts a probe source on each diode anode only when asked", "[circuit]") {
@@ -426,12 +447,13 @@ TEST_CASE("ToSpiceNetlist puts a probe source on each diode anode only when aske
     CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\nD1 0 1 DZ5V1\nDclamp 2 1 DZ5V1\n" + model + ".end\n");
     // Probe nodes come after the circuit nodes, which keep their numbers; the current flows from the circuit node
     // into the anode
-    CHECK(circuit.ToSpiceNetlist("", true) == "* imcsim netlist\n"
-                                              "D1 3 1 DZ5V1\n"
-                                              "Vprobe-D1 0 3 DC 0\n"
-                                              "Dclamp 4 1 DZ5V1\n"
-                                              "Vprobe-Dclamp 2 4 DC 0\n" +
-                                                  model + ".end\n");
+    CHECK(circuit.ToSpiceNetlist("", true)
+          == "* imcsim netlist\n"
+             "D1 3 1 DZ5V1\n"
+             "Vprobe-D1 0 3 DC 0\n"
+             "Dclamp 4 1 DZ5V1\n"
+             "Vprobe-Dclamp 2 4 DC 0\n"
+                 + model + ".end\n");
     CHECK(Core::GetCurrentProbeName(second, "") == "Vprobe-Dclamp");
     CHECK(Core::GetCurrentName(second, "") == "Dclamp");
 }
@@ -446,12 +468,13 @@ TEST_CASE("ToSpiceNetlist gives each custom diode a model of its own", "[circuit
     Core::Circuit circuit;
     circuit.Add(first, {1, 0});
     circuit.Add(second, {2, 0});
-    CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
-                                      "D1 1 0 DCUSTOM_D1\n"
-                                      "D2 2 0 DCUSTOM_D2\n"
-                                      ".model DCUSTOM_D1 D(IS=1e-12 N=1 RS=0 BV=50 IBV=0.001 CJO=0 VJ=1 M=0.5 TT=0)\n"
-                                      ".model DCUSTOM_D2 D(IS=1e-12 N=1 RS=0 BV=50 IBV=0.001 CJO=0 VJ=1 M=0.5 TT=0)\n"
-                                      ".end\n");
+    CHECK(circuit.ToSpiceNetlist()
+          == "* imcsim netlist\n"
+             "D1 1 0 DCUSTOM_D1\n"
+             "D2 2 0 DCUSTOM_D2\n"
+             ".model DCUSTOM_D1 D(IS=1e-12 N=1 RS=0 BV=50 IBV=0.001 CJO=0 VJ=1 M=0.5 TT=0)\n"
+             ".model DCUSTOM_D2 D(IS=1e-12 N=1 RS=0 BV=50 IBV=0.001 CJO=0 VJ=1 M=0.5 TT=0)\n"
+             ".end\n");
 }
 
 TEST_CASE("ToSpiceNetlist writes transistors in SPICE terminal order with the MOSFET body on its source", "[circuit]") {
@@ -462,14 +485,14 @@ TEST_CASE("ToSpiceNetlist writes transistors in SPICE terminal order with the MO
     Core::Circuit circuit;
     circuit.Add(npn, {1, 2, 0});
     circuit.Add(nmos, {3, 2, 0});
-    CHECK(circuit.ToSpiceNetlist() ==
-          "* imcsim netlist\n"
-          "Q1 1 2 0 Q2N3904\n"
-          "M1 3 2 0 0 M2N7000 W=0.0001 L=0.0001\n"
-          ".model Q2N3904 NPN(IS=6.734e-15 BF=416.4 BR=0.7371 VAF=74.03 IKF=0.06678 ISE=6.734e-15 NE=1.259 RB=10 "
-          "RC=1 RE=0 CJE=4.493e-12 CJC=3.638e-12 TF=3.012e-10)\n"
-          ".model M2N7000 NMOS(LEVEL=1 VTO=2.1 KP=0.0703 LAMBDA=0.01 RD=0 RS=0 CGSO=2e-07 CGDO=5e-08)\n"
-          ".end\n");
+    CHECK(circuit.ToSpiceNetlist()
+          == "* imcsim netlist\n"
+             "Q1 1 2 0 Q2N3904\n"
+             "M1 3 2 0 0 M2N7000 W=0.0001 L=0.0001\n"
+             ".model Q2N3904 NPN(IS=6.734e-15 BF=416.4 BR=0.7371 VAF=74.03 IKF=0.06678 ISE=6.734e-15 NE=1.259 RB=10 "
+             "RC=1 RE=0 CJE=4.493e-12 CJC=3.638e-12 TF=3.012e-10)\n"
+             ".model M2N7000 NMOS(LEVEL=1 VTO=2.1 KP=0.0703 LAMBDA=0.01 RD=0 RS=0 CGSO=2e-07 CGDO=5e-08)\n"
+             ".end\n");
 }
 
 TEST_CASE("ToSpiceNetlist probes every transistor terminal, with the current flowing into it", "[circuit]") {
@@ -841,7 +864,8 @@ TEST_CASE("ToSpiceNetlist writes a flip-flop with its inputs in order and both o
     CHECK(netlist.find("A-U1-CLK [3] [10] ADC-U1\n") != std::string::npos);
     CHECK(netlist.find("R-U1-QN 16 7 50\n") != std::string::npos);
     CHECK(netlist.find(".model LOGIC-U1 d_jkff(clk_delay=10n set_delay=10n reset_delay=10n rise_delay=10n "
-                       "fall_delay=10n)\n") != std::string::npos);
+                       "fall_delay=10n)\n")
+          != std::string::npos);
 }
 
 TEST_CASE("Probes of the logic parts", "[circuit]") {

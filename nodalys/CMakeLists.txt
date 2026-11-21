@@ -7,14 +7,23 @@ add_library(nodalys STATIC
     src/analyses/ac_sens_analysis.cpp
     src/analyses/ac_sens_bias.cpp
     src/analyses/ac_sens_elements.cpp
+    src/analyses/analysis_preamble.cpp
     src/analyses/dc_analysis.cpp
     src/analyses/frequency_sweep.cpp
     src/analyses/hb_analysis.cpp
+    src/analyses/hb_bias.cpp
+    src/analyses/hb_residual.cpp
+    src/analyses/hb_result.cpp
+    src/analyses/hb_setup.cpp
+    src/analyses/hb_solve.cpp
+    src/analyses/hb_spectrum.cpp
+    src/analyses/hb_workspace.cpp
     src/analyses/noise_analysis.cpp
     src/analyses/port_matrices.cpp
     src/analyses/pz_analysis.cpp
     src/analyses/pz_checks.cpp
     src/analyses/sens_analysis.cpp
+    src/analyses/solution_readout.cpp
     src/analyses/sp_analysis.cpp
     src/analyses/tf_analysis.cpp
     src/analyses/transient_analysis.cpp
@@ -38,6 +47,7 @@ add_library(nodalys STATIC
     src/export/exporters.cpp
     src/export/json_exporter.cpp
     src/export/raw_exporter.cpp
+    src/export/raw_plot.cpp
     src/expression/expression.cpp
     src/expression/expression_math.cpp
     src/expression/expression_parser.cpp
@@ -48,17 +58,28 @@ add_library(nodalys STATIC
     src/linear/root_refinement.cpp
     src/mna/mna_system.cpp
     src/newton/newton.cpp
+    src/parser/classified_lines.cpp
+    src/parser/element_arguments.cpp
+    src/parser/expression_references.cpp
     src/parser/model_cards.cpp
+    src/parser/netlist_deck.cpp
+    src/parser/netlist_directives.cpp
+    src/parser/netlist_elements.cpp
+    src/parser/netlist_nodes.cpp
     src/parser/netlist_parser.cpp
     src/parser/netlist_subcircuits.cpp
+    src/parser/source_line.cpp
     src/parser/source_waveforms.cpp
     src/parser/spice_number.cpp
     src/parser/spice_text.cpp
     src/parser/spice_values.cpp
     src/parser/subcircuit_elements.cpp
+    src/parser/subcircuit_expansion.cpp
+    src/parser/subcircuit_lines.cpp
     src/parser/subcircuit_models.cpp
     src/parser/subcircuit_scope.cpp
     src/parser/subcircuit_text.cpp
+    src/text/text_case.cpp
 )
 
 target_include_directories(nodalys

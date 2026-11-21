@@ -16,10 +16,10 @@
 namespace GUI {
 
 // Reading
-std::optional<LogicState> ReadLogicOutput(const UIElement &output, const Connectivity &connectivity,
-                                          const Core::OperatingPoint &point);
-std::vector<std::optional<LogicState>> ReadLogicDisplay(const UIElement &display, const Connectivity &connectivity,
-                                                        const Core::OperatingPoint &point);
+std::optional<LogicState>
+ReadLogicOutput(const UIElement &output, const Connectivity &connectivity, const Core::OperatingPoint &point);
+std::vector<std::optional<LogicState>>
+ReadLogicDisplay(const UIElement &display, const Connectivity &connectivity, const Core::OperatingPoint &point);
 
 } // namespace GUI
 

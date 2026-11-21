@@ -76,7 +76,9 @@ void FftPlan::Inverse(std::vector<std::complex<double>> &data) const {
  * @param[out] scratch    Reusable complex buffer resized to `GetSize()`.
  * @return  False if the plan is invalid, `samples.size() != GetSize()`, `harmonics < 0`, or $2H \ge M$.
  */
-bool FftPlan::RealToHarmonics(const std::vector<double> &samples, const int harmonics, std::vector<double> &coeffs,
+bool FftPlan::RealToHarmonics(const std::vector<double> &samples,
+                              const int harmonics,
+                              std::vector<double> &coeffs,
                               std::vector<std::complex<double>> &scratch) const {
     if (!IsValid() || samples.size() != m_Size || harmonics < 0 || m_Size <= 2U * static_cast<std::size_t>(harmonics)) {
         return false;
@@ -129,7 +131,8 @@ bool FftPlan::RealToNormalizedSpectrum(const std::vector<double> &samples,
  * @param[out] scratch  Reusable complex buffer resized to `GetSize()`.
  * @return  False if the plan is invalid, `coeffs` size is even, or $2H \ge M$.
  */
-bool FftPlan::HarmonicsToReal(const std::vector<double> &coeffs, std::vector<double> &samples,
+bool FftPlan::HarmonicsToReal(const std::vector<double> &coeffs,
+                              std::vector<double> &samples,
                               std::vector<std::complex<double>> &scratch) const {
     if (!IsValid() || coeffs.empty() || (coeffs.size() % 2U) == 0U) {
         return false;

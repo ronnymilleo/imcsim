@@ -6,6 +6,7 @@
 
 #include "results/sensitivity_view.h"
 
+#include "results/logarithmic_level.h"
 #include "spice/spice_value.h"
 #include <algorithm>
 #include <cmath>
@@ -30,8 +31,10 @@ std::string FormatUnit(const std::string &unit, const std::string &prefix) {
  * @param[in] value    Value of the part, or none when the results do not carry it.
  * @return  Such as "R1", "VCC 12V" or "X2.R1".
  */
-std::string FormatSensitivityPartLabel(const Core::ComponentType type, const std::string &name,
-                                       const std::string &element, const std::optional<double> value) {
+std::string FormatSensitivityPartLabel(const Core::ComponentType type,
+                                       const std::string &name,
+                                       const std::string &element,
+                                       const std::optional<double> value) {
     if (type == Core::ComponentType::VCC && value) {
         return std::format("VCC {}V", Core::FormatValue(*value));
     }
@@ -67,9 +70,7 @@ std::optional<float> FindSensitivityLevel(const Core::Sensitivity &sensitivity, 
     if (found->Normalized == 0.0 || largest <= 0.0) {
         return 0.0f;
     }
-    const double level =
-        (std::log10(std::abs(found->Normalized)) - std::log10(largest) + SENSITIVITY_DECADES) / SENSITIVITY_DECADES;
-    return static_cast<float>(std::clamp(level, 0.0, 1.0));
+    return std::clamp(LogarithmicLevel(found->Normalized, largest, SENSITIVITY_DECADES), 0.0f, 1.0f);
 }
 
 /**

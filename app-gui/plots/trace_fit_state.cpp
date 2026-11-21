@@ -11,13 +11,29 @@ namespace GUI {
 
 namespace {
 
-template <typename Key> bool TakeChanged(std::vector<Key> &shown, std::vector<Key> measured) {
+template <typename Key>
+bool TakeChanged(std::vector<Key> &shown, std::vector<Key> measured) {
     const bool changed = measured != shown;
     shown = std::move(measured);
     return changed && !shown.empty();
 }
 
 } // namespace
+
+/**
+ * @brief   Tells which axes of the plot must fit this frame, and keeps what it shows for the next one.
+ * @param[in] version       Version of the result the plot shows this frame.
+ * @param[in] shown         Traces the plot shows this frame.
+ * @param[in] must_fit_all  Whether something besides the result asks every axis to fit, such as a scale that changed.
+ * @return  The axes that fit; every comparison is made, so none of them misses a frame.
+ */
+TraceFits TraceFitState::TakeFits(const std::size_t version, ShownTraces shown, const bool must_fit_all) {
+    const bool is_new_result = TakeNewResult(version);
+    return {.IsNewResult = is_new_result || must_fit_all,
+            .HaveVoltagesChanged = TakeNodesChanged(std::move(shown.Nodes)),
+            .HaveCurrentsChanged = TakeCurrentsChanged(std::move(shown.Currents)),
+            .HasMathChanged = TakeMathChanged(std::move(shown.MathLabels))};
+}
 
 /**
  * @brief   Tells whether every axis must fit, which is the case once for every new result.

@@ -102,8 +102,11 @@ void MarkSteps(const std::vector<double> &xs, const std::span<const PlottedTrace
         spec.MarkerSize = STEP_MARKER_SIZE;
         spec.MarkerFillColor = ImGui::ColorConvertU32ToFloat4(trace.Color);
         spec.MarkerLineColor = spec.MarkerFillColor;
-        ImPlot::PlotScatter(std::format("##{} steps", trace.Label).c_str(), xs.data(), trace.Values->data(),
-                            static_cast<int>(xs.size()), spec);
+        ImPlot::PlotScatter(std::format("##{} steps", trace.Label).c_str(),
+                            xs.data(),
+                            trace.Values->data(),
+                            static_cast<int>(xs.size()),
+                            spec);
     }
     ImPlot::SetAxes(ImAxis_X1, ImAxis_Y1);
 }
@@ -113,8 +116,8 @@ void MarkSteps(const std::vector<double> &xs, const std::span<const PlottedTrace
  *          keeps the zoom of the plot.
  */
 bool HaveSameValues(const Core::DCSweep &first, const Core::DCSweep &second) {
-    if (first.SweptSource != second.SweptSource || first.SweptValues != second.SweptValues ||
-        first.Curves.size() != second.Curves.size()) {
+    if (first.SweptSource != second.SweptSource || first.SweptValues != second.SweptValues
+        || first.Curves.size() != second.Curves.size()) {
         return false;
     }
     for (std::size_t curve = 0; curve < first.Curves.size(); ++curve) {
@@ -124,8 +127,8 @@ bool HaveSameValues(const Core::DCSweep &first, const Core::DCSweep &second) {
             return false;
         }
         for (std::size_t current = 0; current < one.Currents.size(); ++current) {
-            if (one.Currents[current].Name != other.Currents[current].Name ||
-                one.Currents[current].Values != other.Currents[current].Values) {
+            if (one.Currents[current].Name != other.Currents[current].Name
+                || one.Currents[current].Values != other.Currents[current].Values) {
                 return false;
             }
         }
@@ -208,19 +211,21 @@ const Core::DCSweep *OperatingPointTab::GetStepSweep() const {
  */
 void OperatingPointTab::DrawStepPlot(const Core::DCSweep &sweep) {
     const Core::DCSweepCurve &curve = sweep.Curves.front();
-    std::vector<std::string> measured_currents = ListMeasuredCurrents(curve.Currents, m_Schematic);
-    const bool show_currents = !measured_currents.empty();
-    const bool currents_changed = m_Fit.TakeCurrentsChanged(std::move(measured_currents));
-    const bool voltages_changed = m_Fit.TakeNodesChanged(ListMeasuredNodes(curve.NodeVoltages.size(), m_Schematic));
+    ShownTraces shown{.Nodes = ListMeasuredNodes(curve.NodeVoltages.size(), m_Schematic),
+                      .Currents = ListMeasuredCurrents(curve.Currents, m_Schematic),
+                      .MathLabels = {}};
+    const bool show_currents = !shown.Currents.empty();
     const bool has_voltages = HasMeasuredVoltage(curve.NodeVoltages.size(), m_Schematic);
     if (!has_voltages && !show_currents) {
         ImGui::TextDisabled("%s", NOTHING_MEASURED);
     }
-    SetNextFits(m_Fit.TakeNewResult(m_StepSweepVersion), voltages_changed, currents_changed);
+    SetNextFits(m_Fit.TakeFits(m_StepSweepVersion, std::move(shown)));
     if (!BeginTracePlot("##operating_point_steps", ImVec2(-1.0f, ImGui::GetFontSize() * STEP_PLOT_HEIGHT))) {
         return;
     }
-    ImPlot::SetupAxes(sweep.SweptSource.c_str(), "Voltage", ImPlotAxisFlags_None,
+    ImPlot::SetupAxes(sweep.SweptSource.c_str(),
+                      "Voltage",
+                      ImPlotAxisFlags_None,
                       VoltageAxisFlags(has_voltages, show_currents));
     ImPlot::SetupAxisFormat(ImAxis_X1, FormatAxisValue, const_cast<char *>(sweep.SweptUnit.c_str()));
     ImPlot::SetupAxisFormat(ImAxis_Y1, FormatAxisValue, const_cast<char *>("V"));

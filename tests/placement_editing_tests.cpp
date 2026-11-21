@@ -23,7 +23,9 @@
 
 namespace {
 
-void AddMarker(GUI::Schematic &schematic, const GUI::GridPoint point, const std::string &name,
+void AddMarker(GUI::Schematic &schematic,
+               const GUI::GridPoint point,
+               const std::string &name,
                const GUI::Rotation rotation = GUI::Rotation::R0) {
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::PIN, point, rotation));
     static_cast<Core::NetLabel &>(schematic.GetElements().back()->GetComponent()).SetNet(name);
@@ -36,7 +38,7 @@ void MakeBlock(GUI::Schematic &schematic) {
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 0}, GUI::Rotation::R0));
     AddMarker(schematic, {-2, 0}, "IN");
     AddMarker(schematic, {2, 0}, "OUT", GUI::Rotation::R180);
-    schematic.SetSelection({0, 1, 2}, {});
+    schematic.SetSelection({.Elements = {0, 1, 2}, .Wires = {}});
     REQUIRE(schematic.CreateSubcircuitFromSelection("inner", {{"IN", {-2, 0}}, {"OUT", {2, 0}}}));
     schematic.CommitUndoStep();
 }
@@ -52,7 +54,7 @@ std::unique_ptr<GUI::UIElement> MakeInstance(const std::string &block) {
 TEST_CASE("Starting a mode other than selecting empties the selection, and selecting keeps it", "[placement_editing]") {
     GUI::Schematic schematic;
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 0}, GUI::Rotation::R0));
-    schematic.SetSelection({0}, {});
+    schematic.SetSelection({.Elements = {0}, .Wires = {}});
     GUI::BlockSession blocks(schematic);
     GUI::EditorMode mode = GUI::PastingMode{};
 
@@ -79,21 +81,25 @@ TEST_CASE("A block is not placed where it would contain itself", "[placement_edi
     MakeBlock(schematic);
     GUI::BlockSession blocks(schematic);
     GUI::EditorMode mode = GUI::SelectingMode{};
-    GUI::SwitchMode(mode, GUI::PlacingMode{.Type = Core::ComponentType::SUBCIRCUIT, .Block = "inner"}, schematic,
+    GUI::SwitchMode(mode,
+                    GUI::PlacingMode{.Type = Core::ComponentType::SUBCIRCUIT, .Block = "inner"},
+                    schematic,
                     blocks);
     CHECK(GUI::GetPlacingType(mode) == Core::ComponentType::SUBCIRCUIT);
 
     mode = GUI::SelectingMode{};
     REQUIRE(blocks.Open("inner"));
-    GUI::SwitchMode(mode, GUI::PlacingMode{.Type = Core::ComponentType::SUBCIRCUIT, .Block = "inner"},
-                    blocks.GetShown(), blocks);
+    GUI::SwitchMode(mode,
+                    GUI::PlacingMode{.Type = Core::ComponentType::SUBCIRCUIT, .Block = "inner"},
+                    blocks.GetShown(),
+                    blocks);
     CHECK(GUI::IsSelecting(mode));
 }
 
 TEST_CASE("Stopping the editing ends a drag and a paste, and leaves probing alone", "[placement_editing]") {
     GUI::Schematic schematic;
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 0}, GUI::Rotation::R0));
-    schematic.SetSelection({0}, {});
+    schematic.SetSelection({.Elements = {0}, .Wires = {}});
     GUI::EditorMode mode = GUI::SelectingMode{};
     std::get<GUI::SelectingMode>(mode).Drag = GUI::MakeDrag(schematic, {0, 0}, std::nullopt);
     GUI::StopEditing(schematic, mode);
@@ -117,8 +123,11 @@ TEST_CASE("A new label starts with the name of the newest label that has one", "
     }
     CHECK(GUI::FindLastNet(schematic) == "SECOND");
 
-    const auto preview = GUI::MakePlacementPreview(
-        GUI::PlacingMode{.Type = Core::ComponentType::NET_LABEL, .IsMirrored = true}, {2, 2}, schematic, {});
+    const auto preview =
+        GUI::MakePlacementPreview(GUI::PlacingMode{.Type = Core::ComponentType::NET_LABEL, .IsMirrored = true},
+                                  {2, 2},
+                                  schematic,
+                                  {});
     REQUIRE(preview);
     CHECK(static_cast<const Core::NetLabel &>(preview->GetComponent()).GetNet() == "SECOND");
     CHECK(preview->GetPosition() == GUI::GridPoint{2, 2});
@@ -131,8 +140,8 @@ TEST_CASE("The preview of a block takes its pins, and none is made once the bloc
     const GUI::PlacingMode placing = {.Type = Core::ComponentType::SUBCIRCUIT, .Block = "inner"};
     const auto preview = GUI::MakePlacementPreview(placing, {0, 0}, schematic, schematic.GetSubcircuits());
     REQUIRE(preview);
-    CHECK(static_cast<const Core::SubcircuitInstance &>(preview->GetComponent()).GetPins() ==
-          std::vector<std::string>{"IN", "OUT"});
+    CHECK(static_cast<const Core::SubcircuitInstance &>(preview->GetComponent()).GetPins()
+          == std::vector<std::string>{"IN", "OUT"});
     CHECK_FALSE(GUI::MakePlacementPreview(placing, {0, 0}, schematic, {}));
 }
 
@@ -146,8 +155,8 @@ TEST_CASE("A pasted group joins the schematic and is what ends up selected", "[p
 
     CHECK_FALSE(GUI::PlacePastedGroup(schematic, blocks, group));
     CHECK(schematic.GetElements().size() == 2);
-    CHECK(schematic.GetSelectedElements() == std::set<std::size_t>{1});
-    CHECK(schematic.GetSelectedWires() == std::set<std::size_t>{0});
+    CHECK(schematic.GetSelection().Elements == std::set<std::size_t>{1});
+    CHECK(schematic.GetSelection().Wires == std::set<std::size_t>{0});
 }
 
 TEST_CASE("A group that places the block being edited is refused inside that block", "[placement_editing]") {
@@ -165,7 +174,7 @@ TEST_CASE("A group that places the block being edited is refused inside that blo
     CHECK(blocks.GetShown().GetElements().size() == parts);
 
     // On the document the same group is fine
-    blocks.Close(false);
+    REQUIRE(blocks.DiscardAndClose());
     GUI::PastedGroup again;
     again.Elements.push_back(MakeInstance("inner"));
     CHECK_FALSE(GUI::PlacePastedGroup(schematic, blocks, again));

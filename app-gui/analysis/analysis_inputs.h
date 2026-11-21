@@ -1,6 +1,7 @@
 /**
  * @file    analysis_inputs.h
- * @brief   What an analysis takes from the circuit and the stored settings: the sources, nodes and inputs it runs with.
+ * @brief   What an analysis takes from the circuit and the stored settings: the sources, nodes and inputs it runs with,
+ *          and what to say when the circuit lacks one.
  */
 
 #ifndef IMCSIM_ANALYSIS_INPUTS_H
@@ -8,11 +9,14 @@
 
 #include "base/helpers.h"
 #include "circuit/circuit.h"
+#include "schematic/connectivity.h"
 #include "schematic/schematic.h"
 #include "simulation/analysis_settings.h"
 #include <cstddef>
+#include <expected>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace GUI {
@@ -33,19 +37,39 @@ constexpr std::size_t STEPPED_SOURCE_INDEX = 1;
 
 // Sources
 std::vector<SweepSource> ListSweepSources(const Core::Circuit &circuit);
-const std::string &ResolveSweepSource(const Core::SweepRange &range, const std::vector<SweepSource> &sources,
-                                      std::size_t preferred_index);
+const std::string &
+ResolveSweepSource(const Core::SweepRange &range, const std::vector<SweepSource> &sources, std::size_t preferred_index);
 std::string ResolveOptionalInput(const std::string &stored, const std::vector<std::string> &sources);
 
 // Nodes and logic inputs
-std::optional<int> ResolveOutputNode(const std::optional<GridPoint> &point, const Core::Circuit &circuit,
-                                     Schematic &schematic);
+std::optional<int>
+ResolveOutputNode(const std::optional<GridPoint> &point, const Core::Circuit &circuit, Schematic &schematic);
 std::vector<int> ListMeasuredNodes(const Core::Circuit &circuit, const Schematic &schematic);
+std::string FormatMeasuredNodeLabels(const Connectivity &connectivity, const std::vector<int> &nodes);
 std::vector<std::string> ResolveTruthTableInputs(const std::vector<std::string> &stored,
                                                  const std::vector<std::string> &available);
+[[nodiscard]] std::optional<std::vector<std::string>> ToggleTruthTableInput(const std::vector<std::string> &available,
+                                                                            const std::vector<std::string> &chosen,
+                                                                            const std::string &name,
+                                                                            bool is_on);
 
 // Stepped parameter
 std::string GetParameterUnit(const Core::Circuit &circuit, const std::string &part);
+
+// Missing inputs
+std::string DescribeMissingOutputNode(std::string_view analysis);
+std::string DescribeMissingACInput(std::string_view analysis);
+std::string DescribeMissingInputSource(std::string_view analysis);
+
+// Ports of the small-signal analyses
+[[nodiscard]] std::expected<std::string, std::string>
+ResolveAcInput(const Core::Circuit &circuit, const std::string &stored, std::string_view analysis);
+[[nodiscard]] std::expected<std::string, std::string>
+ResolveSweepableInput(const Core::Circuit &circuit, const std::string &stored, std::string_view analysis);
+[[nodiscard]] std::expected<int, std::string> ResolveRequiredOutput(const std::optional<GridPoint> &point,
+                                                                    const Core::Circuit &circuit,
+                                                                    Schematic &schematic,
+                                                                    std::string_view subject);
 
 } // namespace GUI
 

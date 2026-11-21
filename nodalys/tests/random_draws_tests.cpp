@@ -14,11 +14,11 @@
 namespace {
 
 /// Seed of the pinned sequences.
-constexpr std::uint64_t PINNED_SEED = 12345;
+constexpr std::uint64_t PINNED_SEED = 12'345;
 /// The transcendental functions may differ in the last bit between C libraries, so pinned values get this much room.
 constexpr double PINNED_RELATIVE_TOLERANCE = 1e-12;
 /// Draws taken for the statistical checks.
-constexpr int STATISTICS_DRAWS = 200000;
+constexpr int STATISTICS_DRAWS = 200'000;
 
 /// Mean and variance of a sequence of draws.
 struct Moments {
@@ -26,7 +26,8 @@ struct Moments {
     double Variance = 0.0;
 };
 
-template <typename Draw> Moments MeasureMoments(const Draw &draw) {
+template <typename Draw>
+Moments MeasureMoments(const Draw &draw) {
     std::mt19937_64 engine(PINNED_SEED);
     double sum = 0.0;
     double sum_squares = 0.0;
@@ -47,7 +48,9 @@ Catch::Approx Pinned(const double value) {
 
 TEST_CASE("A seed draws the same uniform numbers on every platform", "[random_draws]") {
     std::mt19937_64 engine(PINNED_SEED);
-    constexpr std::array EXPECTED = {0.35762972288842587, 0.40044261704406114, 0.68938331700276845,
+    constexpr std::array EXPECTED = {0.35762972288842587,
+                                     0.40044261704406114,
+                                     0.68938331700276845,
                                      0.55973557064111557};
     for (const double expected : EXPECTED) {
         CHECK(Nodalys::DrawUniform(engine) == Pinned(expected));
@@ -56,7 +59,9 @@ TEST_CASE("A seed draws the same uniform numbers on every platform", "[random_dr
 
 TEST_CASE("A seed draws the same normal numbers on every platform", "[random_draws]") {
     std::mt19937_64 engine(PINNED_SEED);
-    constexpr std::array EXPECTED = {-0.76269092759341395, -1.4227288787842618, 0.34342317777493808,
+    constexpr std::array EXPECTED = {-0.76269092759341395,
+                                     -1.4227288787842618,
+                                     0.34342317777493808,
                                      -0.090293886742040627};
     for (const double expected : EXPECTED) {
         CHECK(Nodalys::DrawStandardNormal(engine) == Pinned(expected));

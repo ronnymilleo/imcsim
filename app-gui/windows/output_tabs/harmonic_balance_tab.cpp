@@ -36,11 +36,6 @@ constexpr float HARMONICS_TABLE_HEIGHT = 18.0f;
 constexpr float STEM_LINE_WEIGHT = 2.0f;
 constexpr float STEM_MARKER_SIZE = 4.0f;
 
-std::vector<std::string> ListMeasuredCurrentNames(const std::vector<Core::ComponentTrace> &currents,
-                                                  const Schematic &schematic) {
-    return ListMeasuredCurrents(currents, schematic);
-}
-
 ImPlotSpec BuildStemSpec(const ImU32 color, const ImPlotMarker marker) {
     ImPlotSpec spec;
     spec.LineColor = ImGui::ColorConvertU32ToFloat4(color);
@@ -50,6 +45,28 @@ ImPlotSpec BuildStemSpec(const ImU32 color, const ImPlotMarker marker) {
     spec.MarkerLineColor = spec.LineColor;
     spec.MarkerFillColor = spec.LineColor;
     return spec;
+}
+
+/**
+ * @brief   Plots the harmonics of one trace as stems from the reference up to each amplitude.
+ * @details A trace with fewer values than frequencies plots the ones it has; one with none plots nothing.
+ */
+void PlotStemTrace(const std::string &label,
+                   const std::vector<double> &frequencies,
+                   const std::vector<double> &values,
+                   const double reference,
+                   const ImU32 color,
+                   const ImPlotMarker marker) {
+    const int stem_count = static_cast<int>(std::min(frequencies.size(), values.size()));
+    if (stem_count <= 0) {
+        return;
+    }
+    ImPlot::PlotStems(label.c_str(),
+                      frequencies.data(),
+                      values.data(),
+                      stem_count,
+                      reference,
+                      BuildStemSpec(color, marker));
 }
 
 const char *GetVoltageSpectrumAxisLabel(const HarmonicAmplitudeUnit amp_unit, const HarmonicScale scale) {
@@ -78,7 +95,8 @@ const char *GetCurrentSpectrumAxisLabel(const HarmonicAmplitudeUnit amp_unit, co
     }
 }
 
-void DrawSpectrumTooltip(const Core::HarmonicBalance &result, Schematic &schematic,
+void DrawSpectrumTooltip(const Core::HarmonicBalance &result,
+                         Schematic &schematic,
                          const HarmonicAmplitudeUnit amp_unit) {
     if (!ImPlot::IsPlotHovered() || result.Frequencies.empty()) {
         return;
@@ -96,8 +114,10 @@ void DrawSpectrumTooltip(const Core::HarmonicBalance &result, Schematic &schemat
             continue;
         }
         const HarmonicTableRow &row = summary.Rows[bin];
-        ImGui::Text("%s: %s (%.2f dBc, %.1f deg)", summary.Label.c_str(),
-                    FormatQuantity(row.MagnitudeLinear, summary.Unit.c_str()).c_str(), row.MagnitudeDbc,
+        ImGui::Text("%s: %s (%.2f dBc, %.1f deg)",
+                    summary.Label.c_str(),
+                    FormatQuantity(row.MagnitudeLinear, summary.Unit.c_str()).c_str(),
+                    row.MagnitudeDbc,
                     row.PhaseDegrees);
     }
     ImGui::EndTooltip();
@@ -126,10 +146,14 @@ void HarmonicBalanceTab::Draw(PlotExporter &exporter) {
         return;
     }
     const std::size_t harmonic_count = result->Frequencies.empty() ? 0 : result->Frequencies.size() - 1;
-    ImGui::TextDisabled("%s", std::format("Fundamental {}Hz, {} harmonics, {} samples ({}, {} iterations)",
-                                          Core::FormatValue(result->FundamentalFrequency), harmonic_count,
-                                          result->Times.size(), result->Strategy, result->Iterations)
-                                  .c_str());
+    ImGui::TextDisabled("%s",
+                        std::format("Fundamental {}Hz, {} harmonics, {} samples ({}, {} iterations)",
+                                    Core::FormatValue(result->FundamentalFrequency),
+                                    harmonic_count,
+                                    result->Times.size(),
+                                    result->Strategy,
+                                    result->Iterations)
+                            .c_str());
     for (const std::string &warning : result->Warnings) {
         ImGui::TextColored(GetWarningTextColor(), "%s", warning.c_str());
     }
@@ -159,8 +183,8 @@ bool HarmonicBalanceTab::CanExport() const {
     if (!result || result->Times.empty()) {
         return false;
     }
-    return HasMeasuredVoltage(result->NodeWaveforms.size(), m_Schematic) ||
-           HasMeasuredCurrent(result->CurrentWaveforms, m_Schematic);
+    return HasMeasuredVoltage(result->NodeWaveforms.size(), m_Schematic)
+        || HasMeasuredCurrent(result->CurrentWaveforms, m_Schematic);
 }
 
 /**
@@ -179,7 +203,8 @@ ExportFigure HarmonicBalanceTab::BuildFigure() const {
     return BuildHarmonicBalanceFigure(*result, m_Schematic, m_Cycles, view);
 }
 
-void HarmonicBalanceTab::DrawControls(const Core::HarmonicBalance &result, const bool has_measured,
+void HarmonicBalanceTab::DrawControls(const Core::HarmonicBalance &result,
+                                      const bool has_measured,
                                       PlotExporter &exporter) {
     ImGui::TextUnformatted("Amplitudes:");
     ImGui::SameLine();
@@ -222,96 +247,100 @@ void HarmonicBalanceTab::DrawControls(const Core::HarmonicBalance &result, const
     ImGui::BeginDisabled(!has_measured);
     if (ImGui::Button("Export CSV...")) {
         exporter.StartText(BuildHarmonicBalanceCsv(result, m_Schematic, m_Preferences.HarmonicAmplitudes),
-                           m_Schematic.GetFilePath(), "harmonic-balance");
+                           m_Schematic.GetFilePath(),
+                           "harmonic-balance");
     }
     ImGui::EndDisabled();
     ImGui::SetItemTooltip("Save DC, THD, harmonic spectra and one-cycle waveforms as a CSV table");
 }
 
-void HarmonicBalanceTab::DrawSpectrumPlot(const Core::HarmonicBalance &result, const bool has_voltages,
-                                          const bool has_currents, const float height) {
+void HarmonicBalanceTab::DrawSpectrumPlot(const Core::HarmonicBalance &result,
+                                          const bool has_voltages,
+                                          const bool has_currents,
+                                          const float height) {
     if (result.Frequencies.empty()) {
         return;
     }
-    const std::size_t version = m_Results.GetHarmonicBalanceVersion();
-    const bool scale_changed = std::exchange(m_DrawnScale, m_Scale) != m_Scale;
-    const bool unit_changed =
-        std::exchange(m_DrawnAmplitudeUnit, m_Preferences.HarmonicAmplitudes) != m_Preferences.HarmonicAmplitudes;
-    const bool new_result = m_SpectrumFit.TakeNewResult(version) || scale_changed || unit_changed;
-    const bool nodes_changed =
-        m_SpectrumFit.TakeNodesChanged(ListMeasuredNodes(result.NodePhasors.size(), m_Schematic));
-    const bool currents_changed =
-        m_SpectrumFit.TakeCurrentsChanged(ListMeasuredCurrentNames(result.CurrentWaveforms, m_Schematic));
-    SetNextFits(new_result, nodes_changed, currents_changed);
-
+    SetNextFits(TakeSpectrumFits(result));
     if (!BeginTracePlot("##hb_spectrum", ImVec2(-1.0f, height))) {
         return;
     }
-    ImPlot::SetupAxes("Frequency", GetVoltageSpectrumAxisLabel(m_Preferences.HarmonicAmplitudes, m_Scale),
-                      ImPlotAxisFlags_None, VoltageAxisFlags(has_voltages, has_currents));
-    ImPlot::SetupAxisFormat(ImAxis_X1, FormatAxisValue, const_cast<char *>("Hz"));
-    if (m_Scale == HarmonicScale::LINEAR) {
-        ImPlot::SetupAxisFormat(ImAxis_Y1, FormatAxisValue, const_cast<char *>("V"));
-    }
-    if (has_currents) {
-        ImPlot::SetupAxis(ImAxis_Y2, GetCurrentSpectrumAxisLabel(m_Preferences.HarmonicAmplitudes, m_Scale),
-                          ImPlotAxisFlags_AuxDefault);
-        if (m_Scale == HarmonicScale::LINEAR) {
-            ImPlot::SetupAxisFormat(ImAxis_Y2, FormatAxisValue, const_cast<char *>("A"));
-        }
-    }
-
-    const double stem_ref = m_Scale == HarmonicScale::LINEAR ? 0.0 : HARMONIC_DECIBEL_FLOOR;
-    const int count = static_cast<int>(result.Frequencies.size());
-    for (std::size_t node = 1; node < result.NodePhasors.size(); ++node) {
-        if (!m_Schematic.IsVoltageMeasured(static_cast<int>(node))) {
-            continue;
-        }
-        const std::vector<double> values =
-            ListSpectrumValues(result.NodePhasors[node], m_Preferences.HarmonicAmplitudes, m_Scale);
-        const int stem_count = std::min(count, static_cast<int>(values.size()));
-        if (stem_count <= 0) {
-            continue;
-        }
-        const std::string label = GetVoltageLabel(m_Schematic.GetConnectivity(), static_cast<int>(node));
-        ImPlot::PlotStems(label.c_str(), result.Frequencies.data(), values.data(), stem_count, stem_ref,
-                          BuildStemSpec(GetNodeColor(static_cast<int>(node)), ImPlotMarker_Circle));
-    }
-    if (has_currents) {
-        ImPlot::SetAxes(ImAxis_X1, ImAxis_Y2);
-        for (std::size_t index = 0; index < result.CurrentPhasors.size(); ++index) {
-            if (!m_Schematic.IsCurrentMeasured(result.CurrentPhasors[index].Name)) {
-                continue;
-            }
-            const std::vector<double> values =
-                ListSpectrumValues(result.CurrentPhasors[index].Phasors, m_Preferences.HarmonicAmplitudes, m_Scale);
-            const int stem_count = std::min(count, static_cast<int>(values.size()));
-            if (stem_count <= 0) {
-                continue;
-            }
-            const std::string label = std::format("I({})", result.CurrentPhasors[index].Name);
-            ImPlot::PlotStems(label.c_str(), result.Frequencies.data(), values.data(), stem_count, stem_ref,
-                              BuildStemSpec(GetCurrentColor(index), ImPlotMarker_Square));
-        }
-        ImPlot::SetAxes(ImAxis_X1, ImAxis_Y1);
-    }
+    SetupSpectrumAxes(has_voltages, has_currents);
+    PlotSpectrumStems(result, has_currents);
     DrawSpectrumTooltip(result, m_Schematic, m_Preferences.HarmonicAmplitudes);
     ImPlot::EndPlot();
 }
 
-void HarmonicBalanceTab::DrawWaveformPlot(const Core::HarmonicBalance &result, const bool has_voltages,
-                                          const bool has_currents, const float height) {
+/**
+ * @brief   Frequency, the voltage amplitude and, when a current is shown, the current amplitude, in the scale chosen.
+ * @note    Call it between BeginPlot and the first item.
+ */
+void HarmonicBalanceTab::SetupSpectrumAxes(const bool has_voltages, const bool has_currents) const {
+    ImPlot::SetupAxes("Frequency",
+                      GetVoltageSpectrumAxisLabel(m_Preferences.HarmonicAmplitudes, m_Scale),
+                      ImPlotAxisFlags_None,
+                      VoltageAxisFlags(has_voltages, has_currents));
+    ImPlot::SetupAxisFormat(ImAxis_X1, FormatAxisValue, const_cast<char *>("Hz"));
+    if (m_Scale == HarmonicScale::LINEAR) {
+        ImPlot::SetupAxisFormat(ImAxis_Y1, FormatAxisValue, const_cast<char *>("V"));
+    }
+    if (!has_currents) {
+        return;
+    }
+    ImPlot::SetupAxis(ImAxis_Y2,
+                      GetCurrentSpectrumAxisLabel(m_Preferences.HarmonicAmplitudes, m_Scale),
+                      ImPlotAxisFlags_AuxDefault);
+    if (m_Scale == HarmonicScale::LINEAR) {
+        ImPlot::SetupAxisFormat(ImAxis_Y2, FormatAxisValue, const_cast<char *>("A"));
+    }
+}
+
+/**
+ * @brief   Plots the harmonics of every measured voltage, and of every measured current on the current axis.
+ * @note    Call it after SetupSpectrumAxes().
+ */
+void HarmonicBalanceTab::PlotSpectrumStems(const Core::HarmonicBalance &result, const bool has_currents) const {
+    // In decibels the stems rise from the floor of the scale, since an amplitude of zero has no decibels
+    const double reference = m_Scale == HarmonicScale::LINEAR ? 0.0 : HARMONIC_DECIBEL_FLOOR;
+    for (std::size_t node = 1; node < result.NodePhasors.size(); ++node) {
+        if (!m_Schematic.GetMeasurements().IsVoltageMeasured(static_cast<int>(node))) {
+            continue;
+        }
+        PlotStemTrace(GetVoltageLabel(m_Schematic.GetConnectivity(), static_cast<int>(node)),
+                      result.Frequencies,
+                      ListSpectrumValues(result.NodePhasors[node], m_Preferences.HarmonicAmplitudes, m_Scale),
+                      reference,
+                      GetNodeColor(static_cast<int>(node)),
+                      ImPlotMarker_Circle);
+    }
+    if (!has_currents) {
+        return;
+    }
+    ImPlot::SetAxes(ImAxis_X1, ImAxis_Y2);
+    for (std::size_t index = 0; index < result.CurrentPhasors.size(); ++index) {
+        const Core::ComponentPhasors &current = result.CurrentPhasors[index];
+        if (!m_Schematic.GetMeasurements().IsCurrentMeasured(current.Name)) {
+            continue;
+        }
+        PlotStemTrace(std::format("I({})", current.Name),
+                      result.Frequencies,
+                      ListSpectrumValues(current.Phasors, m_Preferences.HarmonicAmplitudes, m_Scale),
+                      reference,
+                      GetCurrentColor(index),
+                      ImPlotMarker_Square);
+    }
+    ImPlot::SetAxes(ImAxis_X1, ImAxis_Y1);
+}
+
+void HarmonicBalanceTab::DrawWaveformPlot(const Core::HarmonicBalance &result,
+                                          const bool has_voltages,
+                                          const bool has_currents,
+                                          const float height) {
     const HarmonicWaveformSet waveforms = BuildHarmonicWaveforms(result, m_Schematic, m_Cycles);
     if (waveforms.Times.empty()) {
         return;
     }
-    const bool cycles_changed = std::exchange(m_DrawnCycles, m_Cycles) != m_Cycles;
-    const bool new_result = m_WaveformFit.TakeNewResult(m_Results.GetHarmonicBalanceVersion()) || cycles_changed;
-    const bool nodes_changed =
-        m_WaveformFit.TakeNodesChanged(ListMeasuredNodes(result.NodeWaveforms.size(), m_Schematic));
-    const bool currents_changed =
-        m_WaveformFit.TakeCurrentsChanged(ListMeasuredCurrentNames(result.CurrentWaveforms, m_Schematic));
-    SetNextFits(new_result, nodes_changed, currents_changed);
+    SetNextFits(TakeWaveformFits(result));
 
     if (!BeginTracePlot("##hb_waveform", ImVec2(-1.0f, height))) {
         return;
@@ -426,6 +455,38 @@ void HarmonicBalanceTab::DrawStatistics(const Core::HarmonicBalance &result) {
         }
         ImGui::EndTable();
     }
+}
+
+/**
+ * @brief   Tells which axes of the spectrum fit this frame: all of them for a new result and for another scale or unit
+ *          of the amplitudes, since the old range means nothing in the new one.
+ * @param[in] result  The result shown.
+ * @return  The axes that fit; what the plot shows is kept for the next frame.
+ */
+TraceFits HarmonicBalanceTab::TakeSpectrumFits(const Core::HarmonicBalance &result) {
+    const bool scale_changed = std::exchange(m_DrawnScale, m_Scale) != m_Scale;
+    const bool unit_changed =
+        std::exchange(m_DrawnAmplitudeUnit, m_Preferences.HarmonicAmplitudes) != m_Preferences.HarmonicAmplitudes;
+    return m_SpectrumFit.TakeFits(m_Results.GetHarmonicBalanceVersion(),
+                                  {.Nodes = ListMeasuredNodes(result.NodePhasors.size(), m_Schematic),
+                                   .Currents = ListMeasuredCurrents(result.CurrentWaveforms, m_Schematic),
+                                   .MathLabels = {}},
+                                  scale_changed || unit_changed);
+}
+
+/**
+ * @brief   Tells which axes of the waveforms fit this frame: all of them for a new result and for another number of
+ *          cycles, which changes the time axis.
+ * @param[in] result  The result shown.
+ * @return  The axes that fit; what the plot shows is kept for the next frame.
+ */
+TraceFits HarmonicBalanceTab::TakeWaveformFits(const Core::HarmonicBalance &result) {
+    const bool cycles_changed = std::exchange(m_DrawnCycles, m_Cycles) != m_Cycles;
+    return m_WaveformFit.TakeFits(m_Results.GetHarmonicBalanceVersion(),
+                                  {.Nodes = ListMeasuredNodes(result.NodeWaveforms.size(), m_Schematic),
+                                   .Currents = ListMeasuredCurrents(result.CurrentWaveforms, m_Schematic),
+                                   .MathLabels = {}},
+                                  cycles_changed);
 }
 
 } // namespace GUI

@@ -45,7 +45,8 @@ TEST_CASE("The default file is in gigahertz, magnitude and angle, against the re
 
 TEST_CASE("A two-port lists S11 S21 S12 S22 on one line per frequency", "[touchstone]") {
     const auto text = GUI::FormatTouchstone(
-        MakeTwoPort(), {.Unit = GUI::TouchstoneFrequencyUnit::GHZ, .Format = GUI::TouchstoneFormat::REAL_IMAGINARY});
+        MakeTwoPort(),
+        {.Unit = GUI::TouchstoneFrequencyUnit::GHZ, .Format = GUI::TouchstoneFormat::REAL_IMAGINARY});
     REQUIRE(text.has_value());
     const std::vector<std::string> lines = SplitLines(*text);
     // Comment lines, the option line, then the two frequencies
@@ -64,14 +65,16 @@ TEST_CASE("The frequencies and the values follow the unit and the format", "[tou
     // S11 = 0.5, S21 = j, S12 = -1, S22 = 0
     result.Values = {{0.5, 0.0}, {-1.0, 0.0}, {0.0, 1.0}, {0.0, 0.0}};
     const auto megahertz = GUI::FormatTouchstone(
-        result, {.Unit = GUI::TouchstoneFrequencyUnit::MHZ, .Format = GUI::TouchstoneFormat::MAGNITUDE_ANGLE});
+        result,
+        {.Unit = GUI::TouchstoneFrequencyUnit::MHZ, .Format = GUI::TouchstoneFormat::MAGNITUDE_ANGLE});
     REQUIRE(megahertz.has_value());
     CHECK_THAT(*megahertz, ContainsSubstring("# MHz S MA R 50\n"));
     // S11 is 0.5 at 0 degrees, S21 is 1 at 90, S12 is 1 at 180 and S22 is 0 at 0
     CHECK_THAT(*megahertz, ContainsSubstring("\n1.5 0.5 0 1 90 1 180 0 0\n"));
 
     const auto hertz = GUI::FormatTouchstone(
-        result, {.Unit = GUI::TouchstoneFrequencyUnit::HZ, .Format = GUI::TouchstoneFormat::DECIBEL_ANGLE});
+        result,
+        {.Unit = GUI::TouchstoneFrequencyUnit::HZ, .Format = GUI::TouchstoneFormat::DECIBEL_ANGLE});
     REQUIRE(hertz.has_value());
     CHECK_THAT(*hertz, ContainsSubstring("# Hz S DB R 50\n"));
     // 0.5 is -6.02 dB, 1 is 0 dB and a zero is floored at -300 dB
@@ -121,7 +124,8 @@ TEST_CASE("A one-port is a .s1p file with a pair of numbers after each frequency
     result.ReferenceOhms = {50.0};
     result.Values = {{0.1, 0.2}, {0.3, -0.4}};
     const auto text = GUI::FormatTouchstone(
-        result, {.Unit = GUI::TouchstoneFrequencyUnit::GHZ, .Format = GUI::TouchstoneFormat::REAL_IMAGINARY});
+        result,
+        {.Unit = GUI::TouchstoneFrequencyUnit::GHZ, .Format = GUI::TouchstoneFormat::REAL_IMAGINARY});
     REQUIRE(text.has_value());
     const std::vector<std::string> lines = SplitLines(*text);
     REQUIRE(lines.size() == 4);

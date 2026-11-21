@@ -33,8 +33,8 @@
 
 namespace {
 
-std::shared_ptr<Core::SubcircuitDefinition> MakeDivider(std::string name, Core::Resistor &upper,
-                                                        Core::Resistor &lower) {
+std::shared_ptr<Core::SubcircuitDefinition>
+MakeDivider(std::string name, Core::Resistor &upper, Core::Resistor &lower) {
     upper.SetName("R1");
     upper.SetValueExpression("{RTOP}");
     lower.SetName("R2");
@@ -58,7 +58,9 @@ Core::SubcircuitInstance MakeInstance(const std::string &name, const std::string
 /**
  * @brief   A pin marker; unturned, its arrow points right, which puts the pin on the left of the block.
  */
-void AddMarker(GUI::Schematic &schematic, const GUI::GridPoint point, const std::string &name,
+void AddMarker(GUI::Schematic &schematic,
+               const GUI::GridPoint point,
+               const std::string &name,
                const GUI::Rotation rotation = GUI::Rotation::R0) {
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::PIN, point, rotation));
     static_cast<Core::NetLabel &>(schematic.GetElements().back()->GetComponent()).SetNet(name);
@@ -82,8 +84,8 @@ bool AreWiresClearOf(const GUI::Schematic &schematic, const GUI::UIElement &bloc
         const GUI::GridPoint step = {(end.X > point.X) - (end.X < point.X), (end.Y > point.Y) - (end.Y < point.Y)};
         for (;; point = {point.X + step.X, point.Y + step.Y}) {
             const bool is_inside =
-                static_cast<float>(point.X) >= bounds.Min.x && static_cast<float>(point.X) <= bounds.Max.x &&
-                static_cast<float>(point.Y) >= bounds.Min.y && static_cast<float>(point.Y) <= bounds.Max.y;
+                static_cast<float>(point.X) >= bounds.Min.x && static_cast<float>(point.X) <= bounds.Max.x
+                && static_cast<float>(point.Y) >= bounds.Min.y && static_cast<float>(point.Y) <= bounds.Max.y;
             if ((is_inside && !std::ranges::contains(leads, point)) || std::ranges::contains(names, point)) {
                 return false;
             }
@@ -255,7 +257,9 @@ TEST_CASE("Subcircuit definitions and instances round-trip through an imcsim fil
     CHECK(copy.GetParameters().at("RTOP") == 3e3);
 
     GUI::Schematic schematic;
-    schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings),
+    schematic.Replace(std::move(loaded->Elements),
+                      std::move(loaded->Wires),
+                      std::move(loaded->Settings),
                       std::move(loaded->Subcircuits));
     const std::string netlist = schematic.BuildSpiceNetlist();
     INFO(netlist);
@@ -315,7 +319,7 @@ TEST_CASE("A selection becomes a reusable block and its creation is undoable", "
     AddMarker(schematic, {2, 0}, "OUT", GUI::Rotation::R180);
     schematic.AddWire({2, 0}, {6, 0});
     schematic.AddWire({-6, 0}, {-2, 0});
-    schematic.SetSelection({0, 3, 4}, {0, 1});
+    schematic.SetSelection({.Elements = {0, 3, 4}, .Wires = {0, 1}});
     schematic.CommitUndoStep();
 
     auto candidates = schematic.GetSubcircuitPinCandidates();
@@ -329,10 +333,10 @@ TEST_CASE("A selection becomes a reusable block and its creation is undoable", "
     REQUIRE(schematic.GetSubcircuits().size() == 1);
     CHECK(schematic.GetSubcircuits()[0].Elements.size() == 3);
     CHECK(schematic.GetSubcircuits()[0].Pins[0].Name == "INPUT");
-    CHECK(static_cast<const Core::NetLabel &>(schematic.GetSubcircuits()[0].Elements[1]->GetComponent()).GetNet() ==
-          "INPUT");
-    CHECK(static_cast<const Core::NetLabel &>(schematic.GetSubcircuits()[0].Elements[2]->GetComponent()).GetNet() ==
-          "OUTPUT");
+    CHECK(static_cast<const Core::NetLabel &>(schematic.GetSubcircuits()[0].Elements[1]->GetComponent()).GetNet()
+          == "INPUT");
+    CHECK(static_cast<const Core::NetLabel &>(schematic.GetSubcircuits()[0].Elements[2]->GetComponent()).GetNet()
+          == "OUTPUT");
     REQUIRE(schematic.GetElements().size() == 3);
     const auto &instance = static_cast<const Core::SubcircuitInstance &>(schematic.GetElement(2).GetComponent());
     CHECK(instance.GetDefinitionName() == "block");
@@ -360,7 +364,7 @@ TEST_CASE("Only selected pin markers become block connections", "[subcircuit]") 
     schematic.AddWire({2, 0}, {6, 0});
     schematic.AddWire({-6, 0}, {-2, 0});
     schematic.AddWire({0, 2}, {0, 6});
-    schematic.SetSelection({0, 4, 5}, {0, 1, 2});
+    schematic.SetSelection({.Elements = {0, 4, 5}, .Wires = {0, 1, 2}});
 
     auto candidates = schematic.GetSubcircuitPinCandidates();
     REQUIRE(candidates);
@@ -369,14 +373,14 @@ TEST_CASE("Only selected pin markers become block connections", "[subcircuit]") 
     CHECK((*candidates)[1].SuggestedName == "P2");
     REQUIRE(schematic.CreateSubcircuitFromSelection("amplifier", {{"IN", {-2, 0}}, {"OUT", {2, 0}}}));
     CHECK(schematic.GetSubcircuits()[0].Pins.size() == 2);
-    CHECK(static_cast<const Core::SubcircuitInstance &>(schematic.GetElements().back()->GetComponent()).GetPins() ==
-          std::vector<std::string>{"IN", "OUT"});
+    CHECK(static_cast<const Core::SubcircuitInstance &>(schematic.GetElements().back()->GetComponent()).GetPins()
+          == std::vector<std::string>{"IN", "OUT"});
 }
 
 TEST_CASE("Block creation requires unique markers on separate nodes", "[subcircuit]") {
     GUI::Schematic schematic;
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 0}, GUI::Rotation::R0));
-    schematic.SetSelection({0}, {});
+    schematic.SetSelection({.Elements = {0}, .Wires = {}});
     auto unmarked = schematic.GetSubcircuitPinCandidates();
     REQUIRE_FALSE(unmarked);
     CHECK(unmarked.error().contains("pin markers"));
@@ -384,7 +388,7 @@ TEST_CASE("Block creation requires unique markers on separate nodes", "[subcircu
 
     AddMarker(schematic, {-2, 0}, "IN");
     AddMarker(schematic, {2, 0}, "IN", GUI::Rotation::R180);
-    schematic.SetSelection({0, 1, 2}, {});
+    schematic.SetSelection({.Elements = {0, 1, 2}, .Wires = {}});
     auto repeated = schematic.GetSubcircuitPinCandidates();
     REQUIRE_FALSE(repeated);
     CHECK(repeated.error().contains("unique"));
@@ -405,8 +409,9 @@ TEST_CASE("Editing a definition propagates pins, parameters and contents to ever
     AddMarker(schematic, {2, 0}, "OUT", GUI::Rotation::R180);
     schematic.AddWire({2, 0}, {6, 0});
     schematic.AddWire({-6, 0}, {-2, 0});
-    schematic.SetSelection({0, 3, 4}, {});
-    auto created = schematic.CreateSubcircuitFromSelection("block", {{"IN", {-2, 0}}, {"OUT", {2, 0}}},
+    schematic.SetSelection({.Elements = {0, 3, 4}, .Wires = {}});
+    auto created = schematic.CreateSubcircuitFromSelection("block",
+                                                           {{"IN", {-2, 0}}, {"OUT", {2, 0}}},
                                                            {{"R", 1e3}, {"DROP", 2.0}});
     REQUIRE(created);
     auto &first_instance = static_cast<Core::SubcircuitInstance &>(schematic.GetElement(2).GetComponent());
@@ -463,7 +468,7 @@ TEST_CASE("Block creation needs pin markers in the selection and valid metadata"
     GUI::Schematic schematic;
     CHECK_FALSE(schematic.GetSubcircuitPinCandidates());
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::SUBCIRCUIT, {0, 0}, GUI::Rotation::R0));
-    schematic.SetSelection({0}, {});
+    schematic.SetSelection({.Elements = {0}, .Wires = {}});
     CHECK_FALSE(schematic.GetSubcircuitPinCandidates());
     CHECK_FALSE(schematic.CreateSubcircuitFromSelection("not valid", {}));
     CHECK_FALSE(schematic.OpenSubcircuit("missing"));
@@ -496,7 +501,7 @@ TEST_CASE("A pin on the ground inside a block is refused, since it would connect
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::GROUND, {2, 0}, GUI::Rotation::R0));
     AddMarker(schematic, {-2, 0}, "IN");
     AddMarker(schematic, {2, 0}, "GND", GUI::Rotation::R180);
-    schematic.SetSelection({0, 1, 2, 3}, {});
+    schematic.SetSelection({.Elements = {0, 1, 2, 3}, .Wires = {}});
     const auto created = schematic.CreateSubcircuitFromSelection("grounded", {{"IN", {-2, 0}}, {"GND", {2, 0}}});
     REQUIRE_FALSE(created);
     CHECK(created.error().contains("ground"));
@@ -522,7 +527,7 @@ TEST_CASE("Reordering the pins of a new block keeps each name on its own marker"
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 0}, GUI::Rotation::R0));
     AddMarker(schematic, {-2, 0}, "IN");
     AddMarker(schematic, {2, 0}, "OUT", GUI::Rotation::R180);
-    schematic.SetSelection({0, 1, 2}, {});
+    schematic.SetSelection({.Elements = {0, 1, 2}, .Wires = {}});
     // The output first, as the dialog's Up button leaves them
     REQUIRE(schematic.CreateSubcircuitFromSelection("block", {{"OUT", {2, 0}}, {"IN", {-2, 0}}}));
 
@@ -598,6 +603,35 @@ TEST_CASE("A pin goes on the edge its marker's arrow comes from", "[subcircuit]"
     CHECK(std::string_view(GUI::GetPinSideName(Core::PinSide::BOTTOM)) == "bottom");
 }
 
+TEST_CASE("The marker of a pin is the one whose terminal is on the pin's point", "[subcircuit]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 0}, GUI::Rotation::R0));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::PIN, {-4, 0}, GUI::Rotation::R0));
+    CHECK(GUI::FindPinMarker(elements, {-4, 0}) == elements[1].get());
+    // A part that is no marker is not found, even on the point of one of its terminals
+    CHECK(GUI::FindPinMarker(elements, elements[0]->GetTerminals().front()) == nullptr);
+}
+
+TEST_CASE("Pin markers take the names of the pins on their points, and a marker without a pin is refused",
+          "[subcircuit]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::PIN, {-4, 0}, GUI::Rotation::R0));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::PIN, {4, 0}, GUI::Rotation::R180));
+    const std::vector<GUI::SavedSubcircuitPin> pins = {{"IN", {-4, 0}}, {"OUT", {4, 0}}};
+    const auto named = GUI::NameMarkersAfterPins(elements, pins);
+    REQUIRE(named);
+    CHECK(*named);
+    CHECK(static_cast<const Core::NetLabel &>(elements[1]->GetComponent()).GetNet() == "OUT");
+    // Named once already, the second pass changes nothing
+    const auto again = GUI::NameMarkersAfterPins(elements, pins);
+    REQUIRE(again);
+    CHECK_FALSE(*again);
+
+    const auto refused = GUI::NameMarkersAfterPins(elements, {pins.front()});
+    REQUIRE_FALSE(refused);
+    CHECK(refused.error() == "Every pin marker needs a block pin name");
+}
+
 TEST_CASE("Renaming a pin keeps the wires of every instance on it", "[subcircuit]") {
     GUI::Schematic schematic;
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 0}, GUI::Rotation::R0));
@@ -607,7 +641,7 @@ TEST_CASE("Renaming a pin keeps the wires of every instance on it", "[subcircuit
     AddMarker(schematic, {2, 0}, "OUT", GUI::Rotation::R180);
     schematic.AddWire({2, 0}, {6, 0});
     schematic.AddWire({-6, 0}, {-2, 0});
-    schematic.SetSelection({0, 3, 4}, {});
+    schematic.SetSelection({.Elements = {0, 3, 4}, .Wires = {}});
     REQUIRE(schematic.CreateSubcircuitFromSelection("block", {{"IN", {-2, 0}}, {"OUT", {2, 0}}}));
     schematic.CommitUndoStep();
     const std::size_t wire_count = schematic.GetWires().size();
@@ -618,8 +652,8 @@ TEST_CASE("Renaming a pin keeps the wires of every instance on it", "[subcircuit
     REQUIRE(schematic.UpdateSubcircuit("block", **content, {{"SIGNAL", {-2, 0}}, {"OUT", {2, 0}}}, {}));
     CHECK(schematic.GetWires().size() == wire_count);
     const GUI::UIElement &block = schematic.GetElement(2);
-    CHECK(static_cast<const Core::SubcircuitInstance &>(block.GetComponent()).GetPins() ==
-          std::vector<std::string>{"SIGNAL", "OUT"});
+    CHECK(static_cast<const Core::SubcircuitInstance &>(block.GetComponent()).GetPins()
+          == std::vector<std::string>{"SIGNAL", "OUT"});
     const GUI::Connectivity &nodes = schematic.GetConnectivity();
     const std::vector<GUI::GridPoint> terminals = block.GetTerminals();
     CHECK(nodes.GetNode({-6, 0}) == nodes.GetNode(terminals[0]));
@@ -639,7 +673,7 @@ TEST_CASE("The wires of a new block go around its box, from the edge each pin is
     schematic.AddWire({-2, 6}, {-6, 6});
     schematic.AddWire({2, 0}, {2, 6});
     schematic.AddWire({2, 6}, {6, 6});
-    schematic.SetSelection({0, 3, 4}, {});
+    schematic.SetSelection({.Elements = {0, 3, 4}, .Wires = {}});
     REQUIRE(schematic.CreateSubcircuitFromSelection("block", {{"IN", {-2, 0}}, {"OUT", {2, 0}}}));
 
     const GUI::UIElement &block = *schematic.GetElements().back();
@@ -689,7 +723,7 @@ TEST_CASE("A new block moves aside when its box would cover a point its wires go
     AddMarker(schematic, {1, 0}, "OUT", GUI::Rotation::R180);
     schematic.AddWire({-6, 0}, {-1, 0});
     schematic.AddWire({1, 0}, {6, 0});
-    schematic.SetSelection({0, 3, 4}, {});
+    schematic.SetSelection({.Elements = {0, 3, 4}, .Wires = {}});
     REQUIRE(schematic.CreateSubcircuitFromSelection("block", {{"IN", {-1, 0}}, {"OUT", {1, 0}}}));
 
     const GUI::UIElement &block = *schematic.GetElements().back();
@@ -734,7 +768,7 @@ TEST_CASE("A part follows only a parameter of the block it is in", "[subcircuit]
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 0}, GUI::Rotation::R0));
     AddMarker(schematic, {-2, 0}, "IN");
     AddMarker(schematic, {2, 0}, "OUT", GUI::Rotation::R180);
-    schematic.SetSelection({0, 1, 2}, {});
+    schematic.SetSelection({.Elements = {0, 1, 2}, .Wires = {}});
     REQUIRE(schematic.CreateSubcircuitFromSelection("block", {{"IN", {-2, 0}}, {"OUT", {2, 0}}}, {{"R", 1e3}}));
     auto content = schematic.OpenSubcircuit("block");
     REQUIRE(content);
@@ -806,7 +840,7 @@ TEST_CASE("Picking another edge for a pin turns its marker in place, and the ins
     AddMarker(schematic, {2, 0}, "OUT", GUI::Rotation::R180);
     schematic.AddWire({2, 0}, {6, 0});
     schematic.AddWire({-6, 0}, {-2, 0});
-    schematic.SetSelection({0, 3, 4}, {});
+    schematic.SetSelection({.Elements = {0, 3, 4}, .Wires = {}});
     REQUIRE(schematic.CreateSubcircuitFromSelection("block", {{"IN", {-2, 0}}, {"OUT", {2, 0}}}));
     schematic.CommitUndoStep();
 

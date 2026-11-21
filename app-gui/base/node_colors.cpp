@@ -73,8 +73,10 @@ ImU32 GetHeatColor(const float level) {
     const float fraction = position - static_cast<float>(stop);
     const ImVec4 &low = HEAT_STOPS[stop];
     const ImVec4 &high = HEAT_STOPS[stop + 1];
-    return ImGui::ColorConvertFloat4ToU32({low.x + (high.x - low.x) * fraction, low.y + (high.y - low.y) * fraction,
-                                           low.z + (high.z - low.z) * fraction, 1.0f});
+    return ImGui::ColorConvertFloat4ToU32({low.x + (high.x - low.x) * fraction,
+                                           low.y + (high.y - low.y) * fraction,
+                                           low.z + (high.z - low.z) * fraction,
+                                           1.0f});
 }
 
 } // namespace GUI

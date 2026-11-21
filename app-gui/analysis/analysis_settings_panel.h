@@ -7,16 +7,25 @@
 #ifndef IMCSIM_ANALYSIS_SETTINGS_PANEL_H
 #define IMCSIM_ANALYSIS_SETTINGS_PANEL_H
 
+#include "analysis/run_mode_settings_panel.h"
 #include "base/value_field.h"
-#include "results/parameter_step.h"
 #include "schematic/schematic.h"
 #include "schematic/simulation_settings.h"
-#include "simulation/monte_carlo.h"
 #include <array>
 #include <cstddef>
+#include <optional>
 #include <string>
 
 namespace GUI {
+
+/**
+ * @struct  FrequencyRangeFields
+ * @brief   The start and stop fields of a frequency range, which keep the text being typed.
+ */
+struct FrequencyRangeFields {
+    ValueField Start;
+    ValueField Stop;
+};
 
 /**
  * @class   AnalysisSettingsPanel
@@ -43,55 +52,47 @@ private:
     ValueField m_StopTime;
     ValueField m_TimeStep;
     ValueField m_LiveSeconds;
-    ValueField m_StartFrequency;
-    ValueField m_StopFrequency;
+    FrequencyRangeFields m_ACSweepRange;
     /// Start, stop and step of the swept DC sweep range.
     std::array<ValueField, 3> m_SweptFields;
     /// Start, stop and step of the stepped DC sweep range.
     std::array<ValueField, 3> m_SteppedFields;
-    ValueField m_NoiseStartFrequency;
-    ValueField m_NoiseStopFrequency;
-    ValueField m_ACSensitivityStartFrequency;
-    ValueField m_ACSensitivityStopFrequency;
-    ValueField m_SStartFrequency;
-    ValueField m_SStopFrequency;
+    FrequencyRangeFields m_NoiseRange;
+    FrequencyRangeFields m_ACSensitivityRange;
+    FrequencyRangeFields m_SParameterRange;
     ValueField m_HBFundamental;
-    /// Start, stop and step of the stepped parameter.
-    std::array<ValueField, 3> m_ParameterFields;
-    /// The tolerance in percent that the buttons of Monte Carlo give every part of a kind.
-    ValueField m_ToleranceAllField;
-    double m_ToleranceAllPercent = 5.0;
     ValueField m_RelativeTolerance;
     ValueField m_CurrentTolerance;
     ValueField m_VoltageTolerance;
     ValueField m_NominalTemperature;
 
+    // Run mode
+    RunModeSettingsPanel m_RunModeSettings;
+
     // Settings fields
     void DrawSelectedSettings(SimulationSettings &settings);
     void LoadSettingsFields();
+    void DrawOperatingPointSettings();
     void DrawTransientSettings(SimulationSettings &settings);
     void DrawACSweepSettings(SimulationSettings &settings);
     void DrawDCSweepSettings(SimulationSettings &settings);
     void DrawNoiseSettings(SimulationSettings &settings);
     void DrawTransferFunctionSettings(SimulationSettings &settings);
-    void DrawSensitivitySettings(SimulationSettings &settings);
-    void DrawACSensitivityInputs(SimulationSettings &settings);
-    void DrawPoleZeroSettings(SimulationSettings &settings);
     void DrawSParameterSettings(SimulationSettings &settings);
     void DrawPortSummary();
-    void DrawSourceAndOutputPickers(std::string &source, std::optional<GridPoint> &output, const std::string &id,
-                                    const char *empty_text, const char *tooltip);
+    void DrawPoleZeroSettings(SimulationSettings &settings);
+    void DrawSourceAndOutputPickers(std::string &source,
+                                    std::optional<GridPoint> &output,
+                                    const std::string &id,
+                                    const char *empty_text,
+                                    const char *tooltip);
+    void
+    DrawOutputPicker(const char *id, std::optional<GridPoint> &output, int shown_node, const Core::Circuit &circuit);
+    void DrawSensitivitySettings(SimulationSettings &settings);
+    void DrawACSensitivityInputs(SimulationSettings &settings, const Core::Circuit &circuit);
     void DrawTruthTableSettings(SimulationSettings &settings);
     void DrawHarmonicBalanceSettings(SimulationSettings &settings);
-    void DrawRunModeSettings(SimulationSettings &settings);
     void DrawSolverSettings(Core::SolverOptions &options);
-    void DrawParameterStepSettings(ParameterStepSettings &step);
-    void DrawMonteCarloSettings(Core::MonteCarloSettings &monte_carlo);
-    void DrawToleranceButtons();
-    void DrawMonteCarloSummary(const Core::MonteCarloSettings &monte_carlo);
-    void DrawParameterPicker(ParameterStepSettings &step, const Core::Circuit &circuit);
-    void DrawStepValues(ParameterStepSettings &step, const std::string &unit);
-    void LoadParameterStepFields(const ParameterStepSettings &step);
     void LoadSolverFields(const Core::SolverOptions &options);
 };
 

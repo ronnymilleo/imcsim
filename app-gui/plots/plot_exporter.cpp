@@ -53,8 +53,8 @@ void PlotExporter::OpenPopup() {
  *                            hold; the image always shows the window.
  * @return  What to save once the user picks it.
  */
-std::optional<ExportChoice> PlotExporter::DrawPopup(const std::string &plot_name, const bool can_export,
-                                                    const bool has_longer_run) {
+std::optional<ExportChoice>
+PlotExporter::DrawPopup(const std::string &plot_name, const bool can_export, const bool has_longer_run) {
     if (!ImGui::BeginPopup(EXPORT_POPUP)) {
         return std::nullopt;
     }
@@ -114,8 +114,10 @@ std::optional<ExportChoice> PlotExporter::DrawPopup(const std::string &plot_name
  * @param[in] schematic_path  File of the schematic, if it has one.
  * @param[in] file_suffix     Names the plot in the file name, such as "ac-sweep".
  */
-void PlotExporter::Start(ExportFigure figure, const ExportFormat format,
-                         const std::optional<std::filesystem::path> &schematic_path, const std::string &file_suffix) {
+void PlotExporter::Start(ExportFigure figure,
+                         const ExportFormat format,
+                         const std::optional<std::filesystem::path> &schematic_path,
+                         const std::string &file_suffix) {
     if (m_Dialog.IsPending()) {
         return;
     }
@@ -141,7 +143,8 @@ void PlotExporter::Start(ExportFigure figure, const ExportFormat format,
  *                            untitled one.
  * @param[in] file_suffix     Added to the schematic's name.
  */
-void PlotExporter::StartText(std::string csv, const std::optional<std::filesystem::path> &schematic_path,
+void PlotExporter::StartText(std::string csv,
+                             const std::optional<std::filesystem::path> &schematic_path,
                              const std::string &file_suffix) {
     if (m_Dialog.IsPending()) {
         return;
@@ -164,7 +167,8 @@ void PlotExporter::StartText(std::string csv, const std::optional<std::filesyste
  *                            untitled one.
  * @param[in] file_suffix     Added to the schematic's name.
  */
-void PlotExporter::StartTouchstone(std::string text, const int port_count,
+void PlotExporter::StartTouchstone(std::string text,
+                                   const int port_count,
                                    const std::optional<std::filesystem::path> &schematic_path,
                                    const std::string &file_suffix) {
     if (m_Dialog.IsPending()) {

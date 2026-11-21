@@ -1,6 +1,7 @@
 /**
  * @file    subcircuit_pins.h
- * @brief   Checks the pins of a block definition, tells the edge each one goes on and hands them to its instances.
+ * @brief   Checks the pins of a block definition, finds and names their markers, tells the edge each one goes on
+ *          and hands them to its instances.
  */
 
 #ifndef IMCSIM_SUBCIRCUIT_PINS_H
@@ -11,6 +12,7 @@
 #include "schematic/connectivity.h"
 #include "schematic/schematic_file.h"
 #include <array>
+#include <expected>
 #include <memory>
 #include <optional>
 #include <string>
@@ -26,6 +28,12 @@ inline constexpr auto PIN_SIDES =
 // Checks
 std::optional<std::string> CheckPinNodes(const Connectivity &connectivity, const std::vector<SavedSubcircuitPin> &pins);
 
+// Markers
+UIElement *FindPinMarker(const std::vector<std::unique_ptr<UIElement>> &elements, GridPoint point);
+[[nodiscard]] std::expected<bool, std::string>
+NameMarkersAfterPins(const std::vector<std::unique_ptr<UIElement>> &elements,
+                     const std::vector<SavedSubcircuitPin> &pins);
+
 // Sides
 Core::PinSide GetMarkerSide(const UIElement &marker);
 std::optional<Core::PinSide> FindMarkerSide(const std::vector<std::unique_ptr<UIElement>> &elements, GridPoint point);
@@ -34,7 +42,8 @@ const char *GetPinSideName(Core::PinSide side);
 std::optional<Core::PinSide> ParsePinSide(std::string_view name);
 
 // S-parameter ports
-bool IsPortNumberTaken(const std::vector<std::unique_ptr<UIElement>> &elements, int number,
+bool IsPortNumberTaken(const std::vector<std::unique_ptr<UIElement>> &elements,
+                       int number,
                        const Core::Component *except);
 int FindFreePortNumber(const std::vector<std::unique_ptr<UIElement>> &elements, const Core::Component *except);
 

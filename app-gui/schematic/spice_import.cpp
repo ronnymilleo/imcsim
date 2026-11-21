@@ -7,11 +7,15 @@
 #include "schematic/spice_import.h"
 
 #include "circuit/components/subcircuit.h"
+#include "schematic/free_name.h"
+#include "spice/spice_text.h"
 #include <algorithm>
 #include <array>
 #include <cctype>
 #include <format>
+#include <functional>
 #include <set>
+#include <string_view>
 #include <utility>
 
 namespace GUI {
@@ -23,19 +27,12 @@ constexpr auto TOP_PORTS = std::to_array<std::string_view>({"V+", "VCC", "VDD", 
 /// Port names of negative supplies and ground, whose pins go on the bottom edge.
 constexpr auto BOTTOM_PORTS = std::to_array<std::string_view>({"V-", "VEE", "VSS", "VNEG", "VS-", "VCC-", "GND", "0"});
 
-std::string ToUpper(const std::string_view text) {
-    std::string upper(text);
-    std::ranges::transform(upper, upper.begin(),
-                           [](const unsigned char character) { return static_cast<char>(std::toupper(character)); });
-    return upper;
-}
-
 /**
  * @brief   The edge a port name suggests; most libraries number their ports, which suggests nothing and stays on the
  *          left.
  */
 Core::PinSide SuggestSide(const std::string_view port) {
-    const std::string upper = ToUpper(port);
+    const std::string upper = Core::ToUpper(port);
     if (std::ranges::contains(TOP_PORTS, upper)) {
         return Core::PinSide::TOP;
     }
@@ -76,13 +73,12 @@ std::string MakeIdentifier(const std::string_view text, const std::string_view f
  */
 std::vector<SavedSubcircuitPin> SuggestSpicePins(const Core::LibrarySubcircuit &subcircuit) {
     std::vector<SavedSubcircuitPin> pins;
-    std::set<std::string> names;
+    std::set<std::string, std::less<>> names;
     for (const std::string &port : subcircuit.Ports) {
-        const std::string base = MakeIdentifier(port, "P");
-        std::string name = base;
-        for (int suffix = 2; !names.insert(name).second; ++suffix) {
-            name = std::format("{}_{}", base, suffix);
-        }
+        std::string name = FindFreeName(MakeIdentifier(port, "P"), [&names](const std::string_view candidate) {
+            return names.contains(candidate);
+        });
+        names.insert(name);
         pins.push_back({.Name = std::move(name), .Point = {}, .Side = SuggestSide(port)});
     }
     return pins;
@@ -119,6 +115,15 @@ SavedSubcircuit MakeSpiceBlock(const Core::LibrarySubcircuit &subcircuit, std::v
     block.Parameters = subcircuit.Parameters;
     block.Spice = Core::SubcircuitText{.Ports = subcircuit.Ports, .Text = subcircuit.Text};
     return block;
+}
+
+/**
+ * @brief   Tells how many device models an import added, when it added no block to place.
+ * @param[in] count  Number of models imported.
+ * @return  Text such as "1 device model imported" or "3 device models imported".
+ */
+std::string DescribeImportedModels(const std::size_t count) {
+    return std::format("{} device model{} imported", count, count == 1 ? "" : "s");
 }
 
 } // namespace GUI

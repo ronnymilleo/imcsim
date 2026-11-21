@@ -49,7 +49,8 @@ void BehavioralSourceDevice::SetTemperature(const ThermalConditions &thermal) {
     m_TemperatureCelsius = thermal.TemperatureKelvin - CELSIUS_TO_KELVIN;
 }
 
-BehavioralSourceDevice::BehavioralSourceDevice(std::string name, Expression expression,
+BehavioralSourceDevice::BehavioralSourceDevice(std::string name,
+                                               Expression expression,
                                                std::vector<BehavioralBinding> bindings)
     : m_Name(std::move(name)), m_Expression(std::move(expression)), m_Bindings(std::move(bindings)),
       m_Partials(m_Bindings.size(), 0.0) {
@@ -143,8 +144,12 @@ std::vector<double> BehavioralSourceDevice::ReadInputs(const std::vector<double>
     return values;
 }
 
-BehavioralVoltageDevice::BehavioralVoltageDevice(std::string name, const int node_a, const int node_b, const int branch,
-                                                 Expression expression, std::vector<BehavioralBinding> bindings)
+BehavioralVoltageDevice::BehavioralVoltageDevice(std::string name,
+                                                 const int node_a,
+                                                 const int node_b,
+                                                 const int branch,
+                                                 Expression expression,
+                                                 std::vector<BehavioralBinding> bindings)
     : BehavioralSourceDevice(std::move(name), std::move(expression), std::move(bindings)), m_NodeA(node_a),
       m_NodeB(node_b), m_Branch(branch) {
 }
@@ -179,8 +184,11 @@ std::complex<double> BehavioralVoltageDevice::AcTerminalCurrent(const int termin
     return terminal == 0 ? current : -current;
 }
 
-BehavioralCurrentDevice::BehavioralCurrentDevice(std::string name, const int node_a, const int node_b,
-                                                 Expression expression, std::vector<BehavioralBinding> bindings)
+BehavioralCurrentDevice::BehavioralCurrentDevice(std::string name,
+                                                 const int node_a,
+                                                 const int node_b,
+                                                 Expression expression,
+                                                 std::vector<BehavioralBinding> bindings)
     : BehavioralSourceDevice(std::move(name), std::move(expression), std::move(bindings)), m_NodeA(node_a),
       m_NodeB(node_b) {
 }

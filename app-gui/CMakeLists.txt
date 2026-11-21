@@ -8,13 +8,18 @@ add_library(imcsim-gui-lib
             analysis/analysis_inputs.cpp
             analysis/analysis_settings_panel.cpp
             analysis/auto_rerun.cpp
+            analysis/harmonic_balance_samples.cpp
+            analysis/live_run_plan.cpp
             analysis/run_ac_sweep.cpp
             analysis/run_dc_sweep.cpp
             analysis/run_harmonic_balance.cpp
             analysis/run_jobs.cpp
+            analysis/run_mode_settings_panel.cpp
             analysis/run_noise.cpp
             analysis/run_operating_point.cpp
             analysis/run_pole_zero.cpp
+            analysis/run_repeat.cpp
+            analysis/run_report.cpp
             analysis/run_s_parameters.cpp
             analysis/run_sensitivity.cpp
             analysis/run_status.cpp
@@ -32,11 +37,18 @@ add_library(imcsim-gui-lib
             base/trace_swatch.cpp
             base/value_field.cpp
             canvas/schematic_canvas.cpp
+            overlays/color_legend.cpp
+            overlays/displayed_state.cpp
+            overlays/fuse_blow_tracker.cpp
             overlays/fuse_flash.cpp
+            overlays/glow_falloff.cpp
             overlays/glow_renderer.cpp
             overlays/heat_glow.cpp
+            overlays/hovered_value.cpp
             overlays/led_glow.cpp
             overlays/live_current.cpp
+            overlays/node_readouts.cpp
+            overlays/part_heat.cpp
             overlays/readout_placement.cpp
             overlays/schematic_overlays.cpp
             plots/harmonic_balance_view.cpp
@@ -62,11 +74,13 @@ add_library(imcsim-gui-lib
             results/circuit_snapshot.cpp
             results/current_flow.cpp
             results/fuse_readings.cpp
+            results/logarithmic_level.cpp
             results/logic_bus.cpp
             results/logic_outputs.cpp
             results/logic_trace.cpp
             results/math_channel.cpp
             results/monte_carlo_results.cpp
+            results/node_index.cpp
             results/parameter_step.cpp
             results/playback.cpp
             results/point_window.cpp
@@ -75,12 +89,16 @@ add_library(imcsim-gui-lib
             results/sensitivity_view.cpp
             results/stability_circles.cpp
             results/stability_summary.cpp
-            results/trace_math.cpp
+            results/trace_math_eval.cpp
+            results/trace_math_parser.cpp
+            results/trace_math_samples.cpp
+            results/trace_math_units.cpp
             results/trace_statistics.cpp
             results/transient_window.cpp
             results/truth_table.cpp
             results/two_port_metrics.cpp
             schematic/block_definitions.cpp
+            schematic/block_library.cpp
             schematic/block_nesting.cpp
             schematic/block_session.cpp
             schematic/block_wiring.cpp
@@ -92,17 +110,22 @@ add_library(imcsim-gui-lib
             schematic/element_factory.cpp
             schematic/examples.cpp
             schematic/file_elements.cpp
+            schematic/file_figure_fields.cpp
             schematic/file_json.cpp
             schematic/file_library_models.cpp
             schematic/file_measurements.cpp
-            schematic/file_part_fields.cpp
+            schematic/file_model_fields.cpp
+            schematic/file_part_state_fields.cpp
             schematic/file_settings.cpp
+            schematic/file_source_fields.cpp
             schematic/file_subcircuits.cpp
             schematic/file_wires.cpp
+            schematic/free_name.cpp
             schematic/group_editing.cpp
             schematic/live_input.cpp
             schematic/logic_bus_definition.cpp
             schematic/math_channel_definition.cpp
+            schematic/measurements.cpp
             schematic/parameter_step_settings.cpp
             schematic/part_catalog.cpp
             schematic/part_names.cpp
@@ -117,6 +140,7 @@ add_library(imcsim-gui-lib
             schematic/schematic_file_actions.cpp
             schematic/selection.cpp
             schematic/selection_editing.cpp
+            schematic/shortcuts.cpp
             schematic/simulation_settings.cpp
             schematic/spice_import.cpp
             schematic/subcircuit_pins.cpp
@@ -131,16 +155,18 @@ add_library(imcsim-gui-lib
             ui_elements/ui_controlled_source.cpp
             ui_elements/ui_controlled_switch.cpp
             ui_elements/ui_current_source.cpp
+            ui_elements/ui_dependent_source.cpp
             ui_elements/ui_diode.cpp
             ui_elements/ui_element.cpp
+            ui_elements/ui_flip_flop.cpp
             ui_elements/ui_fuse.cpp
+            ui_elements/ui_gate.cpp
             ui_elements/ui_ground.cpp
             ui_elements/ui_inductor.cpp
             ui_elements/ui_initial_voltage.cpp
             ui_elements/ui_logic_box.cpp
             ui_elements/ui_logic_input.cpp
             ui_elements/ui_logic_output.cpp
-            ui_elements/ui_logic_part.cpp
             ui_elements/ui_mosfet.cpp
             ui_elements/ui_net_label.cpp
             ui_elements/ui_nodeset.cpp
@@ -148,6 +174,7 @@ add_library(imcsim-gui-lib
             ui_elements/ui_potentiometer.cpp
             ui_elements/ui_resistor.cpp
             ui_elements/ui_seven_segment.cpp
+            ui_elements/ui_single_terminal_element.cpp
             ui_elements/ui_source.cpp
             ui_elements/ui_subcircuit.cpp
             ui_elements/ui_subcircuit_pin.cpp
@@ -159,6 +186,9 @@ add_library(imcsim-gui-lib
             ui_elements/ui_wire.cpp
             windows/app_window.cpp
             windows/block_dialog.cpp
+            windows/block_navigator.cpp
+            windows/canvas_pointer.cpp
+            windows/clipboard_actions.cpp
             windows/dock_layout.cpp
             windows/editor_canvas_drawing.cpp
             windows/editor_context_menu.cpp
@@ -174,6 +204,7 @@ add_library(imcsim-gui-lib
             windows/output_tabs/cursor_widgets.cpp
             windows/output_tabs/dc_sweep_tab.cpp
             windows/output_tabs/harmonic_balance_tab.cpp
+            windows/output_tabs/logic_lane_plot.cpp
             windows/output_tabs/monte_carlo_tab.cpp
             windows/output_tabs/noise_tab.cpp
             windows/output_tabs/operating_point_tab.cpp
@@ -181,10 +212,15 @@ add_library(imcsim-gui-lib
             windows/output_tabs/plot_widgets.cpp
             windows/output_tabs/pole_zero_tab.cpp
             windows/output_tabs/result_tables.cpp
+            windows/output_tabs/s_parameter_choices.cpp
+            windows/output_tabs/s_parameter_smith.cpp
+            windows/output_tabs/s_parameter_stability.cpp
             windows/output_tabs/s_parameter_tab.cpp
+            windows/output_tabs/s_parameter_widgets.cpp
             windows/output_tabs/spectrum_tab.cpp
             windows/output_tabs/statistics_widgets.cpp
             windows/output_tabs/step_widgets.cpp
+            windows/output_tabs/touchstone_export_control.cpp
             windows/output_tabs/transient_tab.cpp
             windows/output_window.cpp
             windows/part_editor.cpp
@@ -195,15 +231,18 @@ add_library(imcsim-gui-lib
             windows/part_editor_models.cpp
             windows/part_editor_passives.cpp
             windows/part_editor_sources.cpp
-            windows/part_fields.cpp
             windows/part_picker.cpp
             windows/part_popover.cpp
             windows/part_rail.cpp
             windows/preferences_window.cpp
             windows/properties_window.cpp
+            windows/selection_input.cpp
             windows/simulation_window.cpp
-            windows/spice_block_dialog.cpp
+            windows/spice_import_dialog.cpp
+            windows/spice_pin_table.cpp
+            windows/spice_settings_dialog.cpp
             windows/tool_icons.cpp
+            windows/turn_keys.cpp
 )
 
 target_include_directories(imcsim-gui-lib

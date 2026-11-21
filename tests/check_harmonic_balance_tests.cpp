@@ -34,7 +34,8 @@ TEST_CASE("Harmonic balance validates frequency, harmonics, samples and periodic
               .has_value());
     CHECK(Core::CheckHarmonicBalanceSettings(setup.Circuit, {.FundamentalFrequency = 1e3, .Harmonics = 0}).has_value());
     CHECK(Core::CheckHarmonicBalanceSettings(
-              setup.Circuit, {.FundamentalFrequency = 1e3, .Harmonics = Core::MAX_HARMONIC_BALANCE_HARMONICS + 1})
+              setup.Circuit,
+              {.FundamentalFrequency = 1e3, .Harmonics = Core::MAX_HARMONIC_BALANCE_HARMONICS + 1})
               .has_value());
     CHECK(
         Core::CheckHarmonicBalanceSettings(setup.Circuit, {.FundamentalFrequency = 1e3, .Harmonics = 8, .Samples = 16})
@@ -43,7 +44,7 @@ TEST_CASE("Harmonic balance validates frequency, harmonics, samples and periodic
         Core::CheckHarmonicBalanceSettings(setup.Circuit, {.FundamentalFrequency = 1e3, .Harmonics = 8, .Samples = 30})
             .has_value());
     CHECK(Core::CheckHarmonicBalanceSettings(setup.Circuit,
-                                             {.FundamentalFrequency = 1e3, .Harmonics = 8, .Samples = 131072})
+                                             {.FundamentalFrequency = 1e3, .Harmonics = 8, .Samples = 131'072})
               .has_value());
 
     // Frequency must be an integer harmonic within 1..Harmonics

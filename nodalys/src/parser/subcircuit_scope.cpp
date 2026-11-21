@@ -8,26 +8,29 @@
 
 #include "parser/spice_text.h"
 #include "parser/spice_values.h"
+#include "text/text_case.h"
 
 #include <format>
 
 namespace Nodalys {
 
-namespace {
-
-bool IsGroundName(const std::string &upper_name) {
-    return upper_name.empty() || upper_name == "0" || upper_name == "GND";
+/**
+ * @param[in,out] context  Expansion the scope belongs to, which gives its new nodes and collects what it reports. It
+ *                         must outlive this scope; a child scope is made with the same one.
+ * @param[in]     parent   Scope the definition of this instance sits in, or null for the instance the expansion starts
+ *                         from. It must outlive this scope.
+ * @param[in]     prefix   Name of the instance with those it sits in, such as "X1.XLOAD", put before its element names
+ *                         so two instances of one block never share one.
+ */
+TextScope::TextScope(ExpansionContext &context, const TextScope *parent, std::string prefix)
+    : m_Context(context), m_Parent(parent), m_Prefix(std::move(prefix)) {
 }
 
-} // namespace
-
 /**
- * @param[in] parent  Scope the definition of this instance sits in, or null for the instance the expansion starts from.
- *                    It must outlive this scope.
- * @param[in] prefix  Name of the instance with those it sits in, such as "X1.XLOAD", put before its element names so
- *                    two instances of one block never share one.
+ * @brief   The expansion this scope belongs to, shared by all the scopes of one expansion.
  */
-TextScope::TextScope(const TextScope *parent, std::string prefix) : m_Parent(parent), m_Prefix(std::move(prefix)) {
+ExpansionContext &TextScope::GetContext() const {
+    return m_Context;
 }
 
 /**
@@ -102,22 +105,21 @@ void TextScope::MapNode(const std::string &upper_name, const NodeId node) {
  * @brief   The node a name of the text stands for.
  * @details Ground is 0 or GND. Any other name that no port mapped is private to this scope and gets a node of its own
  *          the first time it is read.
- * @param[in,out] context  Expansion that gives the new node.
- * @param[in]     name     Node name as written.
+ * @param[in] name  Node name as written.
  * @return  The node.
  */
-NodeId TextScope::ResolveNode(ExpansionContext &context, const std::string_view name) {
-    const std::string upper = ToUpperCase(TrimSpaces(name));
+NodeId TextScope::ResolveNode(const std::string_view name) {
+    const std::string upper = ToUpper(TrimSpaces(name));
     if (IsGroundName(upper)) {
         return GROUND_NODE;
     }
     if (const auto found = m_Nodes.find(upper); found != m_Nodes.end()) {
         return found->second;
     }
-    const NodeId node = context.Builder.AddNode();
+    const NodeId node = m_Context.Builder.AddNode();
     m_Nodes[upper] = node;
-    if (context.OnInternalNode) {
-        context.OnInternalNode(ToUpperCase(MakeName(upper)), node);
+    if (const InstanceObservers &observers = m_Context.Observers; observers.OnInternalNode) {
+        observers.OnInternalNode(ToUpper(MakeName(upper)), node);
     }
     return node;
 }

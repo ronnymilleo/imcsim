@@ -359,16 +359,33 @@ TEST_CASE("A voltage source keeps its sine parameters while switching type", "[c
     CHECK_FALSE(source.IsValidAC({.Frequency = -1.0}));
 }
 
+TEST_CASE("A source drives its AC magnitude only while it is an AC source", "[component]") {
+    Core::VoltageSource source;
+    source.SetAC({.Magnitude = 2.5});
+    // The magnitude is kept apart from the waveform, so a DC source sits at zero in a sweep
+    CHECK(source.GetACMagnitude() == 0.0);
+    source.SetSourceType(Core::VoltageSource::SourceType::PULSE);
+    CHECK(source.GetACMagnitude() == 0.0);
+    source.SetSourceType(Core::VoltageSource::SourceType::AC);
+    CHECK(source.GetACMagnitude() == 2.5);
+}
+
 TEST_CASE("Source type names convert both ways", "[component]") {
-    for (const auto type : {Core::VoltageSource::SourceType::DC, Core::VoltageSource::SourceType::AC,
-                            Core::VoltageSource::SourceType::PULSE, Core::VoltageSource::SourceType::EXP,
-                            Core::VoltageSource::SourceType::SFFM, Core::VoltageSource::SourceType::AM,
-                            Core::VoltageSource::SourceType::PWL, Core::VoltageSource::SourceType::NOISE,
+    for (const auto type : {Core::VoltageSource::SourceType::DC,
+                            Core::VoltageSource::SourceType::AC,
+                            Core::VoltageSource::SourceType::PULSE,
+                            Core::VoltageSource::SourceType::EXP,
+                            Core::VoltageSource::SourceType::SFFM,
+                            Core::VoltageSource::SourceType::AM,
+                            Core::VoltageSource::SourceType::PWL,
+                            Core::VoltageSource::SourceType::NOISE,
                             Core::VoltageSource::SourceType::RANDOM}) {
         CHECK(Core::ParseSourceType(Core::GetSourceTypeName(type)) == type);
     }
-    for (const auto distribution : {Core::RandomDistribution::UNIFORM, Core::RandomDistribution::GAUSSIAN,
-                                    Core::RandomDistribution::EXPONENTIAL, Core::RandomDistribution::POISSON}) {
+    for (const auto distribution : {Core::RandomDistribution::UNIFORM,
+                                    Core::RandomDistribution::GAUSSIAN,
+                                    Core::RandomDistribution::EXPONENTIAL,
+                                    Core::RandomDistribution::POISSON}) {
         CHECK(Core::ParseRandomDistribution(Core::GetRandomDistributionName(distribution)) == distribution);
     }
     CHECK_FALSE(Core::ParseRandomDistribution("gaussian"));
@@ -542,6 +559,71 @@ TEST_CASE("A custom diode starts from the parameters of the model it replaces", 
     CHECK(diode.GetParameters().BreakdownVoltage == 1000.0);
 }
 
+TEST_CASE("A library model replaces the ready model, and any other choice replaces the library model",
+          "[component][model_choice]") {
+    Core::Diode diode(Core::ComponentType::DIODE);
+    Core::BJT bjt(Core::ComponentType::NPN);
+    Core::MOSFET mosfet(Core::ComponentType::NMOS);
+    diode.SetLibraryModel("MYD");
+    bjt.SetLibraryModel("MYQ");
+    mosfet.SetLibraryModel("MYM");
+    CHECK(diode.GetModel() == nullptr);
+    CHECK_FALSE(diode.IsCustom());
+    CHECK(std::string_view(diode.GetModelName()) == "MYD");
+    CHECK(bjt.GetModel() == nullptr);
+    CHECK_FALSE(bjt.IsCustom());
+    CHECK(mosfet.GetModel() == nullptr);
+    CHECK_FALSE(mosfet.IsCustom());
+
+    // Going back to the ready model of the list drops the library model
+    diode.SetModel(Core::GetDiodeModels(Core::ComponentType::DIODE).front());
+    CHECK_FALSE(diode.HasLibraryModel());
+    CHECK(diode.GetModel() == Core::GetDiodeModels(Core::ComponentType::DIODE).data());
+
+    // Custom parameters drop it too, and start from the ready model that was selected before it
+    bjt.SetCustom();
+    CHECK_FALSE(bjt.HasLibraryModel());
+    CHECK(bjt.IsCustom());
+    CHECK(bjt.GetParameters().ForwardBeta
+          == Core::GetBJTModels(Core::ComponentType::NPN).front().Parameters.ForwardBeta);
+    mosfet.SetCustomParameters({.Width = 50e-6});
+    CHECK_FALSE(mosfet.HasLibraryModel());
+    CHECK(mosfet.IsCustom());
+    CHECK(mosfet.GetParameters().Width == 50e-6);
+}
+
+TEST_CASE("An op-amp switches between ready and custom specifications like the other modeled parts",
+          "[component][model_choice]") {
+    Core::OpAmp op_amp;
+    op_amp.SetName("U4");
+    const Core::OpAmpModel *ready = Core::FindOpAmpModel(Core::ComponentType::OP_AMP, "uA741");
+    REQUIRE(ready != nullptr);
+    CHECK(op_amp.IsIdeal());
+    CHECK(std::string_view(op_amp.GetModelName()) == "Ideal");
+
+    op_amp.SetModel(*ready);
+    CHECK_FALSE(op_amp.IsIdeal());
+    CHECK(op_amp.GetSpiceModelName() == ready->SpiceName);
+
+    op_amp.SetCustom();
+    CHECK(op_amp.IsCustom());
+    CHECK(op_amp.GetModel() == nullptr);
+    CHECK(std::string_view(op_amp.GetModelName()) == "Custom");
+    CHECK(op_amp.GetSpiceModelName() == "imcsim_opamp_U4");
+    CHECK(op_amp.GetParameters().SlewRate == ready->Parameters.SlewRate);
+
+    // Choosing custom again keeps the edited specifications
+    Core::OpAmpParameters edited = op_amp.GetParameters();
+    edited.SlewRate = 13.0;
+    op_amp.SetCustomParameters(edited);
+    op_amp.SetCustom();
+    CHECK(op_amp.GetParameters().SlewRate == 13.0);
+
+    op_amp.SetModel(*ready);
+    CHECK_FALSE(op_amp.IsCustom());
+    CHECK(op_amp.GetParameters().SlewRate == ready->Parameters.SlewRate);
+}
+
 TEST_CASE("Custom diode parameters must be in the range ngspice simulates", "[component]") {
     const Core::Diode diode(Core::ComponentType::LED);
     CHECK(diode.IsValidParameters({}));
@@ -677,11 +759,18 @@ TEST_CASE("Op-amps are named U and have no value", "[component]") {
 }
 
 TEST_CASE("Gates and flip-flops are U parts with no value, and their type names round-trip", "[component]") {
-    for (const Core::ComponentType type :
-         {Core::ComponentType::AND, Core::ComponentType::OR, Core::ComponentType::NOT, Core::ComponentType::NAND,
-          Core::ComponentType::NOR, Core::ComponentType::XOR, Core::ComponentType::XNOR, Core::ComponentType::BUFFER,
-          Core::ComponentType::D_FLIP_FLOP, Core::ComponentType::JK_FLIP_FLOP, Core::ComponentType::T_FLIP_FLOP,
-          Core::ComponentType::SR_FLIP_FLOP}) {
+    for (const Core::ComponentType type : {Core::ComponentType::AND,
+                                           Core::ComponentType::OR,
+                                           Core::ComponentType::NOT,
+                                           Core::ComponentType::NAND,
+                                           Core::ComponentType::NOR,
+                                           Core::ComponentType::XOR,
+                                           Core::ComponentType::XNOR,
+                                           Core::ComponentType::BUFFER,
+                                           Core::ComponentType::D_FLIP_FLOP,
+                                           Core::ComponentType::JK_FLIP_FLOP,
+                                           Core::ComponentType::T_FLIP_FLOP,
+                                           Core::ComponentType::SR_FLIP_FLOP}) {
         const Core::LogicPart part(type);
         INFO(part.GetTypeName());
         CHECK(std::string_view(part.GetNamePrefix()) == "U");
@@ -696,30 +785,49 @@ TEST_CASE("Gates and flip-flops are U parts with no value, and their type names 
     CHECK_FALSE(Core::IsLogicPart(Core::ComponentType::OP_AMP));
 }
 
+TEST_CASE("Each kind of component belongs to the family its handling shares", "[component]") {
+    CHECK(Core::GetFamily(Core::ComponentType::RESISTOR) == Core::ComponentFamily::PASSIVE);
+    CHECK(Core::GetFamily(Core::ComponentType::POTENTIOMETER) == Core::ComponentFamily::PASSIVE);
+    CHECK(Core::GetFamily(Core::ComponentType::GROUND) == Core::ComponentFamily::MARKER);
+    CHECK(Core::GetFamily(Core::ComponentType::PIN) == Core::ComponentFamily::MARKER);
+    CHECK(Core::GetFamily(Core::ComponentType::CLOCK) == Core::ComponentFamily::SOURCE);
+    CHECK(Core::GetFamily(Core::ComponentType::CCVS) == Core::ComponentFamily::CONTROLLED_SOURCE);
+    CHECK(Core::GetFamily(Core::ComponentType::LED) == Core::ComponentFamily::SEMICONDUCTOR);
+    CHECK(Core::GetFamily(Core::ComponentType::RELAY) == Core::ComponentFamily::SWITCHING);
+    CHECK(Core::GetFamily(Core::ComponentType::NAND) == Core::ComponentFamily::LOGIC_GATE);
+    CHECK(Core::GetFamily(Core::ComponentType::JK_FLIP_FLOP) == Core::ComponentFamily::FLIP_FLOP);
+    CHECK(Core::GetFamily(Core::ComponentType::SEVEN_SEGMENT) == Core::ComponentFamily::LOGIC_DISPLAY);
+}
+
 TEST_CASE("The terminals of a gate or flip-flop are its inputs, then its outputs", "[component]") {
     CHECK(Core::GetLogicInputLabels(Core::ComponentType::OR) == std::vector<std::string>{"A", "B"});
     CHECK(Core::GetLogicInputLabels(Core::ComponentType::BUFFER) == std::vector<std::string>{"A"});
     CHECK(Core::GetLogicOutputLabels(Core::ComponentType::NOR) == std::vector<std::string>{"Y"});
-    CHECK(Core::GetLogicInputLabels(Core::ComponentType::D_FLIP_FLOP) ==
-          std::vector<std::string>{"D", "CLK", "SET", "RESET"});
-    CHECK(Core::GetLogicInputLabels(Core::ComponentType::JK_FLIP_FLOP) ==
-          std::vector<std::string>{"J", "K", "CLK", "SET", "RESET"});
-    CHECK(Core::GetLogicInputLabels(Core::ComponentType::T_FLIP_FLOP) ==
-          std::vector<std::string>{"T", "CLK", "SET", "RESET"});
-    CHECK(Core::GetLogicInputLabels(Core::ComponentType::SR_FLIP_FLOP) ==
-          std::vector<std::string>{"S", "R", "CLK", "SET", "RESET"});
+    CHECK(Core::GetLogicInputLabels(Core::ComponentType::D_FLIP_FLOP)
+          == std::vector<std::string>{"D", "CLK", "SET", "RESET"});
+    CHECK(Core::GetLogicInputLabels(Core::ComponentType::JK_FLIP_FLOP)
+          == std::vector<std::string>{"J", "K", "CLK", "SET", "RESET"});
+    CHECK(Core::GetLogicInputLabels(Core::ComponentType::T_FLIP_FLOP)
+          == std::vector<std::string>{"T", "CLK", "SET", "RESET"});
+    CHECK(Core::GetLogicInputLabels(Core::ComponentType::SR_FLIP_FLOP)
+          == std::vector<std::string>{"S", "R", "CLK", "SET", "RESET"});
     CHECK(Core::GetLogicOutputLabels(Core::ComponentType::SR_FLIP_FLOP) == std::vector<std::string>{"Q", "QN"});
 }
 
 TEST_CASE("A gate takes from 2 to 8 inputs and names them A, B, C...", "[component]") {
-    for (const Core::ComponentType type :
-         {Core::ComponentType::AND, Core::ComponentType::OR, Core::ComponentType::NAND, Core::ComponentType::NOR,
-          Core::ComponentType::XOR, Core::ComponentType::XNOR}) {
+    for (const Core::ComponentType type : {Core::ComponentType::AND,
+                                           Core::ComponentType::OR,
+                                           Core::ComponentType::NAND,
+                                           Core::ComponentType::NOR,
+                                           Core::ComponentType::XOR,
+                                           Core::ComponentType::XNOR}) {
         CHECK(Core::HasVariableInputs(type));
     }
     // The inverter, the buffer and the flip-flops keep the inputs they have
-    for (const Core::ComponentType type : {Core::ComponentType::NOT, Core::ComponentType::BUFFER,
-                                           Core::ComponentType::D_FLIP_FLOP, Core::ComponentType::JK_FLIP_FLOP}) {
+    for (const Core::ComponentType type : {Core::ComponentType::NOT,
+                                           Core::ComponentType::BUFFER,
+                                           Core::ComponentType::D_FLIP_FLOP,
+                                           Core::ComponentType::JK_FLIP_FLOP}) {
         CHECK_FALSE(Core::HasVariableInputs(type));
     }
 

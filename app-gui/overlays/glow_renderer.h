@@ -7,6 +7,7 @@
 #define IMCSIM_GLOW_RENDERER_H
 
 #include "imgui.h"
+#include "overlays/glow_falloff.h"
 #include <SDL3/SDL_gpu.h>
 #include <span>
 
@@ -53,6 +54,7 @@ private:
 
     int CreatePipeline(SDL_GPUTextureFormat target_format);
     int CreateTexture();
+    int UploadTexture(const GlowTexels &texels);
     static void BindPipeline(const ImDrawList *draw_list, const ImDrawCmd *command);
 };
 

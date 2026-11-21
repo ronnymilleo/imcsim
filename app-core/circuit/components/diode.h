@@ -7,6 +7,7 @@
 #define IMCSIM_DIODE_H
 
 #include "circuit/components/component.h"
+#include "circuit/components/modeled_component.h"
 #include <memory>
 #include <span>
 #include <string>
@@ -63,7 +64,7 @@ struct DiodeModel {
     LEDColor Color;
 };
 
-inline constexpr const char *CUSTOM_DIODE_MODEL_NAME = "Custom";
+inline constexpr const char *CUSTOM_DIODE_MODEL_NAME = CUSTOM_MODEL_NAME;
 
 /**
  * @class   Diode
@@ -71,7 +72,7 @@ inline constexpr const char *CUSTOM_DIODE_MODEL_NAME = "Custom";
  * @details The same class serves diodes, Zener diodes and LEDs; the component type tells which models it can use.
  *          It has no numeric value: a ready model or its own custom parameters set its behavior.
  */
-class Diode : public Component {
+class Diode : public ModeledComponent<DiodeModel, DiodeParameters> {
 public:
     explicit Diode(ComponentType type);
     ~Diode() override = default;
@@ -79,25 +80,8 @@ public:
     // Copying
     std::unique_ptr<Component> Clone() const override;
 
-    // Ready model
-    const DiodeModel *GetModel() const;
-    void SetModel(const DiodeModel &model);
-
     // Custom parameters
-    bool IsCustom() const;
-    void SetCustom();
-    void SetCustomParameters(const DiodeParameters &parameters);
-    bool IsValidParameters(const DiodeParameters &parameters) const;
-
-    // Simulation
-    const DiodeParameters &GetParameters() const;
-    const char *GetModelName() const;
-    std::string GetSpiceModelName() const;
-
-private:
-    /// Null when the diode uses its custom parameters.
-    const DiodeModel *m_Model;
-    DiodeParameters m_CustomParameters;
+    static bool IsValidParameters(const DiodeParameters &parameters);
 };
 
 // Diodes

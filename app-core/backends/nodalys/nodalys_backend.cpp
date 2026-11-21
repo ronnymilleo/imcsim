@@ -26,11 +26,17 @@ namespace Core {
 
 namespace {
 
-constexpr auto NODALYS_ANALYSES = {
-    AnalysisKind::OPERATING_POINT, AnalysisKind::TRANSIENT,       AnalysisKind::DC_SWEEP,
-    AnalysisKind::AC_SWEEP,        AnalysisKind::NOISE,           AnalysisKind::TRANSFER_FUNCTION,
-    AnalysisKind::SENSITIVITY,     AnalysisKind::AC_SENSITIVITY,  AnalysisKind::POLE_ZERO,
-    AnalysisKind::S_PARAMETERS,    AnalysisKind::HARMONIC_BALANCE};
+constexpr auto NODALYS_ANALYSES = {AnalysisKind::OPERATING_POINT,
+                                   AnalysisKind::TRANSIENT,
+                                   AnalysisKind::DC_SWEEP,
+                                   AnalysisKind::AC_SWEEP,
+                                   AnalysisKind::NOISE,
+                                   AnalysisKind::TRANSFER_FUNCTION,
+                                   AnalysisKind::SENSITIVITY,
+                                   AnalysisKind::AC_SENSITIVITY,
+                                   AnalysisKind::POLE_ZERO,
+                                   AnalysisKind::S_PARAMETERS,
+                                   AnalysisKind::HARMONIC_BALANCE};
 
 /**
  * @brief   Keeps the rows of the nodes of the circuit and drops the rest.
@@ -38,7 +44,8 @@ constexpr auto NODALYS_ANALYSES = {
  *          for each node inside a block. ngspice gives the nodes of the circuit only, and what reads a result by node
  *          number, such as the table of the operating point, must not meet nodes that are not in the schematic.
  */
-template <typename Row> void KeepCircuitNodes(std::vector<Row> &rows, const int node_count) {
+template <typename Row>
+void KeepCircuitNodes(std::vector<Row> &rows, const int node_count) {
     if (rows.size() > static_cast<std::size_t>(node_count)) {
         rows.resize(static_cast<std::size_t>(node_count));
     }
@@ -87,8 +94,8 @@ std::set<std::string> FindSwitchElements(const Circuit &circuit) {
  * @param[in,out] live_start  When the clock of a live run started, moved later by the time spent paused.
  * @param[in]     circuit     Circuit of the run, for its node count, which the chunks keep, and its switches.
  */
-Nodalys::RunMonitor ToNodalysMonitor(const RunMonitor &monitor, std::chrono::steady_clock::time_point &live_start,
-                                     const Circuit &circuit) {
+Nodalys::RunMonitor
+ToNodalysMonitor(const RunMonitor &monitor, std::chrono::steady_clock::time_point &live_start, const Circuit &circuit) {
     const int node_count = circuit.GetNodeCount();
     Nodalys::RunMonitor nodalys_monitor;
     if (monitor.Control != nullptr) {
@@ -98,8 +105,8 @@ Nodalys::RunMonitor ToNodalysMonitor(const RunMonitor &monitor, std::chrono::ste
             std::vector<Nodalys::LiveChange> changes;
             for (const LiveChange &change : monitor.Control->TakeChanges()) {
                 const Nodalys::LiveQuantity quantity = change.Quantity == LiveQuantity::RESISTANCE
-                                                           ? Nodalys::LiveQuantity::RESISTANCE
-                                                           : Nodalys::LiveQuantity::DC_VOLTAGE;
+                                                         ? Nodalys::LiveQuantity::RESISTANCE
+                                                         : Nodalys::LiveQuantity::DC_VOLTAGE;
                 std::string element = change.Element;
                 if (switch_elements.contains(element)) {
                     element.erase(0, SWITCH_RESISTOR_PREFIX.size());
@@ -197,7 +204,9 @@ Nodalys::IntegrationMethod ToNodalysMethod(const Circuit &circuit) {
  * @param[in] temperature_celsius  Simulation temperature in degrees Celsius, or none for the nominal 27 C.
  */
 template <typename Run, typename Compute, typename Convert>
-Run RunOnNodalys(const Circuit &circuit, Compute compute, Convert convert,
+Run RunOnNodalys(const Circuit &circuit,
+                 Compute compute,
+                 Convert convert,
                  const std::optional<double> &temperature_celsius = std::nullopt) {
     Run run;
     std::vector<std::string> compile_warnings;
@@ -236,10 +245,12 @@ std::string DescribeConstantTransfer(const PoleZeroSettings &settings, const int
     std::string text = std::format("The transfer from {} to node {} has no poles or zeros: it is a constant gain at "
                                    "every frequency. Either no capacitor or inductor lies between them, or the output "
                                    "is the node the source holds",
-                                   settings.InputSource, settings.OutputNode);
+                                   settings.InputSource,
+                                   settings.OutputNode);
     if (cancelled_pairs > 0) {
         text += std::format(", or what does lie between them cancels out ({} pole-zero {} at the same place)",
-                            cancelled_pairs, cancelled_pairs == 1 ? "pair" : "pairs");
+                            cancelled_pairs,
+                            cancelled_pairs == 1 ? "pair" : "pairs");
     }
     return text;
 }
@@ -252,7 +263,7 @@ std::string DescribeConstantTransfer(const PoleZeroSettings &settings, const int
 NodalysBackend::NodalysBackend() {
     m_Capabilities.Analyses = NODALYS_ANALYSES;
     m_Capabilities.FindPartProblem = FindPartProblem;
-    for (int index = 0; index <= static_cast<int>(ComponentType::SEVEN_SEGMENT); ++index) {
+    for (int index = 0; index <= static_cast<int>(LAST_COMPONENT_TYPE); ++index) {
         const auto type = static_cast<ComponentType>(index);
         if (IsLogicPart(type)) {
             m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::SENSITIVITY][type] =
@@ -303,8 +314,9 @@ OperatingPointRun NodalysBackend::RunOperatingPoint(const Circuit &circuit,
         },
         [&circuit, node_count = circuit.GetNodeCount()](Nodalys::OperatingPointResult result) {
             KeepCircuitNodes(result.NodeVoltages, node_count);
-            OperatingPoint point{
-                .NodeVoltages = std::move(result.NodeVoltages), .Currents = {}, .Warnings = std::move(result.Warnings)};
+            OperatingPoint point{.NodeVoltages = std::move(result.NodeVoltages),
+                                 .Currents = {},
+                                 .Warnings = std::move(result.Warnings)};
             for (Nodalys::ComponentCurrent &current : result.Currents) {
                 point.Currents.push_back({std::move(current.Name), current.Current});
             }
@@ -322,8 +334,10 @@ OperatingPointRun NodalysBackend::RunOperatingPoint(const Circuit &circuit,
  * @param[in] monitor              Stop request, progress, chunks, live changes and pace of the run.
  * @return  The voltages and currents at every time point or an error, plus the messages of Nodalys.
  */
-TransientRun NodalysBackend::RunTransient(const Circuit &circuit, const TransientSettings &settings,
-                                          const std::optional<double> &temperature_celsius, const RunMonitor &monitor) {
+TransientRun NodalysBackend::RunTransient(const Circuit &circuit,
+                                          const TransientSettings &settings,
+                                          const std::optional<double> &temperature_celsius,
+                                          const RunMonitor &monitor) {
     const Nodalys::TransientConfig config{.StopTime = settings.StopTime,
                                           .TimeStep = settings.TimeStep,
                                           .MaxStep = settings.TimeStep,
@@ -336,7 +350,11 @@ TransientRun NodalysBackend::RunTransient(const Circuit &circuit, const Transien
         circuit,
         [&, options = ToConvergenceOptions(circuit)](const Nodalys::Circuit &compiled,
                                                      std::vector<Nodalys::DiagnosticMessage> *messages) {
-            return Nodalys::ComputeTransient(compiled, config, has_initial_conditions, nodalys_monitor, options,
+            return Nodalys::ComputeTransient(compiled,
+                                             config,
+                                             has_initial_conditions,
+                                             nodalys_monitor,
+                                             options,
                                              messages);
         },
         [&circuit, has_initial_conditions, node_count = circuit.GetNodeCount()](Nodalys::TransientResult result) {
@@ -360,7 +378,8 @@ TransientRun NodalysBackend::RunTransient(const Circuit &circuit, const Transien
  * @param[in] temperature_celsius  Simulation temperature in degrees Celsius, or none for 27 C.
  * @return  One curve per stepped value or an error, plus the messages of Nodalys.
  */
-DCSweepRun NodalysBackend::RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings,
+DCSweepRun NodalysBackend::RunDCSweep(const Circuit &circuit,
+                                      const DCSweepSettings &settings,
                                       const std::optional<double> &temperature_celsius) {
     Nodalys::DcSweepConfig config{.SweptSource = settings.Swept.Source,
                                   .SweptStart = settings.Swept.Start,
@@ -403,7 +422,8 @@ DCSweepRun NodalysBackend::RunDCSweep(const Circuit &circuit, const DCSweepSetti
  * @param[in] temperature_celsius  Simulation temperature in degrees Celsius, or none for 27 C.
  * @return  The magnitude and phase of every node and current or an error, plus the messages of Nodalys.
  */
-ACSweepRun NodalysBackend::RunACSweep(const Circuit &circuit, const ACSweepSettings &settings,
+ACSweepRun NodalysBackend::RunACSweep(const Circuit &circuit,
+                                      const ACSweepSettings &settings,
                                       const std::optional<double> &temperature_celsius) {
     const Nodalys::AcSweepConfig config{.StartFrequency = settings.StartFrequency,
                                         .StopFrequency = settings.StopFrequency,
@@ -471,8 +491,9 @@ NoiseRun NodalysBackend::RunNoise(const Circuit &circuit, const NoiseSettings &s
  */
 TransferFunctionRun NodalysBackend::RunTransferFunction(const Circuit &circuit,
                                                         const TransferFunctionSettings &settings) {
-    const Nodalys::TransferFunctionConfig config{
-        .InputSource = settings.InputSource, .OutputPositiveNode = settings.OutputNode, .OutputNegativeNode = 0};
+    const Nodalys::TransferFunctionConfig config{.InputSource = settings.InputSource,
+                                                 .OutputPositiveNode = settings.OutputNode,
+                                                 .OutputNegativeNode = 0};
     return RunOnNodalys<TransferFunctionRun>(
         circuit,
         [&config, options = ToConvergenceOptions(circuit)](const Nodalys::Circuit &compiled,
@@ -552,8 +573,10 @@ ACSensitivityRun NodalysBackend::RunACSensitivity(const Circuit &circuit, const 
  * @return  The poles and zeros, or an error, also when the solver found none at all.
  */
 PoleZeroRun NodalysBackend::RunPoleZero(const Circuit &circuit, const PoleZeroSettings &settings) {
-    const Nodalys::PoleZeroConfig config{
-        .OutputNode = settings.OutputNode, .InputSource = settings.InputSource, .FindPoles = true, .FindZeros = true};
+    const Nodalys::PoleZeroConfig config{.OutputNode = settings.OutputNode,
+                                         .InputSource = settings.InputSource,
+                                         .FindPoles = true,
+                                         .FindZeros = true};
     return RunOnNodalys<PoleZeroRun>(
         circuit,
         [&config, options = ToConvergenceOptions(circuit)](const Nodalys::Circuit &compiled,
@@ -609,7 +632,8 @@ SParametersRun NodalysBackend::RunSParameters(const Circuit &circuit, const SPar
  * @param[in,out] control   Where the run looks for a stop request between its Newton iterations, or null.
  * @return  The spectra and one-cycle waveforms or an error, plus the messages of Nodalys.
  */
-HarmonicBalanceRun NodalysBackend::RunHarmonicBalance(const Circuit &circuit, const HarmonicBalanceSettings &settings,
+HarmonicBalanceRun NodalysBackend::RunHarmonicBalance(const Circuit &circuit,
+                                                      const HarmonicBalanceSettings &settings,
                                                       RunControl *control) {
     Nodalys::HarmonicBalanceConfig config{.FundamentalFrequency = settings.FundamentalFrequency,
                                           .Harmonics = settings.Harmonics,

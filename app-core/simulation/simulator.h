@@ -18,12 +18,15 @@ namespace Core {
 
 OperatingPointRun RunOperatingPoint(const Circuit &circuit,
                                     const std::optional<ParameterValue> &parameter = std::nullopt);
-TransientRun RunTransient(const Circuit &circuit, const TransientSettings &settings,
+TransientRun RunTransient(const Circuit &circuit,
+                          const TransientSettings &settings,
                           const std::optional<ParameterValue> &parameter = std::nullopt,
                           const RunMonitor &monitor = {});
-ACSweepRun RunACSweep(const Circuit &circuit, const ACSweepSettings &settings,
+ACSweepRun RunACSweep(const Circuit &circuit,
+                      const ACSweepSettings &settings,
                       const std::optional<ParameterValue> &parameter = std::nullopt);
-DCSweepRun RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings,
+DCSweepRun RunDCSweep(const Circuit &circuit,
+                      const DCSweepSettings &settings,
                       const std::optional<ParameterValue> &parameter = std::nullopt);
 NoiseRun RunNoise(const Circuit &circuit, const NoiseSettings &settings);
 TransferFunctionRun RunTransferFunction(const Circuit &circuit, const TransferFunctionSettings &settings);
@@ -32,8 +35,8 @@ ACSensitivityRun RunACSensitivity(const Circuit &circuit, const ACSensitivitySet
 PoleZeroRun RunPoleZero(const Circuit &circuit, const PoleZeroSettings &settings);
 SParametersRun RunSParameters(const Circuit &circuit, const SParameterSettings &settings);
 TruthTableRun RunTruthTable(const Circuit &circuit, const TruthTableSettings &settings, RunControl *control = nullptr);
-HarmonicBalanceRun RunHarmonicBalance(const Circuit &circuit, const HarmonicBalanceSettings &settings,
-                                      RunControl *control = nullptr);
+HarmonicBalanceRun
+RunHarmonicBalance(const Circuit &circuit, const HarmonicBalanceSettings &settings, RunControl *control = nullptr);
 
 } // namespace Core
 

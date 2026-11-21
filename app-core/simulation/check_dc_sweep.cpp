@@ -19,7 +19,7 @@ namespace Core {
 namespace {
 
 /// Most points a DC sweep may take, for the same reason.
-constexpr int MAX_DC_SWEEP_POINTS = 100000;
+constexpr int MAX_DC_SWEEP_POINTS = 100'000;
 
 /**
  * @brief   Values from start to stop, both included, as ngspice counts them.

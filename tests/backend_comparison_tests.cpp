@@ -80,14 +80,18 @@ void CheckOperatingPointParity(const Core::Circuit &circuit) {
     REQUIRE(actual.Result.has_value());
     REQUIRE(actual.Result->NodeVoltages.size() == expected.Result->NodeVoltages.size());
     for (std::size_t node = 1; node < expected.Result->NodeVoltages.size(); ++node) {
-        INFO(std::format("node {}: ngspice {:.4e} V, nodalys {:.4e} V", node, expected.Result->NodeVoltages[node],
+        INFO(std::format("node {}: ngspice {:.4e} V, nodalys {:.4e} V",
+                         node,
+                         expected.Result->NodeVoltages[node],
                          actual.Result->NodeVoltages[node]));
         REQUIRE(Close(actual.Result->NodeVoltages[node], expected.Result->NodeVoltages[node], 1e-4, 1e-6));
     }
     for (const Core::ComponentCurrent &current : expected.Result->Currents) {
         const auto found = std::ranges::find(actual.Result->Currents, current.Name, &Core::ComponentCurrent::Name);
         REQUIRE(found != actual.Result->Currents.end());
-        INFO(std::format("current {}: ngspice {:.4e} A, nodalys {:.4e} A", current.Name, current.Current,
+        INFO(std::format("current {}: ngspice {:.4e} A, nodalys {:.4e} A",
+                         current.Name,
+                         current.Current,
                          found->Current));
         REQUIRE(Close(found->Current, current.Current, 1e-3, 1e-9));
     }
@@ -111,8 +115,11 @@ void CheckDCSweepParity(const Core::Circuit &circuit, const Core::DCSweepSetting
         REQUIRE(act_curve.NodeVoltages.size() == exp_curve.NodeVoltages.size());
         for (std::size_t node = 1; node < exp_curve.NodeVoltages.size(); ++node) {
             for (std::size_t i = 0; i < expected.Result->SweptValues.size(); ++i) {
-                INFO(std::format("sweep[{}] node {}: ngspice {:.4e} V, nodalys {:.4e} V", i, node,
-                                 exp_curve.NodeVoltages[node][i], act_curve.NodeVoltages[node][i]));
+                INFO(std::format("sweep[{}] node {}: ngspice {:.4e} V, nodalys {:.4e} V",
+                                 i,
+                                 node,
+                                 exp_curve.NodeVoltages[node][i],
+                                 act_curve.NodeVoltages[node][i]));
                 REQUIRE(Close(act_curve.NodeVoltages[node][i], exp_curve.NodeVoltages[node][i], 1e-3, 1e-6));
             }
         }
@@ -120,8 +127,11 @@ void CheckDCSweepParity(const Core::Circuit &circuit, const Core::DCSweepSetting
             const std::vector<double> *act_values = TraceOf(act_curve.Currents, current.Name);
             REQUIRE(act_values != nullptr);
             for (std::size_t i = 0; i < expected.Result->SweptValues.size(); ++i) {
-                INFO(std::format("sweep[{}] current {}: ngspice {:.4e} A, nodalys {:.4e} A", i, current.Name,
-                                 current.Values[i], (*act_values)[i]));
+                INFO(std::format("sweep[{}] current {}: ngspice {:.4e} A, nodalys {:.4e} A",
+                                 i,
+                                 current.Name,
+                                 current.Values[i],
+                                 (*act_values)[i]));
                 REQUIRE(Close((*act_values)[i], current.Values[i], 1e-3, 1e-9));
             }
         }
@@ -150,7 +160,8 @@ double Interpolate(const Core::Transient &trace, const std::vector<double> &valu
  * @brief   Runs the transient through both backends and compares every trace at the Nodalys time points.
  * @param[in] skip  Points to skip at the start, while the first-step backward Euler error decays.
  */
-void CheckTransientParity(const Core::Circuit &circuit, const Core::TransientSettings &settings,
+void CheckTransientParity(const Core::Circuit &circuit,
+                          const Core::TransientSettings &settings,
                           const std::size_t skip = 2) {
     Core::NodalysBackend nodalys;
     const Core::TransientRun expected = Ngspice().RunTransient(circuit, settings, std::nullopt, {});
@@ -165,7 +176,10 @@ void CheckTransientParity(const Core::Circuit &circuit, const Core::TransientSet
         const double time = actual.Result->Times[index];
         for (std::size_t node = 1; node < expected.Result->NodeVoltages.size(); ++node) {
             const double wanted = Interpolate(*expected.Result, expected.Result->NodeVoltages[node], time);
-            INFO(std::format("node {} at t = {:.3g}: ngspice {:.4e} V, nodalys {:.4e} V", node, time, wanted,
+            INFO(std::format("node {} at t = {:.3g}: ngspice {:.4e} V, nodalys {:.4e} V",
+                             node,
+                             time,
+                             wanted,
                              actual.Result->NodeVoltages[node][index]));
             REQUIRE(Close(actual.Result->NodeVoltages[node][index], wanted, 1e-3, 1e-3));
         }
@@ -176,8 +190,11 @@ void CheckTransientParity(const Core::Circuit &circuit, const Core::TransientSet
         REQUIRE(actual_values != nullptr);
         for (std::size_t index = skip; index < actual.Result->Times.size(); ++index) {
             const double wanted = Interpolate(*expected.Result, current.Values, actual.Result->Times[index]);
-            INFO(std::format("current {} at t = {:.3g}: ngspice {:.4e} A, nodalys {:.4e} A", current.Name,
-                             actual.Result->Times[index], wanted, (*actual_values)[index]));
+            INFO(std::format("current {} at t = {:.3g}: ngspice {:.4e} A, nodalys {:.4e} A",
+                             current.Name,
+                             actual.Result->Times[index],
+                             wanted,
+                             (*actual_values)[index]));
             REQUIRE(Close((*actual_values)[index], wanted, 1e-3, 1e-6));
         }
     }
@@ -202,18 +219,24 @@ void CheckACSweepParity(const Core::Circuit &circuit, const Core::ACSweepSetting
             const double exp_mag = expected.Result->NodeMagnitudesDecibels[node][i];
             const double act_mag = actual.Result->NodeMagnitudesDecibels[node][i];
             INFO(std::format("f = {:.3g} Hz node {} mag: ngspice {:.4f} dB, nodalys {:.4f} dB",
-                             expected.Result->Frequencies[i], node, exp_mag, act_mag));
+                             expected.Result->Frequencies[i],
+                             node,
+                             exp_mag,
+                             act_mag));
             if (exp_mag > -200.0) {
                 REQUIRE(Close(act_mag, exp_mag, 1e-3, 0.05));
-                double phase_diff = std::fmod(
-                    actual.Result->NodePhasesDegrees[node][i] - expected.Result->NodePhasesDegrees[node][i], 360.0);
+                double phase_diff =
+                    std::fmod(actual.Result->NodePhasesDegrees[node][i] - expected.Result->NodePhasesDegrees[node][i],
+                              360.0);
                 if (phase_diff > 180.0) {
                     phase_diff -= 360.0;
                 } else if (phase_diff < -180.0) {
                     phase_diff += 360.0;
                 }
                 INFO(std::format("f = {:.3g} Hz node {} phase: ngspice {:.4f} deg, nodalys {:.4f} deg",
-                                 expected.Result->Frequencies[i], node, expected.Result->NodePhasesDegrees[node][i],
+                                 expected.Result->Frequencies[i],
+                                 node,
+                                 expected.Result->NodePhasesDegrees[node][i],
                                  actual.Result->NodePhasesDegrees[node][i]));
                 REQUIRE(std::fabs(phase_diff) <= 0.5);
             }
@@ -226,7 +249,10 @@ void CheckACSweepParity(const Core::Circuit &circuit, const Core::ACSweepSetting
         for (std::size_t i = 0; i < expected.Result->Frequencies.size(); ++i) {
             if (exp_cur.Values[i] > -200.0) {
                 INFO(std::format("f = {:.3g} Hz current {} mag: ngspice {:.4f} dB, nodalys {:.4f} dB",
-                                 expected.Result->Frequencies[i], exp_cur.Name, exp_cur.Values[i], (*act_mag)[i]));
+                                 expected.Result->Frequencies[i],
+                                 exp_cur.Name,
+                                 exp_cur.Values[i],
+                                 (*act_mag)[i]));
                 REQUIRE(Close((*act_mag)[i], exp_cur.Values[i], 1e-3, 0.05));
             }
         }
@@ -236,8 +262,10 @@ void CheckACSweepParity(const Core::Circuit &circuit, const Core::ACSweepSetting
 /**
  * @brief   Runs an S-parameter analysis through both backends and compares the S-matrix entries and frequencies.
  */
-void CheckSParameterParity(const Core::Circuit &circuit, const Core::SParameterSettings &settings,
-                           const double tol_mag = 1e-3, const double tol_phase_deg = 0.5) {
+void CheckSParameterParity(const Core::Circuit &circuit,
+                           const Core::SParameterSettings &settings,
+                           const double tol_mag = 1e-3,
+                           const double tol_phase_deg = 0.5) {
     Core::NodalysBackend nodalys;
     const Core::SParametersRun expected = Ngspice().RunSParameters(circuit, settings);
     INFO("ngspice: " + (expected.Result ? std::string("ok") : expected.Result.error()));
@@ -263,8 +291,15 @@ void CheckSParameterParity(const Core::Circuit &circuit, const Core::SParameterS
 
                 INFO(std::format("f = {:.3g} Hz S({}, {}): ngspice ({:.6e}, {:.6e}) [mag {:.4f}], nodalys ({:.6e}, "
                                  "{:.6e}) [mag {:.4f}]",
-                                 expected.Result->Frequencies[f], row, col, exp_val.real(), exp_val.imag(), exp_mag,
-                                 act_val.real(), act_val.imag(), act_mag));
+                                 expected.Result->Frequencies[f],
+                                 row,
+                                 col,
+                                 exp_val.real(),
+                                 exp_val.imag(),
+                                 exp_mag,
+                                 act_val.real(),
+                                 act_val.imag(),
+                                 act_mag));
 
                 REQUIRE(Close(act_val.real(), exp_val.real(), tol_mag, 1e-4));
                 REQUIRE(Close(act_val.imag(), exp_val.imag(), tol_mag, 1e-4));
@@ -287,8 +322,10 @@ void CheckSParameterParity(const Core::Circuit &circuit, const Core::SParameterS
 /**
  * @brief   Runs a pole-zero analysis through both backends and compares the resulting poles and zeros.
  */
-void CheckPoleZeroParity(const Core::Circuit &circuit, const Core::PoleZeroSettings &settings,
-                         const double relative_tol = 1e-3, const double abs_tol = 1e-3) {
+void CheckPoleZeroParity(const Core::Circuit &circuit,
+                         const Core::PoleZeroSettings &settings,
+                         const double relative_tol = 1e-3,
+                         const double abs_tol = 1e-3) {
     Core::NodalysBackend nodalys;
     const Core::PoleZeroRun expected = Ngspice().RunPoleZero(circuit, settings);
     INFO("ngspice: " + (expected.Result ? std::string("ok") : expected.Result.error()));
@@ -305,9 +342,14 @@ void CheckPoleZeroParity(const Core::Circuit &circuit, const Core::PoleZeroSetti
     for (std::size_t i = 0; i < expected.Result->Roots.size(); ++i) {
         const auto &exp_root = expected.Result->Roots[i];
         const auto &act_root = actual.Result->Roots[i];
-        INFO(std::format("Root {}: type={}/{}, exp=({:.6e}, {:.6e}), act=({:.6e}, {:.6e})", i,
-                         exp_root.IsPole ? "pole" : "zero", act_root.IsPole ? "pole" : "zero", exp_root.Real,
-                         exp_root.Imaginary, act_root.Real, act_root.Imaginary));
+        INFO(std::format("Root {}: type={}/{}, exp=({:.6e}, {:.6e}), act=({:.6e}, {:.6e})",
+                         i,
+                         exp_root.IsPole ? "pole" : "zero",
+                         act_root.IsPole ? "pole" : "zero",
+                         exp_root.Real,
+                         exp_root.Imaginary,
+                         act_root.Real,
+                         act_root.Imaginary));
         REQUIRE(act_root.IsPole == exp_root.IsPole);
         CHECK(Close(act_root.Real, exp_root.Real, relative_tol, abs_tol));
         CHECK(Close(act_root.Imaginary, exp_root.Imaginary, relative_tol, abs_tol));
@@ -321,8 +363,10 @@ void CheckPoleZeroParity(const Core::Circuit &circuit, const Core::PoleZeroSetti
 /**
  * @brief   Runs a DC sensitivity analysis through both backends and compares the part sensitivities.
  */
-void CheckSensitivityParity(const Core::Circuit &circuit, const Core::SensitivitySettings &settings,
-                            const double relative_tol = 1e-3, const double abs_tol = 1e-5) {
+void CheckSensitivityParity(const Core::Circuit &circuit,
+                            const Core::SensitivitySettings &settings,
+                            const double relative_tol = 1e-3,
+                            const double abs_tol = 1e-5) {
     Core::NodalysBackend nodalys;
     const Core::SensitivityRun expected = Ngspice().RunSensitivity(circuit, settings);
     INFO("ngspice: " + (expected.Result ? std::string("ok") : expected.Result.error()));
@@ -336,7 +380,9 @@ void CheckSensitivityParity(const Core::Circuit &circuit, const Core::Sensitivit
 
     for (const auto &exp_part : expected.Result->Parts) {
         const auto act_it = std::ranges::find(actual.Result->Parts, exp_part.Name, &Core::PartSensitivity::Name);
-        INFO(std::format("Part {}: expected abs={:.6e}, norm={:.6e}", exp_part.Name, exp_part.Absolute,
+        INFO(std::format("Part {}: expected abs={:.6e}, norm={:.6e}",
+                         exp_part.Name,
+                         exp_part.Absolute,
                          exp_part.Normalized));
         REQUIRE(act_it != actual.Result->Parts.end());
         CHECK(Close(act_it->Absolute, exp_part.Absolute, relative_tol, abs_tol));
@@ -657,11 +703,21 @@ TEST_CASE("Both backends agree on a smooth behavioral source in its voltage and 
           "[backend_comparison][behavioral]") {
     const Core::ComponentType type =
         GENERATE(Core::ComponentType::BEHAVIORAL_VOLTAGE, Core::ComponentType::BEHAVIORAL_CURRENT);
-    const std::string expression =
-        GENERATE("V(IN)*V(IN)", "3*V(IN) + 1", "1m*tanh(V(IN)/26m)", "exp(V(IN)/2)", "sqrt(V(IN))", "V(IN)^3 - V(IN)",
-                 "log10(V(IN)) + ln(V(IN)) + log(V(IN))", "atan(V(IN))*sin(V(IN))", "1k*I(R1)", "pwr(V(IN), 1.5)",
-                 "V(IN)/(1 + V(IN)*V(IN))", "cosh(V(IN)) - sinh(V(IN))/2", "V(IN, 0)*V(IN, OUT)",
-                 "2**V(IN) + pow(V(IN), 2.5) + asinh(V(IN)) + acosh(V(IN) + 1)", "min(V(IN), 1.5)*max(V(IN), 0.5)");
+    const std::string expression = GENERATE("V(IN)*V(IN)",
+                                            "3*V(IN) + 1",
+                                            "1m*tanh(V(IN)/26m)",
+                                            "exp(V(IN)/2)",
+                                            "sqrt(V(IN))",
+                                            "V(IN)^3 - V(IN)",
+                                            "log10(V(IN)) + ln(V(IN)) + log(V(IN))",
+                                            "atan(V(IN))*sin(V(IN))",
+                                            "1k*I(R1)",
+                                            "pwr(V(IN), 1.5)",
+                                            "V(IN)/(1 + V(IN)*V(IN))",
+                                            "cosh(V(IN)) - sinh(V(IN))/2",
+                                            "V(IN, 0)*V(IN, OUT)",
+                                            "2**V(IN) + pow(V(IN), 2.5) + asinh(V(IN)) + acosh(V(IN) + 1)",
+                                            "min(V(IN), 1.5)*max(V(IN), 0.5)");
     INFO(Core::GetTypeName(type) << ": " << expression);
     BehavioralStage stage(type, expression);
     CheckOperatingPointParity(stage.Circuit);
@@ -690,10 +746,16 @@ TEST_CASE("Both backends agree on a behavioral source with jumps and corners awa
           "[backend_comparison][behavioral]") {
     const Core::ComponentType type =
         GENERATE(Core::ComponentType::BEHAVIORAL_VOLTAGE, Core::ComponentType::BEHAVIORAL_CURRENT);
-    const std::string expression =
-        GENERATE("V(IN) > 1 ? 5 : 1", "abs(V(IN) - 3)", "u(V(IN) - 1)*uramp(V(IN))", "min(max(V(IN), -1), 1)*2",
-                 "floor(V(IN)*2)/2 + V(IN)", "V(IN) > 1.5 && V(IN) < 2.5 ? 1 : 0", "nint(V(IN)) + u2(V(IN) - 1.5)",
-                 "(V(IN) < 1) * 3 + (V(IN) >= 1) * V(IN)", "sgn(V(IN) - 2.2)*V(IN) + ceil(V(IN))", "!(V(IN) > 1.2)");
+    const std::string expression = GENERATE("V(IN) > 1 ? 5 : 1",
+                                            "abs(V(IN) - 3)",
+                                            "u(V(IN) - 1)*uramp(V(IN))",
+                                            "min(max(V(IN), -1), 1)*2",
+                                            "floor(V(IN)*2)/2 + V(IN)",
+                                            "V(IN) > 1.5 && V(IN) < 2.5 ? 1 : 0",
+                                            "nint(V(IN)) + u2(V(IN) - 1.5)",
+                                            "(V(IN) < 1) * 3 + (V(IN) >= 1) * V(IN)",
+                                            "sgn(V(IN) - 2.2)*V(IN) + ceil(V(IN))",
+                                            "!(V(IN) > 1.2)");
     INFO(Core::GetTypeName(type) << ": " << expression);
     BehavioralStage stage(type, expression);
     CheckOperatingPointParity(stage.Circuit);
@@ -888,10 +950,12 @@ TEST_CASE("Both backends agree on the small-signal transfer function and impedan
         REQUIRE(actual.Result->InputUnit == expected.Result->InputUnit);
         INFO(std::format("Gain: ngspice {:.6e}, nodalys {:.6e}", expected.Result->Gain, actual.Result->Gain));
         REQUIRE(Close(actual.Result->Gain, expected.Result->Gain, 1e-4, 1e-6));
-        INFO(std::format("Zin: ngspice {:.6e}, nodalys {:.6e}", expected.Result->InputImpedance,
+        INFO(std::format("Zin: ngspice {:.6e}, nodalys {:.6e}",
+                         expected.Result->InputImpedance,
                          actual.Result->InputImpedance));
         REQUIRE(Close(actual.Result->InputImpedance, expected.Result->InputImpedance, 5e-3, 1e-6));
-        INFO(std::format("Zout: ngspice {:.6e}, nodalys {:.6e}", expected.Result->OutputImpedance,
+        INFO(std::format("Zout: ngspice {:.6e}, nodalys {:.6e}",
+                         expected.Result->OutputImpedance,
                          actual.Result->OutputImpedance));
         REQUIRE(Close(actual.Result->OutputImpedance, expected.Result->OutputImpedance, 1e-4, 5e-5));
     };
@@ -991,18 +1055,24 @@ TEST_CASE("Both backends agree on the small-signal noise spectral densities, tot
         for (std::size_t i = 0; i < expected.Result->Frequencies.size(); ++i) {
             const double f = expected.Result->Frequencies[i];
             REQUIRE(Close(actual.Result->Frequencies[i], f, 1e-9, 1e-12));
-            INFO(std::format("f = {:.4g} Hz onoise: ngspice {:.6e}, nodalys {:.6e}", f,
-                             expected.Result->OutputDensities[i], actual.Result->OutputDensities[i]));
+            INFO(std::format("f = {:.4g} Hz onoise: ngspice {:.6e}, nodalys {:.6e}",
+                             f,
+                             expected.Result->OutputDensities[i],
+                             actual.Result->OutputDensities[i]));
             REQUIRE(Close(actual.Result->OutputDensities[i], expected.Result->OutputDensities[i], 1e-3, 1e-15));
-            INFO(std::format("f = {:.4g} Hz inoise: ngspice {:.6e}, nodalys {:.6e}", f,
-                             expected.Result->InputDensities[i], actual.Result->InputDensities[i]));
+            INFO(std::format("f = {:.4g} Hz inoise: ngspice {:.6e}, nodalys {:.6e}",
+                             f,
+                             expected.Result->InputDensities[i],
+                             actual.Result->InputDensities[i]));
             REQUIRE(Close(actual.Result->InputDensities[i], expected.Result->InputDensities[i], 1e-3, 1e-15));
         }
 
-        INFO(std::format("OutputTotal: ngspice {:.6e}, nodalys {:.6e}", expected.Result->OutputTotal,
+        INFO(std::format("OutputTotal: ngspice {:.6e}, nodalys {:.6e}",
+                         expected.Result->OutputTotal,
                          actual.Result->OutputTotal));
         REQUIRE(Close(actual.Result->OutputTotal, expected.Result->OutputTotal, 1e-3, 1e-15));
-        INFO(std::format("InputTotal: ngspice {:.6e}, nodalys {:.6e}", expected.Result->InputTotal,
+        INFO(std::format("InputTotal: ngspice {:.6e}, nodalys {:.6e}",
+                         expected.Result->InputTotal,
                          actual.Result->InputTotal));
         REQUIRE(Close(actual.Result->InputTotal, expected.Result->InputTotal, 1e-3, 1e-15));
 
@@ -1013,8 +1083,10 @@ TEST_CASE("Both backends agree on the small-signal noise spectral densities, tot
                 std::ranges::find(actual.Result->Contributions, exp_c.Name, &Core::NoiseContribution::Name);
             INFO(std::format("contribution {}", exp_c.Name));
             REQUIRE(found != actual.Result->Contributions.end());
-            INFO(std::format("contribution {} OutputTotal: ngspice {:.6e}, nodalys {:.6e}", exp_c.Name,
-                             exp_c.OutputTotal, found->OutputTotal));
+            INFO(std::format("contribution {} OutputTotal: ngspice {:.6e}, nodalys {:.6e}",
+                             exp_c.Name,
+                             exp_c.OutputTotal,
+                             found->OutputTotal));
             REQUIRE(Close(found->OutputTotal, exp_c.OutputTotal, 1e-3, 1e-15));
             for (std::size_t i = 0; i < expected.Result->Frequencies.size(); ++i) {
                 REQUIRE(Close(found->OutputDensities[i], exp_c.OutputDensities[i], 1e-3, 1e-15));
@@ -1039,11 +1111,12 @@ TEST_CASE("Both backends agree on the small-signal noise spectral densities, tot
         circuit.Add(r1, {1, 2});
         circuit.Add(c1, {2, 0});
         circuit.Add(ground, {0});
-        check_noise_parity(circuit, {.OutputNode = 2,
-                                     .InputSource = "V1",
-                                     .StartFrequency = 10.0,
-                                     .StopFrequency = 100e3,
-                                     .PointsPerDecade = 10});
+        check_noise_parity(circuit,
+                           {.OutputNode = 2,
+                            .InputSource = "V1",
+                            .StartFrequency = 10.0,
+                            .StopFrequency = 100e3,
+                            .PointsPerDecade = 10});
     }
 
     SECTION("Inverting ideal op-amp amplifier") {
@@ -1074,11 +1147,12 @@ TEST_CASE("Both backends agree on the small-signal noise spectral densities, tot
         circuit.Add(r2, {2, 3});
         circuit.Add(op_amp, {3, 0, 2, 4, 5});
         circuit.Add(ground, {0});
-        check_noise_parity(circuit, {.OutputNode = 3,
-                                     .InputSource = "V3",
-                                     .StartFrequency = 10.0,
-                                     .StopFrequency = 100e3,
-                                     .PointsPerDecade = 5});
+        check_noise_parity(circuit,
+                           {.OutputNode = 3,
+                            .InputSource = "V3",
+                            .StartFrequency = 10.0,
+                            .StopFrequency = 100e3,
+                            .PointsPerDecade = 5});
     }
 
     SECTION("Common-emitter BJT amplifier") {
@@ -1109,11 +1183,12 @@ TEST_CASE("Both backends agree on the small-signal noise spectral densities, tot
         circuit.Add(re, {5, 0});
         circuit.Add(q1, {4, 3, 5});
         circuit.Add(ground, {0});
-        check_noise_parity(circuit, {.OutputNode = 4,
-                                     .InputSource = "V2",
-                                     .StartFrequency = 100.0,
-                                     .StopFrequency = 1e6,
-                                     .PointsPerDecade = 5});
+        check_noise_parity(circuit,
+                           {.OutputNode = 4,
+                            .InputSource = "V2",
+                            .StartFrequency = 100.0,
+                            .StopFrequency = 1e6,
+                            .PointsPerDecade = 5});
     }
 
     SECTION("Common-source NMOS amplifier") {
@@ -1136,11 +1211,12 @@ TEST_CASE("Both backends agree on the small-signal noise spectral densities, tot
         circuit.Add(rd, {1, 3});
         circuit.Add(m1, {3, 2, 0});
         circuit.Add(ground, {0});
-        check_noise_parity(circuit, {.OutputNode = 3,
-                                     .InputSource = "V2",
-                                     .StartFrequency = 10.0,
-                                     .StopFrequency = 100e3,
-                                     .PointsPerDecade = 5});
+        check_noise_parity(circuit,
+                           {.OutputNode = 3,
+                            .InputSource = "V2",
+                            .StartFrequency = 10.0,
+                            .StopFrequency = 100e3,
+                            .PointsPerDecade = 5});
     }
 
     SECTION("Non-inverting uA741 op-amp amplifier") {
@@ -1172,11 +1248,12 @@ TEST_CASE("Both backends agree on the small-signal noise spectral densities, tot
         circuit.Add(r2, {5, 4});
         circuit.Add(op_amp, {5, 3, 4, 1, 2});
         circuit.Add(ground, {0});
-        check_noise_parity(circuit, {.OutputNode = 5,
-                                     .InputSource = "V3",
-                                     .StartFrequency = 10.0,
-                                     .StopFrequency = 100e3,
-                                     .PointsPerDecade = 5});
+        check_noise_parity(circuit,
+                           {.OutputNode = 5,
+                            .InputSource = "V3",
+                            .StartFrequency = 10.0,
+                            .StopFrequency = 100e3,
+                            .PointsPerDecade = 5});
     }
 }
 
@@ -1200,8 +1277,10 @@ TEST_CASE("Both backends agree on S-parameters", "[s_parameters][backend_compari
         circuit.AddPort({.Number = 1, .Node = 1, .ReferenceOhms = 50.0});
         circuit.AddPort({.Number = 2, .Node = 2, .ReferenceOhms = 50.0});
 
-        const Core::SParameterSettings settings{
-            .StartFrequency = 1e6, .StopFrequency = 1e9, .IsLogarithmic = true, .PointsPerDecade = 5};
+        const Core::SParameterSettings settings{.StartFrequency = 1e6,
+                                                .StopFrequency = 1e9,
+                                                .IsLogarithmic = true,
+                                                .PointsPerDecade = 5};
         CheckSParameterParity(circuit, settings);
 
         // Also verify Touchstone export parity
@@ -1239,7 +1318,8 @@ TEST_CASE("Both backends agree on S-parameters", "[s_parameters][backend_compari
         circuit.AddPort({.Number = 2, .Node = 2, .ReferenceOhms = 50.0});
 
         CheckSParameterParity(
-            circuit, {.StartFrequency = 10e6, .StopFrequency = 2e9, .IsLogarithmic = true, .PointsPerDecade = 5});
+            circuit,
+            {.StartFrequency = 10e6, .StopFrequency = 2e9, .IsLogarithmic = true, .PointsPerDecade = 5});
     }
 
     SECTION("LC low-pass T filter") {
@@ -1261,8 +1341,10 @@ TEST_CASE("Both backends agree on S-parameters", "[s_parameters][backend_compari
         circuit.AddPort({.Number = 1, .Node = 1, .ReferenceOhms = 50.0});
         circuit.AddPort({.Number = 2, .Node = 2, .ReferenceOhms = 50.0});
 
-        const Core::SParameterSettings settings{
-            .StartFrequency = 100e3, .StopFrequency = 10e6, .IsLogarithmic = true, .PointsPerDecade = 5};
+        const Core::SParameterSettings settings{.StartFrequency = 100e3,
+                                                .StopFrequency = 10e6,
+                                                .IsLogarithmic = true,
+                                                .PointsPerDecade = 5};
         CheckSParameterParity(circuit, settings);
 
         // Parity of Touchstone export for LC filter
@@ -1308,7 +1390,8 @@ TEST_CASE("Both backends agree on S-parameters", "[s_parameters][backend_compari
         circuit.AddPort({.Number = 2, .Node = 2, .ReferenceOhms = 50.0});
 
         CheckSParameterParity(
-            circuit, {.StartFrequency = 20e6, .StopFrequency = 80e6, .IsLogarithmic = false, .LinearPoints = 25});
+            circuit,
+            {.StartFrequency = 20e6, .StopFrequency = 80e6, .IsLogarithmic = false, .LinearPoints = 25});
     }
 
     SECTION("RF transformer with coupled coils") {
@@ -1324,7 +1407,8 @@ TEST_CASE("Both backends agree on S-parameters", "[s_parameters][backend_compari
         circuit.AddPort({.Number = 2, .Node = 2, .ReferenceOhms = 50.0});
 
         CheckSParameterParity(
-            circuit, {.StartFrequency = 1e6, .StopFrequency = 50e6, .IsLogarithmic = true, .PointsPerDecade = 5});
+            circuit,
+            {.StartFrequency = 1e6, .StopFrequency = 50e6, .IsLogarithmic = true, .PointsPerDecade = 5});
     }
 
     SECTION("Asymmetric reference impedances (50 ohm and 75 ohm)") {
@@ -1339,7 +1423,8 @@ TEST_CASE("Both backends agree on S-parameters", "[s_parameters][backend_compari
         circuit.AddPort({.Number = 2, .Node = 2, .ReferenceOhms = 75.0});
 
         CheckSParameterParity(
-            circuit, {.StartFrequency = 1e6, .StopFrequency = 100e6, .IsLogarithmic = false, .LinearPoints = 11});
+            circuit,
+            {.StartFrequency = 1e6, .StopFrequency = 100e6, .IsLogarithmic = false, .LinearPoints = 11});
     }
 
     SECTION("Three-port resistive star power splitter") {
@@ -1363,7 +1448,8 @@ TEST_CASE("Both backends agree on S-parameters", "[s_parameters][backend_compari
         circuit.AddPort({.Number = 3, .Node = 3, .ReferenceOhms = 50.0});
 
         CheckSParameterParity(
-            circuit, {.StartFrequency = 10e6, .StopFrequency = 500e6, .IsLogarithmic = true, .PointsPerDecade = 3});
+            circuit,
+            {.StartFrequency = 10e6, .StopFrequency = 500e6, .IsLogarithmic = true, .PointsPerDecade = 3});
     }
 }
 

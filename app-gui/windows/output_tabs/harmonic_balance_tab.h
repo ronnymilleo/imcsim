@@ -53,8 +53,14 @@ private:
     // Controls and views
     void DrawControls(const Core::HarmonicBalance &result, bool has_measured, PlotExporter &exporter);
     void DrawSpectrumPlot(const Core::HarmonicBalance &result, bool has_voltages, bool has_currents, float height);
+    void SetupSpectrumAxes(bool has_voltages, bool has_currents) const;
+    void PlotSpectrumStems(const Core::HarmonicBalance &result, bool has_currents) const;
     void DrawWaveformPlot(const Core::HarmonicBalance &result, bool has_voltages, bool has_currents, float height);
     void DrawStatistics(const Core::HarmonicBalance &result);
+
+    // Fits
+    TraceFits TakeSpectrumFits(const Core::HarmonicBalance &result);
+    TraceFits TakeWaveformFits(const Core::HarmonicBalance &result);
 };
 
 } // namespace GUI

@@ -8,11 +8,11 @@
 #define NODALYS_PARSER_SUBCIRCUIT_SCOPE_H
 
 #include "nodalys/circuit_builder.h"
+#include "nodalys/subcircuit_text.h"
 #include "nodalys/types.h"
 #include "parser/model_cards.h"
 
 #include <expected>
-#include <functional>
 #include <map>
 #include <optional>
 #include <set>
@@ -64,9 +64,8 @@ struct ExpansionContext {
     /// Upper-case names of the models whose ignored parameters were already reported, so each is named once however
     /// often it is used.
     std::set<std::string> ReportedModels;
-    /// What the caller wants to hear about the nodes and sources the expansion makes; see SubcircuitTextInstance.
-    std::function<void(const std::string &name, NodeId node)> OnInternalNode;
-    std::function<void(const std::string &name, NodeId positive, NodeId negative)> OnSource;
+    /// What the caller wants to hear about the nodes and sources the expansion makes.
+    InstanceObservers Observers;
 };
 
 /**
@@ -78,7 +77,10 @@ struct ExpansionContext {
  */
 class TextScope {
 public:
-    TextScope(const TextScope *parent, std::string prefix);
+    TextScope(ExpansionContext &context, const TextScope *parent, std::string prefix);
+
+    // Expansion
+    ExpansionContext &GetContext() const;
 
     // Parameters
     std::optional<double> FindParameter(const std::string &upper_name) const;
@@ -94,13 +96,14 @@ public:
 
     // Nodes and names
     void MapNode(const std::string &upper_name, NodeId node);
-    NodeId ResolveNode(ExpansionContext &context, std::string_view name);
+    NodeId ResolveNode(std::string_view name);
     void AddSourceName(const std::string &upper_name, std::string written_name);
     std::optional<std::string> FindSourceName(const std::string &upper_name) const;
     std::string MakeName(std::string_view local_name) const;
     const std::string &GetPrefix() const;
 
 private:
+    ExpansionContext &m_Context;
     const TextScope *m_Parent;
     std::string m_Prefix;
     std::map<std::string, double> m_Parameters;

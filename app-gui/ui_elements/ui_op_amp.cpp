@@ -47,18 +47,24 @@ void UIOpAmp::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, 
 /**
  * @brief   The input signs sit inside the triangle, next to their inputs.
  */
-void UIOpAmp::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
+void UIOpAmp::DrawSymbol(SchematicCanvas &canvas,
+                         const ViewTransform &view,
+                         const ImU32 color,
                          SymbolStyle /*style*/) const {
     const ImVec2 triangle[3] = {LocalToScreen(view, -BODY_HALF_LENGTH, -BODY_HALF_HEIGHT),
                                 LocalToScreen(view, BODY_HALF_LENGTH, 0),
                                 LocalToScreen(view, -BODY_HALF_LENGTH, BODY_HALF_HEIGHT)};
     canvas.AddPolyline(triangle, 3, color, ImDrawFlags_Closed, LINE_THICKNESS);
     for (const float y : {-1.0f, 1.0f}) {
-        canvas.AddLine(LocalToScreen(view, SIGN_X - SIGN_HALF_SIZE, y), LocalToScreen(view, SIGN_X + SIGN_HALF_SIZE, y),
-                       color, LINE_THICKNESS);
+        canvas.AddLine(LocalToScreen(view, SIGN_X - SIGN_HALF_SIZE, y),
+                       LocalToScreen(view, SIGN_X + SIGN_HALF_SIZE, y),
+                       color,
+                       LINE_THICKNESS);
     }
     canvas.AddLine(LocalToScreen(view, SIGN_X, 1.0f - SIGN_HALF_SIZE),
-                   LocalToScreen(view, SIGN_X, 1.0f + SIGN_HALF_SIZE), color, LINE_THICKNESS);
+                   LocalToScreen(view, SIGN_X, 1.0f + SIGN_HALF_SIZE),
+                   color,
+                   LINE_THICKNESS);
 }
 
 /**

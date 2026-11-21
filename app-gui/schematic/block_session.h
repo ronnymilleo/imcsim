@@ -23,24 +23,33 @@
 namespace GUI {
 
 /**
- * @struct  OpenBlock
- * @brief   A block whose contents the editor opened, on the way down from the schematic.
- * @details Pins and Parameters hold its settings while a block inside it is open; the innermost block keeps them in the
- *          session instead.
+ * @struct  BlockSettings
+ * @brief   The name, pins and parameters of a block, as the settings dialog edits them.
  */
-struct OpenBlock {
+struct BlockSettings {
     std::string Name;
-    std::unique_ptr<Schematic> Content;
     std::vector<SavedSubcircuitPin> Pins;
     std::vector<Core::SubcircuitParameter> Parameters;
 };
 
 /**
+ * @struct  OpenBlock
+ * @brief   A block whose contents the editor opened, on the way down from the schematic.
+ * @details Settings are those of this block, kept while the editor goes into a block inside it, so they are still
+ *          there when it comes back. The name is the one of the definition and does not change while it is open.
+ */
+struct OpenBlock {
+    std::unique_ptr<Schematic> Content;
+    BlockSettings Settings;
+};
+
+/**
  * @class   BlockSession
- * @brief   The stack of open blocks of a document, and the name, pins, parameters and error of the settings dialog.
+ * @brief   The stack of open blocks of a document, and the settings and error the dialog shows.
  * @details The root schematic belongs to the caller and must outlive the session. Every open block is a copy of the
  *          block's contents that holds the same definitions as the root, so a part can place any block that does not
- *          contain the one being edited.
+ *          contain the one being edited. The dialog edits the settings of the innermost open block, or those of the
+ *          block to make from the selection while the schematic is shown.
  */
 class BlockSession {
 public:
@@ -61,21 +70,25 @@ public:
     static std::optional<std::string> FindBlockName(const UIElement *element);
     const SavedSubcircuit *FindDefinition(const std::string &name) const;
     void RequestCreate();
-    bool Open(const std::string &name);
-    bool Close(bool apply);
+    [[nodiscard]] std::expected<void, std::string> Open(const std::string &name);
+    [[nodiscard]] std::expected<void, std::string> ApplyAndClose();
+    [[nodiscard]] std::expected<void, std::string> DiscardAndClose();
     std::expected<void, std::string> ApplySpiceUpdate(const std::string &name,
                                                       const std::vector<SavedSubcircuitPin> &pins,
                                                       const std::vector<Core::SubcircuitParameter> &parameters);
 
     // Settings of the dialog
-    bool SyncPins();
-    bool ApplyPinNames();
-    bool CreateBlock();
+    [[nodiscard]] std::expected<void, std::string> SyncPins();
+    [[nodiscard]] std::expected<void, std::string> ApplyPinNames();
+    [[nodiscard]] std::expected<void, std::string> CreateBlock();
     void RestoreSettings();
     std::string &GetName();
     std::vector<SavedSubcircuitPin> &GetPins();
     std::vector<Core::SubcircuitParameter> &GetParameters();
-    std::string &GetError();
+    const std::string &GetError() const;
+    void ShowError(std::string reason);
+    void ClearError();
+    void ReportError(std::string reason);
     void RequestDialog();
     bool TakeDialogRequest();
 
@@ -83,11 +96,16 @@ private:
     Schematic &m_Root;
     /// The blocks open, from the outermost to the one shown; empty while the schematic is shown.
     std::vector<OpenBlock> m_OpenBlocks;
-    std::vector<SavedSubcircuitPin> m_Pins;
-    std::vector<Core::SubcircuitParameter> m_Parameters;
-    std::string m_Name;
+
+    // Settings of the dialog
+    /// The settings of the block to make from the selection, which the dialog shows while no block is open.
+    BlockSettings m_NewBlock;
     std::string m_Error;
     bool m_IsDialogRequested = false;
+
+    std::expected<void, std::string> ApplyInnermost();
+    void LeaveInnermost();
+    BlockSettings &GetShownSettings();
 };
 
 } // namespace GUI

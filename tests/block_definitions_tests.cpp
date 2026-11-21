@@ -103,11 +103,13 @@ TEST_CASE("Two pin markers on one node are refused", "[block_definitions]") {
 }
 
 TEST_CASE("A new pin continues the old one at its point, or else the one of its name", "[block_definitions]") {
-    const std::vector<GUI::SavedSubcircuitPin> old_pins = {
-        {.Name = "IN", .Point = {0, 0}}, {.Name = "OUT", .Point = {4, 0}}, {.Name = "GND", .Point = {8, 0}}};
+    const std::vector<GUI::SavedSubcircuitPin> old_pins = {{.Name = "IN", .Point = {0, 0}},
+                                                           {.Name = "OUT", .Point = {4, 0}},
+                                                           {.Name = "GND", .Point = {8, 0}}};
     // IN was renamed at the same point, OUT moved but kept its name, and the last pin is new
-    const std::vector<GUI::SavedSubcircuitPin> new_pins = {
-        {.Name = "INPUT", .Point = {0, 0}}, {.Name = "OUT", .Point = {12, 0}}, {.Name = "EXTRA", .Point = {16, 0}}};
+    const std::vector<GUI::SavedSubcircuitPin> new_pins = {{.Name = "INPUT", .Point = {0, 0}},
+                                                           {.Name = "OUT", .Point = {12, 0}},
+                                                           {.Name = "EXTRA", .Point = {16, 0}}};
 
     const auto matches = GUI::MatchPins(old_pins, new_pins);
 
@@ -128,15 +130,23 @@ TEST_CASE("An old pin continues only one new pin", "[block_definitions]") {
     CHECK_FALSE(matches[1].has_value());
 }
 
-TEST_CASE("A free name takes the first suffix no definition has", "[block_definitions]") {
-    const std::vector<GUI::SavedSubcircuit> none;
-    CHECK(GUI::FindFreeName("amp", none) == "amp_2");
+TEST_CASE("Copied contents share nothing with the parts they came from", "[block_definitions]") {
+    const auto resistor = GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 0}, GUI::Rotation::R0);
+    const auto marker = MakeMarker({-2, 0}, "IN");
+    const std::vector<const GUI::UIElement *> parts = {resistor.get(), marker.get()};
+    const std::vector<GUI::UIWire> wires = {{{-4, 0}, {-2, 0}}};
 
-    std::vector<GUI::SavedSubcircuit> definitions;
-    definitions.push_back(MakeDefinition("amp"));
-    definitions.push_back(MakeDefinition("amp_2"));
-    definitions.push_back(MakeDefinition("amp_3"));
-    CHECK(GUI::FindFreeName("amp", definitions) == "amp_4");
+    auto copied = GUI::CopyContent(parts, wires, {});
+    REQUIRE(copied);
+    REQUIRE(copied->Elements.size() == 2);
+    CHECK(copied->Elements[0].get() != resistor.get());
+    CHECK(copied->Elements[0]->GetComponent().GetType() == Core::ComponentType::RESISTOR);
+    CHECK(static_cast<const Core::NetLabel &>(copied->Elements[1]->GetComponent()).GetNet() == "IN");
+    CHECK(copied->Wires == wires);
+
+    // Changing the copy leaves the part it came from as it was
+    copied->Elements[0]->SetPosition({8, 8});
+    CHECK(resistor->GetPosition() == GUI::GridPoint{0, 0});
 }
 
 TEST_CASE("Definitions with the same contents describe alike and others do not", "[block_definitions]") {

@@ -37,16 +37,18 @@ struct RoutingObstacles {
 };
 
 // Placement
-void MoveToFreeSpot(UISubcircuit &block, const std::vector<GridPoint> &pin_points,
-                    const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires);
+void MoveToFreeSpot(UISubcircuit &block,
+                    const std::vector<GridPoint> &pin_points,
+                    const std::vector<std::unique_ptr<UIElement>> &elements,
+                    const std::vector<UIWire> &wires);
 std::optional<GridPoint> DetachFromBox(std::vector<UIWire> &wires, GridPoint old_point, const UIElement &block);
 
 // Routing
 void KeepOffBlock(RoutingObstacles &obstacles, const UISubcircuit &block);
-std::vector<std::optional<std::vector<UIWire>>> RouteLinks(const std::vector<std::unique_ptr<UIElement>> &elements,
-                                                           const std::vector<UIWire> &wires,
-                                                           const RoutingObstacles &obstacles,
-                                                           const std::vector<WireLink> &links);
+std::vector<UIWire> RouteLinks(const std::vector<std::unique_ptr<UIElement>> &elements,
+                               const std::vector<UIWire> &wires,
+                               const RoutingObstacles &obstacles,
+                               const std::vector<WireLink> &links);
 
 } // namespace GUI
 

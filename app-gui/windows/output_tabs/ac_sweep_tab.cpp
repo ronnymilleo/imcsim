@@ -13,7 +13,6 @@
 #include "windows/output_tabs/plot_widgets.h"
 #include "windows/output_tabs/statistics_widgets.h"
 #include "windows/output_tabs/step_widgets.h"
-#include <cmath>
 #include <format>
 #include <optional>
 #include <string>
@@ -95,16 +94,14 @@ ExportFigure ACSweepTab::BuildFigure(const FrameResults &frame) const {
  * @details Both plots share their frequency range and cursors, so zooming one zooms the other.
  */
 void ACSweepTab::DrawPlots(const Core::ACSweep &sweep, const ACMathTraces &math) {
-    std::vector<std::string> measured_currents = ListMeasuredCurrents(sweep.CurrentMagnitudesDecibels, m_Schematic);
-    const bool shows_currents = !measured_currents.empty();
+    ShownTraces shown{.Nodes = ListMeasuredNodes(sweep.NodeMagnitudesDecibels.size(), m_Schematic),
+                      .Currents = ListMeasuredCurrents(sweep.CurrentMagnitudesDecibels, m_Schematic),
+                      .MathLabels = ListMathLabels(math.Magnitudes)};
+    const bool shows_currents = !shown.Currents.empty();
     const bool has_voltages =
         HasMeasuredVoltage(sweep.NodeMagnitudesDecibels.size(), m_Schematic) || UsesAxis(math.Magnitudes, ImAxis_Y1);
     const bool has_current_axis = shows_currents || UsesAxis(math.Magnitudes, ImAxis_Y2);
-    const PlotFits fits{.IsNewResult = m_Fit.TakeNewResult(m_Results.GetACSweepVersion()),
-                        .HaveVoltagesChanged =
-                            m_Fit.TakeNodesChanged(ListMeasuredNodes(sweep.NodeMagnitudesDecibels.size(), m_Schematic)),
-                        .HaveCurrentsChanged = m_Fit.TakeCurrentsChanged(std::move(measured_currents)),
-                        .HasMathChanged = m_Fit.TakeMathChanged(ListMathLabels(math.Magnitudes)),
+    const PlotFits fits{.Fits = m_Fit.TakeFits(m_Results.GetACSweepVersion(), std::move(shown)),
                         .ShowsCurrents = shows_currents,
                         .HasCurrentAxis = has_current_axis,
                         .VoltageAxisFlags =
@@ -141,17 +138,12 @@ void ACSweepTab::DrawPlots(const Core::ACSweep &sweep, const ACMathTraces &math)
  *          and the cursors, on a logarithmic frequency axis.
  */
 void ACSweepTab::DrawPlot(const Core::ACSweep &sweep, const BodePlot &plot, const PlotFits &fits) {
-    SetNextFits(fits.IsNewResult, fits.HaveVoltagesChanged, fits.HaveCurrentsChanged);
-    if (fits.HasMathChanged) {
-        FitMathAxes(*plot.Math);
-    }
+    SetNextFits(fits.Fits, *plot.Math);
     if (!BeginTracePlot(plot.Id, ImVec2(-1.0f, fits.Height))) {
         return;
     }
     ImPlot::SetupAxes("Frequency", plot.VoltageAxis, ImPlotAxisFlags_None, fits.VoltageAxisFlags);
-    ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
-    ImPlot::SetupAxisLinks(ImAxis_X1, &m_View.From, &m_View.To);
-    ImPlot::SetupAxisFormat(ImAxis_X1, FormatAxisValue, const_cast<char *>("Hz"));
+    SetupLogFrequencyAxis(&m_View);
     if (fits.HasCurrentAxis) {
         ImPlot::SetupAxis(ImAxis_Y2, plot.CurrentAxis, ImPlotAxisFlags_AuxDefault);
     }
@@ -161,9 +153,7 @@ void ACSweepTab::DrawPlot(const Core::ACSweep &sweep, const BodePlot &plot, cons
     const auto &steps = m_Results.GetACSweepSteps();
     std::vector<StepTraces> step_traces;
     if (steps) {
-        for (const Core::ACSweep &step : steps->Results) {
-            step_traces.push_back({&step.Frequencies, &(step.*plot.Nodes), &(step.*plot.Currents)});
-        }
+        step_traces = MakeStepTraces(steps->Results, &Core::ACSweep::Frequencies, plot.Nodes, plot.Currents);
         PlotOtherSteps(step_traces, steps->Selected, m_Schematic, fits.ShowsCurrents, {});
     }
     std::vector<PlottedTrace> plotted;
@@ -173,8 +163,12 @@ void ACSweepTab::DrawPlot(const Core::ACSweep &sweep, const BodePlot &plot, cons
     }
     PlotMath(sweep.Frequencies, *plot.Math, "", plotted, plot.Unit);
     if (steps && plot.HasLabels) {
-        LabelSteps(step_traces, steps->Selected, ListStepLabels(steps->Parameter, steps->Unit, steps->Values),
-                   m_Schematic, fits.ShowsCurrents, {});
+        LabelSteps(step_traces,
+                   steps->Selected,
+                   ListStepLabels(steps->Parameter, steps->Unit, steps->Values),
+                   m_Schematic,
+                   fits.ShowsCurrents,
+                   {});
     }
     DrawRoots(plot.HasLabels);
     DrawCursors(m_Cursors, true);
@@ -200,10 +194,7 @@ void ACSweepTab::DrawRoots(const bool has_labels) {
  */
 void ACSweepTab::DrawStatistics(const Core::ACSweep &sweep, const ACMathTraces &math) {
     const PlotCursors &cursors = m_Cursors;
-    const CursorReadings cursor_readings = {
-        {"A", FormatQuantity(cursors.A, "Hz")},
-        {"B", FormatQuantity(cursors.B, "Hz")},
-        {"B/A", cursors.A > 0.0 ? FormatFixed(std::log10(cursors.B / cursors.A), " dec") : std::string(NO_VALUE)}};
+    const CursorReadings cursor_readings = ReadCursors(cursors, "Hz", {ReadCursorDecades(cursors)});
     DrawStatisticsHeader("Response over the whole sweep");
     std::vector<PlottedTrace> magnitudes =
         ListTraces(sweep.NodeMagnitudesDecibels, sweep.CurrentMagnitudesDecibels, m_Schematic, " dB", " dB");
@@ -211,7 +202,7 @@ void ACSweepTab::DrawStatistics(const Core::ACSweep &sweep, const ACMathTraces &
         ListTraces(sweep.NodePhasesDegrees, sweep.CurrentPhasesDegrees, m_Schematic, " deg", " deg");
     for (std::size_t index = 0; index < math.Magnitudes.size(); ++index) {
         const MathTrace &magnitude = math.Magnitudes[index];
-        magnitudes.push_back({magnitude.Label, &magnitude.Values, " dB", magnitude.Color});
+        magnitudes.push_back(ToPlottedTrace(magnitude, " dB"));
         phases.push_back({magnitude.Label, &math.Phases[index].Values, " deg", magnitude.Color});
     }
     if (magnitudes.empty()) {
@@ -222,9 +213,8 @@ void ACSweepTab::DrawStatistics(const Core::ACSweep &sweep, const ACMathTraces &
     for (std::size_t index = 0; index < magnitudes.size(); ++index) {
         traces.push_back({.MagnitudesDecibels = *magnitudes[index].Values, .PhasesDegrees = *phases[index].Values});
     }
-    const std::vector<StatisticsRow> rows =
-        BuildBodeStatistics(sweep.Frequencies, traces, cursors.Shown ? std::optional(cursors) : std::nullopt);
-    DrawTraceTable("bode_statistics", magnitudes, rows, cursors.Shown ? cursor_readings : CursorReadings{});
+    const std::vector<StatisticsRow> rows = BuildBodeStatistics(sweep.Frequencies, traces, GetShownCursors(cursors));
+    DrawTraceTable("bode_statistics", magnitudes, rows, cursor_readings);
 }
 
 } // namespace GUI

@@ -84,7 +84,10 @@ std::string SeedCard(const unsigned int seed) {
 }
 
 std::string FormatSweepRange(const SweepRange &range) {
-    return std::format("{} {} {} {}", range.Source, FormatSpiceValue(range.Start), FormatSpiceValue(range.Stop),
+    return std::format("{} {} {} {}",
+                       range.Source,
+                       FormatSpiceValue(range.Start),
+                       FormatSpiceValue(range.Stop),
                        FormatSpiceValue(range.Step));
 }
 
@@ -108,6 +111,7 @@ constexpr double TARGET_CHUNK_SECONDS = 0.03;
 constexpr double FIRST_CHUNK_SHARE = 0.01;
 /// A run has ended when its last point is this close to the stop time, which ngspice lands on exactly.
 constexpr double COMPLETE_SHARE = 1.0 - 1e-9;
+
 /**
  * @brief   How much simulated time the first chunk covers: a fixed stretch of the clock for a live run, the length the
  *          monitor asks for, or else a small share of the stop time.
@@ -127,7 +131,9 @@ double GetFirstChunkDuration(const TransientSettings &settings, const RunMonitor
  *          was quick, half when it was slow, so the chunks settle around the target wall time as the circuit gets
  *          easier or harder. A length the monitor fixed stays as it is.
  */
-double GetNextChunkDuration(const RunMonitor &monitor, const double duration, const double wall_seconds,
+double GetNextChunkDuration(const RunMonitor &monitor,
+                            const double duration,
+                            const double wall_seconds,
                             const double smallest) {
     if (monitor.FixedChunkSeconds > 0.0) {
         return duration;
@@ -149,9 +155,9 @@ double GetNextChunkDuration(const RunMonitor &monitor, const double duration, co
 void RemoveChunkMessages(std::vector<SimulatorMessage> &messages) {
     bool has_analysis_line = false;
     std::erase_if(messages, [&has_analysis_line](const SimulatorMessage &message) {
-        if (message.Text.contains("condition met: stop  when time >") ||
-            message.Text.starts_with("doAnalyses: pause requested") || message.Text == "run simulation interrupted" ||
-            message.Text == "simulation interrupted") {
+        if (message.Text.contains("condition met: stop  when time >")
+            || message.Text.starts_with("doAnalyses: pause requested") || message.Text == "run simulation interrupted"
+            || message.Text == "simulation interrupted") {
             return true;
         }
         return message.Text.starts_with("Doing analysis at TEMP") && std::exchange(has_analysis_line, true);
@@ -189,7 +195,9 @@ bool IsCancelled(const RunControl *control) {
  */
 void ApplyLiveChanges(RunControl &control) {
     for (const LiveChange &change : control.TakeChanges()) {
-        SendCommand(std::format("alter {} {} = {}", change.Element, GetAlterParameter(change.Quantity),
+        SendCommand(std::format("alter {} {} = {}",
+                                change.Element,
+                                GetAlterParameter(change.Quantity),
                                 FormatSpiceValue(change.Value)));
     }
 }
@@ -234,8 +242,10 @@ bool PublishChunk(const Circuit &circuit, const RunMonitor &monitor, const doubl
  *          a fixed stretch of the clock per chunk at its pace and waits when it gets ahead, holds between chunks while
  *          paused, and alters the circuit with the changes sent before each chunk.
  */
-std::optional<std::string> RunInChunks(const Circuit &circuit, const TransientSettings &settings,
-                                       const RunMonitor &monitor, const std::vector<SimulatorMessage> &messages) {
+std::optional<std::string> RunInChunks(const Circuit &circuit,
+                                       const TransientSettings &settings,
+                                       const RunMonitor &monitor,
+                                       const std::vector<SimulatorMessage> &messages) {
     const bool is_live = monitor.LivePace > 0.0;
     const double pace = monitor.LivePace;
     double duration = GetFirstChunkDuration(settings, monitor);
@@ -285,8 +295,11 @@ std::optional<std::string> RunInChunks(const Circuit &circuit, const TransientSe
  *          disturb.
  */
 template <typename Data, typename Reader, typename Execute = decltype(&RunToTheEnd)>
-SimulationRun<Data> Simulate(const Circuit &circuit, const std::string_view analysis,
-                             const std::string_view plot_prefix, Reader read_result, Execute execute = &RunToTheEnd,
+SimulationRun<Data> Simulate(const Circuit &circuit,
+                             const std::string_view analysis,
+                             const std::string_view plot_prefix,
+                             Reader read_result,
+                             Execute execute = &RunToTheEnd,
                              const bool add_current_probes = true) {
     SimulationRun<Data> run;
     if (!EnsureInitialized()) {
@@ -302,8 +315,8 @@ SimulationRun<Data> Simulate(const Circuit &circuit, const std::string_view anal
     const char *plot = ngSpice_CurPlot();
     if (failure) {
         run.Result = std::unexpected(*failure);
-    } else if (plot == nullptr || !std::string_view(plot).starts_with(plot_prefix) || HasErrorLine(run.Messages) ||
-               NeverSettled(run.Messages)) {
+    } else if (plot == nullptr || !std::string_view(plot).starts_with(plot_prefix) || HasErrorLine(run.Messages)
+               || NeverSettled(run.Messages)) {
         run.Result = std::unexpected(DescribeFailure(circuit, run.Messages));
     } else {
         run.Result = read_result();
@@ -334,11 +347,20 @@ std::string_view NgspiceBackend::GetName() const {
 const BackendCapabilities &NgspiceBackend::GetCapabilities() const {
     std::call_once(m_CapabilitiesReady, [this] {
         m_Capabilities = {
-            .Analyses = {AnalysisKind::OPERATING_POINT, AnalysisKind::TRANSIENT, AnalysisKind::AC_SWEEP,
-                         AnalysisKind::DC_SWEEP, AnalysisKind::NOISE, AnalysisKind::TRANSFER_FUNCTION,
-                         AnalysisKind::SENSITIVITY, AnalysisKind::POLE_ZERO, AnalysisKind::S_PARAMETERS},
+            .Analyses = {AnalysisKind::OPERATING_POINT,
+                         AnalysisKind::TRANSIENT,
+                         AnalysisKind::AC_SWEEP,
+                         AnalysisKind::DC_SWEEP,
+                         AnalysisKind::NOISE,
+                         AnalysisKind::TRANSFER_FUNCTION,
+                         AnalysisKind::SENSITIVITY,
+                         AnalysisKind::POLE_ZERO,
+                         AnalysisKind::S_PARAMETERS},
             .UnsupportedParts = {},
             .UnsupportedPartsByAnalysis = {},
+            .UnsupportedWithNodesets = {{AnalysisKind::TRANSFER_FUNCTION,
+                                         "ngspice crashes in a transfer function when the circuit has a nodeset, and "
+                                         "Nodalys runs it"}},
             .TemperatureUnsupported = std::nullopt,
             .SParameters = {.MinPorts = 2,
                             .MinPortsReason = "ngspice needs at least two S-parameter ports, and Nodalys takes one",
@@ -348,7 +370,7 @@ const BackendCapabilities &NgspiceBackend::GetCapabilities() const {
         // The digital models allocate nodes while ngspice sets up the sensitivity analysis, which it cannot recover
         // from, and they leave the pole-zero solver nothing to follow; the parts are told apart by type, from the
         // first to the last of the enumeration
-        for (int index = 0; index <= static_cast<int>(ComponentType::SEVEN_SEGMENT); ++index) {
+        for (int index = 0; index <= static_cast<int>(LAST_COMPONENT_TYPE); ++index) {
             const auto type = static_cast<ComponentType>(index);
             if (IsLogicPart(type)) {
                 m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::SENSITIVITY][type] =
@@ -362,7 +384,7 @@ const BackendCapabilities &NgspiceBackend::GetCapabilities() const {
         }
         if (!AreDigitalModelsAvailable()) {
             // The parts are told apart by type, from the first to the last of the enumeration
-            for (int index = 0; index <= static_cast<int>(ComponentType::SEVEN_SEGMENT); ++index) {
+            for (int index = 0; index <= static_cast<int>(LAST_COMPONENT_TYPE); ++index) {
                 const auto type = static_cast<ComponentType>(index);
                 if (IsLogicPart(type)) {
                     m_Capabilities.UnsupportedParts[type] =
@@ -383,7 +405,9 @@ const BackendCapabilities &NgspiceBackend::GetCapabilities() const {
  */
 OperatingPointRun NgspiceBackend::RunOperatingPoint(const Circuit &circuit,
                                                     const std::optional<double> &temperature_celsius) {
-    return Simulate<OperatingPoint>(circuit, std::format("{}.op", TemperatureCard(temperature_celsius)), "op",
+    return Simulate<OperatingPoint>(circuit,
+                                    std::format("{}.op", TemperatureCard(temperature_celsius)),
+                                    "op",
                                     [&circuit] { return ReadOperatingPoint(circuit); });
 }
 
@@ -400,13 +424,18 @@ OperatingPointRun NgspiceBackend::RunOperatingPoint(const Circuit &circuit,
  *          point, with a warning in the result; the same holds for logic parts that never settle into an operating
  *          point, such as a latch with both inputs idle, which start from 0 V.
  */
-TransientRun NgspiceBackend::RunTransient(const Circuit &circuit, const TransientSettings &settings,
-                                          const std::optional<double> &temperature_celsius, const RunMonitor &monitor) {
+TransientRun NgspiceBackend::RunTransient(const Circuit &circuit,
+                                          const TransientSettings &settings,
+                                          const std::optional<double> &temperature_celsius,
+                                          const RunMonitor &monitor) {
     // An initial condition needs uic, which skips the operating point and starts the capacitors and inductors from
     // the IC= values written in the netlist
     const bool has_initial_conditions = circuit.HasInitialConditions();
-    std::string analysis = std::format("{}{}.tran {} {}", TemperatureCard(temperature_celsius), SeedCard(settings.Seed),
-                                       FormatSpiceValue(settings.TimeStep), FormatSpiceValue(settings.StopTime));
+    std::string analysis = std::format("{}{}.tran {} {}",
+                                       TemperatureCard(temperature_celsius),
+                                       SeedCard(settings.Seed),
+                                       FormatSpiceValue(settings.TimeStep),
+                                       FormatSpiceValue(settings.StopTime));
     if (has_initial_conditions) {
         analysis += " uic";
     }
@@ -459,11 +488,14 @@ TransientRun NgspiceBackend::RunTransient(const Circuit &circuit, const Transien
  * @param[in] temperature_celsius  Temperature of the run in degrees Celsius, or none for the default one.
  * @return  The magnitude and phase of every node at every frequency or an error, plus every line ngspice printed.
  */
-ACSweepRun NgspiceBackend::RunACSweep(const Circuit &circuit, const ACSweepSettings &settings,
+ACSweepRun NgspiceBackend::RunACSweep(const Circuit &circuit,
+                                      const ACSweepSettings &settings,
                                       const std::optional<double> &temperature_celsius) {
-    const std::string analysis =
-        std::format("{}.ac dec {} {} {}", TemperatureCard(temperature_celsius), settings.PointsPerDecade,
-                    FormatSpiceValue(settings.StartFrequency), FormatSpiceValue(settings.StopFrequency));
+    const std::string analysis = std::format("{}.ac dec {} {} {}",
+                                             TemperatureCard(temperature_celsius),
+                                             settings.PointsPerDecade,
+                                             FormatSpiceValue(settings.StartFrequency),
+                                             FormatSpiceValue(settings.StopFrequency));
     return Simulate<ACSweep>(circuit, analysis, "ac", [&circuit] { return ReadACSweep(circuit); });
 }
 
@@ -476,7 +508,8 @@ ACSweepRun NgspiceBackend::RunACSweep(const Circuit &circuit, const ACSweepSetti
  *          ngspice printed.
  * @note    AC and pulse sources are swept through their DC value.
  */
-DCSweepRun NgspiceBackend::RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings,
+DCSweepRun NgspiceBackend::RunDCSweep(const Circuit &circuit,
+                                      const DCSweepSettings &settings,
                                       const std::optional<double> &temperature_celsius) {
     std::string analysis =
         std::format("{}.dc {}", TemperatureCard(temperature_celsius), FormatSweepRange(settings.Swept));
@@ -498,9 +531,12 @@ DCSweepRun NgspiceBackend::RunDCSweep(const Circuit &circuit, const DCSweepSetti
  */
 NoiseRun NgspiceBackend::RunNoise(const Circuit &circuit, const NoiseSettings &settings) {
     // The last 1 asks for the share of every device in the results
-    const std::string analysis = std::format(
-        ".noise v({}) {} dec {} {} {} 1", settings.OutputNode, settings.InputSource, settings.PointsPerDecade,
-        FormatSpiceValue(settings.StartFrequency), FormatSpiceValue(settings.StopFrequency));
+    const std::string analysis = std::format(".noise v({}) {} dec {} {} {} 1",
+                                             settings.OutputNode,
+                                             settings.InputSource,
+                                             settings.PointsPerDecade,
+                                             FormatSpiceValue(settings.StartFrequency),
+                                             FormatSpiceValue(settings.StopFrequency));
     return Simulate<Noise>(circuit, analysis, "noise", [&circuit, &settings] { return ReadNoise(circuit, settings); });
 }
 
@@ -513,8 +549,9 @@ NoiseRun NgspiceBackend::RunNoise(const Circuit &circuit, const NoiseSettings &s
 TransferFunctionRun NgspiceBackend::RunTransferFunction(const Circuit &circuit,
                                                         const TransferFunctionSettings &settings) {
     const std::string analysis = std::format(".tf v({}) {}", settings.OutputNode, settings.InputSource);
-    return Simulate<TransferFunction>(circuit, analysis, "tf",
-                                      [&circuit, &settings] { return ReadTransferFunction(circuit, settings); });
+    return Simulate<TransferFunction>(circuit, analysis, "tf", [&circuit, &settings] {
+        return ReadTransferFunction(circuit, settings);
+    });
 }
 
 /**
@@ -532,8 +569,11 @@ PoleZeroRun NgspiceBackend::RunPoleZero(const Circuit &circuit, const PoleZeroSe
     if (!input) {
         return {std::unexpected(std::format("The input source {} is not in the circuit", settings.InputSource)), {}};
     }
-    const std::string analysis = std::format(".pz {} {} {} 0 {} pz", input->PositiveNode, input->NegativeNode,
-                                             settings.OutputNode, input->IsCurrent ? "cur" : "vol");
+    const std::string analysis = std::format(".pz {} {} {} 0 {} pz",
+                                             input->PositiveNode,
+                                             input->NegativeNode,
+                                             settings.OutputNode,
+                                             input->IsCurrent ? "cur" : "vol");
     // ngspice calls a voltage input shorted, and finds nothing, unless the source has an AC magnitude, which a DC
     // source or a pulse has not; the analysis does not depend on its value
     const auto run_with_ac_input = [&settings](const std::vector<SimulatorMessage> & /*messages*/) {
@@ -542,7 +582,11 @@ PoleZeroRun NgspiceBackend::RunPoleZero(const Circuit &circuit, const PoleZeroSe
         return std::optional<std::string>();
     };
     PoleZeroRun run = Simulate<PoleZero>(
-        circuit, analysis, "pz", [&circuit, &settings] { return ReadPoleZero(circuit, settings); }, run_with_ac_input,
+        circuit,
+        analysis,
+        "pz",
+        [&circuit, &settings] { return ReadPoleZero(circuit, settings); },
+        run_with_ac_input,
         false);
     if (!run.Result) {
         if (const std::optional<std::string> explanation = DescribePoleZeroFailure(run.Messages)) {
@@ -568,7 +612,12 @@ SParametersRun NgspiceBackend::RunSParameters(const Circuit &circuit, const SPar
     const std::string analysis =
         std::format("{}{}", FormatPortSources(circuit.GetPorts()), FormatSParameterAnalysis(settings));
     SParametersRun run = Simulate<SParameters>(
-        circuit, analysis, "sp", [&circuit] { return ReadSParameters(circuit); }, &RunToTheEnd, false);
+        circuit,
+        analysis,
+        "sp",
+        [&circuit] { return ReadSParameters(circuit); },
+        &RunToTheEnd,
+        false);
     if (!run.Result) {
         if (const std::optional<std::string> explanation = DescribeSParameterFailure(run.Messages)) {
             run.Result = std::unexpected(*explanation);
@@ -585,8 +634,9 @@ SParametersRun NgspiceBackend::RunSParameters(const Circuit &circuit, const SPar
  */
 SensitivityRun NgspiceBackend::RunSensitivity(const Circuit &circuit, const SensitivitySettings &settings) {
     const std::string analysis = std::format(".sens v({})", settings.OutputNode);
-    SensitivityRun run = Simulate<Sensitivity>(circuit, analysis, "sens",
-                                               [&circuit, &settings] { return ReadSensitivity(circuit, settings); });
+    SensitivityRun run = Simulate<Sensitivity>(circuit, analysis, "sens", [&circuit, &settings] {
+        return ReadSensitivity(circuit, settings);
+    });
     // ngspice always notes, on its error stream, that a source with a waveform is taken at its DC value; that is what
     // this analysis does, so the note is no warning, but it stays in the output
     for (SimulatorMessage &message : run.Messages) {

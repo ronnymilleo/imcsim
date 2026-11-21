@@ -19,7 +19,9 @@ namespace GUI {
 namespace {
 
 constexpr ImVec4 Rgb(const int red, const int green, const int blue, const float alpha = 1.0f) {
-    return {static_cast<float>(red) / 255.0f, static_cast<float>(green) / 255.0f, static_cast<float>(blue) / 255.0f,
+    return {static_cast<float>(red) / 255.0f,
+            static_cast<float>(green) / 255.0f,
+            static_cast<float>(blue) / 255.0f,
             alpha};
 }
 
@@ -519,6 +521,28 @@ ImU32 GetPreviewColor() {
  */
 ImU32 GetHighlightColor() {
     return ImGui::ColorConvertFloat4ToU32(GetPalette().AccentHot);
+}
+
+/**
+ * @brief   The same color with another alpha.
+ * @param[in] color  Color to change.
+ * @param[in] alpha  The new alpha, from 0 for clear to 255 for opaque.
+ * @return  The color with its red, green and blue kept.
+ */
+ImU32 ReplaceAlpha(const ImU32 color, const ImU32 alpha) {
+    return (color & ~IM_COL32_A_MASK) | (alpha << IM_COL32_A_SHIFT);
+}
+
+/**
+ * @brief   The same color, more see-through.
+ * @param[in] color   Color to change.
+ * @param[in] factor  What its alpha is multiplied by, from 0 to 1.
+ * @return  The color with its red, green and blue kept and its alpha scaled.
+ */
+ImU32 ScaleAlpha(const ImU32 color, const float factor) {
+    ImVec4 components = ImGui::ColorConvertU32ToFloat4(color);
+    components.w *= factor;
+    return ImGui::ColorConvertFloat4ToU32(components);
 }
 
 /**

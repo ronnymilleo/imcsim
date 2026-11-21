@@ -11,6 +11,7 @@
 #include "schematic/probing.h"
 #include "schematic/schematic_drawing.h"
 #include "schematic/selection.h"
+#include "windows/turn_keys.h"
 #include <format>
 #include <string>
 #include <utility>
@@ -26,26 +27,31 @@ constexpr float WIRE_CURSOR_HALF_SIZE = 4.0f;
  */
 std::optional<MeasurementTarget> FindTargetAt(const ModeInput &input) {
     Schematic &schematic = input.Blocks.GetShown();
-    return FindMeasurementTarget(schematic.GetElements(), schematic.GetWires(), schematic.GetConnectivity(),
-                                 input.View.ToWorld(ImGui::GetIO().MousePos), WIRE_PICK_DISTANCE / input.Zoom);
+    return FindMeasurementTarget(schematic.GetElements(),
+                                 schematic.GetWires(),
+                                 schematic.GetConnectivity(),
+                                 input.Pointer.GetWorldPosition(),
+                                 input.Pointer.GetPickTolerance());
 }
 
 /**
- * @brief   Turns or mirrors the pasted group by the keys pressed this frame.
- * @return  True when Esc cancels the paste.
+ * @brief   Esc while the editor has the focus, or a right click on the canvas, leaves the placing, probing and pasting
+ *          modes.
  */
-bool HandlePastingKeys(PastedGroup &group) {
-    if (ImGui::IsKeyPressed(ImGuiKey_R)) {
-        TransformGroup(group, {.Type = PointTransform::Kind::QUARTER_TURN, .Delta = {}, .Pivot = {}});
+bool WantsToLeaveMode(const ModeInput &input) {
+    return (ImGui::IsWindowFocused() && ImGui::IsKeyPressed(ImGuiKey_Escape))
+        || (input.Pointer.IsHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right));
+}
+
+/**
+ * @brief   Turns the part being placed as a turning key asks: a quarter turn, or a mirror.
+ */
+void TurnPlacementBy(PlacingMode &mode, const PointTransform::Kind kind) {
+    if (kind == PointTransform::Kind::QUARTER_TURN) {
+        TurnPlacement(mode);
+    } else {
+        MirrorPlacement(mode, kind == PointTransform::Kind::MIRROR_TOP_BOTTOM);
     }
-    if (ImGui::IsKeyPressed(ImGuiKey_M)) {
-        const bool top_to_bottom = ImGui::GetIO().KeyShift;
-        TransformGroup(group, {.Type = top_to_bottom ? PointTransform::Kind::MIRROR_TOP_BOTTOM
-                                                     : PointTransform::Kind::MIRROR_LEFT_RIGHT,
-                               .Delta = {},
-                               .Pivot = {}});
-    }
-    return ImGui::IsKeyPressed(ImGuiKey_Escape);
 }
 
 /**
@@ -53,25 +59,26 @@ bool HandlePastingKeys(PastedGroup &group) {
  */
 void DrawWirePreview(const WiringMode &mode, const ModeInput &input, const GridPoint cursor) {
     if (!mode.Start) {
-        const ImVec2 cursor_on_screen = input.View.ToScreen(ToVec2(cursor));
+        const ImVec2 cursor_on_screen = input.Pointer.View.ToScreen(ToVec2(cursor));
         const ImVec2 half_size = {WIRE_CURSOR_HALF_SIZE, WIRE_CURSOR_HALF_SIZE};
-        ImGui::GetWindowDrawList()->AddRect(cursor_on_screen - half_size, cursor_on_screen + half_size,
+        ImGui::GetWindowDrawList()->AddRect(cursor_on_screen - half_size,
+                                            cursor_on_screen + half_size,
                                             GetPreviewColor());
     } else {
         const GridPoint corner = FindWireCorner(*mode.Start, cursor, input.IsWireVerticalFirst);
-        UIWire(*mode.Start, corner).Draw(input.Canvas, input.View, GetPreviewColor());
-        UIWire(corner, cursor).Draw(input.Canvas, input.View, GetPreviewColor());
+        UIWire(*mode.Start, corner).Draw(input.Canvas, input.Pointer.View, GetPreviewColor());
+        UIWire(corner, cursor).Draw(input.Canvas, input.Pointer.View, GetPreviewColor());
     }
 }
 
 } // namespace
 
 /**
- * @brief   Selecting handles its clicks before the schematic is drawn (EditorWindow::HandleSelection()), so a dragged
+ * @brief   Selecting handles its clicks before the schematic is drawn (HandleSelectionInput()), so a dragged
  *          part is drawn where the cursor is; here, hovering a wire or a part shows its value on display.
  */
 std::optional<EditorMode> HandleMode(SelectingMode &mode, const ModeInput &input) {
-    if (!input.IsHovered || mode.Drag || !input.Overlays.GetDisplayed()) {
+    if (!input.Pointer.IsHovered || mode.Drag || !input.Overlays.GetDisplayed()) {
         return std::nullopt;
     }
     if (const std::optional<MeasurementTarget> target = FindTargetAt(input)) {
@@ -86,32 +93,26 @@ std::optional<EditorMode> HandleMode(SelectingMode &mode, const ModeInput &input
  * @details A label or a pin marker needs a name next, so placing one ends the mode and opens its popover on the name.
  */
 std::optional<EditorMode> HandleMode(PlacingMode &mode, const ModeInput &input) {
+    if (WantsToLeaveMode(input)) {
+        return SelectingMode{};
+    }
     // Keyboard shortcuts only apply while the editor has focus, so typing elsewhere does not trigger them
     if (ImGui::IsWindowFocused()) {
-        if (ImGui::IsKeyPressed(ImGuiKey_R)) {
-            TurnPlacement(mode);
-        }
-        if (ImGui::IsKeyPressed(ImGuiKey_M)) {
-            MirrorPlacement(mode, ImGui::GetIO().KeyShift);
-        }
-        if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
-            return SelectingMode{};
+        if (const std::optional<PointTransform::Kind> turn = ReadTurnKey()) {
+            TurnPlacementBy(mode, *turn);
         }
     }
-    if (!input.IsHovered) {
+    if (!input.Pointer.IsHovered) {
         return std::nullopt;
-    }
-    if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
-        return SelectingMode{};
     }
 
     Schematic &schematic = input.Blocks.GetShown();
-    const GridPoint position = Snap(input.View.ToWorld(ImGui::GetIO().MousePos));
+    const GridPoint position = Snap(input.Pointer.GetWorldPosition());
     std::unique_ptr<UIElement> preview = MakePlacementPreview(mode, position, schematic, input.Root.GetSubcircuits());
     if (!preview) {
         return SelectingMode{};
     }
-    preview->Draw(input.Canvas, input.View, GetPreviewColor(), input.UserPreferences.Symbols);
+    preview->Draw(input.Canvas, input.Pointer.View, GetPreviewColor(), input.UserPreferences.Symbols);
     if (!ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         return std::nullopt;
     }
@@ -139,14 +140,14 @@ std::optional<EditorMode> HandleMode(WiringMode &mode, const ModeInput &input) {
             return StopWire(mode) ? std::optional<EditorMode>(SelectingMode{}) : std::nullopt;
         }
     }
-    if (!input.IsHovered) {
+    if (!input.Pointer.IsHovered) {
         return std::nullopt;
     }
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
         return StopWire(mode) ? std::optional<EditorMode>(SelectingMode{}) : std::nullopt;
     }
 
-    const GridPoint cursor = Snap(input.View.ToWorld(ImGui::GetIO().MousePos));
+    const GridPoint cursor = Snap(input.Pointer.GetWorldPosition());
     DrawWirePreview(mode, input, cursor);
     if (!ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         return std::nullopt;
@@ -163,14 +164,11 @@ std::optional<EditorMode> HandleMode(WiringMode &mode, const ModeInput &input) {
  *          current on a part, and a left click adds it to the plots or removes it. Esc or right click leaves the mode.
  */
 std::optional<EditorMode> HandleMode(ProbingMode & /*mode*/, const ModeInput &input) {
-    if (ImGui::IsWindowFocused() && ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+    if (WantsToLeaveMode(input)) {
         return SelectingMode{};
     }
-    if (!input.IsHovered) {
+    if (!input.Pointer.IsHovered) {
         return std::nullopt;
-    }
-    if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
-        return SelectingMode{};
     }
 
     Schematic &schematic = input.Blocks.GetShown();
@@ -179,23 +177,27 @@ std::optional<EditorMode> HandleMode(ProbingMode & /*mode*/, const ModeInput &in
         ImGui::SetTooltip("Click a wire for its voltage, or a part for its current");
         return std::nullopt;
     }
-    const bool measured =
-        target->Node ? schematic.IsVoltageMeasured(*target->Node) : schematic.IsCurrentMeasured(target->Current);
-    ImGui::GetWindowDrawList()->AddCircle(ImGui::GetIO().MousePos, MEASUREMENT_MARKER_RADIUS * 2.0f,
-                                          GetHighlightColor(), 0, LINE_THICKNESS);
+    const bool measured = target->Node ? schematic.GetMeasurements().IsVoltageMeasured(*target->Node)
+                                       : schematic.GetMeasurements().IsCurrentMeasured(target->Current);
+    ImGui::GetWindowDrawList()->AddCircle(ImGui::GetIO().MousePos,
+                                          MEASUREMENT_MARKER_RADIUS * 2.0f,
+                                          GetHighlightColor(),
+                                          0,
+                                          LINE_THICKNESS);
     const std::optional<DisplayedState> &displayed = input.Overlays.GetDisplayed();
-    ImGui::SetTooltip("%s", std::format("{}\nClick to {} the plots",
-                                        DescribeMeasurement(*target, schematic.GetConnectivity(),
-                                                            displayed ? &displayed->Point : nullptr),
-                                        measured ? "remove it from" : "add it to")
-                                .c_str());
+    ImGui::SetTooltip(
+        "%s",
+        std::format("{}\nClick to {} the plots",
+                    DescribeMeasurement(*target, schematic.GetConnectivity(), displayed ? &displayed->Point : nullptr),
+                    measured ? "remove it from" : "add it to")
+            .c_str());
     if (!ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         return std::nullopt;
     }
     if (target->Node) {
         schematic.SetVoltageMeasured(*target->Node, !measured);
     } else {
-        schematic.SetCurrentMeasured(target->Current, !measured);
+        schematic.GetMeasurements().SetCurrentMeasured(target->Current, !measured);
     }
     return std::nullopt;
 }
@@ -206,23 +208,25 @@ std::optional<EditorMode> HandleMode(ProbingMode & /*mode*/, const ModeInput &in
  *          placed. Parts get the next free names of the schematic.
  */
 std::optional<EditorMode> HandleMode(PastingMode &mode, const ModeInput &input) {
-    PastedGroup &group = mode.Group;
-    if (ImGui::IsWindowFocused() && HandlePastingKeys(group)) {
+    if (WantsToLeaveMode(input)) {
         return SelectingMode{};
     }
-    if (!input.IsHovered) {
+    PastedGroup &group = mode.Group;
+    if (ImGui::IsWindowFocused()) {
+        if (const std::optional<PointTransform::Kind> turn = ReadTurnKey()) {
+            TransformGroup(group, {.Type = *turn, .Delta = {}, .Pivot = {}});
+        }
+    }
+    if (!input.Pointer.IsHovered) {
         return std::nullopt;
     }
-    if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
-        return SelectingMode{};
-    }
 
-    MovePivotTo(group, Snap(input.View.ToWorld(ImGui::GetIO().MousePos)));
+    MovePivotTo(group, Snap(input.Pointer.GetWorldPosition()));
     for (const UIWire &wire : group.Wires) {
-        wire.Draw(input.Canvas, input.View, GetPreviewColor());
+        wire.Draw(input.Canvas, input.Pointer.View, GetPreviewColor());
     }
     for (const auto &element : group.Elements) {
-        element->Draw(input.Canvas, input.View, GetPreviewColor(), input.UserPreferences.Symbols);
+        element->Draw(input.Canvas, input.Pointer.View, GetPreviewColor(), input.UserPreferences.Symbols);
     }
     if (!ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         return std::nullopt;

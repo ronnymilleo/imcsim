@@ -20,8 +20,8 @@ using Catch::Matchers::WithinRel;
 constexpr double DECIBELS_PER_NEPER = 20.0 / std::numbers::ln10;
 
 /// A part with the same figures at the three frequencies of MakeSensitivity().
-Core::ACPartSensitivity MakePart(const std::string &name, const std::optional<double> &decibels,
-                                 const std::optional<double> &degrees) {
+Core::ACPartSensitivity
+MakePart(const std::string &name, const std::optional<double> &decibels, const std::optional<double> &degrees) {
     return {.Name = name,
             .Element = {},
             .Unit = "Ohm",

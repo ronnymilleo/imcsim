@@ -51,12 +51,15 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   operating point and not a held voltage: the solver first finds the point with the node pulled to the guess, then lets
   go and converges again from there. A circuit with one operating point ends where it always does, whatever the guess;
   a circuit with several, such as a latch, a flip-flop made of transistors or a Schmitt trigger, ends in the stable
-  state nearest the guess, so a nodeset on each of two cross-coupled nodes picks which transistor conducts. Every
-  analysis that starts from an operating point reads it, the transient included (when it starts from one, that is,
-  without the Initial field of a capacitor or inductor in use, which has none to guess), and a DC sweep reads it for its
-  first point only, the others continuing from the point before. The harmonic balance leaves it out. The same rules as
-  the initial voltage apply: two on one node must agree, ground cannot take one, a node needs a part connected to it,
-  and one inside a block acts on the node of each instance. Both engines mean the same.
+  state nearest the guess, so a nodeset on each of two cross-coupled nodes picks which transistor conducts (the
+  bistable example shows it). Every analysis that starts from an operating point reads it, the transient included
+  (when it starts from one, that is, without the Initial field of a capacitor or inductor in use, which has none to
+  guess), and a DC sweep reads it for its first point only, the others continuing from the point before. The harmonic
+  balance reads it in the DC bias it starts from, so it runs around the state the nodesets pick. The same rules as the
+  initial voltage apply: two on one node must agree, ground cannot take one, a node needs a part connected to it, and
+  one inside a block acts on the node of each instance. Both engines mean the same. The Transfer function analysis is
+  the one exception: ngspice cannot run it on a circuit with a nodeset, so it is disabled with the reason while
+  ngspice is the engine, and Nodalys runs it.
 - **Switches**: a switch and a push button have a Closed (or Pressed) box in their properties, and the symbol and a
   label under it show the state. Both start open. Outside a live run, the state holds for the whole simulation. During
   a live run, click a switch to flip it or hold a push button to press it (see Live runs).
@@ -165,7 +168,7 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   status bar shows the run and, for a stepped analysis or a truth table, how much of it is done. A transient runs in
   chunks: its plot opens in the Output window with the first one and grows as the others arrive, with a Stop button
   and "Running, simulated up to 230ms of 1s" above it. Stop keeps the points made so far ("Stopped, simulated up to
-  530ms of 1s", and "Transient stopped" in the status bar). The transient plot shows a window of 2000 points at a time (the
+  530ms of 1s", and "Transient stopped" in the status bar). The transient plot shows a window of 10000 points at a time (the
   Plot points field at its top right sets 1000 to 10000; the run itself may have more time steps), so a long run stays quick to draw and to measure: a scroll bar the
   width of the plot, with its time span written above it after Range, moves the window along the run (the plot fits itself to every window), and
   while the run goes on a Follow box keeps the window on the newest points. The schematic plays the same window: its
@@ -1037,10 +1040,10 @@ the Run report says how many. The table is not exported as a figure, like the op
 
 imcsim solves circuits with one of two engines, picked in Edit > Preferences > Simulation (the **Backend** choice):
 
-- **ngspice** is the reference simulator, the open-source successor of Berkeley SPICE, used as a shared library. It is
-  the default. Logic gates and flip-flops run as its digital models, with X states, and its results are the ones the
-  rest of this guide describes.
-- **Nodalys** is the solver built into imcsim. It reads the circuit directly, with no netlist, and runs every analysis
+- **ngspice** is the reference simulator, the open-source successor of Berkeley SPICE, used as a shared library. Logic
+  gates and flip-flops run as its digital models, with X states, and its results are the ones the rest of this guide
+  describes.
+- **Nodalys** is the solver built into imcsim, and the default. It reads the circuit directly, with no netlist, and runs every analysis
   of ngspice plus the harmonic balance and the AC kind of the sensitivity, which ngspice cannot. Its logic gates and flip-flops are continuous (a smooth
   step of the inputs, with no X states), so an AC sweep or a noise analysis sees through them, and a run is repeatable
   from its seed even for white and 1/f noise.

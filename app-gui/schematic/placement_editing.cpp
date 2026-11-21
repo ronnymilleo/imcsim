@@ -43,7 +43,7 @@ void SwitchMode(EditorMode &current, EditorMode next, Schematic &schematic, cons
         placing != nullptr && !placing->Block.empty() && !blocks.CanPlaceBlock(placing->Block)) {
         return;
     }
-    ClearSelection(schematic, current);
+    CancelSelection(schematic, current);
     if (std::holds_alternative<WiringMode>(next) && std::holds_alternative<WiringMode>(current)) {
         return;
     }
@@ -71,7 +71,8 @@ void StopEditing(Schematic &schematic, EditorMode &mode) {
  * @param[in] definitions  The blocks of the document.
  * @return  The part, or null when the block being placed is no longer defined.
  */
-std::unique_ptr<UIElement> MakePlacementPreview(const PlacingMode &mode, const GridPoint position,
+std::unique_ptr<UIElement> MakePlacementPreview(const PlacingMode &mode,
+                                                const GridPoint position,
                                                 const Schematic &schematic,
                                                 const std::vector<SavedSubcircuit> &definitions) {
     auto preview = CreateElement(mode.Type, position, mode.Orientation);
@@ -121,15 +122,10 @@ std::optional<std::string> PlacePastedGroup(Schematic &root, BlockSession &block
     for (const UIWire &wire : group.Wires) {
         schematic.AddWire(wire.GetStart(), wire.GetEnd());
     }
-    std::set<std::size_t> elements;
-    for (std::size_t index = first_element; index < schematic.GetElements().size(); ++index) {
-        elements.insert(index);
-    }
-    std::set<std::size_t> wires;
-    for (std::size_t index = first_wire; index < schematic.GetWires().size(); ++index) {
-        wires.insert(index);
-    }
-    schematic.SetSelection(std::move(elements), std::move(wires));
+    // A wire of no length is not added, so the wires added are counted rather than taken from the group
+    schematic.SetSelection(
+        MakeRangeSelection({.First = first_element, .Count = schematic.GetElements().size() - first_element},
+                           {.First = first_wire, .Count = schematic.GetWires().size() - first_wire}));
     return std::nullopt;
 }
 

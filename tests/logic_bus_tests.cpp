@@ -83,8 +83,8 @@ TEST_CASE("A bus keeps a value while all its bits do, and is unknown while any i
 }
 
 TEST_CASE("A bus is described by its bits and format", "[logic_bus]") {
-    CHECK(GUI::DescribeBus({.Name = "B", .Bits = {"V(Q1)", "V(Q0)"}, .Format = GUI::BusFormat::BINARY}) ==
-          "V(Q1) V(Q0), bin");
+    CHECK(GUI::DescribeBus({.Name = "B", .Bits = {"V(Q1)", "V(Q0)"}, .Format = GUI::BusFormat::BINARY})
+          == "V(Q1) V(Q0), bin");
     CHECK(GUI::DescribeBus({.Name = "E"}) == "no bits, hex");
 }
 
@@ -106,10 +106,10 @@ TEST_CASE("Buses are saved with the measurements of a file and read back", "[log
     CHECK_FALSE(read->Warnings.empty());
 
     GUI::Schematic schematic;
-    schematic.SetBuses(measurements.Buses);
+    schematic.GetMeasurements().SetBuses(measurements.Buses);
     CHECK(schematic.SaveMeasurements().Buses == measurements.Buses);
-    schematic.ClearMeasurements();
-    CHECK(schematic.GetBuses().empty());
+    schematic.GetMeasurements().Clear();
+    CHECK(schematic.GetMeasurements().GetBuses().empty());
 }
 
 TEST_CASE("A plot draws the shown buses whose bits all name a node, read against their logic levels", "[logic_bus]") {

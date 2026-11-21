@@ -5,6 +5,8 @@
 
 #include "simulation/simulation_backend.h"
 
+#include "circuit/node_voltage_targets.h"
+
 #include <format>
 #include <mutex>
 #include <utility>
@@ -30,35 +32,47 @@ std::mutex g_backend_mutex;
 class NoBackend : public SimulationBackend {
 public:
     std::string_view GetName() const override { return "The missing simulation engine"; }
+
     const BackendCapabilities &GetCapabilities() const override { return m_Capabilities; }
 
     OperatingPointRun RunOperatingPoint(const Circuit &, const std::optional<double> &) override {
         return Fail<OperatingPointRun>();
     }
-    TransientRun RunTransient(const Circuit &, const TransientSettings &, const std::optional<double> &,
+
+    TransientRun RunTransient(const Circuit &,
+                              const TransientSettings &,
+                              const std::optional<double> &,
                               const RunMonitor &) override {
         return Fail<TransientRun>();
     }
+
     ACSweepRun RunACSweep(const Circuit &, const ACSweepSettings &, const std::optional<double> &) override {
         return Fail<ACSweepRun>();
     }
+
     DCSweepRun RunDCSweep(const Circuit &, const DCSweepSettings &, const std::optional<double> &) override {
         return Fail<DCSweepRun>();
     }
+
     NoiseRun RunNoise(const Circuit &, const NoiseSettings &) override { return Fail<NoiseRun>(); }
+
     TransferFunctionRun RunTransferFunction(const Circuit &, const TransferFunctionSettings &) override {
         return Fail<TransferFunctionRun>();
     }
+
     SensitivityRun RunSensitivity(const Circuit &, const SensitivitySettings &) override {
         return Fail<SensitivityRun>();
     }
+
     PoleZeroRun RunPoleZero(const Circuit &, const PoleZeroSettings &) override { return Fail<PoleZeroRun>(); }
+
     SParametersRun RunSParameters(const Circuit &, const SParameterSettings &) override {
         return Fail<SParametersRun>();
     }
 
 private:
-    template <typename Run> static Run Fail() {
+    template <typename Run>
+    static Run Fail() {
         Run run;
         run.Result = std::unexpected(std::string(NO_BACKEND_REASON));
         return run;
@@ -189,8 +203,8 @@ HarmonicBalanceRun SimulationBackend::RunHarmonicBalance(const Circuit & /*circu
  * @param[in] kind     Analysis to run.
  * @return  The reason, written for the user, or no value when the backend can run it.
  */
-std::optional<std::string> FindUnsupported(const SimulationBackend &backend, const std::set<ComponentType> &parts,
-                                           const AnalysisKind kind) {
+std::optional<std::string>
+FindUnsupported(const SimulationBackend &backend, const std::set<ComponentType> &parts, const AnalysisKind kind) {
     const BackendCapabilities &capabilities = backend.GetCapabilities();
     if (!capabilities.Analyses.contains(GetRequiredAnalysis(kind))) {
         return std::format("{} does not run the {} analysis", backend.GetName(), GetAnalysisKindName(kind));
@@ -221,8 +235,8 @@ std::optional<std::string> FindUnsupported(const SimulationBackend &backend, con
  * @param[in] kind     Analysis to run.
  * @return  The reason, written for the user, or no value when the backend can run it.
  */
-std::optional<std::string> FindUnsupported(const SimulationBackend &backend, const Circuit &circuit,
-                                           const AnalysisKind kind) {
+std::optional<std::string>
+FindUnsupported(const SimulationBackend &backend, const Circuit &circuit, const AnalysisKind kind) {
     std::set<ComponentType> parts;
     const std::vector<const Component *> all_parts = CollectParts(circuit);
     for (const Component *part : all_parts) {
@@ -230,6 +244,11 @@ std::optional<std::string> FindUnsupported(const SimulationBackend &backend, con
     }
     if (const std::optional<std::string> reason = FindUnsupported(backend, parts, kind)) {
         return reason;
+    }
+    const auto with_nodesets = backend.GetCapabilities().UnsupportedWithNodesets.find(kind);
+    if (with_nodesets != backend.GetCapabilities().UnsupportedWithNodesets.end()
+        && !ResolveNodeVoltages(circuit, NodeVoltageKind::NODESET).empty()) {
+        return with_nodesets->second;
     }
     const auto &find_problem = backend.GetCapabilities().FindPartProblem;
     if (!find_problem) {

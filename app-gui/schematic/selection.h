@@ -32,14 +32,43 @@ struct Selection {
     bool operator==(const Selection &) const = default;
 };
 
-Selection PickAt(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires,
-                 ImVec2 world_pos, float wire_tolerance);
-Selection PickInRectangle(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires,
-                          ImVec2 corner, ImVec2 opposite_corner);
+/**
+ * @struct  IndexRange
+ * @brief   Consecutive indices into a list, such as the items just added to it.
+ */
+struct IndexRange {
+    std::size_t First = 0;
+    std::size_t Count = 0;
+};
+
+/**
+ * @struct  SelectedItems
+ * @brief   The parts and wires a selection picks, in index order, for copying them out of the schematic.
+ */
+struct SelectedItems {
+    /// Parts of the schematic, which stay owned by it.
+    std::vector<const UIElement *> Elements;
+    std::vector<UIWire> Wires;
+};
+
+Selection MakeRangeSelection(IndexRange elements, IndexRange wires);
+Selection PickAt(const std::vector<std::unique_ptr<UIElement>> &elements,
+                 const std::vector<UIWire> &wires,
+                 ImVec2 world_pos,
+                 float wire_tolerance);
+Selection PickInRectangle(const std::vector<std::unique_ptr<UIElement>> &elements,
+                          const std::vector<UIWire> &wires,
+                          ImVec2 corner,
+                          ImVec2 opposite_corner);
 Selection PickNode(const std::vector<UIWire> &wires, const Connectivity &connectivity, std::size_t wire_index);
 Selection PickAll(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires);
 Selection Toggled(const Selection &current, const Selection &picked);
 Selection Joined(const Selection &current, const Selection &picked);
+
+// Selected items
+SelectedItems CollectSelected(const std::vector<std::unique_ptr<UIElement>> &elements,
+                              const std::vector<UIWire> &wires,
+                              const Selection &selection);
 
 } // namespace GUI
 

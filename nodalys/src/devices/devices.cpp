@@ -99,7 +99,8 @@ double ResistorDevice::TerminalCurrent(const int terminal, const std::vector<dou
     return terminal == 0 ? current : -current;
 }
 
-std::complex<double> ResistorDevice::AcTerminalCurrent(const int terminal, const std::vector<double> & /*x_dc*/,
+std::complex<double> ResistorDevice::AcTerminalCurrent(const int terminal,
+                                                       const std::vector<double> & /*x_dc*/,
                                                        const std::vector<std::complex<double>> &x_ac,
                                                        const double /*omega*/) const {
     const std::complex<double> current = m_Conductance * AcBranchVoltage(x_ac, m_NodeA, m_NodeB);
@@ -134,8 +135,11 @@ void ResistorDevice::SetTemperature(const ThermalConditions &thermal) {
 // - Gear-2:                    a = a0,       b = a1 q(t) + a2 q(t - hp)
 // ============================================================================
 
-CapacitorDevice::CapacitorDevice(const int node_a, const int node_b, const double capacitance,
-                                 const double initial_voltage, const bool has_initial)
+CapacitorDevice::CapacitorDevice(const int node_a,
+                                 const int node_b,
+                                 const double capacitance,
+                                 const double initial_voltage,
+                                 const bool has_initial)
     : m_NodeA(node_a), m_NodeB(node_b), m_Capacitance(capacitance), m_InitialVoltage(initial_voltage),
       m_HasInitial(has_initial) {
     if (m_HasInitial) {
@@ -191,7 +195,8 @@ double CapacitorDevice::TerminalCurrent(const int terminal, const std::vector<do
     return terminal == 0 ? current : -current;
 }
 
-std::complex<double> CapacitorDevice::AcTerminalCurrent(const int terminal, const std::vector<double> & /*x_dc*/,
+std::complex<double> CapacitorDevice::AcTerminalCurrent(const int terminal,
+                                                        const std::vector<double> & /*x_dc*/,
                                                         const std::vector<std::complex<double>> &x_ac,
                                                         const double omega) const {
     const std::complex<double> current =
@@ -225,8 +230,12 @@ void CapacitorDevice::RejectStep() {
 // - Gear-2:                    a = a0,       b = a1 phi(t) + a2 phi(t - hp)
 // ============================================================================
 
-InductorDevice::InductorDevice(const int node_a, const int node_b, const int branch, const double inductance,
-                               const double initial_current, const bool has_initial)
+InductorDevice::InductorDevice(const int node_a,
+                               const int node_b,
+                               const int branch,
+                               const double inductance,
+                               const double initial_current,
+                               const bool has_initial)
     : m_NodeA(node_a), m_NodeB(node_b), m_Branch(branch), m_Inductance(inductance), m_InitialCurrent(initial_current),
       m_HasInitial(has_initial) {
     if (m_HasInitial) {
@@ -264,7 +273,8 @@ double InductorDevice::TerminalCurrent(const int terminal, const std::vector<dou
     return terminal == 0 ? current : -current;
 }
 
-std::complex<double> InductorDevice::AcTerminalCurrent(const int terminal, const std::vector<double> & /*x_dc*/,
+std::complex<double> InductorDevice::AcTerminalCurrent(const int terminal,
+                                                       const std::vector<double> & /*x_dc*/,
                                                        const std::vector<std::complex<double>> &x_ac,
                                                        const double /*omega*/) const {
     const std::complex<double> current = x_ac[static_cast<std::size_t>(m_Branch)];
@@ -289,8 +299,13 @@ void InductorDevice::RejectStep() {
 // VoltageSourceDevice & CurrentSourceDevice
 // ============================================================================
 
-VoltageSourceDevice::VoltageSourceDevice(const int node_a, const int node_b, const int branch, const double dc_value,
-                                         Waveform waveform, const double ac_magnitude, SourcePeriodicity periodicity)
+VoltageSourceDevice::VoltageSourceDevice(const int node_a,
+                                         const int node_b,
+                                         const int branch,
+                                         const double dc_value,
+                                         Waveform waveform,
+                                         const double ac_magnitude,
+                                         SourcePeriodicity periodicity)
     : m_NodeA(node_a), m_NodeB(node_b), m_Branch(branch), m_DcValue(dc_value), m_Waveform(std::move(waveform)),
       m_AcMagnitude(ac_magnitude), m_Periodicity(periodicity) {
 }
@@ -346,15 +361,19 @@ double VoltageSourceDevice::TerminalCurrent(const int terminal, const std::vecto
     return terminal == 0 ? current : -current;
 }
 
-std::complex<double> VoltageSourceDevice::AcTerminalCurrent(const int terminal, const std::vector<double> & /*x_dc*/,
+std::complex<double> VoltageSourceDevice::AcTerminalCurrent(const int terminal,
+                                                            const std::vector<double> & /*x_dc*/,
                                                             const std::vector<std::complex<double>> &x_ac,
                                                             const double /*omega*/) const {
     const std::complex<double> current = x_ac[static_cast<std::size_t>(m_Branch)];
     return terminal == 0 ? current : -current;
 }
 
-CurrentSourceDevice::CurrentSourceDevice(const int node_a, const int node_b, const double dc_value,
-                                         VoltageSourceDevice::Waveform waveform, const double ac_magnitude,
+CurrentSourceDevice::CurrentSourceDevice(const int node_a,
+                                         const int node_b,
+                                         const double dc_value,
+                                         VoltageSourceDevice::Waveform waveform,
+                                         const double ac_magnitude,
                                          SourcePeriodicity periodicity)
     : m_NodeA(node_a), m_NodeB(node_b), m_DcValue(dc_value), m_Waveform(std::move(waveform)),
       m_AcMagnitude(ac_magnitude), m_Periodicity(periodicity) {
@@ -413,7 +432,8 @@ double CurrentSourceDevice::TerminalCurrent(const int terminal, const std::vecto
     return terminal == 0 ? m_Value : -m_Value;
 }
 
-std::complex<double> CurrentSourceDevice::AcTerminalCurrent(const int terminal, const std::vector<double> & /*x_dc*/,
+std::complex<double> CurrentSourceDevice::AcTerminalCurrent(const int terminal,
+                                                            const std::vector<double> & /*x_dc*/,
                                                             const std::vector<std::complex<double>> & /*x_ac*/,
                                                             const double /*omega*/) const {
     const std::complex<double> current(m_AcMagnitude, 0.0);
@@ -424,8 +444,12 @@ std::complex<double> CurrentSourceDevice::AcTerminalCurrent(const int terminal, 
 // Controlled Sources: VCVS (E), VCCS (G), CCCS (F), CCVS (H)
 // ============================================================================
 
-VcvsDevice::VcvsDevice(const int node_a, const int node_b, const int control_positive, const int control_negative,
-                       const int branch, const double gain)
+VcvsDevice::VcvsDevice(const int node_a,
+                       const int node_b,
+                       const int control_positive,
+                       const int control_negative,
+                       const int branch,
+                       const double gain)
     : m_NodeA(node_a), m_NodeB(node_b), m_ControlPositive(control_positive), m_ControlNegative(control_negative),
       m_Branch(branch), m_Gain(gain) {
 }
@@ -445,14 +469,18 @@ double VcvsDevice::TerminalCurrent(const int terminal, const std::vector<double>
     return terminal == 0 ? current : -current;
 }
 
-std::complex<double> VcvsDevice::AcTerminalCurrent(const int terminal, const std::vector<double> & /*x_dc*/,
+std::complex<double> VcvsDevice::AcTerminalCurrent(const int terminal,
+                                                   const std::vector<double> & /*x_dc*/,
                                                    const std::vector<std::complex<double>> &x_ac,
                                                    const double /*omega*/) const {
     const std::complex<double> current = x_ac[static_cast<std::size_t>(m_Branch)];
     return terminal == 0 ? current : -current;
 }
 
-VccsDevice::VccsDevice(const int node_a, const int node_b, const int control_positive, const int control_negative,
+VccsDevice::VccsDevice(const int node_a,
+                       const int node_b,
+                       const int control_positive,
+                       const int control_negative,
                        const double gain)
     : m_NodeA(node_a), m_NodeB(node_b), m_ControlPositive(control_positive), m_ControlNegative(control_negative),
       m_Gain(gain) {
@@ -472,7 +500,8 @@ double VccsDevice::TerminalCurrent(const int terminal, const std::vector<double>
     return terminal == 0 ? current : -current;
 }
 
-std::complex<double> VccsDevice::AcTerminalCurrent(const int terminal, const std::vector<double> & /*x_dc*/,
+std::complex<double> VccsDevice::AcTerminalCurrent(const int terminal,
+                                                   const std::vector<double> & /*x_dc*/,
                                                    const std::vector<std::complex<double>> &x_ac,
                                                    const double /*omega*/) const {
     const std::complex<double> current = m_Gain * AcBranchVoltage(x_ac, m_ControlPositive, m_ControlNegative);
@@ -494,14 +523,18 @@ double CccsDevice::TerminalCurrent(const int terminal, const std::vector<double>
     return terminal == 0 ? current : -current;
 }
 
-std::complex<double> CccsDevice::AcTerminalCurrent(const int terminal, const std::vector<double> & /*x_dc*/,
+std::complex<double> CccsDevice::AcTerminalCurrent(const int terminal,
+                                                   const std::vector<double> & /*x_dc*/,
                                                    const std::vector<std::complex<double>> &x_ac,
                                                    const double /*omega*/) const {
     const std::complex<double> current = m_Gain * x_ac[static_cast<std::size_t>(m_ControlBranch)];
     return terminal == 0 ? current : -current;
 }
 
-CcvsDevice::CcvsDevice(const int node_a, const int node_b, const int branch, const int control_branch,
+CcvsDevice::CcvsDevice(const int node_a,
+                       const int node_b,
+                       const int branch,
+                       const int control_branch,
                        const double gain)
     : m_NodeA(node_a), m_NodeB(node_b), m_Branch(branch), m_ControlBranch(control_branch), m_Gain(gain) {
 }
@@ -520,7 +553,8 @@ double CcvsDevice::TerminalCurrent(const int terminal, const std::vector<double>
     return terminal == 0 ? current : -current;
 }
 
-std::complex<double> CcvsDevice::AcTerminalCurrent(const int terminal, const std::vector<double> & /*x_dc*/,
+std::complex<double> CcvsDevice::AcTerminalCurrent(const int terminal,
+                                                   const std::vector<double> & /*x_dc*/,
                                                    const std::vector<std::complex<double>> &x_ac,
                                                    const double /*omega*/) const {
     const std::complex<double> current = x_ac[static_cast<std::size_t>(m_Branch)];
@@ -531,7 +565,10 @@ std::complex<double> CcvsDevice::AcTerminalCurrent(const int terminal, const std
 // SwitchDevice
 // ============================================================================
 
-SwitchDevice::SwitchDevice(const int node_a, const int node_b, const int control_positive, const int control_negative,
+SwitchDevice::SwitchDevice(const int node_a,
+                           const int node_b,
+                           const int control_positive,
+                           const int control_negative,
                            SwitchParameters parameters)
     : m_NodeA(node_a), m_NodeB(node_b), m_ControlPositive(control_positive), m_ControlNegative(control_negative),
       m_Parameters(parameters), m_Resistance(parameters.OffResistance) {
@@ -554,7 +591,8 @@ double SwitchDevice::TerminalCurrent(const int terminal, const std::vector<doubl
     return terminal == 0 ? current : -current;
 }
 
-std::complex<double> SwitchDevice::AcTerminalCurrent(const int terminal, const std::vector<double> & /*x_dc*/,
+std::complex<double> SwitchDevice::AcTerminalCurrent(const int terminal,
+                                                     const std::vector<double> & /*x_dc*/,
                                                      const std::vector<std::complex<double>> &x_ac,
                                                      const double /*omega*/) const {
     const std::complex<double> current = AcBranchVoltage(x_ac, m_NodeA, m_NodeB) / m_Resistance;
@@ -586,9 +624,14 @@ bool SwitchDevice::HasSwitched() const {
 // where a and b are the coefficient and the offset of the integration method, b taken from the history of each flux.
 // ============================================================================
 
-CoupledInductorDevice::CoupledInductorDevice(const int primary_a, const int primary_b, const int secondary_a,
-                                             const int secondary_b, const int branch1, const int branch2,
-                                             const double primary_inductance, const double secondary_inductance,
+CoupledInductorDevice::CoupledInductorDevice(const int primary_a,
+                                             const int primary_b,
+                                             const int secondary_a,
+                                             const int secondary_b,
+                                             const int branch1,
+                                             const int branch2,
+                                             const double primary_inductance,
+                                             const double secondary_inductance,
                                              const double mutual)
     : m_PrimaryA(primary_a), m_PrimaryB(primary_b), m_SecondaryA(secondary_a), m_SecondaryB(secondary_b),
       m_Branch1(branch1), m_Branch2(branch2), m_L1(primary_inductance), m_L2(secondary_inductance), m_M(mutual) {
@@ -628,7 +671,8 @@ double CoupledInductorDevice::TerminalCurrent(const int terminal, const std::vec
     return x[static_cast<std::size_t>(branch)];
 }
 
-std::complex<double> CoupledInductorDevice::AcTerminalCurrent(const int terminal, const std::vector<double> & /*x_dc*/,
+std::complex<double> CoupledInductorDevice::AcTerminalCurrent(const int terminal,
+                                                              const std::vector<double> & /*x_dc*/,
                                                               const std::vector<std::complex<double>> &x_ac,
                                                               const double /*omega*/) const {
     const int branch = terminal == 0 ? m_Branch1 : m_Branch2;
@@ -695,7 +739,8 @@ double NodesetDevice::TerminalCurrent(const int /*terminal*/, const std::vector<
     return 0.0;
 }
 
-std::complex<double> NodesetDevice::AcTerminalCurrent(const int /*terminal*/, const std::vector<double> & /*x_dc*/,
+std::complex<double> NodesetDevice::AcTerminalCurrent(const int /*terminal*/,
+                                                      const std::vector<double> & /*x_dc*/,
                                                       const std::vector<std::complex<double>> & /*x_ac*/,
                                                       const double /*omega*/) const {
     return {};
@@ -719,7 +764,8 @@ double NodeSeedDevice::TerminalCurrent(const int /*terminal*/, const std::vector
     return 0.0;
 }
 
-std::complex<double> NodeSeedDevice::AcTerminalCurrent(const int /*terminal*/, const std::vector<double> & /*x_dc*/,
+std::complex<double> NodeSeedDevice::AcTerminalCurrent(const int /*terminal*/,
+                                                       const std::vector<double> & /*x_dc*/,
                                                        const std::vector<std::complex<double>> & /*x_ac*/,
                                                        const double /*omega*/) const {
     return {};

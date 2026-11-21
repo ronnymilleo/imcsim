@@ -127,6 +127,9 @@ TEST_CASE("Logic outputs show what a decoder gives, with no LED, resistor or Gro
             readings.push_back(GUI::ReadLogicOutput(*element, schematic.GetConnectivity(), *run.Result));
         }
     }
-    CHECK(readings == std::vector<std::optional<GUI::LogicState>>{GUI::LogicState::LOW, GUI::LogicState::HIGH,
-                                                                  GUI::LogicState::LOW, GUI::LogicState::LOW});
+    CHECK(readings
+          == std::vector<std::optional<GUI::LogicState>>{GUI::LogicState::LOW,
+                                                         GUI::LogicState::HIGH,
+                                                         GUI::LogicState::LOW,
+                                                         GUI::LogicState::LOW});
 }

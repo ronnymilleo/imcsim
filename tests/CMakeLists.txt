@@ -15,10 +15,13 @@ add_executable(imcsim-tests
             backend_comparison_tests.cpp
             behavioral_expression_tests.cpp
             block_definitions_tests.cpp
+            block_library_tests.cpp
             block_nesting_tests.cpp
             block_session_tests.cpp
+            block_wiring_tests.cpp
             canvas_view_tests.cpp
             check_ac_sweep_tests.cpp
+            check_analysis_ports_tests.cpp
             check_dc_sweep_tests.cpp
             check_harmonic_balance_tests.cpp
             check_transient_tests.cpp
@@ -26,40 +29,57 @@ add_executable(imcsim-tests
             circuit_copy_tests.cpp
             circuit_snapshot_tests.cpp
             circuit_tests.cpp
+            clipboard_actions_tests.cpp
             clipboard_tests.cpp
             code_models.cpp
+            color_legend_tests.cpp
             component_tests.cpp
             connectivity_tests.cpp
             controlled_sources_tests.cpp
             counter_examples_tests.cpp
             current_flow_tests.cpp
+            cursor_widgets_tests.cpp
             default_backend.cpp
+            displayed_state_tests.cpp
             dock_layout_tests.cpp
             editor_command_tests.cpp
             editor_mode_tests.cpp
             element_factory_tests.cpp
             engine_cross_validation_tests.cpp
             examples_tests.cpp
+            file_json_tests.cpp
+            free_name_tests.cpp
+            fuse_blow_tracker_tests.cpp
             fuse_tests.cpp
+            glow_falloff_tests.cpp
             group_editing_tests.cpp
+            harmonic_balance_samples_tests.cpp
             harmonic_balance_view_tests.cpp
             heat_glow_tests.cpp
             helpers_tests.cpp
+            hovered_value_tests.cpp
             initial_voltages_tests.cpp
             led_glow_tests.cpp
             live_change_tests.cpp
+            live_current_tests.cpp
             live_input_tests.cpp
+            live_run_plan_tests.cpp
+            logarithmic_level_tests.cpp
             logic_bus_definition_tests.cpp
             logic_bus_tests.cpp
+            logic_lane_plot_tests.cpp
             logic_outputs_tests.cpp
             logic_trace_tests.cpp
             math_channel_definition_tests.cpp
             math_channel_tests.cpp
+            measurements_tests.cpp
             monte_carlo_results_tests.cpp
             monte_carlo_tests.cpp
             nodalys_backend_tests.cpp
             nodalys_benchmark_tests.cpp
             nodalys_in_use.cpp
+            node_index_tests.cpp
+            node_readouts_tests.cpp
             nodeset_tests.cpp
             nonlinear_tests.cpp
             op_amp_tests.cpp
@@ -67,6 +87,7 @@ add_executable(imcsim-tests
             parameter_step_settings_tests.cpp
             parameter_step_tests.cpp
             part_catalog_tests.cpp
+            part_heat_tests.cpp
             part_names_tests.cpp
             part_properties_tests.cpp
             placement_editing_tests.cpp
@@ -86,7 +107,11 @@ add_executable(imcsim-tests
             readout_placement_tests.cpp
             ready_blocks_tests.cpp
             result_store_tests.cpp
+            run_jobs_tests.cpp
+            run_repeat_tests.cpp
+            run_report_tests.cpp
             run_status_tests.cpp
+            s_parameter_choices_tests.cpp
             s_parameter_ports_tests.cpp
             s_parameter_view_tests.cpp
             s_parameters_tests.cpp
@@ -98,6 +123,7 @@ add_executable(imcsim-tests
             sensitivity_tests.cpp
             sensitivity_view_tests.cpp
             seven_segment_tests.cpp
+            shortcuts_tests.cpp
             simulation_backend_tests.cpp
             simulation_service_tests.cpp
             simulator_tests.cpp
@@ -108,27 +134,34 @@ add_executable(imcsim-tests
             spice_import_tests.cpp
             spice_inclusions_tests.cpp
             spice_library_tests.cpp
+            spice_text_tests.cpp
             spice_value_tests.cpp
             stability_circles_tests.cpp
             stability_summary_tests.cpp
             stability_view_tests.cpp
             standard_values_tests.cpp
             statistics_table_tests.cpp
+            statistics_widgets_tests.cpp
+            step_widgets_tests.cpp
             stepped_circuit_tests.cpp
             subcircuit_tests.cpp
             svg_writer_tests.cpp
             switches_tests.cpp
             text_fitting_tests.cpp
             theme_contrast_tests.cpp
+            theme_tests.cpp
             touchstone_tests.cpp
             trace_fit_state_tests.cpp
             trace_math_tests.cpp
             trace_statistics_tests.cpp
             two_port_metrics_tests.cpp
             transient_chunks_tests.cpp
+            transient_tab_tests.cpp
             transient_window_tests.cpp
             truth_table_tests.cpp
+            turn_keys_tests.cpp
             ui_element_tests.cpp
+            ui_source_tests.cpp
             ui_wire_tests.cpp
             undo_history_tests.cpp
             voltage_probes_tests.cpp
@@ -151,6 +184,7 @@ target_include_directories(imcsim-tests
 target_link_libraries(imcsim-tests
         PRIVATE
             imcsim-gui-lib
+            nlohmann_json::nlohmann_json
             Catch2::Catch2WithMain
 )
 

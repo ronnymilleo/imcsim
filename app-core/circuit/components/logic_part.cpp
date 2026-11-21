@@ -90,19 +90,7 @@ std::vector<std::string> LogicPart::GetInputLabels() const {
  * @return  True for AND, OR, NOT, NAND, NOR, XOR, XNOR and the buffer.
  */
 bool IsLogicGate(const ComponentType type) {
-    switch (type) {
-    case ComponentType::AND:
-    case ComponentType::OR:
-    case ComponentType::NOT:
-    case ComponentType::NAND:
-    case ComponentType::NOR:
-    case ComponentType::XOR:
-    case ComponentType::XNOR:
-    case ComponentType::BUFFER:
-        return true;
-    default:
-        return false;
-    }
+    return GetFamily(type) == ComponentFamily::LOGIC_GATE;
 }
 
 /**
@@ -111,8 +99,7 @@ bool IsLogicGate(const ComponentType type) {
  * @return  True for the D, JK, T and SR flip-flops.
  */
 bool IsFlipFlop(const ComponentType type) {
-    return type == ComponentType::D_FLIP_FLOP || type == ComponentType::JK_FLIP_FLOP ||
-           type == ComponentType::T_FLIP_FLOP || type == ComponentType::SR_FLIP_FLOP;
+    return GetFamily(type) == ComponentFamily::FLIP_FLOP;
 }
 
 /**
@@ -130,8 +117,8 @@ bool IsLogicPart(const ComponentType type) {
  * @return  True for AND, OR, NAND, NOR, XOR and XNOR.
  */
 bool HasVariableInputs(const ComponentType type) {
-    return type == ComponentType::AND || type == ComponentType::OR || type == ComponentType::NAND ||
-           type == ComponentType::NOR || type == ComponentType::XOR || type == ComponentType::XNOR;
+    return type == ComponentType::AND || type == ComponentType::OR || type == ComponentType::NAND
+        || type == ComponentType::NOR || type == ComponentType::XOR || type == ComponentType::XNOR;
 }
 
 /**

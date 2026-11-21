@@ -48,17 +48,33 @@ struct TerminalMoves {
 };
 
 /**
- * @brief   Brings one instance of a definition that changed up to date, and notes where its wires go.
+ * @struct  InstanceTerminals
+ * @brief   The terminals of an instance before its definition changed, which its wires are still on.
  */
-void RefreshInstance(UIElement &element, const SavedSubcircuit &definition, const std::vector<std::string> &old_names,
-                     const std::vector<std::optional<std::size_t>> &matches, TerminalMoves &moves) {
-    auto &instance = static_cast<Core::SubcircuitInstance &>(element.GetComponent());
-    const std::vector<std::string> instance_pins = instance.GetPins();
-    const std::vector<GridPoint> old_terminals = element.GetTerminals();
-    std::vector<GridPoint> old_inwards;
-    for (std::size_t terminal = 0; terminal < old_terminals.size(); ++terminal) {
-        old_inwards.push_back(element.GetTerminalInward(terminal));
+struct InstanceTerminals {
+    std::vector<GridPoint> Points;
+    /// The direction from each terminal into the box, which tells the edge it is on.
+    std::vector<GridPoint> Inwards;
+    /// The pin of each terminal, by name, in terminal order.
+    std::vector<std::string> PinNames;
+};
+
+InstanceTerminals CaptureTerminals(const UIElement &element) {
+    InstanceTerminals terminals;
+    terminals.Points = element.GetTerminals();
+    for (std::size_t terminal = 0; terminal < terminals.Points.size(); ++terminal) {
+        terminals.Inwards.push_back(element.GetTerminalInward(terminal));
     }
+    terminals.PinNames = static_cast<const Core::SubcircuitInstance &>(element.GetComponent()).GetPins();
+    return terminals;
+}
+
+/**
+ * @brief   Gives an instance the pins of the definition as it is now, and keeps the overrides of the parameters it
+ * still has.
+ */
+void UpdateInstance(UIElement &element, const SavedSubcircuit &definition) {
+    auto &instance = static_cast<Core::SubcircuitInstance &>(element.GetComponent());
     const auto overrides = instance.GetParameters();
     instance.ClearParameters();
     for (const auto &[parameter, value] : overrides) {
@@ -67,9 +83,33 @@ void RefreshInstance(UIElement &element, const SavedSubcircuit &definition, cons
         }
     }
     ApplyDefinitionPins(instance, definition);
-    const std::vector<GridPoint> new_terminals = element.GetTerminals();
-    KeepOffBlock(moves.Blocks, static_cast<const UISubcircuit &>(element));
+}
 
+/**
+ * @brief   Whether a pin went to another edge of its block, so stretching its wires could run them along the box.
+ */
+bool IsPinMovedToOtherEdge(const GridPoint old_point,
+                           const GridPoint new_point,
+                           const GridPoint old_inward,
+                           const GridPoint new_inward) {
+    return old_point != new_point && new_inward != old_inward;
+}
+
+/**
+ * @brief   Plans what happens to the wires on the terminals of one instance that was just updated.
+ * @param[in] element    The instance, already updated.
+ * @param[in] before     Its terminals before the update.
+ * @param[in] old_names  Names of the pins of the definition as they were.
+ * @param[in] matches    For each new pin, the index in old_names of the old pin it continues, if any.
+ * @return  The terminals whose wires follow them, those whose wires go, and the pins that need a new route; the
+ *          obstacles are left for the caller.
+ */
+TerminalMoves PlanTerminalMoves(const UIElement &element,
+                                const InstanceTerminals &before,
+                                const std::vector<std::string> &old_names,
+                                const std::vector<std::optional<std::size_t>> &matches) {
+    TerminalMoves moves;
+    const std::vector<GridPoint> new_terminals = element.GetTerminals();
     std::set<std::size_t> kept_terminals;
     for (std::size_t new_index = 0; new_index < matches.size(); ++new_index) {
         const std::optional<std::size_t> old_pin = matches[new_index];
@@ -77,26 +117,66 @@ void RefreshInstance(UIElement &element, const SavedSubcircuit &definition, cons
             continue;
         }
         // The terminal the old pin had on this instance, found by its name in case the instance is behind
-        const auto found = std::ranges::find(instance_pins, old_names[*old_pin]);
-        if (found == instance_pins.end()) {
+        const auto found = std::ranges::find(before.PinNames, old_names[*old_pin]);
+        if (found == before.PinNames.end()) {
             continue;
         }
-        const auto terminal = static_cast<std::size_t>(found - instance_pins.begin());
+        const auto terminal = static_cast<std::size_t>(found - before.PinNames.begin());
         kept_terminals.insert(terminal);
-        const GridPoint old_point = old_terminals[terminal];
+        const GridPoint old_point = before.Points[terminal];
         const GridPoint new_point = new_terminals[new_index];
-        if (old_point != new_point && element.GetTerminalInward(new_index) != old_inwards[terminal]) {
+        if (IsPinMovedToOtherEdge(old_point,
+                                  new_point,
+                                  before.Inwards[terminal],
+                                  element.GetTerminalInward(new_index))) {
             moves.Rerouted.push_back({.Block = &element, .OldPoint = old_point, .NewPoint = new_point});
         } else {
             moves.OldPoints.push_back(old_point);
             moves.NewPoints.push_back(new_point);
         }
     }
-    for (std::size_t terminal = 0; terminal < old_terminals.size(); ++terminal) {
+    for (std::size_t terminal = 0; terminal < before.Points.size(); ++terminal) {
         if (!kept_terminals.contains(terminal)) {
-            moves.Removed.push_back(old_terminals[terminal]);
+            moves.Removed.push_back(before.Points[terminal]);
         }
     }
+    return moves;
+}
+
+/**
+ * @brief   Adds the moves of one instance to those of the others.
+ */
+void AppendMoves(TerminalMoves &total, TerminalMoves instance) {
+    std::ranges::move(instance.OldPoints, std::back_inserter(total.OldPoints));
+    std::ranges::move(instance.NewPoints, std::back_inserter(total.NewPoints));
+    std::ranges::move(instance.Removed, std::back_inserter(total.Removed));
+    std::ranges::move(instance.Rerouted, std::back_inserter(total.Rerouted));
+}
+
+/**
+ * @brief   Moves the wires on the terminals of the instances as planned: those of pins that went away go, the others
+ *          follow their terminals, and a pin on another edge gets a new wire around the box.
+ */
+void ApplyTerminalMoves(const std::vector<std::unique_ptr<UIElement>> &elements,
+                        std::vector<UIWire> &wires,
+                        const TerminalMoves &moves) {
+    std::erase_if(wires, [&](const UIWire &wire) {
+        return std::ranges::contains(moves.Removed, wire.GetStart())
+            || std::ranges::contains(moves.Removed, wire.GetEnd());
+    });
+    wires = FollowTerminals(wires, moves.OldPoints, moves.NewPoints);
+    if (moves.Rerouted.empty()) {
+        return;
+    }
+    std::vector<WireLink> links;
+    for (const ReroutedPin &pin : moves.Rerouted) {
+        if (const std::optional<GridPoint> start = DetachFromBox(wires, pin.OldPoint, *pin.Block)) {
+            links.push_back({.From = *start, .To = pin.NewPoint});
+        } else {
+            wires = FollowTerminals(wires, {pin.OldPoint}, {pin.NewPoint});
+        }
+    }
+    std::ranges::copy(RouteLinks(elements, wires, moves.Blocks, links), std::back_inserter(wires));
 }
 
 } // namespace
@@ -135,9 +215,10 @@ std::expected<void, std::string> ValidateExpressions(const std::vector<std::uniq
     for (const auto &element : elements) {
         const Core::Component &component = element->GetComponent();
         const std::optional<std::string> &expression = component.GetValueExpression();
-        if (expression &&
-            !std::ranges::contains(parameters, Core::SubcircuitInstance::GetExpressionParameter(*expression),
-                                   &Core::SubcircuitParameter::Name)) {
+        if (expression
+            && !std::ranges::contains(parameters,
+                                      Core::SubcircuitInstance::GetExpressionParameter(*expression),
+                                      &Core::SubcircuitParameter::Name)) {
             return std::unexpected(
                 std::format("{} follows {}, which is not a parameter of the block", component.GetName(), *expression));
         }
@@ -155,8 +236,8 @@ std::expected<void, std::string> CheckPinChoice(const std::vector<SubcircuitPinC
                                                 const std::vector<SavedSubcircuitPin> &pins) {
     std::set<GridPoint> pin_points;
     for (const SavedSubcircuitPin &pin : pins) {
-        if (!std::ranges::contains(candidates, pin.Point, &SubcircuitPinCandidate::Point) ||
-            !pin_points.insert(pin.Point).second) {
+        if (!std::ranges::contains(candidates, pin.Point, &SubcircuitPinCandidate::Point)
+            || !pin_points.insert(pin.Point).second) {
             return std::unexpected("Choose one name for every pin marker");
         }
     }
@@ -174,7 +255,8 @@ std::expected<void, std::string> CheckPinChoice(const std::vector<SubcircuitPinC
  * @return  The markers in the order of the parts; the reason when two give one name or share a node.
  */
 std::expected<std::vector<SubcircuitPinCandidate>, std::string>
-CollectSubcircuitPinMarkers(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires,
+CollectSubcircuitPinMarkers(const std::vector<std::unique_ptr<UIElement>> &elements,
+                            const std::vector<UIWire> &wires,
                             const std::set<std::size_t> *selected) {
     const Connectivity connectivity(elements, wires);
     std::vector<SubcircuitPinCandidate> candidates;
@@ -243,44 +325,50 @@ std::vector<std::optional<std::size_t>> MatchPins(const std::vector<SavedSubcirc
  * @details The pins must reach nodes the outside can connect to.
  * @param[in] elements           Parts of the schematic.
  * @param[in] wires              Wires of the schematic.
- * @param[in] selected_elements  Indices of the parts to copy.
- * @param[in] selected_wires     Indices of the wires to copy.
+ * @param[in] selection          The parts and wires to copy.
  * @param[in] definitions        Blocks the schematic has, which the copied instances use.
  * @param[in] definition         The block with its name, pins and parameters set, which receives the contents.
  * @return  The block with its parts and wires; the reason when its pins cannot connect.
  */
-std::expected<SavedSubcircuit, std::string>
-DrawDefinition(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires,
-               const std::set<std::size_t> &selected_elements, const std::set<std::size_t> &selected_wires,
-               const std::vector<SavedSubcircuit> &definitions, SavedSubcircuit definition) {
-    std::vector<const UIElement *> copied_elements;
-    for (const std::size_t index : selected_elements) {
-        copied_elements.push_back(elements[index].get());
-    }
-    std::vector<UIWire> copied_wires;
-    for (const std::size_t index : selected_wires) {
-        copied_wires.push_back(wires[index]);
-    }
-    // The blocks the selection places go along, so their instances read back
-    auto copied = LoadSchematic(SaveParts(copied_elements, copied_wires, definitions));
+std::expected<SavedSubcircuit, std::string> DrawDefinition(const std::vector<std::unique_ptr<UIElement>> &elements,
+                                                           const std::vector<UIWire> &wires,
+                                                           const Selection &selection,
+                                                           const std::vector<SavedSubcircuit> &definitions,
+                                                           SavedSubcircuit definition) {
+    const SelectedItems selected = CollectSelected(elements, wires, selection);
+    auto copied = CopyContent(selected.Elements, selected.Wires, definitions);
     if (!copied) {
         return std::unexpected(copied.error());
     }
     definition.Elements = std::move(copied->Elements);
     definition.Wires = std::move(copied->Wires);
-    for (auto &element : definition.Elements) {
-        if (!Core::IsSubcircuitPin(element->GetComponent().GetType())) {
-            continue;
-        }
-        const GridPoint point = element->GetTerminals().front();
-        const auto pin = std::ranges::find(definition.Pins, point, &SavedSubcircuitPin::Point);
-        static_cast<Core::NetLabel &>(element->GetComponent()).SetNet(pin->Name);
+    if (auto named = NameMarkersAfterPins(definition.Elements, definition.Pins); !named) {
+        return std::unexpected(named.error());
     }
     if (const std::optional<std::string> problem =
             CheckPinNodes(Connectivity(definition.Elements, definition.Wires), definition.Pins)) {
         return std::unexpected(*problem);
     }
     return definition;
+}
+
+/**
+ * @brief   Copies parts and wires into ones that share nothing with them, as the contents of a block need.
+ * @details The copy goes through the text of a file, which copies the parts deeply; the blocks they place go along,
+ *          so their instances read back.
+ * @param[in] elements     Parts to copy, which stay as they are.
+ * @param[in] wires        Wires to copy.
+ * @param[in] definitions  Blocks the parts may place.
+ * @return  The copies, in the same order; the reason when the text cannot be read back.
+ */
+std::expected<CopiedContent, std::string> CopyContent(const std::span<const UIElement *const> elements,
+                                                      const std::vector<UIWire> &wires,
+                                                      const std::span<const SavedSubcircuit> definitions) {
+    auto loaded = LoadSchematic(SaveParts(elements, wires, definitions));
+    if (!loaded) {
+        return std::unexpected(loaded.error());
+    }
+    return CopiedContent{.Elements = std::move(loaded->Elements), .Wires = std::move(loaded->Wires)};
 }
 
 /**
@@ -303,21 +391,6 @@ std::vector<SavedSubcircuit> CopyDefinitions(const std::vector<SavedSubcircuit> 
 }
 
 /**
- * @brief   Finds a name no definition has yet, from the one a pasted definition came with.
- * @param[in] name         The name the pasted definition came with.
- * @param[in] definitions  The definitions already here.
- * @return  The name with a suffix such as "_2", the first that is free.
- */
-std::string FindFreeName(const std::string &name, const std::vector<SavedSubcircuit> &definitions) {
-    for (int suffix = 2;; ++suffix) {
-        std::string candidate = std::format("{}_{}", name, suffix);
-        if (!std::ranges::contains(definitions, candidate, &SavedSubcircuit::Name)) {
-            return candidate;
-        }
-    }
-}
-
-/**
  * @brief   Brings the instances of a definition that changed up to date among some parts: their pins and edges, the
  *          overrides of the parameters it still has, and the wires on their terminals, which follow the pins that go
  *          on and are removed from the pins that went away.
@@ -330,43 +403,24 @@ std::string FindFreeName(const std::string &name, const std::vector<SavedSubcirc
  *          stretching them could run them along it. They are stretched as before when none leaves the box, and the new
  *          wire bends once when no route is found.
  */
-void RefreshInstancesIn(std::vector<std::unique_ptr<UIElement>> &elements, std::vector<UIWire> &wires,
-                        const SavedSubcircuit &definition, const std::vector<std::string> &old_names,
+void RefreshInstancesIn(std::vector<std::unique_ptr<UIElement>> &elements,
+                        std::vector<UIWire> &wires,
+                        const SavedSubcircuit &definition,
+                        const std::vector<std::string> &old_names,
                         const std::vector<std::optional<std::size_t>> &matches) {
     TerminalMoves moves;
     for (auto &element : elements) {
-        if (element->GetComponent().GetType() == Core::ComponentType::SUBCIRCUIT &&
-            static_cast<const Core::SubcircuitInstance &>(element->GetComponent()).GetDefinitionName() ==
-                definition.Name) {
-            RefreshInstance(*element, definition, old_names, matches, moves);
+        if (element->GetComponent().GetType() != Core::ComponentType::SUBCIRCUIT
+            || static_cast<const Core::SubcircuitInstance &>(element->GetComponent()).GetDefinitionName()
+                   != definition.Name) {
+            continue;
         }
+        const InstanceTerminals before = CaptureTerminals(*element);
+        UpdateInstance(*element, definition);
+        AppendMoves(moves, PlanTerminalMoves(*element, before, old_names, matches));
+        KeepOffBlock(moves.Blocks, static_cast<const UISubcircuit &>(*element));
     }
-    std::erase_if(wires, [&](const UIWire &wire) {
-        return std::ranges::contains(moves.Removed, wire.GetStart()) ||
-               std::ranges::contains(moves.Removed, wire.GetEnd());
-    });
-    wires = FollowTerminals(wires, moves.OldPoints, moves.NewPoints);
-    if (moves.Rerouted.empty()) {
-        return;
-    }
-    std::vector<WireLink> links;
-    for (const ReroutedPin &pin : moves.Rerouted) {
-        if (const std::optional<GridPoint> start = DetachFromBox(wires, pin.OldPoint, *pin.Block)) {
-            links.push_back({.From = *start, .To = pin.NewPoint});
-        } else {
-            wires = FollowTerminals(wires, {pin.OldPoint}, {pin.NewPoint});
-        }
-    }
-    const auto routed = RouteLinks(elements, wires, moves.Blocks, links);
-    for (std::size_t index = 0; index < links.size(); ++index) {
-        if (const std::optional<std::vector<UIWire>> &path = routed[index]) {
-            std::ranges::copy(*path, std::back_inserter(wires));
-        } else {
-            const GridPoint bend = {links[index].To.X, links[index].From.Y};
-            wires.emplace_back(links[index].From, bend);
-            wires.emplace_back(bend, links[index].To);
-        }
-    }
+    ApplyTerminalMoves(elements, wires, moves);
 }
 
 } // namespace GUI

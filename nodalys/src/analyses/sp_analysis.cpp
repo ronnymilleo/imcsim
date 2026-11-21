@@ -5,6 +5,7 @@
 
 #include "analyses/analyses.h"
 
+#include "analyses/analysis_preamble.h"
 #include "analyses/frequency_sweep.h"
 #include "analyses/port_matrices.h"
 #include "devices/devices.h"
@@ -63,7 +64,8 @@ std::optional<std::string> CheckPortNumbers(const std::vector<CircuitPort> &sort
     for (int number = 1; number <= static_cast<int>(sorted_ports.size()); ++number) {
         if (!numbers.contains(number)) {
             return std::format("The S-parameter ports must be numbered 1 to {} with no gap; port {} is missing",
-                               sorted_ports.size(), number);
+                               sorted_ports.size(),
+                               number);
         }
     }
     return std::nullopt;
@@ -84,7 +86,8 @@ std::optional<std::string> CheckPortNodes(const std::vector<CircuitPort> &ports,
         for (std::size_t second = first + 1; second < ports.size(); ++second) {
             if (ports[second].Node == port.Node) {
                 return std::format("Ports {} and {} are on the same node; each port needs a node of its own",
-                                   port.Number, ports[second].Number);
+                                   port.Number,
+                                   ports[second].Number);
             }
         }
     }
@@ -108,14 +111,148 @@ std::expected<std::vector<CircuitPort>, std::string> ValidatePorts(const std::ve
     return ports;
 }
 
-/// Fills the impedance and admittance matrices of a frequency from its S matrix.
+/**
+ * @brief   Fills the impedance and admittance matrices of a frequency from its S matrix.
+ */
 void AddPortMatrices(SParameterResult &result, const PortMatrix &scattering) {
     result.ImpedanceMatrices.push_back(ComputeImpedanceMatrix(scattering, result.ReferenceOhms));
     result.AdmittanceMatrices.push_back(ComputeAdmittanceMatrix(scattering, result.ReferenceOhms));
 }
 
+/**
+ * @brief   Terminates each port with its reference impedance to ground, which the operating point is solved with.
+ * @details The terminations are devices added to the circuit, so the guard that is returned takes them out again
+ *          when it goes out of scope.
+ * @return  The guard that removes the terminations.
+ */
+DeviceRestoreGuard AddPortTerminations(CompiledCircuit &compiled, const std::vector<CircuitPort> &ports) {
+    const std::size_t original_device_count = compiled.Devices.size();
+    for (const CircuitPort &port : ports) {
+        const int u = compiled.System->NodeIndex(port.Node);
+        compiled.Devices.push_back(std::make_unique<ResistorDevice>(u, -1, port.ReferenceOhms));
+    }
+    return DeviceRestoreGuard{compiled.Devices, original_device_count};
+}
+
+/**
+ * @struct  PortDrives
+ * @brief   What each port needs to be excited and read, one entry per port in the order of the ports.
+ */
+struct PortDrives {
+    /// Unknown of the port node, or -1 when the port is on ground.
+    std::vector<int> Unknowns;
+    std::vector<double> SqrtConductances;
+    /// Norton current source of each port, as the right-hand side that excites it.
+    std::vector<std::vector<std::complex<double>>> Excitations;
+};
+
+/**
+ * @brief   Pre-assembles the excitation of each port.
+ * @details Port j is excited with the Norton equivalent current \f$ I_j = 2 \sqrt{G_j} \f$, where
+ *          \f$ G_j = 1 / Z_{0j} \f$.
+ */
+PortDrives MakePortDrives(const CompiledCircuit &compiled, const std::vector<CircuitPort> &ports) {
+    const std::size_t port_count = ports.size();
+    const auto size = static_cast<std::size_t>(compiled.System->GetSize());
+    PortDrives drives{.Unknowns = std::vector<int>(port_count),
+                      .SqrtConductances = std::vector<double>(port_count),
+                      .Excitations = std::vector<std::vector<std::complex<double>>>(
+                          port_count,
+                          std::vector<std::complex<double>>(size, std::complex<double>(0.0, 0.0)))};
+    for (std::size_t j = 0; j < port_count; ++j) {
+        const double gj = 1.0 / ports[j].ReferenceOhms;
+        drives.SqrtConductances[j] = std::sqrt(gj);
+        const int uj = compiled.System->NodeIndex(ports[j].Node);
+        drives.Unknowns[j] = uj;
+        if (uj >= 0) {
+            drives.Excitations[j][static_cast<std::size_t>(uj)] =
+                std::complex<double>(2.0 * drives.SqrtConductances[j], 0.0);
+        }
+    }
+    return drives;
+}
+
+SParameterResult MakeSweepResult(const std::vector<double> &frequencies, const std::vector<CircuitPort> &ports) {
+    SParameterResult result;
+    result.Frequencies = frequencies;
+    result.ReferenceOhms.reserve(ports.size());
+    for (const CircuitPort &port : ports) {
+        result.ReferenceOhms.push_back(port.ReferenceOhms);
+    }
+    result.Values.reserve(frequencies.size() * ports.size() * ports.size());
+    return result;
+}
+
+/**
+ * @brief   Converts the port voltages of one frequency to the power-wave scattering matrix
+ *          \f$ S_{ij} = V_i \sqrt{G_i} - \delta_{ij} \f$.
+ * @param[in] drives     The ports.
+ * @param[in] solutions  The solution of the circuit excited at each port.
+ * @param[in] frequency  Frequency of the solutions in hertz, for the message of a refusal.
+ * @return  The matrix in row-major order, or the entry that is not finite.
+ */
+std::expected<PortMatrix, std::string>
+ScatteringFromSolutions(const PortDrives &drives,
+                        const std::vector<std::vector<std::complex<double>>> &solutions,
+                        const double frequency) {
+    const std::size_t port_count = drives.Unknowns.size();
+    PortMatrix scattering;
+    scattering.reserve(port_count * port_count);
+    for (std::size_t i = 0; i < port_count; ++i) {
+        const int ui = drives.Unknowns[i];
+        const double gi_sqrt = drives.SqrtConductances[i];
+        for (std::size_t j = 0; j < port_count; ++j) {
+            const std::complex<double> vi =
+                (ui < 0) ? std::complex<double>(0.0, 0.0) : solutions[j][static_cast<std::size_t>(ui)];
+            const double delta_ij = (i == j) ? 1.0 : 0.0;
+            const std::complex<double> s_ij = vi * gi_sqrt - delta_ij;
+            if (!std::isfinite(s_ij.real()) || !std::isfinite(s_ij.imag())) {
+                return std::unexpected(std::format("The native solver produced non-finite S({}, {}) at f = {} Hz",
+                                                   i + 1,
+                                                   j + 1,
+                                                   frequency));
+            }
+            scattering.push_back(s_ij);
+        }
+    }
+    return scattering;
+}
+
+/**
+ * @brief   Solves the circuit at each frequency with each port excited in turn and adds the matrices of the frequency.
+ */
+std::optional<std::string> AddFrequencyPoints(SParameterResult &result,
+                                              const CompiledCircuit &compiled,
+                                              const MnaSystem &reactive,
+                                              const PortDrives &drives) {
+    std::vector<std::vector<std::complex<double>>> solutions;
+    for (const double frequency : result.Frequencies) {
+        const double omega = 2.0 * std::numbers::pi * frequency;
+        if (!compiled.System->SolveAcMultiple(reactive, omega, drives.Excitations, solutions)) {
+            return std::format("The native S-parameter solver encountered a singular matrix at f = {} Hz", frequency);
+        }
+        const std::expected<PortMatrix, std::string> scattering = ScatteringFromSolutions(drives, solutions, frequency);
+        if (!scattering) {
+            return scattering.error();
+        }
+        result.Values.insert(result.Values.end(), scattering->begin(), scattering->end());
+        AddPortMatrices(result, *scattering);
+    }
+    return std::nullopt;
+}
+
 } // namespace
 
+/**
+ * @brief   Computes the scattering, impedance and admittance matrices of the ports of the circuit over a range of
+ *          frequencies.
+ * @param[in,out] compiled  Compiled circuit with its matrix and devices; the terminations of the ports are added for
+ *                          the analysis and taken out again.
+ * @param[in]     settings  Ports, when they are not those of the circuit, and frequency range.
+ * @param[in]     options   Numerical limits of the operating point.
+ * @param[out]    messages  Diagnostic messages collected during the analysis; may be null.
+ * @return  The matrices at each frequency, or an error description.
+ */
 std::expected<SParameterResult, std::string> ComputeSParameters(CompiledCircuit &compiled,
                                                                 const SParameterConfig &settings,
                                                                 const ConvergenceOptions &options,
@@ -127,7 +264,6 @@ std::expected<SParameterResult, std::string> ComputeSParameters(CompiledCircuit 
         return std::unexpected(validated_ports.error());
     }
     const std::vector<CircuitPort> &ports = *validated_ports;
-    const auto num_ports = static_cast<int>(ports.size());
 
     const auto freq_points = GenerateFrequencyPoints(settings);
     if (!freq_points) {
@@ -135,96 +271,29 @@ std::expected<SParameterResult, std::string> ComputeSParameters(CompiledCircuit 
     }
     const std::vector<double> &frequencies = *freq_points;
 
-    const int size = compiled.System->GetSize();
+    // The terminations stay in the circuit until the end of the analysis
+    const DeviceRestoreGuard restore_guard = AddPortTerminations(compiled, ports);
 
-    // 1. Terminate all ports with their reference impedance to ground for DC operating point linearization
-    const std::size_t original_device_count = compiled.Devices.size();
-    DeviceRestoreGuard restore_guard{compiled.Devices, original_device_count};
-
-    for (const CircuitPort &port : ports) {
-        const int u = compiled.System->NodeIndex(port.Node);
-        compiled.Devices.push_back(std::make_unique<ResistorDevice>(u, -1, port.ReferenceOhms));
+    const std::expected<std::vector<double>, std::string> x_dc =
+        SolveOperatingPoint(compiled,
+                            options,
+                            "The native solver found no operating point to linearize the S-parameter analysis around",
+                            messages);
+    if (!x_dc) {
+        return std::unexpected(x_dc.error());
     }
+    const MnaSystem reactive = BuildReactiveSystem(compiled, *x_dc);
+    const PortDrives drives = MakePortDrives(compiled, ports);
 
-    std::vector<double> x_dc(static_cast<std::size_t>(size), 0.0);
-    const NewtonOutcome outcome = SolveNewton(*compiled.System, compiled.Devices, x_dc, TimeContext{}, options);
-    if (!outcome.Converged) {
-        return std::unexpected(DescribeFailure(
-            "The native solver found no operating point to linearize the S-parameter analysis around", outcome));
-    }
-    DescribeOutcome(outcome, "operating point", messages);
-
-    // 2. Assemble small-signal AC reactive matrix C_ac
-    std::vector<bool> node_flags(static_cast<std::size_t>(size), false);
-    for (int i = 0; i < size; ++i) {
-        node_flags[static_cast<std::size_t>(i)] = compiled.System->IsNodeUnknown(i);
-    }
-    MnaSystem reactive(std::move(node_flags));
-    for (const std::unique_ptr<Device> &device : compiled.Devices) {
-        device->StampAc(reactive, x_dc);
-    }
-
-    // 3. Pre-assemble Norton current excitation RHS vectors for each port
-    // Excite port j with Norton equivalent current Is_j = 2 * sqrt(Gj), where Gj = 1 / Z0j
-    std::vector<std::vector<std::complex<double>>> rhs_list(
-        static_cast<std::size_t>(num_ports),
-        std::vector<std::complex<double>>(static_cast<std::size_t>(size), std::complex<double>(0.0, 0.0)));
-
-    std::vector<double> sqrt_g(static_cast<std::size_t>(num_ports));
-    std::vector<int> port_unknowns(static_cast<std::size_t>(num_ports));
-
-    for (std::size_t j = 0; j < static_cast<std::size_t>(num_ports); ++j) {
-        const double gj = 1.0 / ports[j].ReferenceOhms;
-        sqrt_g[j] = std::sqrt(gj);
-        const int uj = compiled.System->NodeIndex(ports[j].Node);
-        port_unknowns[j] = uj;
-        if (uj >= 0) {
-            rhs_list[j][static_cast<std::size_t>(uj)] = std::complex<double>(2.0 * sqrt_g[j], 0.0);
-        }
-    }
-
-    SParameterResult result;
-    result.Frequencies = frequencies;
-    result.ReferenceOhms.reserve(static_cast<std::size_t>(num_ports));
-    for (const CircuitPort &port : ports) {
-        result.ReferenceOhms.push_back(port.ReferenceOhms);
-    }
-    result.Values.reserve(frequencies.size() * static_cast<std::size_t>(num_ports * num_ports));
-
-    // 4. Frequency sweep
-    std::vector<std::vector<std::complex<double>>> solutions;
-    for (const double frequency : frequencies) {
-        const double omega = 2.0 * std::numbers::pi * frequency;
-        if (!compiled.System->SolveAcMultiple(reactive, omega, rhs_list, solutions)) {
-            return std::unexpected(
-                std::format("The native S-parameter solver encountered a singular matrix at f = {} Hz", frequency));
-        }
-
-        // 5. Convert port voltages to power-wave scattering matrix S_ij = V_i * sqrt(G_i) - delta_ij
-        PortMatrix scattering;
-        scattering.reserve(static_cast<std::size_t>(num_ports * num_ports));
-        for (std::size_t i = 0; i < static_cast<std::size_t>(num_ports); ++i) {
-            const int ui = port_unknowns[i];
-            const double gi_sqrt = sqrt_g[i];
-            for (std::size_t j = 0; j < static_cast<std::size_t>(num_ports); ++j) {
-                const std::complex<double> vi =
-                    (ui < 0) ? std::complex<double>(0.0, 0.0) : solutions[j][static_cast<std::size_t>(ui)];
-                const double delta_ij = (i == j) ? 1.0 : 0.0;
-                const std::complex<double> s_ij = vi * gi_sqrt - delta_ij;
-                if (!std::isfinite(s_ij.real()) || !std::isfinite(s_ij.imag())) {
-                    return std::unexpected(std::format("The native solver produced non-finite S({}, {}) at f = {} Hz",
-                                                       i + 1, j + 1, frequency));
-                }
-                scattering.push_back(s_ij);
-            }
-        }
-        result.Values.insert(result.Values.end(), scattering.begin(), scattering.end());
-        AddPortMatrices(result, scattering);
+    SParameterResult result = MakeSweepResult(frequencies, ports);
+    if (const std::optional<std::string> failure = AddFrequencyPoints(result, compiled, reactive, drives)) {
+        return std::unexpected(*failure);
     }
 
     if (messages != nullptr) {
         messages->push_back({std::format("nodalys: computed S-parameters for {} ports across {} frequency points",
-                                         num_ports, frequencies.size()),
+                                         ports.size(),
+                                         frequencies.size()),
                              false});
     }
 

@@ -17,7 +17,8 @@ namespace GUI {
  * @struct  ParameterField
  * @brief   One member of a parameter set, such as Core::PulseParameters, as a field of the part editor.
  */
-template <typename Parameters> struct ParameterField {
+template <typename Parameters>
+struct ParameterField {
     const char *Label;
     double Parameters::*Value;
     // No unit means the unit of the source, volts or amperes
@@ -26,15 +27,13 @@ template <typename Parameters> struct ParameterField {
     double Scale = 1.0;
 };
 
-// Validity
-bool AnyValue(double value);
-
 /**
  * @brief   Loads the text of every field from the members of the parameters.
  */
 template <typename Parameters, std::size_t Count>
 void LoadParameterFields(const std::array<ParameterField<Parameters>, Count> &fields,
-                         std::array<ValueField, Count> &value_fields, const Parameters &parameters) {
+                         std::array<ValueField, Count> &value_fields,
+                         const Parameters &parameters) {
     for (std::size_t index = 0; index < Count; ++index) {
         value_fields[index].Load(parameters.*fields[index].Value * fields[index].Scale);
     }
@@ -47,7 +46,9 @@ void LoadParameterFields(const std::array<ParameterField<Parameters>, Count> &fi
  */
 template <typename Parameters, std::size_t Count>
 bool DrawParameterFields(const std::array<ParameterField<Parameters>, Count> &fields,
-                         std::array<ValueField, Count> &value_fields, const char *source_unit, const auto &is_valid,
+                         std::array<ValueField, Count> &value_fields,
+                         const char *source_unit,
+                         const auto &is_valid,
                          Parameters &parameters) {
     bool changed = false;
     for (std::size_t index = 0; index < Count; ++index) {

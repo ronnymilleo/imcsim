@@ -11,10 +11,13 @@
 #include "circuit/components/resistor.h"
 #include "circuit/components/voltage_source.h"
 #include "schematic/examples.h"
+#include "schematic/probing.h"
 #include "schematic/schematic.h"
+#include "simulation/analysis_sources.h"
 #include "test_printers.h"
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
+#include <format>
 #include <optional>
 #include <string>
 #include <vector>
@@ -96,6 +99,15 @@ TEST_CASE("A truth table varies the stored inputs that are still there, or else 
     CHECK(GUI::ResolveTruthTableInputs({"V9"}, available) == available);
 }
 
+TEST_CASE("Toggling a truth table input keeps circuit order, and never leaves the table without inputs",
+          "[analysis_inputs]") {
+    const std::vector<std::string> available = {"V1", "V2", "V3"};
+    CHECK(GUI::ToggleTruthTableInput(available, {"V3"}, "V1", true) == std::vector<std::string>{"V1", "V3"});
+    CHECK(GUI::ToggleTruthTableInput(available, available, "V2", false) == std::vector<std::string>{"V1", "V3"});
+    // The last input stays, since a table of none has no rows to show
+    CHECK_FALSE(GUI::ToggleTruthTableInput(available, {"V2"}, "V2", false).has_value());
+}
+
 TEST_CASE("The stepped parameter has the unit of its part, or degrees Celsius for the temperature",
           "[analysis_inputs]") {
     Core::Resistor resistor;
@@ -117,7 +129,7 @@ TEST_CASE("The output node is the stored point's, else a measured node that no s
     // The example measures the source node, which the source holds, and the node of the capacitor
     const std::optional<int> measured = GUI::ResolveOutputNode(std::nullopt, circuit, schematic);
     REQUIRE(measured.has_value());
-    CHECK(schematic.IsVoltageMeasured(*measured));
+    CHECK(schematic.GetMeasurements().IsVoltageMeasured(*measured));
     CHECK(GUI::ListMeasuredNodes(circuit, schematic).size() == 2);
 
     // A stored point wins over the measured nodes, and a point that left the circuit is ignored
@@ -128,6 +140,19 @@ TEST_CASE("The output node is the stored point's, else a measured node that no s
     CHECK(*source_node != *measured);
 }
 
+TEST_CASE("The nodes a truth table reads are named as the plots name them, one after the other", "[analysis_inputs]") {
+    GUI::Schematic schematic;
+    OpenRCFilter(schematic);
+    const std::vector<int> nodes = GUI::ListMeasuredNodes(schematic.BuildCircuit(), schematic);
+    REQUIRE(nodes.size() == 2);
+    const GUI::Connectivity &connectivity = schematic.GetConnectivity();
+    CHECK(GUI::FormatMeasuredNodeLabels(connectivity, nodes)
+          == std::format("{}, {}",
+                         GUI::GetVoltageLabel(connectivity, nodes[0]),
+                         GUI::GetVoltageLabel(connectivity, nodes[1])));
+    CHECK(GUI::FormatMeasuredNodeLabels(connectivity, {}).empty());
+}
+
 TEST_CASE("A circuit with only ground has no node to measure", "[analysis_inputs]") {
     GUI::Schematic schematic;
     const Core::Ground ground;
@@ -135,4 +160,40 @@ TEST_CASE("A circuit with only ground has no node to measure", "[analysis_inputs
     circuit.Add(ground, {0});
     CHECK_FALSE(GUI::ResolveOutputNode(std::nullopt, circuit, schematic).has_value());
     CHECK(GUI::ListMeasuredNodes(circuit, schematic).empty());
+}
+
+TEST_CASE("A missing input or output is told in a sentence about the analysis that needs it", "[analysis_inputs]") {
+    CHECK(GUI::DescribeMissingOutputNode("the noise") == "Connect some parts: the noise needs a node to measure");
+    CHECK(GUI::DescribeMissingACInput("A noise analysis")
+          == "A noise analysis needs an AC source as its input; select a voltage or current source and set it to AC");
+    // The input source list is the one a DC sweep can drive, so the message names the same sources
+    CHECK(GUI::DescribeMissingInputSource("A pole-zero analysis")
+          == std::format("A pole-zero analysis needs an input source; add {}", Core::SWEEPABLE_SOURCES));
+}
+
+TEST_CASE("The ports of a small-signal analysis come back resolved, or with the sentence that refuses them",
+          "[analysis_inputs]") {
+    GUI::Schematic schematic;
+    OpenRCFilter(schematic);
+    const Core::Circuit circuit = schematic.BuildCircuit();
+    // The filter's source can be swept, and a stored name that left the circuit gives way to it
+    const auto swept = GUI::ResolveSweepableInput(circuit, "Vgone", "A pole-zero analysis");
+    REQUIRE(swept.has_value());
+    CHECK_FALSE(swept->empty());
+    const auto output = GUI::ResolveRequiredOutput(std::nullopt, circuit, schematic, "the noise");
+    REQUIRE(output.has_value());
+    CHECK(schematic.GetMeasurements().IsVoltageMeasured(*output));
+
+    // A circuit of a lone resistor has no source to drive and no node to measure
+    Core::Resistor resistor;
+    Core::Ground ground;
+    Core::Circuit bare;
+    bare.Add(resistor, {0, 0});
+    bare.Add(ground, {0});
+    GUI::Schematic empty;
+    CHECK(GUI::ResolveAcInput(bare, "", "A noise analysis").error() == GUI::DescribeMissingACInput("A noise analysis"));
+    CHECK(GUI::ResolveSweepableInput(bare, "", "A pole-zero analysis").error()
+          == GUI::DescribeMissingInputSource("A pole-zero analysis"));
+    CHECK(GUI::ResolveRequiredOutput(std::nullopt, bare, empty, "the noise").error()
+          == GUI::DescribeMissingOutputNode("the noise"));
 }

@@ -63,7 +63,8 @@ public:
     /**
      * @brief   A number may be written whole or not, which JSON tells apart as different types.
      */
-    template <typename Apply> void ReadNumber(const char *key, const Apply &apply) {
+    template <typename Apply>
+    void ReadNumber(const char *key, const Apply &apply) {
         const auto entry = m_Document.find(key);
         if (entry == m_Document.end()) {
             return;

@@ -29,8 +29,10 @@ bool IsFinite(const std::complex<double> value) {
  *          infinite when the numerator is positive, and with no numerator either, the side sits on the edge of the
  *          chart: that reads as 0, the least stable value.
  */
-double ComputeMu(const std::complex<double> near_side, const std::complex<double> far_side,
-                 const std::complex<double> delta, const double product) {
+double ComputeMu(const std::complex<double> near_side,
+                 const std::complex<double> far_side,
+                 const std::complex<double> delta,
+                 const double product) {
     const double numerator = 1.0 - std::norm(near_side);
     const double denominator = std::abs(far_side - delta * std::conj(near_side)) + product;
     if (denominator > 0.0) {
@@ -54,8 +56,8 @@ void FillGain(TwoPortMetrics &metrics, const TwoPortMatrix &matrix) {
         // reflections are below 1, that is, when it is stable
         if (metrics.IsUnconditionallyStable) {
             metrics.Gain = GainKind::UNILATERAL;
-            metrics.GainDecibels = PowerToDecibels(std::norm(matrix.S21) /
-                                                   ((1.0 - std::norm(matrix.S11)) * (1.0 - std::norm(matrix.S22))));
+            metrics.GainDecibels = PowerToDecibels(std::norm(matrix.S21)
+                                                   / ((1.0 - std::norm(matrix.S11)) * (1.0 - std::norm(matrix.S22))));
         }
         return;
     }
@@ -116,8 +118,8 @@ TwoPortMetrics ComputeTwoPortMetrics(const TwoPortMatrix &matrix) {
     metrics.DeltaMagnitude = std::abs(delta);
     metrics.IsUnilateral = product <= UNILATERAL_PRODUCT_FLOOR;
     metrics.K = metrics.IsUnilateral
-                    ? std::numeric_limits<double>::infinity()
-                    : (1.0 - std::norm(matrix.S11) - std::norm(matrix.S22) + std::norm(delta)) / (2.0 * product);
+                  ? std::numeric_limits<double>::infinity()
+                  : (1.0 - std::norm(matrix.S11) - std::norm(matrix.S22) + std::norm(delta)) / (2.0 * product);
     metrics.Mu = ComputeMu(matrix.S11, matrix.S22, delta, product);
     metrics.MuPrime = ComputeMu(matrix.S22, matrix.S11, delta, product);
     metrics.IsUnconditionallyStable = metrics.Mu > 1.0 - STABILITY_TOLERANCE;

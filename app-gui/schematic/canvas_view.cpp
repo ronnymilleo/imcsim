@@ -47,7 +47,9 @@ void CanvasView::RequestDefaultFrame() {
  * @param[in] style             Symbol style, which changes the size of the parts.
  * @param[in] terminal_numbers  Whether terminal numbers are drawn, which they take room for.
  */
-void CanvasView::FrameIfRequested(Schematic &schematic, const ImVec2 canvas_size, const SymbolStyle style,
+void CanvasView::FrameIfRequested(Schematic &schematic,
+                                  const ImVec2 canvas_size,
+                                  const SymbolStyle style,
                                   const bool terminal_numbers) {
     const std::optional<float> max_zoom = std::exchange(m_FrameMaxZoom, std::nullopt);
     if (!max_zoom) {

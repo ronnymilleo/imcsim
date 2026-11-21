@@ -187,8 +187,8 @@ TEST_CASE("A common-source stage has the right-half-plane zero at gm over Cgd an
     CHECK(Testing::HasRightHalfPlaneRoot(report.Zeros, 0.0));
     const std::vector<std::complex<double>> expected =
         QuadraticRoots(GATE_SOURCE_CAPACITANCE * GATE_DRAIN_CAPACITANCE,
-                       (GATE_SOURCE_CAPACITANCE + GATE_DRAIN_CAPACITANCE) / LOAD_RESISTANCE +
-                           GATE_DRAIN_CAPACITANCE / SOURCE_RESISTANCE + TRANSCONDUCTANCE * GATE_DRAIN_CAPACITANCE,
+                       (GATE_SOURCE_CAPACITANCE + GATE_DRAIN_CAPACITANCE) / LOAD_RESISTANCE
+                           + GATE_DRAIN_CAPACITANCE / SOURCE_RESISTANCE + TRANSCONDUCTANCE * GATE_DRAIN_CAPACITANCE,
                        1.0 / (SOURCE_RESISTANCE * LOAD_RESISTANCE));
     for (const std::complex<double> &pole : expected) {
         CHECK(Testing::HasRootNear(report.Poles, pole, CLOSED_FORM_TOLERANCE));

@@ -57,7 +57,7 @@ LogicBuses::LogicBuses(Schematic &schematic) : m_Schematic(schematic) {
  */
 void LogicBuses::Draw(const std::vector<std::string> &signals) {
     ImGui::TextDisabled("Buses");
-    std::vector<LogicBus> buses = m_Schematic.GetBuses();
+    std::vector<LogicBus> buses = m_Schematic.GetMeasurements().GetBuses();
     bool open_new_editor = false;
     if (ImGui::SmallButton("Add##bus")) {
         buses.push_back({.Name = GetNextBusName(buses)});
@@ -88,8 +88,8 @@ void LogicBuses::Draw(const std::vector<std::string> &signals) {
     if (removed) {
         buses.erase(buses.begin() + static_cast<std::ptrdiff_t>(*removed));
     }
-    if (buses != m_Schematic.GetBuses()) {
-        m_Schematic.SetBuses(std::move(buses));
+    if (buses != m_Schematic.GetMeasurements().GetBuses()) {
+        m_Schematic.GetMeasurements().SetBuses(std::move(buses));
     }
 }
 
@@ -102,8 +102,8 @@ bool LogicBuses::DrawEditor(LogicBus &bus, const std::vector<std::string> &signa
     ImGui::SetNextItemWidth(ImGui::GetFontSize() * EDITOR_FIELD_WIDTH);
     std::string name = bus.Name;
     // A name another bus has, or none, is not taken, so the list never shows two alike
-    if (ImGui::InputText("Name", &name, ImGuiInputTextFlags_CharsNoBlank) && !name.empty() &&
-        !std::ranges::contains(m_Schematic.GetBuses(), name, &LogicBus::Name)) {
+    if (ImGui::InputText("Name", &name, ImGuiInputTextFlags_CharsNoBlank) && !name.empty()
+        && !std::ranges::contains(m_Schematic.GetMeasurements().GetBuses(), name, &LogicBus::Name)) {
         bus.Name = name;
     }
     for (std::size_t index = 0; index < BUS_FORMATS.size(); ++index) {

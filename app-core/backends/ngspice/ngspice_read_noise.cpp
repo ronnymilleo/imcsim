@@ -12,12 +12,12 @@
 #include "simulation/analysis_settings.h"
 #include "simulation/analysis_sources.h"
 #include "simulation/simulation_results.h"
+#include "spice/spice_text.h"
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <expected>
 #include <format>
-#include <ngspice/sharedspice.h>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -42,12 +42,7 @@ struct NoisePlots {
  */
 std::optional<NoisePlots> FindNoisePlots() {
     NoisePlots plots;
-    char *const *names = ngSpice_AllPlots();
-    for (; names != nullptr && *names != nullptr; ++names) {
-        const std::string name(*names);
-        if (!name.starts_with("noise")) {
-            continue;
-        }
+    for (const std::string &name : ListPlotsStartingWith("noise")) {
         const std::vector<std::string> vectors = ListVectors(name);
         (std::ranges::contains(vectors, "frequency") ? plots.Densities : plots.Totals) = name;
     }
@@ -91,25 +86,6 @@ bool IsDeviceOf(const std::string_view device, const std::vector<std::string> &e
     });
 }
 
-/**
- * @brief   ngspice describes every vector in the same static record, so the values are copied before the next lookup.
- */
-std::optional<std::vector<double>> ReadRealVector(const std::string &name) {
-    const pvector_info vector = FindVector(name);
-    if (vector == nullptr) {
-        return std::nullopt;
-    }
-    return RealPart(*vector);
-}
-
-std::expected<double, std::string> ReadNoiseTotal(const std::string &name) {
-    const pvector_info vector = FindVector(name);
-    if (vector == nullptr || vector->v_realdata == nullptr) {
-        return std::unexpected(std::format("ngspice returned no {}", name));
-    }
-    return vector->v_realdata[0];
-}
-
 // Each part adds up the power of its devices, at every frequency and in total; parts whose noise does not reach the
 // output are left out
 std::expected<std::vector<NoiseContribution>, std::string>
@@ -118,7 +94,8 @@ ReadNoiseContributions(const Circuit &circuit, const NoisePlots &plots, const st
     const std::vector<std::string> total_devices = ListNoiseDevices(ListVectors(plots.Totals), "onoise_total_");
     std::vector<double> device_totals;
     for (const std::string &device : total_devices) {
-        const auto total = ReadNoiseTotal(std::format("onoise_total_{}", device));
+        const std::string name = std::format("onoise_total_{}", device);
+        const auto total = ReadScalar(name, name);
         if (!total) {
             return std::unexpected(total.error());
         }
@@ -136,9 +113,11 @@ ReadNoiseContributions(const Circuit &circuit, const NoisePlots &plots, const st
             if (!IsDeviceOf(device, elements)) {
                 continue;
             }
-            const std::optional<std::vector<double>> densities = ReadRealVector(std::format("onoise_{}", device));
-            if (!densities || densities->size() != point_count) {
-                return std::unexpected(std::format("ngspice returned no noise for {}", device));
+            const auto densities = ReadRealVectorOfLength(std::format("onoise_{}", device),
+                                                          point_count,
+                                                          std::format("noise for {}", device));
+            if (!densities) {
+                return std::unexpected(densities.error());
             }
             for (std::size_t point = 0; point < point_count; ++point) {
                 contribution.OutputDensities[point] += (*densities)[point] * (*densities)[point];
@@ -150,7 +129,8 @@ ReadNoiseContributions(const Circuit &circuit, const NoisePlots &plots, const st
         if (!has_noise || contribution.OutputTotal <= 0.0) {
             continue;
         }
-        std::ranges::transform(contribution.OutputDensities, contribution.OutputDensities.begin(),
+        std::ranges::transform(contribution.OutputDensities,
+                               contribution.OutputDensities.begin(),
                                [](const double power) { return std::sqrt(power); });
         contribution.OutputTotal = std::sqrt(contribution.OutputTotal);
         contributions.push_back(std::move(contribution));
@@ -178,8 +158,8 @@ std::expected<Noise, std::string> ReadNoise(const Circuit &circuit, const NoiseS
     result.InputUnit = SourceUnit(*FindNoiseInput(circuit, settings.InputSource));
 
     SendCommand(std::format("setplot {}", plots->Totals));
-    const auto output_total = ReadNoiseTotal("onoise_total");
-    const auto input_total = ReadNoiseTotal("inoise_total");
+    const auto output_total = ReadScalar("onoise_total", "onoise_total");
+    const auto input_total = ReadScalar("inoise_total", "inoise_total");
     if (!output_total || !input_total) {
         return std::unexpected(!output_total ? output_total.error() : input_total.error());
     }
@@ -190,8 +170,8 @@ std::expected<Noise, std::string> ReadNoise(const Circuit &circuit, const NoiseS
     const std::optional<std::vector<double>> frequencies = ReadRealVector("frequency");
     const std::optional<std::vector<double>> output = ReadRealVector("onoise_spectrum");
     const std::optional<std::vector<double>> input = ReadRealVector("inoise_spectrum");
-    if (!frequencies || !output || !input || output->size() != frequencies->size() ||
-        input->size() != frequencies->size()) {
+    if (!frequencies || !output || !input || output->size() != frequencies->size()
+        || input->size() != frequencies->size()) {
         return std::unexpected("ngspice returned no noise densities");
     }
     result.Frequencies = *frequencies;

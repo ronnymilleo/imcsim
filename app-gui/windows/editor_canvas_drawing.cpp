@@ -21,10 +21,6 @@ namespace {
 constexpr float INSTANT_MARGIN = 0.5f;
 constexpr ImU32 SELECTION_BOX_FILL_ALPHA = 40;
 
-ImU32 WithAlpha(const ImU32 color, const ImU32 alpha) {
-    return (color & ~IM_COL32_A_MASK) | (alpha << IM_COL32_A_SHIFT);
-}
-
 } // namespace
 
 /**
@@ -35,7 +31,10 @@ ImU32 WithAlpha(const ImU32 color, const ImU32 alpha) {
  * @param[in] size       Size of the canvas, in screen pixels.
  * @param[in] zoom       Pixels per grid unit.
  */
-void DrawGrid(ImDrawList *draw_list, const ViewTransform &view, const ImVec2 origin, const ImVec2 size,
+void DrawGrid(ImDrawList *draw_list,
+              const ViewTransform &view,
+              const ImVec2 origin,
+              const ImVec2 size,
               const float zoom) {
     const float step_size = static_cast<float>(GetGridStep(zoom));
 
@@ -69,7 +68,7 @@ void DrawSelectionBox(ImDrawList *draw_list, const ViewTransform &view, const Ed
     const ImVec2 start = view.ToScreen(selecting->Box->Start);
     const ImVec2 end = ImGui::GetIO().MousePos;
     const ImU32 color = GetPalette().Selected;
-    draw_list->AddRectFilled(start, end, WithAlpha(color, SELECTION_BOX_FILL_ALPHA));
+    draw_list->AddRectFilled(start, end, ReplaceAlpha(color, SELECTION_BOX_FILL_ALPHA));
     draw_list->AddRect(start, end, color, 0.0f, 0, 1.0f);
 }
 

@@ -84,7 +84,7 @@ MathChannels::MathChannels(Schematic &schematic) : m_Schematic(schematic) {
  */
 void MathChannels::Draw(const std::vector<std::string> &operands) {
     ImGui::TextDisabled("Math");
-    std::vector<MathChannel> channels = m_Schematic.GetMathChannels();
+    std::vector<MathChannel> channels = m_Schematic.GetMeasurements().GetMathChannels();
     const NetResolver find_node = GetNetResolver();
     bool open_new_editor = false;
     if (ImGui::SmallButton("Add")) {
@@ -106,8 +106,8 @@ void MathChannels::Draw(const std::vector<std::string> &operands) {
     if (removed) {
         channels.erase(channels.begin() + static_cast<std::ptrdiff_t>(*removed));
     }
-    if (channels != m_Schematic.GetMathChannels()) {
-        m_Schematic.SetMathChannels(std::move(channels));
+    if (channels != m_Schematic.GetMeasurements().GetMathChannels()) {
+        m_Schematic.GetMeasurements().SetMathChannels(std::move(channels));
     }
 }
 
@@ -119,7 +119,7 @@ void MathChannels::Draw(const std::vector<std::string> &operands) {
  */
 std::string MathChannels::GetSignature() const {
     std::string signature;
-    for (const MathChannel &channel : m_Schematic.GetMathChannels()) {
+    for (const MathChannel &channel : m_Schematic.GetMeasurements().GetMathChannels()) {
         signature += std::format("{}|{}|{};", channel.Name, channel.Shown, GetChannelExpression(channel));
     }
     return signature;
@@ -134,12 +134,13 @@ std::string MathChannels::GetSignature() const {
  * @param[out] errors         Gets a line for each channel that names a net, node or part the result lacks.
  * @return  The traces of the shown channels that compile and evaluate; the others are left out.
  */
-std::vector<MathTrace> MathChannels::Evaluate(const std::span<const double> xs, const Dimension x_unit,
+std::vector<MathTrace> MathChannels::Evaluate(const std::span<const double> xs,
+                                              const Dimension x_unit,
                                               const std::vector<std::vector<double>> &node_voltages,
                                               const std::vector<Core::ComponentTrace> &currents,
                                               std::vector<std::string> &errors) const {
     std::vector<MathTrace> traces;
-    const std::vector<MathChannel> &channels = m_Schematic.GetMathChannels();
+    const std::vector<MathChannel> &channels = m_Schematic.GetMeasurements().GetMathChannels();
     const NetResolver find_node = GetNetResolver();
     for (std::size_t index = 0; index < channels.size(); ++index) {
         const MathChannel &channel = channels[index];
@@ -169,7 +170,7 @@ std::vector<MathTrace> MathChannels::Evaluate(const std::span<const double> xs, 
  */
 ACMathTraces MathChannels::EvaluateAC(const Core::ACSweep &sweep, std::vector<std::string> &errors) const {
     ACMathTraces traces;
-    const std::vector<MathChannel> &channels = m_Schematic.GetMathChannels();
+    const std::vector<MathChannel> &channels = m_Schematic.GetMeasurements().GetMathChannels();
     const NetResolver find_node = GetNetResolver();
     for (std::size_t index = 0; index < channels.size(); ++index) {
         const MathChannel &channel = channels[index];
@@ -209,7 +210,8 @@ NetResolver MathChannels::GetNetResolver() const {
  * @details A channel that does not compile has its mark in the panel and nothing to add to the errors; one that names
  *          a net the circuit lacks adds a line. Returns no program for a hidden channel or either failure.
  */
-std::optional<MathProgram> MathChannels::GetShownProgram(const MathChannel &channel, const NetResolver &find_node,
+std::optional<MathProgram> MathChannels::GetShownProgram(const MathChannel &channel,
+                                                         const NetResolver &find_node,
                                                          std::vector<std::string> &errors) const {
     const std::expected<MathProgram, std::string> compiled = CompileExpression(GetChannelExpression(channel));
     if (!channel.Shown || !compiled) {
@@ -233,8 +235,11 @@ std::optional<MathProgram> MathChannels::GetShownProgram(const MathChannel &chan
  * @param[in]     opens_editor  Whether its editor opens now, as for a channel just added.
  * @return  False when the user removed the channel in its editor.
  */
-bool MathChannels::DrawChannel(MathChannel &channel, const std::size_t index, const std::vector<std::string> &operands,
-                               const NetResolver &find_node, const bool opens_editor) const {
+bool MathChannels::DrawChannel(MathChannel &channel,
+                               const std::size_t index,
+                               const std::vector<std::string> &operands,
+                               const NetResolver &find_node,
+                               const bool opens_editor) const {
     // The list is as narrow as the trace names, so a mark after the Edit button would be cut off; the name of a
     // channel in error takes the error color instead
     const auto program = CompileChannel(channel, find_node);
@@ -245,7 +250,9 @@ bool MathChannels::DrawChannel(MathChannel &channel, const std::size_t index, co
     if (!program) {
         ImGui::PushStyleColor(ImGuiCol_Text, GetErrorTextColor());
     }
-    DrawTraceCheckbox(channel.Name.c_str(), &channel.Shown, AdaptToBackground(MATH_COLORS[index % MATH_COLORS.size()]),
+    DrawTraceCheckbox(channel.Name.c_str(),
+                      &channel.Shown,
+                      AdaptToBackground(MATH_COLORS[index % MATH_COLORS.size()]),
                       TraceStyle::HEAVY);
     if (!program) {
         ImGui::PopStyleColor();

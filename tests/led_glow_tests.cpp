@@ -14,8 +14,8 @@
 
 namespace {
 
-std::unique_ptr<GUI::UIElement> Part(const Core::ComponentType type, const GUI::GridPoint position,
-                                     const std::string &name) {
+std::unique_ptr<GUI::UIElement>
+Part(const Core::ComponentType type, const GUI::GridPoint position, const std::string &name) {
     auto element = GUI::CreateElement(type, position, GUI::Rotation::R0);
     element->GetComponent().SetName(name);
     return element;
@@ -44,8 +44,11 @@ TEST_CASE("Only LEDs with forward current glow, in the color of their model", "[
     green.SetModel(*Core::FindDiodeModel(Core::ComponentType::LED, "Green"));
     static_cast<Core::Diode &>(elements[2]->GetComponent()).SetCustom();
     // D4 is reverse biased and D5 is no LED
-    const std::vector<Core::ComponentCurrent> currents = {
-        {"D1", 20e-3}, {"D2", 1e-3}, {"D3", 5e-3}, {"D4", -1e-3}, {"D5", 20e-3}};
+    const std::vector<Core::ComponentCurrent> currents = {{"D1", 20e-3},
+                                                          {"D2", 1e-3},
+                                                          {"D3", 5e-3},
+                                                          {"D4", -1e-3},
+                                                          {"D5", 20e-3}};
 
     const std::vector<GUI::LEDGlow> glows = GUI::ComputeLEDGlows(elements, currents);
     REQUIRE(glows.size() == 3);

@@ -11,6 +11,7 @@
 #include "imgui.h"
 #include "schematic/clipboard.h"
 #include "schematic/selection.h"
+#include "schematic/wire_editing.h"
 #include "ui_elements/ui_wire.h"
 #include <cstddef>
 #include <optional>
@@ -33,8 +34,9 @@ struct GroupDrag {
     std::set<std::size_t> Elements;
     std::set<std::size_t> Wires;
     std::vector<GridPoint> StartPositions;
-    std::vector<GridPoint> StartTerminals;
-    std::vector<GridPoint> FixedTerminals;
+    /// The terminals of the dragged parts where the drag started, and those of the parts that stay; each frame
+    /// fills in where the dragged ones are now.
+    TerminalMove StartTerminals;
     std::vector<UIWire> StartWires;
     std::optional<bool> SlidesVertically;
     /// Moved the mouse far enough to change something.
@@ -106,8 +108,8 @@ std::optional<Core::ComponentType> GetPlacingType(const EditorMode &mode);
 
 // Status hints
 std::optional<std::string> DescribeMode(const EditorMode &mode);
-std::string DescribeSelecting(bool is_live, const std::optional<std::string> &selected_part,
-                              std::size_t selected_count);
+std::string
+DescribeSelecting(bool is_live, const std::optional<std::string> &selected_part, std::size_t selected_count);
 std::string DescribeEditorHint(const EditorMode &mode, Schematic &schematic, bool is_live);
 
 // Placing

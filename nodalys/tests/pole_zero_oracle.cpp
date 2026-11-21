@@ -21,7 +21,8 @@ constexpr double DEGREES_PER_RADIAN = 180.0 / std::numbers::pi;
 constexpr double DECIBELS_PER_NEPER = 20.0 / std::numbers::ln10;
 
 /// The log of prod(s - zero) / prod(s - pole), which a product of 60 poles would overflow.
-std::complex<double> LogShape(const std::complex<double> s, const std::vector<std::complex<double>> &poles,
+std::complex<double> LogShape(const std::complex<double> s,
+                              const std::vector<std::complex<double>> &poles,
                               const std::vector<std::complex<double>> &zeros) {
     std::complex<double> total{0.0, 0.0};
     for (const std::complex<double> &zero : zeros) {
@@ -41,8 +42,8 @@ std::complex<double> SweepValue(const Nodalys::AcSweepResult &sweep, const int n
 }
 
 /// How far the AC response is from the roots at one frequency, relative to the gain: log magnitude and angle.
-std::complex<double> LogGainAt(const Nodalys::AcSweepResult &sweep, const PoleZeroReport &report, const int node,
-                               const std::size_t index) {
+std::complex<double>
+LogGainAt(const Nodalys::AcSweepResult &sweep, const PoleZeroReport &report, const int node, const std::size_t index) {
     const std::complex<double> s{0.0, TWO_PI * sweep.Frequencies[index]};
     return std::log(SweepValue(sweep, node, index)) - LogShape(s, report.Poles, report.Zeros);
 }
@@ -57,8 +58,8 @@ std::complex<double> LogGainAt(const Nodalys::AcSweepResult &sweep, const PoleZe
  * @param[in] band     Frequencies to compare at.
  * @return  The roots, the gain and the largest differences; Error is set when a run failed.
  */
-PoleZeroReport CheckPoleZero(const Nodalys::Circuit &circuit, const Nodalys::PoleZeroConfig &config,
-                             const OracleBand &band) {
+PoleZeroReport
+CheckPoleZero(const Nodalys::Circuit &circuit, const Nodalys::PoleZeroConfig &config, const OracleBand &band) {
     PoleZeroReport report;
     const auto roots = Nodalys::ComputePoleZero(circuit, config);
     if (!roots) {
@@ -69,9 +70,10 @@ PoleZeroReport CheckPoleZero(const Nodalys::Circuit &circuit, const Nodalys::Pol
     report.Zeros = roots->Zeros;
     report.Warnings = roots->Warnings;
 
-    const auto sweep = Nodalys::ComputeACSweep(circuit, {.StartFrequency = band.StartFrequencyHertz,
-                                                         .StopFrequency = band.StopFrequencyHertz,
-                                                         .PointsPerDecade = band.PointsPerDecade});
+    const auto sweep = Nodalys::ComputeACSweep(circuit,
+                                               {.StartFrequency = band.StartFrequencyHertz,
+                                                .StopFrequency = band.StopFrequencyHertz,
+                                                .PointsPerDecade = band.PointsPerDecade});
     if (!sweep) {
         report.Error = sweep.error();
         return report;
@@ -97,12 +99,14 @@ PoleZeroReport CheckPoleZero(const Nodalys::Circuit &circuit, const Nodalys::Pol
             report.MaxMagnitudeErrorDecibels = magnitude_error;
             report.WorstFrequencyHertz = sweep->Frequencies[index];
         }
-        report.MaxPhaseErrorDegrees = std::max(
-            report.MaxPhaseErrorDegrees, std::abs(std::remainder(difference.imag(), TWO_PI)) * DEGREES_PER_RADIAN);
+        report.MaxPhaseErrorDegrees =
+            std::max(report.MaxPhaseErrorDegrees,
+                     std::abs(std::remainder(difference.imag(), TWO_PI)) * DEGREES_PER_RADIAN);
     }
     // The gain of a transfer function is real, so its angle is 0 or 180 degrees
-    report.MaxPhaseErrorDegrees = std::max(
-        report.MaxPhaseErrorDegrees, std::abs(std::remainder(reference.imag(), std::numbers::pi)) * DEGREES_PER_RADIAN);
+    report.MaxPhaseErrorDegrees =
+        std::max(report.MaxPhaseErrorDegrees,
+                 std::abs(std::remainder(reference.imag(), std::numbers::pi)) * DEGREES_PER_RADIAN);
     return report;
 }
 
@@ -112,8 +116,8 @@ PoleZeroReport CheckPoleZero(const Nodalys::Circuit &circuit, const Nodalys::Pol
  * @return  True when the run gave a result, with no warning, and the rebuilt response is as close as required.
  */
 bool IsMatch(const PoleZeroReport &report) {
-    return report.Error.empty() && report.Warnings.empty() && report.MaxMagnitudeErrorDecibels <= MATCH_DECIBELS &&
-           report.MaxPhaseErrorDegrees <= MATCH_DEGREES;
+    return report.Error.empty() && report.Warnings.empty() && report.MaxMagnitudeErrorDecibels <= MATCH_DECIBELS
+        && report.MaxPhaseErrorDegrees <= MATCH_DEGREES;
 }
 
 /**
@@ -125,9 +129,11 @@ std::string Describe(const PoleZeroReport &report) {
     if (!report.Error.empty()) {
         return report.Error;
     }
-    std::string text =
-        std::format("gain {:.6g}, magnitude error {:.4g} dB at {:.4g} Hz, phase error {:.4g} deg", report.Gain,
-                    report.MaxMagnitudeErrorDecibels, report.WorstFrequencyHertz, report.MaxPhaseErrorDegrees);
+    std::string text = std::format("gain {:.6g}, magnitude error {:.4g} dB at {:.4g} Hz, phase error {:.4g} deg",
+                                   report.Gain,
+                                   report.MaxMagnitudeErrorDecibels,
+                                   report.WorstFrequencyHertz,
+                                   report.MaxPhaseErrorDegrees);
     for (const std::string &warning : report.Warnings) {
         text += "\n  warning: " + warning;
     }
@@ -147,8 +153,9 @@ std::string Describe(const PoleZeroReport &report) {
  * @return  True when some root has a real part above the tolerance.
  */
 bool HasRightHalfPlaneRoot(const std::vector<std::complex<double>> &roots, const double tolerance_radians_per_second) {
-    return std::ranges::any_of(
-        roots, [tolerance_radians_per_second](const auto &root) { return root.real() > tolerance_radians_per_second; });
+    return std::ranges::any_of(roots, [tolerance_radians_per_second](const auto &root) {
+        return root.real() > tolerance_radians_per_second;
+    });
 }
 
 /**
@@ -158,7 +165,8 @@ bool HasRightHalfPlaneRoot(const std::vector<std::complex<double>> &roots, const
  * @param[in] relative_tolerance  Share of the expected root's size the found one may be off by.
  * @return  True when some root is within the tolerance.
  */
-bool HasRootNear(const std::vector<std::complex<double>> &roots, const std::complex<double> expected,
+bool HasRootNear(const std::vector<std::complex<double>> &roots,
+                 const std::complex<double> expected,
                  const double relative_tolerance) {
     return std::ranges::any_of(roots, [&](const std::complex<double> &root) {
         return std::abs(root - expected) <= relative_tolerance * std::abs(expected);

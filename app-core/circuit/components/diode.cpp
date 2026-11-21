@@ -5,8 +5,8 @@
 
 #include "circuit/components/diode.h"
 
+#include "circuit/components/model_catalog.h"
 #include "circuit/library_model.h"
-#include <algorithm>
 #include <array>
 #include <format>
 #include <memory>
@@ -155,8 +155,7 @@ constexpr auto DIODE_MODELS = std::to_array<DiodeModel>({
  * @brief   Creates a diode part with the default model of its kind.
  * @param[in] type  ComponentType::Diode, ZenerDiode or LED.
  */
-Diode::Diode(const ComponentType type)
-    : Component(type, 0.0), m_Model(GetDiodeModels(type).data()), m_CustomParameters(m_Model->Parameters) {
+Diode::Diode(const ComponentType type) : ModeledComponent(type, GetDiodeModels(type).front(), "DCUSTOM_") {
 }
 
 /**
@@ -168,100 +167,18 @@ std::unique_ptr<Component> Diode::Clone() const {
 }
 
 /**
- * @brief   Returns the ready model the diode uses.
- * @return  An entry of the model list of its kind, or nullptr when the diode uses custom parameters or a
- *          library model.
- */
-const DiodeModel *Diode::GetModel() const {
-    return HasLibraryModel() ? nullptr : m_Model;
-}
-
-/**
- * @brief   Makes the diode use a ready model.
- * @param[in] model  An entry from GetDiodeModels() for the type of this diode; the diode keeps a reference to it.
- */
-void Diode::SetModel(const DiodeModel &model) {
-    m_Model = &model;
-    ClearLibraryModel();
-}
-
-/**
- * @brief   Tells whether the diode uses its own parameters instead of a ready model.
- * @return  True for a custom diode; false for one with a ready or a library model.
- */
-bool Diode::IsCustom() const {
-    return m_Model == nullptr && !HasLibraryModel();
-}
-
-/**
- * @brief   Switches the diode to custom parameters, starting from those of its current model.
- * @note    Does nothing when the diode is already custom, so its parameters are kept.
- */
-void Diode::SetCustom() {
-    ClearLibraryModel();
-    if (m_Model == nullptr) {
-        return;
-    }
-    m_CustomParameters = m_Model->Parameters;
-    m_Model = nullptr;
-}
-
-/**
- * @brief   Makes the diode custom with the given parameters.
- * @param[in] parameters  New parameters; check them with IsValidParameters() first.
- */
-void Diode::SetCustomParameters(const DiodeParameters &parameters) {
-    ClearLibraryModel();
-    m_CustomParameters = parameters;
-    m_Model = nullptr;
-}
-
-/**
  * @brief   Checks whether custom parameters can be simulated.
  * @param[in] parameters  Candidate parameters.
  * @return  True when IS, N, BV, IBV and VJ are positive, RS, CJO and TT are not negative, and M is above 0 and
  *          at most 0.9, the largest grading coefficient ngspice accepts, and the forward current and power
  *          ratings are positive.
  */
-bool Diode::IsValidParameters(const DiodeParameters &parameters) const {
-    return parameters.SaturationCurrent > 0.0 && parameters.EmissionCoefficient > 0.0 &&
-           parameters.SeriesResistance >= 0.0 && parameters.BreakdownVoltage > 0.0 &&
-           parameters.BreakdownCurrent > 0.0 && parameters.JunctionCapacitance >= 0.0 &&
-           parameters.JunctionPotential > 0.0 && parameters.GradingCoefficient > 0.0 &&
-           parameters.GradingCoefficient <= 0.9 && parameters.TransitTime >= 0.0 &&
-           parameters.MaxForwardCurrent > 0.0 && parameters.MaxPower > 0.0;
-}
-
-/**
- * @brief   Returns the parameters the diode is simulated with.
- * @return  Those of its ready model, or its custom ones.
- */
-const DiodeParameters &Diode::GetParameters() const {
-    return m_Model != nullptr ? m_Model->Parameters : m_CustomParameters;
-}
-
-/**
- * @brief   Returns the name of the model, as shown in the editor and saved in files.
- * @return  The ready model name, such as "1N4148", or CustomDiodeModelName, or the name of
- *          the library model it uses.
- */
-const char *Diode::GetModelName() const {
-    if (HasLibraryModel()) {
-        return GetLibraryModel().c_str();
-    }
-    return m_Model != nullptr ? m_Model->Name : CUSTOM_DIODE_MODEL_NAME;
-}
-
-/**
- * @brief   Returns the name of the ".model" line the diode uses in a netlist.
- * @return  The ready model SPICE name, the library model one from GetLibraryModelSpiceName(), or "DCUSTOM_" followed by
- * the diode name, since custom parameters belong to one diode.
- */
-std::string Diode::GetSpiceModelName() const {
-    if (HasLibraryModel()) {
-        return GetLibraryModelSpiceName(GetLibraryModel());
-    }
-    return m_Model != nullptr ? std::string(m_Model->SpiceName) : std::format("DCUSTOM_{}", GetName());
+bool Diode::IsValidParameters(const DiodeParameters &parameters) {
+    return parameters.SaturationCurrent > 0.0 && parameters.EmissionCoefficient > 0.0
+        && parameters.SeriesResistance >= 0.0 && parameters.BreakdownVoltage > 0.0 && parameters.BreakdownCurrent > 0.0
+        && parameters.JunctionCapacitance >= 0.0 && parameters.JunctionPotential > 0.0
+        && parameters.GradingCoefficient > 0.0 && parameters.GradingCoefficient <= 0.9 && parameters.TransitTime >= 0.0
+        && parameters.MaxForwardCurrent > 0.0 && parameters.MaxPower > 0.0;
 }
 
 /**
@@ -279,10 +196,7 @@ bool IsDiode(const ComponentType type) {
  * @return  The models of that part, default first; empty for components that are not diodes.
  */
 std::span<const DiodeModel> GetDiodeModels(const ComponentType type) {
-    const auto first = std::ranges::find(DIODE_MODELS, type, &DiodeModel::Type);
-    const auto last =
-        std::find_if(first, DIODE_MODELS.end(), [type](const DiodeModel &model) { return model.Type != type; });
-    return {first, last};
+    return GetModelsOfType<DiodeModel>(DIODE_MODELS, type);
 }
 
 /**
@@ -292,9 +206,7 @@ std::span<const DiodeModel> GetDiodeModels(const ComponentType type) {
  * @return  The model, or nullptr when that part has no model with that name.
  */
 const DiodeModel *FindDiodeModel(const ComponentType type, const std::string_view name) {
-    const std::span<const DiodeModel> models = GetDiodeModels(type);
-    const auto model = std::ranges::find(models, name, &DiodeModel::Name);
-    return model != models.end() ? &*model : nullptr;
+    return FindModelByName<DiodeModel>(GetDiodeModels(type), name);
 }
 
 /**
@@ -307,9 +219,15 @@ const DiodeModel *FindDiodeModel(const ComponentType type, const std::string_vie
 std::string FormatDiodeModel(const std::string_view spice_name, const DiodeParameters &parameters) {
     return std::format(".model {} D(IS={:.6g} N={:.6g} RS={:.6g} BV={:.6g} IBV={:.6g} CJO={:.6g} VJ={:.6g} M={:.6g} "
                        "TT={:.6g})\n",
-                       spice_name, parameters.SaturationCurrent, parameters.EmissionCoefficient,
-                       parameters.SeriesResistance, parameters.BreakdownVoltage, parameters.BreakdownCurrent,
-                       parameters.JunctionCapacitance, parameters.JunctionPotential, parameters.GradingCoefficient,
+                       spice_name,
+                       parameters.SaturationCurrent,
+                       parameters.EmissionCoefficient,
+                       parameters.SeriesResistance,
+                       parameters.BreakdownVoltage,
+                       parameters.BreakdownCurrent,
+                       parameters.JunctionCapacitance,
+                       parameters.JunctionPotential,
+                       parameters.GradingCoefficient,
                        parameters.TransitTime);
 }
 

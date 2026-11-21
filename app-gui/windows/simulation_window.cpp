@@ -5,6 +5,7 @@
 
 #include "windows/simulation_window.h"
 
+#include "analysis/run_status.h"
 #include "base/theme.h"
 
 namespace GUI {
@@ -15,7 +16,8 @@ namespace GUI {
  * @param[in] controls   Runs of the analyses, shared with the editor toolbar; they must outlive the window.
  * @param[in] settings_panel  Analysis picker and settings, shared with the editor toolbar; it must outlive the window.
  */
-SimulationWindow::SimulationWindow(Schematic &schematic, AnalysisControls &controls,
+SimulationWindow::SimulationWindow(Schematic &schematic,
+                                   AnalysisControls &controls,
                                    AnalysisSettingsPanel &settings_panel)
     : AppWindow("Analysis Settings", true), m_Schematic(schematic), m_Controls(controls),
       m_SettingsPanel(settings_panel) {
@@ -26,17 +28,11 @@ void SimulationWindow::Draw() {
     m_SettingsPanel.DrawAnalysisPicker();
     ImGui::Separator();
     m_SettingsPanel.DrawSettings();
-    const char *label = "Run (F5)";
-    if (m_Controls.GetRunAction() == RunAction::STOP) {
-        label = "Stop";
-    } else if (m_Controls.GetRunAction() == RunAction::CONTINUE) {
-        label = "Continue (F5)";
-    }
-    if (PrimaryButton(label)) {
+    if (PrimaryButton(GetRunButtonLabel(m_Controls.GetRunAction()).c_str())) {
         m_Controls.PressRun();
     }
     ImGui::Separator();
-    m_Controls.DrawRunReport(m_Schematic.GetSimulationSettings().Selected);
+    DrawRunReport(m_Controls, m_Schematic.GetSimulationSettings().Selected);
 }
 
 } // namespace GUI

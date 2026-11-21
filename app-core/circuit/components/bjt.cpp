@@ -5,8 +5,8 @@
 
 #include "circuit/components/bjt.h"
 
+#include "circuit/components/model_catalog.h"
 #include "circuit/library_model.h"
-#include <algorithm>
 #include <array>
 #include <format>
 #include <memory>
@@ -142,8 +142,7 @@ constexpr auto BJT_MODELS = std::to_array<BJTModel>({
  * @brief   Creates a transistor with the default model of its kind.
  * @param[in] type  ComponentType::NPN or PNP.
  */
-BJT::BJT(const ComponentType type)
-    : Component(type, 0.0), m_Model(GetBJTModels(type).data()), m_CustomParameters(m_Model->Parameters) {
+BJT::BJT(const ComponentType type) : ModeledComponent(type, GetBJTModels(type).front(), "QCUSTOM_") {
 }
 
 /**
@@ -155,100 +154,19 @@ std::unique_ptr<Component> BJT::Clone() const {
 }
 
 /**
- * @brief   Returns the ready model the transistor uses.
- * @return  An entry of the model list of its kind, or nullptr when it uses custom parameters or a library
- *          model.
- */
-const BJTModel *BJT::GetModel() const {
-    return HasLibraryModel() ? nullptr : m_Model;
-}
-
-/**
- * @brief   Makes the transistor use a ready model.
- * @param[in] model  An entry from GetBJTModels() for the type of this transistor; it keeps a reference to it.
- */
-void BJT::SetModel(const BJTModel &model) {
-    m_Model = &model;
-    ClearLibraryModel();
-}
-
-/**
- * @brief   Tells whether the transistor uses its own parameters instead of a ready model.
- * @return  True for a custom transistor; false for one with a ready or a library model.
- */
-bool BJT::IsCustom() const {
-    return m_Model == nullptr && !HasLibraryModel();
-}
-
-/**
- * @brief   Switches the transistor to custom parameters, starting from those of its current model.
- * @note    Does nothing when it is already custom, so its parameters are kept.
- */
-void BJT::SetCustom() {
-    ClearLibraryModel();
-    if (m_Model == nullptr) {
-        return;
-    }
-    m_CustomParameters = m_Model->Parameters;
-    m_Model = nullptr;
-}
-
-/**
- * @brief   Makes the transistor custom with the given parameters.
- * @param[in] parameters  New parameters; check them with IsValidParameters() first.
- */
-void BJT::SetCustomParameters(const BJTParameters &parameters) {
-    ClearLibraryModel();
-    m_CustomParameters = parameters;
-    m_Model = nullptr;
-}
-
-/**
  * @brief   Checks whether custom parameters can be simulated.
  * @param[in] parameters  Candidate parameters.
  * @return  True when IS, BF, BR, NE and the ratings are positive and everything else is not negative.
  */
-bool BJT::IsValidParameters(const BJTParameters &parameters) const {
-    return parameters.SaturationCurrent > 0.0 && parameters.ForwardBeta > 0.0 && parameters.ReverseBeta > 0.0 &&
-           parameters.EarlyVoltage >= 0.0 && parameters.ForwardKneeCurrent >= 0.0 &&
-           parameters.LeakageSaturationCurrent >= 0.0 && parameters.LeakageEmissionCoefficient > 0.0 &&
-           parameters.BaseResistance >= 0.0 && parameters.CollectorResistance >= 0.0 &&
-           parameters.EmitterResistance >= 0.0 && parameters.EmitterCapacitance >= 0.0 &&
-           parameters.CollectorCapacitance >= 0.0 && parameters.TransitTime >= 0.0 &&
-           parameters.MaxCollectorEmitterVoltage > 0.0 && parameters.MaxCollectorCurrent > 0.0 &&
-           parameters.MaxPower > 0.0;
-}
-
-/**
- * @brief   Returns the parameters the transistor is simulated with.
- * @return  Those of its ready model, or its custom ones.
- */
-const BJTParameters &BJT::GetParameters() const {
-    return m_Model != nullptr ? m_Model->Parameters : m_CustomParameters;
-}
-
-/**
- * @brief   Returns the name of the model, as shown in the editor and saved in files.
- * @return  The ready model name, such as "2N3904", or CustomBJTModelName, or the name of
- *          the library model it uses.
- */
-const char *BJT::GetModelName() const {
-    if (HasLibraryModel()) {
-        return GetLibraryModel().c_str();
-    }
-    return m_Model != nullptr ? m_Model->Name : CUSTOM_BJT_MODEL_NAME;
-}
-
-/**
- * @brief   Returns the name of the ".model" line the transistor uses in a netlist.
- * @return  The ready model SPICE name, the library model one from GetLibraryModelSpiceName(), or "QCUSTOM_" followed by
- * the transistor name, since custom parameters belong to one transistor.
- */
-std::string BJT::GetSpiceModelName() const {
-    if (HasLibraryModel()) {
-        return GetLibraryModelSpiceName(GetLibraryModel());
-    }
-    return m_Model != nullptr ? std::string(m_Model->SpiceName) : std::format("QCUSTOM_{}", GetName());
+bool BJT::IsValidParameters(const BJTParameters &parameters) {
+    return parameters.SaturationCurrent > 0.0 && parameters.ForwardBeta > 0.0 && parameters.ReverseBeta > 0.0
+        && parameters.EarlyVoltage >= 0.0 && parameters.ForwardKneeCurrent >= 0.0
+        && parameters.LeakageSaturationCurrent >= 0.0 && parameters.LeakageEmissionCoefficient > 0.0
+        && parameters.BaseResistance >= 0.0 && parameters.CollectorResistance >= 0.0
+        && parameters.EmitterResistance >= 0.0 && parameters.EmitterCapacitance >= 0.0
+        && parameters.CollectorCapacitance >= 0.0 && parameters.TransitTime >= 0.0
+        && parameters.MaxCollectorEmitterVoltage > 0.0 && parameters.MaxCollectorCurrent > 0.0
+        && parameters.MaxPower > 0.0;
 }
 
 /**
@@ -266,10 +184,7 @@ bool IsBJT(const ComponentType type) {
  * @return  The models of that part, default first; empty for components that are not bipolar transistors.
  */
 std::span<const BJTModel> GetBJTModels(const ComponentType type) {
-    const auto first = std::ranges::find(BJT_MODELS, type, &BJTModel::Type);
-    const auto last =
-        std::find_if(first, BJT_MODELS.end(), [type](const BJTModel &model) { return model.Type != type; });
-    return {first, last};
+    return GetModelsOfType<BJTModel>(BJT_MODELS, type);
 }
 
 /**
@@ -279,9 +194,7 @@ std::span<const BJTModel> GetBJTModels(const ComponentType type) {
  * @return  The model, or nullptr when that part has no model with that name.
  */
 const BJTModel *FindBJTModel(const ComponentType type, const std::string_view name) {
-    const std::span<const BJTModel> models = GetBJTModels(type);
-    const auto model = std::ranges::find(models, name, &BJTModel::Name);
-    return model != models.end() ? &*model : nullptr;
+    return FindModelByName<BJTModel>(GetBJTModels(type), name);
 }
 
 /**
@@ -291,15 +204,24 @@ const BJTModel *FindBJTModel(const ComponentType type, const std::string_view na
  * @param[in] parameters  Model parameters.
  * @return  The line, newline included, with values in exponent notation and six significant digits.
  */
-std::string FormatBJTModel(const ComponentType type, const std::string_view spice_name,
-                           const BJTParameters &parameters) {
+std::string
+FormatBJTModel(const ComponentType type, const std::string_view spice_name, const BJTParameters &parameters) {
     return std::format(".model {} {}(IS={:.6g} BF={:.6g} BR={:.6g} VAF={:.6g} IKF={:.6g} ISE={:.6g} NE={:.6g} "
                        "RB={:.6g} RC={:.6g} RE={:.6g} CJE={:.6g} CJC={:.6g} TF={:.6g})\n",
-                       spice_name, type == ComponentType::PNP ? "PNP" : "NPN", parameters.SaturationCurrent,
-                       parameters.ForwardBeta, parameters.ReverseBeta, parameters.EarlyVoltage,
-                       parameters.ForwardKneeCurrent, parameters.LeakageSaturationCurrent,
-                       parameters.LeakageEmissionCoefficient, parameters.BaseResistance, parameters.CollectorResistance,
-                       parameters.EmitterResistance, parameters.EmitterCapacitance, parameters.CollectorCapacitance,
+                       spice_name,
+                       type == ComponentType::PNP ? "PNP" : "NPN",
+                       parameters.SaturationCurrent,
+                       parameters.ForwardBeta,
+                       parameters.ReverseBeta,
+                       parameters.EarlyVoltage,
+                       parameters.ForwardKneeCurrent,
+                       parameters.LeakageSaturationCurrent,
+                       parameters.LeakageEmissionCoefficient,
+                       parameters.BaseResistance,
+                       parameters.CollectorResistance,
+                       parameters.EmitterResistance,
+                       parameters.EmitterCapacitance,
+                       parameters.CollectorCapacitance,
                        parameters.TransitTime);
 }
 

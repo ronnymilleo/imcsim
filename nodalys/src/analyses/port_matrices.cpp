@@ -109,8 +109,9 @@ void ScaleByReferences(PortMatrix &matrix, const std::vector<double> &reference_
 }
 
 bool IsFinite(const PortMatrix &matrix) {
-    return std::ranges::all_of(
-        matrix, [](const Complex &entry) { return std::isfinite(entry.real()) && std::isfinite(entry.imag()); });
+    return std::ranges::all_of(matrix, [](const Complex &entry) {
+        return std::isfinite(entry.real()) && std::isfinite(entry.imag());
+    });
 }
 
 } // namespace

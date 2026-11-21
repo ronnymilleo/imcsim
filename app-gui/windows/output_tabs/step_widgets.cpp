@@ -30,8 +30,8 @@ constexpr std::size_t STEADY_SAMPLES = 2;
  * @brief   A curve read at other X values, by straight lines between its samples and held at its ends; both X lists
  *          rise, so one walk along each does it.
  */
-std::vector<double> ResampleOnto(const std::vector<double> &xs, const std::vector<double> &ys,
-                                 const std::vector<double> &targets) {
+std::vector<double>
+ResampleOnto(const std::vector<double> &xs, const std::vector<double> &ys, const std::vector<double> &targets) {
     std::vector<double> values;
     values.reserve(targets.size());
     std::size_t index = 0;
@@ -98,8 +98,11 @@ std::size_t FindSteadySpread(const std::vector<std::vector<double>> &curves) {
  * @param[in] lane_nodes     Nodes drawn as logic lanes, which are skipped as PlotNodes() skips them.
  * @note    Call it before plotting the shown step.
  */
-void PlotOtherSteps(const std::vector<StepTraces> &steps, const std::size_t selected, const Schematic &schematic,
-                    const bool show_currents, const std::vector<int> &lane_nodes) {
+void PlotOtherSteps(const std::vector<StepTraces> &steps,
+                    const std::size_t selected,
+                    const Schematic &schematic,
+                    const bool show_currents,
+                    const std::vector<int> &lane_nodes) {
     for (std::size_t step = 0; step < steps.size(); ++step) {
         if (step == selected) {
             continue;
@@ -107,15 +110,18 @@ void PlotOtherSteps(const std::vector<StepTraces> &steps, const std::size_t sele
         const StepTraces &traces = steps[step];
         const int count = static_cast<int>(traces.Xs->size());
         for (std::size_t node = 1; node < traces.Nodes->size(); ++node) {
-            if (!schematic.IsVoltageMeasured(static_cast<int>(node)) ||
-                std::ranges::contains(lane_nodes, static_cast<int>(node))) {
+            if (!schematic.GetMeasurements().IsVoltageMeasured(static_cast<int>(node))
+                || std::ranges::contains(lane_nodes, static_cast<int>(node))) {
                 continue;
             }
             ImPlotSpec spec;
             spec.LineColor = ImGui::ColorConvertU32ToFloat4(GetNodeColor(static_cast<int>(node)));
             spec.LineColor.w = OTHER_STEP_ALPHA;
-            ImPlot::PlotLine(std::format("##step{}v{}", step, node).c_str(), traces.Xs->data(),
-                             (*traces.Nodes)[node].data(), count, spec);
+            ImPlot::PlotLine(std::format("##step{}v{}", step, node).c_str(),
+                             traces.Xs->data(),
+                             (*traces.Nodes)[node].data(),
+                             count,
+                             spec);
         }
         if (!show_currents) {
             continue;
@@ -123,14 +129,17 @@ void PlotOtherSteps(const std::vector<StepTraces> &steps, const std::size_t sele
         ImPlot::SetAxes(ImAxis_X1, ImAxis_Y2);
         for (std::size_t index = 0; index < traces.Currents->size(); ++index) {
             const Core::ComponentTrace &current = (*traces.Currents)[index];
-            if (!schematic.IsCurrentMeasured(current.Name)) {
+            if (!schematic.GetMeasurements().IsCurrentMeasured(current.Name)) {
                 continue;
             }
             ImPlotSpec spec;
             spec.LineColor = ImGui::ColorConvertU32ToFloat4(GetCurrentColor(index));
             spec.LineColor.w = OTHER_STEP_ALPHA;
-            ImPlot::PlotLine(std::format("##step{}i{}", step, index).c_str(), traces.Xs->data(), current.Values.data(),
-                             count, spec);
+            ImPlot::PlotLine(std::format("##step{}i{}", step, index).c_str(),
+                             traces.Xs->data(),
+                             current.Values.data(),
+                             count,
+                             spec);
         }
         ImPlot::SetAxes(ImAxis_X1, ImAxis_Y1);
     }
@@ -147,8 +156,11 @@ void PlotOtherSteps(const std::vector<StepTraces> &steps, const std::size_t sele
  * @param[in] lane_nodes     Nodes drawn as logic lanes, which get no labels.
  * @note    A trace the steps leave unchanged, such as the input, gets no labels, which would only pile up on one line.
  */
-void LabelSteps(const std::vector<StepTraces> &steps, const std::size_t selected,
-                const std::vector<std::string> &labels, const Schematic &schematic, const bool show_currents,
+void LabelSteps(const std::vector<StepTraces> &steps,
+                const std::size_t selected,
+                const std::vector<std::string> &labels,
+                const Schematic &schematic,
+                const bool show_currents,
                 const std::vector<int> &lane_nodes) {
     const ImVec4 color = ImGui::GetStyleColorVec4(ImGuiCol_PopupBg);
     const std::vector<double> &xs = *steps[selected].Xs;
@@ -165,8 +177,10 @@ void LabelSteps(const std::vector<StepTraces> &steps, const std::size_t selected
         if (sample >= xs.size()) {
             return;
         }
-        const auto [lowest, highest] = std::ranges::minmax_element(
-            resampled, {}, [sample](const std::vector<double> &curve) { return curve[sample]; });
+        const auto [lowest, highest] =
+            std::ranges::minmax_element(resampled, {}, [sample](const std::vector<double> &curve) {
+                return curve[sample];
+            });
         if ((*highest)[sample] - (*lowest)[sample] <= std::max(largest * NEGLIGIBLE_SPREAD, RESIDUE_LEVEL)) {
             return;
         }
@@ -175,8 +189,9 @@ void LabelSteps(const std::vector<StepTraces> &steps, const std::size_t selected
         for (std::size_t step = 0; step < steps.size(); ++step) {
             const double y = resampled[step][sample];
             const float pixel_y = ImPlot::PlotToPixels(xs[sample], y).y;
-            if (std::ranges::any_of(
-                    drawn, [pixel_y](const float other) { return std::abs(other - pixel_y) < ImGui::GetFontSize(); })) {
+            if (std::ranges::any_of(drawn, [pixel_y](const float other) {
+                    return std::abs(other - pixel_y) < ImGui::GetFontSize();
+                })) {
                 continue;
             }
             drawn.push_back(pixel_y);
@@ -185,8 +200,8 @@ void LabelSteps(const std::vector<StepTraces> &steps, const std::size_t selected
     };
     const StepTraces &first = steps.front();
     for (std::size_t node = 1; node < first.Nodes->size(); ++node) {
-        if (!schematic.IsVoltageMeasured(static_cast<int>(node)) ||
-            std::ranges::contains(lane_nodes, static_cast<int>(node))) {
+        if (!schematic.GetMeasurements().IsVoltageMeasured(static_cast<int>(node))
+            || std::ranges::contains(lane_nodes, static_cast<int>(node))) {
             continue;
         }
         std::vector<const std::vector<double> *> curves;
@@ -200,7 +215,7 @@ void LabelSteps(const std::vector<StepTraces> &steps, const std::size_t selected
     }
     ImPlot::SetAxes(ImAxis_X1, ImAxis_Y2);
     for (std::size_t index = 0; index < first.Currents->size(); ++index) {
-        if (!schematic.IsCurrentMeasured((*first.Currents)[index].Name)) {
+        if (!schematic.GetMeasurements().IsCurrentMeasured((*first.Currents)[index].Name)) {
             continue;
         }
         std::vector<const std::vector<double> *> curves;
@@ -220,8 +235,10 @@ void LabelSteps(const std::vector<StepTraces> &steps, const std::size_t selected
  * @param[in] selected   The step shown now.
  * @return  The step the user picked this frame, or no value.
  */
-std::optional<std::size_t> DrawStepSelector(const std::string &parameter, const std::string &unit,
-                                            const std::span<const double> values, const std::size_t selected) {
+std::optional<std::size_t> DrawStepSelector(const std::string &parameter,
+                                            const std::string &unit,
+                                            const std::span<const double> values,
+                                            const std::size_t selected) {
     std::optional<std::size_t> picked;
     DrawFieldLabel("Shown step");
     const std::string shown = FormatStepValue(parameter, values[selected], unit);
@@ -246,8 +263,8 @@ std::optional<std::size_t> DrawStepSelector(const std::string &parameter, const 
  * @param[in] values     The value of each step.
  * @return  One label per step.
  */
-std::vector<std::string> ListStepLabels(const std::string &parameter, const std::string &unit,
-                                        const std::span<const double> values) {
+std::vector<std::string>
+ListStepLabels(const std::string &parameter, const std::string &unit, const std::span<const double> values) {
     std::vector<std::string> labels;
     for (const double value : values) {
         labels.push_back(FormatStepValue(parameter, value, unit));

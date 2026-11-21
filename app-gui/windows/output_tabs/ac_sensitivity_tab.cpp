@@ -66,9 +66,12 @@ void ACSensitivityTab::Draw() {
         "Color the parts by their influence on the response at the marked frequency, as View > Wire Colors > "
         "Sensitivity does");
     ImGui::SameLine();
-    ImGui::TextDisabled("%s", std::format("{} to {}, driven by {}", FormatFrequency(sensitivity->Frequencies.front()),
-                                          FormatFrequency(sensitivity->Frequencies.back()), sensitivity->InputSource)
-                                  .c_str());
+    ImGui::TextDisabled("%s",
+                        std::format("{} to {}, driven by {}",
+                                    FormatFrequency(sensitivity->Frequencies.front()),
+                                    FormatFrequency(sensitivity->Frequencies.back()),
+                                    sensitivity->InputSource)
+                            .c_str());
     for (const std::string &warning : sensitivity->Warnings) {
         ImGui::PushTextWrapPos(0.0f);
         ImGui::TextColored(GetWarningTextColor(), "%s", warning.c_str());
@@ -95,7 +98,10 @@ ExportFigure ACSensitivityTab::BuildFigure() const {
         for (std::size_t index = 0; index < sensitivity->Parts.size(); ++index) {
             colors.push_back(GetCurrentColor(index));
         }
-        return BuildACSensitivityFigure(*sensitivity, MakeACSensitivityCurves(*sensitivity), colors, m_ShownParts,
+        return BuildACSensitivityFigure(*sensitivity,
+                                        MakeACSensitivityCurves(*sensitivity),
+                                        colors,
+                                        m_ShownParts,
                                         GetVoltageLabel(m_Schematic.GetConnectivity(), sensitivity->OutputNode),
                                         m_View);
     }
@@ -133,15 +139,16 @@ void ACSensitivityTab::DrawPlots(const Core::ACSensitivity &sensitivity) {
  * @param[in] height       Height of the plot, in pixels.
  */
 void ACSensitivityTab::DrawPlot(const Core::ACSensitivity &sensitivity, const bool is_phase, const float height) {
-    if (!BeginTracePlot(is_phase ? "Phase##ac_sensitivity" : "Gain##ac_sensitivity", ImVec2(-1.0f, height),
+    if (!BeginTracePlot(is_phase ? "Phase##ac_sensitivity" : "Gain##ac_sensitivity",
+                        ImVec2(-1.0f, height),
                         !is_phase)) {
         return;
     }
-    ImPlot::SetupAxes("Frequency", is_phase ? "Phase (deg per 1 %)" : "Gain (dB per 1 %)", ImPlotAxisFlags_None,
+    ImPlot::SetupAxes("Frequency",
+                      is_phase ? "Phase (deg per 1 %)" : "Gain (dB per 1 %)",
+                      ImPlotAxisFlags_None,
                       ImPlotAxisFlags_AutoFit);
-    ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
-    ImPlot::SetupAxisLinks(ImAxis_X1, &m_View.From, &m_View.To);
-    ImPlot::SetupAxisFormat(ImAxis_X1, FormatAxisValue, const_cast<char *>("Hz"));
+    SetupLogFrequencyAxis(&m_View);
     for (std::size_t index = 0; index < sensitivity.Parts.size(); ++index) {
         const Core::ACPartSensitivity &part = sensitivity.Parts[index];
         if (!m_ShownParts.contains(part.Name)) {
@@ -150,8 +157,11 @@ void ACSensitivityTab::DrawPlot(const Core::ACSensitivity &sensitivity, const bo
         const std::vector<double> &values = is_phase ? m_Curves[index].Phase : m_Curves[index].Magnitude;
         ImPlotSpec spec;
         spec.LineColor = ImGui::ColorConvertU32ToFloat4(GetCurrentColor(index));
-        ImPlot::PlotLine(part.Name.c_str(), sensitivity.Frequencies.data(), values.data(),
-                         static_cast<int>(values.size()), spec);
+        ImPlot::PlotLine(part.Name.c_str(),
+                         sensitivity.Frequencies.data(),
+                         values.data(),
+                         static_cast<int>(values.size()),
+                         spec);
     }
     double frequency =
         sensitivity.Frequencies[std::min(m_Results.GetACSensitivityFrequency(), sensitivity.Frequencies.size() - 1)];
@@ -214,7 +224,8 @@ void ACSensitivityTab::DrawTable(const Core::ACSensitivity &sensitivity) {
             ImGui::TableNextColumn();
             ImGui::TextUnformatted(row.Phase.c_str());
             ImGui::TableNextColumn();
-            ImGui::ProgressBar(static_cast<float>(row.Share), {-FLT_MIN, 0.0f},
+            ImGui::ProgressBar(static_cast<float>(row.Share),
+                               {-FLT_MIN, 0.0f},
                                std::format("{:.1f} %", row.Share * 100.0).c_str());
             ImGui::PopID();
         }
@@ -222,11 +233,12 @@ void ACSensitivityTab::DrawTable(const Core::ACSensitivity &sensitivity) {
     }
     ImGui::PushTextWrapPos(0.0f);
     // The text holds percent signs, so it goes in as an argument and never as the format
-    ImGui::TextDisabled("%s", "Gain and phase per 1 % are the change of the response for a 1 % higher value of the "
-                              "part, which compares parts of different kinds. The share is the size of the change of "
-                              "the whole response, gain and phase together. A part that sets the bias of a transistor "
-                              "counts through the bias as well. Drag the marker in a plot to read another "
-                              "frequency");
+    ImGui::TextDisabled("%s",
+                        "Gain and phase per 1 % are the change of the response for a 1 % higher value of the "
+                        "part, which compares parts of different kinds. The share is the size of the change of "
+                        "the whole response, gain and phase together. A part that sets the bias of a transistor "
+                        "counts through the bias as well. Drag the marker in a plot to read another "
+                        "frequency");
     ImGui::PopTextWrapPos();
 }
 
@@ -237,7 +249,8 @@ void ACSensitivityTab::DrawFrequencyChoice(const Core::ACSensitivity &sensitivit
     const std::size_t corner = FindCornerFrequencyIndex(sensitivity);
     const std::size_t chosen = std::min(m_Results.GetACSensitivityFrequency(), sensitivity.Frequencies.size() - 1);
     ImGui::AlignTextToFramePadding();
-    ImGui::TextUnformatted(std::format("Parts ranked at {}{}", FormatFrequency(sensitivity.Frequencies[chosen]),
+    ImGui::TextUnformatted(std::format("Parts ranked at {}{}",
+                                       FormatFrequency(sensitivity.Frequencies[chosen]),
                                        chosen == corner ? ", the -3 dB point" : "")
                                .c_str());
     ImGui::SameLine();

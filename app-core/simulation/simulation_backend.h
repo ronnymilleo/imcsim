@@ -71,6 +71,8 @@ struct BackendCapabilities {
     std::map<ComponentType, std::string> UnsupportedParts;
     /// Parts the backend cannot simulate in one analysis only, each with the reason shown to the user.
     std::map<AnalysisKind, std::map<ComponentType, std::string>> UnsupportedPartsByAnalysis;
+    /// Analyses the backend cannot run on a circuit that has nodesets, each with the reason shown to the user.
+    std::map<AnalysisKind, std::string> UnsupportedWithNodesets;
     /// Why the backend cannot simulate at a temperature other than the default one, or none when it can.
     std::optional<std::string> TemperatureUnsupported;
     /// What the backend asks of the ports and of the sweep of an S-parameter analysis.
@@ -145,8 +147,10 @@ public:
      * @return  The values at every time point or an error, plus the messages of the backend. A run that was stopped
      *          returns the points made until then, with IsComplete false.
      */
-    virtual TransientRun RunTransient(const Circuit &circuit, const TransientSettings &settings,
-                                      const std::optional<double> &temperature_celsius, const RunMonitor &monitor) = 0;
+    virtual TransientRun RunTransient(const Circuit &circuit,
+                                      const TransientSettings &settings,
+                                      const std::optional<double> &temperature_celsius,
+                                      const RunMonitor &monitor) = 0;
     /**
      * @brief   Sweeps the small-signal response of a circuit across frequency.
      * @param[in] circuit              Circuit to simulate, already checked.
@@ -155,7 +159,8 @@ public:
      * @return  The magnitude and phase of every node and current at every frequency or an error, plus the messages of
      *          the backend.
      */
-    virtual ACSweepRun RunACSweep(const Circuit &circuit, const ACSweepSettings &settings,
+    virtual ACSweepRun RunACSweep(const Circuit &circuit,
+                                  const ACSweepSettings &settings,
                                   const std::optional<double> &temperature_celsius) = 0;
     /**
      * @brief   Sweeps a source through a range of DC values and finds the operating point at each one.
@@ -165,7 +170,8 @@ public:
      * @return  The node voltages and currents along the sweep, one curve per stepped value, or an error, plus the
      *          messages of the backend.
      */
-    virtual DCSweepRun RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings,
+    virtual DCSweepRun RunDCSweep(const Circuit &circuit,
+                                  const DCSweepSettings &settings,
                                   const std::optional<double> &temperature_celsius) = 0;
     /**
      * @brief   Computes the noise of a circuit at a node across frequency, and refers it to an input source.
@@ -209,8 +215,8 @@ public:
 
     virtual ACSensitivityRun RunACSensitivity(const Circuit &circuit, const ACSensitivitySettings &settings);
 
-    virtual HarmonicBalanceRun RunHarmonicBalance(const Circuit &circuit, const HarmonicBalanceSettings &settings,
-                                                  RunControl *control);
+    virtual HarmonicBalanceRun
+    RunHarmonicBalance(const Circuit &circuit, const HarmonicBalanceSettings &settings, RunControl *control);
 };
 
 /// Makes the default backend, the one in use when none was set.
@@ -223,8 +229,8 @@ void SetDefaultBackendFactory(BackendFactory factory);
 
 // Capabilities
 std::string_view GetAnalysisKindName(AnalysisKind kind);
-std::optional<std::string> FindUnsupported(const SimulationBackend &backend, const std::set<ComponentType> &parts,
-                                           AnalysisKind kind);
+std::optional<std::string>
+FindUnsupported(const SimulationBackend &backend, const std::set<ComponentType> &parts, AnalysisKind kind);
 std::optional<std::string> FindUnsupported(const SimulationBackend &backend, const Circuit &circuit, AnalysisKind kind);
 
 } // namespace Core

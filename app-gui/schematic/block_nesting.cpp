@@ -31,8 +31,10 @@ std::optional<std::size_t> FindDefinition(const std::span<const SavedSubcircuit>
  * @brief   Whether a block, or a block it uses on the way down, is the one named; each block is looked into once, so a
  *          cycle in a damaged file ends the walk instead of looping.
  */
-bool ReachesBlock(const std::span<const SavedSubcircuit> definitions, const std::string_view from,
-                  const std::string_view name, std::set<std::string, std::less<>> &visited) {
+bool ReachesBlock(const std::span<const SavedSubcircuit> definitions,
+                  const std::string_view from,
+                  const std::string_view name,
+                  std::set<std::string, std::less<>> &visited) {
     if (from == name) {
         return true;
     }
@@ -72,7 +74,8 @@ std::set<std::string> ListUsedBlocks(const std::vector<std::unique_ptr<UIElement
  * @return  True when an instance among the parts is that block, or a block that contains it at any depth.
  */
 bool UsesBlock(const std::vector<std::unique_ptr<UIElement>> &elements,
-               const std::span<const SavedSubcircuit> definitions, const std::string_view name) {
+               const std::span<const SavedSubcircuit> definitions,
+               const std::string_view name) {
     std::set<std::string, std::less<>> visited;
     return std::ranges::any_of(ListUsedBlocks(elements),
                                [&](const std::string &used) { return ReachesBlock(definitions, used, name, visited); });
@@ -86,10 +89,43 @@ bool UsesBlock(const std::vector<std::unique_ptr<UIElement>> &elements,
  * @param[in] inner        The block looked for.
  * @return  True when outer is inner, or one of its parts, or a part of a block it places, is inner.
  */
-bool ContainsBlock(const std::span<const SavedSubcircuit> definitions, const std::string_view outer,
+bool ContainsBlock(const std::span<const SavedSubcircuit> definitions,
+                   const std::string_view outer,
                    const std::string_view inner) {
     std::set<std::string, std::less<>> visited;
     return ReachesBlock(definitions, outer, inner, visited);
+}
+
+/**
+ * @brief   Orders some items so each one comes after every item it depends on.
+ * @details The walk is depth first and keeps the order of the list where items do not depend on each other. An item in
+ *          a cycle, which only a damaged file can hold, comes after the others it can instead of looping.
+ * @param[in] count           Number of items, which are known by their positions 0 to count - 1.
+ * @param[in] dependencies_of Returns the positions of the items one item depends on, in the order to visit them.
+ * @return  The positions of all the items, in that order.
+ */
+std::vector<std::size_t>
+OrderByDependencies(const std::size_t count,
+                    const std::function<std::vector<std::size_t>(std::size_t)> &dependencies_of) {
+    std::vector<std::size_t> order;
+    std::vector<bool> is_placed(count, false);
+    std::vector<bool> is_open(count, false);
+    const std::function<void(std::size_t)> place = [&](const std::size_t index) {
+        if (is_placed[index] || is_open[index]) {
+            return;
+        }
+        is_open[index] = true;
+        for (const std::size_t dependency : dependencies_of(index)) {
+            place(dependency);
+        }
+        is_open[index] = false;
+        is_placed[index] = true;
+        order.push_back(index);
+    };
+    for (std::size_t index = 0; index < count; ++index) {
+        place(index);
+    }
+    return order;
 }
 
 /**
@@ -99,27 +135,15 @@ bool ContainsBlock(const std::span<const SavedSubcircuit> definitions, const std
  *          A block that uses one it contains, which only a damaged file can hold, keeps its place after the others.
  */
 std::vector<std::size_t> OrderByUse(const std::span<const SavedSubcircuit> definitions) {
-    std::vector<std::size_t> order;
-    std::vector<bool> is_placed(definitions.size(), false);
-    std::vector<bool> is_open(definitions.size(), false);
-    const std::function<void(std::size_t)> place = [&](const std::size_t index) {
-        if (is_placed[index] || is_open[index]) {
-            return;
-        }
-        is_open[index] = true;
+    return OrderByDependencies(definitions.size(), [&](const std::size_t index) {
+        std::vector<std::size_t> used_definitions;
         for (const std::string &used : ListUsedBlocks(definitions[index].Elements)) {
             if (const std::optional<std::size_t> inner = FindDefinition(definitions, used)) {
-                place(*inner);
+                used_definitions.push_back(*inner);
             }
         }
-        is_open[index] = false;
-        is_placed[index] = true;
-        order.push_back(index);
-    };
-    for (std::size_t index = 0; index < definitions.size(); ++index) {
-        place(index);
-    }
-    return order;
+        return used_definitions;
+    });
 }
 
 /**
@@ -128,7 +152,8 @@ std::vector<std::size_t> OrderByUse(const std::span<const SavedSubcircuit> defin
  * @param[in]     old_name  The name the block had.
  * @param[in]     new_name  The name it has now.
  */
-void RenameBlockInstances(std::vector<std::unique_ptr<UIElement>> &elements, const std::string_view old_name,
+void RenameBlockInstances(std::vector<std::unique_ptr<UIElement>> &elements,
+                          const std::string_view old_name,
                           const std::string &new_name) {
     for (auto &element : elements) {
         if (element->GetComponent().GetType() != Core::ComponentType::SUBCIRCUIT) {

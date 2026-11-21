@@ -5,7 +5,7 @@
 
 #include "overlays/heat_glow.h"
 
-#include "results/current_flow.h"
+#include "results/logarithmic_level.h"
 #include <algorithm>
 
 namespace GUI {
@@ -33,7 +33,8 @@ float HeatBrightness(const double power, const double largest_power) {
  *          from the powers are left out.
  */
 std::vector<HeatGlow> ComputeHeatGlows(const std::vector<std::unique_ptr<UIElement>> &elements,
-                                       const std::vector<ComponentPower> &powers, const HeatScale &scale) {
+                                       const std::vector<ComponentPower> &powers,
+                                       const HeatScale &scale) {
     std::vector<HeatGlow> glows;
     for (const auto &element : elements) {
         const Core::Component &component = element->GetComponent();

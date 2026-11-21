@@ -74,8 +74,12 @@ inline void StampCurrentSource(MnaSystem &sys, const int node_a, const int node_
  *          $I(v) \approx G_{\text{eq}} \cdot v + I_{\text{eq}}$ with $I_{\text{eq}} = I(v_0) - G_{\text{eq}} \cdot
  * v_0$.
  */
-inline void StampNortonBranch(MnaSystem &sys, const int node_a, const int node_b, const double conductance,
-                              const double current_at_v0, const double v0) {
+inline void StampNortonBranch(MnaSystem &sys,
+                              const int node_a,
+                              const int node_b,
+                              const double conductance,
+                              const double current_at_v0,
+                              const double v0) {
     const double ieq = current_at_v0 - conductance * v0;
     StampConductance(sys, node_a, node_b, conductance);
     StampCurrentSource(sys, node_a, node_b, ieq);
@@ -99,8 +103,8 @@ struct DepletionCharge {
     double Capacitance;
 };
 
-inline DepletionCharge EvaluateDepletion(const double voltage, const double cj0, const double vj, const double m,
-                                         const double fc) {
+inline DepletionCharge
+EvaluateDepletion(const double voltage, const double cj0, const double vj, const double m, const double fc) {
     if (cj0 <= 0.0) {
         return {0.0, 0.0};
     }
@@ -135,8 +139,10 @@ struct ChargeCompanion {
     double EquivalentCurrent;
 };
 
-inline ChargeCompanion ChargeModel(const double charge_derivative, const double charge_at_iterate,
-                                   const double voltage_iterate, const ChargeHistory &history,
+inline ChargeCompanion ChargeModel(const double charge_derivative,
+                                   const double charge_at_iterate,
+                                   const double voltage_iterate,
+                                   const ChargeHistory &history,
                                    const TimeContext &time) {
     const Companion integration = MakeCompanion(history, time);
     const double conductance = integration.Coefficient * charge_derivative;

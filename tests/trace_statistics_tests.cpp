@@ -49,7 +49,9 @@ Trace Sine(const double amplitude, const double offset, const double frequency, 
 /**
  * @brief   Bode response of a first order low-pass with its corner at corner_frequency.
  */
-void LowPass(const double corner_frequency, std::vector<double> &frequencies, std::vector<double> &magnitudes,
+void LowPass(const double corner_frequency,
+             std::vector<double> &frequencies,
+             std::vector<double> &magnitudes,
              std::vector<double> &phases) {
     for (int step = 0; step <= 600; ++step) {
         const double decade = step * 0.01;
@@ -192,7 +194,7 @@ TEST_CASE("Statistics cover only the span, in either order", "[trace_statistics]
 TEST_CASE("Noise around the mean does not add cycles", "[trace_statistics]") {
     // A 100 Hz sine with fast noise, which crosses the mean several times on each slow crossing
     Trace noisy;
-    for (int index = 0; index <= 10000; ++index) {
+    for (int index = 0; index <= 10'000; ++index) {
         const double time = index * 1e-5;
         const double noise = 0.02 * ((index % 2 == 0) ? 1.0 : -1.0);
         noisy.Xs.push_back(time);

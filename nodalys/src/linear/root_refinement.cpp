@@ -69,8 +69,8 @@ double Norm(const std::vector<Complex> &vector) {
 }
 
 /// The product (A - shift B) x, or (B x) when use_a is false.
-std::vector<Complex> Apply(const DenseMatrix &a, const DenseMatrix &b, const Complex shift,
-                           const std::vector<Complex> &x) {
+std::vector<Complex>
+Apply(const DenseMatrix &a, const DenseMatrix &b, const Complex shift, const std::vector<Complex> &x) {
     const std::size_t n = a.Rows();
     std::vector<Complex> result(n);
     for (std::size_t r = 0; r < n; ++r) {
@@ -84,8 +84,12 @@ std::vector<Complex> Apply(const DenseMatrix &a, const DenseMatrix &b, const Com
 }
 
 /// How far x is from satisfying A x = shift B x, relative to the size of the pencil and of x.
-double Residual(const DenseMatrix &a, const DenseMatrix &b, const Complex shift, const std::vector<Complex> &x,
-                const double a_norm, const double b_norm) {
+double Residual(const DenseMatrix &a,
+                const DenseMatrix &b,
+                const Complex shift,
+                const std::vector<Complex> &x,
+                const double a_norm,
+                const double b_norm) {
     const double size = Norm(x) * (a_norm + std::abs(shift) * b_norm);
     return size > 0.0 ? Norm(Apply(a, b, shift, x)) / size : 0.0;
 }
@@ -196,7 +200,9 @@ void RevertCollisions(const std::vector<Complex> &roots, std::vector<Complex> &r
 }
 
 /// Refines the roots with a non-negative imaginary part; returns which of them were accepted.
-std::vector<bool> RefineUpperHalf(const DenseMatrix &a, const DenseMatrix &b, const std::vector<Complex> &roots,
+std::vector<bool> RefineUpperHalf(const DenseMatrix &a,
+                                  const DenseMatrix &b,
+                                  const std::vector<Complex> &roots,
                                   std::vector<Complex> &result) {
     const double epsilon = std::numeric_limits<double>::epsilon();
     double largest = 0.0;
@@ -251,8 +257,8 @@ std::optional<std::size_t> FindUpperPartner(const std::vector<Complex> &roots, c
  * @param[in] roots  Finite eigenvalues from QZ.
  * @return  The refined roots, in the order of the input.
  */
-std::vector<Complex> RefineRoots(const DenseMatrix &mat_a, const DenseMatrix &mat_b,
-                                 const std::vector<Complex> &roots) {
+std::vector<Complex>
+RefineRoots(const DenseMatrix &mat_a, const DenseMatrix &mat_b, const std::vector<Complex> &roots) {
     std::vector<Complex> result = roots;
     std::vector<bool> is_done(roots.size(), false);
     if (mat_a.Rows() <= MAX_REFINED_SIZE) {

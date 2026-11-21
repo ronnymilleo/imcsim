@@ -7,6 +7,7 @@
 #define IMCSIM_MOSFET_H
 
 #include "circuit/components/component.h"
+#include "circuit/components/modeled_component.h"
 #include <memory>
 #include <span>
 #include <string>
@@ -54,7 +55,7 @@ struct MOSFETModel {
     ComponentType Type;
 };
 
-inline constexpr const char *CUSTOM_MOSFET_MODEL_NAME = "Custom";
+inline constexpr const char *CUSTOM_MOSFET_MODEL_NAME = CUSTOM_MODEL_NAME;
 
 /**
  * @class   MOSFET
@@ -63,7 +64,7 @@ inline constexpr const char *CUSTOM_MOSFET_MODEL_NAME = "Custom";
  * @details The same class serves NMOS and PMOS parts; the component type tells which models it can use. It has no
  *          numeric value: a ready model or its own custom parameters set its behavior.
  */
-class MOSFET : public Component {
+class MOSFET : public ModeledComponent<MOSFETModel, MOSFETParameters> {
 public:
     explicit MOSFET(ComponentType type);
     ~MOSFET() override = default;
@@ -71,25 +72,8 @@ public:
     // Copying
     std::unique_ptr<Component> Clone() const override;
 
-    // Ready model
-    const MOSFETModel *GetModel() const;
-    void SetModel(const MOSFETModel &model);
-
     // Custom parameters
-    bool IsCustom() const;
-    void SetCustom();
-    void SetCustomParameters(const MOSFETParameters &parameters);
-    bool IsValidParameters(const MOSFETParameters &parameters) const;
-
-    // Simulation
-    const MOSFETParameters &GetParameters() const;
-    const char *GetModelName() const;
-    std::string GetSpiceModelName() const;
-
-private:
-    /// Null when the transistor uses its custom parameters.
-    const MOSFETModel *m_Model;
-    MOSFETParameters m_CustomParameters;
+    static bool IsValidParameters(const MOSFETParameters &parameters);
 };
 
 // MOSFETs

@@ -112,8 +112,8 @@ void ControlledSource::SetControllingCurrent(std::string current) {
  * @return  True for VCVS, VCCS, CCCS and CCVS.
  */
 bool IsControlledSource(const ComponentType type) {
-    return type == ComponentType::VCVS || type == ComponentType::VCCS || type == ComponentType::CCCS ||
-           type == ComponentType::CCVS;
+    return type == ComponentType::VCVS || type == ComponentType::VCCS || type == ComponentType::CCCS
+        || type == ComponentType::CCVS;
 }
 
 /**

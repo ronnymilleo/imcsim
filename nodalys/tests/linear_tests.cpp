@@ -232,9 +232,9 @@ TEST_CASE("Eigenvalues twelve decades apart are all found, whichever way the pen
     // Four decoupled first-order modes, as in a circuit with a slow RC and a fast junction, each with a different
     // size of its equations, coupled by a triangular term so the pencil is not diagonal
     constexpr std::array<double, 4> ROOTS{3.0, 4.5e3, 2.0e7, 6.0e12};
-    for (const std::array<std::size_t, 4> order :
-         {std::array<std::size_t, 4>{0, 1, 2, 3}, std::array<std::size_t, 4>{3, 2, 1, 0},
-          std::array<std::size_t, 4>{1, 3, 0, 2}}) {
+    for (const std::array<std::size_t, 4> order : {std::array<std::size_t, 4>{0, 1, 2, 3},
+                                                   std::array<std::size_t, 4>{3, 2, 1, 0},
+                                                   std::array<std::size_t, 4>{1, 3, 0, 2}}) {
         Nodalys::DenseMatrix a(4, 4);
         Nodalys::DenseMatrix b(4, 4);
         for (std::size_t row = 0; row < 4; ++row) {
@@ -296,10 +296,10 @@ TEST_CASE("Roots of a stiff pencil stay put when its entries change by a few rou
     const auto build = [&](const double ulps, const unsigned seed) {
         std::pair<Nodalys::DenseMatrix, Nodalys::DenseMatrix> pencil{Nodalys::DenseMatrix(SIZE, SIZE),
                                                                      Nodalys::DenseMatrix(SIZE, SIZE)};
-        unsigned state = seed * 2654435761u + 1u;
+        unsigned state = seed * 2'654'435'761u + 1u;
         for (std::size_t row = 0; row < SIZE; ++row) {
             for (std::size_t column = 0; column < SIZE; ++column) {
-                state = state * 1664525u + 1013904223u;
+                state = state * 1'664'525u + 1'013'904'223u;
                 const double unit = static_cast<double>(state >> 8) / 8388608.0 - 1.0;
                 pencil.first.At(row, column) = A_ENTRIES[row][column] * (1.0 + unit * ulps * ROUNDING);
                 pencil.second.At(row, column) = B_ENTRIES[row][column] * (1.0 + unit * ulps * ROUNDING);

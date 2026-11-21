@@ -252,7 +252,7 @@
   "simulation": {
     "analysis": "transient",
     "transient": {
-      "step": 0.000001,
+      "step": 1e-07,
       "stop": 0.008
     },
     "ac_sweep": {

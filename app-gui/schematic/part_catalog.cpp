@@ -23,22 +23,36 @@ constexpr auto OP_AMP = std::to_array({ComponentType::OP_AMP});
 // Groups, the first part being the one a group places until another is picked
 constexpr auto SOURCES =
     std::to_array({ComponentType::VOLTAGE_SOURCE, ComponentType::CURRENT_SOURCE, ComponentType::CLOCK});
-constexpr auto SUPPLIES = std::to_array({ComponentType::VCC, ComponentType::NET_LABEL, ComponentType::INITIAL_VOLTAGE,
-                                         ComponentType::NODESET, ComponentType::PIN});
+constexpr auto SUPPLIES = std::to_array({ComponentType::VCC,
+                                         ComponentType::NET_LABEL,
+                                         ComponentType::INITIAL_VOLTAGE,
+                                         ComponentType::NODESET,
+                                         ComponentType::PIN});
 constexpr auto DIODES = std::to_array({ComponentType::DIODE, ComponentType::ZENER_DIODE, ComponentType::LED});
 constexpr auto TRANSISTORS =
     std::to_array({ComponentType::NPN, ComponentType::PNP, ComponentType::NMOS, ComponentType::PMOS});
-constexpr auto CONTROLLED =
-    std::to_array({ComponentType::VCVS, ComponentType::VCCS, ComponentType::CCCS, ComponentType::CCVS,
-                   ComponentType::BEHAVIORAL_VOLTAGE, ComponentType::BEHAVIORAL_CURRENT});
+constexpr auto CONTROLLED = std::to_array({ComponentType::VCVS,
+                                           ComponentType::VCCS,
+                                           ComponentType::CCCS,
+                                           ComponentType::CCVS,
+                                           ComponentType::BEHAVIORAL_VOLTAGE,
+                                           ComponentType::BEHAVIORAL_CURRENT});
 constexpr auto ADJUSTABLE = std::to_array({ComponentType::POTENTIOMETER, ComponentType::TRANSFORMER});
-constexpr auto SWITCHES = std::to_array({ComponentType::SWITCH, ComponentType::PUSH_BUTTON, ComponentType::V_SWITCH,
-                                         ComponentType::RELAY, ComponentType::FUSE});
+constexpr auto SWITCHES = std::to_array({ComponentType::SWITCH,
+                                         ComponentType::PUSH_BUTTON,
+                                         ComponentType::V_SWITCH,
+                                         ComponentType::RELAY,
+                                         ComponentType::FUSE});
 constexpr auto LOGIC_IO =
     std::to_array({ComponentType::LOGIC_INPUT, ComponentType::LOGIC_OUTPUT, ComponentType::SEVEN_SEGMENT});
-constexpr auto GATES =
-    std::to_array({ComponentType::AND, ComponentType::OR, ComponentType::NOT, ComponentType::NAND, ComponentType::NOR,
-                   ComponentType::XOR, ComponentType::XNOR, ComponentType::BUFFER});
+constexpr auto GATES = std::to_array({ComponentType::AND,
+                                      ComponentType::OR,
+                                      ComponentType::NOT,
+                                      ComponentType::NAND,
+                                      ComponentType::NOR,
+                                      ComponentType::XOR,
+                                      ComponentType::XNOR,
+                                      ComponentType::BUFFER});
 constexpr auto FLIP_FLOPS = std::to_array(
     {ComponentType::D_FLIP_FLOP, ComponentType::JK_FLIP_FLOP, ComponentType::T_FLIP_FLOP, ComponentType::SR_FLIP_FLOP});
 

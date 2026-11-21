@@ -26,8 +26,8 @@ namespace {
  * @param[in] open_names  Definitions being looked into, so a block that held itself could not recurse forever.
  * @return  The largest logic level on each such node, ground left out.
  */
-std::map<int, double> FindLogicLevels(const Core::Circuit &body, const Core::Circuit &circuit,
-                                      std::vector<std::string> open_names) {
+std::map<int, double>
+FindLogicLevels(const Core::Circuit &body, const Core::Circuit &circuit, std::vector<std::string> open_names) {
     std::map<int, double> levels;
     const auto raise = [&levels](const int node, const double level) {
         if (node != 0) {
@@ -117,7 +117,8 @@ std::vector<LogicNode> FindLogicNodes(const Core::Circuit &circuit) {
  * @return  Segments in time order that follow one another: each starts at the first sample of its state and ends where
  *          the next begins, and the last ends at the last sample. Empty for no samples.
  */
-std::vector<LogicSegment> FindLogicSegments(const std::span<const double> times, const std::span<const double> voltages,
+std::vector<LogicSegment> FindLogicSegments(const std::span<const double> times,
+                                            const std::span<const double> voltages,
                                             const double logic_level) {
     std::vector<LogicSegment> segments;
     const std::size_t count = std::min(times.size(), voltages.size());
@@ -147,8 +148,10 @@ constexpr double MAX_CELLS = 5000.0;
 /**
  * @brief   What the signal reads at the sample nearest a time.
  */
-LogicState ReadStateAt(const std::span<const double> times, const std::span<const double> voltages,
-                       const double logic_level, const double time) {
+LogicState ReadStateAt(const std::span<const double> times,
+                       const std::span<const double> voltages,
+                       const double logic_level,
+                       const double time) {
     const auto after = std::ranges::lower_bound(times, time);
     auto index = static_cast<std::size_t>(after - times.begin());
     if (index >= times.size()) {
@@ -185,41 +188,68 @@ std::vector<LogicSegment> JoinDefiniteSegments(const std::vector<LogicSegment> &
 }
 
 /**
- * @brief   The changes of every signal, with those that follow another closely merged into the first, since a glitch is
- *          not a change of the data.
- * @details The cells are as wide as the shortest gap between changes, taken as the mean of those within a few percent
- *          of it so the quantizing of the sample times does not add up over many cells, and start at the first change,
- *          so the edges of a clock are the edges of the cells.
+ * @struct  SignalChanges
+ * @brief   When the signals change state, and how long they keep a state between changes, both in ascending order.
  */
-CellGrid FindCellGrid(const std::span<const double> times, const std::span<const LogicSignal> signals) {
-    std::vector<double> changes;
-    std::vector<double> durations;
+struct SignalChanges {
+    std::vector<double> Changes;
+    std::vector<double> Durations;
+};
+
+/**
+ * @struct  CellSpan
+ * @brief   The time a cell covers, and the time its state is read at.
+ */
+struct CellSpan {
+    double From = 0.0;
+    double To = 0.0;
+    /// The middle of the cell as it was laid out, which stays put when the last cell is stretched to the last sample.
+    double ReadTime = 0.0;
+};
+
+/**
+ * @brief   Collects when every signal changes, and the length of every stretch between two changes.
+ * @details The first and the last stretch of a signal are left out of the durations, since the samples cut them short.
+ */
+SignalChanges CollectChanges(const std::span<const double> times, const std::span<const LogicSignal> signals) {
+    SignalChanges found;
     for (const LogicSignal &signal : signals) {
         const std::vector<LogicSegment> segments =
             JoinDefiniteSegments(FindLogicSegments(times, signal.Voltages, signal.LogicLevel));
         for (std::size_t index = 1; index < segments.size(); ++index) {
-            changes.push_back(segments[index].From);
+            found.Changes.push_back(segments[index].From);
         }
         for (std::size_t index = 1; index + 1 < segments.size(); ++index) {
-            durations.push_back(segments[index].To - segments[index].From);
+            found.Durations.push_back(segments[index].To - segments[index].From);
         }
     }
-    const CellGrid whole{.Start = times.front(), .Width = times.back() - times.front()};
-    if (changes.empty()) {
-        return whole;
-    }
-    std::ranges::sort(changes);
-    std::ranges::sort(durations);
-    const double typical = durations.empty() ? whole.Width : durations[durations.size() / 2];
+    std::ranges::sort(found.Changes);
+    std::ranges::sort(found.Durations);
+    return found;
+}
+
+/**
+ * @brief   Keeps the changes that come later than a share of the typical stretch after the last one kept, since a
+ *          glitch is not a change of the data.
+ * @param[in] changes  Times of the changes, ascending and not empty.
+ * @param[in] typical  The typical length of a stretch.
+ */
+std::vector<double> MergeGlitches(const std::vector<double> &changes, const double typical) {
     std::vector<double> merged = {changes.front()};
     for (const double change : changes) {
         if (change - merged.back() > typical * GLITCH_SHARE) {
             merged.push_back(change);
         }
     }
-    if (merged.size() < 2) {
-        return {.Start = merged.front(), .Width = whole.Width};
-    }
+    return merged;
+}
+
+/**
+ * @brief   The mean of the gaps between changes that are within a few percent of the shortest, so the quantizing of the
+ *          sample times does not add up over many cells.
+ * @param[in] merged  Times of the changes, ascending, at least two.
+ */
+double AverageShortestGap(const std::vector<double> &merged) {
     std::vector<double> gaps;
     for (std::size_t index = 1; index < merged.size(); ++index) {
         gaps.push_back(merged[index] - merged[index - 1]);
@@ -233,7 +263,78 @@ CellGrid FindCellGrid(const std::span<const double> times, const std::span<const
             ++count;
         }
     }
-    return {.Start = merged.front(), .Width = total / count};
+    return total / count;
+}
+
+/**
+ * @brief   Finds where the cells start and how wide they are.
+ * @details The cells are as wide as the shortest gap between changes, and start at the first change, so the edges of a
+ *          clock are the edges of the cells. Changes that follow another closely are merged into the first.
+ */
+CellGrid FindCellGrid(const std::span<const double> times, const std::span<const LogicSignal> signals) {
+    const SignalChanges found = CollectChanges(times, signals);
+    const CellGrid whole{.Start = times.front(), .Width = times.back() - times.front()};
+    if (found.Changes.empty()) {
+        return whole;
+    }
+    const double typical = found.Durations.empty() ? whole.Width : found.Durations[found.Durations.size() / 2];
+    const std::vector<double> merged = MergeGlitches(found.Changes, typical);
+    if (merged.size() < 2) {
+        return {.Start = merged.front(), .Width = whole.Width};
+    }
+    return {.Start = merged.front(), .Width = AverageShortestGap(merged)};
+}
+
+/**
+ * @brief   Whether the cells can be listed: they have a width, the view holds samples and there are not too many.
+ */
+bool AreCellsListable(const double width, const double visible_from, const double visible_to) {
+    return width > 0.0 && visible_to > visible_from && !((visible_to - visible_from) / width > MAX_CELLS);
+}
+
+/**
+ * @brief   Lays the cells of a grid over the samples, keeping those that overlap what is in view.
+ * @details What is left of a cell at either end of the samples is too narrow to read, so it joins its neighbor: a
+ *          narrow first cell is folded into the next one, and a narrow last cell is folded into the one before.
+ * @param[in] grid          Where the cells start and how wide they are.
+ * @param[in] first_time    Time of the first sample.
+ * @param[in] last_time     Time of the last sample.
+ * @param[in] visible_from  Start of the time in view, within the samples.
+ * @param[in] visible_to    End of the time in view, within the samples.
+ * @return  The cells in time order, each clipped to the samples.
+ */
+std::vector<CellSpan> LayOutCells(const CellGrid &grid,
+                                  const double first_time,
+                                  const double last_time,
+                                  const double visible_from,
+                                  const double visible_to) {
+    std::vector<CellSpan> spans;
+    bool joins_next = false;
+    for (double cell = std::floor((visible_from - grid.Start) / grid.Width);; cell += 1.0) {
+        double cell_from = std::max(grid.Start + cell * grid.Width, first_time);
+        const double cell_to = std::min(grid.Start + (cell + 1.0) * grid.Width, last_time);
+        if (cell_to - cell_from < grid.Width * GLITCH_SHARE) {
+            if (cell_to >= last_time) {
+                if (!spans.empty()) {
+                    spans.back().To = last_time;
+                }
+                break;
+            }
+            joins_next = true;
+            continue;
+        }
+        if (std::exchange(joins_next, false)) {
+            cell_from = first_time;
+        }
+        if (cell_from >= visible_to) {
+            break;
+        }
+        if (cell_to <= visible_from) {
+            continue;
+        }
+        spans.push_back({.From = cell_from, .To = cell_to, .ReadTime = (cell_from + cell_to) / 2.0});
+    }
+    return spans;
 }
 
 } // namespace
@@ -253,53 +354,24 @@ CellGrid FindCellGrid(const std::span<const double> times, const std::span<const
  *          cells would be in view.
  */
 std::vector<std::vector<LogicSegment>> FindBitCells(const std::span<const double> times,
-                                                    const std::span<const LogicSignal> signals, const double from,
+                                                    const std::span<const LogicSignal> signals,
+                                                    const double from,
                                                     const double to) {
     std::vector<std::vector<LogicSegment>> cells(signals.size());
     if (times.size() < 2) {
         return cells;
     }
-    const double first_time = times.front();
-    const double last_time = times.back();
     const CellGrid grid = FindCellGrid(times, signals);
-    const double start = grid.Start;
-    const double width = grid.Width;
-    const double visible_from = std::max(from, first_time);
-    const double visible_to = std::min(to, last_time);
-    if (!(width > 0.0) || !(visible_to > visible_from) || (visible_to - visible_from) / width > MAX_CELLS) {
+    const double visible_from = std::max(from, times.front());
+    const double visible_to = std::min(to, times.back());
+    if (!AreCellsListable(grid.Width, visible_from, visible_to)) {
         return cells;
     }
-    const double first_cell = std::floor((visible_from - start) / width);
-    bool joins_next = false;
-    for (double cell = first_cell;; cell += 1.0) {
-        double cell_from = std::max(start + cell * width, first_time);
-        const double cell_to = std::min(start + (cell + 1.0) * width, last_time);
-        // What is left of a cell at either end of the samples is too narrow to read, so it joins its neighbor
-        if (cell_to - cell_from < width * GLITCH_SHARE) {
-            if (cell_to >= last_time) {
-                for (std::vector<LogicSegment> &lane : cells) {
-                    if (!lane.empty()) {
-                        lane.back().To = last_time;
-                    }
-                }
-                break;
-            }
-            joins_next = true;
-            continue;
-        }
-        if (std::exchange(joins_next, false)) {
-            cell_from = first_time;
-        }
-        if (cell_from >= visible_to) {
-            break;
-        }
-        if (cell_to <= visible_from) {
-            continue;
-        }
+    for (const CellSpan &span : LayOutCells(grid, times.front(), times.back(), visible_from, visible_to)) {
         for (std::size_t signal = 0; signal < signals.size(); ++signal) {
             const LogicState state =
-                ReadStateAt(times, signals[signal].Voltages, signals[signal].LogicLevel, (cell_from + cell_to) / 2.0);
-            cells[signal].push_back({.From = cell_from, .To = cell_to, .State = state});
+                ReadStateAt(times, signals[signal].Voltages, signals[signal].LogicLevel, span.ReadTime);
+            cells[signal].push_back({.From = span.From, .To = span.To, .State = state});
         }
     }
     return cells;

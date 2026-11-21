@@ -66,6 +66,7 @@ add_library(imcsim-core-lib
             simulation/analysis_sources.cpp
             simulation/analysis_suggestions.cpp
             simulation/check_ac_sweep.cpp
+            simulation/check_analysis_ports.cpp
             simulation/check_dc_sweep.cpp
             simulation/check_frequency_range.cpp
             simulation/check_harmonic_balance.cpp

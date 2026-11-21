@@ -177,21 +177,21 @@ TEST_CASE("A histogram of equal samples is widened around them", "[monte_carlo_r
 TEST_CASE("The bin count follows the root of the sample count within limits", "[monte_carlo_results]") {
     CHECK(GUI::SuggestBinCount(4) == 5);
     CHECK(GUI::SuggestBinCount(100) == 10);
-    CHECK(GUI::SuggestBinCount(1000000) == 40);
+    CHECK(GUI::SuggestBinCount(1'000'000) == 40);
 }
 
 TEST_CASE("The runs sort by number, part value or measurement with the nominal one first", "[monte_carlo_results]") {
     GUI::MonteCarloTable table = MakeTable({0.0, 30.0, 10.0, std::nullopt, 20.0});
     CHECK(GUI::OrderRuns(table, {}) == std::vector<std::size_t>{0, 1, 2, 3, 4});
-    CHECK(GUI::OrderRuns(table, {.By = GUI::RunSort::Key::RUN, .IsAscending = false}) ==
-          std::vector<std::size_t>{0, 4, 3, 2, 1});
-    CHECK(GUI::OrderRuns(table, {.By = GUI::RunSort::Key::MEASURE, .Index = 0}) ==
-          std::vector<std::size_t>{0, 2, 4, 1, 3});
+    CHECK(GUI::OrderRuns(table, {.By = GUI::RunSort::Key::RUN, .IsAscending = false})
+          == std::vector<std::size_t>{0, 4, 3, 2, 1});
+    CHECK(GUI::OrderRuns(table, {.By = GUI::RunSort::Key::MEASURE, .Index = 0})
+          == std::vector<std::size_t>{0, 2, 4, 1, 3});
     // A run without the reading is last in both directions
-    CHECK(GUI::OrderRuns(table, {.By = GUI::RunSort::Key::MEASURE, .Index = 0, .IsAscending = false}) ==
-          std::vector<std::size_t>{0, 1, 4, 2, 3});
-    CHECK(GUI::OrderRuns(table, {.By = GUI::RunSort::Key::PART, .Index = 0, .IsAscending = false}) ==
-          std::vector<std::size_t>{0, 4, 3, 2, 1});
+    CHECK(GUI::OrderRuns(table, {.By = GUI::RunSort::Key::MEASURE, .Index = 0, .IsAscending = false})
+          == std::vector<std::size_t>{0, 1, 4, 2, 3});
+    CHECK(GUI::OrderRuns(table, {.By = GUI::RunSort::Key::PART, .Index = 0, .IsAscending = false})
+          == std::vector<std::size_t>{0, 4, 3, 2, 1});
 }
 
 TEST_CASE("The nodes and columns of a table are listed", "[monte_carlo_results]") {
@@ -317,8 +317,9 @@ TEST_CASE("The CSV has a row per run with the values, the measurements and the s
     table.Runs[2].IsFailed = true;
     table.Runs[2].Error = "no convergence, sorry";
     const std::string csv = GUI::WriteMonteCarloCsv(table, {"V(OUT) Upper -3 dB frequency (Hz)"});
-    CHECK(csv == "Run,R1 (Ohm),V(OUT) Upper -3 dB frequency (Hz),Status\n"
-                 "Nominal,1000,1600,ok\n"
-                 "1,1001,1500.5,ok\n"
-                 "2,1002,,\"no convergence, sorry\"\n");
+    CHECK(csv
+          == "Run,R1 (Ohm),V(OUT) Upper -3 dB frequency (Hz),Status\n"
+             "Nominal,1000,1600,ok\n"
+             "1,1001,1500.5,ok\n"
+             "2,1002,,\"no convergence, sorry\"\n");
 }

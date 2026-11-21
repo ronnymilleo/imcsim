@@ -95,8 +95,11 @@ Core::Transient SliceTransientByTime(const Core::Transient &transient, const dou
 std::vector<MathTrace> SliceMathTraces(const std::vector<MathTrace> &traces, const PointWindow window) {
     std::vector<MathTrace> slices;
     for (const MathTrace &trace : traces) {
-        MathTrace slice{
-            .Label = trace.Label, .Values = {}, .Unit = trace.Unit, .Axis = trace.Axis, .Color = trace.Color};
+        MathTrace slice{.Label = trace.Label,
+                        .Values = {},
+                        .Unit = trace.Unit,
+                        .Axis = trace.Axis,
+                        .Color = trace.Color};
         const std::size_t first = std::min(window.First, trace.Values.size());
         const std::size_t last = std::min(window.First + window.Count, trace.Values.size());
         slice.Values.assign(trace.Values.begin() + static_cast<std::ptrdiff_t>(first),

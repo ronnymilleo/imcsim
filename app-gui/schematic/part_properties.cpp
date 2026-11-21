@@ -25,11 +25,17 @@ bool HasPropertyFields(const Core::Component &component) {
     if (component.HasValue() || Core::IsSwitch(type) || Core::IsLogicPart(type) || Core::IsSubcircuitPin(type)) {
         return true;
     }
-    static constexpr auto OTHER_TYPES = std::to_array(
-        {Core::ComponentType::NET_LABEL, Core::ComponentType::SUBCIRCUIT, Core::ComponentType::V_SWITCH,
-         Core::ComponentType::RELAY, Core::ComponentType::FUSE, Core::ComponentType::CLOCK,
-         Core::ComponentType::LOGIC_INPUT, Core::ComponentType::LOGIC_OUTPUT, Core::ComponentType::SEVEN_SEGMENT,
-         Core::ComponentType::BEHAVIORAL_VOLTAGE, Core::ComponentType::BEHAVIORAL_CURRENT});
+    static constexpr auto OTHER_TYPES = std::to_array({Core::ComponentType::NET_LABEL,
+                                                       Core::ComponentType::SUBCIRCUIT,
+                                                       Core::ComponentType::V_SWITCH,
+                                                       Core::ComponentType::RELAY,
+                                                       Core::ComponentType::FUSE,
+                                                       Core::ComponentType::CLOCK,
+                                                       Core::ComponentType::LOGIC_INPUT,
+                                                       Core::ComponentType::LOGIC_OUTPUT,
+                                                       Core::ComponentType::SEVEN_SEGMENT,
+                                                       Core::ComponentType::BEHAVIORAL_VOLTAGE,
+                                                       Core::ComponentType::BEHAVIORAL_CURRENT});
     return std::ranges::contains(OTHER_TYPES, type);
 }
 
@@ -61,9 +67,9 @@ bool ShowsValueFields(const Core::Component &component) {
     }
     // The switches that follow a voltage, the logic parts, a clock and the logic inputs and outputs have only their
     // parameters
-    if (type == Core::ComponentType::V_SWITCH || type == Core::ComponentType::RELAY ||
-        type == Core::ComponentType::FUSE || Core::IsLogicPart(type) || type == Core::ComponentType::CLOCK ||
-        type == Core::ComponentType::LOGIC_INPUT || Core::IsLogicDisplay(type)) {
+    if (type == Core::ComponentType::V_SWITCH || type == Core::ComponentType::RELAY || type == Core::ComponentType::FUSE
+        || Core::IsLogicPart(type) || type == Core::ComponentType::CLOCK || type == Core::ComponentType::LOGIC_INPUT
+        || Core::IsLogicDisplay(type)) {
         return true;
     }
     return component.HasValue();

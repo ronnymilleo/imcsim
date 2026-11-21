@@ -194,7 +194,8 @@ std::complex<double> FromDecibels(const double decibels, const double degrees) {
 }
 
 // Finds a current by component name, failing the test when it is missing
-template <typename Current> const Current &FindCurrent(const std::vector<Current> &currents, const std::string &name) {
+template <typename Current>
+const Current &FindCurrent(const std::vector<Current> &currents, const std::string &name) {
     const auto found = std::ranges::find_if(currents, [&name](const Current &current) { return current.Name == name; });
     REQUIRE(found != currents.end());
     return *found;
@@ -552,7 +553,8 @@ std::vector<double> RunSeeded(const SourceOnLoad &setup, const unsigned int seed
 } // namespace
 
 TEST_CASE("A seeded random source repeats its values and a new seed changes them", "[simulator]") {
-    for (const auto distribution : {Core::RandomDistribution::UNIFORM, Core::RandomDistribution::EXPONENTIAL,
+    for (const auto distribution : {Core::RandomDistribution::UNIFORM,
+                                    Core::RandomDistribution::EXPONENTIAL,
                                     Core::RandomDistribution::POISSON}) {
         CAPTURE(Core::GetRandomDistributionName(distribution));
         SourceOnLoad setup;
@@ -719,8 +721,11 @@ TEST_CASE("A transient run follows the single-frequency FM of an SFFM source", "
     Core::VoltageSource source;
     source.SetName("Vin1");
     source.SetSourceType(Core::VoltageSource::SourceType::SFFM);
-    const Core::SFFMParameters sffm{
-        .Offset = 0.0, .Amplitude = 1.0, .CarrierFrequency = 1e3, .ModulationIndex = 5.0, .SignalFrequency = 100.0};
+    const Core::SFFMParameters sffm{.Offset = 0.0,
+                                    .Amplitude = 1.0,
+                                    .CarrierFrequency = 1e3,
+                                    .ModulationIndex = 5.0,
+                                    .SignalFrequency = 100.0};
     source.SetSFFM(sffm);
     Core::Resistor load;
     load.SetName("R1");
@@ -740,9 +745,10 @@ TEST_CASE("A transient run follows the single-frequency FM of an SFFM source", "
         const double t = transient.Times[index];
         // The carrier phase is swung by the modulation index times the signal sine
         const double expected =
-            sffm.Offset + sffm.Amplitude * std::sin(2.0 * std::numbers::pi * sffm.CarrierFrequency * t +
-                                                    sffm.ModulationIndex *
-                                                        std::sin(2.0 * std::numbers::pi * sffm.SignalFrequency * t));
+            sffm.Offset
+            + sffm.Amplitude
+                  * std::sin(2.0 * std::numbers::pi * sffm.CarrierFrequency * t
+                             + sffm.ModulationIndex * std::sin(2.0 * std::numbers::pi * sffm.SignalFrequency * t));
         CHECK_THAT(transient.NodeVoltages[1][index], Catch::Matchers::WithinAbs(expected, 1e-3));
     }
 }
@@ -752,8 +758,11 @@ TEST_CASE("A transient run follows the amplitude modulation of an AM source", "[
     source.SetName("Vin1");
     source.SetSourceType(Core::VoltageSource::SourceType::AM);
     // No offset, so the source at t = 0 matches the operating point, and no delay, so the sines start at once
-    const Core::AMParameters am{
-        .Amplitude = 1.0, .Offset = 0.0, .ModulatingFrequency = 100.0, .CarrierFrequency = 1e3, .Delay = 0.0};
+    const Core::AMParameters am{.Amplitude = 1.0,
+                                .Offset = 0.0,
+                                .ModulatingFrequency = 100.0,
+                                .CarrierFrequency = 1e3,
+                                .Delay = 0.0};
     source.SetAM(am);
     Core::Resistor load;
     load.SetName("R1");
@@ -772,10 +781,10 @@ TEST_CASE("A transient run follows the amplitude modulation of an AM source", "[
     for (std::size_t index = 0; index < transient.Times.size(); ++index) {
         const double shifted = transient.Times[index] - am.Delay;
         const double expected =
-            shifted <= 0.0
-                ? 0.0
-                : am.Offset + am.Amplitude * std::sin(2.0 * std::numbers::pi * am.ModulatingFrequency * shifted) *
-                                  std::sin(2.0 * std::numbers::pi * am.CarrierFrequency * shifted);
+            shifted <= 0.0 ? 0.0
+                           : am.Offset
+                                 + am.Amplitude * std::sin(2.0 * std::numbers::pi * am.ModulatingFrequency * shifted)
+                                       * std::sin(2.0 * std::numbers::pi * am.CarrierFrequency * shifted);
         CHECK_THAT(transient.NodeVoltages[1][index], Catch::Matchers::WithinAbs(expected, 1e-3));
     }
 }
@@ -1075,6 +1084,7 @@ TEST_CASE("Each LED model drops its rated forward voltage at 20 mA", "[simulator
         const char *Model;
         double ForwardVoltage;
     };
+
     const Rating rating = GENERATE(Rating{"Red", 1.85}, Rating{"Green", 2.2}, Rating{"Blue", 3.3});
     CAPTURE(rating.Model);
     // The resistor sets 20 mA when the LED drops its rated voltage
@@ -1374,6 +1384,7 @@ TEST_CASE("Each bipolar model has its datasheet gain", "[simulator]") {
         double MinimumGain;
         double MaximumGain;
     };
+
     const Rating rating = GENERATE(Rating{Core::ComponentType::NPN, "2N3904", 100.0, 300.0},
                                    Rating{Core::ComponentType::NPN, "2N2222A", 100.0, 300.0},
                                    Rating{Core::ComponentType::NPN, "BC547B", 200.0, 450.0},
@@ -1424,10 +1435,12 @@ TEST_CASE("Each MOSFET model has its datasheet on-resistance at 10 V of gate dri
         const char *Model;
         double OnResistance;
     };
-    const Rating rating =
-        GENERATE(Rating{Core::ComponentType::NMOS, "2N7000", 1.8}, Rating{Core::ComponentType::NMOS, "BS170", 1.2},
-                 Rating{Core::ComponentType::NMOS, "IRF540N", 0.044}, Rating{Core::ComponentType::PMOS, "BS250", 14.0},
-                 Rating{Core::ComponentType::PMOS, "IRF9540N", 0.117});
+
+    const Rating rating = GENERATE(Rating{Core::ComponentType::NMOS, "2N7000", 1.8},
+                                   Rating{Core::ComponentType::NMOS, "BS170", 1.2},
+                                   Rating{Core::ComponentType::NMOS, "IRF540N", 0.044},
+                                   Rating{Core::ComponentType::PMOS, "BS250", 14.0},
+                                   Rating{Core::ComponentType::PMOS, "IRF9540N", 0.117});
     CAPTURE(rating.Model);
     LowSideSwitch stage(rating.Type, 10.0);
     stage.Transistor.SetModel(*Core::FindMOSFETModel(rating.Type, rating.Model));
@@ -1759,9 +1772,10 @@ TEST_CASE("A stepped DC sweep draws the collector characteristics of a BJT", "[s
     circuit.Add(transistor, {1, 2, 0});
     circuit.Add(reference, {0});
 
-    const Core::DCSweepRun run = Core::RunDCSweep(
-        circuit, {.Swept = {.Source = "V1", .Start = 0.0, .Stop = 5.0, .Step = 0.05},
-                  .Stepped = Core::SweepRange{.Source = "I1", .Start = 10e-6, .Stop = 30e-6, .Step = 10e-6}});
+    const Core::DCSweepRun run =
+        Core::RunDCSweep(circuit,
+                         {.Swept = {.Source = "V1", .Start = 0.0, .Stop = 5.0, .Step = 0.05},
+                          .Stepped = Core::SweepRange{.Source = "I1", .Start = 10e-6, .Stop = 30e-6, .Step = 10e-6}});
     if (!run.Result) {
         FAIL(run.Result.error());
     }
@@ -1910,8 +1924,9 @@ TEST_CASE("An ideal op-amp rolls off at its gain-bandwidth product", "[simulator
     amplifier.Input.SetSourceType(Core::VoltageSource::SourceType::AC);
     // A noise gain of 11 leaves 1 MHz / 11 of closed-loop bandwidth
     const double corner = 1e6 / 11.0;
-    const Core::ACSweepRun run = Core::RunACSweep(
-        amplifier.Circuit, {.StartFrequency = corner, .StopFrequency = corner * 10.0, .PointsPerDecade = 1});
+    const Core::ACSweepRun run =
+        Core::RunACSweep(amplifier.Circuit,
+                         {.StartFrequency = corner, .StopFrequency = corner * 10.0, .PointsPerDecade = 1});
     if (!run.Result) {
         FAIL(run.Result.error());
     }
@@ -2758,8 +2773,11 @@ TEST_CASE("The noise of an amplifier lists the share of each part, and the ideal
           "[simulator]") {
     InvertingAmplifier amplifier(0.0);
     amplifier.Input.SetSourceType(Core::VoltageSource::SourceType::AC);
-    const Core::NoiseSettings settings{
-        .OutputNode = 3, .InputSource = "Vin1", .StartFrequency = 10.0, .StopFrequency = 100.0, .PointsPerDecade = 1};
+    const Core::NoiseSettings settings{.OutputNode = 3,
+                                       .InputSource = "Vin1",
+                                       .StartFrequency = 10.0,
+                                       .StopFrequency = 100.0,
+                                       .PointsPerDecade = 1};
     const Core::NoiseRun run = Core::RunNoise(amplifier.Circuit, settings);
     WARN(amplifier.Circuit.ToSpiceNetlist(".options savecurrents", true));
     for (const auto &c : run.Result->Contributions) {
@@ -3135,8 +3153,8 @@ TEST_CASE("A clock start delay holds it low until the first rising edge", "[simu
     const Core::Transient &transient = *run.Result;
     const std::vector<double> &voltage = transient.NodeVoltages[1];
     const auto at = [&transient, &voltage](const double time) {
-        return voltage[static_cast<std::size_t>(std::ranges::lower_bound(transient.Times, time) -
-                                                transient.Times.begin())];
+        return voltage[static_cast<std::size_t>(std::ranges::lower_bound(transient.Times, time)
+                                                - transient.Times.begin())];
     };
     // Low through the delay, high in the first pulse at 2.25 ms, low again at 2.75 ms
     CHECK_THAT(at(1.0e-3), Catch::Matchers::WithinAbs(0.0, 0.05));
@@ -3359,11 +3377,13 @@ TEST_CASE("RunTruthTable rejects inputs and outputs it cannot use", "[simulator]
 
 TEST_CASE("Gates with three inputs follow their truth tables, an XOR giving odd parity", "[simulator][digital]") {
     SKIP_WITHOUT_DIGITAL_MODELS();
+
     struct GateCase {
         Core::ComponentType Type;
         /// Whether the output is high for 0, 1, 2 and 3 high inputs.
         std::array<bool, 4> HighForCount;
     };
+
     constexpr std::array<GateCase, 6> CASES = {{{Core::ComponentType::AND, {false, false, false, true}},
                                                 {Core::ComponentType::OR, {false, true, true, true}},
                                                 {Core::ComponentType::NAND, {true, true, true, false}},

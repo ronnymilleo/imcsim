@@ -12,7 +12,6 @@
 #include <cstddef>
 #include <expected>
 #include <format>
-#include <ngspice/sharedspice.h>
 #include <string>
 
 namespace Core {
@@ -26,19 +25,19 @@ std::expected<OperatingPoint, std::string> ReadOperatingPoint(const Circuit &cir
     OperatingPoint result;
     result.NodeVoltages.assign(static_cast<std::size_t>(circuit.GetNodeCount()), 0.0);
     for (int node = 1; node < circuit.GetNodeCount(); ++node) {
-        const pvector_info vector = FindVector(std::format("v({})", node));
-        if (vector == nullptr || vector->v_realdata == nullptr) {
-            return std::unexpected(std::format("ngspice returned no voltage for node {}", node));
+        const auto voltage = ReadScalar(std::format("v({})", node), std::format("voltage for node {}", node));
+        if (!voltage) {
+            return std::unexpected(voltage.error());
         }
-        result.NodeVoltages[static_cast<std::size_t>(node)] = vector->v_realdata[0];
+        result.NodeVoltages[static_cast<std::size_t>(node)] = *voltage;
     }
     for (const CircuitEntry &entry : circuit.GetEntries()) {
         for (const CurrentVector &current : CurrentVectors(*entry.Part)) {
-            const pvector_info vector = FindVector(current.VectorName);
-            if (vector == nullptr || vector->v_realdata == nullptr) {
-                return std::unexpected(std::format("ngspice returned no current for {}", current.TraceName));
+            const auto value = ReadScalar(current.VectorName, std::format("current for {}", current.TraceName));
+            if (!value) {
+                return std::unexpected(value.error());
             }
-            result.Currents.push_back({current.TraceName, vector->v_realdata[0]});
+            result.Currents.push_back({current.TraceName, *value});
         }
     }
     AddRatingWarnings(circuit, result);

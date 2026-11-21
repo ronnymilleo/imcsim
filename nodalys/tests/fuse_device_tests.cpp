@@ -18,8 +18,10 @@ using Catch::Matchers::WithinRel;
 namespace {
 
 /// A 1 A fuse with a time constant of 150 ms, so the runs that blow it stay short.
-constexpr Nodalys::FuseParameters QUICK_FUSE = {
-    .RatedCurrent = 1.0, .MeltingI2t = 0.15, .ColdResistance = 0.15, .BlownResistance = 1e9};
+constexpr Nodalys::FuseParameters QUICK_FUSE = {.RatedCurrent = 1.0,
+                                                .MeltingI2t = 0.15,
+                                                .ColdResistance = 0.15,
+                                                .BlownResistance = 1e9};
 constexpr double QUICK_TIME_CONSTANT = 0.15;
 /// Heat at which the fuse opens, the same as the latch of the ngspice model.
 constexpr double BLOW_HEAT = 1.015;
@@ -165,7 +167,9 @@ TEST_CASE("Overloads far apart do not add up, and overloads close together do", 
     // Each 5 A pulse of 1 ms adds a sixth of the melting heat, which the fuse loses again in a second
     const auto build = [](const double period) {
         Nodalys::CircuitBuilder builder;
-        builder.AddVpulse("V1", SUPPLY, 0,
+        builder.AddVpulse("V1",
+                          SUPPLY,
+                          0,
                           {.Low = 0.0,
                            .High = 12.5,
                            .Delay = 1e-3,

@@ -20,7 +20,8 @@ bool IsStraight(const GridPoint start, const GridPoint end) {
     return start.X == end.X || start.Y == end.Y;
 }
 
-std::optional<GridPoint> FindMovedTerminal(const GridPoint point, const std::vector<GridPoint> &old_terminals,
+std::optional<GridPoint> FindMovedTerminal(const GridPoint point,
+                                           const std::vector<GridPoint> &old_terminals,
                                            const std::vector<GridPoint> &new_terminals) {
     for (std::size_t index = 0; index < old_terminals.size(); ++index) {
         if (old_terminals[index] == point) {
@@ -47,8 +48,9 @@ void AddBentWire(std::vector<UIWire> &wires, const GridPoint fixed, const GridPo
 }
 
 int CountWireEnds(const std::vector<UIWire> &wires, const GridPoint point) {
-    return static_cast<int>(std::ranges::count_if(
-        wires, [point](const UIWire &wire) { return wire.GetStart() == point || wire.GetEnd() == point; }));
+    return static_cast<int>(std::ranges::count_if(wires, [point](const UIWire &wire) {
+        return wire.GetStart() == point || wire.GetEnd() == point;
+    }));
 }
 
 GridPoint OtherEnd(const UIWire &wire, const GridPoint end) {
@@ -60,8 +62,11 @@ GridPoint OtherEnd(const UIWire &wire, const GridPoint end) {
  * @details Terminals are excluded so wires keep ending on them, and so do points another wire passes through, which
  *          would otherwise lose their connection.
  */
-bool CanMergeAt(const std::vector<UIWire> &wires, const std::vector<GridPoint> &terminals, const GridPoint point,
-                const UIWire &first, const UIWire &second) {
+bool CanMergeAt(const std::vector<UIWire> &wires,
+                const std::vector<GridPoint> &terminals,
+                const GridPoint point,
+                const UIWire &first,
+                const UIWire &second) {
     if (std::ranges::contains(terminals, point) || CountWireEnds(wires, point) != 2) {
         return false;
     }
@@ -81,8 +86,8 @@ bool CanMergeAt(const std::vector<UIWire> &wires, const std::vector<GridPoint> &
 }
 
 bool IsSameWire(const UIWire &first, const UIWire &second) {
-    return (first.GetStart() == second.GetStart() && first.GetEnd() == second.GetEnd()) ||
-           (first.GetStart() == second.GetEnd() && first.GetEnd() == second.GetStart());
+    return (first.GetStart() == second.GetStart() && first.GetEnd() == second.GetEnd())
+        || (first.GetStart() == second.GetEnd() && first.GetEnd() == second.GetStart());
 }
 
 /**
@@ -138,14 +143,16 @@ SplitWires SplitBySelection(const std::vector<UIWire> &wires, const std::set<std
 /**
  * @brief   Wires that stay follow every point that moves: the terminals of moved parts, the ends of the moved wires,
  *          and the ends of wires that touch the moved wires in the middle.
- * @details A part that stays keeps its terminals where they are.
+ * @details Starts from the terminals of the move and adds the points of the moved wires to its old and new points;
+ *          a part that stays keeps its terminals where they are.
  */
-void CollectFollowedPoints(const SplitWires &split, const std::vector<GridPoint> &fixed_terminals,
-                           const PointTransform &transform, std::vector<GridPoint> &from, std::vector<GridPoint> &to) {
+TerminalMove
+CollectFollowedPoints(const SplitWires &split, const TerminalMove &terminals, const PointTransform &transform) {
+    TerminalMove followed = terminals;
     const auto follow = [&](const GridPoint point) {
-        if (!std::ranges::contains(fixed_terminals, point) && !std::ranges::contains(from, point)) {
-            from.push_back(point);
-            to.push_back(transform.Apply(point));
+        if (!std::ranges::contains(followed.Fixed, point) && !std::ranges::contains(followed.Old, point)) {
+            followed.Old.push_back(point);
+            followed.New.push_back(transform.Apply(point));
         }
     };
     for (const UIWire &wire : split.Carried) {
@@ -159,14 +166,18 @@ void CollectFollowedPoints(const SplitWires &split, const std::vector<GridPoint>
             }
         }
     }
+    return followed;
 }
 
 /**
  * @brief   A moved wire that ended on a part that stays or on the middle of a wire that stays leaves a wire behind, and
  *          so does a part that stays and touches the moved wire in its middle, such as a ground on a rail.
  */
-void AddConnectors(std::vector<UIWire> &result, const UIWire &carried, const UIWire &shifted,
-                   const std::vector<UIWire> &staying, const std::vector<GridPoint> &fixed_terminals,
+void AddConnectors(std::vector<UIWire> &result,
+                   const UIWire &carried,
+                   const UIWire &shifted,
+                   const std::vector<UIWire> &staying,
+                   const std::vector<GridPoint> &fixed_terminals,
                    const PointTransform &transform) {
     for (const GridPoint end : {carried.GetStart(), carried.GetEnd()}) {
         const bool on_fixed_part = std::ranges::contains(fixed_terminals, end);
@@ -214,7 +225,8 @@ GridPoint PointTransform::Apply(const GridPoint point) const {
  * @note    Call it with the wires from before the drag started, not the previous frame, so moving back and
  *          forth does not pile up bends.
  */
-std::vector<UIWire> FollowTerminals(const std::vector<UIWire> &wires, const std::vector<GridPoint> &old_terminals,
+std::vector<UIWire> FollowTerminals(const std::vector<UIWire> &wires,
+                                    const std::vector<GridPoint> &old_terminals,
                                     const std::vector<GridPoint> &new_terminals) {
     std::vector<UIWire> result;
     result.reserve(wires.size());
@@ -257,12 +269,10 @@ std::vector<UIWire> SimplifyWires(const std::vector<UIWire> &wires, const std::v
 
 /**
  * @brief   Moves a group of wires and parts, and keeps everything else attached to them.
- * @param[in] wires            Wires before the move.
- * @param[in] selected         Indices of the wires that move.
- * @param[in] old_terminals    Terminals of the parts that move, before the move.
- * @param[in] new_terminals    The same terminals after the move, in the same order.
- * @param[in] fixed_terminals  Terminals of the parts that stay.
- * @param[in] transform        What happens to the selected wires.
+ * @param[in] wires      Wires before the move.
+ * @param[in] selected   Indices of the wires that move.
+ * @param[in] terminals  Terminals of the parts that move, before and after the move, and of the parts that stay.
+ * @param[in] transform  What happens to the selected wires.
  * @return  The wires after the move and which of them are the moved ones. Wires that are not selected and end on
  *          something that moved follow it, as FollowTerminals() does, and a moved wire that ended on a part that
  *          stays, or on the middle of a wire that stays, leaves a wire behind that keeps it connected, and so does a
@@ -270,28 +280,27 @@ std::vector<UIWire> SimplifyWires(const std::vector<UIWire> &wires, const std::v
  * @note    Call it with the wires from before the move started, not the previous frame, so moving back and forth
  *          does not pile up bends.
  */
-MovedWires MoveGroup(const std::vector<UIWire> &wires, const std::set<std::size_t> &selected,
-                     const std::vector<GridPoint> &old_terminals, const std::vector<GridPoint> &new_terminals,
-                     const std::vector<GridPoint> &fixed_terminals, const PointTransform &transform) {
+MovedWires MoveGroup(const std::vector<UIWire> &wires,
+                     const std::set<std::size_t> &selected,
+                     const TerminalMove &terminals,
+                     const PointTransform &transform) {
     const SplitWires split = SplitBySelection(wires, selected);
 
-    std::vector<GridPoint> from = old_terminals;
-    std::vector<GridPoint> to = new_terminals;
-    CollectFollowedPoints(split, fixed_terminals, transform, from, to);
-    std::vector<UIWire> result = FollowTerminals(split.Staying, from, to);
+    const TerminalMove followed = CollectFollowedPoints(split, terminals, transform);
+    std::vector<UIWire> result = FollowTerminals(split.Staying, followed.Old, followed.New);
 
     std::vector<UIWire> moved;
     for (const UIWire &wire : split.Carried) {
         const UIWire shifted(transform.Apply(wire.GetStart()), transform.Apply(wire.GetEnd()));
         moved.push_back(shifted);
-        AddConnectors(result, wire, shifted, split.Staying, fixed_terminals, transform);
+        AddConnectors(result, wire, shifted, split.Staying, terminals.Fixed, transform);
     }
     result.insert(result.end(), moved.begin(), moved.end());
 
-    std::vector<GridPoint> terminals = fixed_terminals;
-    terminals.insert(terminals.end(), new_terminals.begin(), new_terminals.end());
+    std::vector<GridPoint> all_terminals = terminals.Fixed;
+    all_terminals.insert(all_terminals.end(), terminals.New.begin(), terminals.New.end());
     MovedWires moved_wires;
-    moved_wires.Wires = SimplifyWires(result, terminals);
+    moved_wires.Wires = SimplifyWires(result, all_terminals);
     for (std::size_t index = 0; index < moved_wires.Wires.size(); ++index) {
         if (std::ranges::any_of(moved, [&](const UIWire &wire) { return Overlaps(wire, moved_wires.Wires[index]); })) {
             moved_wires.Selected.insert(index);

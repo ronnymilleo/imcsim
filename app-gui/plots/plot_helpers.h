@@ -24,8 +24,8 @@ struct LineSegment {
 
 std::size_t FindNearestSample(std::span<const double> xs, double x, bool logarithmic);
 std::size_t FindWidestSpread(const std::vector<const std::vector<double> *> &curves);
-std::vector<LineSegment> SplitIntoDashes(std::span<const ImVec2> points, float dash_length, float gap_length,
-                                         ImVec2 clip_min, ImVec2 clip_max);
+std::vector<LineSegment>
+SplitIntoDashes(std::span<const ImVec2> points, float dash_length, float gap_length, ImVec2 clip_min, ImVec2 clip_max);
 
 } // namespace GUI
 

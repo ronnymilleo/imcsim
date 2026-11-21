@@ -21,7 +21,9 @@
 #include <algorithm>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <cstddef>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -44,7 +46,9 @@ GUI::SavedSubcircuit MakeDefinition(const std::string &name, const std::vector<s
 /**
  * @brief   A pin marker; unturned, its arrow points right, which puts the pin on the left of the block.
  */
-void AddMarker(GUI::Schematic &schematic, const GUI::GridPoint point, const std::string &name,
+void AddMarker(GUI::Schematic &schematic,
+               const GUI::GridPoint point,
+               const std::string &name,
                const GUI::Rotation rotation = GUI::Rotation::R0) {
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::PIN, point, rotation));
     static_cast<Core::NetLabel &>(schematic.GetElements().back()->GetComponent()).SetNet(name);
@@ -62,7 +66,7 @@ void SelectEverything(GUI::Schematic &schematic) {
     for (std::size_t index = 0; index < schematic.GetWires().size(); ++index) {
         wires.insert(index);
     }
-    schematic.SetSelection(std::move(elements), std::move(wires));
+    schematic.SetSelection({.Elements = std::move(elements), .Wires = std::move(wires)});
 }
 
 /**
@@ -139,6 +143,36 @@ TEST_CASE("A cycle in a damaged file neither loops nor loses a block", "[block_n
     CHECK(GUI::ContainsBlock(definitions, "first", "first"));
     CHECK(GUI::ContainsBlock(definitions, "first", "second"));
     CHECK(GUI::OrderByUse(definitions).size() == 2);
+}
+
+TEST_CASE("Items are ordered after the items they depend on, in the order the dependencies are listed",
+          "[block_nesting]") {
+    // 0 needs 2 and then 1; 1 needs 3; 2 and 3 need nothing, and 4 stands alone
+    const std::vector<std::vector<std::size_t>> dependencies = {{2, 1}, {3}, {}, {}, {}};
+    const std::vector<std::size_t> order =
+        GUI::OrderByDependencies(dependencies.size(), [&](const std::size_t index) { return dependencies[index]; });
+    CHECK(order == std::vector<std::size_t>{2, 3, 1, 0, 4});
+}
+
+TEST_CASE("An item that several others depend on is placed once", "[block_nesting]") {
+    const std::vector<std::vector<std::size_t>> dependencies = {{1, 2}, {3}, {3}, {}};
+    const std::vector<std::size_t> order =
+        GUI::OrderByDependencies(dependencies.size(), [&](const std::size_t index) { return dependencies[index]; });
+    CHECK(order == std::vector<std::size_t>{3, 1, 2, 0});
+}
+
+TEST_CASE("Items in a cycle are all placed, once each, and the walk ends", "[block_nesting]") {
+    const std::vector<std::vector<std::size_t>> dependencies = {{1}, {2}, {0}, {}};
+    std::vector<std::size_t> order =
+        GUI::OrderByDependencies(dependencies.size(), [&](const std::size_t index) { return dependencies[index]; });
+    // The item that closes the cycle comes first among the three, since it finds its dependency still open
+    CHECK(order == std::vector<std::size_t>{2, 1, 0, 3});
+    std::ranges::sort(order);
+    CHECK(order == std::vector<std::size_t>{0, 1, 2, 3});
+}
+
+TEST_CASE("Ordering no items gives no positions", "[block_nesting]") {
+    CHECK(GUI::OrderByDependencies(0, [](const std::size_t) { return std::vector<std::size_t>{}; }).empty());
 }
 
 TEST_CASE("Renaming a block points only its own instances at the new name", "[block_nesting]") {
@@ -248,8 +282,10 @@ TEST_CASE("Copying a block carries the blocks inside it, and a paste renames a c
     GUI::Schematic source;
     MakeNestedBlocks(source);
     const std::size_t outer_instance = source.GetElements().size() - 1;
-    const std::string text = GUI::CopySelection(source.GetElements(), source.GetWires(),
-                                                {.Elements = {outer_instance}, .Wires = {}}, source.GetSubcircuits());
+    const std::string text = GUI::CopySelection(source.GetElements(),
+                                                source.GetWires(),
+                                                {.Elements = {outer_instance}, .Wires = {}},
+                                                source.GetSubcircuits());
     auto group = GUI::ParseCopiedSchematic(text);
     REQUIRE(group);
     REQUIRE(group->Subcircuits.size() == 2);

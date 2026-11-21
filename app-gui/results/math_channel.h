@@ -6,7 +6,7 @@
 #ifndef IMCSIM_MATH_CHANNEL_H
 #define IMCSIM_MATH_CHANNEL_H
 
-#include "results/trace_math.h"
+#include "results/trace_math_parser.h"
 #include "schematic/math_channel_definition.h"
 #include <expected>
 #include <string>

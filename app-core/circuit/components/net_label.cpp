@@ -5,6 +5,8 @@
 
 #include "circuit/components/net_label.h"
 
+#include "spice/spice_text.h"
+
 #include <algorithm>
 #include <cctype>
 #include <memory>
@@ -75,10 +77,7 @@ bool NetLabel::IsValidNet(const std::string_view net) {
  * @return  The name in lower case, so "Vout" and "VOUT" are the same net.
  */
 std::string NetLabel::NormalizeNet(const std::string_view net) {
-    std::string normalized(net);
-    std::ranges::transform(normalized, normalized.begin(),
-                           [](const unsigned char character) { return static_cast<char>(std::tolower(character)); });
-    return normalized;
+    return ToLower(net);
 }
 
 } // namespace Core

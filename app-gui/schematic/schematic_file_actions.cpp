@@ -256,7 +256,7 @@ void SchematicFileActions::HandleExampleRequest() {
 void SchematicFileActions::NewSchematic() {
     m_Hooks.StopEditing();
     m_Schematic.Clear();
-    m_Schematic.ClearMeasurements();
+    m_Schematic.GetMeasurements().Clear();
 }
 
 /**
@@ -275,8 +275,11 @@ void SchematicFileActions::OpenFile(const std::filesystem::path &path) {
     }
 
     NewSchematic();
-    m_Schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings),
-                        std::move(loaded->Subcircuits), std::move(loaded->Models));
+    m_Schematic.Replace(std::move(loaded->Elements),
+                        std::move(loaded->Wires),
+                        std::move(loaded->Settings),
+                        std::move(loaded->Subcircuits),
+                        std::move(loaded->Models));
     m_Schematic.RestoreMeasurements(loaded->Measurements);
     m_Schematic.MarkSaved(path);
     m_Hooks.FrameSchematic();
@@ -295,8 +298,11 @@ void SchematicFileActions::OpenExample(const Example &example) {
     }
 
     NewSchematic();
-    m_Schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings),
-                        std::move(loaded->Subcircuits), std::move(loaded->Models));
+    m_Schematic.Replace(std::move(loaded->Elements),
+                        std::move(loaded->Wires),
+                        std::move(loaded->Settings),
+                        std::move(loaded->Subcircuits),
+                        std::move(loaded->Models));
     m_Schematic.RestoreMeasurements(loaded->Measurements);
     m_Hooks.FrameSchematic();
 }
@@ -361,10 +367,13 @@ void SchematicFileActions::SaveFile(std::filesystem::path path) {
     if (path.extension() != SCHEMATIC_EXTENSION) {
         path += SCHEMATIC_EXTENSION;
     }
-    const auto written =
-        WriteTextFile(path, SaveSchematic(m_Schematic.GetElements(), m_Schematic.GetWires(),
-                                          m_Schematic.GetSimulationSettings(), m_Schematic.SaveMeasurements(),
-                                          m_Schematic.GetSubcircuits(), m_Schematic.GetLibraryModels()));
+    const auto written = WriteTextFile(path,
+                                       SaveSchematic(m_Schematic.GetElements(),
+                                                     m_Schematic.GetWires(),
+                                                     m_Schematic.GetSimulationSettings(),
+                                                     m_Schematic.SaveMeasurements(),
+                                                     m_Schematic.GetSubcircuits(),
+                                                     m_Schematic.GetLibraryModels()));
     if (!written) {
         ShowMessages("Could not save the schematic", {written.error()});
         return;

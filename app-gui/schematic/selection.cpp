@@ -17,10 +17,10 @@ namespace {
 bool WireIntersects(const UIWire &wire, const ImVec2 min, const ImVec2 max) {
     const GridPoint start = wire.GetStart();
     const GridPoint end = wire.GetEnd();
-    return static_cast<float>(std::min(start.X, end.X)) <= max.x &&
-           static_cast<float>(std::max(start.X, end.X)) >= min.x &&
-           static_cast<float>(std::min(start.Y, end.Y)) <= max.y &&
-           static_cast<float>(std::max(start.Y, end.Y)) >= min.y;
+    return static_cast<float>(std::min(start.X, end.X)) <= max.x
+        && static_cast<float>(std::max(start.X, end.X)) >= min.x
+        && static_cast<float>(std::min(start.Y, end.Y)) <= max.y
+        && static_cast<float>(std::max(start.Y, end.Y)) >= min.y;
 }
 
 } // namespace
@@ -34,6 +34,23 @@ bool Selection::Empty() const {
 }
 
 /**
+ * @brief   Picks consecutive elements and wires, such as those a paste just added.
+ * @param[in] elements  Indices of the elements to pick.
+ * @param[in] wires     Indices of the wires to pick.
+ * @return  Every index of both ranges; an empty range picks nothing of its kind.
+ */
+Selection MakeRangeSelection(const IndexRange elements, const IndexRange wires) {
+    Selection picked;
+    for (std::size_t index = elements.First; index < elements.First + elements.Count; ++index) {
+        picked.Elements.insert(index);
+    }
+    for (std::size_t index = wires.First; index < wires.First + wires.Count; ++index) {
+        picked.Wires.insert(index);
+    }
+    return picked;
+}
+
+/**
  * @brief   Picks what is under a point: one element or, when there is none, one wire.
  * @param[in] elements        Parts of the schematic.
  * @param[in] wires           Wires of the schematic.
@@ -42,8 +59,10 @@ bool Selection::Empty() const {
  * @return  Elements win over wires, and the most recently added item wins because it is drawn on top. Empty when
  *          nothing is there.
  */
-Selection PickAt(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires,
-                 const ImVec2 world_pos, const float wire_tolerance) {
+Selection PickAt(const std::vector<std::unique_ptr<UIElement>> &elements,
+                 const std::vector<UIWire> &wires,
+                 const ImVec2 world_pos,
+                 const float wire_tolerance) {
     for (std::size_t index = elements.size(); index-- > 0;) {
         if (elements[index]->Contains(world_pos)) {
             return {.Elements = {index}, .Wires = {}};
@@ -65,8 +84,10 @@ Selection PickAt(const std::vector<std::unique_ptr<UIElement>> &elements, const 
  * @param[in] opposite_corner  The other corner, in any position relative to the first.
  * @return  Every element whose symbol bounds and every wire that overlaps the box.
  */
-Selection PickInRectangle(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires,
-                          const ImVec2 corner, const ImVec2 opposite_corner) {
+Selection PickInRectangle(const std::vector<std::unique_ptr<UIElement>> &elements,
+                          const std::vector<UIWire> &wires,
+                          const ImVec2 corner,
+                          const ImVec2 opposite_corner) {
     const ImVec2 min = {std::min(corner.x, opposite_corner.x), std::min(corner.y, opposite_corner.y)};
     const ImVec2 max = {std::max(corner.x, opposite_corner.x), std::max(corner.y, opposite_corner.y)};
     Selection picked;
@@ -111,14 +132,7 @@ Selection PickNode(const std::vector<UIWire> &wires, const Connectivity &connect
  * @return  All of them.
  */
 Selection PickAll(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires) {
-    Selection picked;
-    for (std::size_t index = 0; index < elements.size(); ++index) {
-        picked.Elements.insert(index);
-    }
-    for (std::size_t index = 0; index < wires.size(); ++index) {
-        picked.Wires.insert(index);
-    }
-    return picked;
+    return MakeRangeSelection({.First = 0, .Count = elements.size()}, {.First = 0, .Count = wires.size()});
 }
 
 /**
@@ -152,6 +166,26 @@ Selection Joined(const Selection &current, const Selection &picked) {
     result.Elements.insert(picked.Elements.begin(), picked.Elements.end());
     result.Wires.insert(picked.Wires.begin(), picked.Wires.end());
     return result;
+}
+
+/**
+ * @brief   Lists the parts and wires a selection picks.
+ * @param[in] elements   Parts of the schematic.
+ * @param[in] wires      Wires of the schematic.
+ * @param[in] selection  What is picked, by index into both lists.
+ * @return  Pointers to the picked parts and copies of the picked wires, in index order.
+ */
+SelectedItems CollectSelected(const std::vector<std::unique_ptr<UIElement>> &elements,
+                              const std::vector<UIWire> &wires,
+                              const Selection &selection) {
+    SelectedItems selected;
+    for (const std::size_t index : selection.Elements) {
+        selected.Elements.push_back(elements[index].get());
+    }
+    for (const std::size_t index : selection.Wires) {
+        selected.Wires.push_back(wires[index]);
+    }
+    return selected;
 }
 
 } // namespace GUI

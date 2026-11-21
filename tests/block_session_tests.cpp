@@ -22,7 +22,9 @@ namespace {
 /**
  * @brief   A pin marker; unturned, its arrow points right, which puts the pin on the left of the block.
  */
-void AddMarker(GUI::Schematic &schematic, const GUI::GridPoint point, const std::string &name,
+void AddMarker(GUI::Schematic &schematic,
+               const GUI::GridPoint point,
+               const std::string &name,
                const GUI::Rotation rotation = GUI::Rotation::R0) {
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::PIN, point, rotation));
     static_cast<Core::NetLabel &>(schematic.GetElements().back()->GetComponent()).SetNet(name);
@@ -37,7 +39,7 @@ void SelectEverything(GUI::Schematic &schematic) {
     for (std::size_t index = 0; index < schematic.GetWires().size(); ++index) {
         wires.insert(index);
     }
-    schematic.SetSelection(std::move(elements), std::move(wires));
+    schematic.SetSelection({.Elements = std::move(elements), .Wires = std::move(wires)});
 }
 
 /**
@@ -79,7 +81,7 @@ TEST_CASE("A block cannot be placed inside itself or inside a block it contains"
     // Outer places inner, so placing it inside inner would make a cycle
     CHECK_FALSE(session.CanPlaceBlock("outer"));
     CHECK(session.ListPlaceableBlocks().empty());
-    session.Close(false);
+    REQUIRE(session.DiscardAndClose());
 
     REQUIRE(session.Open("outer"));
     CHECK_FALSE(session.CanPlaceBlock("outer"));
@@ -106,13 +108,63 @@ TEST_CASE("Opening a block shows its contents with its pins, and closing it goes
     REQUIRE(session.Open("inner"));
     CHECK(session.GetOpenBlocks().size() == 2);
     CHECK(session.GetName() == "inner");
-    CHECK(session.Close(false));
+    CHECK(session.DiscardAndClose());
     CHECK(session.GetName() == "outer");
     CHECK(session.GetPins()[0].Name == "CHANGED");
-    CHECK(session.Close(false));
+    CHECK(session.DiscardAndClose());
     CHECK_FALSE(session.IsOpen());
     CHECK(&session.GetShown() == &schematic);
-    CHECK_FALSE(session.Close(false));
+    const auto closed = session.DiscardAndClose();
+    REQUIRE_FALSE(closed);
+    CHECK(closed.error() == "No block is open");
+}
+
+TEST_CASE("A block that cannot be applied stays open and says why, and the dialog shows the reason it is given",
+          "[block_session]") {
+    GUI::Schematic schematic;
+    MakeNestedBlocks(schematic);
+    schematic.MarkSaved({});
+    GUI::BlockSession session(schematic);
+    REQUIRE(session.Open("inner"));
+    // A second marker named IN gives two pins one name
+    AddMarker(session.GetShown(), {0, 4}, "IN", GUI::Rotation::R90);
+
+    const auto closed = session.ApplyAndClose();
+    REQUIRE_FALSE(closed);
+    CHECK(closed.error() == "Subcircuit pin names must be unique identifiers");
+    CHECK(session.IsOpen());
+    CHECK_FALSE(schematic.IsModified());
+    // The session keeps no reason of its own until the editor hands it one to show
+    CHECK(session.GetError().empty());
+    CHECK_FALSE(session.TakeDialogRequest());
+
+    session.ReportError(closed.error());
+    CHECK(session.GetError() == closed.error());
+    CHECK(session.TakeDialogRequest());
+}
+
+TEST_CASE("A block that cannot be opened says why and opens nothing", "[block_session]") {
+    GUI::Schematic schematic;
+    MakeNestedBlocks(schematic);
+    GUI::BlockSession session(schematic);
+    const auto opened = session.Open("missing");
+    REQUIRE_FALSE(opened);
+    CHECK(opened.error() == "Unknown subcircuit missing");
+    CHECK_FALSE(session.IsOpen());
+}
+
+TEST_CASE("Applying a block reaches the blocks open around it, which hold instances of it", "[block_session]") {
+    GUI::Schematic schematic;
+    MakeNestedBlocks(schematic);
+    GUI::BlockSession session(schematic);
+    const std::size_t parts = FindDefinition(schematic, "inner").Elements.size();
+    REQUIRE(session.Open("outer"));
+    REQUIRE(session.Open("inner"));
+    session.GetShown().AddElement(GUI::CreateElement(Core::ComponentType::CAPACITOR, {0, 6}, GUI::Rotation::R0));
+    REQUIRE(session.ApplyAndClose());
+
+    // The contents of outer, shown now, hold their own copy of inner, which took the new part too
+    CHECK(FindDefinition(session.GetShown(), "inner").Elements.size() == parts + 1);
 }
 
 TEST_CASE("A block opened and closed without a change leaves the document unmodified", "[block_session]") {
@@ -121,7 +173,7 @@ TEST_CASE("A block opened and closed without a change leaves the document unmodi
     schematic.MarkSaved({});
     GUI::BlockSession session(schematic);
     REQUIRE(session.Open("inner"));
-    REQUIRE(session.Close(true));
+    REQUIRE(session.ApplyAndClose());
     CHECK_FALSE(schematic.IsModified());
 }
 
@@ -135,13 +187,13 @@ TEST_CASE("Applying a block puts its new contents in the document as one undo st
 
     REQUIRE(session.Open("inner"));
     session.GetShown().AddElement(GUI::CreateElement(Core::ComponentType::CAPACITOR, {0, 6}, GUI::Rotation::R0));
-    REQUIRE(session.Close(false));
+    REQUIRE(session.DiscardAndClose());
     CHECK(FindDefinition(schematic, "inner").Elements.size() == parts);
     CHECK_FALSE(schematic.IsModified());
 
     REQUIRE(session.Open("inner"));
     session.GetShown().AddElement(GUI::CreateElement(Core::ComponentType::CAPACITOR, {0, 6}, GUI::Rotation::R0));
-    REQUIRE(session.Close(true));
+    REQUIRE(session.ApplyAndClose());
     CHECK(FindDefinition(schematic, "inner").Elements.size() == parts + 1);
     CHECK(schematic.IsModified());
     CHECK(schematic.CanUndo());
@@ -157,8 +209,7 @@ TEST_CASE("The blocks open take the definitions the document gained", "[block_se
     // A paste into the block brings a block definition to the document first
     std::vector<GUI::SavedSubcircuit> brought(1);
     brought.front().Name = "brought";
-    std::vector<std::unique_ptr<GUI::UIElement>> no_parts;
-    schematic.MergeSubcircuits(std::move(brought), no_parts);
+    schematic.MergeSubcircuits(std::move(brought));
     session.SyncDefinitions();
     CHECK(session.GetShown().GetSubcircuits().size() == 2);
 }
@@ -174,8 +225,9 @@ TEST_CASE("The pin markers of a block take the names of its pins, and every mark
     CHECK(marker.GetNet() == "SIGNAL");
 
     session.GetPins().clear();
-    CHECK_FALSE(session.ApplyPinNames());
-    CHECK(session.GetError() == "Every pin marker needs a block pin name");
+    const auto refused = session.ApplyPinNames();
+    REQUIRE_FALSE(refused);
+    CHECK(refused.error() == "Every pin marker needs a block pin name");
 }
 
 TEST_CASE("Pins follow the markers of the open block: the order stays and new markers join at the end",
@@ -219,4 +271,11 @@ TEST_CASE("A new block takes a free name and offers the pins of the selection", 
     CHECK(schematic.GetSubcircuits().size() == 1);
     session.RequestCreate();
     CHECK(session.GetName() == "block_2");
+
+    // The numbering goes on from the bare name, as for pasted blocks
+    std::vector<GUI::SavedSubcircuit> brought(1);
+    brought.front().Name = "block_2";
+    schematic.MergeSubcircuits(std::move(brought));
+    session.RequestCreate();
+    CHECK(session.GetName() == "block_3");
 }

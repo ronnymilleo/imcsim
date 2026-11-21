@@ -11,9 +11,33 @@ namespace GUI {
 
 namespace {
 
-constexpr auto ANALYSIS_NAMES =
-    std::to_array<const char *>({"Operating point", "Transient", "AC sweep", "DC sweep", "Noise", "Transfer function",
-                                 "Sensitivity", "Poles and zeros", "S-parameters", "Truth table", "Harmonic balance"});
+constexpr auto ANALYSIS_NAMES = std::to_array<const char *>({"Operating point",
+                                                             "Transient",
+                                                             "AC sweep",
+                                                             "DC sweep",
+                                                             "Noise",
+                                                             "Transfer function",
+                                                             "Sensitivity",
+                                                             "Poles and zeros",
+                                                             "S-parameters",
+                                                             "Truth table",
+                                                             "Harmonic balance"});
+static_assert(ANALYSIS_NAMES.size() == ANALYSIS_COUNT);
+
+/// The analysis of the backend that runs each one, in the order of the Analysis enum; the sensitivity analysis is its
+/// DC kind, and the settings panel asks about the AC kind on its own.
+constexpr auto ANALYSIS_KINDS = std::to_array<Core::AnalysisKind>({Core::AnalysisKind::OPERATING_POINT,
+                                                                   Core::AnalysisKind::TRANSIENT,
+                                                                   Core::AnalysisKind::AC_SWEEP,
+                                                                   Core::AnalysisKind::DC_SWEEP,
+                                                                   Core::AnalysisKind::NOISE,
+                                                                   Core::AnalysisKind::TRANSFER_FUNCTION,
+                                                                   Core::AnalysisKind::SENSITIVITY,
+                                                                   Core::AnalysisKind::POLE_ZERO,
+                                                                   Core::AnalysisKind::S_PARAMETERS,
+                                                                   Core::AnalysisKind::TRUTH_TABLE,
+                                                                   Core::AnalysisKind::HARMONIC_BALANCE});
+static_assert(ANALYSIS_KINDS.size() == ANALYSIS_COUNT);
 
 } // namespace
 
@@ -24,6 +48,15 @@ constexpr auto ANALYSIS_NAMES =
  */
 const char *GetAnalysisName(const Analysis analysis) {
     return ANALYSIS_NAMES[static_cast<std::size_t>(analysis)];
+}
+
+/**
+ * @brief   Returns the analysis of the simulation backend that runs an analysis, which tells whether a backend can.
+ * @param[in] analysis  Analysis to look up.
+ * @return  The backend kind, such as Core::AnalysisKind::AC_SWEEP; the DC kind for the sensitivity analysis.
+ */
+Core::AnalysisKind ToKind(const Analysis analysis) {
+    return ANALYSIS_KINDS[static_cast<std::size_t>(analysis)];
 }
 
 /**

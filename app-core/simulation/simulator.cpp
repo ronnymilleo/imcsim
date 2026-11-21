@@ -33,8 +33,8 @@ namespace {
  * @brief   What stops a run before it reaches the backend: the circuit, the settings the analysis takes, and a part or
  *          an analysis the backend does not run.
  */
-std::optional<std::string> FindProblem(const Circuit &circuit, const std::optional<std::string> &settings_error,
-                                       const AnalysisKind kind) {
+std::optional<std::string>
+FindProblem(const Circuit &circuit, const std::optional<std::string> &settings_error, const AnalysisKind kind) {
     if (const std::optional<std::string> error = CheckCircuit(circuit)) {
         return error;
     }
@@ -121,7 +121,9 @@ struct FirstFailure {
 /**
  * @brief   Reads the output voltages of a combination, or remembers the first failure.
  */
-void ReadRow(TruthTableRow &row, const OperatingPointRun &point, const std::vector<int> &output_nodes,
+void ReadRow(TruthTableRow &row,
+             const OperatingPointRun &point,
+             const std::vector<int> &output_nodes,
              FirstFailure &failure) {
     if (point.Result) {
         for (const int node : output_nodes) {
@@ -147,7 +149,8 @@ TruthTableRun ConcludeTable(TruthTable table, TruthTableRun run, FirstFailure fa
         table.Warnings.push_back(std::format(
             "{} of {} combinations have no operating point, so their outputs read X; a circuit whose outputs depend on "
             "its history, such as a latch, has none for the combinations that hold its state",
-            missing, row_count));
+            missing,
+            row_count));
         run.Messages = std::move(failure.Messages);
     }
     run.Result = std::move(table);
@@ -195,8 +198,10 @@ OperatingPointRun RunOperatingPoint(const Circuit &circuit, const std::optional<
  *          point, such as a latch with both inputs idle, which start from 0 V. Not thread-safe: ngspice is a single
  *          global library instance.
  */
-TransientRun RunTransient(const Circuit &circuit, const TransientSettings &settings,
-                          const std::optional<ParameterValue> &parameter, const RunMonitor &monitor) {
+TransientRun RunTransient(const Circuit &circuit,
+                          const TransientSettings &settings,
+                          const std::optional<ParameterValue> &parameter,
+                          const RunMonitor &monitor) {
     std::optional<std::string> settings_error = CheckTransientSettings(settings);
     if (!settings_error) {
         settings_error = CheckSourceSteps(circuit, settings);
@@ -222,8 +227,8 @@ TransientRun RunTransient(const Circuit &circuit, const TransientSettings &setti
  *          printed. Invalid settings and circuits without an AC source are rejected before reaching the backend.
  * @note    Not thread-safe: the backend in use may be a single global instance, as ngspice is.
  */
-ACSweepRun RunACSweep(const Circuit &circuit, const ACSweepSettings &settings,
-                      const std::optional<ParameterValue> &parameter) {
+ACSweepRun
+RunACSweep(const Circuit &circuit, const ACSweepSettings &settings, const std::optional<ParameterValue> &parameter) {
     if (const std::optional<std::string> error =
             FindProblem(circuit, CheckACSweepSettings(circuit, settings), AnalysisKind::AC_SWEEP)) {
         return {std::unexpected(*error), {}};
@@ -247,8 +252,8 @@ ACSweepRun RunACSweep(const Circuit &circuit, const ACSweepSettings &settings,
  * @note    AC and pulse sources are swept through their DC value. Not thread-safe: ngspice is a single global
  *          library instance.
  */
-DCSweepRun RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings,
-                      const std::optional<ParameterValue> &parameter) {
+DCSweepRun
+RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings, const std::optional<ParameterValue> &parameter) {
     if (const std::optional<std::string> error =
             FindProblem(circuit, CheckDCSweepSettings(circuit, settings), AnalysisKind::DC_SWEEP)) {
         return {std::unexpected(*error), {}};
@@ -368,7 +373,8 @@ PoleZeroRun RunPoleZero(const Circuit &circuit, const PoleZeroSettings &settings
  */
 SParametersRun RunSParameters(const Circuit &circuit, const SParameterSettings &settings) {
     if (const std::optional<std::string> error =
-            FindProblem(circuit, CheckSParameterSettings(circuit, settings, GetBackend().GetCapabilities().SParameters),
+            FindProblem(circuit,
+                        CheckSParameterSettings(circuit, settings, GetBackend().GetCapabilities().SParameters),
                         AnalysisKind::S_PARAMETERS)) {
         return {std::unexpected(*error), {}};
     }
@@ -431,8 +437,8 @@ TruthTableRun RunTruthTable(const Circuit &circuit, const TruthTableSettings &se
  *          messages from the backend. Invalid settings and backends that do not support harmonic balance are rejected
  *          before calling the backend.
  */
-HarmonicBalanceRun RunHarmonicBalance(const Circuit &circuit, const HarmonicBalanceSettings &settings,
-                                      RunControl *control) {
+HarmonicBalanceRun
+RunHarmonicBalance(const Circuit &circuit, const HarmonicBalanceSettings &settings, RunControl *control) {
     if (const std::optional<std::string> error =
             FindProblem(circuit, CheckHarmonicBalanceSettings(circuit, settings), AnalysisKind::HARMONIC_BALANCE)) {
         return {std::unexpected(*error), {}};

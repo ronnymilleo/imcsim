@@ -29,8 +29,8 @@ std::vector<double> FindNiceTicks(const double from, const double to, const int 
     const double step = (normalized <= 1.5   ? 1.0
                          : normalized <= 3.0 ? 2.0
                          : normalized <= 7.0 ? 5.0
-                                             : 10.0) *
-                        magnitude;
+                                             : 10.0)
+                      * magnitude;
     const double first = std::ceil(from / step - 1e-9);
     for (double index = first; ticks.size() < 64; index += 1.0) {
         const double tick = index * step;

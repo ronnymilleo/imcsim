@@ -38,24 +38,23 @@ void TransformElement(UIElement &element, const PointTransform &transform) {
 
 /**
  * @brief   Finds the point a selection turns or mirrors about.
- * @param[in] elements           Parts of the schematic.
- * @param[in] selected_elements  Indices of the selected parts.
- * @param[in] wires              Wires of the schematic.
- * @param[in] selected_wires     Indices of the selected wires.
+ * @param[in] elements   Parts of the schematic.
+ * @param[in] wires      Wires of the schematic.
+ * @param[in] selection  The selected parts and wires.
  * @return  The position of the part when it is the only thing selected, so it turns in place; otherwise the middle
  *          of the box around the positions of the selected parts and the ends of the selected wires, on the grid.
  */
 GridPoint FindPivot(const std::vector<std::unique_ptr<UIElement>> &elements,
-                    const std::set<std::size_t> &selected_elements, const std::vector<UIWire> &wires,
-                    const std::set<std::size_t> &selected_wires) {
-    if (selected_elements.size() == 1 && selected_wires.empty()) {
-        return elements[*selected_elements.begin()]->GetPosition();
+                    const std::vector<UIWire> &wires,
+                    const Selection &selection) {
+    if (selection.Elements.size() == 1 && selection.Wires.empty()) {
+        return elements[*selection.Elements.begin()]->GetPosition();
     }
     std::vector<GridPoint> points;
-    for (const std::size_t index : selected_elements) {
+    for (const std::size_t index : selection.Elements) {
         points.push_back(elements[index]->GetPosition());
     }
-    for (const std::size_t index : selected_wires) {
+    for (const std::size_t index : selection.Wires) {
         points.push_back(wires[index].GetStart());
         points.push_back(wires[index].GetEnd());
     }

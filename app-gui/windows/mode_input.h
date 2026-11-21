@@ -14,6 +14,7 @@
 #include "schematic/preferences.h"
 #include "schematic/schematic.h"
 #include "schematic/schematic_file_actions.h"
+#include "windows/canvas_pointer.h"
 #include "windows/part_editor.h"
 #include "windows/part_popover.h"
 #include <optional>
@@ -36,11 +37,7 @@ struct ModeInput {
     SchematicFileActions &Files;
     const Preferences &UserPreferences;
     SchematicCanvas &Canvas;
-    const ViewTransform &View;
-    /// Pixels per grid unit.
-    float Zoom;
-    /// Whether the cursor is over the canvas.
-    bool IsHovered;
+    CanvasPointer Pointer;
     /// Whether wires go up or down before they turn, kept from one wire to the next.
     bool &IsWireVerticalFirst;
 };

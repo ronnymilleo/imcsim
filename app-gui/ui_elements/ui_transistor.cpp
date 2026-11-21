@@ -5,7 +5,6 @@
 
 #include "ui_elements/ui_transistor.h"
 
-#include <cmath>
 #include <utility>
 
 namespace GUI {
@@ -16,8 +15,6 @@ constexpr float LABEL_OFFSET_X = 1.3f;
 constexpr float LABEL_OFFSET_Y = 0.5f;
 /// Bounds reach a little past the right-hand leads, where the terminals sit.
 constexpr float BOUNDS_RIGHT = 1.2f;
-constexpr float ARROW_HEAD_LENGTH = 0.3f;
-constexpr float ARROW_HEAD_HALF_WIDTH = 0.15f;
 
 } // namespace
 
@@ -27,7 +24,8 @@ constexpr float ARROW_HEAD_HALF_WIDTH = 0.15f;
  * @param[in] position   Grid position in world units.
  * @param[in] rotation   Orientation on the grid.
  */
-UITransistor::UITransistor(std::unique_ptr<Core::Component> component, const GridPoint position,
+UITransistor::UITransistor(std::unique_ptr<Core::Component> component,
+                           const GridPoint position,
                            const Rotation rotation)
     : UIElement(std::move(component), position, rotation) {
 }
@@ -69,27 +67,6 @@ std::vector<GridPoint> UITransistor::GetLocalTerminals() const {
  */
 LocalBounds UITransistor::GetLocalBounds() const {
     return {{-2.0f, -2.0f}, {BOUNDS_RIGHT, 2.0f}};
-}
-
-/**
- * @brief   Draws a filled arrow head, such as the one on an emitter.
- * @param[in,out] canvas Where it is drawn: the editor window or an exported image.
- * @param[in] view       Transform of the current frame.
- * @param[in] tip        Point of the arrow, in local grid units.
- * @param[in] direction  Direction the arrow points to, in local grid units; it does not need to be normalized.
- * @param[in] color      Fill color.
- */
-void UITransistor::DrawArrowHead(SchematicCanvas &canvas, const ViewTransform &view, const ImVec2 tip,
-                                 const ImVec2 direction, const ImU32 color) const {
-    const float length = std::hypot(direction.x, direction.y);
-    const ImVec2 along = {direction.x / length, direction.y / length};
-    const ImVec2 across = {-along.y, along.x};
-    const ImVec2 base = {tip.x - along.x * ARROW_HEAD_LENGTH, tip.y - along.y * ARROW_HEAD_LENGTH};
-    canvas.AddTriangleFilled(
-        LocalToScreen(view, tip.x, tip.y),
-        LocalToScreen(view, base.x + across.x * ARROW_HEAD_HALF_WIDTH, base.y + across.y * ARROW_HEAD_HALF_WIDTH),
-        LocalToScreen(view, base.x - across.x * ARROW_HEAD_HALF_WIDTH, base.y - across.y * ARROW_HEAD_HALF_WIDTH),
-        color);
 }
 
 } // namespace GUI

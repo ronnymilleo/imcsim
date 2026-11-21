@@ -89,8 +89,8 @@ struct HarmonicWaveformSet {
 double ScaleHarmonicMagnitude(std::complex<double> phasor, std::size_t order, HarmonicAmplitudeUnit unit);
 double ToHarmonicDecibels(double scaled_magnitude);
 double ToHarmonicDbc(std::complex<double> phasor, double fundamental_magnitude);
-std::vector<double> ListSpectrumValues(std::span<const std::complex<double>> phasors, HarmonicAmplitudeUnit unit,
-                                       HarmonicScale scale);
+std::vector<double>
+ListSpectrumValues(std::span<const std::complex<double>> phasors, HarmonicAmplitudeUnit unit, HarmonicScale scale);
 
 // Waveform tiling across periods
 std::vector<double> TilePeriodicTimes(std::span<const double> times, double fundamental_frequency, int cycles);
@@ -98,14 +98,19 @@ std::vector<double> TilePeriodicValues(std::span<const double> values, int cycle
 HarmonicWaveformSet BuildHarmonicWaveforms(const Core::HarmonicBalance &result, Schematic &schematic, int cycles);
 
 // Summaries and exports
-HarmonicTraceSummary BuildHarmonicTraceSummary(std::string label, std::string unit, bool is_current,
+HarmonicTraceSummary BuildHarmonicTraceSummary(std::string label,
+                                               std::string unit,
+                                               bool is_current,
                                                std::span<const std::complex<double>> phasors,
-                                               std::span<const double> frequencies, HarmonicAmplitudeUnit unit_kind);
-std::vector<HarmonicTraceSummary> BuildHarmonicSummaries(const Core::HarmonicBalance &result, Schematic &schematic,
-                                                         HarmonicAmplitudeUnit unit_kind);
-std::string BuildHarmonicBalanceCsv(const Core::HarmonicBalance &result, Schematic &schematic,
-                                    HarmonicAmplitudeUnit unit_kind);
-ExportFigure BuildHarmonicBalanceFigure(const Core::HarmonicBalance &result, Schematic &schematic, int cycles,
+                                               std::span<const double> frequencies,
+                                               HarmonicAmplitudeUnit unit_kind);
+std::vector<HarmonicTraceSummary>
+BuildHarmonicSummaries(const Core::HarmonicBalance &result, Schematic &schematic, HarmonicAmplitudeUnit unit_kind);
+std::string
+BuildHarmonicBalanceCsv(const Core::HarmonicBalance &result, Schematic &schematic, HarmonicAmplitudeUnit unit_kind);
+ExportFigure BuildHarmonicBalanceFigure(const Core::HarmonicBalance &result,
+                                        Schematic &schematic,
+                                        int cycles,
                                         const std::optional<ExportRange> &view);
 
 } // namespace GUI

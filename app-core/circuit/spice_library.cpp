@@ -191,7 +191,8 @@ void ReadHeader(const std::vector<std::string> &tokens, LibrarySubcircuit &subci
 /**
  * @brief   Appends the definitions of the file that the text uses, and those they use in turn, in file order.
  */
-std::string AddDependencies(const std::string &text, const std::string &own_name,
+std::string AddDependencies(const std::string &text,
+                            const std::string &own_name,
                             const std::map<std::string, Definition> &definitions) {
     std::set<std::string> used;
     std::vector<std::string> pending = {text};
@@ -267,7 +268,9 @@ struct LibraryScan {
 /**
  * @brief   A .model, .param or inclusion outside the subcircuits.
  */
-void ReadTopLevelStatement(LibraryScan &scan, const Statement &statement, const std::vector<std::string> &tokens,
+void ReadTopLevelStatement(LibraryScan &scan,
+                           const Statement &statement,
+                           const std::vector<std::string> &tokens,
                            SpiceLibrary &library) {
     const std::string directive = ToLower(tokens.front());
     const std::string text = JoinLines(scan.Lines, statement.FirstLine, statement.LastLine);
@@ -288,7 +291,8 @@ void ReadTopLevelStatement(LibraryScan &scan, const Statement &statement, const 
         }
     } else if (IsInclusion(directive)) {
         library.Warnings.push_back(std::format("{}: {} is not followed; import the file it names as well",
-                                               scan.Origins[statement.FirstLine], tokens.front()));
+                                               scan.Origins[statement.FirstLine],
+                                               tokens.front()));
     }
 }
 
@@ -298,10 +302,11 @@ void ReadTopLevelStatement(LibraryScan &scan, const Statement &statement, const 
 void AddFoundSubcircuit(LibraryScan &scan, const std::size_t header, const std::size_t end) {
     scan.Found.emplace_back(header, end);
     if (const std::vector<std::string> tokens = Tokenize(scan.Statements[header].Logical); tokens.size() >= 2) {
-        scan.Definitions.try_emplace(ToLower(tokens[1]),
-                                     Definition{.Order = scan.Order++,
-                                                .Text = JoinLines(scan.Lines, scan.Statements[header].FirstLine,
-                                                                  scan.Statements[end].LastLine)});
+        scan.Definitions.try_emplace(
+            ToLower(tokens[1]),
+            Definition{.Order = scan.Order++,
+                       .Text =
+                           JoinLines(scan.Lines, scan.Statements[header].FirstLine, scan.Statements[end].LastLine)});
     }
 }
 
@@ -344,13 +349,16 @@ LibraryScan ScanLibrary(LibraryLines lines, SpiceLibrary &library) {
 /**
  * @brief   An .include or .lib inside a subcircuit brings in what the file does not have.
  */
-void WarnInclusions(const LibraryScan &scan, const std::size_t header, const std::size_t end,
+void WarnInclusions(const LibraryScan &scan,
+                    const std::size_t header,
+                    const std::size_t end,
                     LibrarySubcircuit &subcircuit) {
     for (std::size_t index = header + 1; index < end; ++index) {
         const std::vector<std::string> inner = Tokenize(scan.Statements[index].Logical);
         if (!inner.empty() && IsInclusion(ToLower(inner.front()))) {
             subcircuit.Warnings.push_back(std::format("{}: {} is not followed, so what it brings in is missing",
-                                                      scan.Origins[scan.Statements[index].FirstLine], inner.front()));
+                                                      scan.Origins[scan.Statements[index].FirstLine],
+                                                      inner.front()));
         }
     }
 }
@@ -359,8 +367,10 @@ void WarnInclusions(const LibraryScan &scan, const std::size_t header, const std
  * @brief   The second pass turns a subcircuit into a text that needs nothing else from the file; no value for one
  *          without a name, defined twice or encrypted, with the warning that says so.
  */
-std::optional<LibrarySubcircuit> BuildSubcircuit(const LibraryScan &scan, const std::size_t header,
-                                                 const std::size_t end, std::set<std::string> &names,
+std::optional<LibrarySubcircuit> BuildSubcircuit(const LibraryScan &scan,
+                                                 const std::size_t header,
+                                                 const std::size_t end,
+                                                 std::set<std::string> &names,
                                                  std::vector<std::string> &warnings) {
     const Statement &first = scan.Statements[header];
     const Statement &last = scan.Statements[end];
@@ -379,8 +389,8 @@ std::optional<LibrarySubcircuit> BuildSubcircuit(const LibraryScan &scan, const 
     std::string expressions;
     ReadHeader(tokens, subcircuit, expressions);
     const std::string body = last.FirstLine > first.LastLine + 1
-                                 ? JoinLines(scan.Lines, first.LastLine + 1, last.FirstLine - 1)
-                                 : std::string();
+                               ? JoinLines(scan.Lines, first.LastLine + 1, last.FirstLine - 1)
+                               : std::string();
     if (IsEncrypted(body)) {
         warnings.push_back(std::format("{} is encrypted, so only its vendor's simulator can read it; it was left out",
                                        subcircuit.Name));

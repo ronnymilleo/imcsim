@@ -1,7 +1,7 @@
 /**
  * @file    run_status.h
- * @brief   The text of the run status in the status bar of the editor: what the last run reported, or how far a run in
- *          progress is.
+ * @brief   The text of the run status in the status bar of the editor, what the last run reported, or how far a run in
+ *          progress is, the label of the Run button, and the full report of the last run of an analysis.
  */
 
 #ifndef IMCSIM_RUN_STATUS_H
@@ -45,11 +45,15 @@ struct RunStatusLine {
 // Texts
 std::string FormatRunProgress(std::string_view analysis_name, bool is_stopping, double progress);
 std::string FormatLiveProgress(bool is_paused, const std::optional<Core::Transient> &transient);
-std::string DescribeRunCost(std::optional<double> seconds, Analysis analysis,
-                            const std::optional<Core::Transient> &transient);
+std::string
+DescribeRunCost(std::optional<double> seconds, Analysis analysis, const std::optional<Core::Transient> &transient);
+std::string GetRunButtonLabel(RunAction action);
 
 // Status
 RunStatusLine DescribeRunStatus(const AnalysisControls &controls, const std::optional<Core::Transient> &transient);
+
+// Report
+void DrawRunReport(const AnalysisControls &controls, Analysis analysis);
 
 } // namespace GUI
 

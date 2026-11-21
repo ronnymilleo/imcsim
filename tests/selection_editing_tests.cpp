@@ -29,7 +29,7 @@ GUI::Schematic ResistorWithWire() {
 
 TEST_CASE("A drag is in progress only while the selecting mode holds one", "[selection_editing]") {
     GUI::Schematic schematic = ResistorWithWire();
-    schematic.SetSelection({0}, {});
+    schematic.SetSelection({.Elements = {0}, .Wires = {}});
     GUI::EditorMode mode = GUI::SelectingMode{};
     CHECK_FALSE(GUI::IsDragging(mode));
     std::get<GUI::SelectingMode>(mode).Drag = GUI::MakeDrag(schematic, {0, 0}, std::nullopt);
@@ -40,7 +40,7 @@ TEST_CASE("A drag is in progress only while the selecting mode holds one", "[sel
 TEST_CASE("A drag moves the selected parts by how far the cursor went, and the wires on them follow",
           "[selection_editing]") {
     GUI::Schematic schematic = ResistorWithWire();
-    schematic.SetSelection({0}, {});
+    schematic.SetSelection({.Elements = {0}, .Wires = {}});
     GUI::EditorMode mode = GUI::SelectingMode{};
     std::get<GUI::SelectingMode>(mode).Drag = GUI::MakeDrag(schematic, {0, 0}, std::nullopt);
 
@@ -57,37 +57,37 @@ TEST_CASE("A drag moves the selected parts by how far the cursor went, and the w
 TEST_CASE("A drag that never moved a group leaves just the item that was clicked", "[selection_editing]") {
     GUI::Schematic schematic = ResistorWithWire();
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {12, 0}, GUI::Rotation::R0));
-    schematic.SetSelection({0, 1}, {});
+    schematic.SetSelection({.Elements = {0, 1}, .Wires = {}});
     GUI::EditorMode mode = GUI::SelectingMode{};
     const GUI::Selection clicked = {.Elements = {1}, .Wires = {}};
     std::get<GUI::SelectingMode>(mode).Drag = GUI::MakeDrag(schematic, {12, 0}, clicked);
 
     GUI::EndDrag(schematic, mode);
     CHECK_FALSE(GUI::IsDragging(mode));
-    CHECK(schematic.GetSelectedElements() == std::set<std::size_t>{1});
+    CHECK(schematic.GetSelection().Elements == std::set<std::size_t>{1});
 
     // The same drag that moved first keeps the group
-    schematic.SetSelection({0, 1}, {});
+    schematic.SetSelection({.Elements = {0, 1}, .Wires = {}});
     std::get<GUI::SelectingMode>(mode).Drag = GUI::MakeDrag(schematic, {12, 0}, clicked);
     GUI::UpdateDrag(schematic, mode, {13, 0});
     GUI::EndDrag(schematic, mode);
-    CHECK(schematic.GetSelectedElements() == std::set<std::size_t>{0, 1});
+    CHECK(schematic.GetSelection().Elements == std::set<std::size_t>{0, 1});
 }
 
 TEST_CASE("Replacing or clearing the selection ends the drag, and clearing drops the selection box",
           "[selection_editing]") {
     GUI::Schematic schematic = ResistorWithWire();
-    schematic.SetSelection({0}, {});
+    schematic.SetSelection({.Elements = {0}, .Wires = {}});
     GUI::EditorMode mode = GUI::SelectingMode{};
     std::get<GUI::SelectingMode>(mode).Drag = GUI::MakeDrag(schematic, {0, 0}, std::nullopt);
 
     GUI::ApplySelection(schematic, mode, {.Elements = {}, .Wires = {0}});
     CHECK_FALSE(GUI::IsDragging(mode));
-    CHECK(schematic.GetSelectedElements().empty());
-    CHECK(schematic.GetSelectedWires() == std::set<std::size_t>{0});
+    CHECK(schematic.GetSelection().Elements.empty());
+    CHECK(schematic.GetSelection().Wires == std::set<std::size_t>{0});
 
     std::get<GUI::SelectingMode>(mode).Box = GUI::SelectionBox{.Start = {0.0f, 0.0f}, .Base = {}};
-    GUI::ClearSelection(schematic, mode);
+    GUI::CancelSelection(schematic, mode);
     CHECK_FALSE(std::get<GUI::SelectingMode>(mode).Box);
     CHECK_FALSE(schematic.HasSelection());
 }
@@ -100,13 +100,13 @@ TEST_CASE("Select all works only while selecting", "[selection_editing]") {
 
     mode = GUI::SelectingMode{};
     GUI::SelectAll(schematic, mode);
-    CHECK(schematic.GetSelectedElements() == std::set<std::size_t>{0});
-    CHECK(schematic.GetSelectedWires() == std::set<std::size_t>{0});
+    CHECK(schematic.GetSelection().Elements == std::set<std::size_t>{0});
+    CHECK(schematic.GetSelection().Wires == std::set<std::size_t>{0});
 }
 
 TEST_CASE("Turning the selection takes the wires along unless they are asked to stay", "[selection_editing]") {
     GUI::Schematic following = ResistorWithWire();
-    following.SetSelection({0}, {});
+    following.SetSelection({.Elements = {0}, .Wires = {}});
     GUI::EditorMode mode = GUI::SelectingMode{};
     GUI::TransformSelection(following, mode, GUI::PointTransform::Kind::QUARTER_TURN, false);
     CHECK(following.GetElement(0).GetRotation() != GUI::Rotation::R0);
@@ -118,7 +118,7 @@ TEST_CASE("Turning the selection takes the wires along unless they are asked to 
     }));
 
     GUI::Schematic staying = ResistorWithWire();
-    staying.SetSelection({0}, {});
+    staying.SetSelection({.Elements = {0}, .Wires = {}});
     GUI::TransformSelection(staying, mode, GUI::PointTransform::Kind::QUARTER_TURN, true);
     CHECK(staying.GetElement(0).GetRotation() != GUI::Rotation::R0);
     CHECK(staying.GetWires().front().GetStart() == GUI::GridPoint{2, 0});

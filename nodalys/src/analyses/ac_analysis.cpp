@@ -5,6 +5,7 @@
 
 #include "analyses/analyses.h"
 
+#include "analyses/analysis_preamble.h"
 #include "analyses/frequency_sweep.h"
 #include "devices/devices.h"
 #include <algorithm>
@@ -12,39 +13,18 @@
 #include <complex>
 #include <format>
 #include <numbers>
+#include <utility>
 
 namespace Nodalys {
 
-std::expected<AcSweepResult, std::string> ComputeACSweep(CompiledCircuit &compiled, const AcSweepConfig &settings,
-                                                         const ConvergenceOptions &options,
-                                                         std::vector<DiagnosticMessage> *messages) {
+namespace {
 
-    if (settings.StartFrequency <= 0.0 || settings.StopFrequency < settings.StartFrequency ||
-        settings.PointsPerDecade <= 0) {
-        return std::unexpected("The AC sweep has invalid frequency settings; check start, stop and points per decade");
-    }
+constexpr double MIN_MAGNITUDE = 1e-15;
+constexpr double RAD_TO_DEG = 180.0 / std::numbers::pi;
 
-    const int size = compiled.System->GetSize();
-    std::vector<double> x_dc(static_cast<std::size_t>(size), 0.0);
-    const NewtonOutcome outcome = SolveNewton(*compiled.System, compiled.Devices, x_dc, TimeContext{}, options);
-    if (!outcome.Converged) {
-        return std::unexpected(
-            DescribeFailure("Nodalys found no operating point to linearize the AC sweep around", outcome));
-    }
-    DescribeOutcome(outcome, "operating point", messages);
-
-    std::vector<bool> node_flags(static_cast<std::size_t>(size), false);
-    for (int i = 0; i < size; ++i) {
-        node_flags[static_cast<std::size_t>(i)] = compiled.System->IsNodeUnknown(i);
-    }
-    MnaSystem reactive(std::move(node_flags));
-    for (const std::unique_ptr<Device> &device : compiled.Devices) {
-        device->StampAc(reactive, x_dc);
-    }
-
+AcSweepResult MakeSweepResult(const CompiledCircuit &compiled, std::vector<double> frequencies) {
     AcSweepResult result;
-    result.Frequencies = MakeFrequencySweep(settings.SweepType, settings.StartFrequency, settings.StopFrequency,
-                                            settings.PointsPerDecade);
+    result.Frequencies = std::move(frequencies);
 
     const std::size_t point_count = result.Frequencies.size();
     result.NodeMagnitudesDecibels.resize(static_cast<std::size_t>(compiled.CircuitNodeCount));
@@ -61,42 +41,89 @@ std::expected<AcSweepResult, std::string> ComputeACSweep(CompiledCircuit &compil
         result.CurrentPhasesDegrees[index].Name = compiled.Currents[index].Name;
         result.CurrentPhasesDegrees[index].Values.reserve(point_count);
     }
+    return result;
+}
 
-    constexpr double MIN_MAGNITUDE = 1e-15;
-    constexpr double RAD_TO_DEG = 180.0 / std::numbers::pi;
-    std::vector<std::complex<double>> x_ac(static_cast<std::size_t>(size));
+void AddNodeResponses(AcSweepResult &result,
+                      const CompiledCircuit &compiled,
+                      const std::vector<std::complex<double>> &x_ac) {
+    for (int node = 1; node < compiled.CircuitNodeCount; ++node) {
+        const int unknown = compiled.System->NodeIndex(node);
+        const std::complex<double> v =
+            unknown < 0 ? std::complex<double>{0.0, 0.0} : x_ac[static_cast<std::size_t>(unknown)];
+        const double mag_db = 20.0 * std::log10(std::max(std::abs(v), MIN_MAGNITUDE));
+        const double phase_deg = std::arg(v) * RAD_TO_DEG;
+        result.NodeMagnitudesDecibels[static_cast<std::size_t>(node)].push_back(mag_db);
+        result.NodePhasesDegrees[static_cast<std::size_t>(node)].push_back(phase_deg);
+    }
+}
 
+void AddCurrentResponses(AcSweepResult &result,
+                         const CompiledCircuit &compiled,
+                         const std::vector<double> &x_dc,
+                         const std::vector<std::complex<double>> &x_ac,
+                         const double omega) {
+    for (std::size_t index = 0; index < compiled.Currents.size(); ++index) {
+        std::complex<double> current{0.0, 0.0};
+        for (const CurrentContribution &contribution : compiled.Currents[index].Contributions) {
+            current += contribution.Element->AcTerminalCurrent(contribution.Terminal, x_dc, x_ac, omega);
+        }
+        const double mag_db = 20.0 * std::log10(std::max(std::abs(current), MIN_MAGNITUDE));
+        const double phase_deg = std::arg(current) * RAD_TO_DEG;
+        result.CurrentMagnitudesDecibels[index].Values.push_back(mag_db);
+        result.CurrentPhasesDegrees[index].Values.push_back(phase_deg);
+    }
+}
+
+} // namespace
+
+/**
+ * @brief   Computes the small-signal response of every node and current over a range of frequencies.
+ * @param[in,out] compiled  Compiled circuit with its matrix and devices.
+ * @param[in]     settings  Sweep type and frequency range.
+ * @param[in]     options   Numerical limits of the operating point.
+ * @param[out]    messages  Diagnostic messages collected during the analysis; may be null.
+ * @return  The magnitudes in decibels and the phases in degrees at each frequency, or an error description.
+ */
+std::expected<AcSweepResult, std::string> ComputeACSweep(CompiledCircuit &compiled,
+                                                         const AcSweepConfig &settings,
+                                                         const ConvergenceOptions &options,
+                                                         std::vector<DiagnosticMessage> *messages) {
+
+    if (!IsValidSweepRange(settings.StartFrequency, settings.StopFrequency, settings.PointsPerDecade)) {
+        return std::unexpected("The AC sweep has invalid frequency settings; check start, stop and points per decade");
+    }
+
+    const std::expected<std::vector<double>, std::string> x_dc =
+        SolveOperatingPoint(compiled,
+                            options,
+                            "Nodalys found no operating point to linearize the AC sweep around",
+                            messages);
+    if (!x_dc) {
+        return std::unexpected(x_dc.error());
+    }
+    const MnaSystem reactive = BuildReactiveSystem(compiled, *x_dc);
+
+    AcSweepResult result = MakeSweepResult(compiled,
+                                           MakeFrequencySweep(settings.SweepType,
+                                                              settings.StartFrequency,
+                                                              settings.StopFrequency,
+                                                              settings.PointsPerDecade));
+
+    std::vector<std::complex<double>> x_ac(static_cast<std::size_t>(compiled.System->GetSize()));
     for (const double frequency : result.Frequencies) {
         const double omega = 2.0 * std::numbers::pi * frequency;
         if (!compiled.System->SolveAc(reactive, omega, x_ac)) {
             return std::unexpected(
                 std::format("The Nodalys AC solver encountered a singular matrix at f = {} Hz", frequency));
         }
-
-        for (int node = 1; node < compiled.CircuitNodeCount; ++node) {
-            const int unknown = compiled.System->NodeIndex(node);
-            const std::complex<double> v =
-                unknown < 0 ? std::complex<double>{0.0, 0.0} : x_ac[static_cast<std::size_t>(unknown)];
-            const double mag_db = 20.0 * std::log10(std::max(std::abs(v), MIN_MAGNITUDE));
-            const double phase_deg = std::arg(v) * RAD_TO_DEG;
-            result.NodeMagnitudesDecibels[static_cast<std::size_t>(node)].push_back(mag_db);
-            result.NodePhasesDegrees[static_cast<std::size_t>(node)].push_back(phase_deg);
-        }
-
-        for (std::size_t index = 0; index < compiled.Currents.size(); ++index) {
-            std::complex<double> current{0.0, 0.0};
-            for (const CurrentContribution &contribution : compiled.Currents[index].Contributions) {
-                current += contribution.Element->AcTerminalCurrent(contribution.Terminal, x_dc, x_ac, omega);
-            }
-            const double mag_db = 20.0 * std::log10(std::max(std::abs(current), MIN_MAGNITUDE));
-            const double phase_deg = std::arg(current) * RAD_TO_DEG;
-            result.CurrentMagnitudesDecibels[index].Values.push_back(mag_db);
-            result.CurrentPhasesDegrees[index].Values.push_back(phase_deg);
-        }
+        AddNodeResponses(result, compiled, x_ac);
+        AddCurrentResponses(result, compiled, *x_dc, x_ac, omega);
     }
 
     if (messages) {
-        messages->push_back({std::format("nodalys: AC sweep computed {} frequency points", point_count), false});
+        messages->push_back(
+            {std::format("nodalys: AC sweep computed {} frequency points", result.Frequencies.size()), false});
     }
     return result;
 }

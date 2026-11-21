@@ -8,6 +8,7 @@
 
 #include "devices/devices.h"
 #include "nodalys/analyses.h"
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -40,8 +41,36 @@ struct NewtonOutcome {
  * @param[in]     options  Convergence tolerances and limits.
  * @return  Outcome with iteration count and whether it converged.
  */
-NewtonOutcome SolveNewton(MnaSystem &sys, const std::vector<std::unique_ptr<Device>> &devices, std::vector<double> &x,
-                          const TimeContext &time, const ConvergenceOptions &options);
+NewtonOutcome SolveNewton(MnaSystem &sys,
+                          const std::vector<std::unique_ptr<Device>> &devices,
+                          std::vector<double> &x,
+                          const TimeContext &time,
+                          const ConvergenceOptions &options);
+
+/**
+ * @enum    NodesetPass
+ * @brief   Which of the passes of a solve with nodesets is being run.
+ */
+enum class NodesetPass {
+    /// The nodes are pulled to their guesses.
+    PULLED,
+    /// The nodesets are let go, starting from the point the pulled pass found.
+    RELEASED,
+    /// No nodeset acts, as a solve of a circuit without any.
+    PLAIN,
+};
+
+/**
+ * @brief   Runs a solve of an operating point through the passes of the nodesets.
+ * @details The one place that knows the order: the pulled pass, then the released one from its point, and a plain
+ *          solve from the start when either finds nothing. `SolveNewton` and the DC bias of the harmonic balance both
+ *          go through it, so a nodeset means the same in both.
+ * @param[in,out] x      Initial guess in, solution out; the guess again when the passes found nothing and the plain
+ *                       solve then starts from it.
+ * @param[in]     solve  Runs one pass on `x` and returns whether it converged.
+ * @return  What the last pass that ran returned.
+ */
+bool SolveInNodesetPasses(std::vector<double> &x, const std::function<bool(std::vector<double> &, NodesetPass)> &solve);
 
 /**
  * @brief   Adds to the message of a solve that failed the fault of a device, when one was seen.

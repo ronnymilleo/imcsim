@@ -7,6 +7,7 @@
 
 #include "circuit/components/subcircuit.h"
 #include "nlohmann/json.hpp"
+#include "schematic/block_nesting.h"
 #include "schematic/connectivity.h"
 #include "schematic/file_elements.h"
 #include "schematic/file_json.h"
@@ -84,8 +85,8 @@ std::expected<SavedSubcircuitPin, std::string> ReadSubcircuitPin(const nlohmann:
 /**
  * @brief   The pins of a block, in order, each with a name of its own.
  */
-std::expected<void, std::string> ReadSubcircuitPins(const nlohmann::json &object, const bool is_text,
-                                                    std::vector<SavedSubcircuitPin> &pins) {
+std::expected<void, std::string>
+ReadSubcircuitPins(const nlohmann::json &object, const bool is_text, std::vector<SavedSubcircuitPin> &pins) {
     const auto list = object.find("pins");
     if (list == object.end()) {
         return {};
@@ -107,6 +108,30 @@ std::expected<void, std::string> ReadSubcircuitPins(const nlohmann::json &object
 }
 
 /**
+ * @brief   The parameters of a block, in order, each with a name of its own and a default value.
+ */
+std::expected<void, std::string> ReadSubcircuitParameters(const nlohmann::json &object,
+                                                          std::vector<Core::SubcircuitParameter> &parameters) {
+    const auto list = object.find("parameters");
+    if (list == object.end()) {
+        return {};
+    }
+    if (!list->is_array()) {
+        return std::unexpected("has parameters that are not a list");
+    }
+    for (const nlohmann::json &entry : *list) {
+        const std::optional<std::string> name = entry.is_object() ? ReadString(entry, "name") : std::nullopt;
+        const std::optional<double> value = entry.is_object() ? ReadNumber(entry, "default") : std::nullopt;
+        if (!name || !Core::SubcircuitInstance::IsValidIdentifier(*name) || !value
+            || std::ranges::contains(parameters, *name, &Core::SubcircuitParameter::Name)) {
+            return std::unexpected("has an invalid or repeated parameter");
+        }
+        parameters.push_back({*name, *value});
+    }
+    return {};
+}
+
+/**
  * @brief   The ports and text of a block kept as SPICE text; each pin is the port of the same place.
  */
 std::expected<SavedSubcircuit, std::string> ReadSubcircuitText(const nlohmann::json &object,
@@ -121,8 +146,8 @@ std::expected<SavedSubcircuit, std::string> ReadSubcircuitText(const nlohmann::j
     }
     Core::SubcircuitText spice{.Ports = {}, .Text = *text};
     for (const nlohmann::json &port : *ports) {
-        if (!port.is_string() || port.get<std::string>().empty() ||
-            port.get<std::string>().find_first_of(" \t\n") != std::string::npos) {
+        if (!port.is_string() || port.get<std::string>().empty()
+            || port.get<std::string>().find_first_of(" \t\n") != std::string::npos) {
             return std::unexpected("has a SPICE port that is not one word");
         }
         spice.Ports.push_back(port.get<std::string>());
@@ -154,21 +179,8 @@ std::expected<SavedSubcircuit, std::string> ReadSubcircuit(const nlohmann::json 
     if (auto read = ReadSubcircuitPins(object, is_text, definition.Pins); !read) {
         return std::unexpected(read.error());
     }
-    const auto parameters = object.find("parameters");
-    if (parameters != object.end() && !parameters->is_array()) {
-        return std::unexpected("has parameters that are not a list");
-    }
-    if (parameters != object.end()) {
-        for (const nlohmann::json &parameter : *parameters) {
-            const std::optional<std::string> parameter_name =
-                parameter.is_object() ? ReadString(parameter, "name") : std::nullopt;
-            const std::optional<double> value = parameter.is_object() ? ReadNumber(parameter, "default") : std::nullopt;
-            if (!parameter_name || !Core::SubcircuitInstance::IsValidIdentifier(*parameter_name) || !value ||
-                std::ranges::contains(definition.Parameters, *parameter_name, &Core::SubcircuitParameter::Name)) {
-                return std::unexpected("has an invalid or repeated parameter");
-            }
-            definition.Parameters.push_back({*parameter_name, *value});
-        }
+    if (auto read = ReadSubcircuitParameters(object, definition.Parameters); !read) {
+        return std::unexpected(read.error());
     }
     if (is_text) {
         return ReadSubcircuitText(object.at("spice"), std::move(definition));
@@ -217,27 +229,34 @@ std::vector<std::size_t> OrderDefinitionsForReading(const nlohmann::json &list) 
             first_of_name.try_emplace(*name, index);
         }
     }
-    std::vector<std::size_t> order;
-    std::vector<bool> is_placed(list.size(), false);
-    std::vector<bool> is_open(list.size(), false);
-    const std::function<void(std::size_t)> place = [&](const std::size_t index) {
-        if (is_placed[index] || is_open[index]) {
-            return;
-        }
-        is_open[index] = true;
+    return OrderByDependencies(list.size(), [&](const std::size_t index) {
+        std::vector<std::size_t> placed_definitions;
         for (const std::string &used : ListPlacedDefinitions(list[index])) {
             if (const auto inner = first_of_name.find(used); inner != first_of_name.end()) {
-                place(inner->second);
+                placed_definitions.push_back(inner->second);
             }
         }
-        is_open[index] = false;
-        is_placed[index] = true;
-        order.push_back(index);
-    };
-    for (std::size_t index = 0; index < list.size(); ++index) {
-        place(index);
+        return placed_definitions;
+    });
+}
+
+/**
+ * @brief   Puts definitions back in the order of the file, so saving writes them where they were.
+ * @param[in] definitions    Definitions in the order they were read.
+ * @param[in] file_positions Position in the file of each definition, in the same order.
+ */
+std::vector<SavedSubcircuit> InFileOrder(std::vector<SavedSubcircuit> definitions,
+                                         const std::vector<std::size_t> &file_positions) {
+    std::vector<std::size_t> by_file(definitions.size());
+    for (std::size_t position = 0; position < by_file.size(); ++position) {
+        by_file[position] = position;
     }
-    return order;
+    std::ranges::sort(by_file, {}, [&](const std::size_t position) { return file_positions[position]; });
+    std::vector<SavedSubcircuit> ordered;
+    for (const std::size_t position : by_file) {
+        ordered.push_back(std::move(definitions[position]));
+    }
+    return ordered;
 }
 
 } // namespace
@@ -292,17 +311,7 @@ std::vector<SavedSubcircuit> ReadSubcircuits(const nlohmann::json &document, std
             file_positions.push_back(index);
         }
     }
-    // Back to the order of the file, so saving writes them where they were
-    std::vector<std::size_t> by_file(definitions.size());
-    for (std::size_t position = 0; position < by_file.size(); ++position) {
-        by_file[position] = position;
-    }
-    std::ranges::sort(by_file, {}, [&](const std::size_t position) { return file_positions[position]; });
-    std::vector<SavedSubcircuit> ordered;
-    for (const std::size_t position : by_file) {
-        ordered.push_back(std::move(definitions[position]));
-    }
-    return ordered;
+    return InFileOrder(std::move(definitions), file_positions);
 }
 
 } // namespace GUI

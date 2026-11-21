@@ -6,6 +6,7 @@
 #include "simulation/ac_sensitivity.h"
 
 #include "simulation/sensitivity.h"
+#include "spice/spice_text.h"
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -15,16 +16,6 @@
 namespace Core {
 
 namespace {
-
-std::string ToLower(std::string text) {
-    std::ranges::transform(text, text.begin(), [](const unsigned char character) { return std::tolower(character); });
-    return text;
-}
-
-std::string ToUpper(std::string text) {
-    std::ranges::transform(text, text.begin(), [](const unsigned char character) { return std::toupper(character); });
-    return text;
-}
 
 /// The larger the better: how far an element moves the response anywhere in the sweep, in decibels per percent.
 double GetPeakEffect(const ACElementFigures &figures) {
@@ -65,11 +56,12 @@ std::optional<ACPartSensitivity> MakePotentiometerPart(const Component &part, co
         }
         return sum;
     };
-    return MakePart(part, {.Value = part.GetValue(),
-                           .MagnitudeDecibelsPerPercent = add(first->second.MagnitudeDecibelsPerPercent,
-                                                              second->second.MagnitudeDecibelsPerPercent),
-                           .PhaseDegreesPerPercent =
-                               add(first->second.PhaseDegreesPerPercent, second->second.PhaseDegreesPerPercent)});
+    return MakePart(
+        part,
+        {.Value = part.GetValue(),
+         .MagnitudeDecibelsPerPercent =
+             add(first->second.MagnitudeDecibelsPerPercent, second->second.MagnitudeDecibelsPerPercent),
+         .PhaseDegreesPerPercent = add(first->second.PhaseDegreesPerPercent, second->second.PhaseDegreesPerPercent)});
 }
 
 const char *InnerUnit(const char type_letter) {

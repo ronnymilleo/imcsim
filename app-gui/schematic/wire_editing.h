@@ -51,12 +51,28 @@ struct MovedWires {
     std::set<std::size_t> Selected;
 };
 
-std::vector<UIWire> FollowTerminals(const std::vector<UIWire> &wires, const std::vector<GridPoint> &old_terminals,
+/**
+ * @struct  TerminalMove
+ * @brief   The terminals of a move of some parts: where those of the parts that move were and are, and those of the
+ *          parts that stay.
+ */
+struct TerminalMove {
+    /// Terminals of the parts that move, before the move.
+    std::vector<GridPoint> Old;
+    /// The same terminals after the move, in the same order.
+    std::vector<GridPoint> New;
+    /// Terminals of the parts that stay.
+    std::vector<GridPoint> Fixed;
+};
+
+std::vector<UIWire> FollowTerminals(const std::vector<UIWire> &wires,
+                                    const std::vector<GridPoint> &old_terminals,
                                     const std::vector<GridPoint> &new_terminals);
 std::vector<UIWire> SimplifyWires(const std::vector<UIWire> &wires, const std::vector<GridPoint> &terminals);
-MovedWires MoveGroup(const std::vector<UIWire> &wires, const std::set<std::size_t> &selected,
-                     const std::vector<GridPoint> &old_terminals, const std::vector<GridPoint> &new_terminals,
-                     const std::vector<GridPoint> &fixed_terminals, const PointTransform &transform);
+MovedWires MoveGroup(const std::vector<UIWire> &wires,
+                     const std::set<std::size_t> &selected,
+                     const TerminalMove &terminals,
+                     const PointTransform &transform);
 
 } // namespace GUI
 

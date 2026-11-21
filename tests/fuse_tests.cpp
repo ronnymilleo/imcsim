@@ -45,8 +45,10 @@ using Catch::Matchers::WithinAbs;
 using Catch::Matchers::WithinRel;
 
 /// A 1 A fuse with a time constant of 150 ms, shorter than the ready ones, so the runs that blow it stay short.
-constexpr Core::FuseParameters QUICK_FUSE = {
-    .RatedCurrent = 1.0, .MeltingI2t = 0.15, .ColdResistance = 0.15, .BlownResistance = 1e9};
+constexpr Core::FuseParameters QUICK_FUSE = {.RatedCurrent = 1.0,
+                                             .MeltingI2t = 0.15,
+                                             .ColdResistance = 0.15,
+                                             .BlownResistance = 1e9};
 
 /// A 5 V supply on node 1 feeding a quick fuse to node 2, where a load goes to ground.
 struct FuseLoop {
@@ -102,8 +104,8 @@ struct PulsedFuseLoop {
 /// ngspice falls back to slower ways of finding an operating point when the first one fails, and says so
 bool HasConvergenceTrouble(const std::vector<Core::SimulatorMessage> &messages) {
     return std::ranges::any_of(messages, [](const Core::SimulatorMessage &message) {
-        return message.Text.contains("failed") || message.Text.contains("singular") ||
-               message.Text.contains("Transient op");
+        return message.Text.contains("failed") || message.Text.contains("singular")
+            || message.Text.contains("Transient op");
     });
 }
 
@@ -161,10 +163,12 @@ TEST_CASE("The ready fuses are valid and differ in name and figures", "[fuse]") 
         }
     }
     // A slow-blow fuse takes more I2t than a fast one of the same rating, so it cools more slowly
-    const auto fast = std::ranges::find(ready_fuses, std::string("1 A fast"),
-                                        [](const Core::ReadyFuse &ready) { return std::string(ready.Name); });
-    const auto slow = std::ranges::find(ready_fuses, std::string("1 A slow-blow"),
-                                        [](const Core::ReadyFuse &ready) { return std::string(ready.Name); });
+    const auto fast = std::ranges::find(ready_fuses, std::string("1 A fast"), [](const Core::ReadyFuse &ready) {
+        return std::string(ready.Name);
+    });
+    const auto slow = std::ranges::find(ready_fuses, std::string("1 A slow-blow"), [](const Core::ReadyFuse &ready) {
+        return std::string(ready.Name);
+    });
     REQUIRE(fast != ready_fuses.end());
     REQUIRE(slow != ready_fuses.end());
     CHECK(Core::GetCoolingTimeConstant(slow->Parameters) > Core::GetCoolingTimeConstant(fast->Parameters));
@@ -570,8 +574,8 @@ TEST_CASE("A fuse keeps its figures in the file, and one with figures out of ran
     const auto defaults = GUI::LoadSchematic(plain);
     REQUIRE(defaults.has_value());
     REQUIRE(defaults->Elements.size() == 1);
-    CHECK(static_cast<const Core::Fuse &>(defaults->Elements[0]->GetComponent()).GetParameters() ==
-          Core::FuseParameters{});
+    CHECK(static_cast<const Core::Fuse &>(defaults->Elements[0]->GetComponent()).GetParameters()
+          == Core::FuseParameters{});
 }
 
 TEST_CASE("The fuse flash is on for a new user, and the other effects are not", "[fuse][preferences]") {
@@ -587,9 +591,12 @@ TEST_CASE("The fuse flash is on for a new user, and the other effects are not", 
 TEST_CASE("Nodalys declares no fuse unsupported in any analysis", "[fuse][nodalys]") {
     const Core::NodalysBackend nodalys;
     FuseLoop loop(2.5);
-    for (const Core::AnalysisKind kind :
-         {Core::AnalysisKind::OPERATING_POINT, Core::AnalysisKind::TRANSIENT, Core::AnalysisKind::DC_SWEEP,
-          Core::AnalysisKind::AC_SWEEP, Core::AnalysisKind::NOISE, Core::AnalysisKind::TRANSFER_FUNCTION}) {
+    for (const Core::AnalysisKind kind : {Core::AnalysisKind::OPERATING_POINT,
+                                          Core::AnalysisKind::TRANSIENT,
+                                          Core::AnalysisKind::DC_SWEEP,
+                                          Core::AnalysisKind::AC_SWEEP,
+                                          Core::AnalysisKind::NOISE,
+                                          Core::AnalysisKind::TRANSFER_FUNCTION}) {
         CHECK_FALSE(Core::FindUnsupported(nodalys, loop.Circuit, kind).has_value());
     }
 }
@@ -715,16 +722,20 @@ TEST_CASE("A fuse inside a block blows on Nodalys at the time of the same fuse o
 TEST_CASE("The fast and slow-blow fuses of the example blow at the same times on both engines", "[fuse][nodalys]") {
     const auto examples = GUI::GetExamples();
     const auto example =
-        std::ranges::find(examples, std::string("fuse_fast_and_slow_blow.imcsim"),
-                          [](const GUI::Example &candidate) { return std::string(candidate.FileName); });
+        std::ranges::find(examples, std::string("fuse_fast_and_slow_blow.imcsim"), [](const GUI::Example &candidate) {
+            return std::string(candidate.FileName);
+        });
     REQUIRE(example != examples.end());
     auto loaded = GUI::LoadExample(*example);
     if (!loaded) {
         FAIL(loaded.error());
     }
     GUI::Schematic schematic;
-    schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings),
-                      std::move(loaded->Subcircuits), std::move(loaded->Models));
+    schematic.Replace(std::move(loaded->Elements),
+                      std::move(loaded->Wires),
+                      std::move(loaded->Settings),
+                      std::move(loaded->Subcircuits),
+                      std::move(loaded->Models));
     const Core::Circuit circuit = schematic.BuildCircuit();
     const Core::TransientSettings settings = schematic.GetSimulationSettings().Transient;
     const Core::TransientRun on_ngspice = Core::RunTransient(circuit, settings);
@@ -791,8 +802,11 @@ TEST_CASE("A noise analysis with a fuse gives the same total on ngspice and on N
     circuit.Add(loop.Part, {1, 2});
     circuit.Add(loop.Load, {2, 0});
     circuit.Add(loop.Reference, {0});
-    const Core::NoiseSettings settings{
-        .OutputNode = 2, .InputSource = "Vin1", .StartFrequency = 10.0, .StopFrequency = 100.0, .PointsPerDecade = 1};
+    const Core::NoiseSettings settings{.OutputNode = 2,
+                                       .InputSource = "Vin1",
+                                       .StartFrequency = 10.0,
+                                       .StopFrequency = 100.0,
+                                       .PointsPerDecade = 1};
     const Core::NoiseRun on_ngspice = Core::RunNoise(circuit, settings);
     const Core::NoiseRun on_nodalys = [&] {
         const TestSupport::NodalysInUse nodalys;

@@ -5,12 +5,12 @@
 
 #include "windows/editor_toolbar.h"
 
+#include "analysis/run_status.h"
 #include "base/theme.h"
 #include "schematic/shortcuts.h"
 #include "spice/spice_value.h"
 #include "windows/tool_icons.h"
 #include <algorithm>
-#include <array>
 #include <format>
 #include <string>
 #include <utility>
@@ -38,7 +38,8 @@ void DrawGroupSeparator() {
     ImGui::SameLine(0.0f, gap / 2.0f);
     const ImVec2 top = ImGui::GetCursorScreenPos();
     const float side = GetToolButtonSide();
-    ImGui::GetWindowDrawList()->AddLine({top.x, top.y + side * 0.2f}, {top.x, top.y + side * 0.8f},
+    ImGui::GetWindowDrawList()->AddLine({top.x, top.y + side * 0.2f},
+                                        {top.x, top.y + side * 0.8f},
                                         ImGui::GetColorU32(ImGuiCol_Separator));
     ImGui::Dummy({1.0f, side});
     ImGui::SameLine(0.0f, gap / 2.0f);
@@ -59,7 +60,8 @@ void DrawDropdownArrow(const ImVec2 center) {
     const float arrow = ImGui::GetFontSize() * 0.25f;
     ImGui::GetWindowDrawList()->AddTriangleFilled(center + ImVec2(-arrow, -arrow * 0.5f),
                                                   center + ImVec2(arrow, -arrow * 0.5f),
-                                                  center + ImVec2(0.0f, arrow * 0.5f), GetIconColor(true));
+                                                  center + ImVec2(0.0f, arrow * 0.5f),
+                                                  GetIconColor(true));
 }
 
 /**
@@ -67,10 +69,7 @@ void DrawDropdownArrow(const ImVec2 center) {
  */
 float AnalysisButtonWidth() {
     float widest = 0.0f;
-    for (const Analysis analysis :
-         {Analysis::OPERATING_POINT, Analysis::TRANSIENT, Analysis::AC_SWEEP, Analysis::DC_SWEEP, Analysis::NOISE,
-          Analysis::TRANSFER_FUNCTION, Analysis::SENSITIVITY, Analysis::POLE_ZERO, Analysis::S_PARAMETERS,
-          Analysis::TRUTH_TABLE, Analysis::HARMONIC_BALANCE}) {
+    for (const Analysis analysis : ALL_ANALYSES) {
         widest = std::max(widest, ImGui::CalcTextSize(GetAnalysisName(analysis)).x);
     }
     return widest + ImGui::GetStyle().FramePadding.x * 2.0f + ImGui::GetFontSize();
@@ -80,8 +79,134 @@ float AnalysisButtonWidth() {
  * @brief   The Live toggle beside the analysis button, which becomes Discard while a live run goes on.
  */
 float LiveButtonWidth() {
-    return std::max(ImGui::CalcTextSize("Live").x, ImGui::CalcTextSize("Discard").x) +
-           ImGui::GetStyle().FramePadding.x * 2.0f + ImGui::GetFontSize();
+    return std::max(ImGui::CalcTextSize("Live").x, ImGui::CalcTextSize("Discard").x)
+         + ImGui::GetStyle().FramePadding.x * 2.0f + ImGui::GetFontSize();
+}
+
+/**
+ * @brief   The analysis button, Live and Run, pinned to the right end of the bar.
+ */
+float GetRunControlsWidth() {
+    const float spacing = ImGui::GetFontSize() * BUTTON_SPACING;
+    return AnalysisButtonWidth() + LiveButtonWidth() + GetToolButtonSide() + spacing * 2.0f;
+}
+
+/**
+ * @struct  ToolButtonLook
+ * @brief   What one square button of the bar shows: its icon, whether it is the tool in use or can be pressed, and its
+ *          tooltip.
+ */
+struct ToolButtonLook {
+    const char *Id;
+    ToolIcon Icon;
+    bool IsActive = false;
+    bool IsEnabled = true;
+    std::string Tooltip;
+};
+
+/**
+ * @class   ToolButtonRow
+ * @brief   A group of square buttons side by side, spaced alike, each with its icon and its tooltip.
+ */
+class ToolButtonRow {
+public:
+    /**
+     * @brief   Draws the next button of the group.
+     * @param[in] look  What the button shows.
+     * @return  True in the frame it is clicked.
+     */
+    bool Draw(const ToolButtonLook &look) {
+        if (!std::exchange(m_IsFirst, false)) {
+            ImGui::SameLine(0.0f, ImGui::GetFontSize() * BUTTON_SPACING);
+        }
+        ImGui::BeginDisabled(!look.IsEnabled);
+        const bool clicked = ToolButton(look.Id, look.IsActive);
+        ImGui::EndDisabled();
+        DrawToolIcon(ImGui::GetWindowDrawList(),
+                     look.Icon,
+                     GetItemCenter(),
+                     GetIconSize(),
+                     GetIconColor(look.IsEnabled));
+        ImGui::SetItemTooltip("%s", look.Tooltip.c_str());
+        return clicked;
+    }
+
+private:
+    /// The first button of a group starts the bar or follows a separator, which makes its own gap.
+    bool m_IsFirst = true;
+};
+
+/**
+ * @brief   Select, Wire and Probe, with the tool in use shown as active.
+ * @return  The mode of the tool clicked this frame, or none.
+ */
+std::optional<EditorMode> DrawToolButtons(const EditorMode &mode) {
+    ToolButtonRow row;
+    std::optional<EditorMode> picked;
+    if (row.Draw({.Id = "##select",
+                  .Icon = ToolIcon::SELECT,
+                  .IsActive = IsSelecting(mode),
+                  .Tooltip = NameWithShortcut("Select", EditorCommand::START_SELECTING)})) {
+        picked = SelectingMode{};
+    }
+    if (row.Draw({.Id = "##wire",
+                  .Icon = ToolIcon::WIRE,
+                  .IsActive = std::holds_alternative<WiringMode>(mode),
+                  .Tooltip = NameWithShortcut("Wire", EditorCommand::START_WIRING)})) {
+        picked = WiringMode{};
+    }
+    if (row.Draw(
+            {.Id = "##probe",
+             .Icon = ToolIcon::PROBE,
+             .IsActive = std::holds_alternative<ProbingMode>(mode),
+             .Tooltip = NameWithShortcut("Probe", EditorCommand::START_PROBING) + ": pick what the plots measure"})) {
+        picked = ProbingMode{};
+    }
+    return picked;
+}
+
+/**
+ * @brief   Undo and Redo, enabled when the schematic has a step to take, and Fit.
+ * @return  The command of the button clicked this frame, or none.
+ */
+std::optional<EditorCommand> DrawHistoryButtons(const Schematic &schematic) {
+    ToolButtonRow row;
+    std::optional<EditorCommand> command;
+    if (row.Draw({.Id = "##undo",
+                  .Icon = ToolIcon::UNDO,
+                  .IsEnabled = schematic.CanUndo(),
+                  .Tooltip = NameWithShortcut("Undo", EditorCommand::UNDO)})) {
+        command = EditorCommand::UNDO;
+    }
+    if (row.Draw({.Id = "##redo",
+                  .Icon = ToolIcon::REDO,
+                  .IsEnabled = schematic.CanRedo(),
+                  .Tooltip = NameWithShortcut("Redo", EditorCommand::REDO)})) {
+        command = EditorCommand::REDO;
+    }
+    if (row.Draw({.Id = "##fit",
+                  .Icon = ToolIcon::FIT,
+                  .Tooltip = NameWithShortcut("Fit the schematic in view", EditorCommand::FIT)})) {
+        command = EditorCommand::FIT;
+    }
+    return command;
+}
+
+/**
+ * @brief   The part search, as wide as the room before the run controls allows, between its narrowest and widest.
+ * @param[in,out] search    The part search.
+ * @param[in]     blocks    The blocks that can be placed where the editor is, which the search finds too.
+ * @param[in]     run_left  Where the run controls start, on the screen.
+ * @return  The mode of the part picked this frame, or none.
+ */
+std::optional<EditorMode>
+DrawPartSearch(PartPicker &search, const std::vector<const SavedSubcircuit *> &blocks, const float run_left) {
+    const float font_size = ImGui::GetFontSize();
+    const float room = run_left - font_size * GROUP_GAP - ImGui::GetCursorScreenPos().x;
+    const float search_width = std::clamp(room, font_size * SEARCH_MIN_WIDTH, font_size * SEARCH_MAX_WIDTH);
+    // The field is a frame tall and the buttons a little more, so it sits in the middle of the row
+    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + (GetToolButtonSide() - ImGui::GetFrameHeight()) / 2.0f);
+    return search.Draw(blocks, search_width);
 }
 
 /**
@@ -97,27 +222,12 @@ std::string DescribeRunAction(const AnalysisControls &controls, const Analysis s
         return std::format("Stop the {} run", GetAnalysisName(*running));
     }
     if (action == RunAction::CONTINUE) {
-        return "Continue the live run from where it stopped (F5)";
+        return NameWithShortcut("Continue the live run from where it stopped", EditorCommand::RUN);
     }
     if (controls.IsLiveModeOn() && !controls.FindLiveObstacle()) {
-        return std::format("Run {} live (F5)", GetAnalysisName(selected));
+        return NameWithShortcut(std::format("Run {} live", GetAnalysisName(selected)), EditorCommand::RUN);
     }
-    return std::format("Run {} (F5)", GetAnalysisName(selected));
-}
-
-/**
- * @brief   The label of the Run button at the foot of the analysis settings.
- */
-const char *GetRunButtonLabel(const RunAction action) {
-    switch (action) {
-    case RunAction::STOP:
-        return "Stop";
-    case RunAction::CONTINUE:
-        return "Continue (F5)";
-    case RunAction::RUN:
-    default:
-        return "Run (F5)";
-    }
+    return NameWithShortcut(std::format("Run {}", GetAnalysisName(selected)), EditorCommand::RUN);
 }
 
 } // namespace
@@ -128,7 +238,8 @@ const char *GetRunButtonLabel(const RunAction action) {
  * @param[in] settings_panel  Analysis picker and settings, for the popover beside Run; it must outlive the toolbar.
  * @param[in] root_schematic  The document, whose settings name the analysis to run; it must outlive the toolbar.
  */
-EditorToolbar::EditorToolbar(AnalysisControls &controls, AnalysisSettingsPanel &settings_panel,
+EditorToolbar::EditorToolbar(AnalysisControls &controls,
+                             AnalysisSettingsPanel &settings_panel,
                              const Schematic &root_schematic)
     : m_Controls(controls), m_SettingsPanel(settings_panel), m_RootSchematic(root_schematic) {
 }
@@ -143,70 +254,36 @@ EditorToolbar::EditorToolbar(AnalysisControls &controls, AnalysisSettingsPanel &
  * @param[in]     blocks            The blocks that can be placed where the editor is, which the search finds too.
  * @return  The mode or the command the buttons pressed this frame ask for, which the editor carries out.
  */
-ToolbarRequest EditorToolbar::Draw(const EditorMode &mode, const Schematic &schematic, const bool is_editing_block,
-                                   PartPicker &search, const std::vector<const SavedSubcircuit *> &blocks) {
-    ToolbarRequest request;
-    const float font_size = ImGui::GetFontSize();
-    const float spacing = font_size * BUTTON_SPACING;
-    const float side = GetToolButtonSide();
-    const float row_left = ImGui::GetCursorScreenPos().x;
-    const float row_right = row_left + ImGui::GetContentRegionAvail().x;
-    ImDrawList *draw_list = ImGui::GetWindowDrawList();
-    bool is_first = true;
-    const auto tool_button = [&](const char *id, const ToolIcon icon, const bool active, const bool enabled,
-                                 const char *tooltip) {
-        if (!std::exchange(is_first, false)) {
-            ImGui::SameLine(0.0f, spacing);
-        }
-        ImGui::BeginDisabled(!enabled);
-        const bool clicked = ToolButton(id, active);
-        ImGui::EndDisabled();
-        DrawToolIcon(draw_list, icon, GetItemCenter(), GetIconSize(), GetIconColor(enabled));
-        ImGui::SetItemTooltip("%s", tooltip);
-        return clicked;
-    };
-
-    // Tools
-    if (tool_button("##select", ToolIcon::SELECT, IsSelecting(mode), true, "Select (Esc)")) {
-        request.Mode = SelectingMode{};
-    }
-    if (tool_button("##wire", ToolIcon::WIRE, std::holds_alternative<WiringMode>(mode), true, "Wire (W)")) {
-        request.Mode = WiringMode{};
-    }
-    if (tool_button("##probe", ToolIcon::PROBE, std::holds_alternative<ProbingMode>(mode), true,
-                    "Probe (P): pick what the plots measure")) {
-        request.Mode = ProbingMode{};
-    }
+ToolbarRequest EditorToolbar::Draw(const EditorMode &mode,
+                                   const Schematic &schematic,
+                                   const bool is_editing_block,
+                                   PartPicker &search,
+                                   const std::vector<const SavedSubcircuit *> &blocks) {
+    const float row_right = ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvail().x;
+    const float run_left = row_right - GetRunControlsWidth();
+    ToolbarRequest request = {.Mode = DrawToolButtons(mode), .Command = std::nullopt};
     DrawGroupSeparator();
-    is_first = true;
-
-    // History and view
-    if (tool_button("##undo", ToolIcon::UNDO, false, schematic.CanUndo(), "Undo (" IMCSIM_SHORTCUT "Z)")) {
-        request.Command = ToolbarCommand::UNDO;
-    }
-    if (tool_button("##redo", ToolIcon::REDO, false, schematic.CanRedo(), "Redo (" IMCSIM_SHORTCUT "Y)")) {
-        request.Command = ToolbarCommand::REDO;
-    }
-    if (tool_button("##fit", ToolIcon::FIT, false, true, "Fit the schematic in view (Home)")) {
-        request.Command = ToolbarCommand::FIT;
-    }
+    request.Command = DrawHistoryButtons(schematic);
     DrawGroupSeparator();
-
-    // Part search, as wide as the room before the run controls allows
-    const float run_width = AnalysisButtonWidth() + LiveButtonWidth() + side + spacing * 2.0f;
-    const float search_left = ImGui::GetCursorScreenPos().x;
-    const float room = row_right - run_width - font_size * GROUP_GAP - search_left;
-    const float search_width = std::clamp(room, font_size * SEARCH_MIN_WIDTH, font_size * SEARCH_MAX_WIDTH);
-    // The field is a frame tall and the buttons a little more, so it sits in the middle of the row
     const float row_top = ImGui::GetCursorPosY();
-    ImGui::SetCursorPosY(row_top + (side - ImGui::GetFrameHeight()) / 2.0f);
-    if (std::optional<EditorMode> picked = search.Draw(blocks, search_width)) {
+    if (std::optional<EditorMode> picked = DrawPartSearch(search, blocks, run_left)) {
         request.Mode = std::move(picked);
     }
+    DrawRunControls(run_left, row_top, is_editing_block);
+    return request;
+}
 
-    // Simulation, pinned to the right end
+/**
+ * @brief   The analysis button, Live and Run, from where the room before them ends or, when the bar is short of room,
+ *          right after the part search.
+ * @param[in] run_left          Where they start when the bar has room, so Run ends at the right end.
+ * @param[in] row_top           Top of the row of the bar, in window coordinates.
+ * @param[in] is_editing_block  Whether a block is open, which disables them.
+ */
+void EditorToolbar::DrawRunControls(const float run_left, const float row_top, const bool is_editing_block) {
+    const float spacing = ImGui::GetFontSize() * BUTTON_SPACING;
     ImGui::SameLine(0.0f, 0.0f);
-    ImGui::SetCursorScreenPos({std::max(row_right - run_width, ImGui::GetCursorScreenPos().x + font_size * GROUP_GAP),
+    ImGui::SetCursorScreenPos({std::max(run_left, ImGui::GetCursorScreenPos().x + ImGui::GetFontSize() * GROUP_GAP),
                                ImGui::GetWindowPos().y + row_top});
     ImGui::BeginDisabled(is_editing_block);
     DrawAnalysisButton();
@@ -215,7 +292,6 @@ ToolbarRequest EditorToolbar::Draw(const EditorMode &mode, const Schematic &sche
     ImGui::SameLine(0.0f, spacing);
     DrawRunButton();
     ImGui::EndDisabled();
-    return request;
 }
 
 /**
@@ -229,8 +305,11 @@ void EditorToolbar::DrawRunButton() {
     if (PrimaryButton("##run", {side, side})) {
         m_Controls.PressRun();
     }
-    DrawToolIcon(ImGui::GetWindowDrawList(), action == RunAction::STOP ? ToolIcon::STOP : ToolIcon::RUN,
-                 GetItemCenter(), GetIconSize(), GetIconColor(true));
+    DrawToolIcon(ImGui::GetWindowDrawList(),
+                 action == RunAction::STOP ? ToolIcon::STOP : ToolIcon::RUN,
+                 GetItemCenter(),
+                 GetIconSize(),
+                 GetIconColor(true));
     ImGui::SetItemTooltip("%s", DescribeRunAction(m_Controls, selected).c_str());
 }
 
@@ -260,11 +339,11 @@ void EditorToolbar::DrawAnalysisButton() {
         ImGui::Separator();
         m_SettingsPanel.DrawSettings();
         ImGui::Separator();
-        // The popup has the focus, so F5 is checked here too; like the shortcut, it never stops a run
-        const RunAction action = m_Controls.GetRunAction();
-        if (PrimaryButton(GetRunButtonLabel(action)) ||
-            (action != RunAction::STOP && ImGui::IsKeyPressed(ImGuiKey_F5, false))) {
+        // The popup has the focus, so the run key is read here too
+        if (PrimaryButton(GetRunButtonLabel(m_Controls.GetRunAction()).c_str())) {
             m_Controls.PressRun();
+            ImGui::CloseCurrentPopup();
+        } else if (ImGui::IsKeyChordPressed(GetShortcutChord(EditorCommand::RUN)) && m_Controls.PressRunKey()) {
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();

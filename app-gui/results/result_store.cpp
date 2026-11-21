@@ -8,9 +8,24 @@
 #include "results/ac_sensitivity_view.h"
 #include <algorithm>
 #include <iterator>
+#include <optional>
+#include <string>
 #include <utility>
+#include <vector>
 
 namespace GUI {
+
+namespace {
+
+/**
+ * @brief   The warnings of a result, or none when there is no result.
+ */
+template <typename Result>
+std::vector<std::string> ListWarnings(const std::optional<Result> &result) {
+    return result ? result->Warnings : std::vector<std::string>();
+}
+
+} // namespace
 
 /**
  * @brief   Drops every result, since none matches the circuit any more.
@@ -89,8 +104,8 @@ const std::optional<StepFamily<Core::OperatingPoint>> &ResultStore::GetOperating
  * @param[in] step  Index of the step; ignored when out of range or without steps.
  */
 void ResultStore::SelectOperatingPointStep(const std::size_t step) {
-    if (!m_OperatingPointSteps || step >= m_OperatingPointSteps->Results.size() ||
-        step == m_OperatingPointSteps->Selected) {
+    if (!m_OperatingPointSteps || step >= m_OperatingPointSteps->Results.size()
+        || step == m_OperatingPointSteps->Selected) {
         return;
     }
     m_OperatingPointSteps->Selected = step;
@@ -132,15 +147,19 @@ void ResultStore::AppendTransient(Core::Transient chunk) {
         return;
     }
     Core::Transient &whole = *m_Transient;
-    const bool fits = whole.NodeVoltages.size() == chunk.NodeVoltages.size() &&
-                      std::ranges::equal(whole.Currents, chunk.Currents, {}, &Core::ComponentTrace::Name,
+    const bool fits = whole.NodeVoltages.size() == chunk.NodeVoltages.size()
+                   && std::ranges::equal(whole.Currents,
+                                         chunk.Currents,
+                                         {},
+                                         &Core::ComponentTrace::Name,
                                          &Core::ComponentTrace::Name);
     if (!fits) {
         return;
     }
     whole.Times.insert(whole.Times.end(), chunk.Times.begin(), chunk.Times.end());
     for (std::size_t node = 0; node < chunk.NodeVoltages.size(); ++node) {
-        whole.NodeVoltages[node].insert(whole.NodeVoltages[node].end(), chunk.NodeVoltages[node].begin(),
+        whole.NodeVoltages[node].insert(whole.NodeVoltages[node].end(),
+                                        chunk.NodeVoltages[node].begin(),
                                         chunk.NodeVoltages[node].end());
     }
     for (std::size_t current = 0; current < chunk.Currents.size(); ++current) {
@@ -551,6 +570,117 @@ const std::optional<Core::HarmonicBalance> &ResultStore::GetHarmonicBalance() co
  */
 std::size_t ResultStore::GetHarmonicBalanceVersion() const {
     return m_HarmonicBalanceVersion;
+}
+
+/**
+ * @brief   Tells whether an analysis has a result for the current schematic.
+ * @param[in] analysis  Analysis to check.
+ * @return  True when its result is stored; the sensitivity analysis has one when either its DC or its AC result is.
+ */
+bool ResultStore::HasResult(const Analysis analysis) const {
+    switch (analysis) {
+    case Analysis::OPERATING_POINT:
+        return m_OperatingPoint.has_value();
+    case Analysis::TRANSIENT:
+        return m_Transient.has_value();
+    case Analysis::AC_SWEEP:
+        return m_ACSweep.has_value();
+    case Analysis::DC_SWEEP:
+        return m_DCSweep.has_value();
+    case Analysis::NOISE:
+        return m_Noise.has_value();
+    case Analysis::TRANSFER_FUNCTION:
+        return m_TransferFunction.has_value();
+    case Analysis::SENSITIVITY:
+        return m_Sensitivity.has_value() || m_ACSensitivity.has_value();
+    case Analysis::POLE_ZERO:
+        return m_PoleZero.has_value();
+    case Analysis::S_PARAMETERS:
+        return m_SParameters.has_value();
+    case Analysis::TRUTH_TABLE:
+        return m_TruthTable.has_value();
+    case Analysis::HARMONIC_BALANCE:
+        return m_HarmonicBalance.has_value();
+    default:
+        return false;
+    }
+}
+
+/**
+ * @brief   Clears the result of an analysis, as storing no value would, so its version changes.
+ * @param[in] analysis  Analysis whose result goes; for the sensitivity analysis, both the DC and the AC result.
+ */
+void ResultStore::Clear(const Analysis analysis) {
+    switch (analysis) {
+    case Analysis::OPERATING_POINT:
+        SetOperatingPoint(std::nullopt);
+        break;
+    case Analysis::TRANSIENT:
+        SetTransient(std::nullopt);
+        break;
+    case Analysis::AC_SWEEP:
+        SetACSweep(std::nullopt);
+        break;
+    case Analysis::DC_SWEEP:
+        SetDCSweep(std::nullopt);
+        break;
+    case Analysis::NOISE:
+        SetNoise(std::nullopt);
+        break;
+    case Analysis::TRANSFER_FUNCTION:
+        SetTransferFunction(std::nullopt);
+        break;
+    case Analysis::SENSITIVITY:
+        SetSensitivity(std::nullopt);
+        SetACSensitivity(std::nullopt);
+        break;
+    case Analysis::POLE_ZERO:
+        SetPoleZero(std::nullopt);
+        break;
+    case Analysis::S_PARAMETERS:
+        SetSParameters(std::nullopt);
+        break;
+    case Analysis::TRUTH_TABLE:
+        SetTruthTable(std::nullopt);
+        break;
+    case Analysis::HARMONIC_BALANCE:
+        SetHarmonicBalance(std::nullopt);
+        break;
+    default:
+        break;
+    }
+}
+
+/**
+ * @brief   Lists the warnings the result of an analysis carries, such as a transistor past its maximum voltage or the
+ *          combinations of a truth table that have no operating point.
+ * @param[in] analysis  Analysis whose result is read.
+ * @return  The warnings, or none when the analysis has no result or its kind of result carries no warnings; the
+ *          sensitivity analysis reads those of its AC result, as the DC one has none.
+ */
+std::vector<std::string> ResultStore::GetWarnings(const Analysis analysis) const {
+    switch (analysis) {
+    case Analysis::OPERATING_POINT:
+        return ListWarnings(m_OperatingPoint);
+    case Analysis::TRANSIENT:
+        return ListWarnings(m_Transient);
+    case Analysis::SENSITIVITY:
+        return ListWarnings(m_ACSensitivity);
+    case Analysis::POLE_ZERO:
+        return ListWarnings(m_PoleZero);
+    case Analysis::S_PARAMETERS:
+        return ListWarnings(m_SParameters);
+    case Analysis::TRUTH_TABLE:
+        return ListWarnings(m_TruthTable);
+    case Analysis::HARMONIC_BALANCE:
+        return ListWarnings(m_HarmonicBalance);
+    case Analysis::AC_SWEEP:
+    case Analysis::DC_SWEEP:
+    case Analysis::NOISE:
+    case Analysis::TRANSFER_FUNCTION:
+    default:
+        return {};
+    }
 }
 
 /**

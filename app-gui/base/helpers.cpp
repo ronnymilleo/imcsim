@@ -209,7 +209,9 @@ GridPoint Rotate(const GridPoint point, const Rotation rotation) {
  * @param[in] max_zoom     Largest zoom to use; small circuits are centered at it instead of filling the canvas.
  * @return  The view frame; with no points, the origin at the top-left corner and the largest zoom.
  */
-ViewFrame FramePoints(const std::span<const GridPoint> points, const ImVec2 canvas_size, const float min_zoom,
+ViewFrame FramePoints(const std::span<const GridPoint> points,
+                      const ImVec2 canvas_size,
+                      const float min_zoom,
                       const float max_zoom) {
     if (points.empty()) {
         return {.Pan = {0.0f, 0.0f}, .Zoom = max_zoom};
@@ -228,8 +230,8 @@ ViewFrame FramePoints(const std::span<const GridPoint> points, const ImVec2 canv
  * @param[in] max_zoom     Largest zoom to use; small areas are centered at it instead of filling the canvas.
  * @return  The view frame, with a margin of two grid units around the area.
  */
-ViewFrame FrameBounds(const ImVec2 min, const ImVec2 max, const ImVec2 canvas_size, const float min_zoom,
-                      const float max_zoom) {
+ViewFrame
+FrameBounds(const ImVec2 min, const ImVec2 max, const ImVec2 canvas_size, const float min_zoom, const float max_zoom) {
     const float width = max.x - min.x + 2.0f * FRAME_MARGIN;
     const float height = max.y - min.y + 2.0f * FRAME_MARGIN;
     const float zoom = std::clamp(std::min(canvas_size.x / width, canvas_size.y / height), min_zoom, max_zoom);

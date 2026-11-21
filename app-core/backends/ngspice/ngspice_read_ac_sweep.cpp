@@ -18,8 +18,8 @@
 #include <expected>
 #include <format>
 #include <iterator>
-#include <ngspice/sharedspice.h>
 #include <numbers>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -42,18 +42,6 @@ double ToDegrees(const std::complex<double> value) {
     return std::arg(value) * 180.0 / std::numbers::pi;
 }
 
-// ngspice computes no device currents in .ac, so resistors, capacitors and current sources are worked out from
-// their node voltages and values; inductors and voltage sources have their branch current in the results. Probed
-// parts are read from their probes instead
-std::expected<std::vector<std::complex<double>>, std::string>
-ReadACCurrent(const std::string &vector_name, const std::string &trace_name, const std::size_t point_count) {
-    const pvector_info vector = FindVector(vector_name);
-    if (vector == nullptr || static_cast<std::size_t>(vector->v_length) != point_count) {
-        return std::unexpected(std::format("ngspice returned no currents for {}", trace_name));
-    }
-    return ComplexValues(*vector);
-}
-
 void AddACCurrent(std::string name, const std::vector<std::complex<double>> &currents, ACSweep &result) {
     ComponentTrace magnitudes{name, {}};
     ComponentTrace phases{std::move(name), {}};
@@ -65,13 +53,14 @@ void AddACCurrent(std::string name, const std::vector<std::complex<double>> &cur
 
 // Voltage across the part times its admittance: 1/R for a resistor, j*2*pi*f*C for a capacitor
 std::vector<std::complex<double>>
-PassiveACCurrent(const CircuitEntry &entry, const std::vector<double> &frequencies,
+PassiveACCurrent(const CircuitEntry &entry,
+                 const std::vector<double> &frequencies,
                  const std::vector<std::vector<std::complex<double>>> &node_voltages) {
     const Component &component = *entry.Part;
     std::vector<std::complex<double>> currents(frequencies.size());
     for (std::size_t index = 0; index < frequencies.size(); ++index) {
-        const std::complex<double> voltage = node_voltages[static_cast<std::size_t>(entry.Nodes[0])][index] -
-                                             node_voltages[static_cast<std::size_t>(entry.Nodes[1])][index];
+        const std::complex<double> voltage = node_voltages[static_cast<std::size_t>(entry.Nodes[0])][index]
+                                           - node_voltages[static_cast<std::size_t>(entry.Nodes[1])][index];
         const std::complex<double> admittance =
             component.GetType() == ComponentType::RESISTOR
                 ? std::complex<double>(1.0 / component.GetValue(), 0.0)
@@ -86,19 +75,25 @@ PassiveACCurrent(const CircuitEntry &entry, const std::vector<double> &frequenci
  */
 std::vector<std::complex<double>> CurrentSourceACCurrent(const Component &component, const std::size_t point_count) {
     const auto &source = static_cast<const Source &>(component);
-    const double magnitude = source.GetSourceType() == Source::SourceType::AC ? source.GetAC().Magnitude : 0.0;
+    const double magnitude = source.GetACMagnitude();
     return std::vector<std::complex<double>>(point_count, std::complex<double>(magnitude, 0.0));
 }
 
 bool HasACBranchCurrent(const ComponentType type) {
-    static constexpr std::array BRANCH_CURRENT_TYPES = {ComponentType::INDUCTOR, ComponentType::VCC,
-                                                        ComponentType::VOLTAGE_SOURCE, ComponentType::CLOCK,
+    static constexpr std::array BRANCH_CURRENT_TYPES = {ComponentType::INDUCTOR,
+                                                        ComponentType::VCC,
+                                                        ComponentType::VOLTAGE_SOURCE,
+                                                        ComponentType::CLOCK,
                                                         ComponentType::LOGIC_INPUT};
     return std::ranges::contains(BRANCH_CURRENT_TYPES, type);
 }
 
+// ngspice computes no device currents in .ac, so resistors, capacitors and current sources are worked out from
+// their node voltages and values; inductors and voltage sources have their branch current in the results. Probed
+// parts are read from their probes instead
 std::expected<std::vector<std::complex<double>>, std::string>
-ACCurrent(const CircuitEntry &entry, const std::vector<double> &frequencies,
+ACCurrent(const CircuitEntry &entry,
+          const std::vector<double> &frequencies,
           const std::vector<std::vector<std::complex<double>>> &node_voltages) {
     const Component &component = *entry.Part;
     const ComponentType type = component.GetType();
@@ -109,7 +104,9 @@ ACCurrent(const CircuitEntry &entry, const std::vector<double> &frequencies,
         return CurrentSourceACCurrent(component, frequencies.size());
     }
     if (HasACBranchCurrent(type)) {
-        return ReadACCurrent(BranchVectorName(component.GetName()), component.GetName(), frequencies.size());
+        return ReadComplexVectorOfLength(BranchVectorName(component.GetName()),
+                                         frequencies.size(),
+                                         std::format("currents for {}", component.GetName()));
     }
     return std::unexpected(std::format("{} carries no current", component.GetName()));
 }
@@ -122,12 +119,12 @@ ACCurrent(const CircuitEntry &entry, const std::vector<double> &frequencies,
  * @return  The sweep or the error when a vector is missing.
  */
 std::expected<ACSweep, std::string> ReadACSweep(const Circuit &circuit) {
-    const pvector_info frequency = FindVector("frequency");
-    if (frequency == nullptr) {
+    const std::optional<std::vector<double>> frequencies = ReadRealVector("frequency");
+    if (!frequencies) {
         return std::unexpected("ngspice returned no frequency points");
     }
     ACSweep result;
-    result.Frequencies = RealPart(*frequency);
+    result.Frequencies = *frequencies;
     const std::size_t point_count = result.Frequencies.size();
 
     // Ground stays at zero, which the current of a component connected to it needs
@@ -136,12 +133,15 @@ std::expected<ACSweep, std::string> ReadACSweep(const Circuit &circuit) {
     result.NodeMagnitudesDecibels.resize(node_voltages.size());
     result.NodePhasesDegrees.resize(node_voltages.size());
     for (std::size_t node = 1; node < node_voltages.size(); ++node) {
-        const pvector_info vector = FindVector(std::format("v({})", node));
-        if (vector == nullptr || static_cast<std::size_t>(vector->v_length) != point_count) {
-            return std::unexpected(std::format("ngspice returned no response for node {}", node));
+        auto voltages = ReadComplexVectorOfLength(std::format("v({})", node),
+                                                  point_count,
+                                                  std::format("response for node {}", node));
+        if (!voltages) {
+            return std::unexpected(voltages.error());
         }
-        node_voltages[node] = ComplexValues(*vector);
-        std::ranges::transform(node_voltages[node], std::back_inserter(result.NodeMagnitudesDecibels[node]),
+        node_voltages[node] = std::move(*voltages);
+        std::ranges::transform(node_voltages[node],
+                               std::back_inserter(result.NodeMagnitudesDecibels[node]),
                                ToDecibels);
         std::ranges::transform(node_voltages[node], std::back_inserter(result.NodePhasesDegrees[node]), ToDegrees);
     }
@@ -150,7 +150,9 @@ std::expected<ACSweep, std::string> ReadACSweep(const Circuit &circuit) {
         const std::vector<CurrentVector> vectors = CurrentVectors(*entry.Part);
         if (!GetCurrentProbes(*entry.Part).empty()) {
             for (const CurrentVector &current : vectors) {
-                const auto currents = ReadACCurrent(current.VectorName, current.TraceName, point_count);
+                const auto currents = ReadComplexVectorOfLength(current.VectorName,
+                                                                point_count,
+                                                                std::format("currents for {}", current.TraceName));
                 if (!currents) {
                     return std::unexpected(currents.error());
                 }

@@ -9,6 +9,7 @@
 #include "devices/devices.h"
 #include "mna/mna_system.h"
 #include "nodalys/types.h"
+#include "text/text_case.h"
 #include <map>
 #include <memory>
 #include <string>
@@ -43,6 +44,9 @@ struct NoiseGroup {
     std::vector<const Device *> Devices;
 };
 
+/// Devices by the name of their element; SPICE names ignore case, so "Vin" finds the source written "VIN".
+using DevicesByName = std::map<std::string, Device *, CaseInsensitiveLess>;
+
 /**
  * @struct  CompiledCircuit
  * @brief   Assembled MNA system and stamped device models ready for simulation.
@@ -55,8 +59,8 @@ struct CompiledCircuit {
     std::vector<CurrentRef> Currents;
     std::vector<NoiseGroup> NoiseGroups;
     std::vector<bool> DynamicNode;
-    std::map<std::string, Device *> SourcesByName;
-    std::map<std::string, Device *> ElementsByName;
+    DevicesByName SourcesByName;
+    DevicesByName ElementsByName;
     std::vector<CircuitPort> Ports;
     bool HasInitialConditions = false;
     ThermalConditions Thermal;

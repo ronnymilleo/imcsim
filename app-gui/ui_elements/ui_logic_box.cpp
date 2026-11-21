@@ -9,7 +9,6 @@
 #include <algorithm>
 #include <array>
 #include <cfloat>
-#include <cmath>
 
 namespace GUI {
 
@@ -57,33 +56,27 @@ void UILogicBox::DrawLit(SchematicCanvas &canvas, const ViewTransform &view, con
  * @param[in] rotation   Orientation on the grid.
  */
 UILogicBox::UILogicBox(std::unique_ptr<Core::Component> component, const GridPoint position, const Rotation rotation)
-    : UIElement(std::move(component), position, rotation) {
-}
-
-/**
- * @brief   The lead from the terminal up to the box.
- */
-void UILogicBox::DrawLead(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
-    canvas.AddLine(LocalToScreen(view, 0, 0), LocalToScreen(view, 0, BOX_BOTTOM), color, LINE_THICKNESS);
+    : UISingleTerminalElement(std::move(component), position, rotation) {
 }
 
 void UILogicBox::DrawBox(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
-    const std::array<ImVec2, 4> box = {
-        LocalToScreen(view, -BOX_HALF_WIDTH, BOX_TOP), LocalToScreen(view, BOX_HALF_WIDTH, BOX_TOP),
-        LocalToScreen(view, BOX_HALF_WIDTH, BOX_BOTTOM), LocalToScreen(view, -BOX_HALF_WIDTH, BOX_BOTTOM)};
+    const std::array<ImVec2, 4> box = {LocalToScreen(view, -BOX_HALF_WIDTH, BOX_TOP),
+                                       LocalToScreen(view, BOX_HALF_WIDTH, BOX_TOP),
+                                       LocalToScreen(view, BOX_HALF_WIDTH, BOX_BOTTOM),
+                                       LocalToScreen(view, -BOX_HALF_WIDTH, BOX_BOTTOM)};
     canvas.AddPolyline(box.data(), static_cast<int>(box.size()), color, ImDrawFlags_Closed, LINE_THICKNESS);
 }
 
 /**
  * @brief   The digit in the middle of the box, sized with the zoom and left out when too small to read.
  */
-void UILogicBox::DrawDigit(SchematicCanvas &canvas, const ViewTransform &view, const char *digit,
+void UILogicBox::DrawDigit(SchematicCanvas &canvas,
+                           const ViewTransform &view,
+                           const char *digit,
                            const ImU32 color) const {
     const float middle = (BOX_TOP + BOX_BOTTOM) / 2.0f;
     const ImVec2 center = LocalToScreen(view, 0.0f, middle);
-    // One grid unit long in local space, so its length on screen is the current zoom
-    const ImVec2 unit = LocalToScreen(view, 0.0f, middle + 1.0f) - center;
-    const float font_size = std::hypot(unit.x, unit.y) * DIGIT_SCALE;
+    const float font_size = LocalLengthToScreen(view, DIGIT_SCALE);
     if (font_size < MIN_LABEL_SIZE) {
         return;
     }
@@ -92,19 +85,15 @@ void UILogicBox::DrawDigit(SchematicCanvas &canvas, const ViewTransform &view, c
     canvas.AddText(font, font_size, center - text_size / 2.0f, color, digit);
 }
 
-std::vector<GridPoint> UILogicBox::GetLocalTerminals() const {
-    return {{0, 0}};
+LocalBounds UILogicBox::GetLocalBounds() const {
+    return {{-BOX_HALF_WIDTH, BOX_TOP}, {BOX_HALF_WIDTH, 0.0f}};
 }
 
 /**
- * @brief   The terminal is at the origin and its lead goes up to the box.
+ * @brief   The lead goes up from the terminal to the box.
  */
-GridPoint UILogicBox::GetLocalTerminalInward(std::size_t /*terminal*/) const {
-    return {0, -1};
-}
-
-LocalBounds UILogicBox::GetLocalBounds() const {
-    return {{-BOX_HALF_WIDTH, BOX_TOP}, {BOX_HALF_WIDTH, 0.0f}};
+ImVec2 UILogicBox::GetLeadEnd() const {
+    return {0.0f, BOX_BOTTOM};
 }
 
 } // namespace GUI

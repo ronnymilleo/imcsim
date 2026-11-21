@@ -41,7 +41,9 @@ constexpr ImU32 CURSOR_B_COLOR = IM_COL32(115, 204, 255, 255);
  * @param[in] logarithmic  Whether the X axis is logarithmic, which changes what is nearest.
  * @param[in] plotted      The traces drawn.
  */
-void DrawCursorReadout(const std::vector<double> &xs, const char *x_unit, const bool logarithmic,
+void DrawCursorReadout(const std::vector<double> &xs,
+                       const char *x_unit,
+                       const bool logarithmic,
                        const std::vector<PlottedTrace> &plotted) {
     if (!ImPlot::IsPlotHovered() || xs.empty() || plotted.empty()) {
         return;
@@ -50,7 +52,8 @@ void DrawCursorReadout(const std::vector<double> &xs, const char *x_unit, const 
     const float x = ImPlot::PlotToPixels(xs[sample], 0.0).x;
     const ImVec2 plot_position = ImPlot::GetPlotPos();
     ImPlot::PushPlotClipRect();
-    ImPlot::GetPlotDrawList()->AddLine({x, plot_position.y}, {x, plot_position.y + ImPlot::GetPlotSize().y},
+    ImPlot::GetPlotDrawList()->AddLine({x, plot_position.y},
+                                       {x, plot_position.y + ImPlot::GetPlotSize().y},
                                        ImGui::GetColorU32(ImGuiCol_Text, 0.35f));
     ImPlot::PopPlotClipRect();
 
@@ -63,9 +66,11 @@ void DrawCursorReadout(const std::vector<double> &xs, const char *x_unit, const 
         const double value = (*trace.Values)[sample];
         std::string text = std::format("{}: {}{}", trace.Label, Core::FormatMeasurement(value), trace.Unit);
         if (trace.LogicLevel) {
-            text =
-                std::format("{}: {} ({}{})", trace.Label, GetLogicStateName(ReadLogicState(value, *trace.LogicLevel)),
-                            Core::FormatMeasurement(value), trace.Unit);
+            text = std::format("{}: {} ({}{})",
+                               trace.Label,
+                               GetLogicStateName(ReadLogicState(value, *trace.LogicLevel)),
+                               Core::FormatMeasurement(value),
+                               trace.Unit);
         }
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(trace.Color), "%s", text.c_str());
     }
@@ -108,6 +113,30 @@ void DrawCursors(PlotCursors &cursors, const bool logarithmic) {
  */
 PlotSpan MeasuredSpan(const PlotCursors &cursors, const PlotSpan &view) {
     return cursors.Shown ? PlotSpan{.From = cursors.A, .To = cursors.B} : view;
+}
+
+/**
+ * @brief   Keeps a span within a run, from its earlier end, as the cursors may sit in either order or past the run.
+ * @param[in] span  The span measured, such as between the cursors.
+ * @param[in] run   The first and last instants of the run.
+ * @return  The part of the span inside the run, earlier end first; the whole run when nothing of the span is in it.
+ */
+PlotSpan ClipSpanToRun(const PlotSpan &span, const PlotSpan &run) {
+    const double from = std::max(std::min(span.From, span.To), run.From);
+    const double to = std::min(std::max(span.From, span.To), run.To);
+    if (!(from < to)) {
+        return run;
+    }
+    return {.From = from, .To = to};
+}
+
+/**
+ * @brief   The cursors the statistics read the traces at.
+ * @param[in] cursors  The cursors of the plot.
+ * @return  The cursors while they are shown, otherwise no value.
+ */
+std::optional<PlotCursors> GetShownCursors(const PlotCursors &cursors) {
+    return cursors.Shown ? std::optional(cursors) : std::nullopt;
 }
 
 /**
@@ -170,8 +199,8 @@ void DrawPlaybackBar(TransientPlayback &playback, const double from, const doubl
     ImGui::SameLine();
     const std::string readout = std::format("t = {}s / {}s", Core::FormatValue(playback.Time), Core::FormatValue(to));
     const float readout_width =
-        std::max(ImGui::CalcTextSize(readout.c_str()).x, ImGui::CalcTextSize(WIDEST_TIME_READOUT).x) +
-        style.ItemSpacing.x;
+        std::max(ImGui::CalcTextSize(readout.c_str()).x, ImGui::CalcTextSize(WIDEST_TIME_READOUT).x)
+        + style.ItemSpacing.x;
     ImGui::SetNextItemWidth(
         std::max(ImGui::GetContentRegionAvail().x - readout_width, ImGui::GetFontSize() * MIN_TIME_SLIDER_WIDTH));
     ImGui::SliderScalar("##time", ImGuiDataType_Double, &playback.Time, &from, &to, "");

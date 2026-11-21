@@ -12,6 +12,7 @@
 #include "plots/math_channels.h"
 #include "plots/plot_types.h"
 #include "plots/statistics_table.h"
+#include "plots/trace_fit_state.h"
 #include "results/playback.h"
 #include "schematic/schematic.h"
 #include "simulation/simulation_results.h"
@@ -51,31 +52,47 @@ int FormatAxisValue(double value, char *buffer, int size, void *unit);
 bool BeginTracePlot(const char *id, ImVec2 size, bool has_legend = false);
 float PlotHeight(int plot_count);
 ImPlotAxisFlags VoltageAxisFlags(bool has_voltages, bool has_other_traces);
-void SetNextFits(bool new_result, bool voltages_changed, bool currents_changed);
+void SetNextFits(const TraceFits &fits, const std::vector<MathTrace> &math = {});
+void SetupLogFrequencyAxis(PlotSpan *shared_view);
 
 // Traces
-void PlotNodes(const std::vector<double> &xs, const std::vector<std::vector<double>> &node_values, Schematic &schematic,
-               const char *unit, const std::string &suffix, std::vector<PlottedTrace> &plotted,
+void PlotNodes(const std::vector<double> &xs,
+               const std::vector<std::vector<double>> &node_values,
+               Schematic &schematic,
+               const char *unit,
+               const std::string &suffix,
+               std::vector<PlottedTrace> &plotted,
                const std::vector<int> &excluded = {});
-void PlotDashedLine(const std::string &label, const std::vector<double> &xs, const std::vector<double> &ys,
+void PlotDashedLine(const std::string &label,
+                    const std::vector<double> &xs,
+                    const std::vector<double> &ys,
                     ImU32 color);
-void PlotCurrents(const std::vector<double> &xs, const std::vector<Core::ComponentTrace> &currents,
-                  const Schematic &schematic, const char *unit, const std::string &suffix,
+void PlotCurrents(const std::vector<double> &xs,
+                  const std::vector<Core::ComponentTrace> &currents,
+                  const Schematic &schematic,
+                  const char *unit,
+                  const std::string &suffix,
                   std::vector<PlottedTrace> &plotted);
 bool HasMeasuredVoltage(std::size_t node_count, const Schematic &schematic);
-std::vector<int> ListMeasuredNodes(std::size_t node_count, const Schematic &schematic,
-                                   const std::vector<int> &excluded = {});
+std::vector<int>
+ListMeasuredNodes(std::size_t node_count, const Schematic &schematic, const std::vector<int> &excluded = {});
 std::vector<std::string> ListMeasuredCurrents(const std::vector<Core::ComponentTrace> &currents,
                                               const Schematic &schematic);
 std::vector<PlottedTrace> ListTraces(const std::vector<std::vector<double>> &node_values,
-                                     const std::vector<Core::ComponentTrace> &currents, Schematic &schematic,
-                                     const char *voltage_unit, const char *current_unit);
+                                     const std::vector<Core::ComponentTrace> &currents,
+                                     Schematic &schematic,
+                                     const char *voltage_unit,
+                                     const char *current_unit);
 
 // Math channels
 void SetupMathAxes(const std::vector<MathTrace> &math, bool current_axis_ready, const std::string &third_unit);
 void FitMathAxes(const std::vector<MathTrace> &math);
-void PlotMath(const std::vector<double> &xs, const std::vector<MathTrace> &math, const std::string &suffix,
-              std::vector<PlottedTrace> &plotted, const char *readout_unit = nullptr);
+PlottedTrace ToPlottedTrace(const MathTrace &trace, const char *unit = nullptr);
+void PlotMath(const std::vector<double> &xs,
+              const std::vector<MathTrace> &math,
+              const std::string &suffix,
+              std::vector<PlottedTrace> &plotted,
+              const char *readout_unit = nullptr);
 void DrawMathErrors(const std::vector<std::string> &errors);
 
 // Poles and zeros

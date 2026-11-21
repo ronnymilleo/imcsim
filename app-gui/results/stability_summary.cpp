@@ -84,7 +84,8 @@ std::string DescribeInstability(const TwoPortSweep &sweep, const std::vector<Uns
     const bool is_k = AreAllKBelowOne(sweep);
     const std::string reason = is_k ? "K < 1" : "mu < 1";
     const std::size_t worst = FindWorstPoint(sweep, is_k);
-    const std::string lowest = std::format("; lowest {} is {} at {}", is_k ? "K" : "mu",
+    const std::string lowest = std::format("; lowest {} is {} at {}",
+                                           is_k ? "K" : "mu",
                                            FormatFactor(is_k ? sweep.Metrics[worst].K : sweep.Metrics[worst].Mu),
                                            FormatFrequency(sweep.Frequencies[worst]));
     const bool is_whole =
@@ -98,11 +99,14 @@ std::string DescribeInstability(const TwoPortSweep &sweep, const std::vector<Uns
     } else if (regions.size() == 2) {
         where = DescribeBand(sweep, regions.front()) + " and " + DescribeBand(sweep, regions.back());
     } else {
-        where = std::format("in {} separate bands between {} and {}", regions.size(),
+        where = std::format("in {} separate bands between {} and {}",
+                            regions.size(),
                             FormatFrequency(sweep.Frequencies[regions.front().First]),
                             FormatFrequency(sweep.Frequencies[regions.back().Last]));
     }
-    return std::format("Potentially unstable {} ({}){}. Unconditionally stable elsewhere in the sweep.", where, reason,
+    return std::format("Potentially unstable {} ({}){}. Unconditionally stable elsewhere in the sweep.",
+                       where,
+                       reason,
                        lowest);
 }
 
@@ -111,7 +115,8 @@ std::string DescribeStabilityMargin(const TwoPortSweep &sweep) {
     if (!lowest || !std::isfinite(sweep.Metrics[*lowest].Mu)) {
         return "";
     }
-    return std::format("; the smallest margin is mu = {} at {}", FormatFactor(sweep.Metrics[*lowest].Mu),
+    return std::format("; the smallest margin is mu = {} at {}",
+                       FormatFactor(sweep.Metrics[*lowest].Mu),
                        FormatFrequency(sweep.Frequencies[*lowest]));
 }
 
@@ -119,8 +124,10 @@ std::string DescribeStabilityMargin(const TwoPortSweep &sweep) {
  * @brief   What is special about the points of a sweep that lack a reverse or a forward transmission.
  */
 std::string DescribeDegenerateTransmission(const TwoPortSweep &sweep, const std::size_t valid_count) {
-    const auto unilateral = static_cast<std::size_t>(std::ranges::count_if(
-        sweep.Metrics, [](const TwoPortMetrics &metrics) { return metrics.IsValid && metrics.IsUnilateral; }));
+    const auto unilateral =
+        static_cast<std::size_t>(std::ranges::count_if(sweep.Metrics, [](const TwoPortMetrics &metrics) {
+            return metrics.IsValid && metrics.IsUnilateral;
+        }));
     const auto silent =
         static_cast<std::size_t>(std::ranges::count_if(sweep.Metrics, [](const TwoPortMetrics &metrics) {
             return metrics.IsValid && !metrics.HasForwardTransmission;
@@ -145,8 +152,10 @@ std::string DescribeCoverage(const char *name, const StabilityBoundary &boundary
     if (boundary.Coverage == ChartCoverage::PARTLY) {
         return "";
     }
-    return std::format("{} circle: the whole chart is {} at {}, so no circle shows.", name,
-                       boundary.Coverage == ChartCoverage::ENTIRELY_STABLE ? "stable" : "unstable", frequency);
+    return std::format("{} circle: the whole chart is {} at {}, so no circle shows.",
+                       name,
+                       boundary.Coverage == ChartCoverage::ENTIRELY_STABLE ? "stable" : "unstable",
+                       frequency);
 }
 
 } // namespace
@@ -215,11 +224,14 @@ std::string DescribeStability(const TwoPortSweep &sweep) {
         const TwoPortMetrics &metrics = sweep.Metrics[index];
         const std::string frequency = FormatFrequency(sweep.Frequencies[index]);
         text = IsUnstable(metrics)
-                   ? std::format("Potentially unstable at {} ({} = {}).", frequency,
-                                 std::isfinite(metrics.K) && metrics.K < 1.0 ? "K" : "mu",
-                                 FormatFactor(std::isfinite(metrics.K) && metrics.K < 1.0 ? metrics.K : metrics.Mu))
-                   : std::format("Unconditionally stable at {} (K = {}, mu = {}).", frequency, FormatFactor(metrics.K),
-                                 FormatFactor(metrics.Mu));
+                 ? std::format("Potentially unstable at {} ({} = {}).",
+                               frequency,
+                               std::isfinite(metrics.K) && metrics.K < 1.0 ? "K" : "mu",
+                               FormatFactor(std::isfinite(metrics.K) && metrics.K < 1.0 ? metrics.K : metrics.Mu))
+                 : std::format("Unconditionally stable at {} (K = {}, mu = {}).",
+                               frequency,
+                               FormatFactor(metrics.K),
+                               FormatFactor(metrics.Mu));
     } else if (regions.empty()) {
         text = "Unconditionally stable over the whole sweep" + DescribeStabilityMargin(sweep) + ".";
     } else {

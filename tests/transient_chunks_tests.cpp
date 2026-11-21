@@ -97,18 +97,13 @@ double ValueAt(const std::vector<double> &times, const std::vector<double> &valu
 constexpr auto THRESHOLD_SENSITIVE_EXAMPLES =
     std::to_array<std::string_view>({"Schmitt trigger", "Astable multivibrator started by an initial voltage"});
 
-/// Circuits that ring after a switching edge at a frequency the example's time step does not resolve, so the height of
-/// the ring depends on where the steps fall: the buck converter's switch node peaks at 8.9 V with a 2 us step and at
-/// 19.3 V with a 0.05 us one, and the one-piece run at the example's 1 us step reads 14.9 V. A cut moves the steps, so
-/// the chunked run lands anywhere in that range, which is the engine's step dependence and not a fault of the cut
-/// (see "A cut in the middle of a ringing edge..."). They are compared by staying within a span of the one-piece range.
-constexpr auto UNDERRESOLVED_RINGING_EXAMPLES = std::to_array<std::string_view>({"Buck converter"});
-
 /**
  * @brief   Lowest and highest value of a trace within a window of time around an instant.
  */
-std::pair<double, double> RangeAround(const std::vector<double> &times, const std::vector<double> &values,
-                                      const double time, const double half_window) {
+std::pair<double, double> RangeAround(const std::vector<double> &times,
+                                      const std::vector<double> &values,
+                                      const double time,
+                                      const double half_window) {
     double lowest = ValueAt(times, values, time - half_window);
     double highest = lowest;
     for (const double edge : {time, time + half_window}) {
@@ -117,7 +112,8 @@ std::pair<double, double> RangeAround(const std::vector<double> &times, const st
     }
     const auto first = std::ranges::lower_bound(times, time - half_window);
     for (std::size_t index = static_cast<std::size_t>(first - times.begin());
-         index < times.size() && times[index] <= time + half_window; ++index) {
+         index < times.size() && times[index] <= time + half_window;
+         ++index) {
         lowest = std::min(lowest, values[index]);
         highest = std::max(highest, values[index]);
     }
@@ -176,7 +172,9 @@ struct BackendInUse {
             Core::SetBackend(std::make_unique<Core::NodalysBackend>());
         }
     }
+
     ~BackendInUse() { Core::SetBackend(nullptr); }
+
     BackendInUse(const BackendInUse &) = delete;
     BackendInUse &operator=(const BackendInUse &) = delete;
 };
@@ -242,8 +240,11 @@ TEST_CASE("A chunked transient matches the one-piece run on every example", "[tr
         auto loaded = GUI::LoadExample(example);
         REQUIRE(loaded.has_value());
         GUI::Schematic schematic;
-        schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings),
-                          std::move(loaded->Subcircuits), std::move(loaded->Models));
+        schematic.Replace(std::move(loaded->Elements),
+                          std::move(loaded->Wires),
+                          std::move(loaded->Settings),
+                          std::move(loaded->Subcircuits),
+                          std::move(loaded->Models));
         const Core::Circuit circuit = schematic.BuildCircuit();
         // The examples with logic parts, loose or inside blocks, run only where ngspice has the digital models
         if (Core::FindUnsupported(Core::GetBackend(), circuit, Core::AnalysisKind::TRANSIENT)) {
@@ -263,19 +264,16 @@ TEST_CASE("A chunked transient matches the one-piece run on every example", "[tr
         CHECK(chunked.Result->IsComplete);
         CHECK(received.Chunks.size() > 1);
 
-        // Every node reaches the same lows and highs, to a small share of its size, or for a ringing one only within
-        // one span of the one-piece range, which still catches a spike that is not a ring
-        const bool is_ringing = std::ranges::contains(UNDERRESOLVED_RINGING_EXAMPLES, std::string_view(example.Title));
+        // Every node reaches the same lows and highs, to a small share of its size
         for (std::size_t node = 1; node < chunked.Result->NodeVoltages.size(); ++node) {
             const auto [chunked_lowest, chunked_highest] = std::ranges::minmax(chunked.Result->NodeVoltages[node]);
             const auto [lowest, highest] = std::ranges::minmax(one_piece.Result->NodeVoltages[node]);
-            const double share = is_ringing ? 1.0 : 0.02;
-            const double tolerance = share * Span(one_piece.Result->NodeVoltages[node]) + 1e-6;
+            const double tolerance = 0.02 * Span(one_piece.Result->NodeVoltages[node]) + 1e-6;
             INFO("node " << node);
             CHECK(std::abs(chunked_lowest - lowest) <= tolerance);
             CHECK(std::abs(chunked_highest - highest) <= tolerance);
         }
-        if (is_ringing || std::ranges::contains(THRESHOLD_SENSITIVE_EXAMPLES, std::string_view(example.Title))) {
+        if (std::ranges::contains(THRESHOLD_SENSITIVE_EXAMPLES, std::string_view(example.Title))) {
             continue;
         }
 
@@ -289,9 +287,10 @@ TEST_CASE("A chunked transient matches the one-piece run on every example", "[tr
             std::optional<double> first_time;
             for (std::size_t index = 0; index < chunked.Result->Times.size(); ++index) {
                 const double value = chunked.Result->NodeVoltages[node][index];
-                const auto [lowest, highest] =
-                    RangeAround(one_piece.Result->Times, one_piece.Result->NodeVoltages[node],
-                                chunked.Result->Times[index], half_window);
+                const auto [lowest, highest] = RangeAround(one_piece.Result->Times,
+                                                           one_piece.Result->NodeVoltages[node],
+                                                           chunked.Result->Times[index],
+                                                           half_window);
                 if (value < lowest - tolerance || value > highest + tolerance) {
                     ++outside;
                     first_time = first_time.value_or(chunked.Result->Times[index]);
@@ -330,12 +329,16 @@ TEST_CASE("A cut in the middle of a ringing edge leaves the buck converter withi
     auto loaded = GUI::LoadExample(*buck);
     REQUIRE(loaded.has_value());
     GUI::Schematic schematic;
-    schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings),
-                      std::move(loaded->Subcircuits), std::move(loaded->Models));
+    schematic.Replace(std::move(loaded->Elements),
+                      std::move(loaded->Wires),
+                      std::move(loaded->Settings),
+                      std::move(loaded->Subcircuits),
+                      std::move(loaded->Models));
     const Core::Circuit circuit = schematic.BuildCircuit();
 
-    // The first 2 ms, which hold the cuts that failed in CI (1.49 ms) and others that make the switch node ring, run
-    // with a step fine enough to resolve the ring: its peak, 19.3 V, is what the circuit does
+    // The first 2 ms hold the cuts that failed in CI (1.49 ms) and others that make the switch node ring. The
+    // reference runs with a step finer than the example's, which resolves the ring: its peak, 19.3 V, is what the
+    // circuit does
     Core::TransientSettings fine = schematic.GetSimulationSettings().Transient;
     fine.StopTime = 2e-3;
     fine.TimeStep = 0.05e-6;
@@ -346,7 +349,8 @@ TEST_CASE("A cut in the middle of a ringing edge leaves the buck converter withi
 
     Core::TransientSettings coarse = fine;
     coarse.TimeStep = schematic.GetSimulationSettings().Transient.TimeStep;
-    // 1.28 ms rings by 5 V above the one-piece run, and 1.378 and 1.486 ms are the ones that failed in CI
+    // 1.28 ms rang by 5 V above the one-piece run when the step was 1 us, and 1.378 and 1.486 ms are the ones that
+    // failed in CI
     for (const double cut : {1.28e-3, 1.378e-3, 1.486e-3}) {
         INFO("cut at " << cut << " s");
         Received received;
@@ -406,8 +410,10 @@ TEST_CASE("A run with a stepped value can be monitored, and a run without a moni
           "[transient_chunks]") {
     ChargingCapacitor setup;
     Received received;
-    const Core::TransientRun stepped = Core::RunTransient(
-        setup.Circuit, setup.Settings, Core::ParameterValue{.Part = "R1", .Value = 2e3}, received.Monitor);
+    const Core::TransientRun stepped = Core::RunTransient(setup.Circuit,
+                                                          setup.Settings,
+                                                          Core::ParameterValue{.Part = "R1", .Value = 2e3},
+                                                          received.Monitor);
     REQUIRE(stepped.Result.has_value());
     CHECK(received.Chunks.size() > 1);
 
@@ -424,8 +430,9 @@ TEST_CASE("The lines ngspice prints at each chunk are left out of the messages, 
     REQUIRE(run.Result.has_value());
     CHECK(std::ranges::none_of(run.Messages,
                                [](const Core::SimulatorMessage &message) { return message.FromErrorStream; }));
-    const auto analysis_lines = std::ranges::count_if(
-        run.Messages, [](const Core::SimulatorMessage &message) { return message.Text.starts_with("Doing analysis"); });
+    const auto analysis_lines = std::ranges::count_if(run.Messages, [](const Core::SimulatorMessage &message) {
+        return message.Text.starts_with("Doing analysis");
+    });
     CHECK(analysis_lines == 1);
 }
 

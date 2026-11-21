@@ -9,8 +9,11 @@
 #include "nodalys/types.h"
 
 #include <map>
+#include <optional>
 #include <set>
 #include <string>
+#include <string_view>
+#include <vector>
 
 namespace Nodalys {
 
@@ -31,11 +34,41 @@ struct ParsedModel {
     std::map<std::string, double> Params;
 };
 
-// Device parameters; a parameter the device reads is added to read_keys when it is given
-DiodeParameters BuildDiodeParameters(const ParsedModel &model, std::set<std::string> *read_keys = nullptr);
-BjtParameters BuildBjtParameters(const ParsedModel &model, std::set<std::string> *read_keys = nullptr);
-MosfetParameters BuildMosfetParameters(const ParsedModel &model, std::set<std::string> *read_keys = nullptr);
-SwitchParameters BuildSwitchParameters(const ParsedModel &model, std::set<std::string> *read_keys = nullptr);
+/**
+ * @struct  ModelCardWords
+ * @brief   The words of a .model card as written, before its values are read: ".model <name> <type>(<NAME=VALUE>...)".
+ */
+struct ModelCardWords {
+    std::string Name;
+    /// The type in upper case, such as "D" or "NPN".
+    std::string TypeName;
+    /// What follows the type, without the parentheses around the list, one token each, expected to be NAME=VALUE.
+    std::vector<std::string> Assignments;
+};
+
+/**
+ * @struct  BuiltParameters
+ * @brief   The parameters of a device built from a .model card, with the names of the card parameters it read.
+ */
+template <typename T>
+struct BuiltParameters {
+    T Parameters;
+    /// Upper-case names of the parameters the card gives and the device took, so the others can be reported.
+    std::set<std::string> ReadKeys;
+};
+
+// Cards
+std::optional<ModelCardWords> SplitModelCard(const std::vector<std::string> &tokens);
+std::optional<ParsedModel::ModelKind> FindModelKind(std::string_view type);
+
+// Device parameters
+BuiltParameters<DiodeParameters> BuildDiodeParameters(const ParsedModel &model);
+BuiltParameters<BjtParameters> BuildBjtParameters(const ParsedModel &model);
+BuiltParameters<MosfetParameters> BuildMosfetParameters(const ParsedModel &model);
+BuiltParameters<SwitchParameters> BuildSwitchParameters(const ParsedModel &model);
+
+// Ignored parameters
+std::string ListIgnoredParameters(const ParsedModel &model, const std::set<std::string> &read_keys);
 
 } // namespace Nodalys
 

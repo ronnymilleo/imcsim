@@ -21,7 +21,7 @@ namespace {
 /// Powers of two, so the transform halves at every stage.
 constexpr std::size_t MIN_SAMPLE_COUNT = 1024;
 /// Keeps the transform well under a millisecond per trace.
-constexpr std::size_t MAX_SAMPLE_COUNT = 65536;
+constexpr std::size_t MAX_SAMPLE_COUNT = 65'536;
 /// Floor of a spectrum relative to its strongest bin, -200 dB.
 constexpr double DECIBEL_FLOOR = 1e-10;
 /// Floor of a trace of zeros, 1e-15 (-300 dB), as in the AC sweep.
@@ -124,7 +124,9 @@ double LobePower(const std::vector<double> &amplitudes, const std::size_t center
 /**
  * @brief   Tells whether a peak stands out of the median of the bins around it, outside its own lobe.
  */
-bool StandsOutOfFloor(const std::vector<double> &amplitudes, const std::size_t peak_bin, const std::size_t half_width,
+bool StandsOutOfFloor(const std::vector<double> &amplitudes,
+                      const std::size_t peak_bin,
+                      const std::size_t half_width,
                       const std::size_t first_bin) {
     const std::size_t first =
         std::max(first_bin, peak_bin > FLOOR_NEIGHBORHOOD_BINS ? peak_bin - FLOOR_NEIGHBORHOOD_BINS : 0);
@@ -202,8 +204,12 @@ std::size_t ChooseSpectrumSampleCount(const std::span<const double> xs, double f
  * @note    The trace is read between its samples by straight lines, as the plots draw it, which leaves a floor of
  *          distortion that a smaller time step lowers.
  */
-std::optional<Spectrum> ComputeSpectrum(const std::span<const double> xs, const std::span<const double> ys, double from,
-                                        double to, const std::size_t sample_count, const SpectrumWindow window) {
+std::optional<Spectrum> ComputeSpectrum(const std::span<const double> xs,
+                                        const std::span<const double> ys,
+                                        double from,
+                                        double to,
+                                        const std::size_t sample_count,
+                                        const SpectrumWindow window) {
     const std::size_t count = std::min(xs.size(), ys.size());
     if (count < 2 || sample_count < 2 || !std::has_single_bit(sample_count)) {
         return std::nullopt;
@@ -372,7 +378,9 @@ std::vector<double> ComputeNoiseDensities(const Spectrum &spectrum) {
  * are left out.
  */
 std::optional<NoiseBand> MeasureNoiseBand(const std::span<const double> frequencies,
-                                          const std::span<const double> densities, double from, double to) {
+                                          const std::span<const double> densities,
+                                          double from,
+                                          double to) {
     const std::size_t count = std::min(frequencies.size(), densities.size());
     if (count <= MEAN_SKIRT_BINS) {
         return std::nullopt;

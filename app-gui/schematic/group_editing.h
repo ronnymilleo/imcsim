@@ -7,20 +7,19 @@
 #define IMCSIM_GROUP_EDITING_H
 
 #include "base/helpers.h"
+#include "schematic/selection.h"
 #include "schematic/wire_editing.h"
 #include "ui_elements/ui_element.h"
 #include "ui_elements/ui_wire.h"
-#include <cstddef>
 #include <memory>
-#include <set>
 #include <vector>
 
 namespace GUI {
 
 void TransformElement(UIElement &element, const PointTransform &transform);
 GridPoint FindPivot(const std::vector<std::unique_ptr<UIElement>> &elements,
-                    const std::set<std::size_t> &selected_elements, const std::vector<UIWire> &wires,
-                    const std::set<std::size_t> &selected_wires);
+                    const std::vector<UIWire> &wires,
+                    const Selection &selection);
 
 } // namespace GUI
 

@@ -112,11 +112,11 @@ TEST_CASE("Each port is a source of its number and reference impedance on its no
 }
 
 TEST_CASE("The S-parameter card follows the sweep type", "[s_parameters]") {
-    CHECK(Core::FormatSParameterAnalysis({.StartFrequency = 1e6, .StopFrequency = 1e9, .PointsPerDecade = 20}) ==
-          ".sp dec 20 1Meg 1G");
+    CHECK(Core::FormatSParameterAnalysis({.StartFrequency = 1e6, .StopFrequency = 1e9, .PointsPerDecade = 20})
+          == ".sp dec 20 1Meg 1G");
     CHECK(Core::FormatSParameterAnalysis(
-              {.StartFrequency = 1e3, .StopFrequency = 1e6, .IsLogarithmic = false, .LinearPoints = 101}) ==
-          ".sp lin 101 1k 1Meg");
+              {.StartFrequency = 1e3, .StopFrequency = 1e6, .IsLogarithmic = false, .LinearPoints = 101})
+          == ".sp lin 101 1k 1Meg");
 }
 
 TEST_CASE("A reflection tells the impedance, the standing wave ratio and the return loss", "[s_parameters]") {
@@ -277,7 +277,8 @@ TEST_CASE("ngspice does not simulate logic parts in an S-parameter analysis, and
         Core::FindUnsupported(Core::GetBackend(), {Core::ComponentType::AND}, Core::AnalysisKind::S_PARAMETERS);
     REQUIRE(reason.has_value());
     CHECK(reason->contains("digital"));
-    CHECK_FALSE(Core::FindUnsupported(Core::GetBackend(), {Core::ComponentType::RESISTOR, Core::ComponentType::NPN},
+    CHECK_FALSE(Core::FindUnsupported(Core::GetBackend(),
+                                      {Core::ComponentType::RESISTOR, Core::ComponentType::NPN},
                                       Core::AnalysisKind::S_PARAMETERS)
                     .has_value());
     CHECK(Core::GetAnalysisKindName(Core::AnalysisKind::S_PARAMETERS) == "S-parameter");

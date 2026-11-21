@@ -62,23 +62,31 @@ PlotSpan GetDecadeFitRange(const std::vector<std::span<const double>> &traces) {
 }
 
 std::string FormatFrequencyRange(const Core::Noise &noise) {
-    return std::format("{}Hz to {}Hz", Core::FormatValue(noise.Frequencies.front()),
+    return std::format("{}Hz to {}Hz",
+                       Core::FormatValue(noise.Frequencies.front()),
                        Core::FormatValue(noise.Frequencies.back()));
 }
 
 /**
  * @brief   The output in the color of its node, the shares checked in the panel, and the input-referred noise dashed.
  */
-void PlotNoiseTraces(const Core::Noise &noise, const Connectivity &connectivity, const std::set<std::string> &shown,
-                     const bool input_shown, const std::string &output_unit, const std::string &input_unit,
+void PlotNoiseTraces(const Core::Noise &noise,
+                     const Connectivity &connectivity,
+                     const std::set<std::string> &shown,
+                     const bool input_shown,
+                     const std::string &output_unit,
+                     const std::string &input_unit,
                      std::vector<PlottedTrace> &plotted) {
     const std::string output_label = GetVoltageLabel(connectivity, noise.OutputNode);
     const ImU32 output_color = GetNodeColor(noise.OutputNode);
     ImPlotSpec output_spec;
     output_spec.LineColor = ImGui::ColorConvertU32ToFloat4(output_color);
     output_spec.LineWeight = MATH_LINE_WEIGHT;
-    ImPlot::PlotLine(output_label.c_str(), noise.Frequencies.data(), noise.OutputDensities.data(),
-                     static_cast<int>(noise.Frequencies.size()), output_spec);
+    ImPlot::PlotLine(output_label.c_str(),
+                     noise.Frequencies.data(),
+                     noise.OutputDensities.data(),
+                     static_cast<int>(noise.Frequencies.size()),
+                     output_spec);
     plotted.push_back({output_label, &noise.OutputDensities, output_unit.c_str(), output_color});
     for (std::size_t index = 0; index < noise.Contributions.size(); ++index) {
         const Core::NoiseContribution &contribution = noise.Contributions[index];
@@ -87,8 +95,11 @@ void PlotNoiseTraces(const Core::Noise &noise, const Connectivity &connectivity,
         }
         ImPlotSpec spec;
         spec.LineColor = ImGui::ColorConvertU32ToFloat4(GetCurrentColor(index));
-        ImPlot::PlotLine(contribution.Name.c_str(), noise.Frequencies.data(), contribution.OutputDensities.data(),
-                         static_cast<int>(noise.Frequencies.size()), spec);
+        ImPlot::PlotLine(contribution.Name.c_str(),
+                         noise.Frequencies.data(),
+                         contribution.OutputDensities.data(),
+                         static_cast<int>(noise.Frequencies.size()),
+                         spec);
         plotted.push_back(
             {contribution.Name, &contribution.OutputDensities, output_unit.c_str(), GetCurrentColor(index)});
     }
@@ -131,7 +142,8 @@ void NoiseTab::Draw() {
                 return;
             }
             ImGui::PushTextWrapPos(0.0f);
-            ImGui::TextColored(GetWarningTextColor(), "%s",
+            ImGui::TextColored(GetWarningTextColor(),
+                               "%s",
                                std::format("No noise reaches {}: an ideal source holds it, or no part that adds "
                                            "noise drives it. Pick another output beside Run",
                                            GetVoltageLabel(m_Schematic.GetConnectivity(), noise->OutputNode))
@@ -170,11 +182,12 @@ void NoiseTab::DrawPlot(const Core::Noise &noise) {
     const bool input_shown = HasInputGain(noise);
     if (!input_shown) {
         ImGui::PushTextWrapPos(0.0f);
-        ImGui::TextDisabled("%s", std::format("{} hardly reaches {} (under -120 dB, as through a logic gate), so its "
-                                              "input-referred noise is left out",
-                                              noise.InputSource,
-                                              GetVoltageLabel(m_Schematic.GetConnectivity(), noise.OutputNode))
-                                      .c_str());
+        ImGui::TextDisabled("%s",
+                            std::format("{} hardly reaches {} (under -120 dB, as through a logic gate), so its "
+                                        "input-referred noise is left out",
+                                        noise.InputSource,
+                                        GetVoltageLabel(m_Schematic.GetConnectivity(), noise.OutputNode))
+                                .c_str());
         ImGui::PopTextWrapPos();
     }
     if (!BeginTracePlot("##noise", ImVec2(-1.0f, PlotHeight(1)), true)) {
@@ -185,7 +198,12 @@ void NoiseTab::DrawPlot(const Core::Noise &noise) {
     const std::string input_unit = GetDensityUnit(noise.InputUnit);
     SetupAxes(noise, input_shown, output_unit, input_unit);
     std::vector<PlottedTrace> plotted;
-    PlotNoiseTraces(noise, m_Schematic.GetConnectivity(), m_ShownContributions, input_shown, output_unit, input_unit,
+    PlotNoiseTraces(noise,
+                    m_Schematic.GetConnectivity(),
+                    m_ShownContributions,
+                    input_shown,
+                    output_unit,
+                    input_unit,
                     plotted);
     DrawCursorReadout(noise.Frequencies, "Hz", true, plotted);
     const ImPlotRange view = ImPlot::GetPlotLimits().X;
@@ -200,15 +218,17 @@ void NoiseTab::DrawPlot(const Core::Noise &noise) {
  *          a current source, it has its own. The limits are set during the setup, since ImPlot fits an axis on its own
  *          the first frame it is shown.
  */
-void NoiseTab::SetupAxes(const Core::Noise &noise, const bool input_shown, const std::string &output_unit,
+void NoiseTab::SetupAxes(const Core::Noise &noise,
+                         const bool input_shown,
+                         const std::string &output_unit,
                          const std::string &input_unit) {
     const bool new_result = m_Fit.TakeNewResult(m_Results.GetNoiseVersion());
-    const bool shares_changed = TakeTracesChanged(
-        m_PlottedContributions, std::vector<std::string>(m_ShownContributions.begin(), m_ShownContributions.end()));
+    const bool shares_changed =
+        TakeTracesChanged(m_PlottedContributions,
+                          std::vector<std::string>(m_ShownContributions.begin(), m_ShownContributions.end()));
     const bool input_in_volts = noise.InputUnit == "V";
     ImPlot::SetupAxes("Frequency", "Noise density", ImPlotAxisFlags_None, ImPlotAxisFlags_None);
-    ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
-    ImPlot::SetupAxisFormat(ImAxis_X1, FormatAxisValue, const_cast<char *>("Hz"));
+    SetupLogFrequencyAxis(nullptr);
     ImPlot::SetupAxisScale(ImAxis_Y1, ImPlotScale_Log10);
     ImPlot::SetupAxisFormat(ImAxis_Y1, FormatAxisValue, const_cast<char *>(output_unit.c_str()));
     if (input_shown && !input_in_volts) {

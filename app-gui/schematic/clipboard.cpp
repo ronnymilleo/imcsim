@@ -9,23 +9,79 @@
 #include "schematic/block_nesting.h"
 #include "schematic/group_editing.h"
 #include "schematic/schematic_file.h"
+#include "schematic/selection.h"
 #include <algorithm>
+#include <iterator>
 #include <set>
+#include <string>
+#include <vector>
 
 namespace GUI {
 
 namespace {
 
 GridPoint FindGroupPivot(const PastedGroup &group) {
-    std::set<std::size_t> elements;
-    std::set<std::size_t> wires;
-    for (std::size_t index = 0; index < group.Elements.size(); ++index) {
-        elements.insert(index);
+    return FindPivot(group.Elements, group.Wires, PickAll(group.Elements, group.Wires));
+}
+
+/**
+ * @brief   Copies the blocks that some parts place, with the blocks inside them at any depth.
+ * @details Every definition is read back together, so the instances inside the copies find each other.
+ * @param[in] subcircuits  Block definitions of the schematic.
+ * @param[in] parts        Parts being copied.
+ * @return  Deep copies of the definitions the parts need, in the order of the schematic; none when no part is a block.
+ */
+std::vector<SavedSubcircuit> CopyNeededDefinitions(const std::span<const SavedSubcircuit> subcircuits,
+                                                   const std::vector<const UIElement *> &parts) {
+    std::set<std::string> placed;
+    for (const UIElement *part : parts) {
+        if (part->GetComponent().GetType() == Core::ComponentType::SUBCIRCUIT) {
+            placed.insert(static_cast<const Core::SubcircuitInstance &>(part->GetComponent()).GetDefinitionName());
+        }
     }
-    for (std::size_t index = 0; index < group.Wires.size(); ++index) {
-        wires.insert(index);
+    std::vector<SavedSubcircuit> copied;
+    if (placed.empty()) {
+        return copied;
     }
-    return FindPivot(group.Elements, elements, group.Wires, wires);
+    auto loaded = LoadSchematic(SaveSchematic({}, {}, {}, {}, subcircuits));
+    if (!loaded) {
+        return copied;
+    }
+    for (SavedSubcircuit &definition : loaded->Subcircuits) {
+        const bool is_needed = std::ranges::any_of(placed, [&](const std::string &name) {
+            return ContainsBlock(subcircuits, name, definition.Name);
+        });
+        if (is_needed) {
+            copied.push_back(std::move(definition));
+        }
+    }
+    return copied;
+}
+
+/**
+ * @brief   Copies the library models that some parts use, those inside the blocks copied with them included.
+ * @param[in] models       Library models of the schematic.
+ * @param[in] parts        Parts being copied.
+ * @param[in] definitions  Blocks copied with the parts.
+ * @return  The models any of them names, in the order of the schematic.
+ */
+std::vector<Core::LibraryModel> CopyNeededModels(const std::span<const Core::LibraryModel> models,
+                                                 const std::vector<const UIElement *> &parts,
+                                                 const std::vector<SavedSubcircuit> &definitions) {
+    std::set<std::string> needed;
+    for (const UIElement *part : parts) {
+        needed.insert(part->GetComponent().GetLibraryModel());
+    }
+    for (const SavedSubcircuit &definition : definitions) {
+        for (const auto &element : definition.Elements) {
+            needed.insert(element->GetComponent().GetLibraryModel());
+        }
+    }
+    std::vector<Core::LibraryModel> copied;
+    std::ranges::copy_if(models, std::back_inserter(copied), [&](const Core::LibraryModel &model) {
+        return needed.contains(model.Name);
+    });
+    return copied;
 }
 
 } // namespace
@@ -41,54 +97,16 @@ GridPoint FindGroupPivot(const PastedGroup &group) {
  * @return  A schematic of just those items, in the format of the files, so it pastes into another copy of the program
  *          as well as this one.
  */
-std::string CopySelection(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires,
-                          const Selection &selection, const std::span<const SavedSubcircuit> subcircuits,
+std::string CopySelection(const std::vector<std::unique_ptr<UIElement>> &elements,
+                          const std::vector<UIWire> &wires,
+                          const Selection &selection,
+                          const std::span<const SavedSubcircuit> subcircuits,
                           const std::span<const Core::LibraryModel> models) {
-    std::vector<const UIElement *> copied_elements;
-    std::set<std::string> needed_definitions;
-    for (const std::size_t index : selection.Elements) {
-        const UIElement *element = elements[index].get();
-        copied_elements.push_back(element);
-        if (element->GetComponent().GetType() == Core::ComponentType::SUBCIRCUIT) {
-            needed_definitions.insert(
-                static_cast<const Core::SubcircuitInstance &>(element->GetComponent()).GetDefinitionName());
-        }
-    }
-    std::vector<UIWire> copied_wires;
-    for (const std::size_t index : selection.Wires) {
-        copied_wires.push_back(wires[index]);
-    }
-    // The blocks the copied blocks place go along, at any depth; every definition is read back together, so their
-    // instances find each other
-    std::vector<SavedSubcircuit> copied_definitions;
-    if (auto loaded = LoadSchematic(SaveSchematic({}, {}, {}, {}, subcircuits));
-        loaded && !needed_definitions.empty()) {
-        for (SavedSubcircuit &definition : loaded->Subcircuits) {
-            const bool is_needed = std::ranges::any_of(needed_definitions, [&](const std::string &name) {
-                return ContainsBlock(subcircuits, name, definition.Name);
-            });
-            if (is_needed) {
-                copied_definitions.push_back(std::move(definition));
-            }
-        }
-    }
-    // The library models the copied parts use, those inside the copied blocks included
-    std::set<std::string> needed_models;
-    for (const UIElement *element : copied_elements) {
-        needed_models.insert(element->GetComponent().GetLibraryModel());
-    }
-    for (const SavedSubcircuit &definition : copied_definitions) {
-        for (const auto &element : definition.Elements) {
-            needed_models.insert(element->GetComponent().GetLibraryModel());
-        }
-    }
-    std::vector<Core::LibraryModel> copied_models;
-    for (const Core::LibraryModel &model : models) {
-        if (needed_models.contains(model.Name)) {
-            copied_models.push_back(model);
-        }
-    }
-    return SaveParts(copied_elements, copied_wires, copied_definitions, copied_models);
+    const SelectedItems selected = CollectSelected(elements, wires, selection);
+    std::vector<SavedSubcircuit> copied_definitions = CopyNeededDefinitions(subcircuits, selected.Elements);
+    const std::vector<Core::LibraryModel> copied_models =
+        CopyNeededModels(models, selected.Elements, copied_definitions);
+    return SaveParts(selected.Elements, selected.Wires, copied_definitions, copied_models);
 }
 
 /**

@@ -7,7 +7,9 @@
 #define NODALYS_PARSER_NETLIST_SUBCIRCUITS_H
 
 #include "nodalys/circuit_builder.h"
+#include "nodalys/subcircuit_text.h"
 #include "nodalys/types.h"
+#include "parser/netlist_deck.h"
 
 #include <expected>
 #include <functional>
@@ -18,33 +20,13 @@
 
 namespace Nodalys {
 
-/**
- * @struct  InstanceLine
- * @brief   The parts of an X line: X<name> <nodes> <subcircuit> [params:] [NAME=VALUE...].
- */
-struct InstanceLine {
-    std::vector<std::string> NodeNames;
-    std::string SubcircuitName;
-    /// The NAME=VALUE tokens, as written, with the PARAMS: word among them when the line has it.
-    std::vector<std::string> ParameterTokens;
-};
-
-/**
- * @struct  InstanceObservers
- * @brief   What the caller wants to hear about the nodes and sources that the instances of a netlist make.
- */
-struct InstanceObservers {
-    std::function<void(const std::string &name, NodeId node)> OnInternalNode;
-    std::function<void(const std::string &name, NodeId positive, NodeId negative)> OnSource;
-};
-
-// Reading
-std::optional<InstanceLine> SplitInstanceLine(const std::vector<std::string> &tokens);
-
 // Placing
 std::expected<std::vector<std::string>, std::string>
-AddNetlistInstance(CircuitBuilder &builder, const std::vector<std::string> &definition_lines, std::string_view line,
-                   const std::function<NodeId(std::string_view)> &resolve_node, const InstanceObservers &observers);
+AddNetlistInstance(CircuitBuilder &builder,
+                   const std::vector<std::string> &definition_lines,
+                   const DeckLine &line,
+                   const std::function<NodeId(std::string_view)> &resolve_node,
+                   const InstanceObservers &observers);
 
 } // namespace Nodalys
 

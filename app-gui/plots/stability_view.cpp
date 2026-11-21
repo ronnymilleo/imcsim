@@ -76,7 +76,9 @@ std::string DescribeStableRegion(const StabilityBoundary &boundary) {
     return origin_side > 0.0 ? "the side of the origin" : "the side away from the origin";
 }
 
-ExportSmithCircle MakeCircle(const std::string &name, const ExportColor color, const double frequency_hertz,
+ExportSmithCircle MakeCircle(const std::string &name,
+                             const ExportColor color,
+                             const double frequency_hertz,
                              const StabilityBoundary &boundary) {
     ExportSmithCircle circle{.Name = name,
                              .Color = color,
@@ -244,7 +246,8 @@ ExportFigure BuildStabilityTableFigure(const TwoPortSweep &sweep) {
  *          circle that does not cross the chart is listed in the table only. A result that is not of two ports, or a
  *          frequency outside the sweep, adds no circles.
  */
-ExportFigure BuildSmithFigureWithCircles(const Core::SParameters &result, const std::vector<SParameterEntry> &entries,
+ExportFigure BuildSmithFigureWithCircles(const Core::SParameters &result,
+                                         const std::vector<SParameterEntry> &entries,
                                          const std::size_t frequency) {
     ExportFigure figure = BuildSmithFigure(result, entries);
     if (!figure.Smith || !IsTwoPort(result) || frequency >= result.Frequencies.size()) {
@@ -257,7 +260,8 @@ ExportFigure BuildSmithFigureWithCircles(const Core::SParameters &result, const 
         MakeCircle("Source stability circle", SOURCE_CIRCLE_COLOR, frequency_hertz, circles.Source));
     smith.Circles.push_back(MakeCircle("Load stability circle", LOAD_CIRCLE_COLOR, frequency_hertz, circles.Load));
     const bool is_any_drawn = !smith.Circles.front().Boundary.empty() || !smith.Circles.back().Boundary.empty();
-    smith.Title = std::format("Smith chart, stability circles at {}Hz{}", Core::FormatValue(frequency_hertz),
+    smith.Title = std::format("Smith chart, stability circles at {}Hz{}",
+                              Core::FormatValue(frequency_hertz),
                               is_any_drawn ? "; the hatching marks the unstable side" : ": none crosses the chart");
     return figure;
 }

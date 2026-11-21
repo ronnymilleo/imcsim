@@ -5,6 +5,7 @@
 
 #include "analyses/ac_sens_bias.h"
 
+#include "analyses/analysis_preamble.h"
 #include <algorithm>
 #include <cmath>
 #include <map>
@@ -30,7 +31,7 @@ struct DeviceStamp {
 class StampProbe {
 public:
     explicit StampProbe(const CompiledCircuit &compiled)
-        : m_Conductance(MakeSystem(compiled)), m_Reactive(MakeSystem(compiled)) {}
+        : m_Conductance(MakeEmptySystemLike(*compiled.System)), m_Reactive(MakeEmptySystemLike(*compiled.System)) {}
 
     /**
      * @brief   Stamps one device at an iterate into the scratch systems.
@@ -45,22 +46,17 @@ public:
     }
 
     const MnaSystem &GetConductance() const { return m_Conductance; }
+
     const MnaSystem &GetReactive() const { return m_Reactive; }
 
 private:
-    static MnaSystem MakeSystem(const CompiledCircuit &compiled) {
-        std::vector<bool> node_flags(static_cast<std::size_t>(compiled.System->GetSize()), false);
-        for (int index = 0; index < compiled.System->GetSize(); ++index) {
-            node_flags[static_cast<std::size_t>(index)] = compiled.System->IsNodeUnknown(index);
-        }
-        return MnaSystem(std::move(node_flags));
-    }
-
     MnaSystem m_Conductance;
     MnaSystem m_Reactive;
 };
 
-/// The unknowns a stamp reads: the columns where it has an entry.
+/**
+ * @brief   The unknowns a stamp reads: the columns where it has an entry.
+ */
 std::vector<int> FindReadUnknowns(const StampProbe &probe, const int size) {
     std::vector<int> unknowns;
     for (int column = 0; column < size; ++column) {
@@ -86,7 +82,11 @@ DeviceStamp CopyStamp(const StampProbe &probe) {
 /**
  * @brief   Central difference of the stamps of a device with respect to one DC unknown.
  */
-void ProbeUnknown(StampProbe &probe, Device &device, const std::vector<double> &x_dc, const int unknown, const int size,
+void ProbeUnknown(StampProbe &probe,
+                  Device &device,
+                  const std::vector<double> &x_dc,
+                  const int unknown,
+                  const int size,
                   std::vector<JacobianDerivative> &derivatives) {
     const auto index = static_cast<std::size_t>(unknown);
     const double step = DERIVATIVE_STEP * std::max(MIN_STEP_SCALE, std::fabs(x_dc[index]));
@@ -116,7 +116,9 @@ void ProbeUnknown(StampProbe &probe, Device &device, const std::vector<double> &
     }
 }
 
-/// Adds the derivatives of one unknown to the total, summing entries of the same position.
+/**
+ * @brief   Adds the derivatives of one unknown to the total, summing entries of the same position.
+ */
 void Merge(std::map<int, std::map<std::pair<int, int>, JacobianEntry>> &total,
            const std::vector<JacobianDerivative> &found) {
     for (const JacobianDerivative &derivative : found) {
@@ -185,7 +187,8 @@ std::vector<JacobianDerivative> FindJacobianDerivatives(const CompiledCircuit &c
 std::vector<std::complex<double>> FindBiasWeights(const std::vector<JacobianDerivative> &derivatives,
                                                   const std::size_t size,
                                                   const std::vector<std::complex<double>> &adjoint,
-                                                  const std::vector<std::complex<double>> &x_ac, const double omega) {
+                                                  const std::vector<std::complex<double>> &x_ac,
+                                                  const double omega) {
     std::vector<std::complex<double>> weights(size, std::complex<double>{0.0, 0.0});
     for (const JacobianDerivative &derivative : derivatives) {
         std::complex<double> sum{0.0, 0.0};

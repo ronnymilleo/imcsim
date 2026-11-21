@@ -1,0 +1,8 @@
+# Formatting-only commits, which git blame skips with: git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# Put each argument and parameter on a line of its own when a call does not fit
+2ea88cd25cc085f79cde8068e01d32b1591b28c0
+
+# Break long expressions before their operators, put templates on their own line, group the digits of long integers
+# and separate definitions
+929c9b61b3450f07f1ef95737e0bf831c91c475a

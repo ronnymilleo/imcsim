@@ -6,6 +6,7 @@
 #include "parser/subcircuit_models.h"
 
 #include "parser/spice_text.h"
+#include "text/text_case.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -18,46 +19,6 @@ namespace {
 /// The one level of the diode, bipolar and MOSFET models that the engine has.
 constexpr double SUPPORTED_LEVEL = 1.0;
 
-/**
- * @brief   The kind of device a .model type stands for, or none for a type the engine has no device for.
- */
-std::optional<ParsedModel::ModelKind> FindKind(const std::string &type) {
-    if (type == "D") {
-        return ParsedModel::ModelKind::DIODE;
-    }
-    if (type == "NPN") {
-        return ParsedModel::ModelKind::BJT_NPN;
-    }
-    if (type == "PNP") {
-        return ParsedModel::ModelKind::BJT_PNP;
-    }
-    if (type == "NMOS") {
-        return ParsedModel::ModelKind::MOSFET_NMOS;
-    }
-    if (type == "PMOS") {
-        return ParsedModel::ModelKind::MOSFET_PMOS;
-    }
-    if (type == "SW" || type == "VSWITCH") {
-        return ParsedModel::ModelKind::SWITCH;
-    }
-    return std::nullopt;
-}
-
-/**
- * @brief   The text of the parameters of a card: what follows the type, without the parentheses around the list.
- */
-std::string_view FindParameterText(const std::string_view after_name, std::string &type) {
-    const std::string_view text = TrimSpaces(after_name);
-    const std::size_t type_end = text.find_first_of(" \t(");
-    type = ToUpperCase(text.substr(0, type_end));
-    std::string_view parameters = type_end == std::string_view::npos ? std::string_view() : text.substr(type_end);
-    parameters = TrimSpaces(parameters);
-    if (parameters.size() >= 2 && parameters.front() == '(' && parameters.back() == ')') {
-        parameters = parameters.substr(1, parameters.size() - 2);
-    }
-    return parameters;
-}
-
 } // namespace
 
 /**
@@ -69,22 +30,18 @@ std::string_view FindParameterText(const std::string_view after_name, std::strin
  * @return  The model, or what was not understood.
  */
 std::expected<TextModel, std::string> ParseTextModel(const TextScope &scope, const std::vector<std::string> &tokens) {
-    if (tokens.size() < 3) {
+    const std::optional<ModelCardWords> card = SplitModelCard(tokens);
+    if (!card) {
         return std::unexpected("a .model card needs a name and a type");
     }
     TextModel model;
-    model.Name = tokens[1];
-    std::string rest;
-    for (std::size_t index = 2; index < tokens.size(); ++index) {
-        rest += index == 2 ? "" : " ";
-        rest += tokens[index];
-    }
-    const std::string_view parameter_text = FindParameterText(rest, model.TypeName);
-    if (const std::optional<ParsedModel::ModelKind> kind = FindKind(model.TypeName)) {
+    model.Name = card->Name;
+    model.TypeName = card->TypeName;
+    if (const std::optional<ParsedModel::ModelKind> kind = FindModelKind(model.TypeName)) {
         model.IsSupported = true;
         model.Card.Kind = *kind;
     }
-    for (const std::string &token : SplitTokens(parameter_text)) {
+    for (const std::string &token : card->Assignments) {
         const std::size_t equals = token.find('=');
         if (equals == std::string::npos || equals == 0) {
             return std::unexpected(std::format("the model parameter '{}' is not written as NAME=VALUE", token));
@@ -92,9 +49,11 @@ std::expected<TextModel, std::string> ParseTextModel(const TextScope &scope, con
         const auto value = scope.Evaluate(std::string_view(token).substr(equals + 1));
         if (!value) {
             return std::unexpected(std::format("the parameter {} of the model {}: {}",
-                                               ToUpperCase(token.substr(0, equals)), model.Name, value.error()));
+                                               ToUpper(token.substr(0, equals)),
+                                               model.Name,
+                                               value.error()));
         }
-        model.Card.Params[ToUpperCase(token.substr(0, equals))] = *value;
+        model.Card.Params[ToUpper(token.substr(0, equals))] = *value;
     }
     return model;
 }
@@ -107,15 +66,17 @@ std::expected<TextModel, std::string> ParseTextModel(const TextScope &scope, con
  * @return  The model, or why the element cannot use it: not defined, of another kind, of a type the engine has no
  *          device for, or of a level other than 1.
  */
-std::expected<const TextModel *, std::string> UseTextModel(const TextScope &scope, const std::string_view name,
+std::expected<const TextModel *, std::string> UseTextModel(const TextScope &scope,
+                                                           const std::string_view name,
                                                            const std::initializer_list<ParsedModel::ModelKind> kinds) {
-    const TextModel *model = scope.FindModel(ToUpperCase(name));
+    const TextModel *model = scope.FindModel(ToUpper(name));
     if (model == nullptr) {
         return std::unexpected(std::format("it uses the model {}, which the text does not define", name));
     }
     if (!model->IsSupported) {
         return std::unexpected(std::format("the model {} is of the type {}, which Nodalys has no device for",
-                                           model->Name, model->TypeName));
+                                           model->Name,
+                                           model->TypeName));
     }
     if (std::ranges::find(kinds, model->Card.Kind) == kinds.end()) {
         return std::unexpected(
@@ -124,7 +85,8 @@ std::expected<const TextModel *, std::string> UseTextModel(const TextScope &scop
     if (const auto level = model->Card.Params.find("LEVEL");
         level != model->Card.Params.end() && level->second != SUPPORTED_LEVEL) {
         return std::unexpected(std::format("Nodalys simulates the level 1 model only, and the model {} is level {}",
-                                           model->Name, level->second));
+                                           model->Name,
+                                           level->second));
     }
     return model;
 }
@@ -135,21 +97,18 @@ std::expected<const TextModel *, std::string> UseTextModel(const TextScope &scop
  * @param[in]     model      Model an element used.
  * @param[in]     read_keys  Parameters the device took from it.
  */
-void ReportIgnoredParameters(ExpansionContext &context, const TextModel &model,
+void ReportIgnoredParameters(ExpansionContext &context,
+                             const TextModel &model,
                              const std::set<std::string> &read_keys) {
-    if (!context.ReportedModels.insert(ToUpperCase(model.Name)).second) {
+    if (!context.ReportedModels.insert(ToUpper(model.Name)).second) {
         return;
     }
-    std::string ignored;
-    for (const auto &[key, value] : model.Card.Params) {
-        if (key != "LEVEL" && !read_keys.contains(key)) {
-            ignored += ignored.empty() ? key : ", " + key;
-        }
-    }
-    if (!ignored.empty()) {
+    if (const std::string ignored = ListIgnoredParameters(model.Card, read_keys); !ignored.empty()) {
         context.Warnings.push_back(std::format("Nodalys does not read the parameters {} of the model {} in the "
                                                "subcircuit {}",
-                                               ignored, model.Name, context.SubcircuitName));
+                                               ignored,
+                                               model.Name,
+                                               context.SubcircuitName));
     }
 }
 

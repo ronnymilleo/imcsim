@@ -9,13 +9,13 @@
 #include "analysis/analysis_controls.h"
 #include "analysis/analysis_settings_panel.h"
 #include "base/helpers.h"
+#include "canvas/schematic_canvas.h"
 #include "circuit/components/component.h"
 #include "imgui.h"
 #include "overlays/glow_renderer.h"
 #include "overlays/schematic_overlays.h"
 #include "results/playback.h"
 #include "results/result_store.h"
-#include "schematic/block_session.h"
 #include "schematic/canvas_view.h"
 #include "schematic/clipboard.h"
 #include "schematic/editor_command.h"
@@ -26,9 +26,11 @@
 #include "schematic/schematic.h"
 #include "schematic/schematic_file_actions.h"
 #include "schematic/selection.h"
+#include "schematic/shortcuts.h"
 #include "schematic/wire_editing.h"
 #include "ui_elements/ui_element.h"
 #include "windows/app_window.h"
+#include "windows/block_navigator.h"
 #include "windows/editor_context_menu.h"
 #include "windows/editor_menus.h"
 #include "windows/editor_toolbar.h"
@@ -37,7 +39,7 @@
 #include "windows/part_picker.h"
 #include "windows/part_popover.h"
 #include "windows/part_rail.h"
-#include "windows/spice_block_dialog.h"
+#include "windows/spice_import_dialog.h"
 #include <cstddef>
 #include <filesystem>
 #include <memory>
@@ -57,16 +59,22 @@ namespace GUI {
  *          from the EditorToolbar, their keys, or the PartPicker that Space opens, which only ask for them; a status
  *          bar lists the keys of each mode.
  * Schematics are saved to and opened from JSON files by its SchematicFileActions, the colors of a result are drawn by
- * its SchematicOverlays, and where it looks is kept by its CanvasView. The blocks it has open are a BlockSession, and
- * the input of each mode, the menus, the properties popover and the context menu live in modules of their own. The root
- * schematic belongs to the application. While a subcircuit is open, this window edits a temporary document and applies
- * it back to the root as one undo step; it otherwise keeps interaction state such as the current mode and drag.
+ * its SchematicOverlays, and where it looks is kept by its CanvasView. Its BlockNavigator moves it into and out of
+ * blocks, and the input of each mode, the menus, the properties popover and the context menu live in modules of their
+ * own. The root schematic belongs to the application. While a subcircuit is open, this window edits a temporary
+ * document and applies it back to the root as one undo step; it otherwise keeps interaction state such as the current
+ * mode and drag.
  */
 class EditorWindow : public AppWindow {
 public:
-    EditorWindow(Schematic &schematic, const ResultStore &results, AnalysisControls &controls,
-                 AnalysisSettingsPanel &settings_panel, PartEditor &part_editor, GlowRenderer &glow_renderer,
-                 TransientPlayback &playback, const Preferences &preferences);
+    EditorWindow(Schematic &schematic,
+                 const ResultStore &results,
+                 AnalysisControls &controls,
+                 AnalysisSettingsPanel &settings_panel,
+                 PartEditor &part_editor,
+                 GlowRenderer &glow_renderer,
+                 TransientPlayback &playback,
+                 const Preferences &preferences);
     ~EditorWindow() override = default;
 
     // Requests, global shortcuts and file popups, whichever window is in front
@@ -99,16 +107,29 @@ private:
         double To = 0.0;
     };
 
+    /**
+     * @struct  CanvasFrame
+     * @brief   Where the canvas is this frame and what the cursor is over, which each step of the frame reads.
+     */
+    struct CanvasFrame {
+        /// Top left corner of the canvas on the screen.
+        ImVec2 Origin;
+        ImVec2 Size;
+        /// Pan and zoom, once the wheel and the middle button of this frame moved them.
+        ViewTransform View;
+        /// Whether the cursor is over the canvas.
+        bool IsHovered = false;
+        /// The part under the cursor that a live run lets the user set by hand, or none.
+        std::optional<LivePart> HoveredLivePart;
+    };
+
     Schematic &m_RootSchematic;
-    Schematic *m_Schematic;
     /// The results of the root schematic, the only one an analysis runs on.
     const ResultStore &m_RootResults;
     /// What the editor shows of the results while a block is open: none, since a block has no run of its own.
     const ResultStore m_NoResults{};
-    /// The blocks open, from the outermost to the one shown, and the settings of the dialog that edits them.
-    BlockSession m_Blocks;
     /// Imports SPICE libraries and sets up the pins of the blocks they become.
-    SpiceBlockDialog m_SpiceDialog;
+    SpiceImportDialog m_SpiceImport;
     AnalysisControls &m_Controls;
     AnalysisSettingsPanel &m_SettingsPanel;
     PartEditor &m_PartEditor;
@@ -126,6 +147,8 @@ private:
 
     /// What clicks and keys on the canvas do now.
     EditorMode m_Mode;
+    /// The level on show, the document or an open block, which the mode, the overlays and the view follow.
+    BlockNavigator m_Navigator;
     /// Whether wires go up or down before they turn, kept from one wire to the next.
     bool m_WireVerticalFirst = false;
     /// Live runs: what the mouse does to the parts set by hand, and the push button it holds.
@@ -143,9 +166,16 @@ private:
 
     // Frame
     void Draw() override;
+    void HandlePartPicker();
+    void DrawRail();
+    CanvasFrame BeginCanvas();
     static ImVec2 GetCanvasSize();
-    void HandleModeKeys();
-    void ApplyToolbarRequest(ToolbarRequest request);
+    std::optional<LivePart> FindHoveredLivePart(ImVec2 origin) const;
+    void HandleCanvasInput(const CanvasFrame &frame);
+    void DrawCanvas(const CanvasFrame &frame);
+    void DrawSchematicLayers(const CanvasFrame &frame, SchematicCanvas &canvas);
+    void HandleModeInput(const CanvasFrame &frame, SchematicCanvas &canvas);
+    void DrawCanvasOverlays(const CanvasFrame &frame);
     std::optional<TimeSpan> GetWindowSpan() const;
     std::optional<double> GetShownInstant() const;
 
@@ -153,40 +183,13 @@ private:
     void SetMode(EditorMode mode);
 
     // Blocks
-    bool IsEditingSubcircuit() const;
     const ResultStore &GetShownResults() const;
-    bool LeaveSubcircuitForDocument();
-    bool ReturnToLevel(std::size_t depth);
-    void ShowSchematic();
-    void OfferBlockParameters();
-    void RequestEditSelectedSubcircuit();
-    void FinishSubcircuitEditing(bool apply);
-    void RunBlockMenuChoice(BlockMenuChoice choice);
-    void ApplySpiceBlockResult(SpiceBlockResult result);
+    void ImportSpiceBlocks(SpiceImportResult imported);
 
-    // Clipboard
-    void HandleClipboardShortcuts();
-    void CopySelected();
-    void CutSelected();
-    void StartPasting();
-    void StartPastingGroup(PastedGroup group);
-
-    // Selection and dragging
-    void HandleSelection(const ViewTransform &view, bool hovered);
-    void HandleSelectionClick(SelectingMode &selecting, ImVec2 cursor_world);
-    void HandleSelectionDoubleClick();
-    void UpdateSelectionBox(SelectingMode &selecting, ImVec2 cursor_world);
-    void UpdateSelectionDrag(SelectingMode &selecting, ImVec2 cursor_world);
-    void HandleSelectionKeys(const SelectingMode &selecting);
-
-    // Menu commands and shortcuts
-    void HandleGlobalShortcuts();
-    void Undo();
-    void Redo();
+    // Commands and shortcuts
     void HandleCommandRequest();
-    bool RunFileCommand(EditorCommand command);
-    bool RunClipboardCommand(EditorCommand command);
-    void RunEditCommand(EditorCommand command);
+    void RunPressedShortcuts(ShortcutScope scope);
+    void RunCommand(EditorCommand command);
     void RunTurnCommand(EditorCommand command);
 };
 

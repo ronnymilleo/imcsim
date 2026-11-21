@@ -71,8 +71,8 @@ TEST_CASE("TRNOISE flicker and telegraph components are deterministic under Rese
 
     source.ResetSeed(99);
     for (int index = 0; index <= 20; ++index) {
-        CHECK(Eval(source, params.Offset, static_cast<double>(index) * params.TimeStep) ==
-              first_run[static_cast<std::size_t>(index)]);
+        CHECK(Eval(source, params.Offset, static_cast<double>(index) * params.TimeStep)
+              == first_run[static_cast<std::size_t>(index)]);
     }
     CHECK(source.NextBreakpoint(0.0) == first_break);
     CHECK_THAT(first_run[0], WithinAbs(0.5, 1e-12));
@@ -153,10 +153,14 @@ TEST_CASE("Seeded transient noise and random sources repeat identically and hold
     Nodalys::CircuitBuilder builder;
     const Nodalys::NodeId n1 = builder.AddNode();
     const Nodalys::NodeId n2 = builder.AddNode();
-    builder.AddVnoise("V1", n1, Nodalys::GROUND_NODE,
+    builder.AddVnoise("V1",
+                      n1,
+                      Nodalys::GROUND_NODE,
                       {.Offset = 2.0, .WhiteAmplitude = 0.4, .TimeStep = 1e-5, .FlickerAmplitude = 0.1});
     builder.AddIrandom(
-        "I1", Nodalys::GROUND_NODE, n2,
+        "I1",
+        Nodalys::GROUND_NODE,
+        n2,
         {.Distribution = Nodalys::RandomDistribution::UNIFORM, .TimeStep = 1e-5, .First = 1e-3, .Second = 2e-3});
     builder.AddResistor("R1", n1, n2, 1e3);
     builder.AddResistor("R2", n2, Nodalys::GROUND_NODE, 1e3);
@@ -170,8 +174,8 @@ TEST_CASE("Seeded transient noise and random sources repeat identically and hold
     CHECK_THAT(op->NodeVoltages[static_cast<std::size_t>(n1)], WithinAbs(2.0, 1e-9));
     CHECK_THAT(op->NodeVoltages[static_cast<std::size_t>(n2)], WithinAbs(2.0, 1e-9));
 
-    const Nodalys::TransientConfig seeded_a{.StopTime = 1e-4, .TimeStep = 1e-5, .MaxStep = 1e-5, .Seed = 12345};
-    const Nodalys::TransientConfig seeded_b{.StopTime = 1e-4, .TimeStep = 1e-5, .MaxStep = 1e-5, .Seed = 67890};
+    const Nodalys::TransientConfig seeded_a{.StopTime = 1e-4, .TimeStep = 1e-5, .MaxStep = 1e-5, .Seed = 12'345};
+    const Nodalys::TransientConfig seeded_b{.StopTime = 1e-4, .TimeStep = 1e-5, .MaxStep = 1e-5, .Seed = 67'890};
     const Nodalys::TransientConfig unseeded{.StopTime = 1e-4, .TimeStep = 1e-5, .MaxStep = 1e-5, .Seed = 0};
 
     const auto run1 = Nodalys::ComputeTransient(circuit, seeded_a);

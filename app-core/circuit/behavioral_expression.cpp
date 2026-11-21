@@ -73,8 +73,8 @@ std::expected<std::vector<std::string>, std::string> ReadNames(const std::string
         start = comma + 1;
     }
     if (type == Kind::CURRENT) {
-        if (names.size() != 1 || names.front().empty() ||
-            std::ranges::any_of(names.front(), [](const char character) { return IsSpace(character); })) {
+        if (names.size() != 1 || names.front().empty()
+            || std::ranges::any_of(names.front(), [](const char character) { return IsSpace(character); })) {
             return std::unexpected("I() takes the name of a current, such as I(R1) or I(Q1.C)");
         }
         return names;

@@ -56,7 +56,9 @@ double LinearEdge(const double from, const double to, const double duration, con
  * @return  The first corner strictly after `time`, or infinity once a single pulse has ended.
  */
 double FindNextPulseCorner(const PulseParameters &pulse, const double time) {
-    const std::array<double, 4> offsets = {0.0, pulse.RiseTime, pulse.RiseTime + pulse.Width,
+    const std::array<double, 4> offsets = {0.0,
+                                           pulse.RiseTime,
+                                           pulse.RiseTime + pulse.Width,
                                            pulse.RiseTime + pulse.Width + pulse.FallTime};
     const bool is_periodic = pulse.Period > 0.0 && std::isfinite(pulse.Period);
     double cycle_start = pulse.Delay;
@@ -138,9 +140,9 @@ double EvaluateExp(const ExpParameters &exp, const double time) {
     if (time < exp.FallDelay) {
         return exp.InitialValue + rise;
     }
-    const double peak =
-        exp.InitialValue +
-        (exp.PeakValue - exp.InitialValue) * (1.0 - std::exp(-(exp.FallDelay - exp.RiseDelay) / exp.RiseTimeConstant));
+    const double peak = exp.InitialValue
+                      + (exp.PeakValue - exp.InitialValue)
+                            * (1.0 - std::exp(-(exp.FallDelay - exp.RiseDelay) / exp.RiseTimeConstant));
     return exp.InitialValue + (peak - exp.InitialValue) * std::exp(-(time - exp.FallDelay) / exp.FallTimeConstant);
 }
 
@@ -170,8 +172,8 @@ double EvaluatePwl(const PwlParameters &pwl, const double time) {
 }
 
 double EvaluateSffm(const SffmParameters &sffm, const double time) {
-    const double phase = 2.0 * std::numbers::pi * sffm.CarrierFrequency * time +
-                         sffm.ModulationIndex * std::sin(2.0 * std::numbers::pi * sffm.SignalFrequency * time);
+    const double phase = 2.0 * std::numbers::pi * sffm.CarrierFrequency * time
+                       + sffm.ModulationIndex * std::sin(2.0 * std::numbers::pi * sffm.SignalFrequency * time);
     return sffm.Offset + sffm.Amplitude * std::sin(phase);
 }
 
@@ -180,8 +182,9 @@ double EvaluateAm(const AmParameters &am, const double time) {
         return 0.0;
     }
     const double local = time - am.Delay;
-    return am.Offset + am.Amplitude * std::sin(2.0 * std::numbers::pi * am.ModulatingFrequency * local) *
-                           std::sin(2.0 * std::numbers::pi * am.CarrierFrequency * local);
+    return am.Offset
+         + am.Amplitude * std::sin(2.0 * std::numbers::pi * am.ModulatingFrequency * local)
+               * std::sin(2.0 * std::numbers::pi * am.CarrierFrequency * local);
 }
 
 VoltageSourceDevice::Waveform MakeDcWaveform(const double) {

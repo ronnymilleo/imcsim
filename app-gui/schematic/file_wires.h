@@ -29,7 +29,9 @@ enum class WireWording {
 nlohmann::json WriteWires(const std::vector<UIWire> &wires);
 
 // Reading
-void ReadWires(const nlohmann::json &object, WireWording wording, std::vector<UIWire> &wires,
+void ReadWires(const nlohmann::json &object,
+               WireWording wording,
+               std::vector<UIWire> &wires,
                std::vector<std::string> &warnings);
 
 } // namespace GUI

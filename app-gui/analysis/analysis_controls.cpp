@@ -7,50 +7,14 @@
 #include "analysis/analysis_controls.h"
 
 #include "analysis/analysis_inputs.h"
-#include "base/theme.h"
-#include "imgui.h"
 #include <algorithm>
 #include <chrono>
+#include <expected>
 #include <iterator>
 #include <utility>
 
 namespace GUI {
 
-namespace {
-
-std::size_t ToIndex(const Analysis analysis) {
-    return static_cast<std::size_t>(analysis);
-}
-
-/**
- * @brief   The warnings the stored result of one analysis carries, or none when it has no result or no warnings.
- */
-std::vector<std::string> ListWarningsOfResult(const ResultStore &results, const Analysis analysis) {
-    if (analysis == Analysis::OPERATING_POINT && results.GetOperatingPoint()) {
-        return results.GetOperatingPoint()->Warnings;
-    }
-    if (analysis == Analysis::TRANSIENT && results.GetTransient()) {
-        return results.GetTransient()->Warnings;
-    }
-    if (analysis == Analysis::SENSITIVITY && results.GetACSensitivity()) {
-        return results.GetACSensitivity()->Warnings;
-    }
-    if (analysis == Analysis::POLE_ZERO && results.GetPoleZero()) {
-        return results.GetPoleZero()->Warnings;
-    }
-    if (analysis == Analysis::S_PARAMETERS && results.GetSParameters()) {
-        return results.GetSParameters()->Warnings;
-    }
-    if (analysis == Analysis::TRUTH_TABLE && results.GetTruthTable()) {
-        return results.GetTruthTable()->Warnings;
-    }
-    if (analysis == Analysis::HARMONIC_BALANCE && results.GetHarmonicBalance()) {
-        return results.GetHarmonicBalance()->Warnings;
-    }
-    return {};
-}
-
-} // namespace
 /**
  * @brief   Creates the controls for a schematic.
  * @param[in] schematic  Schematic whose analyses are set and run; it must outlive the controls.
@@ -78,28 +42,17 @@ void AnalysisControls::RunSelected() {
     const SimulationSettings &settings = m_Schematic.GetSimulationSettings();
     const Analysis analysis = settings.Selected;
     const Core::Circuit circuit = m_Schematic.BuildCircuit();
-    // The noise, the transfer function and the other analyses run once, whatever the step and Monte Carlo settings
-    std::optional<StepPlan> steps;
-    std::optional<Core::MonteCarloSettings> monte_carlo;
-    const bool is_repeated = IsRepeatable(analysis);
-    if (is_repeated && settings.MonteCarlo.Enabled) {
-        ClearResult(analysis);
-        if (const std::optional<std::string> problem = Core::CheckMonteCarlo(circuit, settings.MonteCarlo)) {
-            Finish(analysis, problem, {});
-            return;
-        }
-        monte_carlo = settings.MonteCarlo;
-    } else if (is_repeated && settings.ParameterStep.Enabled) {
-        ClearResult(analysis);
-        const std::string unit = GetParameterUnit(circuit, settings.ParameterStep.Part);
-        auto values = ListStepValues(settings.ParameterStep, unit);
-        if (!values) {
-            Finish(analysis, std::move(values.error()), {});
-            return;
-        }
-        steps = StepPlan{.Settings = settings.ParameterStep, .Unit = unit, .Values = std::move(*values)};
+    std::expected<RunRepeat, std::string> repeat = PlanRunRepeat(settings, circuit);
+    if (!repeat) {
+        Refuse(analysis, std::move(repeat.error()));
+        return;
     }
-    StartAnalysis(analysis, circuit, steps, monte_carlo);
+    // Steps and draws deliver only when the whole run ends, and a stopped step delivers nothing, so the old result goes
+    // now rather than be taken for theirs
+    if (!IsSingleRun(*repeat)) {
+        m_Results.Clear(analysis);
+    }
+    StartAnalysis(analysis, circuit, *repeat);
 }
 
 /**
@@ -149,6 +102,19 @@ void AnalysisControls::PressRun() {
         RunSelected();
         break;
     }
+}
+
+/**
+ * @brief   Does what the run key (F5) does: what the Run button does, except that the key never stops a run, so a
+ *          press meant to start one cannot end the one that just began.
+ * @return  True when it ran or continued; false while a run goes on, which the key leaves alone.
+ */
+bool AnalysisControls::PressRunKey() {
+    if (GetRunAction() == RunAction::STOP) {
+        return false;
+    }
+    PressRun();
+    return true;
 }
 
 /**
@@ -293,8 +259,8 @@ void AnalysisControls::DiscardLive() {
     m_IsLiveRun = false;
     m_IsLiveResult = false;
     m_Schematic.SetLiveRun(false);
-    ClearResult(Analysis::TRANSIENT);
-    m_Statuses[ToIndex(Analysis::TRANSIENT)] = {};
+    m_Results.Clear(Analysis::TRANSIENT);
+    m_Report.Clear(Analysis::TRANSIENT);
 }
 
 /**
@@ -311,7 +277,7 @@ bool AnalysisControls::IsLiveResult() const {
  * @return  The analysis, or no value before the first run.
  */
 std::optional<Analysis> AnalysisControls::GetLastRun() const {
-    return m_LastRun;
+    return m_Report.GetLastRun();
 }
 
 /**
@@ -319,7 +285,7 @@ std::optional<Analysis> AnalysisControls::GetLastRun() const {
  * @return  The number of runs finished since the start, failed ones included.
  */
 std::size_t AnalysisControls::GetFinishedRunCount() const {
-    return m_FinishedRunCount;
+    return m_Report.GetFinishedRunCount();
 }
 
 /**
@@ -329,20 +295,7 @@ std::size_t AnalysisControls::GetFinishedRunCount() const {
  *          result or ngspice reported some; None when it has no result, such as after the circuit changed.
  */
 RunOutcome AnalysisControls::GetOutcome(const Analysis analysis) const {
-    const RunStatus &status = m_Statuses[ToIndex(analysis)];
-    if (status.Error) {
-        return RunOutcome::FAILED;
-    }
-    if (!HasResult(analysis)) {
-        return RunOutcome::NONE;
-    }
-    if (analysis == Analysis::TRANSIENT && m_Results.GetTransient() && !m_Results.GetTransient()->IsComplete) {
-        return RunOutcome::STOPPED;
-    }
-    const bool ngspice_warned = std::ranges::any_of(
-        status.Messages, [](const Core::SimulatorMessage &message) { return message.FromErrorStream; });
-    return ngspice_warned || !GetResultWarnings(analysis).empty() ? RunOutcome::SUCCEEDED_WITH_WARNINGS
-                                                                  : RunOutcome::SUCCEEDED;
+    return m_Report.GetOutcome(analysis, m_Results, GetResultWarnings(analysis));
 }
 
 /**
@@ -351,7 +304,7 @@ RunOutcome AnalysisControls::GetOutcome(const Analysis analysis) const {
  * @return  The error, or no value when the last run succeeded or there was none.
  */
 const std::optional<std::string> &AnalysisControls::GetError(const Analysis analysis) const {
-    return m_Statuses[ToIndex(analysis)].Error;
+    return m_Report.GetStatus(analysis).Error;
 }
 
 /**
@@ -361,42 +314,33 @@ const std::optional<std::string> &AnalysisControls::GetError(const Analysis anal
  *          which keeps pace with the clock.
  */
 std::optional<double> AnalysisControls::GetRunSeconds(const Analysis analysis) const {
-    return m_Statuses[ToIndex(analysis)].Seconds;
+    return m_Report.GetStatus(analysis).Seconds;
 }
 
 /**
- * @brief   Draws what the last run of an analysis reported: its error or its warnings, and the ngspice output.
- * @param[in] analysis  Analysis whose last run is shown.
+ * @brief   Returns what the last run of an analysis left besides its result.
+ * @param[in] analysis  Analysis to read.
+ * @return  Its error, the ngspice output and the time it took; empty before its first run.
  */
-void AnalysisControls::DrawRunReport(const Analysis analysis) const {
-    const RunStatus &status = m_Statuses[ToIndex(analysis)];
-    ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetFontSize() * 30.0f);
-    if (status.Error) {
-        ImGui::TextColored(GetErrorTextColor(), "%s", status.Error->c_str());
-    } else if (HasResult(analysis)) {
-        ImGui::Text("%s done", GetAnalysisName(analysis));
-        for (const std::string &warning : GetResultWarnings(analysis)) {
-            ImGui::TextColored(GetWarningTextColor(), "%s", warning.c_str());
-        }
-        if (std::ranges::any_of(status.Messages,
-                                [](const Core::SimulatorMessage &message) { return message.FromErrorStream; })) {
-            ImGui::TextColored(GetWarningTextColor(), "ngspice reported warnings; check its output before trusting "
-                                                      "the results");
-        }
-    } else {
-        ImGui::TextDisabled("No results for the current circuit");
+const RunStatus &AnalysisControls::GetRunStatus(const Analysis analysis) const {
+    return m_Report.GetStatus(analysis);
+}
+
+/**
+ * @brief   Lists the warnings of the result of an analysis: rating warnings, such as a transistor past its maximum
+ *          voltage, which the operating point and the transient check, the combinations of a truth table that have no
+ *          operating point, and the runs of a Monte Carlo analysis that failed or did not run.
+ * @param[in] analysis  Analysis whose result is read.
+ * @return  The Monte Carlo warnings first, when the analysis is one Monte Carlo repeats, then those of the result; none
+ *          when it has no result.
+ */
+std::vector<std::string> AnalysisControls::GetResultWarnings(const Analysis analysis) const {
+    std::vector<std::string> warnings;
+    if (const auto &monte_carlo = m_Results.GetMonteCarlo(); monte_carlo && IsRepeatable(analysis)) {
+        warnings = ListMonteCarloWarnings(*monte_carlo);
     }
-    ImGui::PopTextWrapPos();
-    if (status.Messages.empty() || !ImGui::CollapsingHeader("ngspice output")) {
-        return;
-    }
-    for (const Core::SimulatorMessage &message : status.Messages) {
-        if (message.FromErrorStream) {
-            ImGui::TextColored(GetWarningTextColor(), "%s", message.Text.c_str());
-        } else {
-            ImGui::TextUnformatted(message.Text.c_str());
-        }
-    }
+    std::ranges::copy(m_Results.GetWarnings(analysis), std::back_inserter(warnings));
+    return warnings;
 }
 
 /**
@@ -410,23 +354,31 @@ void AnalysisControls::StartRun(const Analysis analysis, Core::Job job) {
 }
 
 /**
- * @brief   The analysis picked, on the circuit built from the schematic, run once or once per step.
+ * @brief   Records why an analysis could not start, and drops its old result, which would not answer the settings that
+ *          were refused.
+ * @note    A refused run took no time, so it reports none.
  */
-void AnalysisControls::StartAnalysis(const Analysis analysis, const Core::Circuit &circuit,
-                                     const std::optional<StepPlan> &steps,
-                                     const std::optional<Core::MonteCarloSettings> &monte_carlo) {
+void AnalysisControls::Refuse(const Analysis analysis, std::string message) {
+    m_Results.Clear(analysis);
+    m_Report.Record(analysis, {.Error = std::move(message), .Messages = {}, .Seconds = std::nullopt});
+}
+
+/**
+ * @brief   The analysis picked, on the circuit built from the schematic, run once, once per step or once per draw.
+ */
+void AnalysisControls::StartAnalysis(const Analysis analysis, const Core::Circuit &circuit, const RunRepeat &repeat) {
     switch (analysis) {
     case Analysis::OPERATING_POINT:
-        RunOperatingPointAnalysis(circuit, steps, monte_carlo);
+        RunOperatingPointAnalysis(circuit, repeat);
         break;
     case Analysis::TRANSIENT:
-        RunTransientAnalysis(circuit, steps, monte_carlo);
+        RunTransientAnalysis(circuit, repeat);
         break;
     case Analysis::AC_SWEEP:
-        RunACSweepAnalysis(circuit, steps, monte_carlo);
+        RunACSweepAnalysis(circuit, repeat);
         break;
     case Analysis::DC_SWEEP:
-        RunDCSweepAnalysis(circuit, steps, monte_carlo);
+        RunDCSweepAnalysis(circuit, repeat);
         break;
     case Analysis::NOISE:
         RunNoiseAnalysis(circuit);
@@ -454,102 +406,17 @@ void AnalysisControls::StartAnalysis(const Analysis analysis, const Core::Circui
     }
 }
 
-void AnalysisControls::ClearResult(const Analysis analysis) {
-    switch (analysis) {
-    case Analysis::OPERATING_POINT:
-        m_Results.SetOperatingPoint(std::nullopt);
-        break;
-    case Analysis::TRANSIENT:
-        m_Results.SetTransient(std::nullopt);
-        break;
-    case Analysis::AC_SWEEP:
-        m_Results.SetACSweep(std::nullopt);
-        break;
-    case Analysis::DC_SWEEP:
-        m_Results.SetDCSweep(std::nullopt);
-        break;
-    case Analysis::NOISE:
-        m_Results.SetNoise(std::nullopt);
-        break;
-    case Analysis::TRANSFER_FUNCTION:
-        m_Results.SetTransferFunction(std::nullopt);
-        break;
-    case Analysis::SENSITIVITY:
-        m_Results.SetSensitivity(std::nullopt);
-        m_Results.SetACSensitivity(std::nullopt);
-        break;
-    case Analysis::POLE_ZERO:
-        m_Results.SetPoleZero(std::nullopt);
-        break;
-    case Analysis::S_PARAMETERS:
-        m_Results.SetSParameters(std::nullopt);
-        break;
-    case Analysis::TRUTH_TABLE:
-        m_Results.SetTruthTable(std::nullopt);
-        break;
-    case Analysis::HARMONIC_BALANCE:
-        m_Results.SetHarmonicBalance(std::nullopt);
-        break;
-    default:
-        break;
-    }
-}
-
-void AnalysisControls::Finish(const Analysis analysis, std::optional<std::string> error,
-                              std::vector<Core::SimulatorMessage> messages) {
-    const std::chrono::duration<double> elapsed = std::chrono::steady_clock::now() - m_RunStart;
-    m_Statuses[ToIndex(analysis)] = {.Error = std::move(error),
-                                     .Messages = std::move(messages),
-                                     .Seconds = m_IsLiveRun ? std::nullopt : std::optional(elapsed.count())};
-    m_LastRun = analysis;
-    ++m_FinishedRunCount;
-}
-
 /**
- * @brief   Rating warnings, such as a transistor past its maximum voltage, which the operating point and the transient
- *          check, the combinations of a truth table that have no operating point, and the runs of a Monte Carlo
- *          analysis that failed or did not run.
+ * @brief   Records how a run that started ended, with the wall time since it started, unless it was live and kept pace
+ *          with the clock.
  */
-std::vector<std::string> AnalysisControls::GetResultWarnings(const Analysis analysis) const {
-    if (const auto &monte_carlo = m_Results.GetMonteCarlo(); monte_carlo && IsRepeatable(analysis)) {
-        std::vector<std::string> warnings = ListMonteCarloWarnings(*monte_carlo);
-        if (analysis == Analysis::TRANSIENT && m_Results.GetTransient()) {
-            std::ranges::copy(m_Results.GetTransient()->Warnings, std::back_inserter(warnings));
-        }
-        if (analysis == Analysis::OPERATING_POINT && m_Results.GetOperatingPoint()) {
-            std::ranges::copy(m_Results.GetOperatingPoint()->Warnings, std::back_inserter(warnings));
-        }
-        return warnings;
-    }
-    return ListWarningsOfResult(m_Results, analysis);
+void AnalysisControls::RecordRunOutcome(const Analysis analysis,
+                                        std::optional<std::string> error,
+                                        std::vector<Core::SimulatorMessage> messages) {
+    const std::chrono::duration<double> elapsed = std::chrono::steady_clock::now() - m_RunStart;
+    m_Report.Record(analysis,
+                    {.Error = std::move(error),
+                     .Messages = std::move(messages),
+                     .Seconds = m_IsLiveRun ? std::nullopt : std::optional(elapsed.count())});
 }
-
-bool AnalysisControls::HasResult(const Analysis analysis) const {
-    switch (analysis) {
-    case Analysis::OPERATING_POINT:
-        return m_Results.GetOperatingPoint().has_value();
-    case Analysis::TRANSIENT:
-        return m_Results.GetTransient().has_value();
-    case Analysis::AC_SWEEP:
-        return m_Results.GetACSweep().has_value();
-    case Analysis::DC_SWEEP:
-        return m_Results.GetDCSweep().has_value();
-    case Analysis::NOISE:
-        return m_Results.GetNoise().has_value();
-    case Analysis::TRANSFER_FUNCTION:
-        return m_Results.GetTransferFunction().has_value();
-    case Analysis::SENSITIVITY:
-        return m_Results.GetSensitivity().has_value() || m_Results.GetACSensitivity().has_value();
-    case Analysis::POLE_ZERO:
-        return m_Results.GetPoleZero().has_value();
-    case Analysis::S_PARAMETERS:
-        return m_Results.GetSParameters().has_value();
-    case Analysis::TRUTH_TABLE:
-        return m_Results.GetTruthTable().has_value();
-    case Analysis::HARMONIC_BALANCE:
-        return m_Results.GetHarmonicBalance().has_value();
-    }
-    return false;
-}
-
 } // namespace GUI

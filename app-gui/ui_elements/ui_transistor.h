@@ -36,8 +36,9 @@ protected:
      *          for custom parameters.
      */
     virtual const char *GetModelName() const = 0;
-    void DrawArrowHead(SchematicCanvas &canvas, const ViewTransform &view, ImVec2 tip, ImVec2 direction,
-                       ImU32 color) const;
+
+    /// The filled arrow on the emitter or the source.
+    static constexpr ArrowHead ARROW_HEAD = {.Length = 0.3f, .HalfWidth = 0.15f};
 };
 
 } // namespace GUI

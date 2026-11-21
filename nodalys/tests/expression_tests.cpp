@@ -31,8 +31,8 @@ Nodalys::Expression Parse(const std::string_view text) {
     return *expression;
 }
 
-Nodalys::ExpressionResult Evaluate(const std::string_view text, const std::vector<double> &inputs = {},
-                                   const double time_seconds = 0.0) {
+Nodalys::ExpressionResult
+Evaluate(const std::string_view text, const std::vector<double> &inputs = {}, const double time_seconds = 0.0) {
     const auto result = Parse(text).Evaluate(inputs, time_seconds);
     INFO("expression: " << text);
     REQUIRE(result.has_value());
@@ -366,6 +366,7 @@ TEST_CASE("The derivative of every operation matches a finite difference", "[nod
         std::string Text;
         std::vector<std::vector<double>> Points;
     };
+
     const std::vector<Case> cases{
         {"v(1) * v(2)", {{1.5, -2.0}, {0.3, 0.7}}},
         {"v(1) / v(2)", {{1.5, -2.0}, {0.3, 0.7}}},

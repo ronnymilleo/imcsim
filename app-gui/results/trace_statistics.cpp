@@ -53,8 +53,11 @@ double CrossingX(const Sample first, const Sample second, const double level) {
  *          span. xs must be monotonic; a sweep that runs downward, as a negative .dc step, is reversed so it rises.
  * @details On a logarithmic axis the X of every sample is its decade, so interpolation follows the plot.
  */
-std::vector<Sample> ClipSamples(const std::span<const double> xs, const std::span<const double> ys, double from,
-                                double to, const bool logarithmic) {
+std::vector<Sample> ClipSamples(const std::span<const double> xs,
+                                const std::span<const double> ys,
+                                double from,
+                                double to,
+                                const bool logarithmic) {
     std::vector<Sample> all;
     const std::size_t count = std::min(xs.size(), ys.size());
     for (std::size_t index = 0; index < count; ++index) {
@@ -135,8 +138,10 @@ std::optional<double> MeasureFrequency(const std::vector<Sample> &samples, const
  * @brief   First X, walking from start in steps of direction, where the trace falls through level; samples are in
  *          decades, so the result is converted back to a frequency.
  */
-std::optional<double> FindFallingFrequency(const std::vector<Sample> &samples, const std::size_t start,
-                                           const int direction, const double level) {
+std::optional<double> FindFallingFrequency(const std::vector<Sample> &samples,
+                                           const std::size_t start,
+                                           const int direction,
+                                           const double level) {
     for (std::size_t index = start; index < samples.size();) {
         const std::size_t next = index + static_cast<std::size_t>(direction);
         if (next >= samples.size()) {
@@ -171,7 +176,9 @@ bool IsNegligible(const double value, const double scale) {
  *                         positive.
  * @return  The interpolated value; the first or last sample outside the trace, and 0 for an empty trace.
  */
-double InterpolateAt(const std::span<const double> xs, const std::span<const double> ys, const double x,
+double InterpolateAt(const std::span<const double> xs,
+                     const std::span<const double> ys,
+                     const double x,
                      const bool logarithmic) {
     const std::size_t count = std::min(xs.size(), ys.size());
     if (count == 0) {
@@ -211,7 +218,8 @@ double InterpolateAt(const std::span<const double> xs, const std::span<const dou
  *          the average of its ends; it is not weighted by time the way the oscilloscope mean of a transient is.
  */
 std::optional<SweepStatistics> ComputeSweepStatistics(const std::span<const double> xs,
-                                                      const std::span<const double> ys, const double from,
+                                                      const std::span<const double> ys,
+                                                      const double from,
                                                       const double to) {
     const std::vector<Sample> samples = ClipSamples(xs, ys, from, to, false);
     if (samples.size() < 2) {
@@ -243,8 +251,8 @@ std::optional<SweepStatistics> ComputeSweepStatistics(const std::span<const doub
  * @note    An end beyond the trace clamps to its nearest sample, so a cursor outside the sweep still gives the slope
  *          up to the edge.
  */
-std::optional<double> ComputeSlope(const std::span<const double> xs, const std::span<const double> ys,
-                                   const double from, const double to) {
+std::optional<double>
+ComputeSlope(const std::span<const double> xs, const std::span<const double> ys, const double from, const double to) {
     const std::size_t count = std::min(xs.size(), ys.size());
     if (count < 2) {
         return std::nullopt;
@@ -285,7 +293,8 @@ std::optional<double> ResistanceFromConductance(const double conductance) {
  *          swings once, such as a charging capacitor, has none.
  */
 std::optional<TraceStatistics> ComputeTraceStatistics(const std::span<const double> xs,
-                                                      const std::span<const double> ys, const double from,
+                                                      const std::span<const double> ys,
+                                                      const double from,
                                                       const double to) {
     const std::vector<Sample> samples = ClipSamples(xs, ys, from, to, false);
     if (samples.size() < 2) {
@@ -327,7 +336,8 @@ std::optional<TraceStatistics> ComputeTraceStatistics(const std::span<const doub
  */
 std::optional<BodeStatistics> ComputeBodeStatistics(const std::span<const double> frequencies,
                                                     const std::span<const double> magnitudes,
-                                                    const std::span<const double> phases, const double from,
+                                                    const std::span<const double> phases,
+                                                    const double from,
                                                     const double to) {
     std::vector<Sample> samples = ClipSamples(frequencies, magnitudes, from, to, true);
     // A math channel has no magnitude where it divides by zero, such as integ() at 0 Hz; the peak and the crossings

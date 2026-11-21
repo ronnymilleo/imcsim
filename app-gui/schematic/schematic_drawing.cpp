@@ -66,8 +66,12 @@ ExportColor ToExportColor(const ImU32 color) {
 /**
  * @brief   Wires, junctions, parts with their labels, terminal numbers and probes, at the export zoom from the origin.
  */
-void DrawWholeSchematic(SvgCanvas &canvas, Schematic &schematic, const SymbolStyle style, const bool terminal_numbers,
-                        const ImU32 element_color, const ImU32 wire_color) {
+void DrawWholeSchematic(SvgCanvas &canvas,
+                        Schematic &schematic,
+                        const SymbolStyle style,
+                        const bool terminal_numbers,
+                        const ImU32 element_color,
+                        const ImU32 wire_color) {
     const ViewTransform view({0.0f, 0.0f}, {0.0f, 0.0f}, EXPORT_ZOOM);
     for (const UIWire &wire : schematic.GetWires()) {
         wire.Draw(canvas, view, wire_color);
@@ -102,7 +106,10 @@ float GetLabelFontSize(const ViewTransform &view) {
  * @brief   Top left corner of a text of the given size beside a line, centered on a point of it: above or left of the
  *          line before it, below or right after it.
  */
-ImVec2 PlaceBesideLine(const ImVec2 point, const ImVec2 size, const bool horizontal_line, const bool before_line,
+ImVec2 PlaceBesideLine(const ImVec2 point,
+                       const ImVec2 size,
+                       const bool horizontal_line,
+                       const bool before_line,
                        const float gap) {
     if (horizontal_line) {
         return {point.x - size.x / 2.0f, before_line ? point.y - gap - size.y : point.y + gap};
@@ -116,8 +123,14 @@ ImVec2 PlaceBesideLine(const ImVec2 point, const ImVec2 size, const bool horizon
  * @details Voltages go above or left of their line and currents below or right, so a voltage marked next to a measured
  *          terminal does not cover the current label. The marker extent is how far the marker reaches from the line.
  */
-void DrawMarkerLabel(SchematicCanvas &canvas, const ViewTransform &view, const ImVec2 point, const bool horizontal_line,
-                     const bool before_line, const float marker_extent, const std::string &text, const ImU32 color) {
+void DrawMarkerLabel(SchematicCanvas &canvas,
+                     const ViewTransform &view,
+                     const ImVec2 point,
+                     const bool horizontal_line,
+                     const bool before_line,
+                     const float marker_extent,
+                     const std::string &text,
+                     const ImU32 color) {
     const float font_size = GetLabelFontSize(view);
     ImFont *font = ImGui::GetFont();
     const ImVec2 size = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, text.c_str());
@@ -144,13 +157,19 @@ void DrawMeasurementMarkers(SchematicCanvas &canvas, const ViewTransform &view, 
     std::set<int> marked_nodes;
     for (const UIWire &wire : schematic.GetWires()) {
         const int node = connectivity.GetNode(wire.GetStart()).value_or(0);
-        if (node == 0 || !schematic.IsVoltageMeasured(node) || !marked_nodes.insert(node).second) {
+        if (node == 0 || !schematic.GetMeasurements().IsVoltageMeasured(node) || !marked_nodes.insert(node).second) {
             continue;
         }
         const ImVec2 point = view.ToScreen((ToVec2(wire.GetStart()) + ToVec2(wire.GetEnd())) / 2.0f);
         canvas.AddCircleFilled(point, dot_radius, GetNodeColor(node));
-        DrawMarkerLabel(canvas, view, point, wire.GetStart().Y == wire.GetEnd().Y, true, dot_radius,
-                        GetVoltageLabel(connectivity, node), GetNodeColor(node));
+        DrawMarkerLabel(canvas,
+                        view,
+                        point,
+                        wire.GetStart().Y == wire.GetEnd().Y,
+                        true,
+                        dot_radius,
+                        GetVoltageLabel(connectivity, node),
+                        GetNodeColor(node));
     }
 
     // Currents keep the colors of their plots, which follow their order in the circuit
@@ -160,7 +179,7 @@ void DrawMeasurementMarkers(SchematicCanvas &canvas, const ViewTransform &view, 
         const std::vector<std::size_t> current_terminals = Core::GetCurrentTerminals(element->GetComponent());
         const std::vector<GridPoint> terminals = element->GetTerminals();
         for (std::size_t index = 0; index < currents.size(); ++index, ++current_index) {
-            if (!schematic.IsCurrentMeasured(currents[index])) {
+            if (!schematic.GetMeasurements().IsCurrentMeasured(currents[index])) {
                 continue;
             }
             // Results report a current as positive into a terminal: the first one of a two-terminal part or a
@@ -172,10 +191,17 @@ void DrawMeasurementMarkers(SchematicCanvas &canvas, const ViewTransform &view, 
             const ImU32 color = GetCurrentColor(current_index);
             canvas.AddTriangleFilled(view.ToScreen(terminal + inward * ARROW_TIP),
                                      view.ToScreen(base + across * ARROW_HALF_WIDTH),
-                                     view.ToScreen(base - across * ARROW_HALF_WIDTH), color);
+                                     view.ToScreen(base - across * ARROW_HALF_WIDTH),
+                                     color);
             const ImVec2 middle = view.ToScreen(terminal + inward * ((ARROW_START + ARROW_TIP) / 2.0f));
-            DrawMarkerLabel(canvas, view, middle, inward.y == 0.0f, false, zoom * ARROW_HALF_WIDTH,
-                            std::format("I({})", currents[index]), color);
+            DrawMarkerLabel(canvas,
+                            view,
+                            middle,
+                            inward.y == 0.0f,
+                            false,
+                            zoom * ARROW_HALF_WIDTH,
+                            std::format("I({})", currents[index]),
+                            color);
         }
     }
 }
@@ -191,7 +217,9 @@ void DrawMeasurementMarkers(SchematicCanvas &canvas, const ViewTransform &view, 
  *          its terminal, above or left of the line of the lead: inside, symbols draw signs and arrows beside their
  *          leads, and probes draw current arrows on them.
  */
-void DrawTerminalNumbers(SchematicCanvas &canvas, const ViewTransform &view, const Schematic &schematic,
+void DrawTerminalNumbers(SchematicCanvas &canvas,
+                         const ViewTransform &view,
+                         const Schematic &schematic,
                          const float ring_scale) {
     const float font_size = GetLabelFontSize(view) * TERMINAL_NUMBER_SCALE;
     const float ring_radius = std::max(GetZoom(view) * ring_scale, MIN_TERMINAL_RING_RADIUS);
@@ -223,8 +251,8 @@ void DrawTerminalNumbers(SchematicCanvas &canvas, const ViewTransform &view, con
  * @note    Labels scale with the zoom, so the area holds at any zoom where they are drawn. Needs ImGui and ImPlot
  *          contexts, as RenderSchematicSvg() does.
  */
-std::optional<SchematicBounds> MeasureSchematic(Schematic &schematic, const SymbolStyle style,
-                                                const bool terminal_numbers) {
+std::optional<SchematicBounds>
+MeasureSchematic(Schematic &schematic, const SymbolStyle style, const bool terminal_numbers) {
     if (schematic.GetElements().empty() && schematic.GetWires().empty()) {
         return std::nullopt;
     }
@@ -245,20 +273,26 @@ std::optional<SchematicBounds> MeasureSchematic(Schematic &schematic, const Symb
  * @note    Needs ImGui and ImPlot contexts: labels are measured with the ImGui font, and current colors come from
  *          the ImPlot colormap. The grid, selection and operating point colors of the editor are left out.
  */
-std::expected<std::string, std::string> RenderSchematicSvg(Schematic &schematic, const SymbolStyle style,
-                                                           const bool terminal_numbers, const bool dark) {
+std::expected<std::string, std::string>
+RenderSchematicSvg(Schematic &schematic, const SymbolStyle style, const bool terminal_numbers, const bool dark) {
     if (schematic.GetElements().empty() && schematic.GetWires().empty()) {
         return std::unexpected("The schematic is empty");
     }
     const ThemePalette &palette = GetPalette();
     SvgWriter svg;
     SvgCanvas canvas(svg, !dark);
-    DrawWholeSchematic(canvas, schematic, style, terminal_numbers, dark ? palette.Element : PRINT_LINE_COLOR,
+    DrawWholeSchematic(canvas,
+                       schematic,
+                       style,
+                       terminal_numbers,
+                       dark ? palette.Element : PRINT_LINE_COLOR,
                        dark ? palette.Wire : PRINT_LINE_COLOR);
 
     const ImVec2 min = canvas.GetMin() - ImVec2(EXPORT_MARGIN, EXPORT_MARGIN);
     const ImVec2 max = canvas.GetMax() + ImVec2(EXPORT_MARGIN, EXPORT_MARGIN);
-    return svg.Finish({min.x, min.y}, max.x - min.x, max.y - min.y,
+    return svg.Finish({min.x, min.y},
+                      max.x - min.x,
+                      max.y - min.y,
                       dark ? ToExportColor(palette.CanvasBackground) : PRINT_BACKGROUND);
 }
 

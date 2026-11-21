@@ -11,6 +11,7 @@
 #include "base/helpers.h"
 #include "circuit/components/subcircuit.h"
 #include "schematic/schematic_file.h"
+#include "schematic/selection.h"
 #include "ui_elements/ui_element.h"
 #include "ui_elements/ui_wire.h"
 #include <cstddef>
@@ -18,6 +19,7 @@
 #include <memory>
 #include <optional>
 #include <set>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -33,6 +35,15 @@ struct SubcircuitPinCandidate {
     std::string SuggestedName;
 };
 
+/**
+ * @struct  CopiedContent
+ * @brief   Parts and wires copied so they share nothing with the ones they came from.
+ */
+struct CopiedContent {
+    std::vector<std::unique_ptr<UIElement>> Elements;
+    std::vector<UIWire> Wires;
+};
+
 // Checking
 std::expected<void, std::string> ValidateMetadata(const std::vector<SavedSubcircuitPin> &pins,
                                                   const std::vector<Core::SubcircuitParameter> &parameters);
@@ -43,23 +54,29 @@ std::expected<void, std::string> CheckPinChoice(const std::vector<SubcircuitPinC
 
 // Pins
 std::expected<std::vector<SubcircuitPinCandidate>, std::string>
-CollectSubcircuitPinMarkers(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires,
+CollectSubcircuitPinMarkers(const std::vector<std::unique_ptr<UIElement>> &elements,
+                            const std::vector<UIWire> &wires,
                             const std::set<std::size_t> *selected);
 std::vector<std::optional<std::size_t>> MatchPins(const std::vector<SavedSubcircuitPin> &old_pins,
                                                   const std::vector<SavedSubcircuitPin> &new_pins);
 
 // Definitions
-std::expected<SavedSubcircuit, std::string>
-DrawDefinition(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires,
-               const std::set<std::size_t> &selected_elements, const std::set<std::size_t> &selected_wires,
-               const std::vector<SavedSubcircuit> &definitions, SavedSubcircuit definition);
+std::expected<SavedSubcircuit, std::string> DrawDefinition(const std::vector<std::unique_ptr<UIElement>> &elements,
+                                                           const std::vector<UIWire> &wires,
+                                                           const Selection &selection,
+                                                           const std::vector<SavedSubcircuit> &definitions,
+                                                           SavedSubcircuit definition);
+std::expected<CopiedContent, std::string> CopyContent(std::span<const UIElement *const> elements,
+                                                      const std::vector<UIWire> &wires,
+                                                      std::span<const SavedSubcircuit> definitions);
 std::string DescribeDefinition(const SavedSubcircuit &definition);
 std::vector<SavedSubcircuit> CopyDefinitions(const std::vector<SavedSubcircuit> &definitions);
-std::string FindFreeName(const std::string &name, const std::vector<SavedSubcircuit> &definitions);
 
 // Instances
-void RefreshInstancesIn(std::vector<std::unique_ptr<UIElement>> &elements, std::vector<UIWire> &wires,
-                        const SavedSubcircuit &definition, const std::vector<std::string> &old_names,
+void RefreshInstancesIn(std::vector<std::unique_ptr<UIElement>> &elements,
+                        std::vector<UIWire> &wires,
+                        const SavedSubcircuit &definition,
+                        const std::vector<std::string> &old_names,
                         const std::vector<std::optional<std::size_t>> &matches);
 
 } // namespace GUI

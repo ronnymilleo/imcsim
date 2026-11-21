@@ -24,11 +24,15 @@ public:
 
     OperatingPointRun RunOperatingPoint(const Circuit &circuit,
                                         const std::optional<double> &temperature_celsius) override;
-    TransientRun RunTransient(const Circuit &circuit, const TransientSettings &settings,
-                              const std::optional<double> &temperature_celsius, const RunMonitor &monitor) override;
-    ACSweepRun RunACSweep(const Circuit &circuit, const ACSweepSettings &settings,
+    TransientRun RunTransient(const Circuit &circuit,
+                              const TransientSettings &settings,
+                              const std::optional<double> &temperature_celsius,
+                              const RunMonitor &monitor) override;
+    ACSweepRun RunACSweep(const Circuit &circuit,
+                          const ACSweepSettings &settings,
                           const std::optional<double> &temperature_celsius) override;
-    DCSweepRun RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings,
+    DCSweepRun RunDCSweep(const Circuit &circuit,
+                          const DCSweepSettings &settings,
                           const std::optional<double> &temperature_celsius) override;
     NoiseRun RunNoise(const Circuit &circuit, const NoiseSettings &settings) override;
     TransferFunctionRun RunTransferFunction(const Circuit &circuit, const TransferFunctionSettings &settings) override;

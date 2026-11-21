@@ -60,10 +60,7 @@ private:
      * @brief   What both plots share in a frame: which axes fit and which traces they show.
      */
     struct PlotFits {
-        bool IsNewResult;
-        bool HaveVoltagesChanged;
-        bool HaveCurrentsChanged;
-        bool HasMathChanged;
+        TraceFits Fits;
         bool ShowsCurrents;
         bool HasCurrentAxis;
         ImPlotAxisFlags VoltageAxisFlags;

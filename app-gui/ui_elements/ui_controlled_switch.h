@@ -33,8 +33,11 @@ protected:
 
 private:
     bool IsRelay() const;
-    void DrawSign(SchematicCanvas &canvas, const ViewTransform &view, ImVec2 center, bool plus, ImU32 color) const;
-    void DrawDashedLine(SchematicCanvas &canvas, const ViewTransform &view, float from_x, float to_x, float y,
+    void DrawDashedLine(SchematicCanvas &canvas,
+                        const ViewTransform &view,
+                        float from_x,
+                        float to_x,
+                        float y,
                         ImU32 color) const;
 };
 

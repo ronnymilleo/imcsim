@@ -38,31 +38,42 @@ std::string DescribeUnavailableQuantity(SParameterQuantity quantity);
 
 // Entries
 std::string GetMatrixEntryName(const SParameterEntry &entry, SParameterQuantity quantity);
-std::optional<std::complex<double>> ReadMatrixValue(const Core::SParameters &result, std::size_t frequency,
-                                                    const SParameterEntry &entry, SParameterQuantity quantity);
+std::optional<std::complex<double>> ReadMatrixValue(const Core::SParameters &result,
+                                                    std::size_t frequency,
+                                                    const SParameterEntry &entry,
+                                                    SParameterQuantity quantity);
 
 // Absent frequencies
 std::size_t CountAbsentFrequencies(const Core::SParameters &result, SParameterQuantity quantity);
+bool AreAllFrequenciesAbsent(const Core::SParameters &result, SParameterQuantity quantity);
 std::string DescribeAbsentFrequencies(const Core::SParameters &result, SParameterQuantity quantity);
 
 // Curves
-std::vector<double> ListMatrixMagnitudes(const Core::SParameters &result, const SParameterEntry &entry,
-                                         SParameterQuantity quantity);
-std::vector<double> ListMatrixAngles(const Core::SParameters &result, const SParameterEntry &entry,
-                                     SParameterQuantity quantity);
+std::vector<double>
+ListMatrixMagnitudes(const Core::SParameters &result, const SParameterEntry &entry, SParameterQuantity quantity);
+std::vector<double>
+ListMatrixAngles(const Core::SParameters &result, const SParameterEntry &entry, SParameterQuantity quantity);
 
 // Axis
 ExportRange FindDecadeRange(const std::vector<std::vector<double>> &traces);
 
 // Readings
-std::vector<std::string> DescribeMatrixReading(const Core::SParameters &result, std::size_t frequency,
-                                               const SParameterEntry &entry, SParameterQuantity quantity);
+std::vector<std::string> DescribeMatrixReading(const Core::SParameters &result,
+                                               std::size_t frequency,
+                                               const SParameterEntry &entry,
+                                               SParameterQuantity quantity);
+std::string DescribeMatrixReadings(const Core::SParameters &result,
+                                   std::size_t frequency,
+                                   const std::vector<SParameterEntry> &entries,
+                                   SParameterQuantity quantity);
 
 // Figures
 ExportFigure BuildMatrixMagnitudePhaseFigure(const Core::SParameters &result,
                                              const std::vector<SParameterEntry> &entries,
-                                             const std::optional<ExportRange> &view, SParameterQuantity quantity);
-ExportFigure BuildMatrixTableFigure(const Core::SParameters &result, const std::vector<SParameterEntry> &entries,
+                                             const std::optional<ExportRange> &view,
+                                             SParameterQuantity quantity);
+ExportFigure BuildMatrixTableFigure(const Core::SParameters &result,
+                                    const std::vector<SParameterEntry> &entries,
                                     SParameterQuantity quantity);
 
 } // namespace GUI

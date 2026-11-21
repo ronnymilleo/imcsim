@@ -95,13 +95,11 @@ void DrawParameterRows(BlockSession &session) {
 bool DrawDialogButtons(BlockSession &session, const bool editing) {
     bool offers_parameters = false;
     if (ImGui::Button(editing ? "Apply" : "Create block")) {
-        if (editing) {
-            if (session.ApplyPinNames()) {
-                offers_parameters = true;
-                session.GetError().clear();
-                ImGui::CloseCurrentPopup();
-            }
-        } else if (session.CreateBlock()) {
+        if (const auto done = editing ? session.ApplyPinNames() : session.CreateBlock(); !done) {
+            session.ShowError(done.error());
+        } else {
+            offers_parameters = editing;
+            session.ClearError();
             ImGui::CloseCurrentPopup();
         }
     }
@@ -179,7 +177,7 @@ std::optional<std::size_t> DrawBlockBar(const BlockSession &session, const ImVec
         ImGui::AlignTextToFramePadding();
         ImGui::TextColored(text_color, ">");
         ImGui::SameLine();
-        const std::string &name = open_blocks[level].Name;
+        const std::string &name = open_blocks[level].Settings.Name;
         if (level + 1 == open_blocks.size()) {
             ImGui::AlignTextToFramePadding();
             ImGui::TextColored(text_color, "%s", name.c_str());

@@ -6,6 +6,7 @@
 
 #include "results/ac_sensitivity_view.h"
 
+#include "results/logarithmic_level.h"
 #include "results/sensitivity_view.h"
 #include "spice/spice_value.h"
 #include <algorithm>
@@ -110,8 +111,8 @@ double GetInfluence(const Core::ACPartSensitivity &part, const std::size_t frequ
     }
     const double nepers = part.MagnitudeDecibelsPerPercent[frequency_index].value_or(0.0) / DECIBELS_PER_NEPER;
     const double radians = frequency_index < part.PhaseDegreesPerPercent.size()
-                               ? part.PhaseDegreesPerPercent[frequency_index].value_or(0.0) / DEGREES_PER_RADIAN
-                               : 0.0;
+                             ? part.PhaseDegreesPerPercent[frequency_index].value_or(0.0) / DEGREES_PER_RADIAN
+                             : 0.0;
     return std::hypot(nepers, radians);
 }
 
@@ -147,8 +148,9 @@ std::vector<std::size_t> FindMostInfluential(const Core::ACSensitivity &sensitiv
     }
     std::vector<std::size_t> order(peaks.size());
     std::iota(order.begin(), order.end(), std::size_t{0});
-    std::ranges::stable_sort(
-        order, [&peaks](const std::size_t first, const std::size_t second) { return peaks[first] > peaks[second]; });
+    std::ranges::stable_sort(order, [&peaks](const std::size_t first, const std::size_t second) {
+        return peaks[first] > peaks[second];
+    });
     std::erase_if(order, [&peaks](const std::size_t index) { return peaks[index] <= 0.0; });
     order.resize(std::min(order.size(), count));
     return order;
@@ -162,7 +164,8 @@ std::vector<std::size_t> FindMostInfluential(const Core::ACSensitivity &sensitiv
  * @return  1 for the part with the largest influence, 0 for one AC_SENSITIVITY_DECADES below it or with none, linear in
  *          between on a logarithmic scale, or no value for a part the result does not list.
  */
-std::optional<float> FindACSensitivityLevel(const Core::ACSensitivity &sensitivity, const std::string_view part_name,
+std::optional<float> FindACSensitivityLevel(const Core::ACSensitivity &sensitivity,
+                                            const std::string_view part_name,
                                             const std::size_t frequency_index) {
     const auto found = std::ranges::find(sensitivity.Parts, part_name, &Core::ACPartSensitivity::Name);
     if (found == sensitivity.Parts.end()) {
@@ -173,9 +176,7 @@ std::optional<float> FindACSensitivityLevel(const Core::ACSensitivity &sensitivi
     if (influence <= 0.0 || largest <= 0.0) {
         return 0.0f;
     }
-    const double level =
-        (std::log10(influence) - std::log10(largest) + AC_SENSITIVITY_DECADES) / AC_SENSITIVITY_DECADES;
-    return static_cast<float>(std::clamp(level, 0.0, 1.0));
+    return std::clamp(LogarithmicLevel(influence, largest, AC_SENSITIVITY_DECADES), 0.0f, 1.0f);
 }
 
 /**

@@ -140,8 +140,8 @@ std::string ExportCsv(const AcSweepResult &result) {
         }
         for (std::size_t c = 0; c < result.CurrentMagnitudesDecibels.size(); ++c) {
             const double db = (pt < result.CurrentMagnitudesDecibels[c].Values.size())
-                                  ? result.CurrentMagnitudesDecibels[c].Values[pt]
-                                  : 0.0;
+                                ? result.CurrentMagnitudesDecibels[c].Values[pt]
+                                : 0.0;
             const double deg =
                 (pt < result.CurrentPhasesDegrees[c].Values.size()) ? result.CurrentPhasesDegrees[c].Values[pt] : 0.0;
             ss << "," << std::format("{:.8g},{:.8g}", db, deg);
@@ -191,8 +191,8 @@ std::string ExportCsv(const SParameterResult &result) {
             ss << std::format(",S{0}{1}_dB,S{0}{1}_deg,S{0}{1}_re,S{0}{1}_im", i, j);
         }
     }
-    const bool has_matrices = result.ImpedanceMatrices.size() == result.Frequencies.size() &&
-                              result.AdmittanceMatrices.size() == result.Frequencies.size();
+    const bool has_matrices = result.ImpedanceMatrices.size() == result.Frequencies.size()
+                           && result.AdmittanceMatrices.size() == result.Frequencies.size();
     if (has_matrices) {
         WritePortMatrixHeader(ss, 'Z', ports);
         WritePortMatrixHeader(ss, 'Y', ports);
@@ -254,7 +254,9 @@ std::string ExportCsv(const AcSensitivityResult &result) {
     }
     ss << "\n";
     for (std::size_t pt = 0; pt < result.Frequencies.size(); ++pt) {
-        ss << std::format("{:.8g},{:.8g},{:.8g}", result.Frequencies[pt], result.Output[pt].real(),
+        ss << std::format("{:.8g},{:.8g},{:.8g}",
+                          result.Frequencies[pt],
+                          result.Output[pt].real(),
                           result.Output[pt].imag());
         for (const AcElementSensitivity &element : result.Elements) {
             // Empty where the output is too small for a relative change to mean anything

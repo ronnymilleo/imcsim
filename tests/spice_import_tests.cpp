@@ -215,13 +215,11 @@ TEST_CASE("Library models and the parts that use them come back from a file", "[
 
 TEST_CASE("A library model that differs from one of the same name joins under a name of its own", "[spice_import]") {
     GUI::Schematic schematic;
-    std::vector<std::unique_ptr<GUI::UIElement>> no_parts;
-    std::vector<GUI::SavedSubcircuit> no_blocks;
-    CHECK(schematic.MergeLibraryModels({*Core::ReadLibraryModel(".model 1N4148 D(IS=2.52n)")}, no_parts, no_blocks) ==
-          std::vector<std::string>{"1N4148"});
+    CHECK(schematic.MergeLibraryModels({*Core::ReadLibraryModel(".model 1N4148 D(IS=2.52n)")})
+          == std::vector<std::string>{"1N4148"});
     // The same model again adds nothing
-    CHECK(schematic.MergeLibraryModels({*Core::ReadLibraryModel(".model 1N4148 D(IS=2.52n)")}, no_parts, no_blocks) ==
-          std::vector<std::string>{"1N4148"});
+    CHECK(schematic.MergeLibraryModels({*Core::ReadLibraryModel(".model 1N4148 D(IS=2.52n)")})
+          == std::vector<std::string>{"1N4148"});
     REQUIRE(schematic.GetLibraryModels().size() == 1);
 
     // A different one is renamed, and so are the parts that came with it, in blocks too
@@ -231,8 +229,8 @@ TEST_CASE("A library model that differs from one of the same name joins under a 
     std::vector<GUI::SavedSubcircuit> blocks(1);
     blocks[0].Elements.push_back(GUI::CreateElement(Core::ComponentType::LED, {0, 0}, GUI::Rotation::R0));
     blocks[0].Elements.back()->GetComponent().SetLibraryModel("1N4148");
-    CHECK(schematic.MergeLibraryModels({*Core::ReadLibraryModel(".model 1N4148 D(IS=1n)")}, parts, blocks) ==
-          std::vector<std::string>{"1N4148_2"});
+    CHECK(schematic.MergeLibraryModels({*Core::ReadLibraryModel(".model 1N4148 D(IS=1n)")}, parts, blocks)
+          == std::vector<std::string>{"1N4148_2"});
     REQUIRE(schematic.GetLibraryModels().size() == 2);
     CHECK(schematic.GetLibraryModels()[1].Text == ".model 1N4148_2 D(IS=1n)\n");
     CHECK(parts[0]->GetComponent().GetLibraryModel() == "1N4148_2");
@@ -259,4 +257,9 @@ TEST_CASE("A copied part takes the library model it uses along", "[spice_import]
     CHECK(group->Models[0].Name == "1N4148");
     REQUIRE(group->Elements.size() == 1);
     CHECK(group->Elements[0]->GetComponent().GetLibraryModel() == "1N4148");
+}
+
+TEST_CASE("The message of an import of models alone counts them, in the singular for one", "[spice_import]") {
+    CHECK(GUI::DescribeImportedModels(1) == "1 device model imported");
+    CHECK(GUI::DescribeImportedModels(3) == "3 device models imported");
 }

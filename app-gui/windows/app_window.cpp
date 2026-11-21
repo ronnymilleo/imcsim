@@ -20,8 +20,8 @@ namespace {
 void KeepTabBehind() {
     ImGuiWindow *window = ImGui::GetCurrentWindow();
     const ImGuiDockNode *node = window->DockNode;
-    if (node == nullptr || node->TabBar == nullptr ||
-        ImGui::TabBarFindTabByID(node->TabBar, window->TabId) != nullptr) {
+    if (node == nullptr || node->TabBar == nullptr
+        || ImGui::TabBarFindTabByID(node->TabBar, window->TabId) != nullptr) {
         return;
     }
     ImGui::TabBarAddTab(node->TabBar, ImGuiTabItemFlags_Unsorted, window);

@@ -43,8 +43,8 @@ std::size_t FindSpanStart(const std::vector<double> &times, const double span) {
  * follows a run in progress is on its newest points. With a span, the window holds the points of that stretch of time,
  * up to MAX_WINDOW_POINTS.
  */
-PointWindow TransientWindow::Update(const Core::Transient *transient, const std::size_t result_version,
-                                    const bool is_running) {
+PointWindow
+TransientWindow::Update(const Core::Transient *transient, const std::size_t result_version, const bool is_running) {
     if (transient == nullptr) {
         m_Shown = {};
         m_TotalPoints = 0;

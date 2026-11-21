@@ -7,6 +7,7 @@
 
 #include "nodalys/expression.h"
 #include "parser/spice_text.h"
+#include "text/text_case.h"
 
 #include <cctype>
 #include <cstddef>
@@ -23,8 +24,20 @@ bool IsDigit(const char character) {
     return std::isdigit(static_cast<unsigned char>(character)) != 0;
 }
 
+bool IsWordStart(const char character) {
+    return std::isalpha(static_cast<unsigned char>(character)) != 0 || character == '_';
+}
+
 bool IsWordCharacter(const char character) {
     return std::isalnum(static_cast<unsigned char>(character)) != 0 || character == '_';
+}
+
+/**
+ * @brief   Tells whether a number starts at a position: a digit, or a point before one, as in ".5".
+ */
+bool IsNumberStart(const std::string_view text, const std::size_t position) {
+    return IsDigit(text[position])
+        || (text[position] == '.' && position + 1 < text.size() && IsDigit(text[position + 1]));
 }
 
 /**
@@ -34,9 +47,9 @@ std::size_t FindNumberEnd(const std::string_view text, const std::size_t start) 
     std::size_t position = start;
     while (position < text.size()) {
         const char character = text[position];
-        const bool is_exponent_sign = (character == '+' || character == '-') && position > start &&
-                                      (text[position - 1] == 'e' || text[position - 1] == 'E') &&
-                                      position + 1 < text.size() && IsDigit(text[position + 1]);
+        const bool is_exponent_sign = (character == '+' || character == '-') && position > start
+                                   && (text[position - 1] == 'e' || text[position - 1] == 'E')
+                                   && position + 1 < text.size() && IsDigit(text[position + 1]);
         if (!IsWordCharacter(character) && character != '.' && !is_exponent_sign) {
             break;
         }
@@ -75,43 +88,30 @@ std::string SubstituteParameters(const std::string_view text, const ParameterLoo
     std::string result;
     std::size_t position = 0;
     while (position < text.size()) {
-        const char character = text[position];
-        const bool is_number_start =
-            IsDigit(character) || (character == '.' && position + 1 < text.size() && IsDigit(text[position + 1]));
-        if (is_number_start) {
+        if (IsNumberStart(text, position)) {
             const std::size_t end = FindNumberEnd(text, position);
             result.append(text.substr(position, end - position));
             position = end;
             continue;
         }
-        if (!std::isalpha(static_cast<unsigned char>(character)) && character != '_') {
-            result.push_back(character);
+        const std::optional<std::size_t> word_end = FindWordEnd(text, position);
+        if (!word_end) {
+            result.push_back(text[position]);
             ++position;
             continue;
         }
-        std::size_t end = position;
-        while (end < text.size() && IsWordCharacter(text[end])) {
-            ++end;
-        }
-        const std::string_view word = text.substr(position, end - position);
-        std::size_t after = end;
-        while (after < text.size() && std::isspace(static_cast<unsigned char>(text[after])) != 0) {
-            ++after;
-        }
-        if (after < text.size() && text[after] == '(') {
-            const std::string upper = ToUpperCase(word);
-            const bool is_reference = upper == "V" || upper == "I";
-            const std::size_t close = is_reference ? FindClosingParenthesis(text, after) : end;
-            result.append(text.substr(position, close - position));
-            position = close;
+        const std::string_view word = text.substr(position, *word_end - position);
+        if (const std::optional<std::size_t> call_end = FindCallEnd(text, *word_end, word)) {
+            result.append(text.substr(position, *call_end - position));
+            position = *call_end;
             continue;
         }
-        if (const std::optional<double> value = lookup(ToUpperCase(word))) {
+        if (const std::optional<double> value = lookup(ToUpper(word))) {
             result += std::format("({:.{}g})", *value, ROUND_TRIP_DIGITS);
         } else {
             result.append(word);
         }
-        position = end;
+        position = *word_end;
     }
     return result;
 }
@@ -151,6 +151,48 @@ std::expected<double, std::string> EvaluateValue(const std::string_view text, co
         return std::unexpected(std::format("the value '{}' cannot be evaluated: {}", bare, value.error()));
     }
     return value->Value;
+}
+
+/**
+ * @brief   Finds the end of the name that starts at a position, such as a parameter or a function.
+ * @param[in] text      Expression.
+ * @param[in] position  Where the name may start.
+ * @return  The position just after its last character, or none when no name starts there: a name starts with a letter
+ *          or an underscore and goes on with letters, digits and underscores.
+ */
+std::optional<std::size_t> FindWordEnd(const std::string_view text, const std::size_t position) {
+    if (position >= text.size() || !IsWordStart(text[position])) {
+        return std::nullopt;
+    }
+    std::size_t end = position + 1;
+    while (end < text.size() && IsWordCharacter(text[end])) {
+        ++end;
+    }
+    return end;
+}
+
+/**
+ * @brief   Finds how much of a call is copied as written, when a name is followed by a parenthesis.
+ * @details A reference v(...) or i(...) is copied whole, since the names inside it are nodes and sources. A function
+ *          keeps only its name, so the parameters among its arguments are still replaced.
+ * @param[in] text      Expression.
+ * @param[in] word_end  Position just after the name.
+ * @param[in] word      The name.
+ * @return  The position after the part copied as written: the closing parenthesis of a reference, or the end of the
+ *          name of a function. None when no parenthesis follows the name, spaces aside, which makes it a parameter.
+ */
+std::optional<std::size_t>
+FindCallEnd(const std::string_view text, const std::size_t word_end, const std::string_view word) {
+    std::size_t after = word_end;
+    while (after < text.size() && std::isspace(static_cast<unsigned char>(text[after])) != 0) {
+        ++after;
+    }
+    if (after >= text.size() || text[after] != '(') {
+        return std::nullopt;
+    }
+    const std::string upper = ToUpper(word);
+    const bool is_reference = upper == "V" || upper == "I";
+    return is_reference ? FindClosingParenthesis(text, after) : word_end;
 }
 
 } // namespace Nodalys

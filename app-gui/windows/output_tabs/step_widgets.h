@@ -27,15 +27,44 @@ struct StepTraces {
     const std::vector<Core::ComponentTrace> *Currents;
 };
 
+/**
+ * @brief   The traces of every step of a stepped run, as the step plots read them.
+ * @param[in] steps     Results of the steps, which must outlive the traces.
+ * @param[in] xs        Member with the X values, such as the times of a transient.
+ * @param[in] nodes     Member with the values of the nodes.
+ * @param[in] currents  Member with the currents.
+ * @return  One set of traces per step, in order, pointing into the results.
+ */
+template <typename Result>
+std::vector<StepTraces> MakeStepTraces(const std::vector<Result> &steps,
+                                       const std::vector<double> Result::*xs,
+                                       const std::vector<std::vector<double>> Result::*nodes,
+                                       const std::vector<Core::ComponentTrace> Result::*currents) {
+    std::vector<StepTraces> traces;
+    for (const Result &step : steps) {
+        traces.push_back({&(step.*xs), &(step.*nodes), &(step.*currents)});
+    }
+    return traces;
+}
+
 // Steps of a stepped run
-void PlotOtherSteps(const std::vector<StepTraces> &steps, std::size_t selected, const Schematic &schematic,
-                    bool show_currents, const std::vector<int> &lane_nodes);
-void LabelSteps(const std::vector<StepTraces> &steps, std::size_t selected, const std::vector<std::string> &labels,
-                const Schematic &schematic, bool show_currents, const std::vector<int> &lane_nodes);
-std::optional<std::size_t> DrawStepSelector(const std::string &parameter, const std::string &unit,
-                                            std::span<const double> values, std::size_t selected);
-std::vector<std::string> ListStepLabels(const std::string &parameter, const std::string &unit,
-                                        std::span<const double> values);
+void PlotOtherSteps(const std::vector<StepTraces> &steps,
+                    std::size_t selected,
+                    const Schematic &schematic,
+                    bool show_currents,
+                    const std::vector<int> &lane_nodes);
+void LabelSteps(const std::vector<StepTraces> &steps,
+                std::size_t selected,
+                const std::vector<std::string> &labels,
+                const Schematic &schematic,
+                bool show_currents,
+                const std::vector<int> &lane_nodes);
+std::optional<std::size_t> DrawStepSelector(const std::string &parameter,
+                                            const std::string &unit,
+                                            std::span<const double> values,
+                                            std::size_t selected);
+std::vector<std::string>
+ListStepLabels(const std::string &parameter, const std::string &unit, std::span<const double> values);
 
 } // namespace GUI
 

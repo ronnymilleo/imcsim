@@ -73,7 +73,9 @@ bool SetNextDensityLimits(const TransientSpectra &spectra, const ImAxis axis) {
     if (!range) {
         return false;
     }
-    ImPlot::SetNextAxisLimits(axis, range->first / DENSITY_AXIS_MARGIN, range->second * DENSITY_AXIS_MARGIN,
+    ImPlot::SetNextAxisLimits(axis,
+                              range->first / DENSITY_AXIS_MARGIN,
+                              range->second * DENSITY_AXIS_MARGIN,
                               ImPlotCond_Always);
     return true;
 }
@@ -83,8 +85,8 @@ bool SetNextDensityLimits(const TransientSpectra &spectra, const ImAxis axis) {
  */
 bool AreAllBroadband(const TransientSpectra &spectra) {
     const auto has_spectrum = [](const SpectrumTrace &trace) { return trace.Decibels.has_value(); };
-    return std::ranges::any_of(spectra.Traces, has_spectrum) &&
-           std::ranges::all_of(spectra.Traces, [&has_spectrum](const SpectrumTrace &trace) {
+    return std::ranges::any_of(spectra.Traces, has_spectrum)
+        && std::ranges::all_of(spectra.Traces, [&has_spectrum](const SpectrumTrace &trace) {
                return !has_spectrum(trace) || IsBroadband(trace);
            });
 }
@@ -123,7 +125,8 @@ void DrawPeriodsWarning(const TransientSpectra &spectra) {
     }
     const int periods = *periods_needed;
     ImGui::PushTextWrapPos(0.0f);
-    ImGui::TextColored(GetWarningTextColor(), "%s",
+    ImGui::TextColored(GetWarningTextColor(),
+                       "%s",
                        std::format("The stretch needs {} periods to tell the harmonics apart: widen it, or pick the "
                                    "Rectangular window over whole periods",
                                    periods)
@@ -148,10 +151,12 @@ void DrawNoise(const SpectrumTrace &trace, const std::vector<double> &frequencie
     }
     DrawStatistic("Density", FormatQuantity(noise->Density, density_unit.c_str()));
     ImGui::SetItemTooltip(
-        "%s", std::format("Level of the density (the median of its plateau) from {}Hz to {}Hz, the part of the "
-                          "spectrum the plot shows",
-                          Core::FormatValue(from), Core::FormatValue(to))
-                  .c_str());
+        "%s",
+        std::format("Level of the density (the median of its plateau) from {}Hz to {}Hz, the part of the "
+                    "spectrum the plot shows",
+                    Core::FormatValue(from),
+                    Core::FormatValue(to))
+            .c_str());
     DrawStatistic("Noise", FormatQuantity(noise->TotalRms, trace.Unit.c_str()));
     ImGui::SetItemTooltip("Root mean square of the noise over the same band");
 }
@@ -188,9 +193,12 @@ void DrawHarmonics(const SpectrumTrace &trace, const std::vector<double> &freque
         const std::string name = std::format("H{}", harmonic.Order);
         const double relative = harmonic.Amplitude / fundamental.Amplitude;
         DrawStatistic(name.c_str(), FormatFixed(20.0 * std::log10(std::max(relative, 1e-15)), " dBc"));
-        ImGui::SetItemTooltip("%s", std::format("{}Hz, {}{}", Core::FormatValue(harmonic.Frequency),
-                                                Core::FormatValue(harmonic.Amplitude), unit)
-                                        .c_str());
+        ImGui::SetItemTooltip("%s",
+                              std::format("{}Hz, {}{}",
+                                          Core::FormatValue(harmonic.Frequency),
+                                          Core::FormatValue(harmonic.Amplitude),
+                                          unit)
+                                  .c_str());
     }
 }
 
@@ -212,8 +220,8 @@ PlotSpan GetSpectrumFitRange(const TransientSpectra &spectra, const bool logarit
     // Without a measured fundamental, as in a stretch of too few periods, the strongest bin past the skirt of the
     // mean stands in for it
     for (const SpectrumTrace &trace : spectra.Traces) {
-        if (trace.Decibels && !IsBroadband(trace) &&
-            trace.Decibels->size() > static_cast<std::size_t>(SPECTRUM_SKIRT_BINS)) {
+        if (trace.Decibels && !IsBroadband(trace)
+            && trace.Decibels->size() > static_cast<std::size_t>(SPECTRUM_SKIRT_BINS)) {
             const auto strongest =
                 std::max_element(trace.Decibels->begin() + SPECTRUM_SKIRT_BINS, trace.Decibels->end());
             const double frequency = spectra.Frequencies[static_cast<std::size_t>(strongest - trace.Decibels->begin())];
@@ -227,7 +235,9 @@ PlotSpan GetSpectrumFitRange(const TransientSpectra &spectra, const bool logarit
  * @brief   Sets the axes of the decibel view: voltage on the left, currents and math channels on the others.
  */
 void SetupDecibelAxes(const bool has_voltages, const bool has_currents, const bool has_math) {
-    ImPlot::SetupAxes("Frequency", "Voltage (dBV)", ImPlotAxisFlags_None,
+    ImPlot::SetupAxes("Frequency",
+                      "Voltage (dBV)",
+                      ImPlotAxisFlags_None,
                       VoltageAxisFlags(has_voltages, has_currents || has_math));
     if (has_currents) {
         ImPlot::SetupAxis(ImAxis_Y2, "Current (dBA)", ImPlotAxisFlags_AuxDefault);
@@ -241,7 +251,9 @@ void SetupDecibelAxes(const bool has_voltages, const bool has_currents, const bo
  * @brief   Sets the axes of the density view, all logarithmic since a floor spans decades.
  */
 void SetupDensityAxes(const bool has_voltages, const bool has_currents, const bool has_math) {
-    ImPlot::SetupAxes("Frequency", "Voltage density (V/√Hz)", ImPlotAxisFlags_None,
+    ImPlot::SetupAxes("Frequency",
+                      "Voltage density (V/√Hz)",
+                      ImPlotAxisFlags_None,
                       VoltageAxisFlags(has_voltages, has_currents || has_math));
     ImPlot::SetupAxisScale(ImAxis_Y1, ImPlotScale_Log10);
     if (has_currents) {
@@ -268,8 +280,11 @@ void PlotHarmonicMarkers(const SpectrumTrace &trace) {
     marker_spec.LineColor = ImGui::ColorConvertU32ToFloat4(trace.Color);
     marker_spec.Marker = ImPlotMarker_Circle;
     marker_spec.MarkerSize = HARMONIC_MARKER_SIZE;
-    ImPlot::PlotScatter(std::format("##{} harmonics", trace.Label).c_str(), harmonic_frequencies.data(),
-                        harmonic_levels.data(), static_cast<int>(harmonic_frequencies.size()), marker_spec);
+    ImPlot::PlotScatter(std::format("##{} harmonics", trace.Label).c_str(),
+                        harmonic_frequencies.data(),
+                        harmonic_levels.data(),
+                        static_cast<int>(harmonic_frequencies.size()),
+                        marker_spec);
 }
 
 /**
@@ -291,7 +306,7 @@ std::vector<SpectrumTrace> MakeSpectrumTraces(std::vector<PlottedTrace> &sources
                           .Densities = {}});
     }
     for (const MathTrace &trace : math) {
-        sources.push_back({trace.Label, &trace.Values, trace.Unit.c_str(), trace.Color});
+        sources.push_back(ToPlottedTrace(trace));
         traces.push_back({.Label = trace.Label,
                           .Unit = trace.Unit,
                           .Axis = trace.Axis,
@@ -346,7 +361,8 @@ void SetupSpectrumAxes(const TransientSpectra &spectra, const bool is_density, c
     }
 }
 
-void PlotSpectrumLine(const SpectrumTrace &trace, const std::vector<double> &frequencies,
+void PlotSpectrumLine(const SpectrumTrace &trace,
+                      const std::vector<double> &frequencies,
                       const std::vector<double> &values) {
     if (trace.Dashed) {
         PlotDashedLine(trace.Label, frequencies, values, trace.Color);
@@ -354,7 +370,10 @@ void PlotSpectrumLine(const SpectrumTrace &trace, const std::vector<double> &fre
     }
     ImPlotSpec spec;
     spec.LineColor = ImGui::ColorConvertU32ToFloat4(trace.Color);
-    ImPlot::PlotLine(trace.Label.c_str(), frequencies.data(), values.data(), static_cast<int>(frequencies.size()),
+    ImPlot::PlotLine(trace.Label.c_str(),
+                     frequencies.data(),
+                     values.data(),
+                     static_cast<int>(frequencies.size()),
                      spec);
 }
 
@@ -401,8 +420,8 @@ void SpectrumTab::Draw(const FrameResults &frame, const PlotSpan span) {
  * @return  True with a transient and the spectrum of at least one trace.
  */
 bool SpectrumTab::CanExport() const {
-    return m_Results.GetTransient() && m_Spectra &&
-           std::ranges::any_of(m_Spectra->Traces,
+    return m_Results.GetTransient() && m_Spectra
+        && std::ranges::any_of(m_Spectra->Traces,
                                [](const SpectrumTrace &trace) { return trace.Decibels.has_value(); });
 }
 
@@ -429,8 +448,8 @@ void SpectrumTab::Update(const Core::Transient &transient, const std::vector<Mat
         labels.push_back(trace.Label + trace.Unit);
     }
     const std::size_t version = m_Results.GetTransientDataVersion();
-    if (m_Spectra && m_Spectra->TransientVersion == version && m_Spectra->Span.From == span.From &&
-        m_Spectra->Span.To == span.To && m_Spectra->Window == m_Window && m_Spectra->Labels == labels) {
+    if (m_Spectra && m_Spectra->TransientVersion == version && m_Spectra->Span.From == span.From
+        && m_Spectra->Span.To == span.To && m_Spectra->Window == m_Window && m_Spectra->Labels == labels) {
         return;
     }
 
@@ -476,10 +495,12 @@ void SpectrumTab::DrawPlot() {
     }
     const TransientSpectra &spectra = *m_Spectra;
     ImGui::PushTextWrapPos(0.0f);
-    ImGui::TextDisabled("%s", std::format("From {}s to {}s of the transient: zoom its plot or place its cursors to "
-                                          "pick the stretch, such as the steady state",
-                                          Core::FormatValue(spectra.Span.From), Core::FormatValue(spectra.Span.To))
-                                  .c_str());
+    ImGui::TextDisabled("%s",
+                        std::format("From {}s to {}s of the transient: zoom its plot or place its cursors to "
+                                    "pick the stretch, such as the steady state",
+                                    Core::FormatValue(spectra.Span.From),
+                                    Core::FormatValue(spectra.Span.To))
+                            .c_str());
     ImGui::PopTextWrapPos();
     if (spectra.Frequencies.empty()) {
         return;
