@@ -66,6 +66,31 @@ const ParsedModel *FindModel(const DeckContext &context, const std::string &name
 }
 
 /**
+ * @brief   The device parameters a line takes from the model it names, and a diagnostic, once for each model, that
+ * names the parameters of its card that the device does not read.
+ * @param[in,out] context  Netlist being read, which collects the diagnostic.
+ * @param[in]     name     Model name as the line writes it.
+ * @param[in]     build    Builds the parameters of the device from the card, such as BuildDiodeParameters.
+ * @return  The device parameters, at the defaults of the device when the netlist has no such model.
+ */
+template <typename T>
+T ReadModelParameters(DeckContext &context,
+                      const std::string &name,
+                      BuiltParameters<T> (*const build)(const ParsedModel &model)) {
+    const ParsedModel *model = FindModel(context, name);
+    if (model == nullptr) {
+        return T{};
+    }
+    BuiltParameters<T> built = build(*model);
+    if (const std::string ignored = ListIgnoredParameters(*model, built.ReadKeys); !ignored.empty()) {
+        AddUniqueDiagnostic(
+            context.Result.Diagnostics,
+            std::format("Nodalys does not read the parameters {} of the model {}", ignored, ToUpper(name)));
+    }
+    return std::move(built.Parameters);
+}
+
+/**
  * @brief   The number in the name of a port, such as 2 for "V_PORT2", or the fallback when it has none.
  */
 int GetPortNumberFromName(const std::string &name, const int fallback) {
@@ -507,11 +532,10 @@ ElementResult ReadDiode(DeckContext &context, const DeckLine &line) {
     if (tokens.size() < 4) {
         return std::unexpected(std::format("Malformed diode: '{}'", line.Text));
     }
-    const ParsedModel *model = FindModel(context, tokens[3]);
     context.Builder.AddDiode(tokens.front(),
                              context.Nodes.Resolve(tokens[1]),
                              context.Nodes.Resolve(tokens[2]),
-                             model != nullptr ? BuildDiodeParameters(*model) : DiodeParameters{},
+                             ReadModelParameters(context, tokens[3], BuildDiodeParameters),
                              ReadArea(tokens, 4));
     return {};
 }
@@ -531,7 +555,7 @@ ElementResult ReadBjt(DeckContext &context, const DeckLine &line) {
                            nodes.Resolve(tokens[2]),
                            nodes.Resolve(tokens[3]),
                            model == nullptr || model->Kind != ParsedModel::ModelKind::BJT_PNP,
-                           model != nullptr ? BuildBjtParameters(*model) : BjtParameters{},
+                           ReadModelParameters(context, tokens[4], BuildBjtParameters),
                            ReadArea(tokens, 5));
     return {};
 }
@@ -546,7 +570,7 @@ ElementResult ReadMosfet(DeckContext &context, const DeckLine &line) {
         return std::unexpected(std::format("Malformed MOSFET: '{}'", line.Text));
     }
     const ParsedModel *model = FindModel(context, tokens[5]);
-    MosfetParameters parameters = model != nullptr ? BuildMosfetParameters(*model) : MosfetParameters{};
+    MosfetParameters parameters = ReadModelParameters(context, tokens[5], BuildMosfetParameters);
     parameters.Length = FindOptionValue(tokens, FIRST_OPTION, "L").value_or(parameters.Length);
     parameters.Width = FindOptionValue(tokens, FIRST_OPTION, "W").value_or(parameters.Width);
     const NetlistNodes &nodes = context.Nodes;
@@ -568,14 +592,13 @@ ElementResult ReadSwitch(DeckContext &context, const DeckLine &line) {
     if (tokens.size() < 6) {
         return std::unexpected(std::format("Malformed switch: '{}'", line.Text));
     }
-    const ParsedModel *model = FindModel(context, tokens[5]);
     const NetlistNodes &nodes = context.Nodes;
     context.Builder.AddVoltageControlledSwitch(tokens.front(),
                                                nodes.Resolve(tokens[1]),
                                                nodes.Resolve(tokens[2]),
                                                nodes.Resolve(tokens[3]),
                                                nodes.Resolve(tokens[4]),
-                                               model != nullptr ? BuildSwitchParameters(*model) : SwitchParameters{});
+                                               ReadModelParameters(context, tokens[5], BuildSwitchParameters));
     return {};
 }
 

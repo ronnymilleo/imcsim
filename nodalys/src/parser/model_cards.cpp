@@ -11,6 +11,7 @@
 #include <cstddef>
 #include <initializer_list>
 #include <string_view>
+#include <utility>
 
 namespace Nodalys {
 
@@ -21,22 +22,20 @@ namespace {
  */
 class CardReader {
 public:
-    CardReader(const ParsedModel &model, std::set<std::string> *read_keys) : m_Model(model), m_ReadKeys(read_keys) {}
+    explicit CardReader(const ParsedModel &model) : m_Model(model) {}
 
     /// The value of a parameter set to the card, or the default when it does not give it.
-    double Get(const std::string &key, const double default_value) const {
+    double Get(const std::string &key, const double default_value) {
         const auto found = m_Model.Params.find(key);
         if (found == m_Model.Params.end()) {
             return default_value;
         }
-        if (m_ReadKeys != nullptr) {
-            m_ReadKeys->insert(key);
-        }
+        m_ReadKeys.insert(key);
         return found->second;
     }
 
     /// The value of the first of several names for one parameter that the card gives, or the default.
-    double GetAny(const std::initializer_list<std::string_view> keys, const double default_value) const {
+    double GetAny(const std::initializer_list<std::string_view> keys, const double default_value) {
         for (const std::string_view key : keys) {
             if (m_Model.Params.contains(std::string(key))) {
                 return Get(std::string(key), default_value);
@@ -45,9 +44,15 @@ public:
         return default_value;
     }
 
+    /// The parameters built so far with the names the device read, which leaves the reader without them.
+    template <typename T>
+    BuiltParameters<T> Finish(T parameters) {
+        return {.Parameters = std::move(parameters), .ReadKeys = std::move(m_ReadKeys)};
+    }
+
 private:
     const ParsedModel &m_Model;
-    std::set<std::string> *m_ReadKeys;
+    std::set<std::string> m_ReadKeys;
 };
 
 /**
@@ -115,8 +120,11 @@ std::optional<ParsedModel::ModelKind> FindModelKind(const std::string_view type)
     return std::nullopt;
 }
 
-DiodeParameters BuildDiodeParameters(const ParsedModel &model, std::set<std::string> *read_keys) {
-    const CardReader card(model, read_keys);
+/**
+ * @brief   The diode parameters a card gives, the others at the defaults of the device.
+ */
+BuiltParameters<DiodeParameters> BuildDiodeParameters(const ParsedModel &model) {
+    CardReader card(model);
     DiodeParameters p;
     p.SaturationCurrent = card.Get("IS", p.SaturationCurrent);
     p.SeriesResistance = card.Get("RS", p.SeriesResistance);
@@ -129,11 +137,14 @@ DiodeParameters BuildDiodeParameters(const ParsedModel &model, std::set<std::str
     p.TransitTime = card.Get("TT", p.TransitTime);
     p.EnergyGap = card.Get("EG", p.EnergyGap);
     p.SaturationCurrentExponent = card.Get("XTI", p.SaturationCurrentExponent);
-    return p;
+    return card.Finish(p);
 }
 
-BjtParameters BuildBjtParameters(const ParsedModel &model, std::set<std::string> *read_keys) {
-    const CardReader card(model, read_keys);
+/**
+ * @brief   The bipolar transistor parameters a card gives, the others at the defaults of the device.
+ */
+BuiltParameters<BjtParameters> BuildBjtParameters(const ParsedModel &model) {
+    CardReader card(model);
     BjtParameters p;
     p.SaturationCurrent = card.Get("IS", p.SaturationCurrent);
     p.ForwardBeta = card.Get("BF", p.ForwardBeta);
@@ -151,11 +162,14 @@ BjtParameters BuildBjtParameters(const ParsedModel &model, std::set<std::string>
     p.EnergyGap = card.Get("EG", p.EnergyGap);
     p.SaturationCurrentExponent = card.Get("XTI", p.SaturationCurrentExponent);
     p.BetaExponent = card.Get("XTB", p.BetaExponent);
-    return p;
+    return card.Finish(p);
 }
 
-MosfetParameters BuildMosfetParameters(const ParsedModel &model, std::set<std::string> *read_keys) {
-    const CardReader card(model, read_keys);
+/**
+ * @brief   The MOSFET parameters a card gives, the others at the defaults of the device.
+ */
+BuiltParameters<MosfetParameters> BuildMosfetParameters(const ParsedModel &model) {
+    CardReader card(model);
     MosfetParameters p;
     p.ThresholdVoltage = card.Get("VTO", p.ThresholdVoltage);
     p.Transconductance = card.Get("KP", p.Transconductance);
@@ -167,17 +181,37 @@ MosfetParameters BuildMosfetParameters(const ParsedModel &model, std::set<std::s
     p.Length = card.Get("L", p.Length);
     p.Width = card.Get("W", p.Width);
     p.SurfacePotential = card.Get("PHI", p.SurfacePotential);
-    return p;
+    return card.Finish(p);
 }
 
-SwitchParameters BuildSwitchParameters(const ParsedModel &model, std::set<std::string> *read_keys) {
-    const CardReader card(model, read_keys);
+/**
+ * @brief   The switch parameters a card gives, the others at the defaults of the device.
+ */
+BuiltParameters<SwitchParameters> BuildSwitchParameters(const ParsedModel &model) {
+    CardReader card(model);
     SwitchParameters p;
     p.Threshold = card.GetAny({"VT", "VTHRESHOLD"}, p.Threshold);
     p.Hysteresis = card.GetAny({"VH", "VHYSTERESIS"}, p.Hysteresis);
     p.OnResistance = card.Get("RON", p.OnResistance);
     p.OffResistance = card.Get("ROFF", p.OffResistance);
-    return p;
+    return card.Finish(p);
+}
+
+/**
+ * @brief   Lists the parameters of a card that no device of the engine reads, so a caller can say so.
+ * @param[in] model      The card.
+ * @param[in] read_keys  Parameters the device took from it.
+ * @return  Their upper-case names separated by commas, such as "IKR, VAR", or empty when the device read them all.
+ *          LEVEL is never listed: it names the kind of model, not a value the device takes.
+ */
+std::string ListIgnoredParameters(const ParsedModel &model, const std::set<std::string> &read_keys) {
+    std::string ignored;
+    for (const auto &[key, value] : model.Params) {
+        if (key != "LEVEL" && !read_keys.contains(key)) {
+            ignored += ignored.empty() ? key : ", " + key;
+        }
+    }
+    return ignored;
 }
 
 } // namespace Nodalys

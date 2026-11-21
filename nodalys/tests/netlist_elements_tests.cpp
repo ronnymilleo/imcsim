@@ -111,6 +111,24 @@ TEST_CASE("A source in a netlist takes its DC value in every form, DC= included"
     CHECK_THAT(point->NodeVoltages[1], WithinAbs(5.0, 1e-9));
 }
 
+TEST_CASE("A model parameter of a netlist that the engine does not read is named once, whatever uses it",
+          "[nodalys][parser]") {
+    const auto parsed = Nodalys::ParseNetlist("* ignored\nV1 1 0 1\nD1 1 2 dmod\nD2 1 2 DMOD\nR1 2 0 1k\n"
+                                              ".model dmod D(IS=1e-14 KF=1e-16 LEVEL=1)\n.op\n.end\n");
+    REQUIRE(parsed.has_value());
+    REQUIRE(parsed->Diagnostics.size() == 1);
+    // IS is read and LEVEL names the kind of model, so KF alone is reported, once for both diodes
+    CHECK(parsed->Diagnostics.front().Text == "Nodalys does not read the parameters KF of the model DMOD");
+}
+
+TEST_CASE("A netlist whose models give only what the engine reads has no diagnostic", "[nodalys][parser]") {
+    const auto parsed = Nodalys::ParseNetlist("* read\nV1 1 0 1\nQ1 1 1 0 qmod\nM1 1 1 0 0 nmod W=2u\n"
+                                              ".model qmod NPN(BF=100 IS=1e-15)\n.model nmod NMOS(VTO=1 KP=2e-5)\n"
+                                              ".op\n.end\n");
+    REQUIRE(parsed.has_value());
+    CHECK(parsed->Diagnostics.empty());
+}
+
 TEST_CASE("Controlled sources in a netlist follow their controlling voltage or current", "[nodalys][parser]") {
     // V1 holds node 1 at 2 V and drives 2 mA through R1, which Vsense measures on its way to ground
     const std::string_view control = "* controlled\nV1 1 0 2\nR1 1 2 1k\nVsense 2 0 0\n";

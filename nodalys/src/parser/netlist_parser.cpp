@@ -13,7 +13,6 @@
 #include "parser/netlist_nodes.h"
 #include "parser/netlist_subcircuits.h"
 
-#include <algorithm>
 #include <cctype>
 #include <string>
 #include <string_view>
@@ -39,16 +38,6 @@ NetlistNodes RegisterCircuitNodes(const Deck &deck) {
         }
     }
     return nodes;
-}
-
-/**
- * @brief   Adds a diagnostic unless the netlist already has the same one, as every instance of a block repeats the
- *          warnings of its definition.
- */
-void AddUniqueDiagnostic(std::vector<DiagnosticMessage> &diagnostics, const std::string &text) {
-    if (!std::ranges::contains(diagnostics, text, &DiagnosticMessage::Text)) {
-        diagnostics.push_back({text});
-    }
 }
 
 /**

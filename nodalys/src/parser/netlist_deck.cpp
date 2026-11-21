@@ -10,6 +10,7 @@
 #include "parser/spice_text.h"
 #include "text/text_case.h"
 
+#include <algorithm>
 #include <cctype>
 #include <format>
 #include <optional>
@@ -156,6 +157,18 @@ char GetElementLetter(const std::string_view name) {
     const std::size_t dot = name.rfind('.');
     const std::string_view base = dot == std::string_view::npos ? name : name.substr(dot + 1);
     return base.empty() ? '\0' : static_cast<char>(std::toupper(static_cast<unsigned char>(base.front())));
+}
+
+/**
+ * @brief   Adds a diagnostic unless the netlist already has the same one, as every instance of a block repeats the
+ *          warnings of its definition and every element of a model repeats what its card does not give.
+ * @param[in,out] diagnostics  Diagnostics of the netlist.
+ * @param[in]     text         The diagnostic.
+ */
+void AddUniqueDiagnostic(std::vector<DiagnosticMessage> &diagnostics, const std::string &text) {
+    if (!std::ranges::contains(diagnostics, text, &DiagnosticMessage::Text)) {
+        diagnostics.push_back({text});
+    }
 }
 
 } // namespace Nodalys

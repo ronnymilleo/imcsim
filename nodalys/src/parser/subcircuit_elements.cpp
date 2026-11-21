@@ -23,7 +23,6 @@
 #include <initializer_list>
 #include <map>
 #include <optional>
-#include <set>
 #include <string_view>
 
 namespace Nodalys {
@@ -339,11 +338,21 @@ Result AddDiodeLine(const ElementLine &element) {
     if (!area) {
         return std::unexpected(area.error());
     }
-    std::set<std::string> read_keys;
-    const DiodeParameters parameters = BuildDiodeParameters((*model)->Card, &read_keys);
-    ReportIgnoredParameters(element.Scope.GetContext(), **model, read_keys);
+    const DiodeParameters parameters = UseModelParameters(element.Scope.GetContext(), **model, BuildDiodeParameters);
     element.GetBuilder().AddDiode(element.Name, element.ResolveNode(0), element.ResolveNode(1), parameters, *area);
     return {};
+}
+
+/**
+ * @brief   Tells where the model of a bipolar transistor line is: the word after its three nodes, unless no model has
+ *          that name and a word follows it, which makes it the substrate node and the next word the model.
+ * @note    The line must have its three nodes and one word after them.
+ */
+std::size_t FindBjtModelIndex(const ElementLine &element) {
+    constexpr std::size_t AFTER_NODES = FIRST_NODE_INDEX + 3;
+    const bool is_substrate = element.Scope.FindModel(ToUpper(element.Tokens[AFTER_NODES])) == nullptr
+                           && element.Tokens.size() > AFTER_NODES + 1;
+    return is_substrate ? AFTER_NODES + 1 : AFTER_NODES;
 }
 
 Result AddBjtLine(const ElementLine &element) {
@@ -351,12 +360,7 @@ Result AddBjtLine(const ElementLine &element) {
     if (const Result nodes = CheckNodeCount(element, NODES + 1); !nodes) {
         return nodes;
     }
-    // The fourth word is the model, unless the model is the fifth and the fourth is the substrate node
-    const std::size_t model_index =
-        element.Scope.FindModel(ToUpper(element.Tokens[FIRST_NODE_INDEX + NODES])) == nullptr
-                && element.Tokens.size() > FIRST_NODE_INDEX + NODES + 1
-            ? FIRST_NODE_INDEX + NODES + 1
-            : FIRST_NODE_INDEX + NODES;
+    const std::size_t model_index = FindBjtModelIndex(element);
     const auto model = UseTextModel(element.Scope,
                                     element.Tokens[model_index],
                                     {ParsedModel::ModelKind::BJT_NPN, ParsedModel::ModelKind::BJT_PNP});
@@ -367,9 +371,7 @@ Result AddBjtLine(const ElementLine &element) {
     if (!area) {
         return std::unexpected(area.error());
     }
-    std::set<std::string> read_keys;
-    const BjtParameters parameters = BuildBjtParameters((*model)->Card, &read_keys);
-    ReportIgnoredParameters(element.Scope.GetContext(), **model, read_keys);
+    const BjtParameters parameters = UseModelParameters(element.Scope.GetContext(), **model, BuildBjtParameters);
     element.GetBuilder().AddBjt(element.Name,
                                 element.ResolveNode(0),
                                 element.ResolveNode(1),
@@ -398,8 +400,7 @@ Result AddMosfetLine(const ElementLine &element) {
     if (const Result counted = CheckPositionalCount(arguments, 0); !counted) {
         return counted;
     }
-    std::set<std::string> read_keys;
-    MosfetParameters parameters = BuildMosfetParameters((*model)->Card, &read_keys);
+    MosfetParameters parameters = UseModelParameters(element.Scope.GetContext(), **model, BuildMosfetParameters);
     for (const auto &[key, text] : arguments.Options) {
         const auto value = element.Scope.Evaluate(text);
         if (!value) {
@@ -407,7 +408,6 @@ Result AddMosfetLine(const ElementLine &element) {
         }
         (key == "L" ? parameters.Length : parameters.Width) = *value;
     }
-    ReportIgnoredParameters(element.Scope.GetContext(), **model, read_keys);
     element.GetBuilder().AddMosfet(element.Name,
                                    element.ResolveNode(0),
                                    element.ResolveNode(1),
@@ -433,9 +433,7 @@ Result AddSwitchLine(const ElementLine &element) {
                                            "simulated",
                                            element.Tokens[FIRST_NODE_INDEX + NODES + 1]));
     }
-    std::set<std::string> read_keys;
-    const SwitchParameters parameters = BuildSwitchParameters((*model)->Card, &read_keys);
-    ReportIgnoredParameters(element.Scope.GetContext(), **model, read_keys);
+    const SwitchParameters parameters = UseModelParameters(element.Scope.GetContext(), **model, BuildSwitchParameters);
     element.GetBuilder().AddVoltageControlledSwitch(element.Name,
                                                     element.ResolveNode(0),
                                                     element.ResolveNode(1),
