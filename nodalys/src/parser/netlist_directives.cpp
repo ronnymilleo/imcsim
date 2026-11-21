@@ -315,7 +315,7 @@ std::optional<IntegrationMethod> FindIntegrationMethod(const std::string_view na
  *          options it does not have.
  */
 void ApplyOption(DeckContext &context, const std::string &name, const double value) {
-    if (const auto *found = std::ranges::find(NUMERIC_OPTIONS, name, &NumericOption::Name);
+    if (const auto found = std::ranges::find(NUMERIC_OPTIONS, name, &NumericOption::Name);
         found != NUMERIC_OPTIONS.end()) {
         context.Result.Options.*(found->Target) = value;
     } else if (name == "MAXITER" || name == "ITL1") {
@@ -707,7 +707,7 @@ std::vector<std::string> ListDirectiveNodes(const DeckLine &line) {
  */
 std::expected<void, std::string> ReadDirective(DeckContext &context, const DeckLine &line) {
     const std::string name = ToUpper(line.Tokens.front());
-    const auto *reader = std::ranges::find(DIRECTIVE_READERS, name, &DirectiveReader::Name);
+    const auto reader = std::ranges::find(DIRECTIVE_READERS, name, &DirectiveReader::Name);
     if (reader == DIRECTIVE_READERS.end()) {
         return {};
     }

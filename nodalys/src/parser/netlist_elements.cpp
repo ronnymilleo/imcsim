@@ -118,7 +118,7 @@ constexpr auto GATE_WORDS = std::to_array<GateWord>({
 
 std::optional<LogicGateType> FindLogicGateType(const std::string_view word) {
     const std::string upper = ToUpper(word);
-    const auto *found = std::ranges::find(GATE_WORDS, upper, &GateWord::Name);
+    const auto found = std::ranges::find(GATE_WORDS, upper, &GateWord::Name);
     return found == GATE_WORDS.end() ? std::nullopt : std::optional(found->Type);
 }
 
@@ -779,7 +779,7 @@ std::expected<void, std::string> ReadElement(DeckContext &context, const DeckLin
     if (letter == '\0') {
         return {};
     }
-    const auto *reader = std::ranges::find(ELEMENT_READERS, letter, &ElementReader::Letter);
+    const auto reader = std::ranges::find(ELEMENT_READERS, letter, &ElementReader::Letter);
     if (reader == ELEMENT_READERS.end()) {
         context.Result.Diagnostics.push_back({std::format("Ignored unrecognized device line: '{}'", line.Text)});
         return {};
