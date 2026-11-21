@@ -12,3 +12,6 @@ imgui.ini
 .vs
 .venv/
 __pycache__/
+.cache/
+.nest/
+.DS_Store
