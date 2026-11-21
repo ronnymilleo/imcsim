@@ -6,6 +6,7 @@
 #include "parser/subcircuit_elements.h"
 
 #include "nodalys/expression.h"
+#include "parser/expression_references.h"
 #include "parser/source_waveforms.h"
 #include "parser/spice_text.h"
 #include "parser/spice_values.h"
@@ -334,29 +335,17 @@ ResolveExpression(ExpansionContext &context, TextScope &scope, const std::string
     if (!expression) {
         return std::unexpected(std::format("the expression '{}' is not understood: {}", text, expression.error()));
     }
-    std::string resolved;
-    std::size_t copied = 0;
-    for (const ExpressionReference &reference : expression->GetReferences()) {
-        resolved.append(substituted, copied, reference.Start - copied);
-        copied = reference.Start + reference.Length;
-        if (reference.Input.Type == ExpressionInput::Kind::CURRENT) {
-            const std::optional<std::string> source = scope.FindSourceName(ToUpper(reference.Input.First));
-            if (!source) {
-                return std::unexpected(std::format("it reads the current of {}, which is not a voltage source of "
-                                                   "the subcircuit",
-                                                   reference.Input.First));
+    return RewriteExpressionReferences(
+        substituted,
+        *expression,
+        [&](const std::string_view node) { return scope.ResolveNode(context, node); },
+        [&scope](const std::string_view source) -> std::expected<std::string, std::string> {
+            if (const std::optional<std::string> name = scope.FindSourceName(ToUpper(source))) {
+                return *name;
             }
-            resolved += std::format("i({})", *source);
-        } else if (reference.Input.Second.empty()) {
-            resolved += std::format("v({})", scope.ResolveNode(context, reference.Input.First));
-        } else {
-            resolved += std::format("v({},{})",
-                                    scope.ResolveNode(context, reference.Input.First),
-                                    scope.ResolveNode(context, reference.Input.Second));
-        }
-    }
-    resolved.append(substituted, copied, std::string::npos);
-    return resolved;
+            return std::unexpected(
+                std::format("it reads the current of {}, which is not a voltage source of the subcircuit", source));
+        });
 }
 
 /**
