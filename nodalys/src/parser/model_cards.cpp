@@ -5,6 +5,10 @@
 
 #include "parser/model_cards.h"
 
+#include "parser/spice_text.h"
+#include "text/text_case.h"
+
+#include <cstddef>
 #include <initializer_list>
 #include <string_view>
 
@@ -46,7 +50,70 @@ private:
     std::set<std::string> *m_ReadKeys;
 };
 
+/**
+ * @brief   The text of the parameters of a card: what follows the type, without the parentheses around the list.
+ */
+std::string_view FindParameterText(const std::string_view after_name, std::string &type) {
+    const std::string_view text = TrimSpaces(after_name);
+    const std::size_t type_end = text.find_first_of(" \t(");
+    type = ToUpper(text.substr(0, type_end));
+    std::string_view parameters = type_end == std::string_view::npos ? std::string_view() : text.substr(type_end);
+    parameters = TrimSpaces(parameters);
+    if (parameters.size() >= 2 && parameters.front() == '(' && parameters.back() == ')') {
+        parameters = parameters.substr(1, parameters.size() - 2);
+    }
+    return parameters;
+}
+
 } // namespace
+
+/**
+ * @brief   Splits a .model card into its name, its type and its parameter words, the same way for a netlist and for a
+ *          subcircuit kept as text.
+ * @param[in] tokens  Tokens of the card line, from the .model word on.
+ * @return  The words of the card, or none when it has no name and type.
+ */
+std::optional<ModelCardWords> SplitModelCard(const std::vector<std::string> &tokens) {
+    constexpr std::size_t FIRST_AFTER_NAME = 2;
+    if (tokens.size() <= FIRST_AFTER_NAME) {
+        return std::nullopt;
+    }
+    std::string rest;
+    for (std::size_t index = FIRST_AFTER_NAME; index < tokens.size(); ++index) {
+        rest += index == FIRST_AFTER_NAME ? "" : " ";
+        rest += tokens[index];
+    }
+    ModelCardWords card{.Name = tokens[1], .TypeName = {}, .Assignments = {}};
+    card.Assignments = SplitTokens(FindParameterText(rest, card.TypeName));
+    return card;
+}
+
+/**
+ * @brief   The kind of device a .model type stands for.
+ * @param[in] type  Type in upper case, such as "NPN".
+ * @return  The kind, or none for a type the engine has no device for.
+ */
+std::optional<ParsedModel::ModelKind> FindModelKind(const std::string_view type) {
+    if (type == "D") {
+        return ParsedModel::ModelKind::DIODE;
+    }
+    if (type == "NPN") {
+        return ParsedModel::ModelKind::BJT_NPN;
+    }
+    if (type == "PNP") {
+        return ParsedModel::ModelKind::BJT_PNP;
+    }
+    if (type == "NMOS") {
+        return ParsedModel::ModelKind::MOSFET_NMOS;
+    }
+    if (type == "PMOS") {
+        return ParsedModel::ModelKind::MOSFET_PMOS;
+    }
+    if (type == "SW" || type == "VSWITCH") {
+        return ParsedModel::ModelKind::SWITCH;
+    }
+    return std::nullopt;
+}
 
 DiodeParameters BuildDiodeParameters(const ParsedModel &model, std::set<std::string> *read_keys) {
     const CardReader card(model, read_keys);

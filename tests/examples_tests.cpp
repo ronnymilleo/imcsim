@@ -49,7 +49,7 @@
 
 namespace {
 
-/// Seed of the noise source of the noise example in the tests, so every run draws the same numbers.
+/// Seed of the noise source of the noise example in the tests, so every run on Nodalys draws the same numbers.
 constexpr unsigned int NOISE_EXAMPLE_SEED = 1;
 
 /**
@@ -202,10 +202,12 @@ TEST_CASE("The noise example shows a flat floor at the input that the low-pass c
     REQUIRE(settings.Selected == GUI::Analysis::TRANSIENT);
 
     // The noise is drawn anew on each run, and a band of a few dozen bins scatters by about 15%, so a free draw lands
-    // 30% off now and then; a fixed seed makes every run the same draw
+    // 30% off now and then; a fixed seed makes every run the same draw, on Nodalys only, since ngspice does not seed
+    // white noise
     Core::TransientSettings seeded = settings.Transient;
     seeded.Seed = NOISE_EXAMPLE_SEED;
-    const Core::TransientRun run = Core::RunTransient(schematic.BuildCircuit(), seeded);
+    Core::NodalysBackend nodalys;
+    const Core::TransientRun run = nodalys.RunTransient(schematic.BuildCircuit(), seeded, std::nullopt, {});
     REQUIRE(run.Result.has_value());
     const Core::Transient &transient = *run.Result;
     // The whole run fits the default window, so the Spectrum tab covers all of it
@@ -252,9 +254,11 @@ TEST_CASE("The noise example shows a flat floor at the input that the low-pass c
 TEST_CASE("The noise example reads as broadband noise of 1 mV/sqrt(Hz) at its input", "[examples]") {
     GUI::Schematic schematic;
     OpenExample("noise_through_rc_low_pass.imcsim", schematic);
+    // Nodalys, unlike ngspice, seeds the white noise, so the seed makes every run the same draw
     Core::TransientSettings seeded = schematic.GetSimulationSettings().Transient;
     seeded.Seed = NOISE_EXAMPLE_SEED;
-    const Core::TransientRun run = Core::RunTransient(schematic.BuildCircuit(), seeded);
+    Core::NodalysBackend nodalys;
+    const Core::TransientRun run = nodalys.RunTransient(schematic.BuildCircuit(), seeded, std::nullopt, {});
     REQUIRE(run.Result.has_value());
     const Core::Transient &transient = *run.Result;
     const std::size_t input = NodeAt(schematic, {4, 4});

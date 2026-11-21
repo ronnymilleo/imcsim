@@ -19,17 +19,6 @@
 namespace Nodalys {
 
 /**
- * @struct  InstanceLine
- * @brief   The parts of an X line: X<name> <nodes> <subcircuit> [params:] [NAME=VALUE...].
- */
-struct InstanceLine {
-    std::vector<std::string> NodeNames;
-    std::string SubcircuitName;
-    /// The NAME=VALUE tokens, as written, with the PARAMS: word among them when the line has it.
-    std::vector<std::string> ParameterTokens;
-};
-
-/**
  * @struct  InstanceObservers
  * @brief   What the caller wants to hear about the nodes and sources that the instances of a netlist make.
  */
@@ -37,9 +26,6 @@ struct InstanceObservers {
     std::function<void(const std::string &name, NodeId node)> OnInternalNode;
     std::function<void(const std::string &name, NodeId positive, NodeId negative)> OnSource;
 };
-
-// Reading
-std::optional<InstanceLine> SplitInstanceLine(const std::vector<std::string> &tokens);
 
 // Placing
 std::expected<std::vector<std::string>, std::string>

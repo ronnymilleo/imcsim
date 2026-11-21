@@ -19,46 +19,6 @@ namespace {
 /// The one level of the diode, bipolar and MOSFET models that the engine has.
 constexpr double SUPPORTED_LEVEL = 1.0;
 
-/**
- * @brief   The kind of device a .model type stands for, or none for a type the engine has no device for.
- */
-std::optional<ParsedModel::ModelKind> FindKind(const std::string &type) {
-    if (type == "D") {
-        return ParsedModel::ModelKind::DIODE;
-    }
-    if (type == "NPN") {
-        return ParsedModel::ModelKind::BJT_NPN;
-    }
-    if (type == "PNP") {
-        return ParsedModel::ModelKind::BJT_PNP;
-    }
-    if (type == "NMOS") {
-        return ParsedModel::ModelKind::MOSFET_NMOS;
-    }
-    if (type == "PMOS") {
-        return ParsedModel::ModelKind::MOSFET_PMOS;
-    }
-    if (type == "SW" || type == "VSWITCH") {
-        return ParsedModel::ModelKind::SWITCH;
-    }
-    return std::nullopt;
-}
-
-/**
- * @brief   The text of the parameters of a card: what follows the type, without the parentheses around the list.
- */
-std::string_view FindParameterText(const std::string_view after_name, std::string &type) {
-    const std::string_view text = TrimSpaces(after_name);
-    const std::size_t type_end = text.find_first_of(" \t(");
-    type = ToUpper(text.substr(0, type_end));
-    std::string_view parameters = type_end == std::string_view::npos ? std::string_view() : text.substr(type_end);
-    parameters = TrimSpaces(parameters);
-    if (parameters.size() >= 2 && parameters.front() == '(' && parameters.back() == ')') {
-        parameters = parameters.substr(1, parameters.size() - 2);
-    }
-    return parameters;
-}
-
 } // namespace
 
 /**
@@ -70,22 +30,18 @@ std::string_view FindParameterText(const std::string_view after_name, std::strin
  * @return  The model, or what was not understood.
  */
 std::expected<TextModel, std::string> ParseTextModel(const TextScope &scope, const std::vector<std::string> &tokens) {
-    if (tokens.size() < 3) {
+    const std::optional<ModelCardWords> card = SplitModelCard(tokens);
+    if (!card) {
         return std::unexpected("a .model card needs a name and a type");
     }
     TextModel model;
-    model.Name = tokens[1];
-    std::string rest;
-    for (std::size_t index = 2; index < tokens.size(); ++index) {
-        rest += index == 2 ? "" : " ";
-        rest += tokens[index];
-    }
-    const std::string_view parameter_text = FindParameterText(rest, model.TypeName);
-    if (const std::optional<ParsedModel::ModelKind> kind = FindKind(model.TypeName)) {
+    model.Name = card->Name;
+    model.TypeName = card->TypeName;
+    if (const std::optional<ParsedModel::ModelKind> kind = FindModelKind(model.TypeName)) {
         model.IsSupported = true;
         model.Card.Kind = *kind;
     }
-    for (const std::string &token : SplitTokens(parameter_text)) {
+    for (const std::string &token : card->Assignments) {
         const std::size_t equals = token.find('=');
         if (equals == std::string::npos || equals == 0) {
             return std::unexpected(std::format("the model parameter '{}' is not written as NAME=VALUE", token));
