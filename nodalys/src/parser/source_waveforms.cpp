@@ -8,8 +8,10 @@
 #include "parser/spice_text.h"
 #include "text/text_case.h"
 
+#include <array>
 #include <cstddef>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <vector>
 
@@ -24,6 +26,28 @@ constexpr int LAST_RANDOM_DISTRIBUTION = 4;
 constexpr double DEFAULT_RANDOM_TIME_STEP = 10e-6;
 constexpr double DEFAULT_RANDOM_FIRST = 0.1;
 constexpr double DEFAULT_FLICKER_EXPONENT = 1.0;
+
+/**
+ * @struct  WaveformPrefix
+ * @brief   How a word of a source line starts when it is a waveform, with its opening parenthesis.
+ */
+struct WaveformPrefix {
+    std::string_view Prefix;
+    SourceWaveform Waveform;
+};
+
+/// The waveforms a source line may carry, by the upper-case start of their word.
+constexpr auto WAVEFORM_PREFIXES = std::to_array<WaveformPrefix>({
+    {.Prefix = "PULSE(", .Waveform = SourceWaveform::PULSE},
+    {.Prefix = "SIN(", .Waveform = SourceWaveform::SINE},
+    {.Prefix = "SINE(", .Waveform = SourceWaveform::SINE},
+    {.Prefix = "EXP(", .Waveform = SourceWaveform::EXP},
+    {.Prefix = "PWL(", .Waveform = SourceWaveform::PWL},
+    {.Prefix = "SFFM(", .Waveform = SourceWaveform::SFFM},
+    {.Prefix = "AM(", .Waveform = SourceWaveform::AM},
+    {.Prefix = "TRNOISE(", .Waveform = SourceWaveform::TRNOISE},
+    {.Prefix = "TRRANDOM(", .Waveform = SourceWaveform::TRRANDOM},
+});
 
 /**
  * @brief   Sets target to the value at index when the line gave one, so a value left out keeps the default of its
@@ -216,29 +240,10 @@ RandomParameters ReadRandom(const std::vector<double> &values, const SourceLevel
  */
 SourceWaveform FindSourceWaveform(const std::string_view token) {
     const std::string upper = ToUpper(token);
-    if (upper.starts_with("PULSE(")) {
-        return SourceWaveform::PULSE;
-    }
-    if (upper.starts_with("SIN(") || upper.starts_with("SINE(")) {
-        return SourceWaveform::SINE;
-    }
-    if (upper.starts_with("EXP(")) {
-        return SourceWaveform::EXP;
-    }
-    if (upper.starts_with("PWL(")) {
-        return SourceWaveform::PWL;
-    }
-    if (upper.starts_with("SFFM(")) {
-        return SourceWaveform::SFFM;
-    }
-    if (upper.starts_with("AM(")) {
-        return SourceWaveform::AM;
-    }
-    if (upper.starts_with("TRNOISE(")) {
-        return SourceWaveform::TRNOISE;
-    }
-    if (upper.starts_with("TRRANDOM(")) {
-        return SourceWaveform::TRRANDOM;
+    for (const WaveformPrefix &entry : WAVEFORM_PREFIXES) {
+        if (upper.starts_with(entry.Prefix)) {
+            return entry.Waveform;
+        }
     }
     return SourceWaveform::NONE;
 }
