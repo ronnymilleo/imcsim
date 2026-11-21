@@ -74,6 +74,7 @@ add_library(nodalys STATIC
     src/parser/spice_text.cpp
     src/parser/spice_values.cpp
     src/parser/subcircuit_elements.cpp
+    src/parser/subcircuit_expansion.cpp
     src/parser/subcircuit_lines.cpp
     src/parser/subcircuit_models.cpp
     src/parser/subcircuit_scope.cpp

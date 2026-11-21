@@ -9,6 +9,7 @@
 #include "nodalys/circuit_builder.h"
 #include "nodalys/subcircuit_text.h"
 #include "nodalys/types.h"
+#include "parser/netlist_deck.h"
 
 #include <expected>
 #include <functional>
@@ -23,7 +24,7 @@ namespace Nodalys {
 std::expected<std::vector<std::string>, std::string>
 AddNetlistInstance(CircuitBuilder &builder,
                    const std::vector<std::string> &definition_lines,
-                   std::string_view line,
+                   const DeckLine &line,
                    const std::function<NodeId(std::string_view)> &resolve_node,
                    const InstanceObservers &observers);
 

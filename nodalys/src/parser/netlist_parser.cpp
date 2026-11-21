@@ -58,7 +58,7 @@ std::expected<void, std::string> PlaceSubcircuitInstances(DeckContext &context) 
         const auto added = AddNetlistInstance(
             context.Builder,
             context.Lines.DefinitionLines,
-            line.Text,
+            line,
             [&context](const std::string_view name) { return context.Nodes.Resolve(name); },
             observers);
         if (!added) {
