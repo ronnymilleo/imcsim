@@ -142,7 +142,7 @@ constexpr auto BJT_MODELS = std::to_array<BJTModel>({
  * @brief   Creates a transistor with the default model of its kind.
  * @param[in] type  ComponentType::NPN or PNP.
  */
-BJT::BJT(const ComponentType type) : Component(type, 0.0), m_Choice(GetBJTModels(type).front()) {
+BJT::BJT(const ComponentType type) : ModeledComponent(type, GetBJTModels(type).front(), "QCUSTOM_") {
 }
 
 /**
@@ -151,50 +151,6 @@ BJT::BJT(const ComponentType type) : Component(type, 0.0), m_Choice(GetBJTModels
  */
 std::unique_ptr<Component> BJT::Clone() const {
     return std::make_unique<BJT>(*this);
-}
-
-/**
- * @brief   Returns the ready model the transistor uses.
- * @return  An entry of the model list of its kind, or nullptr when it uses custom parameters or a library
- *          model.
- */
-const BJTModel *BJT::GetModel() const {
-    return HasLibraryModel() ? nullptr : m_Choice.GetModel();
-}
-
-/**
- * @brief   Makes the transistor use a ready model.
- * @param[in] model  An entry from GetBJTModels() for the type of this transistor; it keeps a reference to it.
- */
-void BJT::SetModel(const BJTModel &model) {
-    m_Choice.SetModel(model);
-    ClearLibraryModel();
-}
-
-/**
- * @brief   Tells whether the transistor uses its own parameters instead of a ready model.
- * @return  True for a custom transistor; false for one with a ready or a library model.
- */
-bool BJT::IsCustom() const {
-    return m_Choice.IsCustom() && !HasLibraryModel();
-}
-
-/**
- * @brief   Switches the transistor to custom parameters, starting from those of its current model.
- * @note    Does nothing when it is already custom, so its parameters are kept.
- */
-void BJT::SetCustom() {
-    ClearLibraryModel();
-    m_Choice.SetCustom();
-}
-
-/**
- * @brief   Makes the transistor custom with the given parameters.
- * @param[in] parameters  New parameters; check them with IsValidParameters() first.
- */
-void BJT::SetCustomParameters(const BJTParameters &parameters) {
-    ClearLibraryModel();
-    m_Choice.SetCustomParameters(parameters);
 }
 
 /**
@@ -211,38 +167,6 @@ bool BJT::IsValidParameters(const BJTParameters &parameters) {
         && parameters.CollectorCapacitance >= 0.0 && parameters.TransitTime >= 0.0
         && parameters.MaxCollectorEmitterVoltage > 0.0 && parameters.MaxCollectorCurrent > 0.0
         && parameters.MaxPower > 0.0;
-}
-
-/**
- * @brief   Returns the parameters the transistor is simulated with.
- * @return  Those of its ready model, or its custom ones.
- */
-const BJTParameters &BJT::GetParameters() const {
-    return m_Choice.GetParameters();
-}
-
-/**
- * @brief   Returns the name of the model, as shown in the editor and saved in files.
- * @return  The ready model name, such as "2N3904", or CustomBJTModelName, or the name of
- *          the library model it uses.
- */
-const char *BJT::GetModelName() const {
-    if (HasLibraryModel()) {
-        return GetLibraryModel().c_str();
-    }
-    return m_Choice.GetName();
-}
-
-/**
- * @brief   Returns the name of the ".model" line the transistor uses in a netlist.
- * @return  The ready model SPICE name, the library model one from GetLibraryModelSpiceName(), or "QCUSTOM_" followed by
- * the transistor name, since custom parameters belong to one transistor.
- */
-std::string BJT::GetSpiceModelName() const {
-    if (HasLibraryModel()) {
-        return GetLibraryModelSpiceName(GetLibraryModel());
-    }
-    return m_Choice.IsCustom() ? std::format("QCUSTOM_{}", GetName()) : std::string(m_Choice.GetModel()->SpiceName);
 }
 
 /**

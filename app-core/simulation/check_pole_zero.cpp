@@ -7,8 +7,7 @@
 
 #include "circuit/circuit.h"
 #include "simulation/analysis_settings.h"
-#include "simulation/analysis_sources.h"
-#include <format>
+#include "simulation/check_analysis_ports.h"
 #include <optional>
 #include <string>
 
@@ -21,16 +20,10 @@ namespace Core {
  * @return  The reason the analysis cannot run; no value when it can.
  */
 std::optional<std::string> CheckPoleZeroSettings(const Circuit &circuit, const PoleZeroSettings &settings) {
-    if (settings.OutputNode < 1 || settings.OutputNode >= circuit.GetNodeCount()) {
-        return "Pick the output node; ground has no poles or zeros";
+    if (std::optional<std::string> error = CheckOutputNode(circuit, settings.OutputNode, "poles or zeros")) {
+        return error;
     }
-    if (settings.InputSource.empty()) {
-        return std::format("A pole-zero analysis needs an input source; select {}", SWEEPABLE_SOURCES);
-    }
-    if (FindTransferFunctionInput(circuit, settings.InputSource) == nullptr) {
-        return std::format("The input source {} is not {} of the circuit", settings.InputSource, SWEEPABLE_SOURCES);
-    }
-    return std::nullopt;
+    return CheckSweepableInput(circuit, settings.InputSource, "A pole-zero analysis");
 }
 
 } // namespace Core

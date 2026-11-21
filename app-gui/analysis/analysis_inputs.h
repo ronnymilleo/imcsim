@@ -13,6 +13,7 @@
 #include "schematic/schematic.h"
 #include "simulation/analysis_settings.h"
 #include <cstddef>
+#include <expected>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -59,6 +60,16 @@ std::string GetParameterUnit(const Core::Circuit &circuit, const std::string &pa
 std::string DescribeMissingOutputNode(std::string_view analysis);
 std::string DescribeMissingACInput(std::string_view analysis);
 std::string DescribeMissingInputSource(std::string_view analysis);
+
+// Ports of the small-signal analyses
+[[nodiscard]] std::expected<std::string, std::string>
+ResolveAcInput(const Core::Circuit &circuit, const std::string &stored, std::string_view analysis);
+[[nodiscard]] std::expected<std::string, std::string>
+ResolveSweepableInput(const Core::Circuit &circuit, const std::string &stored, std::string_view analysis);
+[[nodiscard]] std::expected<int, std::string> ResolveRequiredOutput(const std::optional<GridPoint> &point,
+                                                                    const Core::Circuit &circuit,
+                                                                    Schematic &schematic,
+                                                                    std::string_view subject);
 
 } // namespace GUI
 

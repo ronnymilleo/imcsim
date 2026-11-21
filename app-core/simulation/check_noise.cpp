@@ -7,9 +7,8 @@
 
 #include "circuit/circuit.h"
 #include "simulation/analysis_settings.h"
-#include "simulation/analysis_sources.h"
+#include "simulation/check_analysis_ports.h"
 #include "simulation/check_frequency_range.h"
-#include <format>
 #include <optional>
 #include <string>
 
@@ -26,16 +25,10 @@ std::optional<std::string> CheckNoiseSettings(const Circuit &circuit, const Nois
             CheckFrequencyRange(settings.StartFrequency, settings.StopFrequency, settings.PointsPerDecade)) {
         return error;
     }
-    if (settings.OutputNode < 1 || settings.OutputNode >= circuit.GetNodeCount()) {
-        return "Pick the output node; ground has no noise to measure";
+    if (std::optional<std::string> error = CheckOutputNode(circuit, settings.OutputNode, "noise to measure")) {
+        return error;
     }
-    if (settings.InputSource.empty()) {
-        return "A noise analysis needs an AC source as its input; select a voltage or current source and set it to AC";
-    }
-    if (FindNoiseInput(circuit, settings.InputSource) == nullptr) {
-        return std::format("The input source {} is not a voltage or current source set to AC", settings.InputSource);
-    }
-    return std::nullopt;
+    return CheckAcInput(circuit, settings.InputSource, "A noise analysis");
 }
 
 } // namespace Core

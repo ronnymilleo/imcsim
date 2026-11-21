@@ -9,6 +9,9 @@
 #include "text/text_case.h"
 
 #include <cstddef>
+#include <string>
+#include <type_traits>
+#include <vector>
 
 namespace Nodalys {
 
@@ -36,13 +39,53 @@ double ValueOr(const std::vector<double> &values, const std::size_t index, const
     return values.size() > index ? values[index] : fallback;
 }
 
-void AddPulse(CircuitBuilder &builder,
-              const std::string &name,
-              const bool is_voltage,
-              const NodeId positive,
-              const NodeId negative,
-              const std::vector<double> &values,
-              const SourceLevels &levels) {
+/**
+ * @struct  SourcePlacement
+ * @brief   Where an independent source goes and what its line gives beside the waveform, the same for every waveform.
+ */
+struct SourcePlacement {
+    CircuitBuilder &Builder;
+    const std::string &Name;
+    /// True for a V source, false for an I source.
+    bool IsVoltage;
+    NodeId Positive;
+    NodeId Negative;
+    const SourceLevels &Levels;
+};
+
+/**
+ * @brief   Adds the voltage or the current source of a waveform, with the small-signal magnitude and phase of the line.
+ * @details The builder has one function for each kind, which take the same arguments, so the placement picks one.
+ */
+template <typename Argument>
+void AddWithPhase(const SourcePlacement &source,
+                  const std::type_identity_t<Argument> waveform,
+                  void (CircuitBuilder::*voltage)(std::string, NodeId, NodeId, Argument, double, double),
+                  void (CircuitBuilder::*current)(std::string, NodeId, NodeId, Argument, double, double)) {
+    (source.Builder.*(source.IsVoltage ? voltage : current))(source.Name,
+                                                             source.Positive,
+                                                             source.Negative,
+                                                             waveform,
+                                                             source.Levels.AcMagnitude,
+                                                             source.Levels.AcPhaseDegrees);
+}
+
+/**
+ * @brief   Adds the voltage or the current source of a random waveform, which takes a small-signal magnitude alone.
+ */
+template <typename Argument>
+void AddWithMagnitude(const SourcePlacement &source,
+                      const std::type_identity_t<Argument> waveform,
+                      void (CircuitBuilder::*voltage)(std::string, NodeId, NodeId, Argument, double),
+                      void (CircuitBuilder::*current)(std::string, NodeId, NodeId, Argument, double)) {
+    (source.Builder.*(source.IsVoltage ? voltage : current))(source.Name,
+                                                             source.Positive,
+                                                             source.Negative,
+                                                             waveform,
+                                                             source.Levels.AcMagnitude);
+}
+
+PulseParameters ReadPulse(const std::vector<double> &values) {
     PulseParameters parameters;
     Assign(parameters.Low, values, 0);
     Assign(parameters.High, values, 1);
@@ -51,42 +94,42 @@ void AddPulse(CircuitBuilder &builder,
     Assign(parameters.FallTime, values, 4);
     Assign(parameters.Width, values, 5);
     Assign(parameters.Period, values, 6);
-    if (is_voltage) {
-        builder.AddVpulse(name, positive, negative, parameters, levels.AcMagnitude, levels.AcPhaseDegrees);
-    } else {
-        builder.AddIpulse(name, positive, negative, parameters, levels.AcMagnitude, levels.AcPhaseDegrees);
-    }
+    return parameters;
 }
 
-void AddSine(CircuitBuilder &builder,
-             const std::string &name,
-             const bool is_voltage,
-             const NodeId positive,
-             const NodeId negative,
-             const std::vector<double> &values,
-             const SourceLevels &levels) {
-    constexpr std::size_t DAMPING_INDEX = 4;
+/**
+ * @brief   Reads a sine, whose small-signal magnitude is the AC one of the line or, without one, its amplitude.
+ */
+SineParameters ReadSine(const std::vector<double> &values, const SourceLevels &levels) {
     SineParameters parameters;
     Assign(parameters.Offset, values, 0);
     Assign(parameters.Amplitude, values, 1);
     Assign(parameters.Frequency, values, 2);
     Assign(parameters.Phase, values, 3);
     parameters.Magnitude = levels.AcMagnitude > 0.0 ? levels.AcMagnitude : parameters.Amplitude;
-    const bool is_damped = values.size() > DAMPING_INDEX && values[DAMPING_INDEX] != 0.0;
-    if (is_voltage) {
-        builder.AddVsine(name, positive, negative, parameters, levels.AcMagnitude, levels.AcPhaseDegrees, is_damped);
-    } else {
-        builder.AddIsine(name, positive, negative, parameters, levels.AcMagnitude, levels.AcPhaseDegrees, is_damped);
-    }
+    return parameters;
 }
 
-void AddExp(CircuitBuilder &builder,
-            const std::string &name,
-            const bool is_voltage,
-            const NodeId positive,
-            const NodeId negative,
-            const std::vector<double> &values,
-            const SourceLevels &levels) {
+/**
+ * @brief   Whether a sine fades, as a damping factor that is given and not zero asks.
+ */
+bool IsDampedSine(const std::vector<double> &values) {
+    constexpr std::size_t DAMPING_INDEX = 4;
+    return values.size() > DAMPING_INDEX && values[DAMPING_INDEX] != 0.0;
+}
+
+void AddSine(const SourcePlacement &source, const std::vector<double> &values) {
+    const auto add = source.IsVoltage ? &CircuitBuilder::AddVsine : &CircuitBuilder::AddIsine;
+    (source.Builder.*add)(source.Name,
+                          source.Positive,
+                          source.Negative,
+                          ReadSine(values, source.Levels),
+                          source.Levels.AcMagnitude,
+                          source.Levels.AcPhaseDegrees,
+                          IsDampedSine(values));
+}
+
+ExpParameters ReadExp(const std::vector<double> &values) {
     ExpParameters parameters;
     Assign(parameters.InitialValue, values, 0);
     Assign(parameters.PeakValue, values, 1);
@@ -94,79 +137,45 @@ void AddExp(CircuitBuilder &builder,
     Assign(parameters.RiseTimeConstant, values, 3);
     Assign(parameters.FallDelay, values, 4);
     Assign(parameters.FallTimeConstant, values, 5);
-    if (is_voltage) {
-        builder.AddVexp(name, positive, negative, parameters, levels.AcMagnitude, levels.AcPhaseDegrees);
-    } else {
-        builder.AddIexp(name, positive, negative, parameters, levels.AcMagnitude, levels.AcPhaseDegrees);
-    }
+    return parameters;
 }
 
-void AddPwl(CircuitBuilder &builder,
-            const std::string &name,
-            const bool is_voltage,
-            const NodeId positive,
-            const NodeId negative,
-            const std::vector<double> &values,
-            const SourceLevels &levels) {
+/**
+ * @brief   Reads the points of a PWL source, a time and a value each; a time left without its value is dropped.
+ */
+PwlParameters ReadPwl(const std::vector<double> &values) {
     PwlParameters parameters;
     parameters.Points.clear();
     for (std::size_t index = 0; index + 1 < values.size(); index += 2) {
         parameters.Points.push_back({values[index], values[index + 1]});
     }
-    if (is_voltage) {
-        builder.AddVpwl(name, positive, negative, parameters, levels.AcMagnitude, levels.AcPhaseDegrees);
-    } else {
-        builder.AddIpwl(name, positive, negative, parameters, levels.AcMagnitude, levels.AcPhaseDegrees);
-    }
+    return parameters;
 }
 
-void AddSffm(CircuitBuilder &builder,
-             const std::string &name,
-             const bool is_voltage,
-             const NodeId positive,
-             const NodeId negative,
-             const std::vector<double> &values,
-             const SourceLevels &levels) {
+SffmParameters ReadSffm(const std::vector<double> &values) {
     SffmParameters parameters;
     Assign(parameters.Offset, values, 0);
     Assign(parameters.Amplitude, values, 1);
     Assign(parameters.CarrierFrequency, values, 2);
     Assign(parameters.ModulationIndex, values, 3);
     Assign(parameters.SignalFrequency, values, 4);
-    if (is_voltage) {
-        builder.AddVsffm(name, positive, negative, parameters, levels.AcMagnitude, levels.AcPhaseDegrees);
-    } else {
-        builder.AddIsffm(name, positive, negative, parameters, levels.AcMagnitude, levels.AcPhaseDegrees);
-    }
+    return parameters;
 }
 
-void AddAm(CircuitBuilder &builder,
-           const std::string &name,
-           const bool is_voltage,
-           const NodeId positive,
-           const NodeId negative,
-           const std::vector<double> &values,
-           const SourceLevels &levels) {
+AmParameters ReadAm(const std::vector<double> &values) {
     AmParameters parameters;
     Assign(parameters.Amplitude, values, 0);
     Assign(parameters.Offset, values, 1);
     Assign(parameters.ModulatingFrequency, values, 2);
     Assign(parameters.CarrierFrequency, values, 3);
     Assign(parameters.Delay, values, 4);
-    if (is_voltage) {
-        builder.AddVam(name, positive, negative, parameters, levels.AcMagnitude, levels.AcPhaseDegrees);
-    } else {
-        builder.AddIam(name, positive, negative, parameters, levels.AcMagnitude, levels.AcPhaseDegrees);
-    }
+    return parameters;
 }
 
-void AddNoise(CircuitBuilder &builder,
-              const std::string &name,
-              const bool is_voltage,
-              const NodeId positive,
-              const NodeId negative,
-              const std::vector<double> &values,
-              const SourceLevels &levels) {
+/**
+ * @brief   Reads transient noise, which rides on the DC value of the line.
+ */
+NoiseParameters ReadNoise(const std::vector<double> &values, const SourceLevels &levels) {
     NoiseParameters parameters;
     parameters.Offset = levels.Dc;
     parameters.WhiteAmplitude = ValueOr(values, 0, 0.0);
@@ -176,20 +185,14 @@ void AddNoise(CircuitBuilder &builder,
     parameters.TelegraphAmplitude = ValueOr(values, 4, 0.0);
     parameters.CaptureTime = ValueOr(values, 5, 0.0);
     parameters.EmissionTime = ValueOr(values, 6, 0.0);
-    if (is_voltage) {
-        builder.AddVnoise(name, positive, negative, parameters, levels.AcMagnitude);
-    } else {
-        builder.AddInoise(name, positive, negative, parameters, levels.AcMagnitude);
-    }
+    return parameters;
 }
 
-void AddRandom(CircuitBuilder &builder,
-               const std::string &name,
-               const bool is_voltage,
-               const NodeId positive,
-               const NodeId negative,
-               const std::vector<double> &values,
-               const SourceLevels &levels) {
+/**
+ * @brief   Reads a random source; a distribution number out of range keeps the default one, and the DC value of the
+ *          line shifts the second figure, as in ngspice.
+ */
+RandomParameters ReadRandom(const std::vector<double> &values, const SourceLevels &levels) {
     RandomParameters parameters;
     if (!values.empty()) {
         const int distribution = static_cast<int>(values[0]);
@@ -201,11 +204,7 @@ void AddRandom(CircuitBuilder &builder,
     parameters.Delay = ValueOr(values, 2, 0.0);
     parameters.First = ValueOr(values, 3, DEFAULT_RANDOM_FIRST);
     parameters.Second = levels.Dc + ValueOr(values, 4, 0.0);
-    if (is_voltage) {
-        builder.AddVrandom(name, positive, negative, parameters, levels.AcMagnitude);
-    } else {
-        builder.AddIrandom(name, positive, negative, parameters, levels.AcMagnitude);
-    }
+    return parameters;
 }
 
 } // namespace
@@ -264,38 +263,40 @@ void AddWaveformSource(CircuitBuilder &builder,
                        const SourceWaveform waveform,
                        const std::vector<double> &values,
                        const SourceLevels &levels) {
+    const SourcePlacement source{.Builder = builder,
+                                 .Name = name,
+                                 .IsVoltage = is_voltage,
+                                 .Positive = positive,
+                                 .Negative = negative,
+                                 .Levels = levels};
     switch (waveform) {
     case SourceWaveform::PULSE:
-        AddPulse(builder, name, is_voltage, positive, negative, values, levels);
+        AddWithPhase(source, ReadPulse(values), &CircuitBuilder::AddVpulse, &CircuitBuilder::AddIpulse);
         break;
     case SourceWaveform::SINE:
-        AddSine(builder, name, is_voltage, positive, negative, values, levels);
+        AddSine(source, values);
         break;
     case SourceWaveform::EXP:
-        AddExp(builder, name, is_voltage, positive, negative, values, levels);
+        AddWithPhase(source, ReadExp(values), &CircuitBuilder::AddVexp, &CircuitBuilder::AddIexp);
         break;
     case SourceWaveform::PWL:
-        AddPwl(builder, name, is_voltage, positive, negative, values, levels);
+        AddWithPhase(source, ReadPwl(values), &CircuitBuilder::AddVpwl, &CircuitBuilder::AddIpwl);
         break;
     case SourceWaveform::SFFM:
-        AddSffm(builder, name, is_voltage, positive, negative, values, levels);
+        AddWithPhase(source, ReadSffm(values), &CircuitBuilder::AddVsffm, &CircuitBuilder::AddIsffm);
         break;
     case SourceWaveform::AM:
-        AddAm(builder, name, is_voltage, positive, negative, values, levels);
+        AddWithPhase(source, ReadAm(values), &CircuitBuilder::AddVam, &CircuitBuilder::AddIam);
         break;
     case SourceWaveform::TRNOISE:
-        AddNoise(builder, name, is_voltage, positive, negative, values, levels);
+        AddWithMagnitude(source, ReadNoise(values, levels), &CircuitBuilder::AddVnoise, &CircuitBuilder::AddInoise);
         break;
     case SourceWaveform::TRRANDOM:
-        AddRandom(builder, name, is_voltage, positive, negative, values, levels);
+        AddWithMagnitude(source, ReadRandom(values, levels), &CircuitBuilder::AddVrandom, &CircuitBuilder::AddIrandom);
         break;
     case SourceWaveform::NONE:
     default:
-        if (is_voltage) {
-            builder.AddVdc(name, positive, negative, levels.Dc, levels.AcMagnitude, levels.AcPhaseDegrees);
-        } else {
-            builder.AddIdc(name, positive, negative, levels.Dc, levels.AcMagnitude, levels.AcPhaseDegrees);
-        }
+        AddWithPhase(source, levels.Dc, &CircuitBuilder::AddVdc, &CircuitBuilder::AddIdc);
         break;
     }
 }

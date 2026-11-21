@@ -18,18 +18,13 @@ namespace GUI {
 
 void AnalysisControls::RunPoleZeroAnalysis(const Core::Circuit &circuit) {
     const SimulationSettings &settings = m_Schematic.GetSimulationSettings();
-    const std::vector<std::string> sources = Core::GetTransferFunctionInputSources(circuit);
-    if (sources.empty()) {
-        Refuse(Analysis::POLE_ZERO, DescribeMissingInputSource("A pole-zero analysis"));
+    const auto input = ResolveSweepableInput(circuit, settings.PoleZeroSource, "A pole-zero analysis");
+    const auto output = ResolveRequiredOutput(settings.PoleZeroOutput, circuit, m_Schematic, "the pole-zero analysis");
+    if (!input || !output) {
+        Refuse(Analysis::POLE_ZERO, !input ? input.error() : output.error());
         return;
     }
-    const std::optional<int> output = ResolveOutputNode(settings.PoleZeroOutput, circuit, m_Schematic);
-    if (!output) {
-        Refuse(Analysis::POLE_ZERO, DescribeMissingOutputNode("the pole-zero analysis"));
-        return;
-    }
-    const Core::PoleZeroSettings run_settings{.OutputNode = *output,
-                                              .InputSource = ResolveOptionalInput(settings.PoleZeroSource, sources)};
+    const Core::PoleZeroSettings run_settings{.OutputNode = *output, .InputSource = *input};
     StartSingleRun(
         Analysis::POLE_ZERO,
         circuit,

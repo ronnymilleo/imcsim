@@ -96,7 +96,7 @@ constexpr auto MOSFET_MODELS = std::to_array<MOSFETModel>({
  * @brief   Creates a MOSFET with the default model of its kind.
  * @param[in] type  ComponentType::NMOS or PMOS.
  */
-MOSFET::MOSFET(const ComponentType type) : Component(type, 0.0), m_Choice(GetMOSFETModels(type).front()) {
+MOSFET::MOSFET(const ComponentType type) : ModeledComponent(type, GetMOSFETModels(type).front(), "MCUSTOM_") {
 }
 
 /**
@@ -105,50 +105,6 @@ MOSFET::MOSFET(const ComponentType type) : Component(type, 0.0), m_Choice(GetMOS
  */
 std::unique_ptr<Component> MOSFET::Clone() const {
     return std::make_unique<MOSFET>(*this);
-}
-
-/**
- * @brief   Returns the ready model the MOSFET uses.
- * @return  An entry of the model list of its kind, or nullptr when it uses custom parameters or a library
- *          model.
- */
-const MOSFETModel *MOSFET::GetModel() const {
-    return HasLibraryModel() ? nullptr : m_Choice.GetModel();
-}
-
-/**
- * @brief   Makes the MOSFET use a ready model.
- * @param[in] model  An entry from GetMOSFETModels() for the type of this MOSFET; it keeps a reference to it.
- */
-void MOSFET::SetModel(const MOSFETModel &model) {
-    m_Choice.SetModel(model);
-    ClearLibraryModel();
-}
-
-/**
- * @brief   Tells whether the MOSFET uses its own parameters instead of a ready model.
- * @return  True for a custom MOSFET; false for one with a ready or a library model.
- */
-bool MOSFET::IsCustom() const {
-    return m_Choice.IsCustom() && !HasLibraryModel();
-}
-
-/**
- * @brief   Switches the MOSFET to custom parameters, starting from those of its current model.
- * @note    Does nothing when it is already custom, so its parameters are kept.
- */
-void MOSFET::SetCustom() {
-    ClearLibraryModel();
-    m_Choice.SetCustom();
-}
-
-/**
- * @brief   Makes the MOSFET custom with the given parameters.
- * @param[in] parameters  New parameters; check them with IsValidParameters() first.
- */
-void MOSFET::SetCustomParameters(const MOSFETParameters &parameters) {
-    ClearLibraryModel();
-    m_Choice.SetCustomParameters(parameters);
 }
 
 /**
@@ -163,38 +119,6 @@ bool MOSFET::IsValidParameters(const MOSFETParameters &parameters) {
         && parameters.GateDrainOverlap >= 0.0 && parameters.Width > 0.0 && parameters.Length > 0.0
         && parameters.MaxDrainSourceVoltage > 0.0 && parameters.MaxGateSourceVoltage > 0.0
         && parameters.MaxDrainCurrent > 0.0 && parameters.MaxPower > 0.0;
-}
-
-/**
- * @brief   Returns the parameters the MOSFET is simulated with.
- * @return  Those of its ready model, or its custom ones.
- */
-const MOSFETParameters &MOSFET::GetParameters() const {
-    return m_Choice.GetParameters();
-}
-
-/**
- * @brief   Returns the name of the model, as shown in the editor and saved in files.
- * @return  The ready model name, such as "2N7000", or CustomMOSFETModelName, or the name of
- *          the library model it uses.
- */
-const char *MOSFET::GetModelName() const {
-    if (HasLibraryModel()) {
-        return GetLibraryModel().c_str();
-    }
-    return m_Choice.GetName();
-}
-
-/**
- * @brief   Returns the name of the ".model" line the MOSFET uses in a netlist.
- * @return  The ready model SPICE name, the library model one from GetLibraryModelSpiceName(), or "MCUSTOM_" followed by
- * the MOSFET name, since custom parameters belong to one MOSFET.
- */
-std::string MOSFET::GetSpiceModelName() const {
-    if (HasLibraryModel()) {
-        return GetLibraryModelSpiceName(GetLibraryModel());
-    }
-    return m_Choice.IsCustom() ? std::format("MCUSTOM_{}", GetName()) : std::string(m_Choice.GetModel()->SpiceName);
 }
 
 /**

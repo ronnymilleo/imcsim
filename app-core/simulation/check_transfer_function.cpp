@@ -7,8 +7,7 @@
 
 #include "circuit/circuit.h"
 #include "simulation/analysis_settings.h"
-#include "simulation/analysis_sources.h"
-#include <format>
+#include "simulation/check_analysis_ports.h"
 #include <optional>
 #include <string>
 
@@ -22,16 +21,10 @@ namespace Core {
  */
 std::optional<std::string> CheckTransferFunctionSettings(const Circuit &circuit,
                                                          const TransferFunctionSettings &settings) {
-    if (settings.OutputNode < 1 || settings.OutputNode >= circuit.GetNodeCount()) {
-        return "Pick the output node; ground has no transfer function";
+    if (std::optional<std::string> error = CheckOutputNode(circuit, settings.OutputNode, "transfer function")) {
+        return error;
     }
-    if (settings.InputSource.empty()) {
-        return std::format("A transfer function analysis needs an input source; select {}", SWEEPABLE_SOURCES);
-    }
-    if (FindTransferFunctionInput(circuit, settings.InputSource) == nullptr) {
-        return std::format("The input source {} is not {} of the circuit", settings.InputSource, SWEEPABLE_SOURCES);
-    }
-    return std::nullopt;
+    return CheckSweepableInput(circuit, settings.InputSource, "A transfer function analysis");
 }
 
 } // namespace Core

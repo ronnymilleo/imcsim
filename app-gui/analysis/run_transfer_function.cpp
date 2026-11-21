@@ -18,19 +18,14 @@ namespace GUI {
 
 void AnalysisControls::RunTransferFunctionAnalysis(const Core::Circuit &circuit) {
     const SimulationSettings &settings = m_Schematic.GetSimulationSettings();
-    const std::vector<std::string> sources = Core::GetTransferFunctionInputSources(circuit);
-    if (sources.empty()) {
-        Refuse(Analysis::TRANSFER_FUNCTION, DescribeMissingInputSource("A transfer function analysis"));
+    const auto input = ResolveSweepableInput(circuit, settings.TransferFunctionSource, "A transfer function analysis");
+    const auto output =
+        ResolveRequiredOutput(settings.TransferFunctionOutput, circuit, m_Schematic, "the transfer function");
+    if (!input || !output) {
+        Refuse(Analysis::TRANSFER_FUNCTION, !input ? input.error() : output.error());
         return;
     }
-    const std::optional<int> output = ResolveOutputNode(settings.TransferFunctionOutput, circuit, m_Schematic);
-    if (!output) {
-        Refuse(Analysis::TRANSFER_FUNCTION, DescribeMissingOutputNode("the transfer function"));
-        return;
-    }
-    const Core::TransferFunctionSettings run_settings{
-        .OutputNode = *output,
-        .InputSource = ResolveOptionalInput(settings.TransferFunctionSource, sources)};
+    const Core::TransferFunctionSettings run_settings{.OutputNode = *output, .InputSource = *input};
     StartSingleRun(
         Analysis::TRANSFER_FUNCTION,
         circuit,
