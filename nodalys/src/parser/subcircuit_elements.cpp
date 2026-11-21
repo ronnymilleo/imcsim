@@ -158,8 +158,8 @@ Result AddSourceLine(const ElementLine &element) {
                       values->Waveform,
                       values->WaveformValues,
                       values->Levels);
-    if (const ExpansionContext &context = element.Scope.GetContext(); context.OnSource) {
-        context.OnSource(element.Name, positive, negative);
+    if (const InstanceObservers &observers = element.Scope.GetContext().Observers; observers.OnSource) {
+        observers.OnSource(element.Name, positive, negative);
     }
     return {};
 }

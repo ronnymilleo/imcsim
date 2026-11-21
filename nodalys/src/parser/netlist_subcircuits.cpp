@@ -54,11 +54,7 @@ AddNetlistInstance(CircuitBuilder &builder,
     }
 
     SubcircuitText text{.Name = instance->SubcircuitName, .Ports = {}, .Body = {}};
-    SubcircuitTextInstance placement{.Prefix = {},
-                                     .PortNodes = {},
-                                     .Parameters = {},
-                                     .OnInternalNode = observers.OnInternalNode,
-                                     .OnSource = observers.OnSource};
+    SubcircuitTextInstance placement{.Prefix = {}, .PortNodes = {}, .Parameters = {}, .Observers = observers};
     std::string call = tokens.front();
     for (std::size_t position = 0; position < instance->NodeNames.size(); ++position) {
         text.Ports.push_back(PortName(position));

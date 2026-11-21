@@ -8,11 +8,11 @@
 #define NODALYS_PARSER_SUBCIRCUIT_SCOPE_H
 
 #include "nodalys/circuit_builder.h"
+#include "nodalys/subcircuit_text.h"
 #include "nodalys/types.h"
 #include "parser/model_cards.h"
 
 #include <expected>
-#include <functional>
 #include <map>
 #include <optional>
 #include <set>
@@ -64,9 +64,8 @@ struct ExpansionContext {
     /// Upper-case names of the models whose ignored parameters were already reported, so each is named once however
     /// often it is used.
     std::set<std::string> ReportedModels;
-    /// What the caller wants to hear about the nodes and sources the expansion makes; see SubcircuitTextInstance.
-    std::function<void(const std::string &name, NodeId node)> OnInternalNode;
-    std::function<void(const std::string &name, NodeId positive, NodeId negative)> OnSource;
+    /// What the caller wants to hear about the nodes and sources the expansion makes.
+    InstanceObservers Observers;
 };
 
 /**

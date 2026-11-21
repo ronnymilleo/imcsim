@@ -228,8 +228,7 @@ AddSubcircuitText(CircuitBuilder &builder, const SubcircuitText &text, const Sub
                              .SubcircuitName = text.Name,
                              .Warnings = {},
                              .ReportedModels = {},
-                             .OnInternalNode = instance.OnInternalNode,
-                             .OnSource = instance.OnSource};
+                             .Observers = instance.Observers};
     TextScope scope(context, nullptr, instance.Prefix);
     for (const auto &[name, value] : instance.Parameters) {
         scope.SetParameter(ToUpper(name), value);
@@ -252,7 +251,7 @@ AddSubcircuitText(CircuitBuilder &builder, const SubcircuitText &text, const Sub
 std::optional<std::string> CheckSubcircuitText(const SubcircuitText &text,
                                                const std::map<std::string, double> &parameters) {
     CircuitBuilder scratch;
-    SubcircuitTextInstance instance{.Prefix = "check", .PortNodes = {}, .Parameters = parameters};
+    SubcircuitTextInstance instance{.Prefix = "check", .PortNodes = {}, .Parameters = parameters, .Observers = {}};
     for (std::size_t port = 0; port < text.Ports.size(); ++port) {
         instance.PortNodes.push_back(scratch.AddNode());
     }

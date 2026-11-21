@@ -118,8 +118,8 @@ NodeId TextScope::ResolveNode(const std::string_view name) {
     }
     const NodeId node = m_Context.Builder.AddNode();
     m_Nodes[upper] = node;
-    if (m_Context.OnInternalNode) {
-        m_Context.OnInternalNode(ToUpper(MakeName(upper)), node);
+    if (const InstanceObservers &observers = m_Context.Observers; observers.OnInternalNode) {
+        observers.OnInternalNode(ToUpper(MakeName(upper)), node);
     }
     return node;
 }

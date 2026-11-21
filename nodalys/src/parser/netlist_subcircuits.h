@@ -7,6 +7,7 @@
 #define NODALYS_PARSER_NETLIST_SUBCIRCUITS_H
 
 #include "nodalys/circuit_builder.h"
+#include "nodalys/subcircuit_text.h"
 #include "nodalys/types.h"
 
 #include <expected>
@@ -17,15 +18,6 @@
 #include <vector>
 
 namespace Nodalys {
-
-/**
- * @struct  InstanceObservers
- * @brief   What the caller wants to hear about the nodes and sources that the instances of a netlist make.
- */
-struct InstanceObservers {
-    std::function<void(const std::string &name, NodeId node)> OnInternalNode;
-    std::function<void(const std::string &name, NodeId positive, NodeId negative)> OnSource;
-};
 
 // Placing
 std::expected<std::vector<std::string>, std::string>
