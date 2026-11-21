@@ -24,6 +24,7 @@ add_executable(nodalys-tests
     mosfet_device_tests.cpp
     netlist_deck_tests.cpp
     netlist_elements_tests.cpp
+    netlist_line_nodes_tests.cpp
     netlist_nodes_tests.cpp
     netlist_subcircuits_tests.cpp
     nodeset_tests.cpp
