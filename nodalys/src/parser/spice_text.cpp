@@ -98,6 +98,14 @@ std::string_view TrimSpaces(std::string_view text) {
 }
 
 /**
+ * @brief   Tells whether a node name is ground, as ngspice reads it: 0, or GND, which it takes for 0.
+ * @param[in] upper_name  Node name in upper case; an empty name is ground too.
+ */
+bool IsGroundName(const std::string_view upper_name) {
+    return upper_name.empty() || upper_name == "0" || upper_name == "GND";
+}
+
+/**
  * @brief   Splits text into the lines SPICE reads: continuation lines are joined to the one above, and blank lines,
  *          comment lines and inline comments are dropped.
  * @param[in] text  Text with one or more lines.
