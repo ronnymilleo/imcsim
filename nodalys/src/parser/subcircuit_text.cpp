@@ -89,13 +89,13 @@ std::optional<std::size_t> FindBodyLength(const std::vector<std::string> &lines,
     return std::nullopt;
 }
 
-Result ExpandScope(ExpansionContext &context, TextScope &scope, const std::vector<std::string> &lines, int depth);
+Result ExpandScope(TextScope &scope, const std::vector<std::string> &lines, int depth);
 
 /**
  * @brief   Sorts the lines of a text and registers its nested subcircuits.
  */
-std::expected<ClassifiedLines, std::string>
-ClassifyLines(ExpansionContext &context, TextScope &scope, const std::vector<std::string> &lines) {
+std::expected<ClassifiedLines, std::string> ClassifyLines(TextScope &scope, const std::vector<std::string> &lines) {
+    const ExpansionContext &context = scope.GetContext();
     ClassifiedLines classified;
     for (std::size_t index = 0; index < lines.size(); ++index) {
         const std::vector<std::string> tokens = SplitTokens(lines[index]);
@@ -134,9 +134,8 @@ ClassifyLines(ExpansionContext &context, TextScope &scope, const std::vector<std
  * @brief   Evaluates the .param lines in order. A value the instance passed is kept, since it overrides the default
  *          the text gives.
  */
-Result DefineParameters(ExpansionContext &context,
-                        TextScope &scope,
-                        const std::vector<std::vector<std::string>> &parameter_lines) {
+Result DefineParameters(TextScope &scope, const std::vector<std::vector<std::string>> &parameter_lines) {
+    const ExpansionContext &context = scope.GetContext();
     for (const std::vector<std::string> &tokens : parameter_lines) {
         for (const auto &[name, text] : SplitParameterTokens(tokens, 1)) {
             if (text.empty()) {
@@ -155,8 +154,8 @@ Result DefineParameters(ExpansionContext &context,
     return {};
 }
 
-Result
-DefineModels(ExpansionContext &context, TextScope &scope, const std::vector<std::vector<std::string>> &model_lines) {
+Result DefineModels(TextScope &scope, const std::vector<std::vector<std::string>> &model_lines) {
+    const ExpansionContext &context = scope.GetContext();
     for (const std::vector<std::string> &tokens : model_lines) {
         auto model = ParseTextModel(scope, tokens);
         if (!model) {
@@ -172,12 +171,12 @@ DefineModels(ExpansionContext &context, TextScope &scope, const std::vector<std:
 /**
  * @brief   Gives each parameter of a called subcircuit its value: what the X line passes, or else its default.
  */
-Result SetInstanceParameters(ExpansionContext &context,
-                             const TextScope &caller,
+Result SetInstanceParameters(const TextScope &caller,
                              TextScope &instance,
                              const TextSubcircuit &subcircuit,
                              const std::string_view line,
                              const std::vector<std::pair<std::string, std::string>> &arguments) {
+    const ExpansionContext &context = caller.GetContext();
     for (const auto &[name, text] : arguments) {
         const bool is_known =
             std::ranges::any_of(subcircuit.Parameters, [&name](const auto &formal) { return formal.first == name; });
@@ -206,11 +205,9 @@ Result SetInstanceParameters(ExpansionContext &context,
 /**
  * @brief   Expands an X line: a nested subcircuit of the text, with its own nodes, parameters and models.
  */
-Result ExpandInstance(ExpansionContext &context,
-                      TextScope &scope,
-                      const std::string &line,
-                      const std::vector<std::string> &tokens,
-                      const int depth) {
+Result
+ExpandInstance(TextScope &scope, const std::string &line, const std::vector<std::string> &tokens, const int depth) {
+    const ExpansionContext &context = scope.GetContext();
     const std::optional<InstanceLine> call = SplitInstanceLine(tokens);
     if (!call) {
         return std::unexpected(Refuse(context, line, "is not written X<name> <nodes> <subcircuit>"));
@@ -235,35 +232,31 @@ Result ExpandInstance(ExpansionContext &context,
     if (depth >= MAX_NESTING_DEPTH) {
         return std::unexpected(Refuse(context, line, "nests subcircuits too deeply; one of them places itself"));
     }
-    TextScope instance(subcircuit->DefinedIn, scope.MakeName(tokens[0]));
-    if (const Result set = SetInstanceParameters(context,
-                                                 scope,
-                                                 instance,
-                                                 *subcircuit,
-                                                 line,
-                                                 SplitParameterTokens(call->ParameterTokens, 0));
+    TextScope instance(scope.GetContext(), subcircuit->DefinedIn, scope.MakeName(tokens[0]));
+    if (const Result set =
+            SetInstanceParameters(scope, instance, *subcircuit, line, SplitParameterTokens(call->ParameterTokens, 0));
         !set) {
         return set;
     }
     for (std::size_t port = 0; port < node_count; ++port) {
-        instance.MapNode(ToUpper(subcircuit->Ports[port]), scope.ResolveNode(context, call->NodeNames[port]));
+        instance.MapNode(ToUpper(subcircuit->Ports[port]), scope.ResolveNode(call->NodeNames[port]));
     }
-    return ExpandScope(context, instance, subcircuit->Lines, depth + 1);
+    return ExpandScope(instance, subcircuit->Lines, depth + 1);
 }
 
 /**
  * @brief   Adds everything a text holds to the circuit, as one instance in a scope.
  */
-Result
-ExpandScope(ExpansionContext &context, TextScope &scope, const std::vector<std::string> &lines, const int depth) {
-    const auto classified = ClassifyLines(context, scope, lines);
+Result ExpandScope(TextScope &scope, const std::vector<std::string> &lines, const int depth) {
+    const ExpansionContext &context = scope.GetContext();
+    const auto classified = ClassifyLines(scope, lines);
     if (!classified) {
         return std::unexpected(classified.error());
     }
-    if (const Result parameters = DefineParameters(context, scope, classified->Parameters); !parameters) {
+    if (const Result parameters = DefineParameters(scope, classified->Parameters); !parameters) {
         return parameters;
     }
-    if (const Result models = DefineModels(context, scope, classified->Models); !models) {
+    if (const Result models = DefineModels(scope, classified->Models); !models) {
         return models;
     }
     for (const std::string &line : classified->Elements) {
@@ -272,10 +265,10 @@ ExpandScope(ExpansionContext &context, TextScope &scope, const std::vector<std::
     for (const std::string &line : classified->Elements) {
         const std::vector<std::string> tokens = SplitTokens(line);
         if (std::toupper(static_cast<unsigned char>(tokens[0].front())) == 'X') {
-            if (const Result expanded = ExpandInstance(context, scope, line, tokens, depth); !expanded) {
+            if (const Result expanded = ExpandInstance(scope, line, tokens, depth); !expanded) {
                 return expanded;
             }
-        } else if (const Result added = AddTextElement(context, scope, line, tokens); !added) {
+        } else if (const Result added = AddTextElement(scope, line, tokens); !added) {
             return std::unexpected(Refuse(context, line, "cannot be simulated: " + added.error()));
         }
     }
@@ -307,14 +300,14 @@ AddSubcircuitText(CircuitBuilder &builder, const SubcircuitText &text, const Sub
                              .ReportedModels = {},
                              .OnInternalNode = instance.OnInternalNode,
                              .OnSource = instance.OnSource};
-    TextScope scope(nullptr, instance.Prefix);
+    TextScope scope(context, nullptr, instance.Prefix);
     for (const auto &[name, value] : instance.Parameters) {
         scope.SetParameter(ToUpper(name), value);
     }
     for (std::size_t port = 0; port < text.Ports.size(); ++port) {
         scope.MapNode(ToUpper(text.Ports[port]), instance.PortNodes[port]);
     }
-    if (const Result expanded = ExpandScope(context, scope, SplitLogicalLines(text.Body), 0); !expanded) {
+    if (const Result expanded = ExpandScope(scope, SplitLogicalLines(text.Body), 0); !expanded) {
         return std::unexpected(expanded.error());
     }
     return std::move(context.Warnings);

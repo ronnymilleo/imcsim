@@ -78,7 +78,10 @@ struct ExpansionContext {
  */
 class TextScope {
 public:
-    TextScope(const TextScope *parent, std::string prefix);
+    TextScope(ExpansionContext &context, const TextScope *parent, std::string prefix);
+
+    // Expansion
+    ExpansionContext &GetContext() const;
 
     // Parameters
     std::optional<double> FindParameter(const std::string &upper_name) const;
@@ -94,13 +97,14 @@ public:
 
     // Nodes and names
     void MapNode(const std::string &upper_name, NodeId node);
-    NodeId ResolveNode(ExpansionContext &context, std::string_view name);
+    NodeId ResolveNode(std::string_view name);
     void AddSourceName(const std::string &upper_name, std::string written_name);
     std::optional<std::string> FindSourceName(const std::string &upper_name) const;
     std::string MakeName(std::string_view local_name) const;
     const std::string &GetPrefix() const;
 
 private:
+    ExpansionContext &m_Context;
     const TextScope *m_Parent;
     std::string m_Prefix;
     std::map<std::string, double> m_Parameters;
