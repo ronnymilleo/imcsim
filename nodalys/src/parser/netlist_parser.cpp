@@ -7,6 +7,7 @@
 #include "nodalys/circuit_builder.h"
 #include "nodalys/expression.h"
 #include "parser/model_cards.h"
+#include "parser/netlist_nodes.h"
 #include "parser/netlist_subcircuits.h"
 #include "parser/source_waveforms.h"
 #include "parser/spice_number.h"
@@ -108,73 +109,6 @@ std::vector<std::string> TokenizeLine(std::string_view line) {
     return tokens;
 }
 
-// Map node string (e.g. "0", "GND", "IN", "1") to NodeId
-class NodeManager {
-public:
-    void Register(std::string_view name) {
-        const std::string upper = ToUpper(Trim(name));
-        if (upper.empty() || upper == "0" || upper == "GND" || upper == "GROUND") {
-            return;
-        }
-        if (m_Registered.contains(upper)) {
-            return;
-        }
-        m_Registered.insert(upper);
-
-        int num = 0;
-        const auto [end, err] = std::from_chars(upper.data(), upper.data() + upper.size(), num);
-        if (err == std::errc() && end == upper.data() + upper.size() && num > 0 && num <= 10'000) {
-            m_NumericNodes.push_back({upper, num});
-            m_MaxNumeric = std::max(m_MaxNumeric, num);
-        } else {
-            m_SymbolicNodes.push_back(upper);
-        }
-    }
-
-    void Finalize(CircuitBuilder &builder) {
-        for (const auto &[name, num] : m_NumericNodes) {
-            m_NodeMap[name] = num;
-        }
-
-        int next_id = m_MaxNumeric + 1;
-        for (const auto &name : m_SymbolicNodes) {
-            if (!m_NodeMap.contains(name)) {
-                m_NodeMap[name] = next_id++;
-            }
-        }
-
-        const int total_nodes = std::max(next_id, 1);
-        builder.SetCircuitNodeCount(total_nodes);
-    }
-
-    /// Gives a name to a node that something else made, such as an internal node of a subcircuit instance.
-    void Bind(const std::string &upper_name, const NodeId node) { m_NodeMap[upper_name] = node; }
-
-    NodeId Resolve(std::string_view name) const {
-        const std::string upper = ToUpper(Trim(name));
-        if (upper.empty() || upper == "0" || upper == "GND" || upper == "GROUND") {
-            return GROUND_NODE;
-        }
-        const auto it = m_NodeMap.find(upper);
-        if (it != m_NodeMap.end()) {
-            return it->second;
-        }
-        int num = 0;
-        const auto [end, err] = std::from_chars(upper.data(), upper.data() + upper.size(), num);
-        if (err == std::errc() && end == upper.data() + upper.size() && num > 0) {
-            return num;
-        }
-        return GROUND_NODE;
-    }
-
-private:
-    std::set<std::string> m_Registered;
-    std::vector<std::pair<std::string, int>> m_NumericNodes;
-    std::vector<std::string> m_SymbolicNodes;
-    int m_MaxNumeric = 0;
-    std::map<std::string, NodeId> m_NodeMap;
-};
-
 struct IcAssignment {
     std::string_view Lhs;
     std::string_view Rhs;
@@ -213,7 +147,7 @@ NextIcAssignment(const std::vector<std::string> &tokens, std::size_t &index, std
 /// initial voltage of the node or as its nodeset.
 std::expected<void, std::string> ParseNodeVoltageDirective(const std::vector<std::string> &tokens,
                                                            std::string_view line,
-                                                           const NodeManager &nodes,
+                                                           const NetlistNodes &nodes,
                                                            CircuitBuilder &builder,
                                                            const bool is_nodeset) {
     for (std::size_t i = 1; i < tokens.size(); ++i) {
@@ -669,7 +603,7 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
     }
     // 4. Parse components and analyses using CircuitBuilder
     CircuitBuilder builder;
-    NodeManager nodes;
+    NetlistNodes nodes;
 
     // Pre-scan all circuit_lines to discover and register all circuit nodes
     for (const auto &line : circuit_lines) {
@@ -798,7 +732,7 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
         }
     }
 
-    nodes.Finalize(builder);
+    builder.SetCircuitNodeCount(nodes.AssignIds());
 
     // Subcircuits come first, since their internal nodes (X1.MID) are named by the directives that follow, wherever
     // those stand in the netlist
