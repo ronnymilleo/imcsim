@@ -292,6 +292,7 @@ struct SourceSpec {
     SourcePeriodicity Periodicity;
     VoltageSourceDevice::Breakpoints Breakpoints;
     std::function<void(std::uint64_t)> SetSeed;
+    VoltageSourceDevice::CallbackFactory CallbackFactory;
 };
 
 /**
@@ -382,7 +383,13 @@ SourceSpec MakeNoiseSpec(const NoiseParameters &params, const double ac_magnitud
             .AcMagnitude = ac_magnitude,
             .Periodicity = NON_PERIODIC,
             .Breakpoints = std::move(noise.NextBreakpoint),
-            .SetSeed = std::move(noise.ResetSeed)};
+            .SetSeed = std::move(noise.ResetSeed),
+            .CallbackFactory = [params]() {
+                TransientNoiseSource fresh = MakeNoiseSource(params);
+                return VoltageSourceDevice::CallbackSet{.Evaluate = std::move(fresh.Evaluate),
+                                                        .NextBreakpoint = std::move(fresh.NextBreakpoint),
+                                                        .SetSeed = std::move(fresh.ResetSeed)};
+            }};
 }
 
 /**
@@ -395,7 +402,13 @@ SourceSpec MakeRandomSpec(const RandomParameters &params, const double ac_magnit
             .AcMagnitude = ac_magnitude,
             .Periodicity = NON_PERIODIC,
             .Breakpoints = std::move(random.NextBreakpoint),
-            .SetSeed = std::move(random.ResetSeed)};
+            .SetSeed = std::move(random.ResetSeed),
+            .CallbackFactory = [params]() {
+                TransientNoiseSource fresh = MakeRandomSource(params);
+                return VoltageSourceDevice::CallbackSet{.Evaluate = std::move(fresh.Evaluate),
+                                                        .NextBreakpoint = std::move(fresh.NextBreakpoint),
+                                                        .SetSeed = std::move(fresh.ResetSeed)};
+            }};
 }
 
 } // namespace
@@ -1097,7 +1110,7 @@ public:
         for (const auto &device : m_Compiled.Devices) {
             device->SetTemperature(m_Compiled.Thermal);
         }
-        return Circuit(std::make_unique<CircuitImpl>(std::move(m_Compiled)));
+        return CircuitAccess::Create(std::make_unique<CircuitImpl>(std::move(m_Compiled)));
     }
 
 private:
@@ -1161,6 +1174,7 @@ private:
     void InstallSource(const std::string &name, std::unique_ptr<SourceDevice> source, SourceSpec spec) {
         source->SetBreakpoints(std::move(spec.Breakpoints));
         source->SetSeedCallback(std::move(spec.SetSeed));
+        source->SetCallbackFactory(std::move(spec.CallbackFactory));
         Device *device = AddDevice(std::move(source));
         // SPICE names ignore case, so "V1" and "v1" are the same source and the second one is a duplicate
         if (!m_Compiled.SourcesByName.try_emplace(name, device).second) {

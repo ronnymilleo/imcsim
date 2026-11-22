@@ -7,7 +7,10 @@
 #define NODALYS_CIRCUIT_IMPL_H
 
 #include "compiler/compiled_circuit.h"
+#include "nodalys/circuit.h"
+#include <expected>
 #include <memory>
+#include <string>
 #include <utility>
 
 namespace Nodalys {
@@ -30,6 +33,16 @@ public:
 
 private:
     CompiledCircuit m_Compiled;
+};
+
+/**
+ * @struct  CircuitAccess
+ * @brief   Internal bridge into Circuit's PIMPL so public headers never expose CircuitImpl.
+ */
+struct CircuitAccess {
+    [[nodiscard]] static Circuit Create(std::unique_ptr<CircuitImpl> impl);
+    static const CompiledCircuit &GetCompiled(const Circuit &circuit);
+    [[nodiscard]] static std::expected<CompiledCircuit, std::string> CloneForRun(const Circuit &circuit);
 };
 
 } // namespace Nodalys

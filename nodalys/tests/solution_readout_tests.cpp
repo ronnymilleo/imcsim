@@ -20,7 +20,9 @@ TEST_CASE("The currents read out of a solution are the ones the operating point 
           "[nodalys][solution_readout]") {
     auto parsed = Nodalys::ParseNetlist("divider\nV1 1 0 DC 10\nR1 1 2 1k\nR2 2 0 4k\n.end\n");
     REQUIRE(parsed.has_value());
-    Nodalys::CompiledCircuit &compiled = parsed->CircuitInstance.Impl().Compiled();
+    auto run = Nodalys::CircuitAccess::CloneForRun(parsed->CircuitInstance);
+    REQUIRE(run.has_value());
+    Nodalys::CompiledCircuit &compiled = *run;
     const auto x_dc = Nodalys::SolveOperatingPoint(compiled, Nodalys::ConvergenceOptions{}, "unused", nullptr);
     REQUIRE(x_dc.has_value());
     const auto point = Nodalys::ComputeOperatingPoint(parsed->CircuitInstance);
