@@ -6,7 +6,7 @@
 #ifndef NODALYS_SMOOTH_LOGIC_H
 #define NODALYS_SMOOTH_LOGIC_H
 
-#include "devices/devices.h"
+#include "devices/device.h"
 #include "nodalys/types.h"
 
 #include <vector>

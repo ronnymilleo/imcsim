@@ -7,7 +7,7 @@
 
 #include "analyses/analysis_preamble.h"
 #include "analyses/solution_readout.h"
-#include "devices/devices.h"
+#include "devices/independent_sources.h"
 #include <algorithm>
 #include <cmath>
 #include <format>

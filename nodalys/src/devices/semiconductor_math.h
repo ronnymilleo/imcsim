@@ -31,6 +31,7 @@
 #define NODALYS_SEMICONDUCTOR_MATH_H
 
 #include "devices/integration.h"
+#include "devices/stamp_helpers.h"
 #include "mna/mna_system.h"
 #include <algorithm>
 #include <cmath>
@@ -68,26 +69,6 @@ struct DepletionCharge {
 
 inline double Exponential(const double argument) {
     return std::exp(std::min(argument, MAX_EXPONENT));
-}
-
-inline double NodeVoltage(const std::vector<double> &x, const int index) {
-    return index < 0 ? 0.0 : x[static_cast<std::size_t>(index)];
-}
-
-inline std::complex<double> AcNodeVoltage(const std::vector<std::complex<double>> &x, const int index) {
-    return index < 0 ? std::complex<double>{0.0, 0.0} : x[static_cast<std::size_t>(index)];
-}
-
-inline void StampConductance(MnaSystem &sys, const int node_a, const int node_b, const double conductance) {
-    sys.AddA(node_a, node_a, conductance);
-    sys.AddA(node_b, node_b, conductance);
-    sys.AddA(node_a, node_b, -conductance);
-    sys.AddA(node_b, node_a, -conductance);
-}
-
-inline void StampCurrentSource(MnaSystem &sys, const int node_a, const int node_b, const double current) {
-    sys.AddRhs(node_a, -current);
-    sys.AddRhs(node_b, current);
 }
 
 /**

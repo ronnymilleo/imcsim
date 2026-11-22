@@ -19,6 +19,7 @@
 
 #include "newton/newton.h"
 
+#include "devices/constraint_devices.h"
 #include <algorithm>
 #include <cmath>
 #include <format>

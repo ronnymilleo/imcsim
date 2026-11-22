@@ -11,7 +11,9 @@
 #include "analyses/analyses.h"
 
 #include "analyses/analysis_preamble.h"
-#include "devices/devices.h"
+#include "devices/controlled_sources.h"
+#include "devices/independent_sources.h"
+#include "devices/passive_devices.h"
 #include "text/text_case.h"
 #include <cmath>
 #include <format>

@@ -34,13 +34,17 @@ add_library(nodalys STATIC
     src/compiler/compiled_circuit.cpp
     src/devices/behavioral_device.cpp
     src/devices/bjt_device.cpp
-    src/devices/devices.cpp
+    src/devices/constraint_devices.cpp
+    src/devices/controlled_sources.cpp
     src/devices/diode_device.cpp
     src/devices/fuse_device.cpp
+    src/devices/independent_sources.cpp
     src/devices/integration.cpp
     src/devices/mosfet_device.cpp
+    src/devices/passive_devices.cpp
     src/devices/random_draws.cpp
     src/devices/smooth_logic.cpp
+    src/devices/switch_device.cpp
     src/devices/thermal.cpp
     src/devices/transient_noise.cpp
     src/devices/waveforms.cpp

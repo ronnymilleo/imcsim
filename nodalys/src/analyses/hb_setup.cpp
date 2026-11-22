@@ -5,6 +5,7 @@
 
 #include "analyses/hb_setup.h"
 
+#include "devices/constraint_devices.h"
 #include "linear/fft.h"
 #include <algorithm>
 #include <cmath>

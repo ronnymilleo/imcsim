@@ -6,7 +6,7 @@
 #ifndef NODALYS_MOSFET_DEVICE_H
 #define NODALYS_MOSFET_DEVICE_H
 
-#include "devices/devices.h"
+#include "devices/device.h"
 #include "nodalys/types.h"
 
 namespace Nodalys {

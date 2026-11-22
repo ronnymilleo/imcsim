@@ -7,7 +7,7 @@
 #define NODALYS_HB_WORKSPACE_H
 
 #include "compiler/compiled_circuit.h"
-#include "devices/devices.h"
+#include "devices/device.h"
 #include "linear/dense_matrix.h"
 #include "linear/fft.h"
 #include "mna/mna_system.h"

@@ -5,7 +5,7 @@
 
 #include "analyses/solution_readout.h"
 
-#include "devices/devices.h"
+#include "devices/device.h"
 
 namespace Nodalys {
 

@@ -6,7 +6,7 @@
 #ifndef NODALYS_COMPILED_CIRCUIT_H
 #define NODALYS_COMPILED_CIRCUIT_H
 
-#include "devices/devices.h"
+#include "devices/device.h"
 #include "mna/mna_system.h"
 #include "nodalys/types.h"
 #include "text/text_case.h"

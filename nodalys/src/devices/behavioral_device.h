@@ -7,7 +7,7 @@
 #ifndef NODALYS_BEHAVIORAL_DEVICE_H
 #define NODALYS_BEHAVIORAL_DEVICE_H
 
-#include "devices/devices.h"
+#include "devices/device.h"
 #include "nodalys/expression.h"
 #include <complex>
 #include <string>

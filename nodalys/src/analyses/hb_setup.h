@@ -8,7 +8,7 @@
 
 #include "analyses/hb_workspace.h"
 #include "compiler/compiled_circuit.h"
-#include "devices/devices.h"
+#include "devices/independent_sources.h"
 #include "nodalys/analyses.h"
 #include <cstddef>
 #include <expected>

@@ -6,6 +6,7 @@
 #include "analyses/hb_result.h"
 
 #include "analyses/hb_spectrum.h"
+#include "devices/independent_sources.h"
 #include <cmath>
 #include <complex>
 #include <format>

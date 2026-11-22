@@ -8,7 +8,7 @@
 #include "analyses/analysis_preamble.h"
 #include "analyses/frequency_sweep.h"
 #include "analyses/port_matrices.h"
-#include "devices/devices.h"
+#include "devices/passive_devices.h"
 #include <algorithm>
 #include <cmath>
 #include <complex>

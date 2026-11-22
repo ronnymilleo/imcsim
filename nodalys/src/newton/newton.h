@@ -6,7 +6,7 @@
 #ifndef NODALYS_NEWTON_H
 #define NODALYS_NEWTON_H
 
-#include "devices/devices.h"
+#include "devices/device.h"
 #include "nodalys/analyses.h"
 #include <functional>
 #include <memory>

@@ -9,7 +9,7 @@
 
 #include "analyses/analysis_preamble.h"
 #include "api/circuit_impl.h"
-#include "devices/devices.h"
+#include "devices/independent_sources.h"
 
 #include <nodalys/nodalys.h>
 

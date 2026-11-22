@@ -6,7 +6,7 @@
 #ifndef NODALYS_TRANSIENT_NOISE_H
 #define NODALYS_TRANSIENT_NOISE_H
 
-#include "devices/devices.h"
+#include "devices/independent_sources.h"
 #include "nodalys/types.h"
 #include <cstdint>
 #include <functional>

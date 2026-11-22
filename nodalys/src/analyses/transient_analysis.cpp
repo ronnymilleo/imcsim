@@ -7,7 +7,8 @@
 
 #include "analyses/analysis_preamble.h"
 #include "analyses/solution_readout.h"
-#include "devices/devices.h"
+#include "devices/independent_sources.h"
+#include "devices/passive_devices.h"
 #include "devices/transient_noise.h"
 #include <algorithm>
 #include <chrono>

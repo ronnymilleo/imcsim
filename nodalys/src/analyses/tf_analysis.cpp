@@ -6,7 +6,7 @@
 #include "analyses/analyses.h"
 
 #include "analyses/analysis_preamble.h"
-#include "devices/devices.h"
+#include "devices/independent_sources.h"
 #include <algorithm>
 #include <cmath>
 

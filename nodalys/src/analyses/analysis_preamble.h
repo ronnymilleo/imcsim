@@ -8,6 +8,7 @@
 #define NODALYS_ANALYSIS_PREAMBLE_H
 
 #include "compiler/compiled_circuit.h"
+#include "devices/independent_sources.h"
 #include "mna/mna_system.h"
 #include "newton/newton.h"
 #include "nodalys/types.h"
