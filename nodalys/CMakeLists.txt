@@ -31,6 +31,7 @@ add_library(nodalys STATIC
     src/api/circuit_builder.cpp
     src/api/nodalys.cpp
     src/bridge/logic_bridge.cpp
+    src/compiler/compiled_circuit.cpp
     src/devices/behavioral_device.cpp
     src/devices/bjt_device.cpp
     src/devices/devices.cpp

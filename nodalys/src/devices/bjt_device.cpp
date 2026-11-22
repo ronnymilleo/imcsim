@@ -434,4 +434,8 @@ void BjtDevice::SetTemperature(const ThermalConditions &thermal) {
     ApplyTemperature(thermal);
 }
 
+std::unique_ptr<Device> BjtDevice::Clone() const {
+    return std::make_unique<BjtDevice>(*this);
+}
+
 } // namespace Nodalys

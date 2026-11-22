@@ -184,6 +184,10 @@ std::complex<double> BehavioralVoltageDevice::AcTerminalCurrent(const int termin
     return terminal == 0 ? current : -current;
 }
 
+std::unique_ptr<Device> BehavioralVoltageDevice::Clone() const {
+    return std::make_unique<BehavioralVoltageDevice>(*this);
+}
+
 BehavioralCurrentDevice::BehavioralCurrentDevice(std::string name,
                                                  const int node_a,
                                                  const int node_b,
@@ -214,6 +218,10 @@ std::complex<double> BehavioralCurrentDevice::AcTerminalCurrent(const int termin
                                                                 const double /*omega*/) const {
     const std::complex<double> current = SmallSignalValue(x_ac);
     return terminal == 0 ? current : -current;
+}
+
+std::unique_ptr<Device> BehavioralCurrentDevice::Clone() const {
+    return std::make_unique<BehavioralCurrentDevice>(*this);
 }
 
 } // namespace Nodalys

@@ -158,4 +158,8 @@ double FuseDevice::NextBreakpoint(const double time) const {
     return next - time >= min_gap ? next : std::numeric_limits<double>::infinity();
 }
 
+std::unique_ptr<Device> FuseDevice::Clone() const {
+    return std::make_unique<FuseDevice>(*this);
+}
+
 } // namespace Nodalys

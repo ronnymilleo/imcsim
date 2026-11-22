@@ -40,6 +40,7 @@ public:
     void RejectStep() override;
     bool HasSwitched() const override;
     double NextBreakpoint(double time) const override;
+    [[nodiscard]] std::unique_ptr<Device> Clone() const override;
 
 private:
     /// The state of the element at one instant.

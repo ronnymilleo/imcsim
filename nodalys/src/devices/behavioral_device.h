@@ -95,6 +95,7 @@ public:
                                            const std::vector<double> &x_dc,
                                            const std::vector<std::complex<double>> &x_ac,
                                            double omega) const override;
+    [[nodiscard]] std::unique_ptr<Device> Clone() const override;
 
 private:
     int m_NodeA;
@@ -121,6 +122,7 @@ public:
                                            const std::vector<double> &x_dc,
                                            const std::vector<std::complex<double>> &x_ac,
                                            double omega) const override;
+    [[nodiscard]] std::unique_ptr<Device> Clone() const override;
 
 private:
     int m_NodeA;

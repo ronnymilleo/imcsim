@@ -125,6 +125,10 @@ void ResistorDevice::SetTemperature(const ThermalConditions &thermal) {
     m_FourKt = GetFourKt(thermal);
 }
 
+std::unique_ptr<Device> ResistorDevice::Clone() const {
+    return std::make_unique<ResistorDevice>(*this);
+}
+
 // ============================================================================
 // CapacitorDevice
 // ============================================================================
@@ -219,6 +223,10 @@ void CapacitorDevice::RejectStep() {
     m_History = m_SavedHistory;
 }
 
+std::unique_ptr<Device> CapacitorDevice::Clone() const {
+    return std::make_unique<CapacitorDevice>(*this);
+}
+
 // ============================================================================
 // InductorDevice
 // ============================================================================
@@ -295,6 +303,10 @@ void InductorDevice::RejectStep() {
     m_History = m_SavedHistory;
 }
 
+std::unique_ptr<Device> InductorDevice::Clone() const {
+    return std::make_unique<InductorDevice>(*this);
+}
+
 // ============================================================================
 // VoltageSourceDevice & CurrentSourceDevice
 // ============================================================================
@@ -324,6 +336,10 @@ void VoltageSourceDevice::SetBreakpoints(Breakpoints breakpoints) {
 
 void VoltageSourceDevice::SetSeedCallback(std::function<void(std::uint64_t)> set_seed) {
     m_SetSeed = std::move(set_seed);
+}
+
+void VoltageSourceDevice::SetCallbackFactory(CallbackFactory factory) {
+    m_CallbackFactory = std::move(factory);
 }
 
 void VoltageSourceDevice::Stamp(MnaSystem &sys, const std::vector<double> & /*x*/, const TimeContext &time) {
@@ -369,6 +385,17 @@ std::complex<double> VoltageSourceDevice::AcTerminalCurrent(const int terminal,
     return terminal == 0 ? current : -current;
 }
 
+std::unique_ptr<Device> VoltageSourceDevice::Clone() const {
+    auto copy = std::make_unique<VoltageSourceDevice>(*this);
+    if (m_CallbackFactory) {
+        CallbackSet callbacks = m_CallbackFactory();
+        copy->m_Waveform = std::move(callbacks.Evaluate);
+        copy->m_Breakpoints = std::move(callbacks.NextBreakpoint);
+        copy->m_SetSeed = std::move(callbacks.SetSeed);
+    }
+    return copy;
+}
+
 CurrentSourceDevice::CurrentSourceDevice(const int node_a,
                                          const int node_b,
                                          const double dc_value,
@@ -399,6 +426,10 @@ void CurrentSourceDevice::SetBreakpoints(VoltageSourceDevice::Breakpoints breakp
 
 void CurrentSourceDevice::SetSeedCallback(std::function<void(std::uint64_t)> set_seed) {
     m_SetSeed = std::move(set_seed);
+}
+
+void CurrentSourceDevice::SetCallbackFactory(VoltageSourceDevice::CallbackFactory factory) {
+    m_CallbackFactory = std::move(factory);
 }
 
 void CurrentSourceDevice::Stamp(MnaSystem &sys, const std::vector<double> & /*x*/, const TimeContext &time) {
@@ -440,6 +471,17 @@ std::complex<double> CurrentSourceDevice::AcTerminalCurrent(const int terminal,
     return terminal == 0 ? current : -current;
 }
 
+std::unique_ptr<Device> CurrentSourceDevice::Clone() const {
+    auto copy = std::make_unique<CurrentSourceDevice>(*this);
+    if (m_CallbackFactory) {
+        VoltageSourceDevice::CallbackSet callbacks = m_CallbackFactory();
+        copy->m_Waveform = std::move(callbacks.Evaluate);
+        copy->m_Breakpoints = std::move(callbacks.NextBreakpoint);
+        copy->m_SetSeed = std::move(callbacks.SetSeed);
+    }
+    return copy;
+}
+
 // ============================================================================
 // Controlled Sources: VCVS (E), VCCS (G), CCCS (F), CCVS (H)
 // ============================================================================
@@ -477,6 +519,10 @@ std::complex<double> VcvsDevice::AcTerminalCurrent(const int terminal,
     return terminal == 0 ? current : -current;
 }
 
+std::unique_ptr<Device> VcvsDevice::Clone() const {
+    return std::make_unique<VcvsDevice>(*this);
+}
+
 VccsDevice::VccsDevice(const int node_a,
                        const int node_b,
                        const int control_positive,
@@ -508,6 +554,10 @@ std::complex<double> VccsDevice::AcTerminalCurrent(const int terminal,
     return terminal == 0 ? current : -current;
 }
 
+std::unique_ptr<Device> VccsDevice::Clone() const {
+    return std::make_unique<VccsDevice>(*this);
+}
+
 CccsDevice::CccsDevice(const int node_a, const int node_b, const int control_branch, const double gain)
     : m_NodeA(node_a), m_NodeB(node_b), m_ControlBranch(control_branch), m_Gain(gain) {
 }
@@ -529,6 +579,10 @@ std::complex<double> CccsDevice::AcTerminalCurrent(const int terminal,
                                                    const double /*omega*/) const {
     const std::complex<double> current = m_Gain * x_ac[static_cast<std::size_t>(m_ControlBranch)];
     return terminal == 0 ? current : -current;
+}
+
+std::unique_ptr<Device> CccsDevice::Clone() const {
+    return std::make_unique<CccsDevice>(*this);
 }
 
 CcvsDevice::CcvsDevice(const int node_a,
@@ -559,6 +613,10 @@ std::complex<double> CcvsDevice::AcTerminalCurrent(const int terminal,
                                                    const double /*omega*/) const {
     const std::complex<double> current = x_ac[static_cast<std::size_t>(m_Branch)];
     return terminal == 0 ? current : -current;
+}
+
+std::unique_ptr<Device> CcvsDevice::Clone() const {
+    return std::make_unique<CcvsDevice>(*this);
 }
 
 // ============================================================================
@@ -610,6 +668,10 @@ void SwitchDevice::RejectStep() {
 
 bool SwitchDevice::HasSwitched() const {
     return m_IsClosed != m_SavedIsClosed;
+}
+
+std::unique_ptr<Device> SwitchDevice::Clone() const {
+    return std::make_unique<SwitchDevice>(*this);
 }
 
 // ============================================================================
@@ -698,6 +760,10 @@ void CoupledInductorDevice::RejectStep() {
     m_History2 = m_SavedHistory2;
 }
 
+std::unique_ptr<Device> CoupledInductorDevice::Clone() const {
+    return std::make_unique<CoupledInductorDevice>(*this);
+}
+
 NodeInitialConditionDevice::NodeInitialConditionDevice(const int node, const double voltage)
     : m_Node(node), m_Voltage(voltage) {
 }
@@ -723,6 +789,10 @@ std::complex<double> NodeInitialConditionDevice::AcTerminalCurrent(const int /*t
     return {};
 }
 
+std::unique_ptr<Device> NodeInitialConditionDevice::Clone() const {
+    return std::make_unique<NodeInitialConditionDevice>(*this);
+}
+
 NodesetDevice::NodesetDevice(const int node, const double voltage) : m_Node(node), m_Voltage(voltage) {
 }
 
@@ -744,6 +814,10 @@ std::complex<double> NodesetDevice::AcTerminalCurrent(const int /*terminal*/,
                                                       const std::vector<std::complex<double>> & /*x_ac*/,
                                                       const double /*omega*/) const {
     return {};
+}
+
+std::unique_ptr<Device> NodesetDevice::Clone() const {
+    return std::make_unique<NodesetDevice>(*this);
 }
 
 NodeSeedDevice::NodeSeedDevice(std::vector<NodeSeed> seeds) : m_Seeds(std::move(seeds)) {
@@ -769,6 +843,10 @@ std::complex<double> NodeSeedDevice::AcTerminalCurrent(const int /*terminal*/,
                                                        const std::vector<std::complex<double>> & /*x_ac*/,
                                                        const double /*omega*/) const {
     return {};
+}
+
+std::unique_ptr<Device> NodeSeedDevice::Clone() const {
+    return std::make_unique<NodeSeedDevice>(*this);
 }
 
 } // namespace Nodalys

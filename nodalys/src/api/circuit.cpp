@@ -45,12 +45,34 @@ void Circuit::SetTemperature(const double temperature_celsius, const double nomi
     }
 }
 
-CircuitImpl &Circuit::Impl() {
-    return *m_Impl;
+/**
+ * @brief   Wraps an internal CircuitImpl in a public Circuit handle.
+ * @param[in] impl  Compiled circuit implementation to take ownership of.
+ * @return  The public Circuit handle owning impl.
+ */
+Circuit CircuitAccess::Create(std::unique_ptr<CircuitImpl> impl) {
+    return Circuit(std::move(impl));
 }
 
-const CircuitImpl &Circuit::Impl() const {
-    return *m_Impl;
+/**
+ * @brief   Reads the immutable compiled circuit blueprint held by a Circuit.
+ * @param[in] circuit  A non-empty compiled circuit.
+ * @return  Const reference to the compiled blueprint.
+ */
+const CompiledCircuit &CircuitAccess::GetCompiled(const Circuit &circuit) {
+    return circuit.m_Impl->Compiled();
+}
+
+/**
+ * @brief   Creates an isolated mutable CompiledCircuit copy for one simulation run.
+ * @param[in] circuit  Immutable circuit to run an analysis on.
+ * @return  Independent CompiledCircuit clone, or an error when circuit is empty.
+ */
+std::expected<CompiledCircuit, std::string> CircuitAccess::CloneForRun(const Circuit &circuit) {
+    if (!circuit.m_Impl) {
+        return std::unexpected("The circuit is empty");
+    }
+    return CloneCompiledCircuit(circuit.m_Impl->Compiled());
 }
 
 } // namespace Nodalys

@@ -41,8 +41,8 @@ Nodalys::Circuit ParseCircuit(const std::string &netlist) {
 } // namespace
 
 TEST_CASE("An output node must be in the circuit and cannot be ground", "[nodalys][analysis_preamble]") {
-    Nodalys::Circuit circuit = ParseCircuit(DIVIDER);
-    const Nodalys::CompiledCircuit &compiled = circuit.Impl().Compiled();
+    const Nodalys::Circuit circuit = ParseCircuit(DIVIDER);
+    const Nodalys::CompiledCircuit &compiled = Nodalys::CircuitAccess::GetCompiled(circuit);
 
     CHECK_FALSE(Nodalys::CheckOutputNode(compiled, 1).has_value());
     CHECK_FALSE(Nodalys::CheckOutputNode(compiled, compiled.CircuitNodeCount - 1).has_value());
@@ -53,8 +53,8 @@ TEST_CASE("An output node must be in the circuit and cannot be ground", "[nodaly
 
 TEST_CASE("An input source is found by name and told apart as a voltage or a current source",
           "[nodalys][analysis_preamble]") {
-    Nodalys::Circuit circuit = ParseCircuit(DIVIDER);
-    const Nodalys::CompiledCircuit &compiled = circuit.Impl().Compiled();
+    const Nodalys::Circuit circuit = ParseCircuit(DIVIDER);
+    const Nodalys::CompiledCircuit &compiled = Nodalys::CircuitAccess::GetCompiled(circuit);
 
     const auto voltage = Nodalys::ResolveInputSource(compiled, "V1", "a test");
     REQUIRE(voltage.has_value());
@@ -72,8 +72,10 @@ TEST_CASE("An input source is found by name and told apart as a voltage or a cur
 
 TEST_CASE("A name that is no source is refused, and so is a source that cannot drive the analysis",
           "[nodalys][analysis_preamble]") {
-    Nodalys::Circuit circuit = ParseCircuit(DIVIDER);
-    Nodalys::CompiledCircuit &compiled = circuit.Impl().Compiled();
+    const Nodalys::Circuit circuit = ParseCircuit(DIVIDER);
+    auto run = Nodalys::CircuitAccess::CloneForRun(circuit);
+    REQUIRE(run.has_value());
+    Nodalys::CompiledCircuit &compiled = *run;
 
     const auto missing = Nodalys::ResolveInputSource(compiled, "nosuch", "a test");
     REQUIRE_FALSE(missing.has_value());
@@ -88,16 +90,18 @@ TEST_CASE("A name that is no source is refused, and so is a source that cannot d
 }
 
 TEST_CASE("A source is found by its name in any case, as SPICE reads names", "[nodalys][analysis_preamble]") {
-    Nodalys::Circuit circuit = ParseCircuit(DIVIDER);
-    const Nodalys::CompiledCircuit &compiled = circuit.Impl().Compiled();
+    const Nodalys::Circuit circuit = ParseCircuit(DIVIDER);
+    const Nodalys::CompiledCircuit &compiled = Nodalys::CircuitAccess::GetCompiled(circuit);
     const auto source = Nodalys::FindSourceByName(compiled, "v1");
     REQUIRE(source.has_value());
     CHECK(*source == compiled.SourcesByName.at("V1"));
 }
 
 TEST_CASE("The operating point of a divider is solved and its convergence reported", "[nodalys][analysis_preamble]") {
-    Nodalys::Circuit circuit = ParseCircuit(DIVIDER);
-    Nodalys::CompiledCircuit &compiled = circuit.Impl().Compiled();
+    const Nodalys::Circuit circuit = ParseCircuit(DIVIDER);
+    auto run = Nodalys::CircuitAccess::CloneForRun(circuit);
+    REQUIRE(run.has_value());
+    Nodalys::CompiledCircuit &compiled = *run;
     std::vector<Nodalys::DiagnosticMessage> messages;
 
     const auto x_dc = Nodalys::SolveOperatingPoint(compiled, Nodalys::ConvergenceOptions{}, "unused", &messages);
@@ -112,9 +116,11 @@ TEST_CASE("The operating point of a divider is solved and its convergence report
 
 TEST_CASE("A circuit with no operating point is refused with the message of the analysis",
           "[nodalys][analysis_preamble]") {
-    Nodalys::Circuit circuit = ParseCircuit("diode\nV1 1 0 DC 5\nR1 1 2 100\nD1 2 0 DMOD\n"
-                                            ".model DMOD D(IS=1e-14)\n.end\n");
-    Nodalys::CompiledCircuit &compiled = circuit.Impl().Compiled();
+    const Nodalys::Circuit circuit = ParseCircuit("diode\nV1 1 0 DC 5\nR1 1 2 100\nD1 2 0 DMOD\n"
+                                                  ".model DMOD D(IS=1e-14)\n.end\n");
+    auto run = Nodalys::CircuitAccess::CloneForRun(circuit);
+    REQUIRE(run.has_value());
+    Nodalys::CompiledCircuit &compiled = *run;
     Nodalys::ConvergenceOptions options;
     options.MaxIterations = 1;
     options.GminSteps = 0;
@@ -129,8 +135,8 @@ TEST_CASE("A circuit with no operating point is refused with the message of the 
 }
 
 TEST_CASE("An empty system made like another has its unknowns and no stamps", "[nodalys][analysis_preamble]") {
-    Nodalys::Circuit circuit = ParseCircuit(DIVIDER);
-    const Nodalys::MnaSystem &original = *circuit.Impl().Compiled().System;
+    const Nodalys::Circuit circuit = ParseCircuit(DIVIDER);
+    const Nodalys::MnaSystem &original = *Nodalys::CircuitAccess::GetCompiled(circuit).System;
 
     const Nodalys::MnaSystem empty = Nodalys::MakeEmptySystemLike(original);
 
@@ -145,8 +151,8 @@ TEST_CASE("An empty system made like another has its unknowns and no stamps", "[
 
 TEST_CASE("The reactive system holds the capacitance of a capacitor and the AC excitation of a source",
           "[nodalys][analysis_preamble]") {
-    Nodalys::Circuit circuit = ParseCircuit(DIVIDER);
-    Nodalys::CompiledCircuit &compiled = circuit.Impl().Compiled();
+    const Nodalys::Circuit circuit = ParseCircuit(DIVIDER);
+    const Nodalys::CompiledCircuit &compiled = Nodalys::CircuitAccess::GetCompiled(circuit);
     const std::vector<double> x_dc(static_cast<std::size_t>(compiled.System->GetSize()), 0.0);
 
     const Nodalys::MnaSystem reactive = Nodalys::BuildReactiveSystem(compiled, x_dc);

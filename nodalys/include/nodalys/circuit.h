@@ -13,7 +13,7 @@
 namespace Nodalys {
 
 class CircuitImpl;
-class CircuitBuilder;
+struct CircuitAccess;
 
 /**
  * @class   Circuit
@@ -45,13 +45,11 @@ public:
     /// Sets the simulation and nominal temperatures in degrees Celsius for subsequent analyses.
     void SetTemperature(double temperature_celsius, double nominal_celsius = 27.0);
 
-    /// Internal accessor for solver execution.
-    explicit Circuit(std::unique_ptr<CircuitImpl> impl);
-    CircuitImpl &Impl();
-    const CircuitImpl &Impl() const;
-
 private:
-    friend class CircuitBuilder;
+    friend struct CircuitAccess;
+
+    explicit Circuit(std::unique_ptr<CircuitImpl> impl);
+
     std::unique_ptr<CircuitImpl> m_Impl;
 };
 
