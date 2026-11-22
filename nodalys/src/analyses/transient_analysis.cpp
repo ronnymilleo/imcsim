@@ -7,7 +7,8 @@
 
 #include "analyses/analysis_preamble.h"
 #include "analyses/solution_readout.h"
-#include "devices/devices.h"
+#include "devices/independent_sources.h"
+#include "devices/passive_devices.h"
 #include "devices/transient_noise.h"
 #include <algorithm>
 #include <chrono>
@@ -49,6 +50,17 @@ constexpr double TIME_TOLERANCE = 1e-12;
 constexpr double STOP_POINT_TOLERANCE = 1e-9;
 
 /**
+ * @struct  ChunkPublisher
+ * @brief   When the points solved so far were last handed to the monitor, and how many of them it has.
+ */
+struct ChunkPublisher {
+    const RunMonitor &Monitor;
+    std::chrono::steady_clock::time_point LastSend;
+    double ChunkEnd = 0.0;
+    std::size_t Sent = 0;
+};
+
+/**
  * @struct  SolutionPoint
  * @brief   The solution of the circuit at one instant, with the currents read from it.
  */
@@ -56,6 +68,25 @@ struct SolutionPoint {
     double Time;
     const std::vector<double> &X;
     const std::vector<double> &Currents;
+};
+
+/**
+ * @struct  StepState
+ * @brief   Where the time stepping stands: the time, the length of the steps, and the solutions of the last three
+ *          points, which the error of the next step is estimated from.
+ */
+struct StepState {
+    double Time = 0.0;
+    double Step = 0.0;
+    double PreviousStep = 0.0;
+    double OlderStep = 0.0;
+    /// Backward Euler starts the run and leaves every corner, where the trapezoidal rule would ring.
+    bool IsRestart = true;
+    double NextCorner = std::numeric_limits<double>::infinity();
+    std::vector<double> Now;
+    std::vector<double> Old;
+    std::vector<double> Older;
+    std::vector<double> CurrentsNow;
 };
 
 class TransientCollector {
@@ -134,36 +165,6 @@ private:
     TransientResult m_Result;
     std::vector<double> m_Scratch;
     std::vector<double> m_CurrentsScratch;
-};
-
-/**
- * @struct  StepState
- * @brief   Where the time stepping stands: the time, the length of the steps, and the solutions of the last three
- *          points, which the error of the next step is estimated from.
- */
-struct StepState {
-    double Time = 0.0;
-    double Step = 0.0;
-    double PreviousStep = 0.0;
-    double OlderStep = 0.0;
-    /// Backward Euler starts the run and leaves every corner, where the trapezoidal rule would ring.
-    bool IsRestart = true;
-    double NextCorner = std::numeric_limits<double>::infinity();
-    std::vector<double> Now;
-    std::vector<double> Old;
-    std::vector<double> Older;
-    std::vector<double> CurrentsNow;
-};
-
-/**
- * @struct  ChunkPublisher
- * @brief   When the points solved so far were last handed to the monitor, and how many of them it has.
- */
-struct ChunkPublisher {
-    const RunMonitor &Monitor;
-    std::chrono::steady_clock::time_point LastSend;
-    double ChunkEnd = 0.0;
-    std::size_t Sent = 0;
 };
 
 bool ApplyLiveChange(Device &device, const LiveChange &change) {

@@ -22,10 +22,10 @@ namespace Nodalys {
 
 namespace {
 
-using Result = std::expected<void, std::string>;
-
 /// How many subcircuits may sit inside one another, which stops a block that places itself.
 constexpr int MAX_NESTING_DEPTH = 16;
+
+using Result = std::expected<void, std::string>;
 
 /**
  * @brief   The message of a line the engine cannot simulate, with the subcircuit it is in.

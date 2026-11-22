@@ -7,7 +7,7 @@
 #ifndef NODALYS_BEHAVIORAL_DEVICE_H
 #define NODALYS_BEHAVIORAL_DEVICE_H
 
-#include "devices/devices.h"
+#include "devices/device.h"
 #include "nodalys/expression.h"
 #include <complex>
 #include <string>
@@ -59,8 +59,6 @@ protected:
     double GetOffset() const;
 
 private:
-    std::vector<double> ReadInputs(const std::vector<double> &x) const;
-
     std::string m_Name;
     Expression m_Expression;
     std::vector<BehavioralBinding> m_Bindings;
@@ -71,6 +69,8 @@ private:
     double m_Offset = 0.0;
     /// Derivative of the value with respect to each input at the last stamp.
     std::vector<double> m_Partials;
+
+    std::vector<double> ReadInputs(const std::vector<double> &x) const;
 };
 
 /**

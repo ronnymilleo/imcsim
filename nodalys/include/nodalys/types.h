@@ -18,6 +18,17 @@ using NodeId = int;
 inline constexpr NodeId GROUND_NODE = 0;
 
 /**
+ * @enum    DigitalLevel
+ * @brief   Discrete logic states for co-simulation and digital-analog boundary.
+ */
+enum class DigitalLevel {
+    LOW,
+    HIGH,
+    UNKNOWN,
+    HIGH_Z,
+};
+
+/**
  * @enum    IntegrationMethod
  * @brief   Formula that turns each charge or flux derivative of a transient into a companion model.
  * @details Both are second order. Backward Euler always takes the first step and the step that leaves a source
@@ -31,14 +42,46 @@ enum class IntegrationMethod {
     GEAR2
 };
 
-/**
- * @struct  DiagnosticMessage
- * @brief   A message emitted by the simulator (e.g. convergence statistics, warnings).
- */
-struct DiagnosticMessage {
-    std::string Text;
-    bool IsError = false;
+enum class LiveQuantity {
+    RESISTANCE,
+    DC_VOLTAGE
 };
+
+/**
+ * @enum    LogicGateType
+ * @brief   Kinds of smooth continuous logic gates.
+ */
+enum class LogicGateType {
+    NOT,
+    BUFFER,
+    AND,
+    NAND,
+    OR,
+    NOR,
+    XOR,
+    XNOR,
+    SCHMITT_TRIGGER,
+};
+
+/**
+ * @enum    RandomDistribution
+ * @brief   Distribution of the values of a SPICE TRRANDOM source, numbered as its TYPE parameter.
+ */
+enum class RandomDistribution {
+    UNIFORM = 1,
+    GAUSSIAN = 2,
+    EXPONENTIAL = 3,
+    POISSON = 4
+};
+
+enum class SemiconductorPolarity {
+    NPN,
+    PNP,
+    NMOS,
+    PMOS
+};
+
+// Circuit and simulation records
 
 /**
  * @struct  CircuitPort
@@ -53,26 +96,23 @@ struct CircuitPort {
 };
 
 /**
- * @struct  DiodeParameters
- * @brief   Shockley diode and junction charge parameters matching Berkeley SPICE3.
+ * @struct  DiagnosticMessage
+ * @brief   A message emitted by the simulator (e.g. convergence statistics, warnings).
  */
-struct DiodeParameters {
-    double SaturationCurrent = 1e-14;
-    double EmissionCoefficient = 1.0;
-    double SeriesResistance = 0.0;
-    double BreakdownVoltage = 100.0;
-    double BreakdownCurrent = 1e-3;
-    double JunctionCapacitance = 0.0;
-    double JunctionPotential = 1.0;
-    double GradingCoefficient = 0.5;
-    double TransitTime = 0.0;
-    /// Band gap `EG` in electron-volts, which sets how fast the saturation current grows with the temperature.
-    double EnergyGap = 1.11;
-    /// Exponent `XTI` of the temperature ratio in the growth of the saturation current.
-    double SaturationCurrentExponent = 3.0;
-
-    bool operator==(const DiodeParameters &) const = default;
+struct DiagnosticMessage {
+    std::string Text;
+    bool IsError = false;
 };
+
+struct LiveChange {
+    std::string Element;
+    LiveQuantity Quantity = LiveQuantity::RESISTANCE;
+    double Value = 0.0;
+
+    bool operator==(const LiveChange &) const = default;
+};
+
+// Device models
 
 /**
  * @struct  BjtParameters
@@ -103,36 +143,48 @@ struct BjtParameters {
 };
 
 /**
- * @struct  MosfetParameters
- * @brief   Level-1 Shichman-Hodges MOSFET parameters.
+ * @struct  BoyleOpAmpParameters
+ * @brief   Datasheet specifications for the Boyle op-amp macromodel (IEEE JSSC 1974).
  */
-struct MosfetParameters {
-    double ThresholdVoltage = 0.0;
-    double Transconductance = 2e-5;
-    double ChannelModulation = 0.0;
-    double DrainResistance = 0.0;
-    double SourceResistance = 0.0;
-    double GateSourceOverlap = 0.0;
-    double GateDrainOverlap = 0.0;
-    double Width = 100e-6;
-    double Length = 100e-6;
-    /// Surface potential `PHI` in volts, which the threshold voltage follows with the temperature.
-    double SurfacePotential = 0.6;
+struct BoyleOpAmpParameters {
+    bool IsPnpInput = false;
+    double OpenLoopGainDecibels = 106.0;
+    double GainBandwidth = 1e6;
+    /// Volts per microsecond, as datasheets specify.
+    double SlewRate = 0.5;
+    double PhaseMarginDegrees = 60.0;
+    double InputBiasCurrent = 80e-9;
+    double CommonModeRejectionDecibels = 90.0;
+    double OutputResistance = 75.0;
+    double ShortCircuitCurrent = 25e-3;
+    double PositiveHeadroom = 1.0;
+    double NegativeHeadroom = 1.0;
+    double SupplyCurrent = 1.7e-3;
+    double InputOffsetVoltage = 0.0;
 
-    bool operator==(const MosfetParameters &) const = default;
+    bool operator==(const BoyleOpAmpParameters &) const = default;
 };
 
 /**
- * @struct  SwitchParameters
- * @brief   Voltage-controlled hysteretic switch parameters.
+ * @struct  DiodeParameters
+ * @brief   Shockley diode and junction charge parameters matching Berkeley SPICE3.
  */
-struct SwitchParameters {
-    double Threshold = 2.5;
-    double Hysteresis = 0.1;
-    double OnResistance = 0.01;
-    double OffResistance = 1e9;
+struct DiodeParameters {
+    double SaturationCurrent = 1e-14;
+    double EmissionCoefficient = 1.0;
+    double SeriesResistance = 0.0;
+    double BreakdownVoltage = 100.0;
+    double BreakdownCurrent = 1e-3;
+    double JunctionCapacitance = 0.0;
+    double JunctionPotential = 1.0;
+    double GradingCoefficient = 0.5;
+    double TransitTime = 0.0;
+    /// Band gap `EG` in electron-volts, which sets how fast the saturation current grows with the temperature.
+    double EnergyGap = 1.11;
+    /// Exponent `XTI` of the temperature ratio in the growth of the saturation current.
+    double SaturationCurrentExponent = 3.0;
 
-    bool operator==(const SwitchParameters &) const = default;
+    bool operator==(const DiodeParameters &) const = default;
 };
 
 /**
@@ -154,84 +206,64 @@ struct FuseParameters {
 };
 
 /**
- * @struct  PulseParameters
- * @brief   SPICE PULSE(V1 V2 TD TR TF PW PER) parameters.
+ * @struct  MosfetParameters
+ * @brief   Level-1 Shichman-Hodges MOSFET parameters.
  */
-struct PulseParameters {
-    double Low = 0.0;
-    double High = 5.0;
-    double Delay = 0.0;
-    double RiseTime = 1e-6;
-    double FallTime = 1e-6;
-    double Width = 0.5e-3;
-    double Period = 1e-3;
+struct MosfetParameters {
+    double ThresholdVoltage = 0.0;
+    double Transconductance = 2e-5;
+    double ChannelModulation = 0.0;
+    double DrainResistance = 0.0;
+    double SourceResistance = 0.0;
+    double GateSourceOverlap = 0.0;
+    double GateDrainOverlap = 0.0;
+    double Width = 100e-6;
+    double Length = 100e-6;
+    /// Surface potential `PHI` in volts, which the threshold voltage follows with the temperature.
+    double SurfacePotential = 0.6;
 
-    bool operator==(const PulseParameters &) const = default;
+    bool operator==(const MosfetParameters &) const = default;
 };
 
 /**
- * @struct  SineParameters
- * @brief   SPICE SIN(VO VA FREQ TD THETA) parameters.
+ * @struct  SmoothLogicParameters
+ * @brief   Physical and analog parameters for C^inf smooth continuous logic gates.
  */
-struct SineParameters {
-    double Amplitude = 1.0;
-    double Frequency = 1e3;
-    double Offset = 0.0;
-    double Magnitude = 1.0;
-    double Phase = 0.0; // degrees
+struct SmoothLogicParameters {
+    /// Low logic level voltage in Volts.
+    double VLow = 0.0;
+    /// High logic level voltage in Volts.
+    double VHigh = 5.0;
+    /// Input switching threshold in Volts.
+    double VThreshold = 2.5;
+    /// Delta transition width in Volts for smooth tanh saturation.
+    double TransitionWidth = 0.1;
+    /// Inertial dynamic propagation delay in seconds.
+    double PropagationDelay = 1e-9;
+    /// Thevenin output stage resistance in Ohms.
+    double OutputResistance = 50.0;
+    /// High-impedance input leakage resistance in Ohms.
+    double InputResistance = 1e9;
+    /// Hysteresis voltage span for Schmitt triggers in Volts.
+    double Hysteresis = 0.5;
 
-    bool operator==(const SineParameters &) const = default;
+    bool operator==(const SmoothLogicParameters &) const = default;
 };
 
 /**
- * @struct  ExpParameters
- * @brief   SPICE EXP(V1 V2 TD1 TAU1 TD2 TAU2) parameters.
+ * @struct  SwitchParameters
+ * @brief   Voltage-controlled hysteretic switch parameters.
  */
-struct ExpParameters {
-    double InitialValue = 0.0;
-    double PeakValue = 5.0;
-    double RiseDelay = 1e-3;
-    double RiseTimeConstant = 0.5e-3;
-    double FallDelay = 5e-3;
-    double FallTimeConstant = 1e-3;
+struct SwitchParameters {
+    double Threshold = 2.5;
+    double Hysteresis = 0.1;
+    double OnResistance = 0.01;
+    double OffResistance = 1e9;
 
-    bool operator==(const ExpParameters &) const = default;
+    bool operator==(const SwitchParameters &) const = default;
 };
 
-/**
- * @struct  PwlPoint
- * @brief   One time/voltage point of a piece-wise linear waveform.
- */
-struct PwlPoint {
-    double Time = 0.0;
-    double Value = 0.0;
-
-    bool operator==(const PwlPoint &) const = default;
-};
-
-/**
- * @struct  PwlParameters
- * @brief   SPICE PWL(T1 V1 T2 V2 ...) piece-wise linear parameters.
- */
-struct PwlParameters {
-    std::vector<PwlPoint> Points = {{0.0, 0.0}, {1e-3, 5.0}, {2e-3, 0.0}};
-
-    bool operator==(const PwlParameters &) const = default;
-};
-
-/**
- * @struct  SffmParameters
- * @brief   SPICE SFFM(VO VA FC MDI FS) single-frequency FM parameters.
- */
-struct SffmParameters {
-    double Offset = 0.0;
-    double Amplitude = 1.0;
-    double CarrierFrequency = 1e3;
-    double ModulationIndex = 5.0;
-    double SignalFrequency = 100.0;
-
-    bool operator==(const SffmParameters &) const = default;
-};
+// Source waveforms
 
 /**
  * @struct  AmParameters
@@ -261,6 +293,21 @@ struct ClockParameters {
 };
 
 /**
+ * @struct  ExpParameters
+ * @brief   SPICE EXP(V1 V2 TD1 TAU1 TD2 TAU2) parameters.
+ */
+struct ExpParameters {
+    double InitialValue = 0.0;
+    double PeakValue = 5.0;
+    double RiseDelay = 1e-3;
+    double RiseTimeConstant = 0.5e-3;
+    double FallDelay = 5e-3;
+    double FallTimeConstant = 1e-3;
+
+    bool operator==(const ExpParameters &) const = default;
+};
+
+/**
  * @struct  NoiseParameters
  * @brief   SPICE TRNOISE(NA NT ALPHA NALPHA RTSAM RTSCAPT RTSEMT) parameters, plus DC offset.
  */
@@ -278,14 +325,40 @@ struct NoiseParameters {
 };
 
 /**
- * @enum    RandomDistribution
- * @brief   Distribution of the values of a SPICE TRRANDOM source, numbered as its TYPE parameter.
+ * @struct  PulseParameters
+ * @brief   SPICE PULSE(V1 V2 TD TR TF PW PER) parameters.
  */
-enum class RandomDistribution {
-    UNIFORM = 1,
-    GAUSSIAN = 2,
-    EXPONENTIAL = 3,
-    POISSON = 4
+struct PulseParameters {
+    double Low = 0.0;
+    double High = 5.0;
+    double Delay = 0.0;
+    double RiseTime = 1e-6;
+    double FallTime = 1e-6;
+    double Width = 0.5e-3;
+    double Period = 1e-3;
+
+    bool operator==(const PulseParameters &) const = default;
+};
+
+/**
+ * @struct  PwlPoint
+ * @brief   One time/voltage point of a piece-wise linear waveform.
+ */
+struct PwlPoint {
+    double Time = 0.0;
+    double Value = 0.0;
+
+    bool operator==(const PwlPoint &) const = default;
+};
+
+/**
+ * @struct  PwlParameters
+ * @brief   SPICE PWL(T1 V1 T2 V2 ...) piece-wise linear parameters.
+ */
+struct PwlParameters {
+    std::vector<PwlPoint> Points = {{0.0, 0.0}, {1e-3, 5.0}, {2e-3, 0.0}};
+
+    bool operator==(const PwlParameters &) const = default;
 };
 
 /**
@@ -303,98 +376,31 @@ struct RandomParameters {
 };
 
 /**
- * @struct  BoyleOpAmpParameters
- * @brief   Datasheet specifications for the Boyle op-amp macromodel (IEEE JSSC 1974).
+ * @struct  SffmParameters
+ * @brief   SPICE SFFM(VO VA FC MDI FS) single-frequency FM parameters.
  */
-struct BoyleOpAmpParameters {
-    bool IsPnpInput = false;
-    double OpenLoopGainDecibels = 106.0;
-    double GainBandwidth = 1e6;
-    /// Volts per microsecond, as datasheets specify.
-    double SlewRate = 0.5;
-    double PhaseMarginDegrees = 60.0;
-    double InputBiasCurrent = 80e-9;
-    double CommonModeRejectionDecibels = 90.0;
-    double OutputResistance = 75.0;
-    double ShortCircuitCurrent = 25e-3;
-    double PositiveHeadroom = 1.0;
-    double NegativeHeadroom = 1.0;
-    double SupplyCurrent = 1.7e-3;
-    double InputOffsetVoltage = 0.0;
+struct SffmParameters {
+    double Offset = 0.0;
+    double Amplitude = 1.0;
+    double CarrierFrequency = 1e3;
+    double ModulationIndex = 5.0;
+    double SignalFrequency = 100.0;
 
-    bool operator==(const BoyleOpAmpParameters &) const = default;
-};
-
-enum class SemiconductorPolarity {
-    NPN,
-    PNP,
-    NMOS,
-    PMOS
-};
-
-enum class LiveQuantity {
-    RESISTANCE,
-    DC_VOLTAGE
-};
-
-struct LiveChange {
-    std::string Element;
-    LiveQuantity Quantity = LiveQuantity::RESISTANCE;
-    double Value = 0.0;
-
-    bool operator==(const LiveChange &) const = default;
+    bool operator==(const SffmParameters &) const = default;
 };
 
 /**
- * @enum    LogicGateType
- * @brief   Kinds of smooth continuous logic gates.
+ * @struct  SineParameters
+ * @brief   SPICE SIN(VO VA FREQ TD THETA) parameters.
  */
-enum class LogicGateType {
-    NOT,
-    BUFFER,
-    AND,
-    NAND,
-    OR,
-    NOR,
-    XOR,
-    XNOR,
-    SCHMITT_TRIGGER,
-};
+struct SineParameters {
+    double Amplitude = 1.0;
+    double Frequency = 1e3;
+    double Offset = 0.0;
+    double Magnitude = 1.0;
+    double Phase = 0.0; // degrees
 
-/**
- * @enum    DigitalLevel
- * @brief   Discrete logic states for co-simulation and digital-analog boundary.
- */
-enum class DigitalLevel {
-    LOW,
-    HIGH,
-    UNKNOWN,
-    HIGH_Z,
-};
-
-/**
- * @struct  SmoothLogicParameters
- * @brief   Physical and analog parameters for C^inf smooth continuous logic gates.
- */
-struct SmoothLogicParameters {
-    /// Low logic level voltage in Volts.
-    double VLow = 0.0;
-    /// High logic level voltage in Volts.
-    double VHigh = 5.0;
-    /// Input switching threshold in Volts.
-    double VThreshold = 2.5;
-    /// Delta transition width in Volts for smooth tanh saturation.
-    double TransitionWidth = 0.1;
-    /// Inertial dynamic propagation delay in seconds.
-    double PropagationDelay = 1e-9;
-    /// Thevenin output stage resistance in Ohms.
-    double OutputResistance = 50.0;
-    /// High-impedance input leakage resistance in Ohms.
-    double InputResistance = 1e9;
-    /// Hysteresis voltage span for Schmitt triggers in Volts.
-    double Hysteresis = 0.5;
-
-    bool operator==(const SmoothLogicParameters &) const = default;
+    bool operator==(const SineParameters &) const = default;
 };
 
 } // namespace Nodalys

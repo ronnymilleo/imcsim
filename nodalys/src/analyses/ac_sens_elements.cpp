@@ -5,7 +5,9 @@
 
 #include "analyses/ac_sens_elements.h"
 
-#include "devices/devices.h"
+#include "devices/controlled_sources.h"
+#include "devices/independent_sources.h"
+#include "devices/passive_devices.h"
 #include "text/text_case.h"
 #include <optional>
 

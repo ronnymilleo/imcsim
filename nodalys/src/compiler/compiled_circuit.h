@@ -6,7 +6,7 @@
 #ifndef NODALYS_COMPILED_CIRCUIT_H
 #define NODALYS_COMPILED_CIRCUIT_H
 
-#include "devices/devices.h"
+#include "devices/device.h"
 #include "mna/mna_system.h"
 #include "nodalys/types.h"
 #include "text/text_case.h"
@@ -16,6 +16,9 @@
 #include <vector>
 
 namespace Nodalys {
+
+/// Devices by the name of their element; SPICE names ignore case, so "Vin" finds the source written "VIN".
+using DevicesByName = std::map<std::string, Device *, CaseInsensitiveLess>;
 
 /**
  * @struct  CurrentContribution
@@ -43,9 +46,6 @@ struct NoiseGroup {
     std::string Name;
     std::vector<const Device *> Devices;
 };
-
-/// Devices by the name of their element; SPICE names ignore case, so "Vin" finds the source written "VIN".
-using DevicesByName = std::map<std::string, Device *, CaseInsensitiveLess>;
 
 /**
  * @struct  CompiledCircuit

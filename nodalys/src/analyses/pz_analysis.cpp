@@ -7,7 +7,7 @@
 
 #include "analyses/analysis_preamble.h"
 #include "analyses/pz_checks.h"
-#include "devices/devices.h"
+#include "devices/device.h"
 #include "linear/qz.h"
 #include <algorithm>
 #include <cmath>

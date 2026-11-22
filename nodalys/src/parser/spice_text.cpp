@@ -14,6 +14,30 @@ namespace Nodalys {
 
 namespace {
 
+/**
+ * @brief   Follows the parentheses, braces and single quotes of a line, inside which a separator splits nothing.
+ */
+class Grouping {
+public:
+    void Follow(const char character) {
+        if (character == '\'') {
+            m_IsQuoted = !m_IsQuoted;
+        } else if (m_IsQuoted) {
+            return;
+        } else if (character == '(' || character == '{') {
+            ++m_Depth;
+        } else if (character == ')' || character == '}') {
+            --m_Depth;
+        }
+    }
+
+    bool IsOpen() const { return m_IsQuoted || m_Depth > 0; }
+
+private:
+    int m_Depth = 0;
+    bool m_IsQuoted = false;
+};
+
 bool IsSpace(const char character) {
     return std::isspace(static_cast<unsigned char>(character)) != 0;
 }
@@ -43,30 +67,6 @@ std::string_view StripInlineComment(const std::string_view line) {
 bool IsSeparator(const char character) {
     return IsSpace(character) || character == ',';
 }
-
-/**
- * @brief   Follows the parentheses, braces and single quotes of a line, inside which a separator splits nothing.
- */
-class Grouping {
-public:
-    void Follow(const char character) {
-        if (character == '\'') {
-            m_IsQuoted = !m_IsQuoted;
-        } else if (m_IsQuoted) {
-            return;
-        } else if (character == '(' || character == '{') {
-            ++m_Depth;
-        } else if (character == ')' || character == '}') {
-            --m_Depth;
-        }
-    }
-
-    bool IsOpen() const { return m_IsQuoted || m_Depth > 0; }
-
-private:
-    int m_Depth = 0;
-    bool m_IsQuoted = false;
-};
 
 std::size_t SkipSeparators(const std::string_view line, std::size_t index) {
     while (index < line.size() && IsSeparator(line[index])) {

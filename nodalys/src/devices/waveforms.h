@@ -6,7 +6,7 @@
 #ifndef NODALYS_WAVEFORMS_H
 #define NODALYS_WAVEFORMS_H
 
-#include "devices/devices.h"
+#include "devices/independent_sources.h"
 #include "nodalys/types.h"
 
 namespace Nodalys {

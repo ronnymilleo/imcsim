@@ -7,7 +7,7 @@
 
 #include "analyses/analysis_preamble.h"
 #include "analyses/frequency_sweep.h"
-#include "devices/devices.h"
+#include "devices/device.h"
 #include <algorithm>
 #include <cmath>
 #include <complex>

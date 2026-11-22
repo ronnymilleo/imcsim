@@ -31,31 +31,16 @@ namespace Nodalys {
 
 namespace {
 
+/// Stop time of the transient that `--analysis tran` synthesizes when the netlist has none.
+constexpr double DEFAULT_STOP_TIME_S = 1e-3;
+/// Time step of the transient that `--analysis tran` synthesizes when the netlist has none.
+constexpr double DEFAULT_TIME_STEP_S = 1e-6;
+
 /// A name that `--analysis` accepts and the kind of directive it picks in the netlist.
 struct AnalysisChoice {
     std::string_view Name;
     AnalysisKind Kind;
 };
-
-/// The names of `--analysis`; a sensitivity has two forms, so its name picks both kinds.
-constexpr auto ANALYSIS_CHOICES = std::to_array<AnalysisChoice>({
-    {"op", AnalysisKind::OPERATING_POINT},
-    {"tran", AnalysisKind::TRANSIENT},
-    {"dc", AnalysisKind::DC_SWEEP},
-    {"ac", AnalysisKind::AC_SWEEP},
-    {"tf", AnalysisKind::TRANSFER_FUNCTION},
-    {"noise", AnalysisKind::NOISE},
-    {"sp", AnalysisKind::S_PARAMETERS},
-    {"pz", AnalysisKind::POLE_ZERO},
-    {"sens", AnalysisKind::SENSITIVITY},
-    {"sens", AnalysisKind::AC_SENSITIVITY},
-    {"hb", AnalysisKind::HARMONIC_BALANCE},
-});
-
-/// Time step of the transient that `--analysis tran` synthesizes when the netlist has none.
-constexpr double DEFAULT_TIME_STEP_S = 1e-6;
-/// Stop time of the transient that `--analysis tran` synthesizes when the netlist has none.
-constexpr double DEFAULT_STOP_TIME_S = 1e-3;
 
 /// What the command line asks for.
 struct CliOptions {
@@ -102,6 +87,21 @@ struct CliSession {
      */
     std::vector<DiagnosticMessage> *GetDiagnosticsSink() { return Options.IsVerbose ? &Diagnostics : nullptr; }
 };
+
+/// The names of `--analysis`; a sensitivity has two forms, so its name picks both kinds.
+constexpr auto ANALYSIS_CHOICES = std::to_array<AnalysisChoice>({
+    {"op", AnalysisKind::OPERATING_POINT},
+    {"tran", AnalysisKind::TRANSIENT},
+    {"dc", AnalysisKind::DC_SWEEP},
+    {"ac", AnalysisKind::AC_SWEEP},
+    {"tf", AnalysisKind::TRANSFER_FUNCTION},
+    {"noise", AnalysisKind::NOISE},
+    {"sp", AnalysisKind::S_PARAMETERS},
+    {"pz", AnalysisKind::POLE_ZERO},
+    {"sens", AnalysisKind::SENSITIVITY},
+    {"sens", AnalysisKind::AC_SENSITIVITY},
+    {"hb", AnalysisKind::HARMONIC_BALANCE},
+});
 
 /**
  * @brief   Tells whether a directive of the netlist is the one that `--analysis` names.

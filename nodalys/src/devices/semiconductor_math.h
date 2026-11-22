@@ -31,6 +31,7 @@
 #define NODALYS_SEMICONDUCTOR_MATH_H
 
 #include "devices/integration.h"
+#include "devices/stamp_helpers.h"
 #include "mna/mna_system.h"
 #include <algorithm>
 #include <cmath>
@@ -40,33 +41,34 @@
 
 namespace Nodalys {
 
-/// Maximum exponent argument before clamping `exp(x)` so intermediate iterates during gmin stepping cannot overflow.
-inline constexpr double MAX_EXPONENT = 80.0;
 /// Forward-bias depletion capacitance cross-over ($FC = 0.5$) used when the parameters omit it.
 inline constexpr double JUNCTION_FORWARD_LIMIT = 0.5;
+/// Maximum exponent argument before clamping `exp(x)` so intermediate iterates during gmin stepping cannot overflow.
+inline constexpr double MAX_EXPONENT = 80.0;
+
+/**
+ * @struct  ChargeCompanion
+ * @brief   Linearized companion for a nonlinear charge $Q(v)$ under the integration method of the step:
+ *          $i = a\,Q(v) + b \approx G_{\text{cap}} v + I_{\text{eq,cap}}$, with $a$ and $b$ from `MakeCompanion()`.
+ */
+struct ChargeCompanion {
+    double Conductance;
+    double EquivalentCurrent;
+};
+
+/**
+ * @struct  DepletionCharge
+ * @brief   SPICE depletion charge $Q(v)$ and capacitance $C(v) = dQ/dv$ of a PN junction.
+ * @details Below $v = FC \cdot VJ$, $C(v) = C_{J0} (1 - v/VJ)^{-M}$. Above $FC \cdot VJ$, SPICE switches to a linear
+ *          extrapolation of $C(v)$ (quadratic in $Q(v)$) to avoid the singularity at $v = VJ$.
+ */
+struct DepletionCharge {
+    double Charge;
+    double Capacitance;
+};
 
 inline double Exponential(const double argument) {
     return std::exp(std::min(argument, MAX_EXPONENT));
-}
-
-inline double NodeVoltage(const std::vector<double> &x, const int index) {
-    return index < 0 ? 0.0 : x[static_cast<std::size_t>(index)];
-}
-
-inline std::complex<double> AcNodeVoltage(const std::vector<std::complex<double>> &x, const int index) {
-    return index < 0 ? std::complex<double>{0.0, 0.0} : x[static_cast<std::size_t>(index)];
-}
-
-inline void StampConductance(MnaSystem &sys, const int node_a, const int node_b, const double conductance) {
-    sys.AddA(node_a, node_a, conductance);
-    sys.AddA(node_b, node_b, conductance);
-    sys.AddA(node_a, node_b, -conductance);
-    sys.AddA(node_b, node_a, -conductance);
-}
-
-inline void StampCurrentSource(MnaSystem &sys, const int node_a, const int node_b, const double current) {
-    sys.AddRhs(node_a, -current);
-    sys.AddRhs(node_b, current);
 }
 
 /**
@@ -91,17 +93,6 @@ inline void StampSeriesResistor(MnaSystem &sys, const int external, const int in
         StampConductance(sys, external, internal, 1.0 / resistance);
     }
 }
-
-/**
- * @struct  DepletionCharge
- * @brief   SPICE depletion charge $Q(v)$ and capacitance $C(v) = dQ/dv$ of a PN junction.
- * @details Below $v = FC \cdot VJ$, $C(v) = C_{J0} (1 - v/VJ)^{-M}$. Above $FC \cdot VJ$, SPICE switches to a linear
- *          extrapolation of $C(v)$ (quadratic in $Q(v)$) to avoid the singularity at $v = VJ$.
- */
-struct DepletionCharge {
-    double Charge;
-    double Capacitance;
-};
 
 inline DepletionCharge
 EvaluateDepletion(const double voltage, const double cj0, const double vj, const double m, const double fc) {
@@ -128,16 +119,6 @@ EvaluateDepletion(const double voltage, const double cj0, const double vj, const
     const double capacitance = czof2 * (f3 + m * voltage / vj);
     return {charge, capacitance};
 }
-
-/**
- * @struct  ChargeCompanion
- * @brief   Linearized companion for a nonlinear charge $Q(v)$ under the integration method of the step:
- *          $i = a\,Q(v) + b \approx G_{\text{cap}} v + I_{\text{eq,cap}}$, with $a$ and $b$ from `MakeCompanion()`.
- */
-struct ChargeCompanion {
-    double Conductance;
-    double EquivalentCurrent;
-};
 
 inline ChargeCompanion ChargeModel(const double charge_derivative,
                                    const double charge_at_iterate,

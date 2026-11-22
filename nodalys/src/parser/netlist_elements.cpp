@@ -28,12 +28,115 @@ namespace Nodalys {
 
 namespace {
 
-/// Where the nodes of an element start, after its name.
-constexpr std::size_t FIRST_NODE = 1;
 /// The reference impedance of a port that does not give one.
 constexpr double DEFAULT_PORT_OHMS = 50.0;
+/// Where the nodes of an element start, after its name.
+constexpr std::size_t FIRST_NODE = 1;
 
+using CurrentControlledAdder = void (CircuitBuilder::*)(std::string, NodeId, NodeId, const std::string &, double);
 using ElementResult = std::expected<void, std::string>;
+using VoltageControlledAdder = void (CircuitBuilder::*)(std::string, NodeId, NodeId, NodeId, NodeId, double);
+
+/**
+ * @struct  BehavioralLine
+ * @brief   The kind and the text of the expression of a B element line, "B1 n+ n- V=<expression>".
+ * @details The text is taken from the line itself, since the tokens break an expression at its spaces and parentheses.
+ */
+struct BehavioralLine {
+    bool IsVoltage = true;
+    std::string Expression;
+};
+
+/**
+ * @struct  ElementReader
+ * @brief   What the engine knows of the elements of one letter: how to list the nodes of a line before they are
+ *          numbered, and how to read it.
+ */
+struct ElementReader {
+    char Letter;
+    std::vector<std::string> (*ListNodes)(const DeckLine &);
+    ElementResult (*Read)(DeckContext &, const DeckLine &);
+};
+
+/**
+ * @struct  GateKind
+ * @brief   The kind of gate of a U line and where its word stands, after the output and the inputs.
+ */
+struct GateKind {
+    std::size_t Index;
+    LogicGateType Type;
+};
+
+/**
+ * @struct  GateOption
+ * @brief   A NAME=VALUE word of a U line and the parameter of the gate it sets.
+ */
+struct GateOption {
+    std::string_view Key;
+    double SmoothLogicParameters::*Target;
+};
+
+/**
+ * @struct  GateWord
+ * @brief   A word of a U line that names the kind of gate.
+ */
+struct GateWord {
+    std::string_view Name;
+    LogicGateType Type;
+};
+
+/**
+ * @struct  PortWords
+ * @brief   The port options of a V, I or P line: PORTNUM and Z0, written NAME=VALUE or NAME VALUE.
+ */
+struct PortWords {
+    std::optional<int> Number;
+    std::optional<double> Ohms;
+};
+
+/**
+ * @struct  SourceWords
+ * @brief   What a V or I line gives after its nodes.
+ */
+struct SourceWords {
+    SourceValues Values;
+    PortWords Port;
+    /// Whether a port option made the line an S-parameter port.
+    bool IsPort = false;
+};
+
+/**
+ * @struct  TwoTerminalValue
+ * @brief   The nodes and the value of a resistor, capacitor or inductor line, "<name> <n1> <n2> <value> ...".
+ */
+struct TwoTerminalValue {
+    NodeId First;
+    NodeId Second;
+    double Value;
+};
+
+constexpr auto GATE_OPTIONS = std::to_array<GateOption>({
+    {"VHIGH", &SmoothLogicParameters::VHigh},
+    {"VLOW", &SmoothLogicParameters::VLow},
+    {"VTH", &SmoothLogicParameters::VThreshold},
+    {"TPD", &SmoothLogicParameters::PropagationDelay},
+    {"ROUT", &SmoothLogicParameters::OutputResistance},
+    {"HYST", &SmoothLogicParameters::Hysteresis},
+});
+
+constexpr auto GATE_WORDS = std::to_array<GateWord>({
+    {"NOT", LogicGateType::NOT},
+    {"INV", LogicGateType::NOT},
+    {"BUF", LogicGateType::BUFFER},
+    {"BUFFER", LogicGateType::BUFFER},
+    {"AND", LogicGateType::AND},
+    {"NAND", LogicGateType::NAND},
+    {"OR", LogicGateType::OR},
+    {"NOR", LogicGateType::NOR},
+    {"XOR", LogicGateType::XOR},
+    {"XNOR", LogicGateType::XNOR},
+    {"SCHMITT", LogicGateType::SCHMITT_TRIGGER},
+});
 
 /**
  * @brief   The value of a NAME=VALUE word among the tokens from first on, such as IC=2 or W=10u.
@@ -100,61 +203,11 @@ int GetPortNumberFromName(const std::string &name, const int fallback) {
 
 // Logic gates
 
-/**
- * @struct  GateWord
- * @brief   A word of a U line that names the kind of gate.
- */
-struct GateWord {
-    std::string_view Name;
-    LogicGateType Type;
-};
-
-constexpr auto GATE_WORDS = std::to_array<GateWord>({
-    {"NOT", LogicGateType::NOT},
-    {"INV", LogicGateType::NOT},
-    {"BUF", LogicGateType::BUFFER},
-    {"BUFFER", LogicGateType::BUFFER},
-    {"AND", LogicGateType::AND},
-    {"NAND", LogicGateType::NAND},
-    {"OR", LogicGateType::OR},
-    {"NOR", LogicGateType::NOR},
-    {"XOR", LogicGateType::XOR},
-    {"XNOR", LogicGateType::XNOR},
-    {"SCHMITT", LogicGateType::SCHMITT_TRIGGER},
-});
-
 std::optional<LogicGateType> FindLogicGateType(const std::string_view word) {
     const std::string upper = ToUpper(word);
     const auto found = std::ranges::find(GATE_WORDS, upper, &GateWord::Name);
     return found == GATE_WORDS.end() ? std::nullopt : std::optional(found->Type);
 }
-
-/**
- * @struct  GateOption
- * @brief   A NAME=VALUE word of a U line and the parameter of the gate it sets.
- */
-struct GateOption {
-    std::string_view Key;
-    double SmoothLogicParameters::*Target;
-};
-
-constexpr auto GATE_OPTIONS = std::to_array<GateOption>({
-    {"VHIGH", &SmoothLogicParameters::VHigh},
-    {"VLOW", &SmoothLogicParameters::VLow},
-    {"VTH", &SmoothLogicParameters::VThreshold},
-    {"TPD", &SmoothLogicParameters::PropagationDelay},
-    {"ROUT", &SmoothLogicParameters::OutputResistance},
-    {"HYST", &SmoothLogicParameters::Hysteresis},
-});
-
-/**
- * @struct  GateKind
- * @brief   The kind of gate of a U line and where its word stands, after the output and the inputs.
- */
-struct GateKind {
-    std::size_t Index;
-    LogicGateType Type;
-};
 
 std::optional<GateKind> FindGateKind(const std::vector<std::string> &tokens) {
     constexpr std::size_t FIRST_INPUT = 2;
@@ -167,16 +220,6 @@ std::optional<GateKind> FindGateKind(const std::vector<std::string> &tokens) {
 }
 
 // Behavioral sources
-
-/**
- * @struct  BehavioralLine
- * @brief   The kind and the text of the expression of a B element line, "B1 n+ n- V=<expression>".
- * @details The text is taken from the line itself, since the tokens break an expression at its spaces and parentheses.
- */
-struct BehavioralLine {
-    bool IsVoltage = true;
-    std::string Expression;
-};
 
 std::optional<BehavioralLine> SplitBehavioralLine(const std::string_view line) {
     constexpr int WORDS_BEFORE_EXPRESSION = 3;
@@ -206,16 +249,6 @@ std::optional<BehavioralLine> SplitBehavioralLine(const std::string_view line) {
 }
 
 // Passive parts
-
-/**
- * @struct  TwoTerminalValue
- * @brief   The nodes and the value of a resistor, capacitor or inductor line, "<name> <n1> <n2> <value> ...".
- */
-struct TwoTerminalValue {
-    NodeId First;
-    NodeId Second;
-    double Value;
-};
 
 std::expected<TwoTerminalValue, std::string>
 ReadTwoTerminalValue(const DeckContext &context, const DeckLine &line, const std::string_view kind) {
@@ -277,15 +310,6 @@ ElementResult ReadInductor(DeckContext &context, const DeckLine &line) {
 // Independent sources and ports
 
 /**
- * @struct  PortWords
- * @brief   The port options of a V, I or P line: PORTNUM and Z0, written NAME=VALUE or NAME VALUE.
- */
-struct PortWords {
-    std::optional<int> Number;
-    std::optional<double> Ohms;
-};
-
-/**
  * @brief   Reads a port option at a token, which a V or I line also takes to become an S-parameter port.
  * @return  How many tokens the option takes, 1 or 2, or 0 when the token is no port option.
  */
@@ -314,17 +338,6 @@ std::size_t ReadPortWord(const std::vector<std::string> &tokens, const std::size
     }
     return 0;
 }
-
-/**
- * @struct  SourceWords
- * @brief   What a V or I line gives after its nodes.
- */
-struct SourceWords {
-    SourceValues Values;
-    PortWords Port;
-    /// Whether a port option made the line an S-parameter port.
-    bool IsPort = false;
-};
 
 /**
  * @brief   Reads a number of a source line of a netlist, a literal with its scale suffix.
@@ -413,9 +426,6 @@ ElementResult ReadPort(DeckContext &context, const DeckLine &line) {
 }
 
 // Controlled sources
-
-using VoltageControlledAdder = void (CircuitBuilder::*)(std::string, NodeId, NodeId, NodeId, NodeId, double);
-using CurrentControlledAdder = void (CircuitBuilder::*)(std::string, NodeId, NodeId, const std::string &, double);
 
 /**
  * @brief   E or G lines: <name> <pos> <neg> <ctrl_pos> <ctrl_neg> <value>.
@@ -707,41 +717,29 @@ std::vector<std::string> ListInstanceNodes(const DeckLine &line) {
 }
 
 /**
- * @struct  ElementReader
- * @brief   What the engine knows of the elements of one letter: how to list the nodes of a line before they are
- *          numbered, and how to read it.
- */
-struct ElementReader {
-    char Letter;
-    std::vector<std::string> (*ListNodes)(const DeckLine &);
-    ElementResult (*Read)(DeckContext &, const DeckLine &);
-};
-
-constexpr auto ELEMENT_READERS = std::to_array<ElementReader>({
-    {'R', ListTwoNodes, ReadResistor},
-    {'C', ListTwoNodes, ReadCapacitor},
-    {'L', ListTwoNodes, ReadInductor},
-    {'V', ListTwoNodes, ReadSource},
-    {'I', ListTwoNodes, ReadSource},
-    {'P', ListTwoNodes, ReadPort},
-    {'E', ListFourNodes, ReadVcvs},
-    {'G', ListFourNodes, ReadVccs},
-    {'H', ListTwoNodes, ReadCcvs},
-    {'F', ListTwoNodes, ReadCccs},
-    {'B', ListBehavioralNodes, ReadBehavioral},
-    {'D', ListTwoNodes, ReadDiode},
-    {'Q', ListThreeNodes, ReadBjt},
-    {'M', ListFourNodes, ReadMosfet},
-    {'S', ListFourNodes, ReadSwitch},
-    {'U', ListGateNodes, ReadLogicGate},
-    {'X', ListInstanceNodes, SkipInstance},
-});
-
-/**
  * @brief   The reader of the elements of a line, by the letter of its name.
  * @return  The reader, or null for a letter the engine has no element for.
  */
 const ElementReader *FindElementReader(const DeckLine &line) {
+    static constexpr auto ELEMENT_READERS = std::to_array<ElementReader>({
+        {'R', ListTwoNodes, ReadResistor},
+        {'C', ListTwoNodes, ReadCapacitor},
+        {'L', ListTwoNodes, ReadInductor},
+        {'V', ListTwoNodes, ReadSource},
+        {'I', ListTwoNodes, ReadSource},
+        {'P', ListTwoNodes, ReadPort},
+        {'E', ListFourNodes, ReadVcvs},
+        {'G', ListFourNodes, ReadVccs},
+        {'H', ListTwoNodes, ReadCcvs},
+        {'F', ListTwoNodes, ReadCccs},
+        {'B', ListBehavioralNodes, ReadBehavioral},
+        {'D', ListTwoNodes, ReadDiode},
+        {'Q', ListThreeNodes, ReadBjt},
+        {'M', ListFourNodes, ReadMosfet},
+        {'S', ListFourNodes, ReadSwitch},
+        {'U', ListGateNodes, ReadLogicGate},
+        {'X', ListInstanceNodes, SkipInstance},
+    });
     const auto reader =
         std::ranges::find(ELEMENT_READERS, GetElementLetter(line.Tokens.front()), &ElementReader::Letter);
     return reader == ELEMENT_READERS.end() ? nullptr : &*reader;

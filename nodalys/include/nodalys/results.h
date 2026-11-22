@@ -18,6 +18,45 @@
 
 namespace Nodalys {
 
+/// A square complex matrix of the ports at one frequency, row by row.
+using PortMatrix = std::vector<std::complex<double>>;
+
+/**
+ * @enum    SensitivityParameter
+ * @brief   Which value of an element a sensitivity is taken with respect to.
+ */
+enum class SensitivityParameter {
+    RESISTANCE,
+    CAPACITANCE,
+    INDUCTANCE,
+    /// DC value of a voltage source.
+    VOLTAGE,
+    /// DC value of a current source.
+    CURRENT,
+    /// Gain of a controlled source.
+    GAIN
+};
+
+// Shared result records
+
+/**
+ * @struct  AcElementSensitivity
+ * @brief   How the complex output of an AC analysis changes with the value of one element, at every frequency.
+ * @details Derivatives are $\partial V / \partial p$ in volts per unit of the value. The two figures are what a user
+ *          reads: the change of the magnitude in decibels and of the phase in degrees for a 1 % change of the value,
+ *          none at a frequency where the output is too small for a relative change to mean anything.
+ */
+struct AcElementSensitivity {
+    /// Lower case name of the element, as the netlist writes it ("r1", "x1.r1" inside a block).
+    std::string Name;
+    SensitivityParameter Parameter = SensitivityParameter::RESISTANCE;
+    /// Value of the element: ohms, farads, henries, volts, amperes or the gain.
+    double Value = 0.0;
+    std::vector<std::complex<double>> Derivatives;
+    std::vector<std::optional<double>> MagnitudeDecibelsPerPercent;
+    std::vector<std::optional<double>> PhaseDegreesPerPercent;
+};
+
 /**
  * @struct  ComponentCurrent
  * @brief   Current through one circuit component at the DC operating point.
@@ -25,6 +64,15 @@ namespace Nodalys {
 struct ComponentCurrent {
     std::string Name;
     double Current = 0.0;
+};
+
+/**
+ * @struct  ComponentPhasors
+ * @brief   Complex peak harmonic phasors for one monitored component current (indexed 0..H).
+ */
+struct ComponentPhasors {
+    std::string Name;
+    std::vector<std::complex<double>> Phasors;
 };
 
 /**
@@ -37,35 +85,6 @@ struct ComponentTrace {
 };
 
 /**
- * @struct  OperatingPointResult
- * @brief   DC Operating Point (.op) node voltages and branch currents.
- */
-struct OperatingPointResult {
-    /// Node voltages indexed by NodeId (node 0 is ground and always 0 V).
-    std::vector<double> NodeVoltages;
-    /// Component currents.
-    std::vector<ComponentCurrent> Currents;
-    /// Warnings emitted during solution.
-    std::vector<std::string> Warnings;
-};
-
-/**
- * @struct  TransientResult
- * @brief   Time-domain Transient (.tran) node voltage and branch current trajectories.
- */
-struct TransientResult {
-    std::vector<double> Times;
-    /// Indexed by node number, then by time point.
-    std::vector<std::vector<double>> NodeVoltages;
-    /// Currents for each monitored component over time.
-    std::vector<ComponentTrace> Currents;
-    /// Diagnostic warnings.
-    std::vector<std::string> Warnings;
-    /// False if simulation was interrupted or cut short.
-    bool IsComplete = true;
-};
-
-/**
  * @struct  DcSweepCurve
  * @brief   A single curve of a DC sweep for one value of the stepped source.
  */
@@ -73,6 +92,46 @@ struct DcSweepCurve {
     double StepValue = 0.0;
     std::vector<std::vector<double>> NodeVoltages;
     std::vector<ComponentTrace> Currents;
+};
+
+/**
+ * @struct  NoiseContribution
+ * @brief   Individual component spectral noise density and integrated total RMS noise.
+ */
+struct NoiseContribution {
+    std::string Name;
+    std::vector<double> OutputDensities;
+    double OutputTotal = 0.0;
+};
+
+// Analysis results
+
+/**
+ * @struct  AcSensitivityResult
+ * @brief   Small-signal AC sensitivity of an output voltage to every element value, across frequency.
+ */
+struct AcSensitivityResult {
+    int OutputPositiveNode = 0;
+    int OutputNegativeNode = 0;
+    std::string InputSource;
+    std::vector<double> Frequencies;
+    /// The output phasor at each frequency, for the AC magnitude of the input source.
+    std::vector<std::complex<double>> Output;
+    std::vector<AcElementSensitivity> Elements;
+    /// What the user should know about the run, such as the frequencies where the output is too small to measure.
+    std::vector<std::string> Warnings;
+};
+
+/**
+ * @struct  AcSweepResult
+ * @brief   Small-Signal AC (.ac) frequency response (dB magnitude and unwrapped degrees phase).
+ */
+struct AcSweepResult {
+    std::vector<double> Frequencies;
+    std::vector<std::vector<double>> NodeMagnitudesDecibels;
+    std::vector<std::vector<double>> NodePhasesDegrees;
+    std::vector<ComponentTrace> CurrentMagnitudesDecibels;
+    std::vector<ComponentTrace> CurrentPhasesDegrees;
 };
 
 /**
@@ -89,39 +148,28 @@ struct DcSweepResult {
 };
 
 /**
- * @struct  AcSweepResult
- * @brief   Small-Signal AC (.ac) frequency response (dB magnitude and unwrapped degrees phase).
+ * @struct  HarmonicBalanceResult
+ * @brief   Periodic steady-state Harmonic Balance (.hb) spectra, one-cycle waveforms, and diagnostics.
+ * @details Phasors use peak amplitude convention: $x(t) = X_0 + \sum_{k=1}^{H} \text{Re}(X_k e^{j k \omega_0 t})$,
+ *          where DC ($k = 0$) has zero imaginary part.
  */
-struct AcSweepResult {
+struct HarmonicBalanceResult {
     std::vector<double> Frequencies;
-    std::vector<std::vector<double>> NodeMagnitudesDecibels;
-    std::vector<std::vector<double>> NodePhasesDegrees;
-    std::vector<ComponentTrace> CurrentMagnitudesDecibels;
-    std::vector<ComponentTrace> CurrentPhasesDegrees;
-};
-
-/**
- * @struct  TransferFunctionResult
- * @brief   Small-Signal DC Transfer Function (.tf) gain, input impedance, and output impedance.
- */
-struct TransferFunctionResult {
-    std::string InputSource;
-    int OutputPositiveNode = 0;
-    int OutputNegativeNode = 0;
-    double Gain = 0.0;
-    std::string GainUnit;
-    double InputImpedance = 0.0;
-    double OutputImpedance = 0.0;
-};
-
-/**
- * @struct  NoiseContribution
- * @brief   Individual component spectral noise density and integrated total RMS noise.
- */
-struct NoiseContribution {
-    std::string Name;
-    std::vector<double> OutputDensities;
-    double OutputTotal = 0.0;
+    /// Complex peak phasors indexed [node][harmonic], node 0 is ground.
+    std::vector<std::vector<std::complex<double>>> NodePhasors;
+    /// Complex peak current phasors per monitored component.
+    std::vector<ComponentPhasors> CurrentPhasors;
+    /// Reconstructed time points over one period [0, T0).
+    std::vector<double> Times;
+    /// Reconstructed periodic node voltage waveforms indexed [node][sample].
+    std::vector<std::vector<double>> NodeWaveforms;
+    /// Reconstructed periodic component current waveforms.
+    std::vector<ComponentTrace> CurrentWaveforms;
+    /// Diagnostic warnings emitted during analysis.
+    std::vector<std::string> Warnings;
+    int Iterations = 0;
+    /// Recovery strategy used when plain Newton did not converge ("", "source stepping", or "gmin stepping").
+    std::string Strategy;
 };
 
 /**
@@ -140,8 +188,29 @@ struct NoiseResult {
     std::vector<NoiseContribution> Contributions;
 };
 
-/// A square complex matrix of the ports at one frequency, row by row.
-using PortMatrix = std::vector<std::complex<double>>;
+/**
+ * @struct  OperatingPointResult
+ * @brief   DC Operating Point (.op) node voltages and branch currents.
+ */
+struct OperatingPointResult {
+    /// Node voltages indexed by NodeId (node 0 is ground and always 0 V).
+    std::vector<double> NodeVoltages;
+    /// Component currents.
+    std::vector<ComponentCurrent> Currents;
+    /// Warnings emitted during solution.
+    std::vector<std::string> Warnings;
+};
+
+/**
+ * @struct  PoleZeroResult
+ * @brief   Small-Signal Pole-Zero (.pz) finite poles and zeros in rad/s.
+ */
+struct PoleZeroResult {
+    std::vector<std::complex<double>> Poles;
+    std::vector<std::complex<double>> Zeros;
+    /// What makes the roots doubtful, such as roots that do not rebuild the AC response of the circuit.
+    std::vector<std::string> Warnings;
+};
 
 /**
  * @struct  SParameterResult
@@ -246,17 +315,6 @@ private:
 };
 
 /**
- * @struct  PoleZeroResult
- * @brief   Small-Signal Pole-Zero (.pz) finite poles and zeros in rad/s.
- */
-struct PoleZeroResult {
-    std::vector<std::complex<double>> Poles;
-    std::vector<std::complex<double>> Zeros;
-    /// What makes the roots doubtful, such as roots that do not rebuild the AC response of the circuit.
-    std::vector<std::string> Warnings;
-};
-
-/**
  * @struct  SensitivityResult
  * @brief   Small-signal DC Sensitivity (.sens) vectors for circuit components and subcircuits.
  */
@@ -267,90 +325,34 @@ struct SensitivityResult {
 };
 
 /**
- * @enum    SensitivityParameter
- * @brief   Which value of an element a sensitivity is taken with respect to.
+ * @struct  TransferFunctionResult
+ * @brief   Small-Signal DC Transfer Function (.tf) gain, input impedance, and output impedance.
  */
-enum class SensitivityParameter {
-    RESISTANCE,
-    CAPACITANCE,
-    INDUCTANCE,
-    /// DC value of a voltage source.
-    VOLTAGE,
-    /// DC value of a current source.
-    CURRENT,
-    /// Gain of a controlled source.
-    GAIN
-};
-
-/**
- * @struct  AcElementSensitivity
- * @brief   How the complex output of an AC analysis changes with the value of one element, at every frequency.
- * @details Derivatives are $\partial V / \partial p$ in volts per unit of the value. The two figures are what a user
- *          reads: the change of the magnitude in decibels and of the phase in degrees for a 1 % change of the value,
- *          none at a frequency where the output is too small for a relative change to mean anything.
- */
-struct AcElementSensitivity {
-    /// Lower case name of the element, as the netlist writes it ("r1", "x1.r1" inside a block).
-    std::string Name;
-    SensitivityParameter Parameter = SensitivityParameter::RESISTANCE;
-    /// Value of the element: ohms, farads, henries, volts, amperes or the gain.
-    double Value = 0.0;
-    std::vector<std::complex<double>> Derivatives;
-    std::vector<std::optional<double>> MagnitudeDecibelsPerPercent;
-    std::vector<std::optional<double>> PhaseDegreesPerPercent;
-};
-
-/**
- * @struct  AcSensitivityResult
- * @brief   Small-signal AC sensitivity of an output voltage to every element value, across frequency.
- */
-struct AcSensitivityResult {
+struct TransferFunctionResult {
+    std::string InputSource;
     int OutputPositiveNode = 0;
     int OutputNegativeNode = 0;
-    std::string InputSource;
-    std::vector<double> Frequencies;
-    /// The output phasor at each frequency, for the AC magnitude of the input source.
-    std::vector<std::complex<double>> Output;
-    std::vector<AcElementSensitivity> Elements;
-    /// What the user should know about the run, such as the frequencies where the output is too small to measure.
-    std::vector<std::string> Warnings;
+    double Gain = 0.0;
+    std::string GainUnit;
+    double InputImpedance = 0.0;
+    double OutputImpedance = 0.0;
 };
 
 /**
- * @struct  ComponentPhasors
- * @brief   Complex peak harmonic phasors for one monitored component current (indexed 0..H).
+ * @struct  TransientResult
+ * @brief   Time-domain Transient (.tran) node voltage and branch current trajectories.
  */
-struct ComponentPhasors {
-    std::string Name;
-    std::vector<std::complex<double>> Phasors;
-};
-
-/**
- * @struct  HarmonicBalanceResult
- * @brief   Periodic steady-state Harmonic Balance (.hb) spectra, one-cycle waveforms, and diagnostics.
- * @details Phasors use peak amplitude convention: $x(t) = X_0 + \sum_{k=1}^{H} \text{Re}(X_k e^{j k \omega_0 t})$,
- *          where DC ($k = 0$) has zero imaginary part.
- */
-struct HarmonicBalanceResult {
-    std::vector<double> Frequencies;
-    /// Complex peak phasors indexed [node][harmonic], node 0 is ground.
-    std::vector<std::vector<std::complex<double>>> NodePhasors;
-    /// Complex peak current phasors per monitored component.
-    std::vector<ComponentPhasors> CurrentPhasors;
-    /// Reconstructed time points over one period [0, T0).
+struct TransientResult {
     std::vector<double> Times;
-    /// Reconstructed periodic node voltage waveforms indexed [node][sample].
-    std::vector<std::vector<double>> NodeWaveforms;
-    /// Reconstructed periodic component current waveforms.
-    std::vector<ComponentTrace> CurrentWaveforms;
-    /// Diagnostic warnings emitted during analysis.
+    /// Indexed by node number, then by time point.
+    std::vector<std::vector<double>> NodeVoltages;
+    /// Currents for each monitored component over time.
+    std::vector<ComponentTrace> Currents;
+    /// Diagnostic warnings.
     std::vector<std::string> Warnings;
-    int Iterations = 0;
-    /// Recovery strategy used when plain Newton did not converge ("", "source stepping", or "gmin stepping").
-    std::string Strategy;
+    /// False if simulation was interrupted or cut short.
+    bool IsComplete = true;
 };
-
-[[nodiscard]] double ComputeThd(std::span<const std::complex<double>> phasors);
 
 using SimulationResult = std::variant<OperatingPointResult,
                                       TransientResult,
@@ -363,6 +365,8 @@ using SimulationResult = std::variant<OperatingPointResult,
                                       SensitivityResult,
                                       AcSensitivityResult,
                                       HarmonicBalanceResult>;
+
+[[nodiscard]] double ComputeThd(std::span<const std::complex<double>> phasors);
 
 } // namespace Nodalys
 

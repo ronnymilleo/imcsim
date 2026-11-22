@@ -6,7 +6,7 @@
 #ifndef NODALYS_SMOOTH_LOGIC_H
 #define NODALYS_SMOOTH_LOGIC_H
 
-#include "devices/devices.h"
+#include "devices/device.h"
 #include "nodalys/types.h"
 
 #include <vector>
@@ -57,9 +57,6 @@ private:
         double OutputDerivative = 0.0;
     };
 
-    LogicEvaluation Evaluate(const std::vector<double> &x) const;
-    double ReadVoltage(const std::vector<double> &x, int node) const;
-
     // Gate Configuration
     LogicGateType m_Type;
     int m_Output;
@@ -76,6 +73,9 @@ private:
     double m_CapEquivalent = 0.0;
     ChargeHistory m_History;
     ChargeHistory m_SavedHistory;
+
+    LogicEvaluation Evaluate(const std::vector<double> &x) const;
+    double ReadVoltage(const std::vector<double> &x, int node) const;
 };
 
 } // namespace Nodalys

@@ -24,6 +24,17 @@
 
 namespace Nodalys {
 
+// Silicon band gap temperature law (volts, volts per kelvin, kelvin)
+inline constexpr double BAND_GAP_AT_ZERO_KELVIN = 1.16;
+inline constexpr double BAND_GAP_OFFSET_KELVIN = 1108.0;
+inline constexpr double BAND_GAP_SLOPE = 7.02e-4;
+
+// Temperature scale and SPICE reference
+/// Offset between degrees Celsius and kelvin, as ngspice (`CONSTCtoK`).
+inline constexpr double CELSIUS_TO_KELVIN = 273.15;
+/// The temperature the junction laws of SPICE refer to, $27\,^\circ\text{C}$ (`REFTEMP`), whatever `TNOM` is.
+inline constexpr double REFERENCE_TEMPERATURE_KELVIN = 300.15;
+
 /**
  * @struct  ThermalConditions
  * @brief   The temperature of a run and the nominal temperature the models are given at, in kelvin.
@@ -34,17 +45,6 @@ struct ThermalConditions {
 
     bool operator==(const ThermalConditions &) const = default;
 };
-
-/// The temperature the junction laws of SPICE refer to, $27\,^\circ\text{C}$ (`REFTEMP`), whatever `TNOM` is.
-inline constexpr double REFERENCE_TEMPERATURE_KELVIN = 300.15;
-
-/// Offset between degrees Celsius and kelvin, as ngspice (`CONSTCtoK`).
-inline constexpr double CELSIUS_TO_KELVIN = 273.15;
-
-/// Band gap of silicon at 0 K and the two constants of its temperature law, in volts, volts per kelvin and kelvin.
-inline constexpr double BAND_GAP_AT_ZERO_KELVIN = 1.16;
-inline constexpr double BAND_GAP_SLOPE = 7.02e-4;
-inline constexpr double BAND_GAP_OFFSET_KELVIN = 1108.0;
 
 // Conditions
 ThermalConditions MakeThermalConditions(double temperature_celsius, double nominal_celsius);

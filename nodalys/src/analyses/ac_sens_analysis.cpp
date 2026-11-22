@@ -14,7 +14,7 @@
 #include "analyses/ac_sens_elements.h"
 #include "analyses/analysis_preamble.h"
 #include "analyses/frequency_sweep.h"
-#include "devices/devices.h"
+#include "devices/device.h"
 #include <algorithm>
 #include <cmath>
 #include <complex>
@@ -26,21 +26,46 @@ namespace Nodalys {
 
 namespace {
 
-using Complex = std::complex<double>;
-
-/// Output smaller than this share of the AC magnitude of the input counts as zero: a relative change of it means
-/// nothing, and it is far below what the solver resolves (about -180 dB).
-constexpr double MIN_RELATIVE_OUTPUT = 1e-9;
-
 /// Decibels of a magnitude ratio per neper.
 constexpr double DECIBELS_PER_NEPER = 20.0 / std::numbers::ln10;
 constexpr double DEGREES_PER_RADIAN = 180.0 / std::numbers::pi;
+/// Output smaller than this share of the AC magnitude of the input counts as zero: a relative change of it means
+/// nothing, and it is far below what the solver resolves (about -180 dB).
+constexpr double MIN_RELATIVE_OUTPUT = 1e-9;
 constexpr double PERCENT = 100.0;
+
+using Complex = std::complex<double>;
+
+/**
+ * @struct  AcInput
+ * @brief   The input source and its AC magnitude.
+ */
+struct AcInput {
+    const Device &Source;
+    double Magnitude = 0.0;
+};
+
+/// Solves the small-signal system and both adjoints at one frequency.
+struct FrequencySolution {
+    std::vector<Complex> AcSolution;
+    std::vector<Complex> Adjoint;
+    std::vector<Complex> BiasAdjoint;
+};
 
 /// The output node of the analysis and what reads its voltage.
 struct Output {
     int Positive = -1;
     int Negative = -1;
+};
+
+/// Everything the loop over the frequencies reads and does not change.
+struct SweepContext {
+    const CompiledCircuit &Compiled;
+    const MnaSystem &Reactive;
+    const std::vector<double> &DcSolution;
+    const std::vector<Complex> &Selector;
+    const std::vector<JacobianDerivative> &Derivatives;
+    const std::vector<AcSensitivityElement> &Elements;
 };
 
 std::optional<std::string> CheckConfig(const CompiledCircuit &compiled, const AcSensitivityConfig &settings) {
@@ -58,15 +83,6 @@ std::optional<std::string> CheckConfig(const CompiledCircuit &compiled, const Ac
     }
     return std::nullopt;
 }
-
-/**
- * @struct  AcInput
- * @brief   The input source and its AC magnitude.
- */
-struct AcInput {
-    const Device &Source;
-    double Magnitude = 0.0;
-};
 
 /**
  * @brief   Finds the input source and checks that it has an AC magnitude to drive the analysis with.
@@ -161,23 +177,6 @@ std::optional<std::string> DescribeSmallOutput(const AcSensitivityResult &result
                        frequencies.front(),
                        frequencies.back());
 }
-
-/// Everything the loop over the frequencies reads and does not change.
-struct SweepContext {
-    const CompiledCircuit &Compiled;
-    const MnaSystem &Reactive;
-    const std::vector<double> &DcSolution;
-    const std::vector<Complex> &Selector;
-    const std::vector<JacobianDerivative> &Derivatives;
-    const std::vector<AcSensitivityElement> &Elements;
-};
-
-/// Solves the small-signal system and both adjoints at one frequency.
-struct FrequencySolution {
-    std::vector<Complex> AcSolution;
-    std::vector<Complex> Adjoint;
-    std::vector<Complex> BiasAdjoint;
-};
 
 std::expected<FrequencySolution, std::string> SolveFrequency(const SweepContext &context, const double frequency) {
     const double omega = 2.0 * std::numbers::pi * frequency;

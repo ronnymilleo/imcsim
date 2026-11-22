@@ -8,7 +8,7 @@
 #include "analyses/analysis_preamble.h"
 #include "analyses/frequency_sweep.h"
 #include "analyses/port_matrices.h"
-#include "devices/devices.h"
+#include "devices/passive_devices.h"
 #include <algorithm>
 #include <cmath>
 #include <complex>
@@ -32,6 +32,18 @@ struct DeviceRestoreGuard {
             Devices.erase(Devices.begin() + static_cast<std::ptrdiff_t>(OriginalCount), Devices.end());
         }
     }
+};
+
+/**
+ * @struct  PortDrives
+ * @brief   What each port needs to be excited and read, one entry per port in the order of the ports.
+ */
+struct PortDrives {
+    /// Unknown of the port node, or -1 when the port is on ground.
+    std::vector<int> Unknowns;
+    std::vector<double> SqrtConductances;
+    /// Norton current source of each port, as the right-hand side that excites it.
+    std::vector<std::vector<std::complex<double>>> Excitations;
 };
 
 // The messages of the checks that imcsim runs before any backend are worded the same way here, so a cause reads the
@@ -133,18 +145,6 @@ DeviceRestoreGuard AddPortTerminations(CompiledCircuit &compiled, const std::vec
     }
     return DeviceRestoreGuard{compiled.Devices, original_device_count};
 }
-
-/**
- * @struct  PortDrives
- * @brief   What each port needs to be excited and read, one entry per port in the order of the ports.
- */
-struct PortDrives {
-    /// Unknown of the port node, or -1 when the port is on ground.
-    std::vector<int> Unknowns;
-    std::vector<double> SqrtConductances;
-    /// Norton current source of each port, as the right-hand side that excites it.
-    std::vector<std::vector<std::complex<double>>> Excitations;
-};
 
 /**
  * @brief   Pre-assembles the excitation of each port.

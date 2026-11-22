@@ -18,12 +18,8 @@ namespace Nodalys {
 
 namespace {
 
-constexpr double NO_CORNER = std::numeric_limits<double>::infinity();
 constexpr std::size_t FLICKER_TAPS = 1024;
-
-bool IsAfter(const double corner, const double time) {
-    return corner > time + 1e-12 * std::max(std::fabs(time), std::fabs(corner)) + 1e-21;
-}
+constexpr double NO_CORNER = std::numeric_limits<double>::infinity();
 
 class NoiseState {
 public:
@@ -69,26 +65,17 @@ public:
         return value;
     }
 
-    double NextBreakpoint(const double time) {
-        double next = NO_CORNER;
-        if (HasSteppedNoise()) {
-            const double k = std::floor(time / m_Params.TimeStep) + 1.0;
-            const double step_corner = k * m_Params.TimeStep;
-            next = IsAfter(step_corner, time) ? step_corner : (k + 1.0) * m_Params.TimeStep;
-        }
-        if (HasTelegraph()) {
-            EnsureTelegraphPast(time);
-            for (const double corner : m_TelegraphTimes) {
-                if (IsAfter(corner, time)) {
-                    next = std::min(next, corner);
-                    break;
-                }
-            }
-        }
-        return next;
-    }
+    double NextBreakpoint(double time);
 
 private:
+    NoiseParameters m_Params;
+    std::mt19937_64 m_Rng;
+    std::vector<double> m_Samples;
+    std::vector<double> m_FlickerWhite;
+    std::vector<double> m_FlickerWeights;
+    std::vector<double> m_TelegraphTimes;
+    std::vector<double> m_TelegraphValues;
+
     bool HasSteppedNoise() const {
         return m_Params.TimeStep > 0.0 && (m_Params.WhiteAmplitude != 0.0 || m_Params.FlickerAmplitude != 0.0);
     }
@@ -133,14 +120,6 @@ private:
         const auto idx = static_cast<std::size_t>(std::distance(m_TelegraphTimes.begin(), it)) - 1;
         return m_TelegraphValues[idx];
     }
-
-    NoiseParameters m_Params;
-    std::mt19937_64 m_Rng;
-    std::vector<double> m_Samples;
-    std::vector<double> m_FlickerWhite;
-    std::vector<double> m_FlickerWeights;
-    std::vector<double> m_TelegraphTimes;
-    std::vector<double> m_TelegraphValues;
 };
 
 class RandomState {
@@ -161,20 +140,13 @@ public:
         return m_Samples[index];
     }
 
-    double NextBreakpoint(const double time) const {
-        if (m_Params.TimeStep <= 0.0) {
-            return NO_CORNER;
-        }
-        if (time < m_Params.Delay && IsAfter(m_Params.Delay, time)) {
-            return m_Params.Delay;
-        }
-        const double elapsed = std::max(0.0, time - m_Params.Delay);
-        const double k = std::floor(elapsed / m_Params.TimeStep) + 1.0;
-        const double corner = m_Params.Delay + k * m_Params.TimeStep;
-        return IsAfter(corner, time) ? corner : m_Params.Delay + (k + 1.0) * m_Params.TimeStep;
-    }
+    double NextBreakpoint(double time) const;
 
 private:
+    RandomParameters m_Params;
+    std::mt19937_64 m_Rng;
+    std::vector<double> m_Samples;
+
     void EnsureSample(const std::size_t target) {
         while (m_Samples.size() <= target) {
             m_Samples.push_back(DrawValue());
@@ -201,11 +173,43 @@ private:
             return 0.0;
         }
     }
-
-    RandomParameters m_Params;
-    std::mt19937_64 m_Rng;
-    std::vector<double> m_Samples;
 };
+
+bool IsAfter(const double corner, const double time) {
+    return corner > time + 1e-12 * std::max(std::fabs(time), std::fabs(corner)) + 1e-21;
+}
+
+double NoiseState::NextBreakpoint(const double time) {
+    double next = NO_CORNER;
+    if (HasSteppedNoise()) {
+        const double k = std::floor(time / m_Params.TimeStep) + 1.0;
+        const double step_corner = k * m_Params.TimeStep;
+        next = IsAfter(step_corner, time) ? step_corner : (k + 1.0) * m_Params.TimeStep;
+    }
+    if (HasTelegraph()) {
+        EnsureTelegraphPast(time);
+        for (const double corner : m_TelegraphTimes) {
+            if (IsAfter(corner, time)) {
+                next = std::min(next, corner);
+                break;
+            }
+        }
+    }
+    return next;
+}
+
+double RandomState::NextBreakpoint(const double time) const {
+    if (m_Params.TimeStep <= 0.0) {
+        return NO_CORNER;
+    }
+    if (time < m_Params.Delay && IsAfter(m_Params.Delay, time)) {
+        return m_Params.Delay;
+    }
+    const double elapsed = std::max(0.0, time - m_Params.Delay);
+    const double k = std::floor(elapsed / m_Params.TimeStep) + 1.0;
+    const double corner = m_Params.Delay + k * m_Params.TimeStep;
+    return IsAfter(corner, time) ? corner : m_Params.Delay + (k + 1.0) * m_Params.TimeStep;
+}
 
 } // namespace
 

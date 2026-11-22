@@ -24,6 +24,47 @@ namespace Nodalys {
 
 namespace {
 
+/// The words that follow the sweep type, which are the points, the start and the stop.
+constexpr std::size_t SWEEP_NUMBER_COUNT = 3;
+
+/**
+ * @struct  Assignment
+ * @brief   The two sides of a NAME=VALUE word, as written.
+ */
+struct Assignment {
+    std::string_view Name;
+    std::string_view Value;
+};
+
+/**
+ * @struct  DirectiveReader
+ * @brief   The function that reads one directive, by its upper-case name.
+ */
+struct DirectiveReader {
+    std::string_view Name;
+    std::expected<void, std::string> (*Read)(DeckContext &, const DeckLine &);
+};
+
+/**
+ * @struct  FrequencySweepWords
+ * @brief   The sweep of an .ac, .noise or .sens ... ac directive as it is written.
+ */
+struct FrequencySweepWords {
+    FrequencySweepType Type = FrequencySweepType::DECADE;
+    int Points = 0;
+    double StartFrequency = 0.0;
+    double StopFrequency = 0.0;
+};
+
+/**
+ * @struct  NumericOption
+ * @brief   An option of .options whose number goes into the convergence options.
+ */
+struct NumericOption {
+    std::string_view Name;
+    double ConvergenceOptions::*Target;
+};
+
 /**
  * @struct  OutputNodes
  * @brief   The two nodes of an output written V(node) or V(positive, negative), by name.
@@ -32,6 +73,13 @@ struct OutputNodes {
     std::string Positive;
     std::string Negative;
 };
+
+constexpr auto NUMERIC_OPTIONS = std::to_array<NumericOption>({
+    {"RELTOL", &ConvergenceOptions::RelTol},
+    {"VNTOL", &ConvergenceOptions::VoltageAbsTol},
+    {"ABSTOL", &ConvergenceOptions::CurrentAbsTol},
+    {"GMIN", &ConvergenceOptions::Gmin},
+});
 
 /**
  * @brief   Reads the nodes of an output written V(node) or V(positive, negative); a bare name is the node itself.
@@ -53,15 +101,6 @@ OutputNodes ReadOutputNodes(std::string_view text) {
 }
 
 // Node voltages
-
-/**
- * @struct  Assignment
- * @brief   The two sides of a NAME=VALUE word, as written.
- */
-struct Assignment {
-    std::string_view Name;
-    std::string_view Value;
-};
 
 /**
  * @brief   Splits a word such as "v(out)=5" at its equals sign; the tokens already join "v(out) = 5" into one word.
@@ -108,20 +147,6 @@ std::expected<void, std::string> ReadNodeVoltages(DeckContext &context, const De
 }
 
 // Frequency sweeps
-
-/**
- * @struct  FrequencySweepWords
- * @brief   The sweep of an .ac, .noise or .sens ... ac directive as it is written.
- */
-struct FrequencySweepWords {
-    FrequencySweepType Type = FrequencySweepType::DECADE;
-    int Points = 0;
-    double StartFrequency = 0.0;
-    double StopFrequency = 0.0;
-};
-
-/// The words that follow the sweep type, which are the points, the start and the stop.
-constexpr std::size_t SWEEP_NUMBER_COUNT = 3;
 
 std::optional<FrequencySweepType> FindSweepType(const std::string_view word) {
     const std::string upper = ToUpper(word);
@@ -282,22 +307,6 @@ void ReadPoleZeroKind(const std::string_view word, PoleZeroConfig &config) {
 }
 
 // Options
-
-/**
- * @struct  NumericOption
- * @brief   An option of .options whose number goes into the convergence options.
- */
-struct NumericOption {
-    std::string_view Name;
-    double ConvergenceOptions::*Target;
-};
-
-constexpr auto NUMERIC_OPTIONS = std::to_array<NumericOption>({
-    {"RELTOL", &ConvergenceOptions::RelTol},
-    {"VNTOL", &ConvergenceOptions::VoltageAbsTol},
-    {"ABSTOL", &ConvergenceOptions::CurrentAbsTol},
-    {"GMIN", &ConvergenceOptions::Gmin},
-});
 
 std::optional<IntegrationMethod> FindIntegrationMethod(const std::string_view name) {
     if (name == "GEAR") {
@@ -651,32 +660,6 @@ std::expected<void, std::string> ReadNodesets(DeckContext &context, const DeckLi
     return ReadNodeVoltages(context, line, true);
 }
 
-/**
- * @struct  DirectiveReader
- * @brief   The function that reads one directive, by its upper-case name.
- */
-struct DirectiveReader {
-    std::string_view Name;
-    std::expected<void, std::string> (*Read)(DeckContext &, const DeckLine &);
-};
-
-constexpr auto DIRECTIVE_READERS = std::to_array<DirectiveReader>({
-    {".OP", ReadOperatingPoint},
-    {".TRAN", ReadTransient},
-    {".DC", ReadDcSweep},
-    {".AC", ReadAcSweep},
-    {".TF", ReadTransferFunction},
-    {".NOISE", ReadNoise},
-    {".SP", ReadSParameters},
-    {".PZ", ReadPoleZero},
-    {".SENS", ReadSensitivity},
-    {".HB", ReadHarmonicBalance},
-    {".OPTIONS", ReadOptions},
-    {".TEMP", ReadTemperature},
-    {".IC", ReadInitialConditions},
-    {".NODESET", ReadNodesets},
-});
-
 } // namespace
 
 /**
@@ -706,6 +689,22 @@ std::vector<std::string> ListDirectiveNodes(const DeckLine &line) {
  *          directive cannot be read otherwise.
  */
 std::expected<void, std::string> ReadDirective(DeckContext &context, const DeckLine &line) {
+    static constexpr auto DIRECTIVE_READERS = std::to_array<DirectiveReader>({
+        {".OP", ReadOperatingPoint},
+        {".TRAN", ReadTransient},
+        {".DC", ReadDcSweep},
+        {".AC", ReadAcSweep},
+        {".TF", ReadTransferFunction},
+        {".NOISE", ReadNoise},
+        {".SP", ReadSParameters},
+        {".PZ", ReadPoleZero},
+        {".SENS", ReadSensitivity},
+        {".HB", ReadHarmonicBalance},
+        {".OPTIONS", ReadOptions},
+        {".TEMP", ReadTemperature},
+        {".IC", ReadInitialConditions},
+        {".NODESET", ReadNodesets},
+    });
     const std::string name = ToUpper(line.Tokens.front());
     const auto reader = std::ranges::find(DIRECTIVE_READERS, name, &DirectiveReader::Name);
     if (reader == DIRECTIVE_READERS.end()) {

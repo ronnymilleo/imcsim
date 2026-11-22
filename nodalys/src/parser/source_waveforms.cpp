@@ -28,6 +28,20 @@ constexpr double DEFAULT_RANDOM_FIRST = 0.1;
 constexpr double DEFAULT_FLICKER_EXPONENT = 1.0;
 
 /**
+ * @struct  SourcePlacement
+ * @brief   Where an independent source goes and what its line gives beside the waveform, the same for every waveform.
+ */
+struct SourcePlacement {
+    CircuitBuilder &Builder;
+    const std::string &Name;
+    /// True for a V source, false for an I source.
+    bool IsVoltage;
+    NodeId Positive;
+    NodeId Negative;
+    const SourceLevels &Levels;
+};
+
+/**
  * @struct  WaveformPrefix
  * @brief   How a word of a source line starts when it is a waveform, with its opening parenthesis.
  */
@@ -62,20 +76,6 @@ void Assign(double &target, const std::vector<double> &values, const std::size_t
 double ValueOr(const std::vector<double> &values, const std::size_t index, const double fallback) {
     return values.size() > index ? values[index] : fallback;
 }
-
-/**
- * @struct  SourcePlacement
- * @brief   Where an independent source goes and what its line gives beside the waveform, the same for every waveform.
- */
-struct SourcePlacement {
-    CircuitBuilder &Builder;
-    const std::string &Name;
-    /// True for a V source, false for an I source.
-    bool IsVoltage;
-    NodeId Positive;
-    NodeId Negative;
-    const SourceLevels &Levels;
-};
 
 /**
  * @brief   Adds the voltage or the current source of a waveform, with the small-signal magnitude and phase of the line.

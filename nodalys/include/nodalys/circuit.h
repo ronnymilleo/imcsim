@@ -48,9 +48,9 @@ public:
 private:
     friend struct CircuitAccess;
 
-    explicit Circuit(std::unique_ptr<CircuitImpl> impl);
-
     std::unique_ptr<CircuitImpl> m_Impl;
+
+    explicit Circuit(std::unique_ptr<CircuitImpl> impl);
 };
 
 } // namespace Nodalys

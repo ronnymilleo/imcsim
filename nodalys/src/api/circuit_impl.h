@@ -15,6 +15,18 @@
 
 namespace Nodalys {
 
+class CircuitImpl;
+
+/**
+ * @struct  CircuitAccess
+ * @brief   Internal bridge into Circuit's PIMPL so public headers never expose CircuitImpl.
+ */
+struct CircuitAccess {
+    [[nodiscard]] static Circuit Create(std::unique_ptr<CircuitImpl> impl);
+    static const CompiledCircuit &GetCompiled(const Circuit &circuit);
+    [[nodiscard]] static std::expected<CompiledCircuit, std::string> CloneForRun(const Circuit &circuit);
+};
+
 class CircuitImpl {
 public:
     explicit CircuitImpl(CompiledCircuit compiled) : m_Compiled(std::move(compiled)) {}
@@ -33,16 +45,6 @@ public:
 
 private:
     CompiledCircuit m_Compiled;
-};
-
-/**
- * @struct  CircuitAccess
- * @brief   Internal bridge into Circuit's PIMPL so public headers never expose CircuitImpl.
- */
-struct CircuitAccess {
-    [[nodiscard]] static Circuit Create(std::unique_ptr<CircuitImpl> impl);
-    static const CompiledCircuit &GetCompiled(const Circuit &circuit);
-    [[nodiscard]] static std::expected<CompiledCircuit, std::string> CloneForRun(const Circuit &circuit);
 };
 
 } // namespace Nodalys

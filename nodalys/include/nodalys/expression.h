@@ -29,6 +29,8 @@
 
 namespace Nodalys {
 
+struct ExpressionProgram;
+
 /**
  * @struct  ExpressionInput
  * @brief   A voltage or a current an expression reads, as it is named in the text.
@@ -68,8 +70,6 @@ struct ExpressionResult {
     std::vector<double> Partials;
 };
 
-struct ExpressionProgram;
-
 /**
  * @class   Expression
  * @brief   A parsed expression, cheap to copy, that is evaluated at the values of its inputs.
@@ -86,9 +86,9 @@ public:
     Evaluate(std::span<const double> inputs, double time_seconds, double temperature_celsius = 27.0) const;
 
 private:
-    explicit Expression(std::shared_ptr<const ExpressionProgram> program);
-
     std::shared_ptr<const ExpressionProgram> m_Program;
+
+    explicit Expression(std::shared_ptr<const ExpressionProgram> program);
 };
 
 } // namespace Nodalys
