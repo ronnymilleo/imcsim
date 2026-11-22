@@ -19,6 +19,18 @@ namespace Nodalys {
 class Circuit;
 
 /**
+ * @enum    FrequencySweepType
+ * @brief   Frequency spacing mode for AC, noise, AC sensitivity and S-parameter frequency sweeps.
+ */
+enum class FrequencySweepType {
+    LINEAR,
+    DECADE,
+    OCTAVE
+};
+
+// Solver control
+
+/**
  * @struct  ConvergenceOptions
  * @brief   Numerical tolerances and iteration limits for Newton-Raphson and LTE step control.
  */
@@ -36,112 +48,22 @@ struct ConvergenceOptions {
 };
 
 /**
- * @struct  DcSweepConfig
- * @brief   Configuration for a 1D or 2D DC sweep (.dc).
+ * @struct  RunMonitor
+ * @brief   Asynchronous control and streaming callbacks for interactive/live simulation.
  */
-struct DcSweepConfig {
-    std::string SweptSource;
-    double SweptStart = 0.0;
-    double SweptStop = 0.0;
-    double SweptStep = 0.0;
-    std::string SteppedSource;
-    double SteppedStart = 0.0;
-    double SteppedStop = 0.0;
-    double SteppedStep = 0.0;
+struct RunMonitor {
+    std::function<bool()> ShouldStop = nullptr;
+    std::function<void(double progress)> OnProgress = nullptr;
+    std::function<std::vector<LiveChange>()> TakeLiveChanges = nullptr;
+    std::function<void(const TransientResult &chunk)> PostTransientChunk = nullptr;
+    /// Simulated seconds after which a chunk ends, besides the clock interval; 0 ends chunks by the clock only.
+    double ChunkSpan = 0.0;
+    /// Called after each chunk with the simulated time reached; it may block, to pace a live run or hold it while
+    /// paused, and returns false to stop the run.
+    std::function<bool(double time)> AfterChunk = nullptr;
 };
 
-/**
- * @struct  TransientConfig
- * @brief   Configuration for time-domain transient analysis (.tran).
- */
-struct TransientConfig {
-    double StopTime = 0.0;
-    double TimeStep = 0.0;
-    double MaxStep = 0.0;
-    bool UseInitialConditions = false;
-    IntegrationMethod Method = IntegrationMethod::TRAPEZOIDAL;
-    /// Seed for TRNOISE and TRRANDOM sources; 0 draws a new sequence on each run.
-    unsigned int Seed = 0;
-};
-
-/**
- * @enum    FrequencySweepType
- * @brief   Frequency spacing mode for AC, noise, AC sensitivity and S-parameter frequency sweeps.
- */
-enum class FrequencySweepType {
-    LINEAR,
-    DECADE,
-    OCTAVE
-};
-
-/**
- * @struct  AcSweepConfig
- * @brief   Configuration for small-signal AC frequency sweep (.ac).
- */
-struct AcSweepConfig {
-    double StartFrequency = 1.0;
-    double StopFrequency = 1e6;
-    /// Points per decade or per octave of a logarithmic sweep, or the points in all of a linear one.
-    int PointsPerDecade = 10;
-    FrequencySweepType SweepType = FrequencySweepType::DECADE;
-};
-
-/**
- * @struct  TransferFunctionConfig
- * @brief   Configuration for small-signal DC transfer function (.tf).
- */
-struct TransferFunctionConfig {
-    std::string InputSource;
-    int OutputPositiveNode = 0;
-    int OutputNegativeNode = 0;
-};
-
-/**
- * @struct  NoiseConfig
- * @brief   Configuration for small-signal AC noise analysis (.noise).
- */
-struct NoiseConfig {
-    int OutputPositiveNode = 0;
-    int OutputNegativeNode = 0;
-    std::string InputSource;
-    double StartFrequency = 1.0;
-    double StopFrequency = 1e6;
-    /// Points per decade or per octave of a logarithmic sweep, or the points in all of a linear one.
-    int PointsPerDecade = 10;
-    FrequencySweepType SweepType = FrequencySweepType::DECADE;
-};
-
-/**
- * @struct  SParameterConfig
- * @brief   Configuration for multiport small-signal scattering parameter analysis (.sp).
- */
-struct SParameterConfig {
-    FrequencySweepType SweepType = FrequencySweepType::DECADE;
-    double StartFrequency = 1e6;
-    double StopFrequency = 1e9;
-    int Points = 100;
-    std::vector<CircuitPort> Ports;
-};
-
-/**
- * @struct  PoleZeroConfig
- * @brief   Configuration for small-signal pole-zero analysis (.pz).
- */
-struct PoleZeroConfig {
-    int OutputNode = 0;
-    std::string InputSource;
-    bool FindPoles = true;
-    bool FindZeros = true;
-};
-
-/**
- * @struct  SensitivityConfig
- * @brief   Configuration for small-signal DC sensitivity analysis (.sens).
- */
-struct SensitivityConfig {
-    int OutputPositiveNode = 0;
-    int OutputNegativeNode = 0;
-};
+// Analysis configurations
 
 /**
  * @struct  AcSensitivityConfig
@@ -161,6 +83,33 @@ struct AcSensitivityConfig {
 };
 
 /**
+ * @struct  AcSweepConfig
+ * @brief   Configuration for small-signal AC frequency sweep (.ac).
+ */
+struct AcSweepConfig {
+    double StartFrequency = 1.0;
+    double StopFrequency = 1e6;
+    /// Points per decade or per octave of a logarithmic sweep, or the points in all of a linear one.
+    int PointsPerDecade = 10;
+    FrequencySweepType SweepType = FrequencySweepType::DECADE;
+};
+
+/**
+ * @struct  DcSweepConfig
+ * @brief   Configuration for a 1D or 2D DC sweep (.dc).
+ */
+struct DcSweepConfig {
+    std::string SweptSource;
+    double SweptStart = 0.0;
+    double SweptStop = 0.0;
+    double SweptStep = 0.0;
+    std::string SteppedSource;
+    double SteppedStart = 0.0;
+    double SteppedStop = 0.0;
+    double SteppedStep = 0.0;
+};
+
+/**
  * @struct  HarmonicBalanceConfig
  * @brief   Configuration for periodic steady-state Harmonic Balance analysis (.hb).
  */
@@ -174,69 +123,81 @@ struct HarmonicBalanceConfig {
 };
 
 /**
- * @struct  RunMonitor
- * @brief   Asynchronous control and streaming callbacks for interactive/live simulation.
+ * @struct  NoiseConfig
+ * @brief   Configuration for small-signal AC noise analysis (.noise).
  */
-struct RunMonitor {
-    std::function<bool()> ShouldStop = nullptr;
-    std::function<void(double progress)> OnProgress = nullptr;
-    std::function<std::vector<LiveChange>()> TakeLiveChanges = nullptr;
-    std::function<void(const TransientResult &chunk)> PostTransientChunk = nullptr;
-    /// Simulated seconds after which a chunk ends, besides the clock interval; 0 ends chunks by the clock only.
-    double ChunkSpan = 0.0;
-    /// Called after each chunk with the simulated time reached; it may block, to pace a live run or hold it while
-    /// paused, and returns false to stop the run.
-    std::function<bool(double time)> AfterChunk = nullptr;
+struct NoiseConfig {
+    int OutputPositiveNode = 0;
+    int OutputNegativeNode = 0;
+    std::string InputSource;
+    double StartFrequency = 1.0;
+    double StopFrequency = 1e6;
+    /// Points per decade or per octave of a logarithmic sweep, or the points in all of a linear one.
+    int PointsPerDecade = 10;
+    FrequencySweepType SweepType = FrequencySweepType::DECADE;
+};
+
+/**
+ * @struct  PoleZeroConfig
+ * @brief   Configuration for small-signal pole-zero analysis (.pz).
+ */
+struct PoleZeroConfig {
+    int OutputNode = 0;
+    std::string InputSource;
+    bool FindPoles = true;
+    bool FindZeros = true;
+};
+
+/**
+ * @struct  SParameterConfig
+ * @brief   Configuration for multiport small-signal scattering parameter analysis (.sp).
+ */
+struct SParameterConfig {
+    FrequencySweepType SweepType = FrequencySweepType::DECADE;
+    double StartFrequency = 1e6;
+    double StopFrequency = 1e9;
+    int Points = 100;
+    std::vector<CircuitPort> Ports;
+};
+
+/**
+ * @struct  SensitivityConfig
+ * @brief   Configuration for small-signal DC sensitivity analysis (.sens).
+ */
+struct SensitivityConfig {
+    int OutputPositiveNode = 0;
+    int OutputNegativeNode = 0;
+};
+
+/**
+ * @struct  TransferFunctionConfig
+ * @brief   Configuration for small-signal DC transfer function (.tf).
+ */
+struct TransferFunctionConfig {
+    std::string InputSource;
+    int OutputPositiveNode = 0;
+    int OutputNegativeNode = 0;
+};
+
+/**
+ * @struct  TransientConfig
+ * @brief   Configuration for time-domain transient analysis (.tran).
+ */
+struct TransientConfig {
+    double StopTime = 0.0;
+    double TimeStep = 0.0;
+    double MaxStep = 0.0;
+    bool UseInitialConditions = false;
+    IntegrationMethod Method = IntegrationMethod::TRAPEZOIDAL;
+    /// Seed for TRNOISE and TRRANDOM sources; 0 draws a new sequence on each run.
+    unsigned int Seed = 0;
 };
 
 // Top-level analysis entry points
-std::expected<OperatingPointResult, std::string>
-ComputeOperatingPoint(const Circuit &circuit,
-                      const ConvergenceOptions &options = {},
-                      std::vector<DiagnosticMessage> *messages = nullptr);
-
-std::expected<DcSweepResult, std::string> ComputeDCSweep(const Circuit &circuit,
-                                                         const DcSweepConfig &config,
-                                                         const ConvergenceOptions &options = {},
-                                                         std::vector<DiagnosticMessage> *messages = nullptr);
-
-std::expected<TransientResult, std::string> ComputeTransient(const Circuit &circuit,
-                                                             const TransientConfig &config,
-                                                             bool has_initial_conditions = false,
-                                                             const RunMonitor &monitor = {},
-                                                             const ConvergenceOptions &options = {},
-                                                             std::vector<DiagnosticMessage> *messages = nullptr);
-
 std::expected<AcSweepResult, std::string> ComputeACSweep(const Circuit &circuit,
                                                          const AcSweepConfig &config,
                                                          const ConvergenceOptions &options = {},
                                                          std::vector<DiagnosticMessage> *messages = nullptr);
-
-std::expected<TransferFunctionResult, std::string>
-ComputeTransferFunction(const Circuit &circuit,
-                        const TransferFunctionConfig &config,
-                        const ConvergenceOptions &options = {},
-                        std::vector<DiagnosticMessage> *messages = nullptr);
-
-std::expected<NoiseResult, std::string> ComputeNoise(const Circuit &circuit,
-                                                     const NoiseConfig &config,
-                                                     const ConvergenceOptions &options = {},
-                                                     std::vector<DiagnosticMessage> *messages = nullptr);
-
-std::expected<SParameterResult, std::string> ComputeSParameters(const Circuit &circuit,
-                                                                const SParameterConfig &config,
-                                                                const ConvergenceOptions &options = {},
-                                                                std::vector<DiagnosticMessage> *messages = nullptr);
-
-std::expected<PoleZeroResult, std::string> ComputePoleZero(const Circuit &circuit,
-                                                           const PoleZeroConfig &config,
-                                                           const ConvergenceOptions &options = {},
-                                                           std::vector<DiagnosticMessage> *messages = nullptr);
-
-std::expected<SensitivityResult, std::string> ComputeSensitivity(const Circuit &circuit,
-                                                                 const SensitivityConfig &config,
-                                                                 const ConvergenceOptions &options = {},
-                                                                 std::vector<DiagnosticMessage> *messages = nullptr);
 
 std::expected<AcSensitivityResult, std::string>
 ComputeAcSensitivity(const Circuit &circuit,
@@ -244,11 +205,54 @@ ComputeAcSensitivity(const Circuit &circuit,
                      const ConvergenceOptions &options = {},
                      std::vector<DiagnosticMessage> *messages = nullptr);
 
+std::expected<DcSweepResult, std::string> ComputeDCSweep(const Circuit &circuit,
+                                                         const DcSweepConfig &config,
+                                                         const ConvergenceOptions &options = {},
+                                                         std::vector<DiagnosticMessage> *messages = nullptr);
+
 std::expected<HarmonicBalanceResult, std::string>
 ComputeHarmonicBalance(const Circuit &circuit,
                        const HarmonicBalanceConfig &config,
                        const ConvergenceOptions &options = {},
                        std::vector<DiagnosticMessage> *messages = nullptr);
+
+std::expected<NoiseResult, std::string> ComputeNoise(const Circuit &circuit,
+                                                     const NoiseConfig &config,
+                                                     const ConvergenceOptions &options = {},
+                                                     std::vector<DiagnosticMessage> *messages = nullptr);
+
+std::expected<OperatingPointResult, std::string>
+ComputeOperatingPoint(const Circuit &circuit,
+                      const ConvergenceOptions &options = {},
+                      std::vector<DiagnosticMessage> *messages = nullptr);
+
+std::expected<PoleZeroResult, std::string> ComputePoleZero(const Circuit &circuit,
+                                                           const PoleZeroConfig &config,
+                                                           const ConvergenceOptions &options = {},
+                                                           std::vector<DiagnosticMessage> *messages = nullptr);
+
+std::expected<SParameterResult, std::string> ComputeSParameters(const Circuit &circuit,
+                                                                const SParameterConfig &config,
+                                                                const ConvergenceOptions &options = {},
+                                                                std::vector<DiagnosticMessage> *messages = nullptr);
+
+std::expected<SensitivityResult, std::string> ComputeSensitivity(const Circuit &circuit,
+                                                                 const SensitivityConfig &config,
+                                                                 const ConvergenceOptions &options = {},
+                                                                 std::vector<DiagnosticMessage> *messages = nullptr);
+
+std::expected<TransferFunctionResult, std::string>
+ComputeTransferFunction(const Circuit &circuit,
+                        const TransferFunctionConfig &config,
+                        const ConvergenceOptions &options = {},
+                        std::vector<DiagnosticMessage> *messages = nullptr);
+
+std::expected<TransientResult, std::string> ComputeTransient(const Circuit &circuit,
+                                                             const TransientConfig &config,
+                                                             bool has_initial_conditions = false,
+                                                             const RunMonitor &monitor = {},
+                                                             const ConvergenceOptions &options = {},
+                                                             std::vector<DiagnosticMessage> *messages = nullptr);
 
 } // namespace Nodalys
 

@@ -17,6 +17,9 @@
 
 namespace Nodalys {
 
+/// Devices by the name of their element; SPICE names ignore case, so "Vin" finds the source written "VIN".
+using DevicesByName = std::map<std::string, Device *, CaseInsensitiveLess>;
+
 /**
  * @struct  CurrentContribution
  * @brief   One device terminal whose entering current adds to a reported component current.
@@ -43,9 +46,6 @@ struct NoiseGroup {
     std::string Name;
     std::vector<const Device *> Devices;
 };
-
-/// Devices by the name of their element; SPICE names ignore case, so "Vin" finds the source written "VIN".
-using DevicesByName = std::map<std::string, Device *, CaseInsensitiveLess>;
 
 /**
  * @struct  CompiledCircuit

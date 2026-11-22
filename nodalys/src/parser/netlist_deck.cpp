@@ -21,6 +21,16 @@ namespace Nodalys {
 namespace {
 
 /**
+ * @struct  OpenBlocks
+ * @brief   The .subckt blocks open at a line of the netlist, whose lines are definitions until their .ends.
+ */
+struct OpenBlocks {
+    int Depth = 0;
+    /// The name of the outermost open block, for the message when the netlist never closes it.
+    std::string OutermostName;
+};
+
+/**
  * @brief   Cuts the title off a netlist: its first line that is not blank, whatever it says, as in SPICE.
  * @return  The title and the text after it.
  */
@@ -66,16 +76,6 @@ std::expected<void, std::string> ReadModelLine(const DeckLine &line, Deck &deck)
     deck.Models[name] = std::move(model);
     return {};
 }
-
-/**
- * @struct  OpenBlocks
- * @brief   The .subckt blocks open at a line of the netlist, whose lines are definitions until their .ends.
- */
-struct OpenBlocks {
-    int Depth = 0;
-    /// The name of the outermost open block, for the message when the netlist never closes it.
-    std::string OutermostName;
-};
 
 /**
  * @brief   Puts one line where it belongs: among the definitions, the models or the circuit lines.

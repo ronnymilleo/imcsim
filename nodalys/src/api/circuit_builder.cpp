@@ -40,29 +40,34 @@ constexpr double IDEAL_GAIN = 1e5;
 constexpr double IDEAL_TRANSCONDUCTANCE = 1e-3;
 constexpr double IDEAL_RESISTANCE = IDEAL_GAIN / IDEAL_TRANSCONDUCTANCE;
 
-struct IdealOpAmpValues {
-    double Transconductance;
-    double Resistance;
-    double Capacitance;
-    DiodeParameters Clamp;
-};
-
-IdealOpAmpValues ComputeIdealOpAmpValues(const double bandwidth) {
-    return {.Transconductance = IDEAL_TRANSCONDUCTANCE,
-            .Resistance = IDEAL_RESISTANCE,
-            .Capacitance = IDEAL_GAIN / (2.0 * std::numbers::pi * IDEAL_RESISTANCE * bandwidth),
-            .Clamp = {.SaturationCurrent = 1e-15, .EmissionCoefficient = 0.01}};
-}
-
 // Boyle macromodel constants
+/// Saturation current of the diodes that clamp the current limiter of the Boyle op-amp.
+constexpr double CLAMP_DIODE_SATURATION_CURRENT = 1e-20;
 constexpr double COMPENSATION_CAPACITANCE = 30e-12;
+constexpr double CURRENT_LIMIT_THRESHOLD = 0.853;
 constexpr double GAIN_STAGE_RESISTANCE = 100e3;
+constexpr double INPUT_SATURATION_CURRENT = 8e-16;
+constexpr double LIMITER_DIODE_DROPS = 1.3831;
+/// Resistance that senses the current in the limiter branches of the Boyle op-amp.
+constexpr double LIMITER_SENSE_RESISTANCE = 10.0;
+constexpr double OUTPUT_SENSE_RESISTANCE = 1.0;
+/// Resistance that biases the middle of a rail swing limiter of the Boyle op-amp.
+constexpr double RAIL_BIAS_RESISTANCE = 1e3;
+/// Saturation current of the diodes of the rail swing limiters of the Boyle op-amp.
+constexpr double RAIL_DIODE_SATURATION_CURRENT = 1e-16;
 constexpr double TAIL_EARLY_VOLTAGE = 200.0;
 constexpr double THERMAL_VT = 0.025852;
-constexpr double INPUT_SATURATION_CURRENT = 8e-16;
-constexpr double OUTPUT_SENSE_RESISTANCE = 1.0;
-constexpr double CURRENT_LIMIT_THRESHOLD = 0.853;
-constexpr double LIMITER_DIODE_DROPS = 1.3831;
+
+// Builder defaults and sentinels
+/// The unknown index of the reference node, which has no row in the system.
+constexpr int GROUND_UNKNOWN = -1;
+/// Factor that lowers the threshold of one gate of a latch, so the two gates are not alike and the operating point
+/// does not stay on the metastable state.
+constexpr double LATCH_THRESHOLD_ASYMMETRY = 0.99;
+/// The periodicity of the sources the harmonic balance cannot take: they have no period it could use.
+constexpr SourcePeriodicity NON_PERIODIC{.Kind = SourceWaveformKind::NON_PERIODIC, .IsSupportedInHb = false};
+/// Control branch of a current-controlled source until Build() binds it to its source, or refuses the circuit.
+constexpr int UNBOUND_CONTROL_BRANCH = -1;
 
 struct BoyleOpAmpValues {
     double CollectorResistance;
@@ -84,6 +89,87 @@ struct BoyleOpAmpValues {
     double GainStageResistance;
     double OutputSenseResistance;
 };
+
+/**
+ * @struct  FlipFlopNodes
+ * @brief   The nodes of the D flip-flop: its outputs and the outputs of its four inner gates.
+ */
+struct FlipFlopNodes {
+    int Q;
+    int QBar;
+    int N1;
+    int N2;
+    int N3;
+    int N4;
+};
+
+struct IdealOpAmpValues {
+    double Transconductance;
+    double Resistance;
+    double Capacitance;
+    DiodeParameters Clamp;
+};
+
+/**
+ * @struct  OpAmpTerminals
+ * @brief   The unknowns of the five terminals of an op-amp, as the devices take them.
+ */
+struct OpAmpTerminals {
+    int Out;
+    int InPos;
+    int InNeg;
+    int VccPos;
+    int VccNeg;
+};
+
+/**
+ * @struct  RailLimiterNodes
+ * @brief   The three internal nodes of one rail swing limiter of the Boyle op-amp.
+ */
+struct RailLimiterNodes {
+    int Sense;
+    int Mid;
+    int Ref;
+};
+
+/**
+ * @struct  BoyleNodes
+ * @brief   The internal nodes of the Boyle op-amp, which every stage of the macromodel reads a different subset of.
+ */
+struct BoyleNodes {
+    int Col1;
+    int Col2;
+    int Emit1;
+    int Emit2;
+    int Tail;
+    int Gain;
+    int OutInternal;
+    int ClampNode;
+    int ClampSense;
+    RailLimiterNodes Upper;
+    RailLimiterNodes Lower;
+};
+
+/**
+ * @struct  SourceSpec
+ * @brief   What an independent source is made of, whether it is a voltage source or a current source.
+ */
+struct SourceSpec {
+    double Dc = 0.0;
+    VoltageSourceDevice::Waveform Waveform;
+    double AcMagnitude = 0.0;
+    SourcePeriodicity Periodicity;
+    VoltageSourceDevice::Breakpoints Breakpoints;
+    std::function<void(std::uint64_t)> SetSeed;
+    VoltageSourceDevice::CallbackFactory CallbackFactory;
+};
+
+IdealOpAmpValues ComputeIdealOpAmpValues(const double bandwidth) {
+    return {.Transconductance = IDEAL_TRANSCONDUCTANCE,
+            .Resistance = IDEAL_RESISTANCE,
+            .Capacitance = IDEAL_GAIN / (2.0 * std::numbers::pi * IDEAL_RESISTANCE * bandwidth),
+            .Clamp = {.SaturationCurrent = 1e-15, .EmissionCoefficient = 0.01}};
+}
 
 BoyleOpAmpValues ComputeBoyleOpAmpValues(const BoyleOpAmpParameters &parameters) {
     const double tail_current = parameters.SlewRate * 1e6 * COMPENSATION_CAPACITANCE;
@@ -117,93 +203,6 @@ BoyleOpAmpValues ComputeBoyleOpAmpValues(const BoyleOpAmpParameters &parameters)
             .GainStageResistance = GAIN_STAGE_RESISTANCE,
             .OutputSenseResistance = OUTPUT_SENSE_RESISTANCE};
 }
-
-/// The unknown index of the reference node, which has no row in the system.
-constexpr int GROUND_UNKNOWN = -1;
-/// Control branch of a current-controlled source until Build() binds it to its source, or refuses the circuit.
-constexpr int UNBOUND_CONTROL_BRANCH = -1;
-
-/// Saturation current of the diodes that clamp the current limiter of the Boyle op-amp.
-constexpr double CLAMP_DIODE_SATURATION_CURRENT = 1e-20;
-/// Saturation current of the diodes of the rail swing limiters of the Boyle op-amp.
-constexpr double RAIL_DIODE_SATURATION_CURRENT = 1e-16;
-/// Resistance that senses the current in the limiter branches of the Boyle op-amp.
-constexpr double LIMITER_SENSE_RESISTANCE = 10.0;
-/// Resistance that biases the middle of a rail swing limiter of the Boyle op-amp.
-constexpr double RAIL_BIAS_RESISTANCE = 1e3;
-
-/// Factor that lowers the threshold of one gate of a latch, so the two gates are not alike and the operating point
-/// does not stay on the metastable state.
-constexpr double LATCH_THRESHOLD_ASYMMETRY = 0.99;
-
-/**
-
- * @struct  OpAmpTerminals
-
- * @brief   The unknowns of the five terminals of an op-amp, as the devices take them.
-
- */
-
-struct OpAmpTerminals {
-    int Out;
-    int InPos;
-    int InNeg;
-    int VccPos;
-    int VccNeg;
-};
-
-/**
-
- * @struct  RailLimiterNodes
-
- * @brief   The three internal nodes of one rail swing limiter of the Boyle op-amp.
-
- */
-
-struct RailLimiterNodes {
-    int Sense;
-    int Mid;
-    int Ref;
-};
-
-/**
-
- * @struct  BoyleNodes
-
- * @brief   The internal nodes of the Boyle op-amp, which every stage of the macromodel reads a different subset of.
-
- */
-
-struct BoyleNodes {
-    int Col1;
-    int Col2;
-    int Emit1;
-    int Emit2;
-    int Tail;
-    int Gain;
-    int OutInternal;
-    int ClampNode;
-    int ClampSense;
-    RailLimiterNodes Upper;
-    RailLimiterNodes Lower;
-};
-
-/**
-
- * @struct  FlipFlopNodes
-
- * @brief   The nodes of the D flip-flop: its outputs and the outputs of its four inner gates.
-
- */
-
-struct FlipFlopNodes {
-    int Q;
-    int QBar;
-    int N1;
-    int N2;
-    int N3;
-    int N4;
-};
 
 /**
  * @brief   Lists the inputs of a gate, followed by the one that only some circuits connect.
@@ -273,27 +272,6 @@ BjtParameters ScaleByArea(BjtParameters parameters, const double area) {
     parameters.EmitterResistance /= area;
     return parameters;
 }
-
-/// The periodicity of the sources the harmonic balance cannot take: they have no period it could use.
-constexpr SourcePeriodicity NON_PERIODIC{.Kind = SourceWaveformKind::NON_PERIODIC, .IsSupportedInHb = false};
-
-/**
-
- * @struct  SourceSpec
-
- * @brief   What an independent source is made of, whether it is a voltage source or a current source.
-
- */
-
-struct SourceSpec {
-    double Dc = 0.0;
-    VoltageSourceDevice::Waveform Waveform;
-    double AcMagnitude = 0.0;
-    SourcePeriodicity Periodicity;
-    VoltageSourceDevice::Breakpoints Breakpoints;
-    std::function<void(std::uint64_t)> SetSeed;
-    VoltageSourceDevice::CallbackFactory CallbackFactory;
-};
 
 /**
  * @brief   Describes a source that holds a constant level.
@@ -1136,6 +1114,18 @@ private:
         std::function<void(int)> Bind;
     };
 
+    int m_CircuitNodeCount = 0;
+    int m_MaxNode = 0;
+    std::vector<std::function<void()>> m_Actions;
+    std::vector<PendingCurrent> m_PendingCurrents;
+    std::vector<PendingControl> m_PendingControls;
+    std::vector<std::string> m_Errors;
+    std::vector<bool> m_IsNodeUnknown;
+    std::vector<bool> m_DynamicUnknown;
+    std::map<int, double> m_InitialNodeVoltages;
+    std::map<int, double> m_NodesetVoltages;
+    CompiledCircuit m_Compiled;
+
     /**
      * @brief   Registers a device under its name, with the current through its first terminal as the current of the
      *          element.
@@ -1492,18 +1482,6 @@ private:
         }
         m_PendingControls.clear();
     }
-
-    int m_CircuitNodeCount = 0;
-    int m_MaxNode = 0;
-    std::vector<std::function<void()>> m_Actions;
-    std::vector<PendingCurrent> m_PendingCurrents;
-    std::vector<PendingControl> m_PendingControls;
-    std::vector<std::string> m_Errors;
-    std::vector<bool> m_IsNodeUnknown;
-    std::vector<bool> m_DynamicUnknown;
-    std::map<int, double> m_InitialNodeVoltages;
-    std::map<int, double> m_NodesetVoltages;
-    CompiledCircuit m_Compiled;
 };
 
 CircuitBuilder::CircuitBuilder(int num_circuit_nodes)

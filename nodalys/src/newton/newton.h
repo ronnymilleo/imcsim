@@ -16,6 +16,19 @@
 namespace Nodalys {
 
 /**
+ * @enum    NodesetPass
+ * @brief   Which of the passes of a solve with nodesets is being run.
+ */
+enum class NodesetPass {
+    /// The nodes are pulled to their guesses.
+    PULLED,
+    /// The nodesets are let go, starting from the point the pulled pass found.
+    RELEASED,
+    /// No nodeset acts, as a solve of a circuit without any.
+    PLAIN,
+};
+
+/**
  * @struct  NewtonOutcome
  * @brief   What a Newton solve ended with, for diagnostic messages.
  */
@@ -46,19 +59,6 @@ NewtonOutcome SolveNewton(MnaSystem &sys,
                           std::vector<double> &x,
                           const TimeContext &time,
                           const ConvergenceOptions &options);
-
-/**
- * @enum    NodesetPass
- * @brief   Which of the passes of a solve with nodesets is being run.
- */
-enum class NodesetPass {
-    /// The nodes are pulled to their guesses.
-    PULLED,
-    /// The nodesets are let go, starting from the point the pulled pass found.
-    RELEASED,
-    /// No nodeset acts, as a solve of a circuit without any.
-    PLAIN,
-};
 
 /**
  * @brief   Runs a solve of an operating point through the passes of the nodesets.

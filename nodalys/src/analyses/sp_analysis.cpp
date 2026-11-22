@@ -34,6 +34,18 @@ struct DeviceRestoreGuard {
     }
 };
 
+/**
+ * @struct  PortDrives
+ * @brief   What each port needs to be excited and read, one entry per port in the order of the ports.
+ */
+struct PortDrives {
+    /// Unknown of the port node, or -1 when the port is on ground.
+    std::vector<int> Unknowns;
+    std::vector<double> SqrtConductances;
+    /// Norton current source of each port, as the right-hand side that excites it.
+    std::vector<std::vector<std::complex<double>>> Excitations;
+};
+
 // The messages of the checks that imcsim runs before any backend are worded the same way here, so a cause reads the
 // same wherever it is found: tests/s_parameters_tests.cpp keeps the two in step
 
@@ -133,18 +145,6 @@ DeviceRestoreGuard AddPortTerminations(CompiledCircuit &compiled, const std::vec
     }
     return DeviceRestoreGuard{compiled.Devices, original_device_count};
 }
-
-/**
- * @struct  PortDrives
- * @brief   What each port needs to be excited and read, one entry per port in the order of the ports.
- */
-struct PortDrives {
-    /// Unknown of the port node, or -1 when the port is on ground.
-    std::vector<int> Unknowns;
-    std::vector<double> SqrtConductances;
-    /// Norton current source of each port, as the right-hand side that excites it.
-    std::vector<std::vector<std::complex<double>>> Excitations;
-};
 
 /**
  * @brief   Pre-assembles the excitation of each port.

@@ -30,6 +30,20 @@ constexpr double MIN_LOG_FREQUENCY_STEP = 1e-12;
 /// How close the slope of the noise density in a log-log plot may come to -1, where the integral is a logarithm.
 constexpr double INVERSE_SLOPE_TOLERANCE = 1e-10;
 
+/**
+ * @struct  NoiseAccumulator
+ * @brief   What the sweep carries from one frequency to the next: the variance of each device at the previous point,
+ *          its integral so far, and the variance of each group at every point.
+ */
+struct NoiseAccumulator {
+    std::unordered_map<const Device *, std::size_t> DeviceIndex;
+    std::vector<double> PreviousDeviceVariances;
+    std::vector<double> IntegratedDeviceVariances;
+    double IntegratedOutputVariance = 0.0;
+    double IntegratedInputVariance = 0.0;
+    std::vector<std::vector<double>> GroupVariances;
+};
+
 double IntegrateNoiseStep(const double f1, const double f2, const double s1, const double s2) {
     if (s1 <= 0.0 && s2 <= 0.0) {
         return 0.0;
@@ -54,20 +68,6 @@ double IntegrateNoiseStep(const double f1, const double f2, const double s1, con
     }
     return (s2 * f2 - s1 * f1) / (alpha + 1.0);
 }
-
-/**
- * @struct  NoiseAccumulator
- * @brief   What the sweep carries from one frequency to the next: the variance of each device at the previous point,
- *          its integral so far, and the variance of each group at every point.
- */
-struct NoiseAccumulator {
-    std::unordered_map<const Device *, std::size_t> DeviceIndex;
-    std::vector<double> PreviousDeviceVariances;
-    std::vector<double> IntegratedDeviceVariances;
-    double IntegratedOutputVariance = 0.0;
-    double IntegratedInputVariance = 0.0;
-    std::vector<std::vector<double>> GroupVariances;
-};
 
 NoiseAccumulator MakeAccumulator(const CompiledCircuit &compiled, const std::size_t point_count) {
     const std::size_t device_count = compiled.Devices.size();

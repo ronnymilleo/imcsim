@@ -14,29 +14,29 @@ namespace Nodalys {
 
 namespace {
 
-using Complex = std::complex<double>;
-
+/// Two QZ roots farther apart than this share of their size were different roots to start with.
+constexpr double DISTINCT_START_SHARE = 1e-3;
 /// Iterations of the shifted inverse iteration: two or three from a root QZ got right, more from one it got far wrong.
 constexpr int MAX_ITERATIONS = 40;
-/// A step smaller than this share of the root, or of the noise floor, ends the iteration.
-constexpr double STEP_TOLERANCE = 1e-14;
 /// Pencils larger than this keep the QZ values: every root costs a few complex factorizations of the pencil.
 constexpr std::size_t MAX_REFINED_SIZE = 150;
+/// How far a root may move as a share of its own size.
+constexpr double MAX_RELATIVE_MOVE = 1.0;
 /// How far a root may move, in units of the rounding of the largest root. QZ promises one rounding, but a root of a
 /// strongly non-normal pencil can be off by a million times that.
 constexpr double NOISE_ROUNDINGS = 1e7;
-/// How far a root may move as a share of its own size.
-constexpr double MAX_RELATIVE_MOVE = 1.0;
+/// A root whose eigenvector leaves A singular to this many roundings is at the origin.
+constexpr double ORIGIN_ROUNDINGS = 50.0;
 /// Residual, in roundings of the pencil times its size, under which a refined root is believed.
 constexpr double RESIDUAL_ROUNDINGS = 1e3;
 /// Two refined roots this close, as a share of their size, are the same root.
 constexpr double SAME_ROOT_SHARE = 1e-4;
-/// Two QZ roots farther apart than this share of their size were different roots to start with.
-constexpr double DISTINCT_START_SHARE = 1e-3;
-/// A root whose eigenvector leaves A singular to this many roundings is at the origin.
-constexpr double ORIGIN_ROUNDINGS = 50.0;
+/// A step smaller than this share of the root, or of the noise floor, ends the iteration.
+constexpr double STEP_TOLERANCE = 1e-14;
 /// Rounds of the largest root under which a root that was not refined is taken for noise at the origin.
 constexpr double UNREFINED_ORIGIN_ROUNDINGS = 10.0;
+
+using Complex = std::complex<double>;
 
 /**
  * @struct  Refined

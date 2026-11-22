@@ -28,6 +28,38 @@
 namespace Nodalys {
 
 /**
+ * @enum    SourceWaveformKind
+ * @brief   Classification of an independent source's waveform for Harmonic Balance validation.
+ */
+enum class SourceWaveformKind {
+    DC,
+    SINE,
+    PULSE,
+    CLOCK,
+    NON_PERIODIC
+};
+
+/**
+ * @struct  NodeSeed
+ * @brief   One node index and its initial Newton guess for `NodeSeedDevice`.
+ */
+struct NodeSeed {
+    int Node = -1;
+    double Voltage = 0.0;
+};
+
+/**
+ * @struct  SourcePeriodicity
+ * @brief   Periodicity metadata attached to independent voltage and current sources.
+ */
+struct SourcePeriodicity {
+    SourceWaveformKind Kind = SourceWaveformKind::DC;
+    double Frequency = 0.0;
+    double MinEdgeTime = 0.0;
+    bool IsSupportedInHb = true;
+};
+
+/**
  * @class   Device
  * @brief   One element between the nodes of the compiled circuit, with the physics of its kind.
  * @details A device knows the unknown indices of its nodes and branches, set by the compiler. The results ask for
@@ -318,29 +350,6 @@ private:
     ChargeHistory m_SavedHistory;
     double m_InitialCurrent;
     bool m_HasInitial;
-};
-
-/**
- * @enum    SourceWaveformKind
- * @brief   Classification of an independent source's waveform for Harmonic Balance validation.
- */
-enum class SourceWaveformKind {
-    DC,
-    SINE,
-    PULSE,
-    CLOCK,
-    NON_PERIODIC
-};
-
-/**
- * @struct  SourcePeriodicity
- * @brief   Periodicity metadata attached to independent voltage and current sources.
- */
-struct SourcePeriodicity {
-    SourceWaveformKind Kind = SourceWaveformKind::DC;
-    double Frequency = 0.0;
-    double MinEdgeTime = 0.0;
-    bool IsSupportedInHb = true;
 };
 
 /**
@@ -760,15 +769,6 @@ public:
 private:
     int m_Node;
     double m_Voltage;
-};
-
-/**
- * @struct  NodeSeed
- * @brief   One node index and its initial Newton guess for `NodeSeedDevice`.
- */
-struct NodeSeed {
-    int Node = -1;
-    double Voltage = 0.0;
 };
 
 /**

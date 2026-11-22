@@ -41,11 +41,11 @@ public:
                                        std::vector<std::complex<double>> &scratch) const;
 
 private:
-    void Transform(std::vector<std::complex<double>> &data, bool inverse) const;
-
     std::size_t m_Size = 0;
     std::vector<std::size_t> m_BitRev;
     std::vector<std::complex<double>> m_Twiddles;
+
+    void Transform(std::vector<std::complex<double>> &data, bool inverse) const;
 };
 
 // Size Helpers

@@ -72,15 +72,6 @@ private:
         int Cathode;
     };
 
-    /// Recomputes the parameters at the temperature, from the ones given at the nominal temperature.
-    void ApplyTemperature(const ThermalConditions &thermal);
-    /// Evaluates the level-1 channel equations for nonnegative effective $v_{ds} \ge 0$.
-    Channel Evaluate(double vgs_eff, double vds_eff) const;
-    /// Finds which terminal acts as the drain at the solution `x` and evaluates the channel in that frame.
-    ChannelState EvaluateChannel(const std::vector<double> &x) const;
-    /// Finds the anode and the cathode of the body-drain diode, which depend on the polarity.
-    BodyDiodeNodes GetBodyDiodeNodes() const;
-
     int m_Drain;
     int m_Gate;
     int m_Source;
@@ -101,6 +92,15 @@ private:
     ChargeHistory m_HistoryGd, m_SavedHistoryGd;
     double m_Gcgs = 0.0, m_Ieqgs = 0.0, m_Gcgd = 0.0, m_Ieqgd = 0.0;
     double m_Critical; ///< `PNJLIM` critical voltage of the body-drain junction diode.
+
+    /// Recomputes the parameters at the temperature, from the ones given at the nominal temperature.
+    void ApplyTemperature(const ThermalConditions &thermal);
+    /// Evaluates the level-1 channel equations for nonnegative effective $v_{ds} \ge 0$.
+    Channel Evaluate(double vgs_eff, double vds_eff) const;
+    /// Finds which terminal acts as the drain at the solution `x` and evaluates the channel in that frame.
+    ChannelState EvaluateChannel(const std::vector<double> &x) const;
+    /// Finds the anode and the cathode of the body-drain diode, which depend on the polarity.
+    BodyDiodeNodes GetBodyDiodeNodes() const;
 };
 
 } // namespace Nodalys

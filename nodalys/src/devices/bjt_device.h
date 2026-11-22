@@ -89,15 +89,6 @@ private:
         double Transcapacitance;
     };
 
-    /// Recomputes the parameters at the temperature, from the ones given at the nominal temperature.
-    void ApplyTemperature(const ThermalConditions &thermal);
-    /// Evaluates the intrinsic transport equations in NPN polarity ($v_{be}, v_{bc}$ forward-positive).
-    Intrinsic Evaluate(double vbe, double vbc) const;
-    /// Reads the junction voltages from `x` and evaluates the intrinsic transistor there.
-    JunctionState EvaluateState(const std::vector<double> &x) const;
-    /// Evaluates the charges of both junctions at a junction state.
-    JunctionCharges EvaluateCharges(const JunctionState &state) const;
-
     int m_Collector;
     int m_Base;
     int m_Emitter;
@@ -118,6 +109,15 @@ private:
     ChargeHistory m_HistoryBe, m_SavedHistoryBe;
     ChargeHistory m_HistoryBc, m_SavedHistoryBc;
     double m_Gqbe = 0.0, m_Ieqbe = 0.0, m_Gqbc = 0.0, m_Ieqbc = 0.0;
+
+    /// Recomputes the parameters at the temperature, from the ones given at the nominal temperature.
+    void ApplyTemperature(const ThermalConditions &thermal);
+    /// Evaluates the intrinsic transport equations in NPN polarity ($v_{be}, v_{bc}$ forward-positive).
+    Intrinsic Evaluate(double vbe, double vbc) const;
+    /// Reads the junction voltages from `x` and evaluates the intrinsic transistor there.
+    JunctionState EvaluateState(const std::vector<double> &x) const;
+    /// Evaluates the charges of both junctions at a junction state.
+    JunctionCharges EvaluateCharges(const JunctionState &state) const;
 };
 
 } // namespace Nodalys

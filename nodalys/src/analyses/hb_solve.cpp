@@ -42,11 +42,6 @@ struct HbNewtonOutcome {
 
 /// The vectors and matrices of the Newton iteration, sized once so it allocates nothing per iteration.
 struct NewtonBuffers {
-    NewtonBuffers(const HbWorkspace &ws, const std::size_t total)
-        : Jacobian(total, total), RhsNegative(total), Delta(total), Candidate(total), Next(total),
-          CandidateSamples(ws.SampleCount, std::vector<double>(static_cast<std::size_t>(ws.UnknownCount), 0.0)),
-          PreviousSamples(ws.SampleCount, std::vector<double>(static_cast<std::size_t>(ws.UnknownCount), 0.0)) {}
-
     DenseMatrix Jacobian;
     HarmonicResidual Residual;
     std::vector<double> RhsNegative;
@@ -57,6 +52,11 @@ struct NewtonBuffers {
     std::vector<double> Next;
     std::vector<std::vector<double>> CandidateSamples;
     std::vector<std::vector<double>> PreviousSamples;
+
+    NewtonBuffers(const HbWorkspace &ws, const std::size_t total)
+        : Jacobian(total, total), RhsNegative(total), Delta(total), Candidate(total), Next(total),
+          CandidateSamples(ws.SampleCount, std::vector<double>(static_cast<std::size_t>(ws.UnknownCount), 0.0)),
+          PreviousSamples(ws.SampleCount, std::vector<double>(static_cast<std::size_t>(ws.UnknownCount), 0.0)) {}
 };
 
 /**

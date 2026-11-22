@@ -19,9 +19,15 @@ namespace Nodalys {
 
 namespace {
 
+constexpr std::string_view HERTZ_REASON =
+    "hertz, the frequency, is not supported by Nodalys in an expression: it would make the small-signal gain depend on "
+    "the frequency, which an AC sweep cannot stamp once";
 /// Deepest nesting of parentheses, operators and calls, so a hostile text cannot exhaust the stack of the parser or of
 /// the evaluation that follows its shape.
 constexpr int MAX_NESTING_DEPTH = 200;
+constexpr double NOMINAL_E = 2.718281828459045;
+constexpr double NOMINAL_PI = 3.141592653589793;
+constexpr std::string_view RANDOM_REASON = "draws random numbers, which Nodalys does not run in an expression";
 
 /// A function the language knows, and how many operands it takes.
 struct FunctionEntry {
@@ -30,98 +36,11 @@ struct FunctionEntry {
     int OperandCount;
 };
 
-constexpr auto FUNCTIONS = std::to_array<FunctionEntry>({
-    {"abs", Operation::ABS, 1},
-    {"sqrt", Operation::SQRT, 1},
-    {"exp", Operation::EXP, 1},
-    // ngspice reads log() as the natural logarithm, like ln(), and log10() as the decimal one
-    {"ln", Operation::LN, 1},
-    {"log", Operation::LN, 1},
-    {"log10", Operation::LOG10, 1},
-    {"sin", Operation::SIN, 1},
-    {"cos", Operation::COS, 1},
-    {"tan", Operation::TAN, 1},
-    {"asin", Operation::ASIN, 1},
-    {"acos", Operation::ACOS, 1},
-    {"atan", Operation::ATAN, 1},
-    {"sinh", Operation::SINH, 1},
-    {"cosh", Operation::COSH, 1},
-    {"tanh", Operation::TANH, 1},
-    {"asinh", Operation::ASINH, 1},
-    {"acosh", Operation::ACOSH, 1},
-    {"atanh", Operation::ATANH, 1},
-    {"sgn", Operation::SIGN, 1},
-    {"u", Operation::STEP, 1},
-    {"u2", Operation::RAMP_STEP, 1},
-    {"uramp", Operation::RAMP, 1},
-    {"floor", Operation::FLOOR, 1},
-    {"ceil", Operation::CEIL, 1},
-    {"nint", Operation::NEAREST_INTEGER, 1},
-    {"min", Operation::MIN, 2},
-    {"max", Operation::MAX, 2},
-    {"pow", Operation::POW, 2},
-    {"pwr", Operation::PWR, 2},
-});
-
 /// A name that ngspice reads and Nodalys does not, with what to tell the user.
 struct RefusedName {
     std::string_view Name;
     std::string_view Reason;
 };
-
-constexpr std::string_view RANDOM_REASON = "draws random numbers, which Nodalys does not run in an expression";
-
-constexpr auto REFUSED_FUNCTIONS = std::to_array<RefusedName>({
-    {"limit",
-     "limit() is a Monte Carlo function of ngspice (the nominal value plus or minus a deviation, chosen at "
-     "random), not a clamp; clamp with min(max(x, low), high)"},
-    {"atan2", "atan2() is not available in a behavioral expression of ngspice either; use atan(y / x)"},
-    {"gauss", RANDOM_REASON},
-    {"agauss", RANDOM_REASON},
-    {"unif", RANDOM_REASON},
-    {"aunif", RANDOM_REASON},
-    {"rnd", RANDOM_REASON},
-    {"random", RANDOM_REASON},
-    {"exponential", RANDOM_REASON},
-});
-
-constexpr std::string_view HERTZ_REASON =
-    "hertz, the frequency, is not supported by Nodalys in an expression: it would make the small-signal gain depend on "
-    "the frequency, which an AC sweep cannot stamp once";
-
-constexpr double NOMINAL_E = 2.718281828459045;
-constexpr double NOMINAL_PI = 3.141592653589793;
-
-bool IsSpace(const char character) {
-    return std::isspace(static_cast<unsigned char>(character)) != 0;
-}
-
-bool IsDigit(const char character) {
-    return std::isdigit(static_cast<unsigned char>(character)) != 0;
-}
-
-bool IsLetter(const char character) {
-    return std::isalpha(static_cast<unsigned char>(character)) != 0;
-}
-
-bool IsIdentifierCharacter(const char character) {
-    return IsLetter(character) || IsDigit(character) || character == '_';
-}
-
-std::string_view Trim(std::string_view text) {
-    while (!text.empty() && IsSpace(text.front())) {
-        text.remove_prefix(1);
-    }
-    while (!text.empty() && IsSpace(text.back())) {
-        text.remove_suffix(1);
-    }
-    return text;
-}
-
-bool IsSameInput(const ExpressionInput &first, const ExpressionInput &second) {
-    return first.Type == second.Type && ToLower(first.First) == ToLower(second.First)
-        && ToLower(first.Second) == ToLower(second.Second);
-}
 
 /**
  * @class   Parser
@@ -152,11 +71,84 @@ public:
     }
 
 private:
+    static constexpr auto FUNCTIONS = std::to_array<FunctionEntry>({
+        {"abs", Operation::ABS, 1},
+        {"sqrt", Operation::SQRT, 1},
+        {"exp", Operation::EXP, 1},
+        // ngspice reads log() as the natural logarithm, like ln(), and log10() as the decimal one
+        {"ln", Operation::LN, 1},
+        {"log", Operation::LN, 1},
+        {"log10", Operation::LOG10, 1},
+        {"sin", Operation::SIN, 1},
+        {"cos", Operation::COS, 1},
+        {"tan", Operation::TAN, 1},
+        {"asin", Operation::ASIN, 1},
+        {"acos", Operation::ACOS, 1},
+        {"atan", Operation::ATAN, 1},
+        {"sinh", Operation::SINH, 1},
+        {"cosh", Operation::COSH, 1},
+        {"tanh", Operation::TANH, 1},
+        {"asinh", Operation::ASINH, 1},
+        {"acosh", Operation::ACOSH, 1},
+        {"atanh", Operation::ATANH, 1},
+        {"sgn", Operation::SIGN, 1},
+        {"u", Operation::STEP, 1},
+        {"u2", Operation::RAMP_STEP, 1},
+        {"uramp", Operation::RAMP, 1},
+        {"floor", Operation::FLOOR, 1},
+        {"ceil", Operation::CEIL, 1},
+        {"nint", Operation::NEAREST_INTEGER, 1},
+        {"min", Operation::MIN, 2},
+        {"max", Operation::MAX, 2},
+        {"pow", Operation::POW, 2},
+        {"pwr", Operation::PWR, 2},
+    });
+
+    static constexpr auto REFUSED_FUNCTIONS = std::to_array<RefusedName>({
+        {"limit",
+         "limit() is a Monte Carlo function of ngspice (the nominal value plus or minus a deviation, chosen at "
+         "random), not a clamp; clamp with min(max(x, low), high)"},
+        {"atan2", "atan2() is not available in a behavioral expression of ngspice either; use atan(y / x)"},
+        {"gauss", RANDOM_REASON},
+        {"agauss", RANDOM_REASON},
+        {"unif", RANDOM_REASON},
+        {"aunif", RANDOM_REASON},
+        {"rnd", RANDOM_REASON},
+        {"random", RANDOM_REASON},
+        {"exponential", RANDOM_REASON},
+    });
+
     std::string_view m_Text;
     std::size_t m_Position = 0;
     int m_Depth = 0;
     std::string m_Error;
     ExpressionProgram m_Program;
+
+    // Character and input helpers
+    static bool IsSpace(const char character) { return std::isspace(static_cast<unsigned char>(character)) != 0; }
+
+    static bool IsDigit(const char character) { return std::isdigit(static_cast<unsigned char>(character)) != 0; }
+
+    static bool IsLetter(const char character) { return std::isalpha(static_cast<unsigned char>(character)) != 0; }
+
+    static bool IsIdentifierCharacter(const char character) {
+        return IsLetter(character) || IsDigit(character) || character == '_';
+    }
+
+    static std::string_view Trim(std::string_view text) {
+        while (!text.empty() && IsSpace(text.front())) {
+            text.remove_prefix(1);
+        }
+        while (!text.empty() && IsSpace(text.back())) {
+            text.remove_suffix(1);
+        }
+        return text;
+    }
+
+    static bool IsSameInput(const ExpressionInput &first, const ExpressionInput &second) {
+        return first.Type == second.Type && ToLower(first.First) == ToLower(second.First)
+            && ToLower(first.Second) == ToLower(second.Second);
+    }
 
     // Text
     char Peek(const std::size_t offset = 0) const {

@@ -16,6 +16,23 @@ namespace Nodalys {
 
 namespace {
 
+/**
+ * @struct  SweepRun
+ * @brief   What the sweep carries from one point to the next: the solution it continues from, the context of the
+ *          solve and the outcome of the last one.
+ */
+struct SweepRun {
+    CompiledCircuit &Compiled;
+    const ConvergenceOptions &Options;
+    Device *Swept;
+    const std::string &SweptName;
+    const std::vector<double> &SweptValues;
+    std::vector<double> Solution;
+    /// Only the first point starts from the nodesets; the others continue from the point before them.
+    TimeContext Context;
+    NewtonOutcome LastOutcome;
+};
+
 std::vector<ComponentCurrent> ReadCurrents(const CompiledCircuit &compiled, const std::vector<double> &x) {
     const std::vector<double> values = ReadCurrentValues(compiled, x);
     std::vector<ComponentCurrent> currents;
@@ -77,23 +94,6 @@ std::vector<double> GenerateSweepValues(const double start, const double stop, c
     }
     return values;
 }
-
-/**
- * @struct  SweepRun
- * @brief   What the sweep carries from one point to the next: the solution it continues from, the context of the
- *          solve and the outcome of the last one.
- */
-struct SweepRun {
-    CompiledCircuit &Compiled;
-    const ConvergenceOptions &Options;
-    Device *Swept;
-    const std::string &SweptName;
-    const std::vector<double> &SweptValues;
-    std::vector<double> Solution;
-    /// Only the first point starts from the nodesets; the others continue from the point before them.
-    TimeContext Context;
-    NewtonOutcome LastOutcome;
-};
 
 void AppendPoint(DcSweepCurve &curve,
                  const std::vector<double> &voltages,

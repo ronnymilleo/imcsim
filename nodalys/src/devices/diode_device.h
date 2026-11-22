@@ -54,13 +54,6 @@ private:
         double Conductance;
     };
 
-    /// Recomputes the parameters at the temperature, from the ones given at the nominal temperature.
-    void ApplyTemperature(const ThermalConditions &thermal);
-    Junction Evaluate(double voltage) const;
-    double Charge(double voltage) const;
-    double Capacitance(double voltage) const;
-    double VoltageAt(const std::vector<double> &x) const;
-
     int m_Anode;
     int m_Cathode;
     int m_Internal;
@@ -78,6 +71,13 @@ private:
     /// Companion model of the junction capacitance from the most recent transient stamp.
     double m_CapConductance = 0.0;
     double m_CapEquivalent = 0.0;
+
+    /// Recomputes the parameters at the temperature, from the ones given at the nominal temperature.
+    void ApplyTemperature(const ThermalConditions &thermal);
+    Junction Evaluate(double voltage) const;
+    double Charge(double voltage) const;
+    double Capacitance(double voltage) const;
+    double VoltageAt(const std::vector<double> &x) const;
 };
 
 } // namespace Nodalys

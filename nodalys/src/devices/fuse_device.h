@@ -56,10 +56,6 @@ private:
         double BlowTime = 0.0;
     };
 
-    double ResistanceAt(const State &state, double time) const;
-    double PowerOf(const std::vector<double> &x, double resistance) const;
-    State Advance(const State &state, double time, double end_power) const;
-
     int m_NodeA;
     int m_NodeB;
     FuseParameters m_Parameters;
@@ -73,6 +69,10 @@ private:
     double m_Resistance;
     /// True while the stamps are those of a transient step, whose end the accepted state moves to.
     bool m_IsStep = false;
+
+    double ResistanceAt(const State &state, double time) const;
+    double PowerOf(const std::vector<double> &x, double resistance) const;
+    State Advance(const State &state, double time, double end_power) const;
 };
 
 } // namespace Nodalys
