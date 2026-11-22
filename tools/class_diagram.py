@@ -48,8 +48,8 @@ PALETTE = [
 # Declarative targets so app-core and app-gui can be added as independent diagrams later.
 TARGETS: dict[str, dict[str, Any]] = {
     "nodalys": {
-        "title": "Nodalys — Diagrama de Classes & Auditoria Viva",
-        "subtitle": "Motor de simulação C++23 (nodalys/) + ponte imcsim (app-core/backends/nodalys/)",
+        "title": "Nodalys — Class Diagram & Live Audit",
+        "subtitle": "C++23 simulation engine (nodalys/) + imcsim bridge (app-core/backends/nodalys/)",
         "output": "docs/nodalys/class_diagram.html",
         "roots": [
             ("nodalys/include", "public-api"),
@@ -383,7 +383,7 @@ def extract_types_from_file(src: SourceFile) -> list[dict[str, Any]]:
                 "line": start_line,
                 "end_line": end_line,
                 "lines": end_line - start_line + 1,
-                "summary": brief or f"Definido em {src.rel_path}:{start_line}.",
+                "summary": brief or f"Defined in {src.rel_path}:{start_line}.",
                 "fields": fields,
                 "methods": methods,
                 "is_pod": is_pod,
@@ -436,7 +436,7 @@ def infer_relationships(nodes: list[dict[str, Any]], files: list[SourceFile]) ->
             for nm in nested_ref_re.finditer(decl):
                 target = nm.group(1)
                 if target != src_id and target not in node["bases"]:
-                    add_edge(src_id, target, "smell", f"usa ::{nm.group(2)}")
+                    add_edge(src_id, target, "smell", f"uses ::{nm.group(2)}")
 
             for tm in ident_re.finditer(decl):
                 target = tm.group(1)
@@ -675,13 +675,13 @@ def run_live_audit(
                 dynamic_casts.append(f"{f.rel_path}:{idx} — {line.strip()[:90]}")
                 dynamic_cast_targets[dm.group(1)] += 1
             if re.search(r"^\s*#pragma\s+once\b", line):
-                hygiene_issues.append(f"#pragma once em {f.rel_path}:{idx}")
+                hygiene_issues.append(f"#pragma once in {f.rel_path}:{idx}")
             if "using namespace " in line:
-                hygiene_issues.append(f"using namespace em {f.rel_path}:{idx}")
+                hygiene_issues.append(f"using namespace in {f.rel_path}:{idx}")
             if re.search(r"\b(new |delete |malloc\(|free\()", line):
-                hygiene_issues.append(f"alocação crua em {f.rel_path}:{idx}")
+                hygiene_issues.append(f"raw allocation in {f.rel_path}:{idx}")
             if re.search(r"\bthrow\b", line):
-                hygiene_issues.append(f"throw em {f.rel_path}:{idx}")
+                hygiene_issues.append(f"throw in {f.rel_path}:{idx}")
             if f.rel_path.endswith(".cpp") and f.module == "api":
                 vm = void_param_re.match(line)
                 if vm:
@@ -691,7 +691,7 @@ def run_live_audit(
             if "///<" in raw_line:
                 trailing_doxygen.append(f"{f.rel_path}:{idx} — {raw_line.strip()[:90]}")
             if re.search(r"\b(TODO|FIXME|HACK|XXX)\b", raw_line):
-                hygiene_issues.append(f"TODO/FIXME em {f.rel_path}:{idx}")
+                hygiene_issues.append(f"TODO/FIXME in {f.rel_path}:{idx}")
 
         if f.rel_path.endswith(".h"):
             for m in nodiscard_re.finditer(clean):
@@ -716,7 +716,7 @@ def run_live_audit(
         n["alerts"].append(f"{n['virtual_count']} virtuals")
         n["check_ids"].append("A3")
     for n in inverted_private:
-        n["alerts"].append("private: ordem")
+        n["alerts"].append("private: order")
         n["check_ids"].append("A10")
     for target, count in dynamic_cast_targets.items():
         if target in node_by_id:
@@ -761,20 +761,20 @@ def run_live_audit(
         make_check(
             "A1",
             "crit",
-            "Imutabilidade & Thread-Safety",
-            "Uso de const_cast em código de domínio",
-            "Remover const de objetos recebidos como const & gera UB potencial em objetos verdadeiramente const e inviabiliza execuções concorrentes.",
-            "Separar o modelo compilado imutável do estado/workspace mutável de simulação e remover const_cast.",
+            "Immutability & Thread-Safety",
+            "Use of const_cast in domain code",
+            "Casting away const on objects passed by const & risks undefined behavior on truly const instances and prevents concurrent runs.",
+            "Separate the immutable compiled model from mutable per-run simulation state and remove const_cast.",
             const_casts,
             ["Circuit", "CircuitImpl", "CompiledCircuit"],
         ),
         make_check(
             "A2",
             "crit",
-            "Polimorfismo & OCP",
-            "Chamadas de dynamic_cast fora da hierarquia de dispositivos",
-            "Cadeias paralelas de dynamic_cast acoplam análises a subclasses concretas e exigem alterações em vários arquivos a cada novo dispositivo.",
-            "Substituir por contratos polimórficos (ex.: derivadas paramétricas), base comum IndependentSourceDevice e coleções tipadas para diretivas.",
+            "Polymorphism & OCP",
+            "dynamic_cast calls outside the device hierarchy",
+            "Parallel dynamic_cast chains couple analyses to concrete subclasses and require edits across multiple files whenever a device is added.",
+            "Replace with polymorphic contracts (e.g. parameter derivatives), a shared IndependentSourceDevice base, and typed directive collections.",
             dynamic_casts,
             list(dynamic_cast_targets.keys())[:6],
         ),
@@ -782,99 +782,99 @@ def run_live_audit(
             "A3",
             "high",
             "Interface Segregation (ISP)",
-            "Classes base 'gordas' (≥ 10 métodos virtuais)",
-            "Interfaces guarda-chuva misturam papéis distintos (DC, AC, ruído, HB, transiente, ambiente) e forçam overrides vazios.",
-            "Retirar pseudo-devices (.ic/.nodeset/.seed) da base e segregar capacidades opcionais.",
-            [f"{n['id']} ({n['file']}:{n['line']}) — {n['virtual_count']} métodos virtuais" for n in fat_bases],
+            "Fat base classes (>= 10 virtual methods)",
+            "Umbrella interfaces mix distinct roles (DC, AC, noise, HB, transient, environment) and force empty no-op overrides.",
+            "Move pseudo-devices (.ic/.nodeset/.seed) out of the base class and segregate optional capabilities.",
+            [f"{n['id']} ({n['file']}:{n['line']}) — {n['virtual_count']} virtual methods" for n in fat_bases],
             [n["id"] for n in fat_bases],
         ),
         make_check(
             "A4",
             "high",
-            "Arquitetura de Módulos (DAG)",
-            "Ciclos de dependência entre módulos",
-            "Ciclos diretos ou via header público impedem camadas independentes e acoplam subsistemas irmãos.",
-            "Mover utilitários compartilhados (ex.: spice_number) para uma camada base comum abaixo de ambos os módulos.",
+            "Module Architecture (DAG)",
+            "Module dependency cycles",
+            "Direct or public-header cycles break strict layering and couple sibling subsystems.",
+            "Move shared utilities (such as spice_number) into a lower module below both callers.",
             [" → ".join(cyc) for cyc in cycles],
             [],
         ),
         make_check(
             "A5",
             "high",
-            "Coesão & Decomposição",
-            "Arquivos acima do sinal de 500 linhas (CLAUDE.md)",
-            "Arquivos muito extensos tendem a misturar múltiplos tópicos ou responsabilidades de compilação/macromodelos.",
-            "Extrair grupos coesos (macromodelos, famílias de dispositivos, dispatchers) em módulos dedicados.",
-            [f"{f.rel_path} — {f.lines} linhas" for f in large_files],
+            "Cohesion & Decomposition",
+            "Files exceeding the 500-line review signal (CLAUDE.md)",
+            "Large files tend to accumulate multiple topics, macromodels, or unrelated responsibilities.",
+            "Extract cohesive groups (macromodels, device families, element dispatchers) into dedicated modules.",
+            [f"{f.rel_path} — {f.lines} lines" for f in large_files],
             [n["id"] for n in nodes if n["file"] in {f.rel_path for f in large_files} and n["lines"] >= 200][:6],
         ),
         make_check(
             "A6",
             "med",
-            "Design de API Pública",
-            "Parâmetros silenciosamente ignorados ((void)param;) na camada API",
-            "Aceitar parâmetros na API pública e descartá-los com (void) surpreende o chamador e mascara limitações do modelo.",
-            "Implementar o efeito físico, recusar valores não suportados explicitamente ou remover o parâmetro da assinatura.",
+            "Public API Design",
+            "Silently ignored parameters ((void)param;) in the API layer",
+            "Accepting public parameters and discarding them with (void) surprises callers and hides unsupported model features.",
+            "Implement the physical effect, reject unsupported values explicitly, or remove the parameter from the signature.",
             ignored_params,
             ["CircuitBuilder", "CircuitBuilderImpl"],
         ),
         make_check(
             "A7",
             "med",
-            "Complexidade de Funções",
-            "Funções em .cpp acima do sinal de 40 linhas (CLAUDE.md)",
-            "Funções extensas costumam misturar níveis de abstração; revisar se há fases nomeáveis ou tabelas de despacho.",
-            "Extrair fases nomeadas mantendo uma responsabilidade por nível de abstração.",
+            "Function Complexity",
+            "Functions in .cpp files exceeding the 40-line signal (CLAUDE.md)",
+            "Long functions often mix levels of abstraction; review whether named phases or dispatch tables apply.",
+            "Extract named domain steps so each function operates at one level of abstraction.",
             [f"{fn['file']}:{fn['line']} ({fn['length']}L) — {fn['signature']}" for fn in long_funcs],
             [],
         ),
         make_check(
             "A8",
             "low",
-            "Segurança de Retorno (CLAUDE.md)",
-            "Declarações retornando std::expected / std::optional sem [[nodiscard]]",
-            "Omitir [[nodiscard]] permite descartar erros ou resultados ausentes sem aviso do compilador.",
-            "Adicionar [[nodiscard]] às declarações em headers públicos e internos.",
+            "Return Safety (CLAUDE.md)",
+            "Header declarations returning std::expected / std::optional without [[nodiscard]]",
+            "Omitting [[nodiscard]] allows callers to silently discard errors or missing results.",
+            "Add [[nodiscard]] to public and internal header declarations.",
             missing_nodiscard,
             ["CircuitBuilder", "Expression"],
         ),
         make_check(
             "A9",
             "low",
-            "Idiomas C++ (CLAUDE.md)",
-            "Parâmetros por valor marcados const em headers",
-            "O CLAUDE.md define const em parâmetros por valor apenas na definição (.cpp), nunca na declaração (.h).",
-            "Remover const de parâmetros por valor nas declarações de header (enforçado por readability-avoid-const-params-in-decls).",
+            "C++ Idioms (CLAUDE.md)",
+            "By-value parameters marked const in header declarations",
+            "CLAUDE.md marks by-value parameters const only in definitions (.cpp), never in declarations (.h).",
+            "Remove const from by-value parameters in headers (enforced by readability-avoid-const-params-in-decls).",
             header_const_params,
             [],
         ),
         make_check(
             "A10",
             "low",
-            "Layout de Classe (CLAUDE.md)",
-            "Seção private: com métodos antes de membros",
-            "A convenção do guia ordena private: como nested types → members → private methods.",
-            "Reordenar os membros privados antes dos métodos privados nas classes listadas.",
+            "Class Layout (CLAUDE.md)",
+            "private: sections placing methods before data members",
+            "The guideline orders private: as nested types -> members -> private methods.",
+            "Move private data members above private methods in the listed classes.",
             [f"{n['id']} ({n['file']}:{n['line']})" for n in inverted_private],
             [n["id"] for n in inverted_private],
         ),
         make_check(
             "A11",
             "low",
-            "Documentação Doxygen (CLAUDE.md)",
-            "Comentários trailing ///< em vez de /// acima da declaração",
-            "O guia padroniza comentários /// acima de cada declaração individual, evitando comentários trailing ///<.",
-            "Converter comentários ///< para /// acima da linha correspondente (alinhado à task #275).",
+            "Doxygen Style (CLAUDE.md)",
+            "Trailing ///< comments instead of /// above declarations",
+            "The guideline places /// comments above each individual declaration instead of trailing ///< comments.",
+            "Convert ///< comments to /// above each declaration (tracked alongside #275).",
             trailing_doxygen,
             [],
         ),
         make_check(
             "A12",
             "low",
-            "Higiene de Base",
-            "TODO/FIXME, #pragma once, using namespace, new/delete crus ou throw",
-            "Verificação de invariantes básicos de higiene do guia global.",
-            "Manter sempre em zero.",
+            "Codebase Hygiene",
+            "TODO/FIXME, #pragma once, using namespace, raw new/delete, or throw",
+            "Baseline hygiene invariants from the global guidelines.",
+            "Keep at zero.",
             hygiene_issues,
             [],
         ),

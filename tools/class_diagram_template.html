@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -312,13 +312,13 @@
   </div>
 
   <nav class="tabs" role="tablist">
-    <button class="tab-btn active" data-view="diagram">Diagrama de Classes <span class="pill" id="node-count-pill">0</span></button>
-    <button class="tab-btn" data-view="modules">Grafo de Módulos <span class="pill" id="mod-count-pill">0</span></button>
-    <button class="tab-btn" data-view="audit">Auditoria Viva <span class="pill warn" id="open-checks-pill">0</span></button>
+    <button class="tab-btn active" data-view="diagram">Class Diagram <span class="pill" id="node-count-pill">0</span></button>
+    <button class="tab-btn" data-view="modules">Module Graph <span class="pill" id="mod-count-pill">0</span></button>
+    <button class="tab-btn" data-view="audit">Live Audit <span class="pill warn" id="open-checks-pill">0</span></button>
   </nav>
 
   <div>
-    <button class="icon-btn" id="theme-toggle">☀ Tema</button>
+    <button class="icon-btn" id="theme-toggle">☀ Theme</button>
   </div>
 </header>
 
@@ -327,52 +327,52 @@
   <section id="view-diagram" class="view active">
     <aside class="sidebar">
       <div>
-        <div class="section-label">Busca <span style="font-family:var(--mono)">/</span></div>
+        <div class="section-label">Search <span style="font-family:var(--mono)">/</span></div>
         <div class="search-box">
-          <input id="search-input" type="text" placeholder="Classe, método, arquivo, alerta..." />
+          <input id="search-input" type="text" placeholder="Class, method, file, alert..." />
         </div>
       </div>
 
       <div>
-        <div class="section-label">Vistas Rápidas</div>
+        <div class="section-label">Quick Views</div>
         <div class="preset-grid">
-          <button class="preset-btn active" data-preset="classes">Classes &amp; Principais <small data-preset-count="classes"></small></button>
-          <button class="preset-btn" data-preset="all">Todos (incl. POD structs) <small data-preset-count="all"></small></button>
-          <button class="preset-btn" data-preset="hierarchy">Hierarquia de Herança <small data-preset-count="hierarchy"></small></button>
-          <button class="preset-btn" data-preset="alerts">⚠ Apenas com Alertas <small data-preset-count="alerts"></small></button>
+          <button class="preset-btn active" data-preset="classes">Classes &amp; Core Types <small data-preset-count="classes"></small></button>
+          <button class="preset-btn" data-preset="all">All (incl. POD structs) <small data-preset-count="all"></small></button>
+          <button class="preset-btn" data-preset="hierarchy">Inheritance Hierarchy <small data-preset-count="hierarchy"></small></button>
+          <button class="preset-btn" data-preset="alerts">⚠ With Alerts Only <small data-preset-count="alerts"></small></button>
         </div>
       </div>
 
       <div>
         <div class="section-label">
-          Módulos
+          Modules
           <span style="display:flex;gap:6px">
-            <a href="#" id="mod-all" style="color:var(--accent);text-decoration:none;font-size:10px">todos</a>
-            <a href="#" id="mod-none" style="color:var(--text-muted);text-decoration:none;font-size:10px">nenhum</a>
+            <a href="#" id="mod-all" style="color:var(--accent);text-decoration:none;font-size:10px">all</a>
+            <a href="#" id="mod-none" style="color:var(--text-muted);text-decoration:none;font-size:10px">none</a>
           </span>
         </div>
         <div class="filter-list" id="module-filters"></div>
       </div>
 
       <div>
-        <div class="section-label">Relações</div>
+        <div class="section-label">Relationships</div>
         <div class="filter-list" id="rel-filters"></div>
       </div>
 
       <div style="font-size:11px;color:var(--text-dim);line-height:1.5;border-top:1px solid var(--border);padding-top:9px">
-        Gerado automaticamente por <code>tools/class_diagram.py</code>.<br/>
-        • Arraste qualquer caixa (salva localmente).<br/>
-        • Roda do mouse: zoom · Fundo: pan.<br/>
-        • Atalhos: <code>/</code> busca, <code>F</code> fit, <code>Esc</code> limpar.
+        Generated automatically by <code>tools/class_diagram.py</code>.<br/>
+        • Drag any box (saved locally).<br/>
+        • Mouse wheel: zoom · Background: pan.<br/>
+        • Shortcuts: <code>/</code> search, <code>F</code> fit, <code>Esc</code> clear.
       </div>
     </aside>
 
     <div class="canvas-wrap" id="canvas-wrap">
       <div class="canvas-legend">
-        <span><strong style="color:var(--accent)">△</strong> Herança</span>
-        <span><strong style="color:var(--green)">◆</strong> Composição</span>
-        <span><strong style="color:var(--yellow)">◇</strong> Referência</span>
-        <span><strong style="color:var(--text-muted)">⇢</strong> Uso</span>
+        <span><strong style="color:var(--accent)">△</strong> Inheritance</span>
+        <span><strong style="color:var(--green)">◆</strong> Composition</span>
+        <span><strong style="color:var(--yellow)">◇</strong> Reference</span>
+        <span><strong style="color:var(--text-muted)">⇢</strong> Usage</span>
         <span><strong style="color:var(--red)">⚡</strong> Smell</span>
       </div>
       <svg id="diagram-svg">
@@ -403,9 +403,9 @@
         <button id="zoom-in">+</button>
         <button id="zoom-out">−</button>
         <button id="zoom-fit">Fit</button>
-        <button id="relayout-btn">Resetar Layout</button>
-        <button id="toggle-details" class="active">Detalhes: ON</button>
-        <button id="clear-sel">Limpar Foco</button>
+        <button id="relayout-btn">Reset Layout</button>
+        <button id="toggle-details" class="active">Details: ON</button>
+        <button id="clear-sel">Clear Focus</button>
         <span id="zoom-readout" style="padding:5px 7px;font-family:var(--mono);font-size:11px;color:var(--text-muted)">100%</span>
       </div>
     </div>
@@ -418,8 +418,8 @@
     <div class="module-view-wrap">
       <div class="canvas-wrap" style="cursor:default">
         <div class="canvas-legend">
-          <span>Tamanho do círculo = LOC do módulo</span>
-          <span><strong style="color:var(--red)">⚡</strong> Ciclo de dependências detectado</span>
+          <span>Circle size = module LOC</span>
+          <span><strong style="color:var(--red)">⚡</strong> Dependency cycle detected</span>
         </div>
         <svg id="module-svg">
           <defs>
@@ -450,11 +450,11 @@
 const DATA = __PAYLOAD__;
 
 const REL_TYPES = {
-  inherit: { label: "Herança (extends)",      color: "#58a6ff", dash: "",    marker: "url(#arrow-inherit)" },
-  compose: { label: "Composição (posse)",     color: "#3fb950", dash: "",    marker: "url(#arrow-compose)" },
-  agg:     { label: "Agregação / Referência", color: "#d29922", dash: "",    marker: "url(#arrow-agg)" },
-  uses:    { label: "Dependência / Uso",      color: "#8b949e", dash: "4 4", marker: "url(#arrow-uses)" },
-  smell:   { label: "⚡ Smell / Acoplamento", color: "#f85149", dash: "6 4", marker: "url(#arrow-smell)" }
+  inherit: { label: "Inheritance (extends)",     color: "#58a6ff", dash: "",    marker: "url(#arrow-inherit)" },
+  compose: { label: "Composition (owns)",        color: "#3fb950", dash: "",    marker: "url(#arrow-compose)" },
+  agg:     { label: "Aggregation / Reference",   color: "#d29922", dash: "",    marker: "url(#arrow-agg)" },
+  uses:    { label: "Dependency / Usage",        color: "#8b949e", dash: "4 4", marker: "url(#arrow-uses)" },
+  smell:   { label: "⚡ Smell / Coupling",       color: "#f85149", dash: "6 4", marker: "url(#arrow-smell)" }
 };
 
 const STORAGE_KEY = "class-diagram-pos:" + DATA.target;
@@ -728,7 +728,7 @@ function renderDiagram() {
         });
         if (node.fields.length > 5) {
           const m = svgEl("text", { x: 10, y: ty, "font-size": "9", "font-family": "var(--mono)", fill: "var(--text-dim)" });
-          m.textContent = `+ ${node.fields.length - 5} campos...`;
+          m.textContent = `+ ${node.fields.length - 5} more fields...`;
           g.appendChild(m);
         }
         curY += box.fieldsH;
@@ -744,7 +744,7 @@ function renderDiagram() {
         });
         if (node.methods.length > 5) {
           const m = svgEl("text", { x: 10, y: ty, "font-size": "9", "font-family": "var(--mono)", fill: "var(--text-dim)" });
-          m.textContent = `+ ${node.methods.length - 5} métodos...`;
+          m.textContent = `+ ${node.methods.length - 5} more methods...`;
           g.appendChild(m);
         }
       }
@@ -832,8 +832,8 @@ function selectNode(id) {
     inspector.className = "inspector empty";
     inspector.innerHTML = `<div style="max-width:250px">
       <div style="font-size:28px;margin-bottom:8px;opacity:0.6">❖</div>
-      <strong style="color:var(--text)">Selecione uma classe</strong>
-      <p style="font-size:12px;margin-top:6px;line-height:1.5">Clique em qualquer caixa UML para inspecionar arquivo, membros, métodos, conexões e alertas de auditoria.</p>
+      <strong style="color:var(--text)">Select a class</strong>
+      <p style="font-size:12px;margin-top:6px;line-height:1.5">Click any UML box to inspect its file, members, methods, connections, and audit alerts.</p>
     </div>`;
     return;
   }
@@ -862,21 +862,21 @@ function selectNode(id) {
     <div style="font-size:12.5px;line-height:1.55;color:var(--text-muted)">${escapeHtml(node.summary)}</div>
     ${relatedChecks.length ? `
       <div>
-        <div class="section-label">Alertas Ativos (${relatedChecks.length})</div>
+        <div class="section-label">Active Alerts (${relatedChecks.length})</div>
         <div style="display:flex;flex-direction:column;gap:6px">
           ${relatedChecks.map(c => `
             <div class="mini-crit ${c.severity}">
               <strong>[${c.id}] ${escapeHtml(c.title)}</strong><br/>
-              <a onclick="jumpToCheck('${c.id}')">Ver na Auditoria Viva →</a>
+              <a onclick="jumpToCheck('${c.id}')">View in Live Audit →</a>
             </div>
           `).join("")}
         </div>
       </div>
-    ` : `<div class="badge badge-good" style="align-self:flex-start">✓ Sem alertas diretos</div>`}
-    ${node.fields.length ? `<div><div class="section-label">Atributos (${node.fields.length})</div><div class="code-list">${node.fields.map(fmt).join("")}</div></div>` : ""}
-    ${node.methods.length ? `<div><div class="section-label">Métodos (${node.methods.length})</div><div class="code-list">${node.methods.map(fmt).join("")}</div></div>` : ""}
+    ` : `<div class="badge badge-good" style="align-self:flex-start">✓ No direct alerts</div>`}
+    ${node.fields.length ? `<div><div class="section-label">Fields (${node.fields.length})</div><div class="code-list">${node.fields.map(fmt).join("")}</div></div>` : ""}
+    ${node.methods.length ? `<div><div class="section-label">Methods (${node.methods.length})</div><div class="code-list">${node.methods.map(fmt).join("")}</div></div>` : ""}
     <div>
-      <div class="section-label">Conexões (${outgoing.length + incoming.length})</div>
+      <div class="section-label">Connections (${outgoing.length + incoming.length})</div>
       <div style="display:flex;flex-direction:column;gap:5px">
         ${outgoing.map(e => `<div class="rel-chip" onclick="focusNode('${escapeHtml(e.to)}')"><span>→ <strong style="color:${REL_TYPES[e.type].color}">${e.type}</strong> <code>${escapeHtml(e.to)}</code></span><small style="color:var(--text-dim);font-family:var(--mono)">${escapeHtml(e.label || "")}</small></div>`).join("")}
         ${incoming.map(e => `<div class="rel-chip" onclick="focusNode('${escapeHtml(e.from)}')"><span>← <strong style="color:${REL_TYPES[e.type].color}">${e.type}</strong> <code>${escapeHtml(e.from)}</code></span><small style="color:var(--text-dim);font-family:var(--mono)">${escapeHtml(e.label || "")}</small></div>`).join("")}
@@ -995,16 +995,16 @@ function renderModuleGraph() {
   const sorted = [...mg.modules].sort((a, b) => b.loc - a.loc);
   document.getElementById("module-panel").innerHTML = `
     <div>
-      <div class="section-label">Integridade do DAG</div>
-      ${mg.cycles.length ? mg.cycles.map(c => `<div class="mini-crit" style="margin-bottom:6px"><strong>⚡ Ciclo detectado</strong><br/><code>${escapeHtml(c.join(" → "))}</code></div>`).join("")
-        : `<div class="badge badge-good">✓ Nenhum ciclo entre módulos</div>`}
+      <div class="section-label">DAG Integrity</div>
+      ${mg.cycles.length ? mg.cycles.map(c => `<div class="mini-crit" style="margin-bottom:6px"><strong>⚡ Cycle detected</strong><br/><code>${escapeHtml(c.join(" → "))}</code></div>`).join("")
+        : `<div class="badge badge-good">✓ No module cycles</div>`}
     </div>
     <div>
-      <div class="section-label">Volume por Módulo (${DATA.kpis.files} arqs · ${DATA.kpis.loc.toLocaleString("pt-BR")}L)</div>
+      <div class="section-label">Size by Module (${DATA.kpis.files} files · ${DATA.kpis.loc.toLocaleString("en-US")}L)</div>
       <div style="display:flex;flex-direction:column;gap:9px">
         ${sorted.map(m => `
           <div class="bar-row">
-            <div class="bar-head"><span style="color:${m.color}">${escapeHtml(m.id)}</span><span style="color:var(--text-muted)">${m.files} arqs · ${m.loc.toLocaleString("pt-BR")}L</span></div>
+            <div class="bar-head"><span style="color:${m.color}">${escapeHtml(m.id)}</span><span style="color:var(--text-muted)">${m.files} files · ${m.loc.toLocaleString("en-US")}L</span></div>
             <div class="bar-track"><div class="bar-fill" style="width:${(m.loc / maxLoc * 100).toFixed(1)}%;background:${m.color}"></div></div>
           </div>
         `).join("")}
@@ -1019,7 +1019,7 @@ function renderAudit() {
   pill.textContent = k.open_checks;
   pill.className = "pill " + (k.open_checks > 0 ? "warn" : "ok");
 
-  const sevLabel = { crit: "Crítico", high: "Alto", med: "Médio", low: "Estilo / Higiene" };
+  const sevLabel = { crit: "Critical", high: "High", med: "Medium", low: "Style / Hygiene" };
   const sevBadge = { crit: "badge-crit", high: "badge-high", med: "badge-med", low: "badge-low" };
 
   const filtered = CHECKS.filter(c => {
@@ -1030,26 +1030,26 @@ function renderAudit() {
 
   document.getElementById("audit-container").innerHTML = `
     <div>
-      <h2 style="margin:0 0 6px;font-size:20px">Auditoria Viva — ${escapeHtml(DATA.target)}</h2>
+      <h2 style="margin:0 0 6px;font-size:20px">Live Audit — ${escapeHtml(DATA.target)}</h2>
       <p style="margin:0;color:var(--text-muted);line-height:1.55">
-        Métricas extraídas diretamente do código atual por <code>.venv/bin/python tools/class_diagram.py ${escapeHtml(DATA.target)}</code>. Conforme você fecha tasks, re-execute o script para ver cada check passar para <strong>✓ Resolvido</strong>.
+        Metrics extracted directly from the current codebase via <code>.venv/bin/python tools/class_diagram.py ${escapeHtml(DATA.target)}</code>. Re-run the script as you close tasks to watch each check flip to <strong>✓ Resolved</strong>.
       </p>
     </div>
 
     <div class="kpi-grid">
       <div class="kpi-card"><div class="kpi-val" style="color:${k.const_cast ? "var(--red)" : "var(--green)"}">${k.const_cast}</div><div class="kpi-lbl"><code>const_cast</code></div></div>
       <div class="kpi-card"><div class="kpi-val" style="color:${k.dynamic_cast ? "var(--red)" : "var(--green)"}">${k.dynamic_cast}</div><div class="kpi-lbl"><code>dynamic_cast</code></div></div>
-      <div class="kpi-card"><div class="kpi-val" style="color:${k.cycles ? "var(--red)" : "var(--green)"}">${k.cycles}</div><div class="kpi-lbl">Ciclos de módulos</div></div>
-      <div class="kpi-card"><div class="kpi-val" style="color:${k.large_files ? "var(--orange)" : "var(--green)"}">${k.large_files}</div><div class="kpi-lbl">Arquivos &gt; 500L</div></div>
-      <div class="kpi-card"><div class="kpi-val" style="color:${k.missing_nodiscard ? "var(--yellow)" : "var(--green)"}">${k.missing_nodiscard}</div><div class="kpi-lbl">Sem <code>[[nodiscard]]</code></div></div>
-      <div class="kpi-card"><div class="kpi-val" style="color:${k.hygiene_issues ? "var(--red)" : "var(--green)"}">${k.hygiene_issues}</div><div class="kpi-lbl">Violações de higiene</div></div>
+      <div class="kpi-card"><div class="kpi-val" style="color:${k.cycles ? "var(--red)" : "var(--green)"}">${k.cycles}</div><div class="kpi-lbl">Module cycles</div></div>
+      <div class="kpi-card"><div class="kpi-val" style="color:${k.large_files ? "var(--orange)" : "var(--green)"}">${k.large_files}</div><div class="kpi-lbl">Files &gt; 500L</div></div>
+      <div class="kpi-card"><div class="kpi-val" style="color:${k.missing_nodiscard ? "var(--yellow)" : "var(--green)"}">${k.missing_nodiscard}</div><div class="kpi-lbl">Missing <code>[[nodiscard]]</code></div></div>
+      <div class="kpi-card"><div class="kpi-val" style="color:${k.hygiene_issues ? "var(--red)" : "var(--green)"}">${k.hygiene_issues}</div><div class="kpi-lbl">Hygiene issues</div></div>
     </div>
 
     <div class="filter-bar">
       ${[
-        ["open", `Abertos (${k.open_checks})`],
-        ["resolved", `Resolvidos (${k.resolved_checks})`],
-        ["all", `Todos (${CHECKS.length})`]
+        ["open", `Open (${k.open_checks})`],
+        ["resolved", `Resolved (${k.resolved_checks})`],
+        ["all", `All (${CHECKS.length})`]
       ].map(([key, lbl]) => `<button class="sev-btn ${state.auditFilter === key ? "active" : ""}" onclick="setAuditFilter('${key}')">${lbl}</button>`).join("")}
     </div>
 
@@ -1059,22 +1059,22 @@ function renderAudit() {
           <div>
             <div style="display:flex;gap:6px;align-items:center;margin-bottom:5px;flex-wrap:wrap">
               <span class="badge ${c.status === "resolved" ? "badge-good" : sevBadge[c.severity]}">
-                ${c.status === "resolved" ? `✓ ${c.id} · Resolvido` : `${c.id} · ${sevLabel[c.severity]} (${c.count})`}
+                ${c.status === "resolved" ? `✓ ${c.id} · Resolved` : `${c.id} · ${sevLabel[c.severity]} (${c.count})`}
               </span>
               <span class="badge badge-mod">${escapeHtml(c.category)}</span>
             </div>
             <h3>${escapeHtml(c.title)}</h3>
           </div>
           <div style="display:flex;gap:5px;flex-wrap:wrap">
-            ${c.nodes.slice(0, 3).map(n => `<button class="copy-btn" onclick="focusNode('${escapeHtml(n)}')">Ver <code>${escapeHtml(n)}</code></button>`).join("")}
+            ${c.nodes.slice(0, 3).map(n => `<button class="copy-btn" onclick="focusNode('${escapeHtml(n)}')">Focus <code>${escapeHtml(n)}</code></button>`).join("")}
           </div>
         </div>
         <p>${escapeHtml(c.summary)}</p>
-        <p style="color:var(--text)"><strong style="color:var(--accent)">Recomendação:</strong> ${escapeHtml(c.recommendation)}</p>
+        <p style="color:var(--text)"><strong style="color:var(--accent)">Recommendation:</strong> ${escapeHtml(c.recommendation)}</p>
         ${c.items.length ? `
           <div class="items-list">
             ${c.items.map(it => `<div>${escapeHtml(it)}</div>`).join("")}
-            ${c.total_items > c.items.length ? `<div style="color:var(--text-dim);margin-top:4px">… e mais ${c.total_items - c.items.length} ocorrências.</div>` : ""}
+            ${c.total_items > c.items.length ? `<div style="color:var(--text-dim);margin-top:4px">… and ${c.total_items - c.items.length} more occurrences.</div>` : ""}
           </div>
         ` : ""}
       </article>
@@ -1093,7 +1093,7 @@ function switchTab(name) {
 document.querySelectorAll(".tab-btn").forEach(b => b.addEventListener("click", () => switchTab(b.dataset.view)));
 document.getElementById("theme-toggle").addEventListener("click", ev => {
   document.body.classList.toggle("light");
-  ev.target.textContent = document.body.classList.contains("light") ? "☾ Tema" : "☀ Tema";
+  ev.target.textContent = document.body.classList.contains("light") ? "☾ Theme" : "☀ Theme";
 });
 document.getElementById("mod-all").addEventListener("click", e => { e.preventDefault(); DATA.module_order.forEach(k => state.activeModules.add(k)); buildSidebarFilters(); renderDiagram(); });
 document.getElementById("mod-none").addEventListener("click", e => { e.preventDefault(); state.activeModules.clear(); buildSidebarFilters(); renderDiagram(); });
@@ -1124,7 +1124,7 @@ document.getElementById("clear-sel").addEventListener("click", () => { state.sea
 document.getElementById("toggle-details").addEventListener("click", ev => {
   state.showDetails = !state.showDetails;
   ev.target.classList.toggle("active", state.showDetails);
-  ev.target.textContent = "Detalhes: " + (state.showDetails ? "ON" : "OFF");
+  ev.target.textContent = "Details: " + (state.showDetails ? "ON" : "OFF");
   renderDiagram();
 });
 document.addEventListener("keydown", ev => {
@@ -1136,7 +1136,7 @@ document.addEventListener("keydown", ev => {
 
 // Init
 document.getElementById("brand-logo").textContent = DATA.target[0].toUpperCase();
-document.getElementById("brand-sub").textContent = `${DATA.subtitle} · ${DATA.kpis.files} arquivos · ${DATA.kpis.loc.toLocaleString("pt-BR")} LOC`;
+document.getElementById("brand-sub").textContent = `${DATA.subtitle} · ${DATA.kpis.files} files · ${DATA.kpis.loc.toLocaleString("en-US")} LOC`;
 document.querySelectorAll("[data-preset-count]").forEach(el => {
   const key = el.dataset.presetCount;
   el.textContent = NODES.filter(n => passesPreset(n, key)).length;
