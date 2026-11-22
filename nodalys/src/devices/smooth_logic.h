@@ -48,6 +48,7 @@ public:
     bool HasTransientState() const override;
     void AcceptStep(const std::vector<double> &x) override;
     void RejectStep() override;
+    [[nodiscard]] std::unique_ptr<Device> Clone() const override;
 
 private:
     struct LogicEvaluation {

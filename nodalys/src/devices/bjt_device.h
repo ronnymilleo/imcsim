@@ -51,6 +51,7 @@ public:
     void AcceptStep(const std::vector<double> &x) override;
     void RejectStep() override;
     void SetTemperature(const ThermalConditions &thermal) override;
+    [[nodiscard]] std::unique_ptr<Device> Clone() const override;
 
 private:
     struct Intrinsic {

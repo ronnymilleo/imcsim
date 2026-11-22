@@ -20,6 +20,7 @@
 #include <functional>
 #include <limits>
 #include <map>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -183,6 +184,14 @@ public:
      * @param[in] seed  Independent 64-bit stream seed for this device.
      */
     virtual void SetRandomSeed(std::uint64_t seed) { (void)seed; }
+
+    /**
+     * @brief   Creates an independent copy of this device for an isolated simulation run.
+     * @details Stateful waveform generators (such as transient noise and random sources) must allocate fresh internal
+     *          state in the clone so concurrent runs on the same compiled circuit share no mutable state.
+     * @return  A newly owned copy of this device.
+     */
+    [[nodiscard]] virtual std::unique_ptr<Device> Clone() const = 0;
 };
 
 /**
@@ -210,6 +219,7 @@ public:
                                const std::vector<std::complex<double>> &adjoint,
                                double frequency_hz) const override;
     void SetTemperature(const ThermalConditions &thermal) override;
+    [[nodiscard]] std::unique_ptr<Device> Clone() const override;
 
 private:
     int m_NodeA;
@@ -251,6 +261,7 @@ public:
     bool HasTransientState() const override;
     void AcceptStep(const std::vector<double> &x) override;
     void RejectStep() override;
+    [[nodiscard]] std::unique_ptr<Device> Clone() const override;
 
 private:
     int m_NodeA;
@@ -295,6 +306,7 @@ public:
     bool HasTransientState() const override;
     void AcceptStep(const std::vector<double> &x) override;
     void RejectStep() override;
+    [[nodiscard]] std::unique_ptr<Device> Clone() const override;
 
 private:
     int m_NodeA;
@@ -346,6 +358,19 @@ public:
     /// Next corner of the waveform strictly after an instant, or infinity; see Device::NextBreakpoint().
     using Breakpoints = std::function<double(double time)>;
 
+    /**
+     * @struct  CallbackSet
+     * @brief   Fresh waveform, breakpoint and seed callbacks created for an isolated clone of a stateful source.
+     */
+    struct CallbackSet {
+        Waveform Evaluate;
+        Breakpoints NextBreakpoint;
+        std::function<void(std::uint64_t)> SetSeed;
+    };
+
+    /// Creates an independent CallbackSet when cloning a source whose waveform carries mutable state (e.g. TRNOISE).
+    using CallbackFactory = std::function<CallbackSet()>;
+
     VoltageSourceDevice(int node_a,
                         int node_b,
                         int branch,
@@ -369,6 +394,7 @@ public:
 
     void SetBreakpoints(Breakpoints breakpoints);
     void SetSeedCallback(std::function<void(std::uint64_t)> set_seed);
+    void SetCallbackFactory(CallbackFactory factory);
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     void StampAc(MnaSystem &reactive, const std::vector<double> &x_dc) const override;
@@ -381,6 +407,7 @@ public:
     void SetSourceScale(double scale) override;
     double NextBreakpoint(double time) const override;
     void SetRandomSeed(std::uint64_t seed) override;
+    [[nodiscard]] std::unique_ptr<Device> Clone() const override;
 
 private:
     int m_NodeA;
@@ -390,6 +417,7 @@ private:
     Waveform m_Waveform;
     Breakpoints m_Breakpoints;
     std::function<void(std::uint64_t)> m_SetSeed;
+    CallbackFactory m_CallbackFactory;
     double m_AcMagnitude;
     SourcePeriodicity m_Periodicity;
     double m_Scale = 1.0;
@@ -422,6 +450,7 @@ public:
     double SamplePeriodicCurrent(int terminal, double time_seconds) const;
     void SetBreakpoints(VoltageSourceDevice::Breakpoints breakpoints);
     void SetSeedCallback(std::function<void(std::uint64_t)> set_seed);
+    void SetCallbackFactory(VoltageSourceDevice::CallbackFactory factory);
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     void StampAc(MnaSystem &reactive, const std::vector<double> &x_dc) const override;
@@ -434,6 +463,7 @@ public:
     void SetSourceScale(double scale) override;
     double NextBreakpoint(double time) const override;
     void SetRandomSeed(std::uint64_t seed) override;
+    [[nodiscard]] std::unique_ptr<Device> Clone() const override;
 
 private:
     int m_NodeA;
@@ -442,6 +472,7 @@ private:
     VoltageSourceDevice::Waveform m_Waveform;
     VoltageSourceDevice::Breakpoints m_Breakpoints;
     std::function<void(std::uint64_t)> m_SetSeed;
+    VoltageSourceDevice::CallbackFactory m_CallbackFactory;
     double m_AcMagnitude;
     SourcePeriodicity m_Periodicity;
     double m_Scale = 1.0;
@@ -474,6 +505,7 @@ public:
                                            const std::vector<double> &x_dc,
                                            const std::vector<std::complex<double>> &x_ac,
                                            double omega) const override;
+    [[nodiscard]] std::unique_ptr<Device> Clone() const override;
 
 private:
     int m_NodeA;
@@ -508,6 +540,7 @@ public:
                                            const std::vector<double> &x_dc,
                                            const std::vector<std::complex<double>> &x_ac,
                                            double omega) const override;
+    [[nodiscard]] std::unique_ptr<Device> Clone() const override;
 
 private:
     int m_NodeA;
@@ -542,6 +575,7 @@ public:
                                            const std::vector<double> &x_dc,
                                            const std::vector<std::complex<double>> &x_ac,
                                            double omega) const override;
+    [[nodiscard]] std::unique_ptr<Device> Clone() const override;
 
 private:
     int m_NodeA;
@@ -576,6 +610,7 @@ public:
                                            const std::vector<double> &x_dc,
                                            const std::vector<std::complex<double>> &x_ac,
                                            double omega) const override;
+    [[nodiscard]] std::unique_ptr<Device> Clone() const override;
 
 private:
     int m_NodeA;
@@ -610,6 +645,7 @@ public:
     void AcceptStep(const std::vector<double> &x) override;
     void RejectStep() override;
     bool HasSwitched() const override;
+    [[nodiscard]] std::unique_ptr<Device> Clone() const override;
 
 private:
     int m_NodeA;
@@ -652,6 +688,7 @@ public:
     bool HasTransientState() const override;
     void AcceptStep(const std::vector<double> &x) override;
     void RejectStep() override;
+    [[nodiscard]] std::unique_ptr<Device> Clone() const override;
 
 private:
     int m_PrimaryA;
@@ -690,6 +727,7 @@ public:
                                            const std::vector<double> &x_dc,
                                            const std::vector<std::complex<double>> &x_ac,
                                            double omega) const override;
+    [[nodiscard]] std::unique_ptr<Device> Clone() const override;
 
 private:
     int m_Node;
@@ -717,6 +755,7 @@ public:
                                            const std::vector<double> &x_dc,
                                            const std::vector<std::complex<double>> &x_ac,
                                            double omega) const override;
+    [[nodiscard]] std::unique_ptr<Device> Clone() const override;
 
 private:
     int m_Node;
@@ -747,6 +786,7 @@ public:
                                            const std::vector<double> &x_dc,
                                            const std::vector<std::complex<double>> &x_ac,
                                            double omega) const override;
+    [[nodiscard]] std::unique_ptr<Device> Clone() const override;
 
 private:
     std::vector<NodeSeed> m_Seeds;

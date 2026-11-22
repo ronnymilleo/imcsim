@@ -206,4 +206,8 @@ void DiodeDevice::SetTemperature(const ThermalConditions &thermal) {
     ApplyTemperature(thermal);
 }
 
+std::unique_ptr<Device> DiodeDevice::Clone() const {
+    return std::make_unique<DiodeDevice>(*this);
+}
+
 } // namespace Nodalys

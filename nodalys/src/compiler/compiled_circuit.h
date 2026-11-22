@@ -66,6 +66,9 @@ struct CompiledCircuit {
     ThermalConditions Thermal;
 };
 
+// Isolation
+[[nodiscard]] CompiledCircuit CloneCompiledCircuit(const CompiledCircuit &blueprint);
+
 } // namespace Nodalys
 
 #endif // NODALYS_COMPILED_CIRCUIT_H

@@ -320,4 +320,8 @@ void MosfetDevice::SetTemperature(const ThermalConditions &thermal) {
     ApplyTemperature(thermal);
 }
 
+std::unique_ptr<Device> MosfetDevice::Clone() const {
+    return std::make_unique<MosfetDevice>(*this);
+}
+
 } // namespace Nodalys

@@ -222,6 +222,10 @@ void SmoothLogicDevice::RejectStep() {
     }
 }
 
+std::unique_ptr<Device> SmoothLogicDevice::Clone() const {
+    return std::make_unique<SmoothLogicDevice>(*this);
+}
+
 /**
  * @brief   Evaluates the smooth logic function and exact analytical derivatives.
  * @param[in] x  Current iterate vector.
