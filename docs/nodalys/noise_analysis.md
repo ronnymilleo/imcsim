@@ -1,9 +1,9 @@
 # Small-Signal AC Noise Analysis (`.noise`)
 
 **Implementation files:**
-- [`nodalys/src/analyses/noise_analysis.cpp`](../../nodalys/src/analyses/noise_analysis.cpp) (`ComputeNoise`)
+- [`nodalys/src/analyses/noise/noise_analysis.cpp`](../../nodalys/src/analyses/noise/noise_analysis.cpp) (`ComputeNoise`)
 - [`nodalys/src/mna/mna_system.cpp`](../../nodalys/src/mna/mna_system.cpp) (`MnaSystem::SolveAcTranspose`)
-- [`nodalys/src/devices/devices.cpp`](../../nodalys/src/devices/devices.cpp) & [`nodalys/src/devices/diode_device.cpp`](../../nodalys/src/devices/diode_device.cpp), [`nodalys/src/devices/bjt_device.cpp`](../../nodalys/src/devices/bjt_device.cpp) and [`nodalys/src/devices/mosfet_device.cpp`](../../nodalys/src/devices/mosfet_device.cpp) (`Device::OutputNoiseVariance`)
+- [`nodalys/src/devices/devices.cpp`](../../nodalys/src/devices/devices.cpp) & [`nodalys/src/devices/semiconductors/diode_device.cpp`](../../nodalys/src/devices/semiconductors/diode_device.cpp), [`nodalys/src/devices/semiconductors/bjt_device.cpp`](../../nodalys/src/devices/semiconductors/bjt_device.cpp) and [`nodalys/src/devices/semiconductors/mosfet_device.cpp`](../../nodalys/src/devices/semiconductors/mosfet_device.cpp) (`Device::OutputNoiseVariance`)
 - [`app-core/backends/nodalys/compiler.cpp`](../../app-core/backends/nodalys/compiler.cpp) (`CompiledCircuit::NoiseGroups`)
 - [`tests/backend_comparison_tests.cpp`](../../tests/backend_comparison_tests.cpp) (`Both backends agree on the small-signal noise spectral densities, totals and device contributions`)
 

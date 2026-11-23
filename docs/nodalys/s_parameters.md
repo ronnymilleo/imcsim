@@ -1,13 +1,13 @@
 # Small-Signal S-Parameter Analysis (`.sp`)
 
 **Implementation files:**
-- [`nodalys/src/analyses/sp_analysis.cpp`](../../nodalys/src/analyses/sp_analysis.cpp) (`ComputeSParameters`)
-- [`nodalys/src/analyses/port_matrices.cpp`](../../nodalys/src/analyses/port_matrices.cpp) (`ComputeImpedanceMatrix`, `ComputeAdmittanceMatrix`)
+- [`nodalys/src/analyses/sp/sp_analysis.cpp`](../../nodalys/src/analyses/sp/sp_analysis.cpp) (`ComputeSParameters`)
+- [`nodalys/src/analyses/sp/port_matrices.cpp`](../../nodalys/src/analyses/sp/port_matrices.cpp) (`ComputeImpedanceMatrix`, `ComputeAdmittanceMatrix`)
 - [`nodalys/src/mna/mna_system.cpp`](../../nodalys/src/mna/mna_system.cpp) (`MnaSystem::SolveAcMultiple`)
 - [`app-core/backends/nodalys/nodalys_backend.cpp`](../../app-core/backends/nodalys/nodalys_backend.cpp) (`NodalysBackend::RunSParameters`)
 - [`nodalys/include/nodalys/results.h`](../../nodalys/include/nodalys/results.h) (`SParameterResult`)
 - [`nodalys/src/export/exporters.cpp`](../../nodalys/src/export/exporters.cpp) (`ExportTouchstone`)
-- [`nodalys/tests/sp_analysis_tests.cpp`](../../nodalys/tests/sp_analysis_tests.cpp) (one port, Z and Y, sweeps, errors, exports)
+- [`nodalys/tests/analyses/sp_analysis_tests.cpp`](../../nodalys/tests/analyses/sp_analysis_tests.cpp) (one port, Z and Y, sweeps, errors, exports)
 - [`tests/backend_comparison_tests.cpp`](../../tests/backend_comparison_tests.cpp) (`Both backends agree on S-parameters`)
 
 ---

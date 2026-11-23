@@ -1,7 +1,7 @@
 # DC Analyses in Nodalys: Operating Point (`.op`) and DC Sweep (`.dc`)
 
 **Implementation files:**
-- [`nodalys/src/analyses/dc_analysis.cpp`](../../nodalys/src/analyses/dc_analysis.cpp) (`ComputeOperatingPoint`, `ComputeDCSweep`)
+- [`nodalys/src/analyses/dc/dc_analysis.cpp`](../../nodalys/src/analyses/dc/dc_analysis.cpp) (`ComputeOperatingPoint`, `ComputeDCSweep`)
 - [`nodalys/src/newton/newton.cpp`](../../nodalys/src/newton/newton.cpp) (`SolveNewton`)
 - [`nodalys/src/mna/mna_system.cpp`](../../nodalys/src/mna/mna_system.cpp) (`MnaSystem::Solve`, `MnaSystem::CheckResidual`)
 - [`nodalys/src/linear/dense_matrix.cpp`](../../nodalys/src/linear/dense_matrix.cpp) (`BasicDenseMatrix<double>`)
@@ -45,7 +45,7 @@ When direct Newton-Raphson fails to converge from $\mathbf{x}^{(0)} = \mathbf{0}
 3. **Stage 3 — *Source Stepping*:** scales all independent sources by $\lambda \in [0 \to 1]$ with adaptive step halving whenever an intermediate point fails to converge.
 
 ### 1.6 DC Sweep (`.dc`) with Homotopic Continuation
-In [`ComputeDCSweep`](../../nodalys/src/analyses/dc_analysis.cpp), only the first point of each sweep curve requires a cold start ([`ComputeOperatingPoint`](../../nodalys/src/analyses/dc_analysis.cpp)). Every subsequent point $k = 1, 2, \dots, M$ seeds `SolveNewton` directly with the converged vector $\mathbf{x}_{k-1}$ from the preceding source value, typically converging in 2–4 iterations.
+In [`ComputeDCSweep`](../../nodalys/src/analyses/dc/dc_analysis.cpp), only the first point of each sweep curve requires a cold start ([`ComputeOperatingPoint`](../../nodalys/src/analyses/dc/dc_analysis.cpp)). Every subsequent point $k = 1, 2, \dots, M$ seeds `SolveNewton` directly with the converged vector $\mathbf{x}_{k-1}$ from the preceding source value, typically converging in 2–4 iterations.
 
 ### 1.7 Nodesets (`.nodeset`)
 A circuit with several stable operating points (a latch, a flip-flop of transistors, a Schmitt trigger) has no single answer for Newton-Raphson to find: it lands on the one nearest where it starts. `CircuitBuilder::SetNodeset(node, voltage)` (SPICE `.nodeset V(node)=value`) is the guess that picks it, and it is a guess, not a held value, as in SPICE:
@@ -55,7 +55,7 @@ A circuit with several stable operating points (a latch, a flip-flop of transist
 
 If the pulled pass converges nowhere, the solve goes on without the nodesets. Only a solve that finds an operating point has the passes: the operating point, the first point of a DC sweep (`TimeContext::AppliesNodesets` is false for the others, which continue from the point before, so a sweep through a hysteresis loop keeps its branch), the operating points that start the AC, noise, transfer-function, sensitivity, pole-zero and S-parameter analyses, and the one that starts a transient without `uic`. A transient with `uic` has no operating point and ignores nodesets, and the transient steps never read them. The harmonic balance reads them in the DC bias that starts its Newton, by the same two passes (`SolveInNodesetPasses()`, shared with `SolveNewton`), and not in the balance itself; see [`hb_analysis.md`](./hb_analysis.md). This differs from `NodeInitialConditionDevice` (`.ic`), which holds its node in the operating point that starts a transient and keeps that point. A nodeset and an initial voltage on one node may differ.
 
-`ParseNetlist` reads `.nodeset v(1)=5 v(out)=0`, with the same syntax as `.ic`. The tests (`nodalys/tests/nodeset_tests.cpp`) run a two-transistor bistable whose collectors are `.nodeset` either way, and check that a divider is unchanged by any guess.
+`ParseNetlist` reads `.nodeset v(1)=5 v(out)=0`, with the same syntax as `.ic`. The tests (`nodalys/tests/analyses/nodeset_tests.cpp`) run a two-transistor bistable whose collectors are `.nodeset` either way, and check that a divider is unchanged by any guess.
 
 ### 1.8 Options That Reach the Solver
 `ConvergenceOptions` (`RelTol`, `VoltageAbsTol`, `CurrentAbsTol`) is the tolerance of the Newton step and of the residual check, and of the LTE step control of the transient; the netlist parser fills it from `.options reltol= vntol= abstol=`, and the `imcsim` backend from the solver options of the schematic. The nominal temperature is `Circuit::SetTemperature(temperature, nominal)`, the temperature that the diode, BJT and MOSFET model parameters are given at (`.options tnom=`); a run at another temperature scales them from it.

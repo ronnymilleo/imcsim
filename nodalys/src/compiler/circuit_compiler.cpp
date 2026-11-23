@@ -5,17 +5,17 @@
 
 #include "compiler/circuit_compiler.h"
 
-#include "compiler/electromechanical_macromodels.h"
-#include "compiler/logic_macromodels.h"
-#include "compiler/opamp_macromodels.h"
-#include "devices/bjt_device.h"
-#include "devices/controlled_sources.h"
-#include "devices/diode_device.h"
-#include "devices/fuse_device.h"
-#include "devices/mosfet_device.h"
-#include "devices/passive_devices.h"
-#include "devices/smooth_logic.h"
-#include "devices/switch_device.h"
+#include "compiler/macromodels/electromechanical_macromodels.h"
+#include "compiler/macromodels/logic_macromodels.h"
+#include "compiler/macromodels/opamp_macromodels.h"
+#include "devices/passive/fuse_device.h"
+#include "devices/passive/passive_devices.h"
+#include "devices/passive/smooth_logic.h"
+#include "devices/passive/switch_device.h"
+#include "devices/semiconductors/bjt_device.h"
+#include "devices/semiconductors/diode_device.h"
+#include "devices/semiconductors/mosfet_device.h"
+#include "devices/sources/controlled_sources.h"
 #include <algorithm>
 #include <format>
 #include <utility>

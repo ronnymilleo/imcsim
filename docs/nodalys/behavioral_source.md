@@ -1,6 +1,6 @@
 # Behavioral Sources
 
-A behavioral source is the SPICE `B` element: a voltage or a current that follows a free expression of node voltages, branch currents and time. `ngspice` reads the expression itself; `Nodalys` parses it into a compact program ([`expression.h`](../../nodalys/include/nodalys/expression.h), [`src/expression/`](../../nodalys/src/expression)) and evaluates it, with its exact partial derivatives, at each Newton iterate. The devices are [`BehavioralVoltageDevice` and `BehavioralCurrentDevice`](../../nodalys/src/devices/behavioral_device.cpp), built with `CircuitBuilder::AddBehavioralVoltage()` and `AddBehavioralCurrent()`, or from a netlist line.
+A behavioral source is the SPICE `B` element: a voltage or a current that follows a free expression of node voltages, branch currents and time. `ngspice` reads the expression itself; `Nodalys` parses it into a compact program ([`expression.h`](../../nodalys/include/nodalys/expression.h), [`src/expression/`](../../nodalys/src/expression)) and evaluates it, with its exact partial derivatives, at each Newton iterate. The devices are [`BehavioralVoltageDevice` and `BehavioralCurrentDevice`](../../nodalys/src/devices/sources/behavioral_device.cpp), built with `CircuitBuilder::AddBehavioralVoltage()` and `AddBehavioralCurrent()`, or from a netlist line.
 
 The language is the one of the `ngspice` `B` element, so a netlist means the same on both engines. What `ngspice` reads and `Nodalys` does not is refused with a message that names it, never evaluated as something close (section 4).
 

@@ -6,12 +6,12 @@
 #include "nodalys/netlist_parser.h"
 
 #include "nodalys/circuit_builder.h"
-#include "parser/netlist_context.h"
-#include "parser/netlist_deck.h"
-#include "parser/netlist_directives.h"
-#include "parser/netlist_elements.h"
-#include "parser/netlist_nodes.h"
-#include "parser/netlist_subcircuits.h"
+#include "parser/netlist/netlist_context.h"
+#include "parser/netlist/netlist_deck.h"
+#include "parser/netlist/netlist_directives.h"
+#include "parser/netlist/netlist_elements.h"
+#include "parser/netlist/netlist_nodes.h"
+#include "parser/netlist/netlist_subcircuits.h"
 
 #include <cctype>
 #include <string>

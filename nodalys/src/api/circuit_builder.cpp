@@ -10,7 +10,7 @@
 #include "compiler/behavioral_binding.h"
 #include "compiler/circuit_compiler.h"
 #include "compiler/circuit_description.h"
-#include "compiler/logic_macromodels.h"
+#include "compiler/macromodels/logic_macromodels.h"
 #include "devices/thermal.h"
 #include <memory>
 #include <utility>

@@ -3,30 +3,30 @@
 # =============================================================================
 
 add_library(nodalys STATIC
-    src/analyses/ac_analysis.cpp
-    src/analyses/ac_sens_analysis.cpp
-    src/analyses/ac_sens_bias.cpp
-    src/analyses/ac_sens_elements.cpp
-    src/analyses/analysis_preamble.cpp
-    src/analyses/dc_analysis.cpp
-    src/analyses/frequency_sweep.cpp
-    src/analyses/hb_analysis.cpp
-    src/analyses/hb_bias.cpp
-    src/analyses/hb_residual.cpp
-    src/analyses/hb_result.cpp
-    src/analyses/hb_setup.cpp
-    src/analyses/hb_solve.cpp
-    src/analyses/hb_spectrum.cpp
-    src/analyses/hb_workspace.cpp
-    src/analyses/noise_analysis.cpp
-    src/analyses/port_matrices.cpp
-    src/analyses/pz_analysis.cpp
-    src/analyses/pz_checks.cpp
-    src/analyses/sens_analysis.cpp
-    src/analyses/solution_readout.cpp
-    src/analyses/sp_analysis.cpp
-    src/analyses/tf_analysis.cpp
-    src/analyses/transient_analysis.cpp
+    src/analyses/ac/ac_analysis.cpp
+    src/analyses/ac_sens/ac_sens_analysis.cpp
+    src/analyses/ac_sens/ac_sens_bias.cpp
+    src/analyses/ac_sens/ac_sens_elements.cpp
+    src/analyses/common/analysis_preamble.cpp
+    src/analyses/common/frequency_sweep.cpp
+    src/analyses/common/solution_readout.cpp
+    src/analyses/dc/dc_analysis.cpp
+    src/analyses/hb/hb_analysis.cpp
+    src/analyses/hb/hb_bias.cpp
+    src/analyses/hb/hb_residual.cpp
+    src/analyses/hb/hb_result.cpp
+    src/analyses/hb/hb_setup.cpp
+    src/analyses/hb/hb_solve.cpp
+    src/analyses/hb/hb_spectrum.cpp
+    src/analyses/hb/hb_workspace.cpp
+    src/analyses/noise/noise_analysis.cpp
+    src/analyses/pz/pz_analysis.cpp
+    src/analyses/pz/pz_checks.cpp
+    src/analyses/sens/sens_analysis.cpp
+    src/analyses/sp/port_matrices.cpp
+    src/analyses/sp/sp_analysis.cpp
+    src/analyses/tf/tf_analysis.cpp
+    src/analyses/transient/transient_analysis.cpp
     src/api/circuit.cpp
     src/api/circuit_builder.cpp
     src/api/circuit_builder_sources.cpp
@@ -35,25 +35,25 @@ add_library(nodalys STATIC
     src/compiler/behavioral_binding.cpp
     src/compiler/circuit_compiler.cpp
     src/compiler/compiled_circuit.cpp
-    src/compiler/electromechanical_macromodels.cpp
-    src/compiler/logic_macromodels.cpp
-    src/compiler/opamp_macromodels.cpp
+    src/compiler/macromodels/electromechanical_macromodels.cpp
+    src/compiler/macromodels/logic_macromodels.cpp
+    src/compiler/macromodels/opamp_macromodels.cpp
     src/compiler/source_specs.cpp
-    src/devices/behavioral_device.cpp
-    src/devices/bjt_device.cpp
-    src/devices/controlled_sources.cpp
-    src/devices/diode_device.cpp
-    src/devices/fuse_device.cpp
-    src/devices/independent_sources.cpp
     src/devices/integration.cpp
-    src/devices/mosfet_device.cpp
-    src/devices/passive_devices.cpp
-    src/devices/random_draws.cpp
-    src/devices/smooth_logic.cpp
-    src/devices/switch_device.cpp
+    src/devices/passive/fuse_device.cpp
+    src/devices/passive/passive_devices.cpp
+    src/devices/passive/smooth_logic.cpp
+    src/devices/passive/switch_device.cpp
+    src/devices/semiconductors/bjt_device.cpp
+    src/devices/semiconductors/diode_device.cpp
+    src/devices/semiconductors/mosfet_device.cpp
+    src/devices/sources/behavioral_device.cpp
+    src/devices/sources/controlled_sources.cpp
+    src/devices/sources/independent_sources.cpp
+    src/devices/sources/random_draws.cpp
+    src/devices/sources/transient_noise.cpp
+    src/devices/sources/waveforms.cpp
     src/devices/thermal.cpp
-    src/devices/transient_noise.cpp
-    src/devices/waveforms.cpp
     src/export/csv_exporter.cpp
     src/export/exporters.cpp
     src/export/json_exporter.cpp
@@ -63,32 +63,32 @@ add_library(nodalys STATIC
     src/expression/expression_math.cpp
     src/expression/expression_parser.cpp
     src/linear/dense_matrix.cpp
+    src/linear/eigen/pencil_reduction.cpp
+    src/linear/eigen/qz.cpp
+    src/linear/eigen/root_refinement.cpp
     src/linear/fft.cpp
-    src/linear/pencil_reduction.cpp
-    src/linear/qz.cpp
-    src/linear/root_refinement.cpp
     src/mna/mna_system.cpp
     src/newton/newton.cpp
-    src/parser/classified_lines.cpp
-    src/parser/element_arguments.cpp
-    src/parser/expression_references.cpp
-    src/parser/model_cards.cpp
-    src/parser/netlist_deck.cpp
-    src/parser/netlist_directives.cpp
-    src/parser/netlist_elements.cpp
-    src/parser/netlist_nodes.cpp
+    src/parser/netlist/netlist_deck.cpp
+    src/parser/netlist/netlist_directives.cpp
+    src/parser/netlist/netlist_elements.cpp
+    src/parser/netlist/netlist_nodes.cpp
+    src/parser/netlist/netlist_subcircuits.cpp
     src/parser/netlist_parser.cpp
-    src/parser/netlist_subcircuits.cpp
-    src/parser/source_line.cpp
-    src/parser/source_waveforms.cpp
-    src/parser/spice_text.cpp
-    src/parser/spice_values.cpp
-    src/parser/subcircuit_elements.cpp
-    src/parser/subcircuit_expansion.cpp
-    src/parser/subcircuit_lines.cpp
-    src/parser/subcircuit_models.cpp
-    src/parser/subcircuit_scope.cpp
-    src/parser/subcircuit_text.cpp
+    src/parser/sources/source_line.cpp
+    src/parser/sources/source_waveforms.cpp
+    src/parser/subcircuit/subcircuit_elements.cpp
+    src/parser/subcircuit/subcircuit_expansion.cpp
+    src/parser/subcircuit/subcircuit_lines.cpp
+    src/parser/subcircuit/subcircuit_models.cpp
+    src/parser/subcircuit/subcircuit_scope.cpp
+    src/parser/subcircuit/subcircuit_text.cpp
+    src/parser/syntax/classified_lines.cpp
+    src/parser/syntax/element_arguments.cpp
+    src/parser/syntax/expression_references.cpp
+    src/parser/syntax/model_cards.cpp
+    src/parser/syntax/spice_text.cpp
+    src/parser/syntax/spice_values.cpp
     src/text/spice_number.cpp
     src/text/text_case.cpp
 )

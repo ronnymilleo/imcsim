@@ -1,10 +1,10 @@
 # Small-Signal AC / Bode Analysis (`.ac`)
 
 **Implementation files:**
-- [`nodalys/src/analyses/ac_analysis.cpp`](../../nodalys/src/analyses/ac_analysis.cpp) (`ComputeACSweep`)
+- [`nodalys/src/analyses/ac/ac_analysis.cpp`](../../nodalys/src/analyses/ac/ac_analysis.cpp) (`ComputeACSweep`)
 - [`nodalys/src/mna/mna_system.cpp`](../../nodalys/src/mna/mna_system.cpp) (`MnaSystem::SolveAc`, `MnaSystem::SolveAcMultiple`)
 - [`nodalys/src/linear/dense_matrix.cpp`](../../nodalys/src/linear/dense_matrix.cpp) (`BasicDenseMatrix<std::complex<double>>`)
-- [`nodalys/src/devices/devices.cpp`](../../nodalys/src/devices/devices.cpp), [`nodalys/src/devices/diode_device.cpp`](../../nodalys/src/devices/diode_device.cpp), [`nodalys/src/devices/bjt_device.cpp`](../../nodalys/src/devices/bjt_device.cpp) and [`nodalys/src/devices/mosfet_device.cpp`](../../nodalys/src/devices/mosfet_device.cpp) (`StampAc`, `AcTerminalCurrent`)
+- [`nodalys/src/devices/devices.cpp`](../../nodalys/src/devices/devices.cpp), [`nodalys/src/devices/semiconductors/diode_device.cpp`](../../nodalys/src/devices/semiconductors/diode_device.cpp), [`nodalys/src/devices/semiconductors/bjt_device.cpp`](../../nodalys/src/devices/semiconductors/bjt_device.cpp) and [`nodalys/src/devices/semiconductors/mosfet_device.cpp`](../../nodalys/src/devices/semiconductors/mosfet_device.cpp) (`StampAc`, `AcTerminalCurrent`)
 
 ---
 

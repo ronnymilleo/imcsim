@@ -5,7 +5,7 @@
 
 #include "compiler/behavioral_binding.h"
 
-#include "devices/behavioral_device.h"
+#include "devices/sources/behavioral_device.h"
 #include "nodalys/expression.h"
 #include "text/text_case.h"
 #include <charconv>
