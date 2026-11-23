@@ -66,7 +66,7 @@ struct HbWorkspace {
     MnaSystem CLin;
     std::vector<Device *> NonlinearDevices;
     /// The nodesets, stamped in the pulled pass of the DC bias only.
-    std::vector<Device *> Nodesets;
+    std::vector<NodeVoltageDirective> Nodesets;
     /// The excitation B, in `[unknown * CoeffsPerUnknown + coefficient]`.
     std::vector<double> BaseRhsHarmonics;
 

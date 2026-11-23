@@ -34,7 +34,6 @@ add_library(nodalys STATIC
     src/compiler/compiled_circuit.cpp
     src/devices/behavioral_device.cpp
     src/devices/bjt_device.cpp
-    src/devices/constraint_devices.cpp
     src/devices/controlled_sources.cpp
     src/devices/diode_device.cpp
     src/devices/fuse_device.cpp

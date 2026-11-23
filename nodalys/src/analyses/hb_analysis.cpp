@@ -54,7 +54,6 @@ std::expected<HbSolveOutcome, std::string> SolveBalance(HbWorkspace &ws,
     }
 
     ws.NonlinearDevices = partitioned.NonlinearDevices;
-    ws.Nodesets = partitioned.Nodesets;
     HbSolveOutcome outcome = SolveHarmonicBalanceNonlinear(ws, settings, options, x_hb);
     if (ws.IsStopped) {
         return std::unexpected("The harmonic balance was stopped before it converged");

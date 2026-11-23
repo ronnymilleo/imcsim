@@ -93,7 +93,7 @@ std::expected<std::vector<double>, std::string> SolveOperatingPoint(CompiledCirc
                                                                     const std::string_view failure_message,
                                                                     std::vector<DiagnosticMessage> *messages) {
     std::vector<double> x_dc(static_cast<std::size_t>(compiled.System->GetSize()), 0.0);
-    const NewtonOutcome outcome = SolveNewton(*compiled.System, compiled.Devices, x_dc, TimeContext{}, options);
+    const NewtonOutcome outcome = SolveNewton(compiled, x_dc, TimeContext{}, options);
     if (!outcome.Converged) {
         return std::unexpected(DescribeFailure(std::string(failure_message), outcome));
     }

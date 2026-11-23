@@ -41,14 +41,11 @@ std::string_view FindFault(const std::vector<Device *> &devices) {
 /**
  * @brief   Adds the stiff pull of the nodesets to the DC system while the pulled pass runs, and nothing otherwise.
  */
-void StampNodesets(const HbWorkspace &ws, const bool is_nodeset_pass, const std::vector<double> &x, MnaSystem &sys) {
+void StampNodesets(const HbWorkspace &ws, const bool is_nodeset_pass, MnaSystem &sys) {
     if (!is_nodeset_pass) {
         return;
     }
-    const TimeContext pulled{.IsNodesetPass = true};
-    for (Device *nodeset : ws.Nodesets) {
-        nodeset->Stamp(sys, x, pulled);
-    }
+    StampNodeClamps(sys, ws.Nodesets);
 }
 
 /**
@@ -70,7 +67,7 @@ void StampDcSystem(const HbWorkspace &ws,
     for (Device *device : ws.NonlinearDevices) {
         device->Stamp(sys, x, TimeContext{});
     }
-    StampNodesets(ws, is_nodeset_pass, x, sys);
+    StampNodesets(ws, is_nodeset_pass, sys);
     sys.AddGminToNodes(gmin);
 }
 

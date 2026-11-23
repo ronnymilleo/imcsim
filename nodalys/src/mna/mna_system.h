@@ -46,10 +46,6 @@ struct TimeContext {
     /// True at t = 0 of a transient solve (both with and without `uic`); `.ic` node voltages clamp only the solve that
     /// is not `uic`, the operating point that starts the transient.
     bool IsTransientStart = false;
-    /// True on the first pass of an operating-point solve that has nodesets: they pull their nodes to their voltages.
-    /// The second pass, which converges again with them released, and every solve that is not an operating point have
-    /// it false.
-    bool IsNodesetPass = false;
     /// False for the solves that continue a sweep, which start from the point before them and not from the nodesets.
     bool AppliesNodesets = true;
     /// True on the first integration step of a transient and on the step that leaves a source corner: uses Backward

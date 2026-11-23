@@ -39,6 +39,15 @@ struct CurrentRef {
 };
 
 /**
+ * @struct  NodeVoltageDirective
+ * @brief   One node unknown index and its target voltage for `.ic`, `.nodeset`, or an initial Newton guess.
+ */
+struct NodeVoltageDirective {
+    int Node = -1;
+    double Voltage = 0.0;
+};
+
+/**
  * @struct  NoiseGroup
  * @brief   Maps a component name to all internal devices that produce thermal/shot noise.
  */
@@ -62,6 +71,12 @@ struct CompiledCircuit {
     DevicesByName SourcesByName;
     DevicesByName ElementsByName;
     std::vector<CircuitPort> Ports;
+    /// Node voltages clamped during the operating point that starts a transient (`.ic`).
+    std::vector<NodeVoltageDirective> InitialConditions;
+    /// Node voltages pulled during the first pass of an operating-point solve (`.nodeset`).
+    std::vector<NodeVoltageDirective> Nodesets;
+    /// Initial Newton guesses for bistable subcircuits such as flip-flops.
+    std::vector<NodeVoltageDirective> NodeSeeds;
     bool HasInitialConditions = false;
     ThermalConditions Thermal;
 };

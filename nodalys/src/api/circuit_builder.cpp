@@ -9,7 +9,6 @@
 #include "compiler/compiled_circuit.h"
 #include "devices/behavioral_device.h"
 #include "devices/bjt_device.h"
-#include "devices/constraint_devices.h"
 #include "devices/controlled_sources.h"
 #include "devices/diode_device.h"
 #include "devices/fuse_device.h"
@@ -1065,7 +1064,7 @@ public:
         }
         m_Actions.clear();
         for (const auto &[node, voltage] : m_InitialNodeVoltages) {
-            m_Compiled.Devices.push_back(std::make_unique<NodeInitialConditionDevice>(node, voltage));
+            m_Compiled.InitialConditions.push_back({.Node = node, .Voltage = voltage});
         }
         if (!m_InitialNodeVoltages.empty()) {
             for (const auto &device : m_Compiled.Devices) {
@@ -1076,7 +1075,7 @@ public:
         }
         m_InitialNodeVoltages.clear();
         for (const auto &[node, voltage] : m_NodesetVoltages) {
-            m_Compiled.Devices.push_back(std::make_unique<NodesetDevice>(node, voltage));
+            m_Compiled.Nodesets.push_back({.Node = node, .Voltage = voltage});
         }
         m_NodesetVoltages.clear();
         BindBehavioralCurrents();
@@ -1441,14 +1440,12 @@ private:
      * @param[in] params  Logic levels of the gates.
      */
     void AddFlipFlopSeed(const FlipFlopNodes &n, const SmoothLogicParameters &params) {
-        AddDevice(std::make_unique<NodeSeedDevice>(std::vector<NodeSeed>{
-            {.Node = n.Q, .Voltage = params.VLow},
-            {.Node = n.QBar, .Voltage = params.VHigh},
-            {.Node = n.N1, .Voltage = params.VLow},
-            {.Node = n.N2, .Voltage = params.VHigh},
-            {.Node = n.N3, .Voltage = params.VLow},
-            {.Node = n.N4, .Voltage = params.VHigh},
-        }));
+        m_Compiled.NodeSeeds.push_back({.Node = n.Q, .Voltage = params.VLow});
+        m_Compiled.NodeSeeds.push_back({.Node = n.QBar, .Voltage = params.VHigh});
+        m_Compiled.NodeSeeds.push_back({.Node = n.N1, .Voltage = params.VLow});
+        m_Compiled.NodeSeeds.push_back({.Node = n.N2, .Voltage = params.VHigh});
+        m_Compiled.NodeSeeds.push_back({.Node = n.N3, .Voltage = params.VLow});
+        m_Compiled.NodeSeeds.push_back({.Node = n.N4, .Voltage = params.VHigh});
     }
 
     /**
