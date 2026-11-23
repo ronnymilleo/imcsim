@@ -412,7 +412,6 @@ Result AddMosfetLine(const ElementLine &element) {
                                    element.ResolveNode(0),
                                    element.ResolveNode(1),
                                    element.ResolveNode(2),
-                                   element.ResolveNode(3),
                                    (*model)->Card.Kind != ParsedModel::ModelKind::MOSFET_PMOS,
                                    parameters);
     return {};
@@ -434,12 +433,12 @@ Result AddSwitchLine(const ElementLine &element) {
                                            element.Tokens[FIRST_NODE_INDEX + NODES + 1]));
     }
     const SwitchParameters parameters = UseModelParameters(element.Scope.GetContext(), **model, BuildSwitchParameters);
-    element.GetBuilder().AddVoltageControlledSwitch(element.Name,
-                                                    element.ResolveNode(0),
-                                                    element.ResolveNode(1),
-                                                    element.ResolveNode(2),
-                                                    element.ResolveNode(3),
-                                                    parameters);
+    element.GetBuilder().AddSwitch(element.Name,
+                                   element.ResolveNode(0),
+                                   element.ResolveNode(1),
+                                   element.ResolveNode(2),
+                                   element.ResolveNode(3),
+                                   parameters);
     return {};
 }
 

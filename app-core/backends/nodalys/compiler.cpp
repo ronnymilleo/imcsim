@@ -517,12 +517,10 @@ private:
             if (!resolved_mosfet) {
                 return std::unexpected(resolved_mosfet.error());
             }
-            const int body = nodes.size() > 3 ? nodes[3] : nodes[2];
             m_Builder->AddMosfet(entry.Name,
                                  nodes[0],
                                  nodes[1],
                                  nodes[2],
-                                 body,
                                  entry.Type != ComponentType::PMOS,
                                  ToNodalys(*resolved_mosfet));
             return {};
@@ -537,13 +535,12 @@ private:
         const std::vector<int> &nodes = entry.Nodes;
         switch (entry.Type) {
         case ComponentType::V_SWITCH:
-            m_Builder->AddVoltageControlledSwitch(
-                entry.Name,
-                nodes[0],
-                nodes[1],
-                nodes[2],
-                nodes[3],
-                ToNodalys(static_cast<const VoltageControlledSwitch &>(part).GetParameters()));
+            m_Builder->AddSwitch(entry.Name,
+                                 nodes[0],
+                                 nodes[1],
+                                 nodes[2],
+                                 nodes[3],
+                                 ToNodalys(static_cast<const VoltageControlledSwitch &>(part).GetParameters()));
             return {};
         case ComponentType::FUSE:
             m_Builder->AddFuse(entry.Name,
