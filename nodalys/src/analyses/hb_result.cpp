@@ -168,8 +168,9 @@ std::vector<std::complex<double>> FindContributionPhasors(CurrentContext &contex
     if (!contribution.Element->IsLinear()) {
         return FindNonlinearDevicePhasors(context, *contribution.Element, contribution.Terminal);
     }
-    if (const auto *source = dynamic_cast<const CurrentSourceDevice *>(contribution.Element)) {
-        return FindSourcePhasors(context, *source, contribution.Terminal);
+    if (const IndependentSourceDevice *source = contribution.Element->AsIndependentSource();
+        source != nullptr && !source->IsVoltageSource()) {
+        return FindSourcePhasors(context, *static_cast<const CurrentSourceDevice *>(source), contribution.Terminal);
     }
     return FindLinearDevicePhasors(context, *contribution.Element, contribution.Terminal);
 }

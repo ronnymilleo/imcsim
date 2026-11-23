@@ -52,7 +52,7 @@ std::vector<double> ReadNodeVoltages(const CompiledCircuit &compiled, const std:
 }
 
 bool SetSourceValue(Device *device, const double value) {
-    if (auto *source = dynamic_cast<IndependentSourceDevice *>(device)) {
+    if (auto *source = device->AsIndependentSource()) {
         source->SetDcValue(value);
         return true;
     }
@@ -60,7 +60,7 @@ bool SetSourceValue(Device *device, const double value) {
 }
 
 std::string SourceUnit(const Device *device) {
-    if (const auto *source = dynamic_cast<const IndependentSourceDevice *>(device)) {
+    if (const auto *source = device->AsIndependentSource()) {
         return source->IsVoltageSource() ? "V" : "A";
     }
     return "V";

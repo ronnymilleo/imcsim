@@ -95,7 +95,7 @@ std::expected<std::size_t, std::string> ValidateAndResolveSampleCount(const Harm
  */
 std::expected<void, std::string> ValidateDevices(const CompiledCircuit &compiled, const HarmonicBalanceConfig &config) {
     for (const std::unique_ptr<Device> &device : compiled.Devices) {
-        if (const auto *source = dynamic_cast<const IndependentSourceDevice *>(device.get())) {
+        if (const IndependentSourceDevice *source = device->AsIndependentSource()) {
             const std::string_view kind_label = source->IsVoltageSource() ? "voltage" : "current";
             if (auto ok = CheckSourcePeriodicity(source->GetPeriodicity(), kind_label, config); !ok) {
                 return std::unexpected(ok.error());
@@ -151,7 +151,7 @@ std::optional<std::string> FindSharpEdgeWarning(const CompiledCircuit &compiled,
                                                 const std::size_t sample_count) {
     const double sample_dt = 1.0 / config.FundamentalFrequency / static_cast<double>(sample_count);
     for (const std::unique_ptr<Device> &device : compiled.Devices) {
-        const auto *source = dynamic_cast<const IndependentSourceDevice *>(device.get());
+        const IndependentSourceDevice *source = device->AsIndependentSource();
         if (source == nullptr) {
             continue;
         }
@@ -180,7 +180,7 @@ std::optional<std::string> FindSharpEdgeWarning(const CompiledCircuit &compiled,
 PartitionedCircuit PartitionDevices(const CompiledCircuit &compiled) {
     PartitionedCircuit partitioned;
     for (const std::unique_ptr<Device> &device : compiled.Devices) {
-        if (auto *source = dynamic_cast<IndependentSourceDevice *>(device.get())) {
+        if (IndependentSourceDevice *source = device->AsIndependentSource()) {
             partitioned.Sources.push_back(source);
         }
 

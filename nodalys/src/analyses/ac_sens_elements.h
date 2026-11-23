@@ -11,6 +11,7 @@
 #define NODALYS_AC_SENS_ELEMENTS_H
 
 #include "compiler/compiled_circuit.h"
+#include "devices/sensitivity.h"
 #include "nodalys/results.h"
 #include <complex>
 #include <string>
@@ -25,7 +26,7 @@ namespace Nodalys {
 struct AcSensitivityElement {
     std::string Name;
     SensitivityParameter Parameter = SensitivityParameter::RESISTANCE;
-    const Device *Instance = nullptr;
+    const SensitiveDevice *Instance = nullptr;
     double Value = 0.0;
 };
 

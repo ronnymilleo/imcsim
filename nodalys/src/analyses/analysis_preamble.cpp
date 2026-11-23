@@ -84,7 +84,7 @@ ResolveInputSource(const CompiledCircuit &compiled, const std::string_view name,
     if (!found) {
         return std::unexpected(found.error());
     }
-    const auto *source = dynamic_cast<const IndependentSourceDevice *>(*found);
+    const IndependentSourceDevice *source = (*found)->AsIndependentSource();
     if (source == nullptr) {
         return std::unexpected(std::format("The source {} cannot drive {}", name, purpose));
     }

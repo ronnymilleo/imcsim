@@ -7,6 +7,7 @@
 #define NODALYS_CONTROLLED_SOURCES_H
 
 #include "devices/device.h"
+#include "devices/sensitivity.h"
 
 namespace Nodalys {
 
@@ -15,7 +16,7 @@ namespace Nodalys {
  * @brief   A current-controlled current source (SPICE F): the current from a to b is gain times the current of
  *          the controlling branch, which a probe source in series with the controlling terminal carries.
  */
-class CccsDevice : public Device {
+class CccsDevice : public Device, public SensitiveDevice {
 public:
     CccsDevice(int node_a, int node_b, int control_branch, double gain);
 
@@ -35,6 +36,12 @@ public:
                                            const std::vector<double> &x_dc,
                                            const std::vector<std::complex<double>> &x_ac,
                                            double omega) const override;
+
+    [[nodiscard]] const SensitiveDevice *AsSensitive() const override { return this; }
+
+    [[nodiscard]] std::optional<SensitivityDescriptor> DescribeSensitivity() const override;
+    [[nodiscard]] double DcSensitivityDerivative(const DcAdjointView &point) const override;
+    [[nodiscard]] std::complex<double> AcSensitivityDerivative(const AcAdjointView &point) const override;
     [[nodiscard]] std::unique_ptr<Device> Clone() const override;
 
 private:
@@ -48,7 +55,7 @@ private:
  * @class   CcvsDevice
  * @brief   A current-controlled voltage source (SPICE H): v(a) − v(b) = gain times the controlling branch current.
  */
-class CcvsDevice : public Device {
+class CcvsDevice : public Device, public SensitiveDevice {
 public:
     CcvsDevice(int node_a, int node_b, int branch, int control_branch, double gain);
 
@@ -70,6 +77,12 @@ public:
                                            const std::vector<double> &x_dc,
                                            const std::vector<std::complex<double>> &x_ac,
                                            double omega) const override;
+
+    [[nodiscard]] const SensitiveDevice *AsSensitive() const override { return this; }
+
+    [[nodiscard]] std::optional<SensitivityDescriptor> DescribeSensitivity() const override;
+    [[nodiscard]] double DcSensitivityDerivative(const DcAdjointView &point) const override;
+    [[nodiscard]] std::complex<double> AcSensitivityDerivative(const AcAdjointView &point) const override;
     [[nodiscard]] std::unique_ptr<Device> Clone() const override;
 
 private:
@@ -84,7 +97,7 @@ private:
  * @class   VccsDevice
  * @brief   A voltage-controlled current source (SPICE G): the current from a to b is gain·(v(cp) − v(cm)).
  */
-class VccsDevice : public Device {
+class VccsDevice : public Device, public SensitiveDevice {
 public:
     VccsDevice(int node_a, int node_b, int control_positive, int control_negative, double gain);
 
@@ -104,6 +117,12 @@ public:
                                            const std::vector<double> &x_dc,
                                            const std::vector<std::complex<double>> &x_ac,
                                            double omega) const override;
+
+    [[nodiscard]] const SensitiveDevice *AsSensitive() const override { return this; }
+
+    [[nodiscard]] std::optional<SensitivityDescriptor> DescribeSensitivity() const override;
+    [[nodiscard]] double DcSensitivityDerivative(const DcAdjointView &point) const override;
+    [[nodiscard]] std::complex<double> AcSensitivityDerivative(const AcAdjointView &point) const override;
     [[nodiscard]] std::unique_ptr<Device> Clone() const override;
 
 private:
@@ -118,7 +137,7 @@ private:
  * @class   VcvsDevice
  * @brief   A voltage-controlled voltage source (SPICE E): v(a) − v(b) = gain·(v(cp) − v(cm)) as a branch.
  */
-class VcvsDevice : public Device {
+class VcvsDevice : public Device, public SensitiveDevice {
 public:
     VcvsDevice(int node_a, int node_b, int control_positive, int control_negative, int branch, double gain);
 
@@ -140,6 +159,12 @@ public:
                                            const std::vector<double> &x_dc,
                                            const std::vector<std::complex<double>> &x_ac,
                                            double omega) const override;
+
+    [[nodiscard]] const SensitiveDevice *AsSensitive() const override { return this; }
+
+    [[nodiscard]] std::optional<SensitivityDescriptor> DescribeSensitivity() const override;
+    [[nodiscard]] double DcSensitivityDerivative(const DcAdjointView &point) const override;
+    [[nodiscard]] std::complex<double> AcSensitivityDerivative(const AcAdjointView &point) const override;
     [[nodiscard]] std::unique_ptr<Device> Clone() const override;
 
 private:

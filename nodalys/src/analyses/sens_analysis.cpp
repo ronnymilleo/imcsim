@@ -11,11 +11,8 @@
 #include "analyses/analyses.h"
 
 #include "analyses/analysis_preamble.h"
-#include "devices/controlled_sources.h"
-#include "devices/independent_sources.h"
-#include "devices/passive_devices.h"
+#include "devices/sensitivity.h"
 #include "text/text_case.h"
-#include <cmath>
 #include <format>
 #include <optional>
 #include <string>
@@ -24,28 +21,6 @@
 namespace Nodalys {
 
 namespace {
-
-/**
- * @struct  DcAdjointPoint
- * @brief   The operating point and the adjoint of the output, which every element reads its sensitivity from.
- * @details An unknown outside the vectors, such as ground, reads as zero.
- */
-struct DcAdjointPoint {
-    const std::vector<double> &DcSolution;
-    const std::vector<double> &Adjoint;
-
-    double VoltageAt(const int unknown) const {
-        return (unknown >= 0 && static_cast<std::size_t>(unknown) < DcSolution.size())
-                 ? DcSolution[static_cast<std::size_t>(unknown)]
-                 : 0.0;
-    }
-
-    double AdjointAt(const int unknown) const {
-        return (unknown >= 0 && static_cast<std::size_t>(unknown) < Adjoint.size())
-                 ? Adjoint[static_cast<std::size_t>(unknown)]
-                 : 0.0;
-    }
-};
 
 std::optional<std::string> CheckOutputNodes(const CompiledCircuit &compiled, const SensitivityConfig &settings) {
     if (settings.OutputPositiveNode < 0 || settings.OutputPositiveNode >= compiled.CircuitNodeCount) {
@@ -94,91 +69,26 @@ void StoreSensitivity(SensitivityResult &result,
     result.Vectors[scale_key] = scale;
 }
 
-/**
- * @brief   Stores the sensitivity of an element whose value is the parameter: a resistor, a source, a capacitor or an
- *          inductor.
- * @return  True when the device is one of these, even if it stores nothing; false for any other device.
- */
-bool StoreValueSensitivity(SensitivityResult &result,
-                           const Device *device,
-                           const std::string &lower_name,
-                           const bool is_subcircuit,
-                           const DcAdjointPoint &point) {
-    if (const auto *resistor = dynamic_cast<const ResistorDevice *>(device)) {
-        const double resistance = resistor->GetResistance();
-        if (resistance <= 0.0) {
-            return true;
-        }
-        const double vr = point.VoltageAt(resistor->GetNodeA()) - point.VoltageAt(resistor->GetNodeB());
-        const double lr = point.AdjointAt(resistor->GetNodeA()) - point.AdjointAt(resistor->GetNodeB());
-        const double d_v_dr = (vr * lr) / (resistance * resistance);
-        const double scale = resistance * d_v_dr;
-
-        const std::string vec_key = MakeVectorKey("r.", lower_name, is_subcircuit);
-        StoreSensitivity(result, vec_key, vec_key + "_scale", d_v_dr, scale);
-        return true;
-    }
-    if (const auto *vsource = dynamic_cast<const VoltageSourceDevice *>(device)) {
-        const double vs = vsource->GetDcValue();
-        const double d_v_dvs = point.AdjointAt(vsource->GetBranch());
-        const double scale = vs * d_v_dvs;
-
-        const std::string vec_key = MakeVectorKey("v.", lower_name, is_subcircuit);
-        StoreSensitivity(result, vec_key, vec_key + "_scale", d_v_dvs, scale);
-        return true;
-    }
-    if (const auto *isource = dynamic_cast<const CurrentSourceDevice *>(device)) {
-        const double is = isource->GetDcValue();
-        const double d_v_dis = point.AdjointAt(isource->GetNodeB()) - point.AdjointAt(isource->GetNodeA());
-        const double scale = is * d_v_dis;
-
-        const std::string vec_key = MakeVectorKey("i.", lower_name, is_subcircuit);
-        StoreSensitivity(result, vec_key, vec_key + "_scale", d_v_dis, scale);
-        return true;
-    }
-    // A capacitor or an inductor does not change the DC solution, so its sensitivity is zero
-    if (dynamic_cast<const CapacitorDevice *>(device) != nullptr) {
-        const std::string vec_key = MakeVectorKey("c.", lower_name, is_subcircuit);
-        StoreSensitivity(result, vec_key, vec_key + "_scale", 0.0, 0.0);
-        return true;
-    }
-    if (dynamic_cast<const InductorDevice *>(device) != nullptr) {
-        const std::string vec_key = MakeVectorKey("l.", lower_name, is_subcircuit);
-        StoreSensitivity(result, vec_key, vec_key + "_scale", 0.0, 0.0);
-        return true;
-    }
-    return false;
-}
-
-/**
- * @brief   Stores the sensitivity to the gain of a controlled source; any other device stores nothing.
- */
-void StoreGainSensitivity(SensitivityResult &result,
-                          const Device *device,
-                          const std::string &lower_name,
-                          const DcAdjointPoint &point) {
-    double d_v_dgain = 0.0;
-    double gain = 0.0;
-    if (const auto *vcvs = dynamic_cast<const VcvsDevice *>(device)) {
-        const double v_ctrl = point.VoltageAt(vcvs->GetControlPositive()) - point.VoltageAt(vcvs->GetControlNegative());
-        d_v_dgain = point.AdjointAt(vcvs->GetBranch()) * v_ctrl;
-        gain = vcvs->GetGain();
-    } else if (const auto *vccs = dynamic_cast<const VccsDevice *>(device)) {
-        const double v_ctrl = point.VoltageAt(vccs->GetControlPositive()) - point.VoltageAt(vccs->GetControlNegative());
-        d_v_dgain = (point.AdjointAt(vccs->GetNodeB()) - point.AdjointAt(vccs->GetNodeA())) * v_ctrl;
-        gain = vccs->GetGain();
-    } else if (const auto *cccs = dynamic_cast<const CccsDevice *>(device)) {
-        const double i_ctrl = point.VoltageAt(cccs->ControlBranch());
-        d_v_dgain = (point.AdjointAt(cccs->GetNodeB()) - point.AdjointAt(cccs->GetNodeA())) * i_ctrl;
-        gain = cccs->GetGain();
-    } else if (const auto *ccvs = dynamic_cast<const CcvsDevice *>(device)) {
-        const double i_ctrl = point.VoltageAt(ccvs->ControlBranch());
-        d_v_dgain = point.AdjointAt(ccvs->GetBranch()) * i_ctrl;
-        gain = ccvs->GetGain();
-    } else {
+void StoreDeviceSensitivity(SensitivityResult &result,
+                            const Device &device,
+                            const std::string &lower_name,
+                            const DcAdjointView &point) {
+    const SensitiveDevice *sensitive = device.AsSensitive();
+    if (sensitive == nullptr) {
         return;
     }
-    StoreSensitivity(result, lower_name + "_gain", lower_name + "_scale", d_v_dgain, gain * d_v_dgain);
+    const std::optional<SensitivityDescriptor> descriptor = sensitive->DescribeSensitivity();
+    if (!descriptor) {
+        return;
+    }
+    const double derivative = sensitive->DcSensitivityDerivative(point);
+    const double scale = descriptor->Value * derivative;
+    if (descriptor->IsGainParameter) {
+        StoreSensitivity(result, lower_name + "_gain", lower_name + "_scale", derivative, scale);
+        return;
+    }
+    const std::string vec_key = MakeVectorKey(descriptor->SubcircuitPrefix, lower_name, lower_name.contains('.'));
+    StoreSensitivity(result, vec_key, vec_key + "_scale", derivative, scale);
 }
 
 } // namespace
@@ -216,16 +126,12 @@ std::expected<SensitivityResult, std::string> ComputeSensitivity(CompiledCircuit
     result.OutputPositiveNode = settings.OutputPositiveNode;
     result.OutputNegativeNode = settings.OutputNegativeNode;
 
-    const DcAdjointPoint point{.DcSolution = *x_dc, .Adjoint = adjoint};
+    const DcAdjointView point{.DcSolution = *x_dc, .Adjoint = adjoint};
     for (const auto &[name, device] : compiled.ElementsByName) {
         if (device == nullptr) {
             continue;
         }
-        const std::string lower_name = ToLower(name);
-        const bool is_subcircuit = lower_name.contains('.');
-        if (!StoreValueSensitivity(result, device, lower_name, is_subcircuit, point)) {
-            StoreGainSensitivity(result, device, lower_name, point);
-        }
+        StoreDeviceSensitivity(result, *device, ToLower(name), point);
     }
     return result;
 }

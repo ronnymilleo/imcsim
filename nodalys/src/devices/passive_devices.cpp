@@ -105,6 +105,22 @@ void CapacitorDevice::RejectStep() {
     m_History = m_SavedHistory;
 }
 
+std::optional<SensitivityDescriptor> CapacitorDevice::DescribeSensitivity() const {
+    return SensitivityDescriptor{.Parameter = SensitivityParameter::CAPACITANCE,
+                                 .Value = m_Capacitance,
+                                 .SubcircuitPrefix = "c.",
+                                 .IsGainParameter = false};
+}
+
+double CapacitorDevice::DcSensitivityDerivative(const DcAdjointView & /*point*/) const {
+    return 0.0;
+}
+
+std::complex<double> CapacitorDevice::AcSensitivityDerivative(const AcAdjointView &point) const {
+    const std::complex<double> j_omega(0.0, point.Omega);
+    return -j_omega * point.AdjointAcross(m_NodeA, m_NodeB) * point.AcAcross(m_NodeA, m_NodeB);
+}
+
 std::unique_ptr<Device> CapacitorDevice::Clone() const {
     return std::make_unique<CapacitorDevice>(*this);
 }
@@ -275,6 +291,22 @@ void InductorDevice::RejectStep() {
     m_History = m_SavedHistory;
 }
 
+std::optional<SensitivityDescriptor> InductorDevice::DescribeSensitivity() const {
+    return SensitivityDescriptor{.Parameter = SensitivityParameter::INDUCTANCE,
+                                 .Value = m_Inductance,
+                                 .SubcircuitPrefix = "l.",
+                                 .IsGainParameter = false};
+}
+
+double InductorDevice::DcSensitivityDerivative(const DcAdjointView & /*point*/) const {
+    return 0.0;
+}
+
+std::complex<double> InductorDevice::AcSensitivityDerivative(const AcAdjointView &point) const {
+    const std::complex<double> j_omega(0.0, point.Omega);
+    return j_omega * point.AdjointAt(m_Branch) * point.AcAt(m_Branch);
+}
+
 std::unique_ptr<Device> InductorDevice::Clone() const {
     return std::make_unique<InductorDevice>(*this);
 }
@@ -328,6 +360,39 @@ double ResistorDevice::OutputNoiseVariance(const std::vector<double> & /*x_dc*/,
  */
 void ResistorDevice::SetTemperature(const ThermalConditions &thermal) {
     m_FourKt = GetFourKt(thermal);
+}
+
+bool ResistorDevice::ApplyLiveChange(const LiveQuantity quantity, const double value) {
+    if (quantity != LiveQuantity::RESISTANCE) {
+        return false;
+    }
+    SetResistance(value);
+    return true;
+}
+
+std::optional<SensitivityDescriptor> ResistorDevice::DescribeSensitivity() const {
+    const double resistance = GetResistance();
+    if (resistance <= 0.0) {
+        return std::nullopt;
+    }
+    return SensitivityDescriptor{.Parameter = SensitivityParameter::RESISTANCE,
+                                 .Value = resistance,
+                                 .SubcircuitPrefix = "r.",
+                                 .IsGainParameter = false};
+}
+
+double ResistorDevice::DcSensitivityDerivative(const DcAdjointView &point) const {
+    const double resistance = GetResistance();
+    const double vr = point.VoltageAt(m_NodeA) - point.VoltageAt(m_NodeB);
+    const double lr = point.AdjointAt(m_NodeA) - point.AdjointAt(m_NodeB);
+    return (vr * lr) / (resistance * resistance);
+}
+
+std::complex<double> ResistorDevice::AcSensitivityDerivative(const AcAdjointView &point) const {
+    const double resistance = GetResistance();
+    const std::complex<double> direct = point.AdjointAcross(m_NodeA, m_NodeB) * point.AcAcross(m_NodeA, m_NodeB);
+    const std::complex<double> bias = point.BiasAdjointAcross(m_NodeA, m_NodeB) * point.DcAcross(m_NodeA, m_NodeB);
+    return (direct + bias) / (resistance * resistance);
 }
 
 std::unique_ptr<Device> ResistorDevice::Clone() const {
