@@ -172,7 +172,7 @@ add_executable(imcsim-tests
 # The oracle that rebuilds a response from its poles and zeros is shared with the Nodalys tests
 target_sources(imcsim-tests
         PRIVATE
-            ${PROJECT_SOURCE_DIR}/nodalys/tests/pole_zero_oracle.cpp
+            ${PROJECT_SOURCE_DIR}/nodalys/tests/analyses/pz/pole_zero_oracle.cpp
 )
 
 target_include_directories(imcsim-tests

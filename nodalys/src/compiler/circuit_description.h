@@ -7,7 +7,7 @@
 #define NODALYS_COMPILER_CIRCUIT_DESCRIPTION_H
 
 #include "compiler/source_specs.h"
-#include "devices/behavioral_device.h"
+#include "devices/sources/behavioral_device.h"
 #include "devices/thermal.h"
 #include "nodalys/expression.h"
 #include "nodalys/types.h"

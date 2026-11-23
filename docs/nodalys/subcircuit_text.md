@@ -2,7 +2,7 @@
 
 A vendor's library gives a `.subckt` as text: an op-amp macromodel, a regulator, a switch. `imcsim` keeps such a block as text (`SubcircuitDefinition::Spice`), and `ngspice` reads it as it came. `Nodalys` reads it too, with [`AddSubcircuitText()`](../../nodalys/include/nodalys/subcircuit_text.h), which expands one instance of the text into a `CircuitBuilder`, at the nodes the instance is connected to, with the parameters the instance sets. What it cannot simulate it refuses with a message that names the subcircuit and the line, so no line is dropped without a word.
 
-`ParseNetlist()` places the `X` lines of a netlist through the same reader (section 5), so the `nodalys` command line has the subcircuits that `imcsim` has: the text is read on tokens with the scopes of SPICE, with no guessing of which tokens are nodes. The device parameter tables are read from [`model_cards.cpp`](../../nodalys/src/parser/model_cards.cpp), which both share.
+`ParseNetlist()` places the `X` lines of a netlist through the same reader (section 5), so the `nodalys` command line has the subcircuits that `imcsim` has: the text is read on tokens with the scopes of SPICE, with no guessing of which tokens are nodes. The device parameter tables are read from [`model_cards.cpp`](../../nodalys/src/parser/syntax/model_cards.cpp), which both share.
 
 ---
 
@@ -39,7 +39,7 @@ The compiler of `imcsim` ([`compiler.cpp`](../../app-core/backends/nodalys/compi
 | Element names | The name of the instance, a dot, and the name of the element: `X1.R1`, `X1.XLOAD.R2`. Two instances of one block never collide, and the results of `imcsim` still hold the nodes of the circuit only. |
 | Parameters | The values of the instance are the parameters of the block. A `.param` line adds names and may use the ones before it; a value the instance passes wins over a `.param` of the same name. A nested `.subckt` with `params:` takes its defaults, and an X line overrides them with `NAME=VALUE`. |
 | Values | A literal (`4.7k`, `100n`, `1meg`) or an expression of parameters, in braces, quotes or bare: `{RTOP * 3}`, `'GAIN/1Meg'`. The language is that of the behavioral source (`pi`, `e`, `temper`, the functions of [`behavioral_source.md`](./behavioral_source.md)), evaluated once. A value that reads a voltage, a current or `time` is refused. |
-| Source waveforms | Read by the code that `ParseNetlist()` uses for the same words ([`source_waveforms.cpp`](../../nodalys/src/parser/source_waveforms.cpp)), so a source in a block gives the same signal as one written at the top level of a netlist. The numbers in the parentheses are literals or expressions of the parameters of the block, such as `PULSE(0 {VHIGH} 0 1n 1n {TON} {2*TON})`; one that cannot be evaluated is refused. |
+| Source waveforms | Read by the code that `ParseNetlist()` uses for the same words ([`source_waveforms.cpp`](../../nodalys/src/parser/sources/source_waveforms.cpp)), so a source in a block gives the same signal as one written at the top level of a netlist. The numbers in the parentheses are literals or expressions of the parameters of the block, such as `PULSE(0 {VHIGH} 0 1n 1n {TON} {2*TON})`; one that cannot be evaluated is refused. |
 | Behavioral expressions | The names inside `v(...)` are nodes of the block, which become the nodes of the circuit, and `i(...)` names a voltage source of the block. Parameters inside the expression are replaced by their values first. |
 | `.model` | `D`, `NPN`, `PNP`, `NMOS`, `PMOS` (level 1) and `SW`/`VSWITCH`, with parameter values that may be expressions. The card is read in the scope it is written in, and a nested block sees the cards and parameters of the text around it. A card nobody uses is not checked for its type, as in `ngspice`. |
 | Nested `.subckt` | Written inside the text, placed with X lines, nested as deep as 16 levels. A block that places itself is refused. |
@@ -47,7 +47,7 @@ The compiler of `imcsim` ([`compiler.cpp`](../../app-core/backends/nodalys/compi
 
 ### 2.1 Model parameters
 
-The devices of `Nodalys` read the parameters of [`model_cards.cpp`](../../nodalys/src/parser/model_cards.cpp). Any other parameter of a card the text uses, such as `CJS` or the geometry of a MOSFET, is not read, and the warning says which: `Nodalys does not read the parameters CJS, VAR of the model DMOD in the subcircuit OPA1`. It is reported once for each model.
+The devices of `Nodalys` read the parameters of [`model_cards.cpp`](../../nodalys/src/parser/syntax/model_cards.cpp). Any other parameter of a card the text uses, such as `CJS` or the geometry of a MOSFET, is not read, and the warning says which: `Nodalys does not read the parameters CJS, VAR of the model DMOD in the subcircuit OPA1`. It is reported once for each model.
 
 ## 3. What is refused
 
@@ -75,7 +75,7 @@ Each refusal names the subcircuit and the line: `Nodalys cannot simulate the sub
 
 ## 5. Subcircuits of a netlist
 
-`ParseNetlist()` no longer flattens `.subckt` blocks into text lines. It keeps what a netlist defines for its instances, in the order written: the `.subckt` blocks (with their `.ends`, nested blocks included), the `.model` cards and the `.param` lines of the top level. Each `X` line is then placed by [`AddNetlistInstance()`](../../nodalys/src/parser/netlist_subcircuits.h), which builds a `SubcircuitText` whose body is those definitions followed by the line itself, with a port for each node of the line, and hands it to `AddSubcircuitText()`. The definitions are therefore the text around the instance, as the text of a block is for the blocks nested in it.
+`ParseNetlist()` no longer flattens `.subckt` blocks into text lines. It keeps what a netlist defines for its instances, in the order written: the `.subckt` blocks (with their `.ends`, nested blocks included), the `.model` cards and the `.param` lines of the top level. Each `X` line is then placed by [`AddNetlistInstance()`](../../nodalys/src/parser/netlist/netlist_subcircuits.h), which builds a `SubcircuitText` whose body is those definitions followed by the line itself, with a port for each node of the line, and hands it to `AddSubcircuitText()`. The definitions are therefore the text around the instance, as the text of a block is for the blocks nested in it.
 
 | In a netlist | Reading |
 | :--- | :--- |

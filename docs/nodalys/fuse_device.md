@@ -1,6 +1,6 @@
 # Fuse Device
 
-The fuse of `imcsim` is a resistance that opens for good once the current has heated it enough. `ngspice` runs it as the subcircuit `imcsim_fuse` (see the Fuses section of [`docs/models.md`](../models.md)); `Nodalys` models the same behavior as one native device with a thermal state, [`FuseDevice`](../../nodalys/src/devices/fuse_device.cpp), built with `CircuitBuilder::AddFuse(name, a, b, FuseParameters)`.
+The fuse of `imcsim` is a resistance that opens for good once the current has heated it enough. `ngspice` runs it as the subcircuit `imcsim_fuse` (see the Fuses section of [`docs/models.md`](../models.md)); `Nodalys` models the same behavior as one native device with a thermal state, [`FuseDevice`](../../nodalys/src/devices/passive/fuse_device.cpp), built with `CircuitBuilder::AddFuse(name, a, b, FuseParameters)`.
 
 ---
 
@@ -53,7 +53,7 @@ The sigmoids of the subcircuit exist to help `ngspice` converge. `Nodalys` has n
 
 ## 3. Verification
 
-`nodalys/tests/fuse_device_tests.cpp`: the blow time at a constant overcurrent against the closed form of section 1.1 (within 0.1 ms for three loads, and with an output step of 0.2 s, longer than the blow), a fuse at 0.97 A, at 1 A and at 1.001 A that never blows over 20 time constants, a fuse that stays blown, the operating point, DC sweep and AC sweep seeing it whole at 7.7 A, an inductive load cut with no ringing (within 10 $\mu$V of rest, where the trapezoidal rule stays 1.1 mV off), and overloads that cool between pulses and add up when close.
+`nodalys/tests/devices/fuse_device_tests.cpp`: the blow time at a constant overcurrent against the closed form of section 1.1 (within 0.1 ms for three loads, and with an output step of 0.2 s, longer than the blow), a fuse at 0.97 A, at 1 A and at 1.001 A that never blows over 20 time constants, a fuse that stays blown, the operating point, DC sweep and AC sweep seeing it whole at 7.7 A, an inductive load cut with no ringing (within 10 $\mu$V of rest, where the trapezoidal rule stays 1.1 mV off), and overloads that cool between pulses and add up when close.
 
 `tests/fuse_tests.cpp` runs both engines. Blow time of the 1 A, 150 ms fuse in a 5 V loop, read as `imcsim` reads it from the results (the first point whose resistance is above the geometric mean):
 

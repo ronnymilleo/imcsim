@@ -1,8 +1,8 @@
 # Small-Signal Pole-Zero Analysis (`.pz`)
 
 **Implementation files:**
-- [`nodalys/src/linear/qz.h`](../../nodalys/src/linear/qz.h) / [`qz.cpp`](../../nodalys/src/linear/qz.cpp) (`ComputeGeneralizedEigenvalues`)
-- [`nodalys/src/analyses/pz_analysis.cpp`](../../nodalys/src/analyses/pz_analysis.cpp) (`ComputePoleZero`)
+- [`nodalys/src/linear/eigen/qz.h`](../../nodalys/src/linear/eigen/qz.h) / [`qz.cpp`](../../nodalys/src/linear/eigen/qz.cpp) (`ComputeGeneralizedEigenvalues`)
+- [`nodalys/src/analyses/pz/pz_analysis.cpp`](../../nodalys/src/analyses/pz/pz_analysis.cpp) (`ComputePoleZero`)
 - [`app-core/backends/nodalys/nodalys_backend.cpp`](../../app-core/backends/nodalys/nodalys_backend.cpp) (`NodalysBackend::RunPoleZero`)
 - [`tests/backend_comparison_tests.cpp`](../../tests/backend_comparison_tests.cpp) (`Both backends agree on small-signal pole-zero analysis`)
 - [`tests/nodalys_benchmark_tests.cpp`](../../tests/nodalys_benchmark_tests.cpp) (`Twin-T Notch Filter`)
@@ -55,7 +55,7 @@ The transmission zeros are the **finite generalized eigenvalues** of the matrix 
 ---
 
 ### 1.4 Standalone QZ Algorithm (Moler-Stewart Generalized Schur Form)
-`Nodalys` implements a complete, self-contained QZ decomposition in C++23 (`nodalys/src/linear/qz.cpp`) without any external linear algebra libraries (no LAPACK, BLAS, or Eigen):
+`Nodalys` implements a complete, self-contained QZ decomposition in C++23 (`nodalys/src/linear/eigen/qz.cpp`) without any external linear algebra libraries (no LAPACK, BLAS, or Eigen):
 
 1. **Hessenberg-Triangular Reduction (`ReduceToHessenbergTriangular`):**
    - Uses Householder reflections to reduce $\mathbf{B}$ to upper triangular form while transforming $\mathbf{A}$.
@@ -100,7 +100,7 @@ In contrast, **Nodalys** solves the generalized eigenvalue problem globally via 
 
 ---
 
-### 1.7 What Was Verified (`nodalys/tests/pz_analysis_tests.cpp`, `tests/pole_zero_robustness_tests.cpp`)
+### 1.7 What Was Verified (`nodalys/tests/analyses/pz/pz_analysis_tests.cpp`, `tests/pole_zero_robustness_tests.cpp`)
 The oracle (`pole_zero_oracle.h`) rebuilds $H(j\omega)$ from the roots and compares it with the AC sweep; it holds for any circuit.
 
 | Circuit | Result | Worst AC mismatch |

@@ -6,8 +6,8 @@
 #ifndef NODALYS_COMPILER_SOURCE_SPECS_H
 #define NODALYS_COMPILER_SOURCE_SPECS_H
 
-#include "devices/independent_sources.h"
-#include "devices/waveforms.h"
+#include "devices/sources/independent_sources.h"
+#include "devices/sources/waveforms.h"
 #include "nodalys/types.h"
 
 namespace Nodalys {

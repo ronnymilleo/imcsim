@@ -5,7 +5,7 @@
 
 #include "compiler/source_specs.h"
 
-#include "devices/transient_noise.h"
+#include "devices/sources/transient_noise.h"
 #include <algorithm>
 #include <utility>
 

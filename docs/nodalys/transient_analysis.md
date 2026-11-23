@@ -1,11 +1,11 @@
 # Time-Domain Transient Analysis (`.tran`)
 
 **Implementation files:**
-- [`nodalys/src/analyses/transient_analysis.cpp`](../../nodalys/src/analyses/transient_analysis.cpp) (`ComputeTransient`, `TransientCollector`, `FindNextCorner`)
+- [`nodalys/src/analyses/transient/transient_analysis.cpp`](../../nodalys/src/analyses/transient/transient_analysis.cpp) (`ComputeTransient`, `TransientCollector`, `FindNextCorner`)
 - [`nodalys/src/devices/integration.cpp`](../../nodalys/src/devices/integration.cpp) (`MakeCompanion`, `AdvanceHistory`: the Backward Euler, trapezoidal and Gear-2 formulas, shared by every device)
 - [`nodalys/src/devices/devices.cpp`](../../nodalys/src/devices/devices.cpp) (`CapacitorDevice::Stamp`, `InductorDevice::Stamp`, `CoupledInductorDevice::Stamp`, `SwitchDevice::HasSwitched`)
 - [`nodalys/src/devices/semiconductor_math.h`](../../nodalys/src/devices/semiconductor_math.h) (`ChargeModel` for diode, BJT, and MOSFET junction/diffusion charges)
-- [`nodalys/src/devices/waveforms.cpp`](../../nodalys/src/devices/waveforms.cpp) (`SIN`, `PULSE`, `EXP`, `PWL`, `SFFM`, `AM` and the corners of each, `FindNextPulseCorner`)
+- [`nodalys/src/devices/sources/waveforms.cpp`](../../nodalys/src/devices/sources/waveforms.cpp) (`SIN`, `PULSE`, `EXP`, `PWL`, `SFFM`, `AM` and the corners of each, `FindNextPulseCorner`)
 
 ---
 
@@ -94,7 +94,7 @@ The operating point, the DC sweep and the small-signal analyses never stamp the 
 
 ---
 
-### 2.2 Order of Accuracy and Damping of the Two Methods ([`transient_analysis_tests.cpp`](../../nodalys/tests/transient_analysis_tests.cpp))
+### 2.2 Order of Accuracy and Damping of the Two Methods ([`transient_analysis_tests.cpp`](../../nodalys/tests/analyses/transient_analysis_tests.cpp))
 
 With the step held at the output step, halving it divides the error of the RC discharge ($\tau = 1\text{ ms}$, steps of 100 and 50 $\mu$s, error at 2 ms) by 3.87 with the trapezoidal rule and 4.22 with Gear-2, as a second-order method does. On a lossless LC ($L = 1\text{ mH}$, $C = 1\,\mu\text{F}$, 20 steps per period), the trapezoidal rule keeps the amplitude of the ninth period at 0.95 and more (the samples at worst reach $\cos 18^\circ$ of the peak), where Gear-2 leaves 0.70, as its root of modulus $0.99805$ predicts. With a switch of $1\text{ G}\Omega$ cutting a 1 A inductor current ($L = 1\text{ mH}$, $h = 1\,\mu$s), the inductor voltage keeps flipping near $\pm 260\text{ V}$ for ever with the trapezoidal rule (twice that, and $\pm 2000\text{ V}$, before a switch that flips restarts Backward Euler), and falls to zero within two steps with Gear-2.
 

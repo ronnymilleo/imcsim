@@ -10,7 +10,7 @@
 #include "compiler/circuit_description.h"
 #include "compiler/compiled_circuit.h"
 #include "devices/device.h"
-#include "devices/independent_sources.h"
+#include "devices/sources/independent_sources.h"
 #include "nodalys/types.h"
 #include <cstddef>
 #include <expected>

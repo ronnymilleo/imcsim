@@ -5,6 +5,7 @@
  *          says why when a circuit has none to show.
  */
 
+#include "analyses/pz/pole_zero_oracle.h"
 #include "analysis/analysis_inputs.h"
 #include "backends/nodalys/compiler.h"
 #include "backends/nodalys/nodalys_backend.h"
@@ -15,7 +16,6 @@
 #include "circuit/components/resistor.h"
 #include "circuit/components/source.h"
 #include "circuit/components/voltage_source.h"
-#include "pole_zero_oracle.h"
 #include "schematic/examples.h"
 #include "schematic/schematic.h"
 #include "simulation/analysis_sources.h"
