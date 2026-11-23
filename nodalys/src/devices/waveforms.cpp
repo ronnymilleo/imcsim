@@ -80,11 +80,11 @@ double FindNextPulseCorner(const PulseParameters &pulse, const double time) {
     return NO_CORNER;
 }
 
-VoltageSourceDevice::Breakpoints MakePulseBreakpoints(const PulseParameters &pulse) {
+BreakpointCallback MakePulseBreakpoints(const PulseParameters &pulse) {
     return [pulse](const double time) { return FindNextPulseCorner(pulse, time); };
 }
 
-VoltageSourceDevice::Breakpoints MakeExpBreakpoints(const ExpParameters &exp) {
+BreakpointCallback MakeExpBreakpoints(const ExpParameters &exp) {
     return [exp](const double time) {
         for (const double corner : {exp.RiseDelay, exp.FallDelay}) {
             if (IsAfter(corner, time)) {
@@ -95,7 +95,7 @@ VoltageSourceDevice::Breakpoints MakeExpBreakpoints(const ExpParameters &exp) {
     };
 }
 
-VoltageSourceDevice::Breakpoints MakePwlBreakpoints(const PwlParameters &pwl) {
+BreakpointCallback MakePwlBreakpoints(const PwlParameters &pwl) {
     return [pwl](const double time) {
         for (const PwlPoint &point : pwl.Points) {
             if (IsAfter(point.Time, time)) {
@@ -106,11 +106,11 @@ VoltageSourceDevice::Breakpoints MakePwlBreakpoints(const PwlParameters &pwl) {
     };
 }
 
-VoltageSourceDevice::Breakpoints MakeAmBreakpoints(const AmParameters &am) {
+BreakpointCallback MakeAmBreakpoints(const AmParameters &am) {
     return [am](const double time) { return IsAfter(am.Delay, time) ? am.Delay : NO_CORNER; };
 }
 
-VoltageSourceDevice::Breakpoints MakeClockBreakpoints(const ClockParameters &parameters) {
+BreakpointCallback MakeClockBreakpoints(const ClockParameters &parameters) {
     return MakePulseBreakpoints(ClockPulse(parameters));
 }
 
@@ -187,11 +187,11 @@ double EvaluateAm(const AmParameters &am, const double time) {
                * std::sin(2.0 * std::numbers::pi * am.CarrierFrequency * local);
 }
 
-VoltageSourceDevice::Waveform MakeDcWaveform(const double) {
+WaveformCallback MakeDcWaveform(const double) {
     return [](const double dc, const TimeContext &) { return dc; };
 }
 
-VoltageSourceDevice::Waveform MakePulseWaveform(const double, const PulseParameters &pulse) {
+WaveformCallback MakePulseWaveform(const double, const PulseParameters &pulse) {
     return [pulse](const double dc, const TimeContext &time) {
         if (time.IsTransient) {
             return EvaluatePulse(pulse, time.Time);
@@ -206,33 +206,33 @@ VoltageSourceDevice::Waveform MakePulseWaveform(const double, const PulseParamet
     };
 }
 
-VoltageSourceDevice::Waveform MakeSineWaveform(const double, const SineParameters &sine) {
+WaveformCallback MakeSineWaveform(const double, const SineParameters &sine) {
     return [sine](const double dc, const TimeContext &time) {
         return (time.IsTransient || time.IsPeriodicSteadyState) ? EvaluateSine(sine, time.Time) : dc;
     };
 }
 
-VoltageSourceDevice::Waveform MakeExpWaveform(const double, const ExpParameters &exp) {
+WaveformCallback MakeExpWaveform(const double, const ExpParameters &exp) {
     return
         [exp](const double dc, const TimeContext &time) { return time.IsTransient ? EvaluateExp(exp, time.Time) : dc; };
 }
 
-VoltageSourceDevice::Waveform MakePwlWaveform(const double, const PwlParameters &pwl) {
+WaveformCallback MakePwlWaveform(const double, const PwlParameters &pwl) {
     return
         [pwl](const double dc, const TimeContext &time) { return time.IsTransient ? EvaluatePwl(pwl, time.Time) : dc; };
 }
 
-VoltageSourceDevice::Waveform MakeSffmWaveform(const double, const SffmParameters &sffm) {
+WaveformCallback MakeSffmWaveform(const double, const SffmParameters &sffm) {
     return [sffm](const double dc, const TimeContext &time) {
         return time.IsTransient ? EvaluateSffm(sffm, time.Time) : dc;
     };
 }
 
-VoltageSourceDevice::Waveform MakeAmWaveform(const double, const AmParameters &am) {
+WaveformCallback MakeAmWaveform(const double, const AmParameters &am) {
     return [am](const double dc, const TimeContext &time) { return time.IsTransient ? EvaluateAm(am, time.Time) : dc; };
 }
 
-VoltageSourceDevice::Waveform MakeClockWaveform(const ClockParameters &parameters) {
+WaveformCallback MakeClockWaveform(const ClockParameters &parameters) {
     const PulseParameters pulse = ClockPulse(parameters);
     return [pulse](const double, const TimeContext &time) {
         if (time.IsPeriodicSteadyState && !time.IsTransient) {

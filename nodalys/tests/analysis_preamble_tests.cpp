@@ -59,14 +59,15 @@ TEST_CASE("An input source is found by name and told apart as a voltage or a cur
     const auto voltage = Nodalys::ResolveInputSource(compiled, "V1", "a test");
     REQUIRE(voltage.has_value());
     CHECK(voltage->IsVoltage());
-    CHECK(voltage->Voltage != nullptr);
-    CHECK(voltage->Current == nullptr);
+    CHECK(voltage->AsVoltage() != nullptr);
+    CHECK(&voltage->GetSource() == compiled.SourcesByName.at("V1"));
     CHECK(&voltage->GetDevice() == compiled.SourcesByName.at("V1"));
 
     const auto current = Nodalys::ResolveInputSource(compiled, "I1", "a test");
     REQUIRE(current.has_value());
     CHECK_FALSE(current->IsVoltage());
-    CHECK(current->Current != nullptr);
+    CHECK(current->AsVoltage() == nullptr);
+    CHECK(&current->GetSource() == compiled.SourcesByName.at("I1"));
     CHECK(&current->GetDevice() == compiled.SourcesByName.at("I1"));
 }
 

@@ -18,18 +18,30 @@ namespace Nodalys {
  * @return  True for a voltage source, false for a current source.
  */
 bool InputSource::IsVoltage() const {
-    return Voltage != nullptr;
+    return Source != nullptr && Source->IsVoltageSource();
 }
 
 /**
  * @brief   Gives the source as a device, whichever kind it is.
- * @return  The voltage source or the current source.
+ * @return  The independent source as a Device reference.
  */
 const Device &InputSource::GetDevice() const {
-    if (Voltage != nullptr) {
-        return *Voltage;
-    }
-    return *Current;
+    return *Source;
+}
+
+/**
+ * @brief   Gives the underlying independent source.
+ * @return  The independent source reference.
+ */
+const IndependentSourceDevice &InputSource::GetSource() const {
+    return *Source;
+}
+
+/**
+ * @brief   Returns the source as a voltage source when it is one, or null for a current source.
+ */
+const VoltageSourceDevice *InputSource::AsVoltage() const {
+    return IsVoltage() ? static_cast<const VoltageSourceDevice *>(Source) : nullptr;
 }
 
 /**
@@ -72,12 +84,11 @@ ResolveInputSource(const CompiledCircuit &compiled, const std::string_view name,
     if (!found) {
         return std::unexpected(found.error());
     }
-    const InputSource source{.Voltage = dynamic_cast<const VoltageSourceDevice *>(*found),
-                             .Current = dynamic_cast<const CurrentSourceDevice *>(*found)};
-    if (source.Voltage == nullptr && source.Current == nullptr) {
+    const auto *source = dynamic_cast<const IndependentSourceDevice *>(*found);
+    if (source == nullptr) {
         return std::unexpected(std::format("The source {} cannot drive {}", name, purpose));
     }
-    return source;
+    return InputSource{.Source = source};
 }
 
 /**

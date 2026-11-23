@@ -101,15 +101,14 @@ std::expected<InputSource, std::string> ResolveNoiseInput(const CompiledCircuit 
  * @brief   The gain from the input source to the output, read from the adjoint solution.
  */
 std::complex<double> FindSourceGain(const InputSource &input, const std::vector<std::complex<double>> &adjoint) {
-    if (input.IsVoltage()) {
-        return adjoint[static_cast<std::size_t>(input.Voltage->GetBranch())];
+    if (const VoltageSourceDevice *voltage = input.AsVoltage()) {
+        return adjoint[static_cast<std::size_t>(voltage->GetBranch())];
     }
-    const std::complex<double> la = input.Current->GetNodeA() < 0
-                                      ? std::complex<double>{0.0, 0.0}
-                                      : adjoint[static_cast<std::size_t>(input.Current->GetNodeA())];
-    const std::complex<double> lb = input.Current->GetNodeB() < 0
-                                      ? std::complex<double>{0.0, 0.0}
-                                      : adjoint[static_cast<std::size_t>(input.Current->GetNodeB())];
+    const IndependentSourceDevice &source = input.GetSource();
+    const std::complex<double> la =
+        source.GetNodeA() < 0 ? std::complex<double>{0.0, 0.0} : adjoint[static_cast<std::size_t>(source.GetNodeA())];
+    const std::complex<double> lb =
+        source.GetNodeB() < 0 ? std::complex<double>{0.0, 0.0} : adjoint[static_cast<std::size_t>(source.GetNodeB())];
     return lb - la;
 }
 

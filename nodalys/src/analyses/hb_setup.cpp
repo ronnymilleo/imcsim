@@ -22,24 +22,6 @@ constexpr std::size_t MAX_DENSE_UNKNOWNS_WARNING = 1500;
 constexpr std::size_t MAX_DENSE_UNKNOWNS = 4000;
 constexpr double FREQ_RATIO_RELTOL = 1e-9;
 
-/// An independent source seen through what the balance needs to know about it.
-struct SourceView {
-    /// The periodicity of the source, or null when the device is not an independent source.
-    const SourcePeriodicity *Periodicity = nullptr;
-    /// "voltage" or "current", for the messages.
-    std::string_view KindLabel;
-};
-
-SourceView FindSource(const Device &device) {
-    if (const auto *vs = dynamic_cast<const VoltageSourceDevice *>(&device)) {
-        return {.Periodicity = &vs->GetPeriodicity(), .KindLabel = "voltage"};
-    }
-    if (const auto *cs = dynamic_cast<const CurrentSourceDevice *>(&device)) {
-        return {.Periodicity = &cs->GetPeriodicity(), .KindLabel = "current"};
-    }
-    return {};
-}
-
 /**
  * @brief   Checks that a source repeats with a harmonic of the fundamental that the expansion keeps.
  */
@@ -113,8 +95,9 @@ std::expected<std::size_t, std::string> ValidateAndResolveSampleCount(const Harm
  */
 std::expected<void, std::string> ValidateDevices(const CompiledCircuit &compiled, const HarmonicBalanceConfig &config) {
     for (const std::unique_ptr<Device> &device : compiled.Devices) {
-        if (const SourceView source = FindSource(*device); source.Periodicity != nullptr) {
-            if (auto ok = CheckSourcePeriodicity(*source.Periodicity, source.KindLabel, config); !ok) {
+        if (const auto *source = dynamic_cast<const IndependentSourceDevice *>(device.get())) {
+            const std::string_view kind_label = source->IsVoltageSource() ? "voltage" : "current";
+            if (auto ok = CheckSourcePeriodicity(source->GetPeriodicity(), kind_label, config); !ok) {
                 return std::unexpected(ok.error());
             }
         } else if (!device->SupportsHarmonicBalance()) {
@@ -168,17 +151,21 @@ std::optional<std::string> FindSharpEdgeWarning(const CompiledCircuit &compiled,
                                                 const std::size_t sample_count) {
     const double sample_dt = 1.0 / config.FundamentalFrequency / static_cast<double>(sample_count);
     for (const std::unique_ptr<Device> &device : compiled.Devices) {
-        const SourcePeriodicity *periodicity = FindSource(*device).Periodicity;
-        if (periodicity == nullptr || !periodicity->IsSupportedInHb || periodicity->Frequency <= 0.0) {
+        const auto *source = dynamic_cast<const IndependentSourceDevice *>(device.get());
+        if (source == nullptr) {
+            continue;
+        }
+        const SourcePeriodicity &periodicity = source->GetPeriodicity();
+        if (!periodicity.IsSupportedInHb || periodicity.Frequency <= 0.0) {
             continue;
         }
         const bool is_edged =
-            periodicity->Kind == SourceWaveformKind::PULSE || periodicity->Kind == SourceWaveformKind::CLOCK;
-        if (is_edged && periodicity->MinEdgeTime < sample_dt) {
+            periodicity.Kind == SourceWaveformKind::PULSE || periodicity.Kind == SourceWaveformKind::CLOCK;
+        if (is_edged && periodicity.MinEdgeTime < sample_dt) {
             return std::format(
                 "A periodic pulse/clock edge ({:.3g} s) is faster than the time grid ({:.3g} s); increase Samples or "
                 "Harmonics to reduce Gibbs/aliasing distortion",
-                periodicity->MinEdgeTime,
+                periodicity.MinEdgeTime,
                 sample_dt);
         }
     }
@@ -193,10 +180,8 @@ std::optional<std::string> FindSharpEdgeWarning(const CompiledCircuit &compiled,
 PartitionedCircuit PartitionDevices(const CompiledCircuit &compiled) {
     PartitionedCircuit partitioned;
     for (const std::unique_ptr<Device> &device : compiled.Devices) {
-        if (auto *vs = dynamic_cast<VoltageSourceDevice *>(device.get())) {
-            partitioned.VoltageSources.push_back(vs);
-        } else if (auto *cs = dynamic_cast<CurrentSourceDevice *>(device.get())) {
-            partitioned.CurrentSources.push_back(cs);
+        if (auto *source = dynamic_cast<IndependentSourceDevice *>(device.get())) {
+            partitioned.Sources.push_back(source);
         }
 
         if (device->IsLinear()) {
@@ -230,11 +215,8 @@ void AssembleLinearAndExcitation(HbWorkspace &ws, const PartitionedCircuit &part
         rhs_probe.Clear();
         const double t_m = static_cast<double>(m) * period / static_cast<double>(ws.SampleCount);
         const TimeContext steady_state{.IsPeriodicSteadyState = true, .Time = t_m};
-        for (VoltageSourceDevice *vs : partitioned.VoltageSources) {
-            vs->Stamp(rhs_probe, zero_x, steady_state);
-        }
-        for (CurrentSourceDevice *cs : partitioned.CurrentSources) {
-            cs->Stamp(rhs_probe, zero_x, steady_state);
+        for (IndependentSourceDevice *source : partitioned.Sources) {
+            source->Stamp(rhs_probe, zero_x, steady_state);
         }
         const std::vector<double> &rhs = rhs_probe.Rhs();
         for (int u = 0; u < ws.UnknownCount; ++u) {

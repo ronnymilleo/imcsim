@@ -94,8 +94,7 @@ std::expected<AcInput, std::string> ResolveAcInput(const CompiledCircuit &compil
     if (!source) {
         return std::unexpected(source.error());
     }
-    const double magnitude =
-        source->IsVoltage() ? source->Voltage->GetAcMagnitude() : source->Current->GetAcMagnitude();
+    const double magnitude = source->GetSource().GetAcMagnitude();
     if (magnitude == 0.0) {
         return std::unexpected(std::format("The source {} has no AC magnitude; set it to AC", settings.InputSource));
     }

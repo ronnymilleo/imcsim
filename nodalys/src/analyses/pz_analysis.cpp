@@ -39,12 +39,13 @@ SmallSignalSystem BuildSmallSignalSystem(CompiledCircuit &compiled,
                              .Reactive = reactive.Matrix(),
                              .Input = std::vector<double>(static_cast<std::size_t>(size), 0.0),
                              .Output = std::vector<double>(static_cast<std::size_t>(size), 0.0)};
-    if (input.IsVoltage()) {
-        system.Input[static_cast<std::size_t>(input.Voltage->GetBranch())] = 1.0;
+    if (const VoltageSourceDevice *voltage = input.AsVoltage()) {
+        system.Input[static_cast<std::size_t>(voltage->GetBranch())] = 1.0;
     } else {
+        const IndependentSourceDevice &source = input.GetSource();
         system.IsCurrentInput = true;
-        system.PortPositive = input.Current->GetNodeA();
-        system.PortNegative = input.Current->GetNodeB();
+        system.PortPositive = source.GetNodeA();
+        system.PortNegative = source.GetNodeB();
         if (system.PortPositive >= 0) {
             system.Input[static_cast<std::size_t>(system.PortPositive)] = -1.0;
         }

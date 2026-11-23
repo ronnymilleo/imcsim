@@ -12,6 +12,117 @@
 namespace Nodalys {
 
 // ============================================================================
+// IndependentSourceDevice
+// ============================================================================
+
+double IndependentSourceDevice::GetDcValue() const {
+    return m_DcValue;
+}
+
+void IndependentSourceDevice::SetDcValue(const double value) {
+    m_DcValue = value;
+}
+
+void IndependentSourceDevice::SetBreakpoints(BreakpointCallback breakpoints) {
+    m_Breakpoints = std::move(breakpoints);
+}
+
+void IndependentSourceDevice::SetSeedCallback(SeedCallback set_seed) {
+    m_SetSeed = std::move(set_seed);
+}
+
+void IndependentSourceDevice::SetCallbackFactory(SourceCallbackFactory factory) {
+    m_CallbackFactory = std::move(factory);
+}
+
+bool IndependentSourceDevice::SupportsHarmonicBalance() const {
+    return m_Periodicity.IsSupportedInHb;
+}
+
+void IndependentSourceDevice::SetSourceScale(const double scale) {
+    m_Scale = scale;
+}
+
+double IndependentSourceDevice::NextBreakpoint(const double time) const {
+    return m_Breakpoints ? m_Breakpoints(time) : Device::NextBreakpoint(time);
+}
+
+void IndependentSourceDevice::SetRandomSeed(const std::uint64_t seed) {
+    if (m_SetSeed) {
+        m_SetSeed(seed);
+    }
+}
+
+IndependentSourceDevice::IndependentSourceDevice(const int node_a,
+                                                 const int node_b,
+                                                 const double dc_value,
+                                                 WaveformCallback waveform,
+                                                 const double ac_magnitude,
+                                                 SourcePeriodicity periodicity)
+    : m_NodeA(node_a), m_NodeB(node_b), m_DcValue(dc_value), m_Waveform(std::move(waveform)),
+      m_AcMagnitude(ac_magnitude), m_Periodicity(periodicity) {
+}
+
+double IndependentSourceDevice::EvaluateValue(const TimeContext &time) const {
+    return m_Scale * m_Waveform(m_DcValue, time);
+}
+
+void IndependentSourceDevice::RefreshClonedCallbacks() {
+    if (m_CallbackFactory) {
+        SourceCallbacks callbacks = m_CallbackFactory();
+        m_Waveform = std::move(callbacks.Evaluate);
+        m_Breakpoints = std::move(callbacks.NextBreakpoint);
+        m_SetSeed = std::move(callbacks.SetSeed);
+    }
+}
+
+// ============================================================================
+// CurrentSourceDevice
+// ============================================================================
+
+CurrentSourceDevice::CurrentSourceDevice(const int node_a,
+                                         const int node_b,
+                                         const double dc_value,
+                                         WaveformCallback waveform,
+                                         const double ac_magnitude,
+                                         SourcePeriodicity periodicity)
+    : IndependentSourceDevice(node_a, node_b, dc_value, std::move(waveform), ac_magnitude, periodicity) {
+}
+
+double CurrentSourceDevice::SamplePeriodicCurrent(const int terminal, const double time_seconds) const {
+    const TimeContext steady_state{.IsPeriodicSteadyState = true, .Time = time_seconds};
+    const double current = EvaluateValue(steady_state);
+    return terminal == 0 ? current : -current;
+}
+
+void CurrentSourceDevice::Stamp(MnaSystem &sys, const std::vector<double> & /*x*/, const TimeContext &time) {
+    m_Value = EvaluateValue(time);
+    StampCurrentSource(sys, GetNodeA(), GetNodeB(), m_Value);
+}
+
+void CurrentSourceDevice::StampAc(MnaSystem &reactive, const std::vector<double> & /*x_dc*/) const {
+    StampCurrentSource(reactive, GetNodeA(), GetNodeB(), GetAcMagnitude());
+}
+
+double CurrentSourceDevice::TerminalCurrent(const int terminal, const std::vector<double> & /*x*/) const {
+    return terminal == 0 ? m_Value : -m_Value;
+}
+
+std::complex<double> CurrentSourceDevice::AcTerminalCurrent(const int terminal,
+                                                            const std::vector<double> & /*x_dc*/,
+                                                            const std::vector<std::complex<double>> & /*x_ac*/,
+                                                            const double /*omega*/) const {
+    const std::complex<double> current(GetAcMagnitude(), 0.0);
+    return terminal == 0 ? current : -current;
+}
+
+std::unique_ptr<Device> CurrentSourceDevice::Clone() const {
+    auto copy = std::make_unique<CurrentSourceDevice>(*this);
+    copy->RefreshClonedCallbacks();
+    return copy;
+}
+
+// ============================================================================
 // VoltageSourceDevice
 // ============================================================================
 
@@ -19,47 +130,23 @@ VoltageSourceDevice::VoltageSourceDevice(const int node_a,
                                          const int node_b,
                                          const int branch,
                                          const double dc_value,
-                                         Waveform waveform,
+                                         WaveformCallback waveform,
                                          const double ac_magnitude,
                                          SourcePeriodicity periodicity)
-    : m_NodeA(node_a), m_NodeB(node_b), m_Branch(branch), m_DcValue(dc_value), m_Waveform(std::move(waveform)),
-      m_AcMagnitude(ac_magnitude), m_Periodicity(periodicity) {
-}
-
-double VoltageSourceDevice::GetDcValue() const {
-    return m_DcValue;
-}
-
-void VoltageSourceDevice::SetDcValue(const double value) {
-    m_DcValue = value;
-}
-
-void VoltageSourceDevice::SetBreakpoints(Breakpoints breakpoints) {
-    m_Breakpoints = std::move(breakpoints);
-}
-
-void VoltageSourceDevice::SetSeedCallback(std::function<void(std::uint64_t)> set_seed) {
-    m_SetSeed = std::move(set_seed);
-}
-
-void VoltageSourceDevice::SetCallbackFactory(CallbackFactory factory) {
-    m_CallbackFactory = std::move(factory);
+    : IndependentSourceDevice(node_a, node_b, dc_value, std::move(waveform), ac_magnitude, periodicity),
+      m_Branch(branch) {
 }
 
 void VoltageSourceDevice::Stamp(MnaSystem &sys, const std::vector<double> & /*x*/, const TimeContext &time) {
-    sys.AddA(m_NodeA, m_Branch, 1.0);
-    sys.AddA(m_NodeB, m_Branch, -1.0);
-    sys.AddA(m_Branch, m_NodeA, 1.0);
-    sys.AddA(m_Branch, m_NodeB, -1.0);
-    sys.AddRhs(m_Branch, m_Scale * m_Waveform(m_DcValue, time));
+    sys.AddA(GetNodeA(), m_Branch, 1.0);
+    sys.AddA(GetNodeB(), m_Branch, -1.0);
+    sys.AddA(m_Branch, GetNodeA(), 1.0);
+    sys.AddA(m_Branch, GetNodeB(), -1.0);
+    sys.AddRhs(m_Branch, EvaluateValue(time));
 }
 
 void VoltageSourceDevice::StampAc(MnaSystem &reactive, const std::vector<double> & /*x_dc*/) const {
-    reactive.AddRhs(m_Branch, m_AcMagnitude);
-}
-
-bool VoltageSourceDevice::SupportsHarmonicBalance() const {
-    return m_Periodicity.IsSupportedInHb;
+    reactive.AddRhs(m_Branch, GetAcMagnitude());
 }
 
 double VoltageSourceDevice::TerminalCurrent(const int terminal, const std::vector<double> &x) const {
@@ -75,118 +162,9 @@ std::complex<double> VoltageSourceDevice::AcTerminalCurrent(const int terminal,
     return terminal == 0 ? current : -current;
 }
 
-void VoltageSourceDevice::SetSourceScale(const double scale) {
-    m_Scale = scale;
-}
-
-double VoltageSourceDevice::NextBreakpoint(const double time) const {
-    return m_Breakpoints ? m_Breakpoints(time) : Device::NextBreakpoint(time);
-}
-
-void VoltageSourceDevice::SetRandomSeed(const std::uint64_t seed) {
-    if (m_SetSeed) {
-        m_SetSeed(seed);
-    }
-}
-
 std::unique_ptr<Device> VoltageSourceDevice::Clone() const {
     auto copy = std::make_unique<VoltageSourceDevice>(*this);
-    if (m_CallbackFactory) {
-        CallbackSet callbacks = m_CallbackFactory();
-        copy->m_Waveform = std::move(callbacks.Evaluate);
-        copy->m_Breakpoints = std::move(callbacks.NextBreakpoint);
-        copy->m_SetSeed = std::move(callbacks.SetSeed);
-    }
-    return copy;
-}
-
-// ============================================================================
-// CurrentSourceDevice
-// ============================================================================
-
-CurrentSourceDevice::CurrentSourceDevice(const int node_a,
-                                         const int node_b,
-                                         const double dc_value,
-                                         VoltageSourceDevice::Waveform waveform,
-                                         const double ac_magnitude,
-                                         SourcePeriodicity periodicity)
-    : m_NodeA(node_a), m_NodeB(node_b), m_DcValue(dc_value), m_Waveform(std::move(waveform)),
-      m_AcMagnitude(ac_magnitude), m_Periodicity(periodicity) {
-}
-
-double CurrentSourceDevice::GetDcValue() const {
-    return m_DcValue;
-}
-
-void CurrentSourceDevice::SetDcValue(const double value) {
-    m_DcValue = value;
-}
-
-double CurrentSourceDevice::SamplePeriodicCurrent(const int terminal, const double time_seconds) const {
-    const TimeContext steady_state{.IsPeriodicSteadyState = true, .Time = time_seconds};
-    const double current = m_Scale * m_Waveform(m_DcValue, steady_state);
-    return terminal == 0 ? current : -current;
-}
-
-void CurrentSourceDevice::SetBreakpoints(VoltageSourceDevice::Breakpoints breakpoints) {
-    m_Breakpoints = std::move(breakpoints);
-}
-
-void CurrentSourceDevice::SetSeedCallback(std::function<void(std::uint64_t)> set_seed) {
-    m_SetSeed = std::move(set_seed);
-}
-
-void CurrentSourceDevice::SetCallbackFactory(VoltageSourceDevice::CallbackFactory factory) {
-    m_CallbackFactory = std::move(factory);
-}
-
-void CurrentSourceDevice::Stamp(MnaSystem &sys, const std::vector<double> & /*x*/, const TimeContext &time) {
-    m_Value = m_Scale * m_Waveform(m_DcValue, time);
-    StampCurrentSource(sys, m_NodeA, m_NodeB, m_Value);
-}
-
-void CurrentSourceDevice::StampAc(MnaSystem &reactive, const std::vector<double> & /*x_dc*/) const {
-    StampCurrentSource(reactive, m_NodeA, m_NodeB, m_AcMagnitude);
-}
-
-bool CurrentSourceDevice::SupportsHarmonicBalance() const {
-    return m_Periodicity.IsSupportedInHb;
-}
-
-double CurrentSourceDevice::TerminalCurrent(const int terminal, const std::vector<double> & /*x*/) const {
-    return terminal == 0 ? m_Value : -m_Value;
-}
-
-std::complex<double> CurrentSourceDevice::AcTerminalCurrent(const int terminal,
-                                                            const std::vector<double> & /*x_dc*/,
-                                                            const std::vector<std::complex<double>> & /*x_ac*/,
-                                                            const double /*omega*/) const {
-    const std::complex<double> current(m_AcMagnitude, 0.0);
-    return terminal == 0 ? current : -current;
-}
-
-void CurrentSourceDevice::SetSourceScale(const double scale) {
-    m_Scale = scale;
-}
-
-double CurrentSourceDevice::NextBreakpoint(const double time) const {
-    return m_Breakpoints ? m_Breakpoints(time) : Device::NextBreakpoint(time);
-}
-
-void CurrentSourceDevice::SetRandomSeed(const std::uint64_t seed) {
-    if (m_SetSeed) {
-        m_SetSeed(seed);
-    }
-}
-
-std::unique_ptr<Device> CurrentSourceDevice::Clone() const {
-    auto copy = std::make_unique<CurrentSourceDevice>(*this);
-    if (m_CallbackFactory) {
-        VoltageSourceDevice::CallbackSet callbacks = m_CallbackFactory();
-        copy->m_Waveform = std::move(callbacks.Evaluate);
-        copy->m_Breakpoints = std::move(callbacks.NextBreakpoint);
-        copy->m_SetSeed = std::move(callbacks.SetSeed);
-    }
+    copy->RefreshClonedCallbacks();
     return copy;
 }
 
