@@ -33,9 +33,10 @@ constexpr double DEFAULT_PORT_OHMS = 50.0;
 /// Where the nodes of an element start, after its name.
 constexpr std::size_t FIRST_NODE = 1;
 
-using CurrentControlledAdder = void (CircuitBuilder::*)(std::string, NodeId, NodeId, const std::string &, double);
+using CurrentControlledAdder =
+    CircuitBuilder &(CircuitBuilder::*)(std::string, NodeId, NodeId, const std::string &, double);
 using ElementResult = std::expected<void, std::string>;
-using VoltageControlledAdder = void (CircuitBuilder::*)(std::string, NodeId, NodeId, NodeId, NodeId, double);
+using VoltageControlledAdder = CircuitBuilder &(CircuitBuilder::*)(std::string, NodeId, NodeId, NodeId, NodeId, double);
 
 /**
  * @struct  BehavioralLine
@@ -588,7 +589,6 @@ ElementResult ReadMosfet(DeckContext &context, const DeckLine &line) {
                               nodes.Resolve(tokens[1]),
                               nodes.Resolve(tokens[2]),
                               nodes.Resolve(tokens[3]),
-                              nodes.Resolve(tokens[4]),
                               model == nullptr || model->Kind != ParsedModel::ModelKind::MOSFET_PMOS,
                               parameters);
     return {};
@@ -603,12 +603,12 @@ ElementResult ReadSwitch(DeckContext &context, const DeckLine &line) {
         return std::unexpected(std::format("Malformed switch: '{}'", line.Text));
     }
     const NetlistNodes &nodes = context.Nodes;
-    context.Builder.AddVoltageControlledSwitch(tokens.front(),
-                                               nodes.Resolve(tokens[1]),
-                                               nodes.Resolve(tokens[2]),
-                                               nodes.Resolve(tokens[3]),
-                                               nodes.Resolve(tokens[4]),
-                                               ReadModelParameters(context, tokens[5], BuildSwitchParameters));
+    context.Builder.AddSwitch(tokens.front(),
+                              nodes.Resolve(tokens[1]),
+                              nodes.Resolve(tokens[2]),
+                              nodes.Resolve(tokens[3]),
+                              nodes.Resolve(tokens[4]),
+                              ReadModelParameters(context, tokens[5], BuildSwitchParameters));
     return {};
 }
 

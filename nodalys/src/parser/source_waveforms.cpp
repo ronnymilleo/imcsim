@@ -84,8 +84,8 @@ double ValueOr(const std::vector<double> &values, const std::size_t index, const
 template <typename Argument>
 void AddWithPhase(const SourcePlacement &source,
                   const std::type_identity_t<Argument> waveform,
-                  void (CircuitBuilder::*voltage)(std::string, NodeId, NodeId, Argument, double, double),
-                  void (CircuitBuilder::*current)(std::string, NodeId, NodeId, Argument, double, double)) {
+                  CircuitBuilder &(CircuitBuilder::*voltage)(std::string, NodeId, NodeId, Argument, double, double),
+                  CircuitBuilder &(CircuitBuilder::*current)(std::string, NodeId, NodeId, Argument, double, double)) {
     (source.Builder.*(source.IsVoltage ? voltage : current))(source.Name,
                                                              source.Positive,
                                                              source.Negative,
@@ -100,8 +100,8 @@ void AddWithPhase(const SourcePlacement &source,
 template <typename Argument>
 void AddWithMagnitude(const SourcePlacement &source,
                       const std::type_identity_t<Argument> waveform,
-                      void (CircuitBuilder::*voltage)(std::string, NodeId, NodeId, Argument, double),
-                      void (CircuitBuilder::*current)(std::string, NodeId, NodeId, Argument, double)) {
+                      CircuitBuilder &(CircuitBuilder::*voltage)(std::string, NodeId, NodeId, Argument, double),
+                      CircuitBuilder &(CircuitBuilder::*current)(std::string, NodeId, NodeId, Argument, double)) {
     (source.Builder.*(source.IsVoltage ? voltage : current))(source.Name,
                                                              source.Positive,
                                                              source.Negative,

@@ -21,6 +21,7 @@ namespace Nodalys {
 class CircuitBuilderImpl {
 public:
     CircuitDescription Description;
+    bool HasBuilt = false;
 
     explicit CircuitBuilderImpl(int num_circuit_nodes) {
         if (num_circuit_nodes > 0) {

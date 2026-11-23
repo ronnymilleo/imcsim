@@ -364,7 +364,6 @@ TEST_CASE("Gear-2 integrates the junction charges of a diode, a BJT and a MOSFET
                           4,
                           2,
                           0,
-                          0,
                           true,
                           {.ThresholdVoltage = 1.0,
                            .Transconductance = 2e-3,

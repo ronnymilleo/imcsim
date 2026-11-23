@@ -181,3 +181,26 @@ TEST_CASE("Concurrent analyses on one shared const circuit complete cleanly and 
     CHECK(ac_run->Frequencies.size() > 5);
     CHECK(sp_run->Frequencies.size() == 4);
 }
+
+TEST_CASE("CircuitBuilder supports fluent chaining and refuses repeated or moved-from Build() calls",
+          "[nodalys][circuit_builder]") {
+    Nodalys::CircuitBuilder builder;
+    builder.AddVdc("V1", 1, 0, 10.0).AddResistor("R1", 1, 2, 1000.0).AddResistor("R2", 2, 0, 1000.0);
+
+    const auto first = builder.Build();
+    REQUIRE(first.has_value());
+    const auto op = Nodalys::ComputeOperatingPoint(*first);
+    REQUIRE(op.has_value());
+    CHECK_THAT(op->NodeVoltages[2], WithinRel(5.0, 1e-9));
+
+    const auto second = builder.Build();
+    REQUIRE_FALSE(second.has_value());
+
+    Nodalys::CircuitBuilder original;
+    original.AddVdc("V1", 1, 0, 5.0).AddResistor("R1", 1, 0, 100.0);
+    Nodalys::CircuitBuilder moved(std::move(original));
+    const auto from_moved_from = original.Build();
+    REQUIRE_FALSE(from_moved_from.has_value());
+    const auto from_target = moved.Build();
+    REQUIRE(from_target.has_value());
+}
