@@ -19,10 +19,11 @@
 namespace Nodalys {
 
 // Cards
-std::expected<TextModel, std::string> ParseTextModel(const TextScope &scope, const std::vector<std::string> &tokens);
+[[nodiscard]] std::expected<TextModel, std::string> ParseTextModel(const TextScope &scope,
+                                                                   const std::vector<std::string> &tokens);
 
 // Use
-std::expected<const TextModel *, std::string>
+[[nodiscard]] std::expected<const TextModel *, std::string>
 UseTextModel(const TextScope &scope, std::string_view name, std::initializer_list<ParsedModel::ModelKind> kinds);
 void ReportIgnoredParameters(ExpansionContext &context, const TextModel &model, const std::set<std::string> &read_keys);
 

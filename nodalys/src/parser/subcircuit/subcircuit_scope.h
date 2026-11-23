@@ -83,10 +83,10 @@ public:
     ExpansionContext &GetContext() const;
 
     // Parameters
-    std::optional<double> FindParameter(const std::string &upper_name) const;
+    [[nodiscard]] std::optional<double> FindParameter(const std::string &upper_name) const;
     void SetParameter(const std::string &upper_name, double value);
     bool HasOwnParameter(const std::string &upper_name) const;
-    std::expected<double, std::string> Evaluate(std::string_view text) const;
+    [[nodiscard]] std::expected<double, std::string> Evaluate(std::string_view text) const;
 
     // Definitions
     void AddModel(const std::string &upper_name, TextModel model);
@@ -98,7 +98,7 @@ public:
     void MapNode(const std::string &upper_name, NodeId node);
     NodeId ResolveNode(std::string_view name);
     void AddSourceName(const std::string &upper_name, std::string written_name);
-    std::optional<std::string> FindSourceName(const std::string &upper_name) const;
+    [[nodiscard]] std::optional<std::string> FindSourceName(const std::string &upper_name) const;
     std::string MakeName(std::string_view local_name) const;
     const std::string &GetPrefix() const;
 

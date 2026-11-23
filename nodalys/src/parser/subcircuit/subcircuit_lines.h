@@ -36,7 +36,7 @@ std::vector<std::pair<std::string, std::string>> SplitParameterTokens(const std:
                                                                       std::size_t first);
 
 // Instances
-std::optional<InstanceLine> SplitInstanceLine(const std::vector<std::string> &tokens);
+[[nodiscard]] std::optional<InstanceLine> SplitInstanceLine(const std::vector<std::string> &tokens);
 
 } // namespace Nodalys
 

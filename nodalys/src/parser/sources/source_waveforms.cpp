@@ -129,7 +129,7 @@ SineParameters ReadSine(const std::vector<double> &values, const SourceLevels &l
     Assign(parameters.Offset, values, 0);
     Assign(parameters.Amplitude, values, 1);
     Assign(parameters.Frequency, values, 2);
-    Assign(parameters.Phase, values, 3);
+    Assign(parameters.PhaseDegrees, values, 3);
     parameters.Magnitude = levels.AcMagnitude > 0.0 ? levels.AcMagnitude : parameters.Amplitude;
     return parameters;
 }

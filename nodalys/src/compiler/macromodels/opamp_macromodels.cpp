@@ -115,7 +115,7 @@ IdealOpAmpValues ComputeIdealOpAmpValues(const double bandwidth) {
 }
 
 BoyleOpAmpValues ComputeBoyleOpAmpValues(const BoyleOpAmpParameters &parameters) {
-    const double tail_current = parameters.SlewRate * 1e6 * COMPENSATION_CAPACITANCE;
+    const double tail_current = parameters.SlewRateVoltsPerMicrosecond * 1e6 * COMPENSATION_CAPACITANCE;
     const double collector_current = tail_current / 2.0;
     const double beta = collector_current / parameters.InputBiasCurrent;
     const double collector_resistance =

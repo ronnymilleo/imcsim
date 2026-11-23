@@ -21,11 +21,12 @@ using ParameterLookup = std::function<std::optional<double>(const std::string &n
 // Values
 std::string SubstituteParameters(std::string_view text, const ParameterLookup &lookup);
 std::string_view StripValueBrackets(std::string_view text);
-std::expected<double, std::string> EvaluateValue(std::string_view text, const ParameterLookup &lookup);
+[[nodiscard]] std::expected<double, std::string> EvaluateValue(std::string_view text, const ParameterLookup &lookup);
 
 // Words
-std::optional<std::size_t> FindWordEnd(std::string_view text, std::size_t position);
-std::optional<std::size_t> FindCallEnd(std::string_view text, std::size_t word_end, std::string_view word);
+[[nodiscard]] std::optional<std::size_t> FindWordEnd(std::string_view text, std::size_t position);
+[[nodiscard]] std::optional<std::size_t>
+FindCallEnd(std::string_view text, std::size_t word_end, std::string_view word);
 
 } // namespace Nodalys
 

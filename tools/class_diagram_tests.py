@@ -85,8 +85,12 @@ class ClassDiagramTests(unittest.TestCase):
             cd.SourceFile(
                 "nodalys/include/nodalys/api.h",
                 "public-api",
-                "std::expected<int, std::string> Run(const int x);\n",
-                1,
+                "std::expected<int, std::string> Run(const int x);\n"
+                "inline int Helper(const int v) {\n"
+                "    const int local = v + 1;\n"
+                "    return local;\n"
+                "}\n",
+                5,
             ),
             cd.SourceFile(
                 "nodalys/src/api/api.cpp",

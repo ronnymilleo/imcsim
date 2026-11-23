@@ -23,10 +23,11 @@ using ExpressionNodeResolver = std::function<NodeId(std::string_view)>;
 using ExpressionSourceResolver = std::function<std::expected<std::string, std::string>(std::string_view)>;
 
 // References
-std::expected<std::string, std::string> RewriteExpressionReferences(std::string_view text,
-                                                                    const Expression &expression,
-                                                                    const ExpressionNodeResolver &resolve_node,
-                                                                    const ExpressionSourceResolver &resolve_source);
+[[nodiscard]] std::expected<std::string, std::string>
+RewriteExpressionReferences(std::string_view text,
+                            const Expression &expression,
+                            const ExpressionNodeResolver &resolve_node,
+                            const ExpressionSourceResolver &resolve_source);
 
 } // namespace Nodalys
 

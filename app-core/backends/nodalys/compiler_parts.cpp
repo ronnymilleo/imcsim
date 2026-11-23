@@ -39,7 +39,7 @@ Nodalys::BoyleOpAmpParameters MakeBoyleParams(const OpAmpParameters &params) {
         .IsPnpInput = params.InputStage == OpAmpInputStage::PNP,
         .OpenLoopGainDecibels = params.OpenLoopGainDecibels,
         .GainBandwidth = params.GainBandwidth,
-        .SlewRate = params.SlewRate,
+        .SlewRateVoltsPerMicrosecond = params.SlewRate,
         .PhaseMarginDegrees = params.PhaseMarginDegrees,
         .InputBiasCurrent = params.InputBiasCurrent,
         .CommonModeRejectionDecibels = params.CommonModeRejectionDecibels,

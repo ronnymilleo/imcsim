@@ -76,13 +76,13 @@ struct ExpressionResult {
  */
 class Expression {
 public:
-    static std::expected<Expression, std::string> Parse(std::string_view text);
+    [[nodiscard]] static std::expected<Expression, std::string> Parse(std::string_view text);
 
     const std::vector<ExpressionInput> &GetInputs() const;
     const std::vector<ExpressionReference> &GetReferences() const;
     bool IsTimeDependent() const;
 
-    std::expected<ExpressionResult, std::string>
+    [[nodiscard]] std::expected<ExpressionResult, std::string>
     Evaluate(std::span<const double> inputs, double time_seconds, double temperature_celsius = 27.0) const;
 
 private:

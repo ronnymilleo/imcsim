@@ -35,7 +35,8 @@ struct OperationResult {
 };
 
 // Evaluation
-std::expected<OperationResult, std::string> ApplyOperation(Operation operation, double first, double second);
+[[nodiscard]] std::expected<OperationResult, std::string>
+ApplyOperation(Operation operation, double first, double second);
 
 // Naming
 std::string_view GetOperationName(Operation operation);

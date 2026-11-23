@@ -14,7 +14,7 @@
 namespace Nodalys {
 
 // Parsing
-std::expected<ExpressionProgram, std::string> ParseExpressionProgram(std::string_view text);
+[[nodiscard]] std::expected<ExpressionProgram, std::string> ParseExpressionProgram(std::string_view text);
 
 } // namespace Nodalys
 

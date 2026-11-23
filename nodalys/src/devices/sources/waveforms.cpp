@@ -148,7 +148,7 @@ double EvaluateExp(const ExpParameters &exp, const double time) {
 
 double EvaluateSine(const SineParameters &sine, const double time) {
     const double omega = 2.0 * std::numbers::pi * sine.Frequency;
-    const double phase_rad = sine.Phase * (std::numbers::pi / 180.0);
+    const double phase_rad = sine.PhaseDegrees * (std::numbers::pi / 180.0);
     return sine.Offset + sine.Amplitude * std::sin(omega * time + phase_rad);
 }
 

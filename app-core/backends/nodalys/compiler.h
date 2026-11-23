@@ -18,9 +18,10 @@ namespace Core {
 class SubcircuitInstance;
 
 // Compiling
-std::expected<Nodalys::Circuit, std::string> CompileCircuit(const Circuit &circuit,
-                                                            std::vector<std::string> *warnings = nullptr);
-std::optional<std::string> FindSpiceBlockProblem(const Circuit &circuit, const SubcircuitInstance &instance);
+[[nodiscard]] std::expected<Nodalys::Circuit, std::string> CompileCircuit(const Circuit &circuit,
+                                                                          std::vector<std::string> *warnings = nullptr);
+[[nodiscard]] std::optional<std::string> FindSpiceBlockProblem(const Circuit &circuit,
+                                                               const SubcircuitInstance &instance);
 
 } // namespace Core
 

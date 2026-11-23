@@ -151,7 +151,7 @@ struct BoyleOpAmpParameters {
     double OpenLoopGainDecibels = 106.0;
     double GainBandwidth = 1e6;
     /// Volts per microsecond, as datasheets specify.
-    double SlewRate = 0.5;
+    double SlewRateVoltsPerMicrosecond = 0.5;
     double PhaseMarginDegrees = 60.0;
     double InputBiasCurrent = 80e-9;
     double CommonModeRejectionDecibels = 90.0;
@@ -398,7 +398,8 @@ struct SineParameters {
     double Frequency = 1e3;
     double Offset = 0.0;
     double Magnitude = 1.0;
-    double Phase = 0.0; // degrees
+    /// Phase angle in degrees.
+    double PhaseDegrees = 0.0;
 
     bool operator==(const SineParameters &) const = default;
 };

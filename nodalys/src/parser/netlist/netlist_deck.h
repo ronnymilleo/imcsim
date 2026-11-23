@@ -45,7 +45,7 @@ struct Deck {
 };
 
 // Reading
-std::expected<Deck, std::string> ReadDeck(std::string_view text);
+[[nodiscard]] std::expected<Deck, std::string> ReadDeck(std::string_view text);
 
 // Element names
 char GetElementLetter(std::string_view name);
