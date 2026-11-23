@@ -29,9 +29,16 @@ add_library(nodalys STATIC
     src/analyses/transient_analysis.cpp
     src/api/circuit.cpp
     src/api/circuit_builder.cpp
+    src/api/circuit_builder_sources.cpp
     src/api/nodalys.cpp
     src/bridge/logic_bridge.cpp
+    src/compiler/behavioral_binding.cpp
+    src/compiler/circuit_compiler.cpp
     src/compiler/compiled_circuit.cpp
+    src/compiler/electromechanical_macromodels.cpp
+    src/compiler/logic_macromodels.cpp
+    src/compiler/opamp_macromodels.cpp
+    src/compiler/source_specs.cpp
     src/devices/behavioral_device.cpp
     src/devices/bjt_device.cpp
     src/devices/controlled_sources.cpp
