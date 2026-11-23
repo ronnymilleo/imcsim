@@ -159,12 +159,12 @@ struct BoyleNodes {
  */
 struct SourceSpec {
     double Dc = 0.0;
-    VoltageSourceDevice::Waveform Waveform;
+    WaveformCallback Waveform;
     double AcMagnitude = 0.0;
     SourcePeriodicity Periodicity;
-    VoltageSourceDevice::Breakpoints Breakpoints;
-    std::function<void(std::uint64_t)> SetSeed;
-    VoltageSourceDevice::CallbackFactory CallbackFactory;
+    BreakpointCallback Breakpoints;
+    SeedCallback SetSeed;
+    SourceCallbackFactory CallbackFactory;
 };
 
 IdealOpAmpValues ComputeIdealOpAmpValues(const double bandwidth) {
@@ -367,9 +367,9 @@ SourceSpec MakeNoiseSpec(const NoiseParameters &params, const double ac_magnitud
             .SetSeed = std::move(noise.ResetSeed),
             .CallbackFactory = [params]() {
                 TransientNoiseSource fresh = MakeNoiseSource(params);
-                return VoltageSourceDevice::CallbackSet{.Evaluate = std::move(fresh.Evaluate),
-                                                        .NextBreakpoint = std::move(fresh.NextBreakpoint),
-                                                        .SetSeed = std::move(fresh.ResetSeed)};
+                return SourceCallbacks{.Evaluate = std::move(fresh.Evaluate),
+                                       .NextBreakpoint = std::move(fresh.NextBreakpoint),
+                                       .SetSeed = std::move(fresh.ResetSeed)};
             }};
 }
 
@@ -386,9 +386,9 @@ SourceSpec MakeRandomSpec(const RandomParameters &params, const double ac_magnit
             .SetSeed = std::move(random.ResetSeed),
             .CallbackFactory = [params]() {
                 TransientNoiseSource fresh = MakeRandomSource(params);
-                return VoltageSourceDevice::CallbackSet{.Evaluate = std::move(fresh.Evaluate),
-                                                        .NextBreakpoint = std::move(fresh.NextBreakpoint),
-                                                        .SetSeed = std::move(fresh.ResetSeed)};
+                return SourceCallbacks{.Evaluate = std::move(fresh.Evaluate),
+                                       .NextBreakpoint = std::move(fresh.NextBreakpoint),
+                                       .SetSeed = std::move(fresh.ResetSeed)};
             }};
 }
 
@@ -1163,8 +1163,7 @@ private:
      * @param[in] source   The source device, built from the same spec.
      * @param[in] spec     Spec the source was built from, of which the breakpoints and the seed are used here.
      */
-    template <typename SourceDevice>
-    void InstallSource(const std::string &name, std::unique_ptr<SourceDevice> source, SourceSpec spec) {
+    void InstallSource(const std::string &name, std::unique_ptr<IndependentSourceDevice> source, SourceSpec spec) {
         source->SetBreakpoints(std::move(spec.Breakpoints));
         source->SetSeedCallback(std::move(spec.SetSeed));
         source->SetCallbackFactory(std::move(spec.CallbackFactory));

@@ -25,8 +25,7 @@ namespace Nodalys {
 struct PartitionedCircuit {
     std::vector<Device *> LinearDevices;
     std::vector<Device *> NonlinearDevices;
-    std::vector<VoltageSourceDevice *> VoltageSources;
-    std::vector<CurrentSourceDevice *> CurrentSources;
+    std::vector<IndependentSourceDevice *> Sources;
 };
 
 // Validation

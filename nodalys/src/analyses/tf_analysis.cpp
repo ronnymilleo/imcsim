@@ -41,8 +41,8 @@ std::expected<TransferFunctionResult, std::string> ComputeTransferFunction(Compi
     if (!input) {
         return std::unexpected(input.error());
     }
-    const VoltageSourceDevice *voltage_source = input->Voltage;
-    const CurrentSourceDevice *current_source = input->Current;
+    const VoltageSourceDevice *voltage_source = input->AsVoltage();
+    const IndependentSourceDevice &input_source = input->GetSource();
 
     const int size = compiled.System->GetSize();
     const std::expected<std::vector<double>, std::string> x_dc =
@@ -54,11 +54,11 @@ std::expected<TransferFunctionResult, std::string> ComputeTransferFunction(Compi
     const int out_idx = compiled.System->NodeIndex(out_node);
 
     compiled.System->ClearRhs();
-    if (input->IsVoltage()) {
+    if (voltage_source != nullptr) {
         compiled.System->AddRhs(voltage_source->GetBranch(), 1.0);
     } else {
-        compiled.System->AddRhs(current_source->GetNodeA(), -1.0);
-        compiled.System->AddRhs(current_source->GetNodeB(), 1.0);
+        compiled.System->AddRhs(input_source.GetNodeA(), -1.0);
+        compiled.System->AddRhs(input_source.GetNodeB(), 1.0);
     }
 
     std::vector<double> dx_in(static_cast<std::size_t>(size), 0.0);
@@ -70,10 +70,10 @@ std::expected<TransferFunctionResult, std::string> ComputeTransferFunction(Compi
     result.OutputPositiveNode = out_node;
     result.OutputNegativeNode = settings.OutputNegativeNode;
     result.InputSource = settings.InputSource;
-    result.GainUnit = input->IsVoltage() ? "V/V" : "V/A";
+    result.GainUnit = voltage_source != nullptr ? "V/V" : "V/A";
     result.Gain = dx_in[static_cast<std::size_t>(out_idx)];
 
-    if (input->IsVoltage()) {
+    if (voltage_source != nullptr) {
         const double current_into_circuit = -dx_in[static_cast<std::size_t>(voltage_source->GetBranch())];
         if (std::fabs(current_into_circuit) <= 1.01 * options.Gmin) {
             result.InputImpedance = OPEN_CIRCUIT_IMPEDANCE;
@@ -81,10 +81,8 @@ std::expected<TransferFunctionResult, std::string> ComputeTransferFunction(Compi
             result.InputImpedance = 1.0 / current_into_circuit;
         }
     } else {
-        const double va =
-            current_source->GetNodeA() < 0 ? 0.0 : dx_in[static_cast<std::size_t>(current_source->GetNodeA())];
-        const double vb =
-            current_source->GetNodeB() < 0 ? 0.0 : dx_in[static_cast<std::size_t>(current_source->GetNodeB())];
+        const double va = input_source.GetNodeA() < 0 ? 0.0 : dx_in[static_cast<std::size_t>(input_source.GetNodeA())];
+        const double vb = input_source.GetNodeB() < 0 ? 0.0 : dx_in[static_cast<std::size_t>(input_source.GetNodeB())];
         result.InputImpedance = std::min(vb - va, OPEN_CIRCUIT_IMPEDANCE);
     }
 

@@ -6,10 +6,10 @@
 #ifndef NODALYS_TRANSIENT_NOISE_H
 #define NODALYS_TRANSIENT_NOISE_H
 
-#include "devices/independent_sources.h"
+#include "devices/waveforms.h"
 #include "nodalys/types.h"
+#include <cstddef>
 #include <cstdint>
-#include <functional>
 
 namespace Nodalys {
 
@@ -18,9 +18,9 @@ namespace Nodalys {
  * @brief   Waveform, breakpoint, and seed-reset callbacks for a transient noise or random source.
  */
 struct TransientNoiseSource {
-    VoltageSourceDevice::Waveform Evaluate;
-    VoltageSourceDevice::Breakpoints NextBreakpoint;
-    std::function<void(std::uint64_t)> ResetSeed;
+    WaveformCallback Evaluate;
+    BreakpointCallback NextBreakpoint;
+    SeedCallback ResetSeed;
 };
 
 // Mixing

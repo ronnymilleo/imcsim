@@ -23,16 +23,15 @@ namespace Nodalys {
 /**
  * @struct  InputSource
  * @brief   The independent source that drives an analysis, which is a voltage source or a current source.
- * @details Exactly one of the two pointers is set. The sources belong to the circuit.
+ * @details Points to a non-null independent source owned by the circuit.
  */
 struct InputSource {
-    /// The source when it is a voltage source, or null.
-    const VoltageSourceDevice *Voltage = nullptr;
-    /// The source when it is a current source, or null.
-    const CurrentSourceDevice *Current = nullptr;
+    const IndependentSourceDevice *Source = nullptr;
 
     bool IsVoltage() const;
     const Device &GetDevice() const;
+    const IndependentSourceDevice &GetSource() const;
+    const VoltageSourceDevice *AsVoltage() const;
 };
 
 // Checks
