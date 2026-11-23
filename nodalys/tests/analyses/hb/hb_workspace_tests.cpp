@@ -20,14 +20,14 @@ TEST_CASE("The traces keep only the entries that are not zero, one trace over th
 
     // The entry (0, 1) is nonzero at samples 1 and 3 only, and (1, 1) at sample 3
     for (std::size_t m = 0; m < SAMPLES; ++m) {
-        Nodalys::DenseMatrix matrix(2, 2);
+        Nodalys::MnaSystem system(2, 0);
         if (m == 1 || m == 3) {
-            matrix.Add(0, 1, static_cast<double>(m));
+            system.AddA(0, 1, static_cast<double>(m));
         }
         if (m == 3) {
-            matrix.Add(1, 1, 7.0);
+            system.AddA(1, 1, 7.0);
         }
-        traces.RecordMatrix(matrix, m);
+        traces.RecordMatrix(system, m);
     }
 
     REQUIRE(traces.Pairs.size() == 2);
@@ -40,15 +40,15 @@ TEST_CASE("Resetting the traces forgets the entries of the last matrix and takes
           "[nodalys][hb][workspace]") {
     Nodalys::ActiveMatrixTraces traces;
     traces.Reset(1, 2);
-    Nodalys::DenseMatrix matrix(1, 1);
-    matrix.Add(0, 0, 5.0);
-    traces.RecordMatrix(matrix, 0);
+    Nodalys::MnaSystem system(1, 0);
+    system.AddA(0, 0, 5.0);
+    traces.RecordMatrix(system, 0);
     REQUIRE(traces.Pairs.size() == 1);
 
     traces.Reset(1, 3);
     CHECK(traces.Pairs.empty());
     CHECK(traces.Traces.empty());
-    traces.RecordMatrix(matrix, 2);
+    traces.RecordMatrix(system, 2);
     CHECK(traces.Traces == std::vector<double>{0.0, 0.0, 5.0});
 }
 

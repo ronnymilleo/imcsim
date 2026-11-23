@@ -288,25 +288,17 @@ bool SolveLinearCircuit(const HbWorkspace &ws, std::vector<double> &coeffs_out) 
     }
 
     // Harmonics k = 1 .. H: solve (G_lin + j * k * omega0 * C_lin) * X_k = B_k
-    ComplexDenseMatrix mat(static_cast<std::size_t>(n), static_cast<std::size_t>(n));
     std::vector<std::complex<double>> rhs_k(static_cast<std::size_t>(n));
     std::vector<std::complex<double>> sol_k(static_cast<std::size_t>(n));
 
     for (int k = 1; k <= ws.Harmonics; ++k) {
         const double kw = static_cast<double>(k) * ws.Omega0;
-        mat.Reset();
         for (int r = 0; r < n; ++r) {
-            for (int c = 0; c < n; ++c) {
-                const double g_val = ws.GLin.Matrix().At(static_cast<std::size_t>(r), static_cast<std::size_t>(c));
-                const double c_val = ws.CLin.Matrix().At(static_cast<std::size_t>(r), static_cast<std::size_t>(c));
-                mat.At(static_cast<std::size_t>(r), static_cast<std::size_t>(c)) =
-                    std::complex<double>(g_val, kw * c_val);
-            }
             const double ba = ws.BaseRhsHarmonics[ws.Index(r, 2 * k - 1)];
             const double bb = ws.BaseRhsHarmonics[ws.Index(r, 2 * k)];
             rhs_k[static_cast<std::size_t>(r)] = std::complex<double>(ba, -bb);
         }
-        if (!mat.FactorizeLU() || !mat.Solve(rhs_k, sol_k)) {
+        if (!ws.GLin.SolveAcFor(ws.CLin, kw, rhs_k, sol_k)) {
             return false;
         }
         for (int u = 0; u < n; ++u) {

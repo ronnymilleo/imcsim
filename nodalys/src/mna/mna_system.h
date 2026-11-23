@@ -28,11 +28,16 @@
 #ifndef NODALYS_MNA_SYSTEM_H
 #define NODALYS_MNA_SYSTEM_H
 
-#include "linear/dense_matrix.h"
 #include "nodalys/types.h"
+#include <complex>
+#include <memory>
 #include <vector>
 
 namespace Nodalys {
+
+template <typename Scalar>
+class BasicDenseMatrix;
+using DenseMatrix = BasicDenseMatrix<double>;
 
 /**
  * @struct  TimeContext
@@ -71,6 +76,11 @@ class MnaSystem {
 public:
     MnaSystem(int node_count, int branch_count);
     explicit MnaSystem(std::vector<bool> is_node_unknown);
+    MnaSystem(const MnaSystem &other);
+    MnaSystem &operator=(const MnaSystem &other);
+    MnaSystem(MnaSystem &&other) noexcept;
+    MnaSystem &operator=(MnaSystem &&other) noexcept;
+    ~MnaSystem();
 
     /// Total number of unknowns (node voltages + branch currents).
     int GetSize() const;
@@ -84,8 +94,24 @@ public:
     /// Number of node-voltage unknowns in the system.
     int GetNodeUnknownCount() const;
 
-    /// The assembled linearized dense matrix A.
-    const DenseMatrix &Matrix() const;
+    /// Returns assembled matrix entry $A(\text{row}, \text{col})$, or `0.0` when out of bounds or absent.
+    [[nodiscard]] double Entry(int row, int col) const;
+
+    /**
+     * @brief   Visits every non-zero entry `(row, col, value)` of the assembled matrix $A$.
+     * @details Storage-agnostic iteration hook so analyses never depend on dense vs. sparse matrix layout.
+     */
+    template <typename Visitor>
+    void ForEachNonZero(const Visitor &visitor) const {
+        VisitNonZeros(
+            [](const int row, const int col, const double value, const void *context) {
+                (*static_cast<const Visitor *>(context))(row, col, value);
+            },
+            &visitor);
+    }
+
+    /// Materializes a dense copy of $A$ for inherently dense algorithms (e.g. QZ generalized eigenvalues in `.pz`).
+    [[nodiscard]] DenseMatrix ToDenseMatrix() const;
 
     /// The assembled right-hand side vector.
     const std::vector<double> &Rhs() const;
@@ -95,6 +121,9 @@ public:
 
     /// Adds `value` to matrix entry $A(\text{row}, \text{col})$. Silently ignores negative indices (ground).
     void AddA(int row, int col, double value);
+
+    /// Adds every non-zero matrix entry of `source` into this system's matrix $A$.
+    void AddMatrixFrom(const MnaSystem &source);
 
     /// Adds `value` to right-hand side entry $\text{rhs}(\text{row})$. Silently ignores negative indices (ground).
     void AddRhs(int row, double value);
@@ -124,6 +153,16 @@ public:
      * @return  False if the complex matrix at frequency $\omega$ is singular.
      */
     bool SolveAc(const MnaSystem &reactive, double omega, std::vector<std::complex<double>> &x_ac) const;
+
+    /**
+     * @brief   Solves the small-signal complex AC system $(A_{\text{DC}} + j \omega C_{\text{AC}}) \cdot x_{\text{AC}}
+     *          = \text{rhs}$ for an explicit complex right-hand side.
+     * @return  False if the complex matrix at frequency $\omega$ is singular or sizes differ.
+     */
+    [[nodiscard]] bool SolveAcFor(const MnaSystem &reactive,
+                                  double omega,
+                                  const std::vector<std::complex<double>> &rhs,
+                                  std::vector<std::complex<double>> &x_ac) const;
 
     /**
      * @brief   Solves the small-signal complex AC system for multiple right-hand sides, reusing the LU factorization.
@@ -170,10 +209,14 @@ public:
     bool CheckResidual(const std::vector<double> &x, double voltage_abstol, double current_abstol, double reltol) const;
 
 private:
-    DenseMatrix m_A;
+    struct Storage;
+
+    std::unique_ptr<Storage> m_Storage;
     std::vector<double> m_Rhs;
     std::vector<bool> m_IsNodeUnknown;
     int m_NodeUnknowns = 0;
+
+    void VisitNonZeros(void (*callback)(int, int, double, const void *), const void *context) const;
 };
 
 } // namespace Nodalys

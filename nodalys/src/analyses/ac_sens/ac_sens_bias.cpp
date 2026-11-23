@@ -21,12 +21,6 @@ constexpr double DERIVATIVE_STEP = 1e-6;
 /// Smallest size a DC unknown is taken to have when it is probed, so an unknown at zero volts still moves.
 constexpr double MIN_STEP_SCALE = 1.0;
 
-/// The stamps of one device at one iterate: the matrix of the operating point and the reactive coefficients.
-struct DeviceStamp {
-    DenseMatrix Conductance;
-    DenseMatrix Reactive;
-};
-
 /// Scratch systems that every stamp goes through, so the work does not allocate one per probe.
 class StampProbe {
 public:
@@ -55,28 +49,19 @@ private:
 };
 
 /**
- * @brief   The unknowns a stamp reads: the columns where it has an entry.
+ * @brief   The unknowns a stamp reads: the sorted unique columns where it has a non-zero entry.
  */
-std::vector<int> FindReadUnknowns(const StampProbe &probe, const int size) {
+std::vector<int> FindReadUnknowns(const StampProbe &probe) {
     std::vector<int> unknowns;
-    for (int column = 0; column < size; ++column) {
-        for (int row = 0; row < size; ++row) {
-            const auto r = static_cast<std::size_t>(row);
-            const auto c = static_cast<std::size_t>(column);
-            if (probe.GetConductance().Matrix().At(r, c) != 0.0 || probe.GetReactive().Matrix().At(r, c) != 0.0) {
-                unknowns.push_back(column);
-                break;
-            }
-        }
-    }
+    const auto record_column = [&](const int /*row*/, const int column, const double /*value*/) {
+        unknowns.push_back(column);
+    };
+    probe.GetConductance().ForEachNonZero(record_column);
+    probe.GetReactive().ForEachNonZero(record_column);
+    std::ranges::sort(unknowns);
+    const auto [first, last] = std::ranges::unique(unknowns);
+    unknowns.erase(first, last);
     return unknowns;
-}
-
-/**
- * @brief   Copies the matrices a probe holds, to subtract them from the ones of another iterate.
- */
-DeviceStamp CopyStamp(const StampProbe &probe) {
-    return {probe.GetConductance().Matrix(), probe.GetReactive().Matrix()};
 }
 
 /**
@@ -86,29 +71,34 @@ void ProbeUnknown(StampProbe &probe,
                   Device &device,
                   const std::vector<double> &x_dc,
                   const int unknown,
-                  const int size,
                   std::vector<JacobianDerivative> &derivatives) {
     const auto index = static_cast<std::size_t>(unknown);
     const double step = DERIVATIVE_STEP * std::max(MIN_STEP_SCALE, std::fabs(x_dc[index]));
+    std::map<std::pair<int, int>, std::pair<double, double>> diff;
+
     std::vector<double> x = x_dc;
     x[index] = x_dc[index] + step;
     probe.Stamp(device, x);
-    const DeviceStamp above = CopyStamp(probe);
+    probe.GetConductance().ForEachNonZero(
+        [&](const int row, const int col, const double value) { diff[{row, col}].first += value; });
+    probe.GetReactive().ForEachNonZero(
+        [&](const int row, const int col, const double value) { diff[{row, col}].second += value; });
+
     x[index] = x_dc[index] - step;
     probe.Stamp(device, x);
+    probe.GetConductance().ForEachNonZero(
+        [&](const int row, const int col, const double value) { diff[{row, col}].first -= value; });
+    probe.GetReactive().ForEachNonZero(
+        [&](const int row, const int col, const double value) { diff[{row, col}].second -= value; });
 
     JacobianDerivative derivative{.Unknown = unknown, .Entries = {}};
-    for (int row = 0; row < size; ++row) {
-        for (int column = 0; column < size; ++column) {
-            const auto r = static_cast<std::size_t>(row);
-            const auto c = static_cast<std::size_t>(column);
-            const double conductance =
-                (above.Conductance.At(r, c) - probe.GetConductance().Matrix().At(r, c)) / (2.0 * step);
-            const double reactive = (above.Reactive.At(r, c) - probe.GetReactive().Matrix().At(r, c)) / (2.0 * step);
-            if (conductance != 0.0 || reactive != 0.0) {
-                derivative.Entries.push_back(
-                    {.Row = row, .Column = column, .Conductance = conductance, .Reactive = reactive});
-            }
+    const double inv_two_step = 1.0 / (2.0 * step);
+    for (const auto &[position, delta] : diff) {
+        const double conductance = delta.first * inv_two_step;
+        const double reactive = delta.second * inv_two_step;
+        if (conductance != 0.0 || reactive != 0.0) {
+            derivative.Entries.push_back(
+                {.Row = position.first, .Column = position.second, .Conductance = conductance, .Reactive = reactive});
         }
     }
     if (!derivative.Entries.empty()) {
@@ -147,7 +137,6 @@ void Merge(std::map<int, std::map<std::pair<int, int>, JacobianEntry>> &total,
  */
 std::vector<JacobianDerivative> FindJacobianDerivatives(const CompiledCircuit &compiled,
                                                         const std::vector<double> &x_dc) {
-    const int size = compiled.System->GetSize();
     StampProbe probe(compiled);
     std::map<int, std::map<std::pair<int, int>, JacobianEntry>> total;
     for (const std::unique_ptr<Device> &device : compiled.Devices) {
@@ -156,8 +145,8 @@ std::vector<JacobianDerivative> FindJacobianDerivatives(const CompiledCircuit &c
         }
         probe.Stamp(*device, x_dc);
         std::vector<JacobianDerivative> found;
-        for (const int unknown : FindReadUnknowns(probe, size)) {
-            ProbeUnknown(probe, *device, x_dc, unknown, size, found);
+        for (const int unknown : FindReadUnknowns(probe)) {
+            ProbeUnknown(probe, *device, x_dc, unknown, found);
         }
         probe.Stamp(*device, x_dc);
         Merge(total, found);
