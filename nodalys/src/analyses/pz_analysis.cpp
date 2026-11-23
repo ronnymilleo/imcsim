@@ -113,7 +113,6 @@ std::expected<PoleZeroResult, std::string> ComputePoleZero(CompiledCircuit &comp
                                                            const PoleZeroConfig &settings,
                                                            const ConvergenceOptions &options,
                                                            std::vector<DiagnosticMessage> *messages) {
-
     const int out_node = settings.OutputNode;
     if (const std::optional<std::string> refusal = CheckOutputNode(compiled, out_node)) {
         return std::unexpected(*refusal);

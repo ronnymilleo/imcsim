@@ -31,7 +31,6 @@ std::expected<TransferFunctionResult, std::string> ComputeTransferFunction(Compi
                                                                            const TransferFunctionConfig &settings,
                                                                            const ConvergenceOptions &options,
                                                                            std::vector<DiagnosticMessage> *messages) {
-
     const int out_node = settings.OutputPositiveNode;
     if (const std::optional<std::string> refusal = CheckOutputNode(compiled, out_node)) {
         return std::unexpected(*refusal);

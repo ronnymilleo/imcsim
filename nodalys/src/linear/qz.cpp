@@ -23,18 +23,179 @@ namespace {
 /// Size of B, relative to its largest entry, at or below which an eigenvalue counts as infinite.
 constexpr double INFINITE_EIGENVALUE_FRACTION = 1e-13;
 
-/**
- * @brief   Reduces matrix pair (A, B) to upper Hessenberg-triangular form in place.
- * @param[in,out] a  Matrix A reduced to upper Hessenberg form.
- * @param[in,out] b  Matrix B reduced to upper triangular form.
- */
-void ReduceToHessenbergTriangular(DenseMatrix &a, DenseMatrix &b) {
-    const std::size_t n = a.Rows();
-    if (n <= 1) {
-        return;
-    }
+/// Unitary 2x2 complex Givens rotation used when splitting a complex-conjugate 2x2 block.
+struct ComplexRotation {
+    double C = 0.0;
+    double Sr = 1.0;
+    double Si = 0.0;
+};
 
-    // 1. Reduce B to upper triangular form via Householder reflections from the left
+/// Generalized eigenvalue numerators (Alfr + i*Alfi) and denominators (Beta) for all n diagonal slots.
+struct EigenvalueArrays {
+    std::vector<double> Alfr;
+    std::vector<double> Alfi;
+    std::vector<double> Beta;
+};
+
+/// Two-element Householder reflector parameterized as I + [v1, v2]^T * [1, u2].
+struct Householder2 {
+    double V1 = 0.0;
+    double V2 = 0.0;
+    double U2 = 0.0;
+    bool Active = false;
+};
+
+/// Three-element Householder reflector parameterized as I + [v1, v2, v3]^T * [1, u2, u3].
+struct Householder3 {
+    double V1 = 0.0;
+    double V2 = 0.0;
+    double V3 = 0.0;
+    double U2 = 0.0;
+    double U3 = 0.0;
+    bool Active = false;
+};
+
+/// Implicit single- or double-shift starter computed for one QZ bulge-chasing sweep.
+struct QzShift {
+    int Order = 2;
+    std::size_t Start = 0;
+    double A1 = 0.0;
+    double A2 = 0.0;
+    double A3 = 0.0;
+};
+
+/// Normalized entries of a 2x2 quasi-triangular block (A, B) for eigenvalue extraction.
+struct ScaledBlock2x2 {
+    double An = 0.0;
+    double Bn = 0.0;
+    double A11 = 0.0;
+    double A12 = 0.0;
+    double A21 = 0.0;
+    double A22 = 0.0;
+    double B11 = 0.0;
+    double B12 = 0.0;
+    double B22 = 0.0;
+};
+
+// Householder and rotation primitives
+
+Householder2 MakeHouseholder2(const double x1, const double x2) {
+    const double s = std::abs(x1) + std::abs(x2);
+    if (s == 0.0) {
+        return {};
+    }
+    const double u1 = x1 / s;
+    const double u2 = x2 / s;
+    const double r = std::copysign(std::sqrt(u1 * u1 + u2 * u2), u1);
+    const double v1 = -(u1 + r) / r;
+    const double v2 = -u2 / r;
+    return {.V1 = v1, .V2 = v2, .U2 = v2 / v1, .Active = true};
+}
+
+Householder3 MakeHouseholder3(const double x1, const double x2, const double x3) {
+    const double s = std::abs(x1) + std::abs(x2) + std::abs(x3);
+    if (s == 0.0) {
+        return {};
+    }
+    const double u1 = x1 / s;
+    const double u2 = x2 / s;
+    const double u3 = x3 / s;
+    const double r = std::copysign(std::sqrt(u1 * u1 + u2 * u2 + u3 * u3), u1);
+    const double v1 = -(u1 + r) / r;
+    const double v2 = -u2 / r;
+    const double v3 = -u3 / r;
+    return {.V1 = v1, .V2 = v2, .V3 = v3, .U2 = v2 / v1, .U3 = v3 / v1, .Active = true};
+}
+
+void ApplyLeftHouseholder2(DenseMatrix &mat,
+                           const std::size_t r0,
+                           const std::size_t r1,
+                           const std::size_t col_start,
+                           const std::size_t col_end,
+                           const Householder2 &h) {
+    for (std::size_t j = col_start; j < col_end; ++j) {
+        const double t = mat.At(r0, j) + h.U2 * mat.At(r1, j);
+        mat.At(r0, j) += t * h.V1;
+        mat.At(r1, j) += t * h.V2;
+    }
+}
+
+void ApplyRightHouseholder2(DenseMatrix &mat,
+                            const std::size_t c0,
+                            const std::size_t c1,
+                            const std::size_t row_start,
+                            const std::size_t row_end,
+                            const Householder2 &h) {
+    for (std::size_t i = row_start; i < row_end; ++i) {
+        const double t = mat.At(i, c0) + h.U2 * mat.At(i, c1);
+        mat.At(i, c0) += t * h.V1;
+        mat.At(i, c1) += t * h.V2;
+    }
+}
+
+void ApplyLeftHouseholder3(DenseMatrix &mat,
+                           const std::size_t r0,
+                           const std::size_t r1,
+                           const std::size_t r2,
+                           const std::size_t col_start,
+                           const std::size_t col_end,
+                           const Householder3 &h) {
+    for (std::size_t j = col_start; j < col_end; ++j) {
+        const double t = mat.At(r0, j) + h.U2 * mat.At(r1, j) + h.U3 * mat.At(r2, j);
+        mat.At(r0, j) += t * h.V1;
+        mat.At(r1, j) += t * h.V2;
+        mat.At(r2, j) += t * h.V3;
+    }
+}
+
+void ApplyRightHouseholder3(DenseMatrix &mat,
+                            const std::size_t c0,
+                            const std::size_t c1,
+                            const std::size_t c2,
+                            const std::size_t row_start,
+                            const std::size_t row_end,
+                            const Householder3 &h) {
+    for (std::size_t i = row_start; i < row_end; ++i) {
+        const double t = mat.At(i, c0) + h.U2 * mat.At(i, c1) + h.U3 * mat.At(i, c2);
+        mat.At(i, c0) += t * h.V1;
+        mat.At(i, c1) += t * h.V2;
+        mat.At(i, c2) += t * h.V3;
+    }
+}
+
+ComplexRotation MakeComplexRotation(const double a1, const double a1i, const double a2, const double a2i) {
+    const double c = std::sqrt(a1 * a1 + a1i * a1i);
+    if (c == 0.0) {
+        return {.C = 0.0, .Sr = 1.0, .Si = 0.0};
+    }
+    const double sr = (a1 * a2 + a1i * a2i) / c;
+    const double si = (a1 * a2i - a1i * a2) / c;
+    const double r = std::sqrt(c * c + sr * sr + si * si);
+    return {.C = c / r, .Sr = sr / r, .Si = si / r};
+}
+
+// Phase 1: Hessenberg-triangular reduction (Qzhes)
+
+void ApplyColumnReflector(DenseMatrix &target,
+                          const DenseMatrix &v_source,
+                          const std::size_t l,
+                          const std::size_t col_start,
+                          const double rho) {
+    const std::size_t n = target.Rows();
+    for (std::size_t j = col_start; j < n; ++j) {
+        double t = 0.0;
+        for (std::size_t i = l; i < n; ++i) {
+            t += v_source.At(i, l) * target.At(i, j);
+        }
+        t = -t / rho;
+        for (std::size_t i = l; i < n; ++i) {
+            target.At(i, j) += t * v_source.At(i, l);
+        }
+    }
+}
+
+void TriangularizeB(DenseMatrix &a, DenseMatrix &b) {
+    const std::size_t n = a.Rows();
     for (std::size_t l = 0; l < n - 1; ++l) {
         const std::size_t l1 = l + 1;
         double s = 0.0;
@@ -54,89 +215,266 @@ void ReduceToHessenbergTriangular(DenseMatrix &a, DenseMatrix &b) {
         b.At(l, l) += r;
         const double rho = r * b.At(l, l);
 
-        for (std::size_t j = l1; j < n; ++j) {
-            double t = 0.0;
-            for (std::size_t i = l; i < n; ++i) {
-                t += b.At(i, l) * b.At(i, j);
-            }
-            t = -t / rho;
-            for (std::size_t i = l; i < n; ++i) {
-                b.At(i, j) += t * b.At(i, l);
-            }
-        }
-        for (std::size_t j = 0; j < n; ++j) {
-            double t = 0.0;
-            for (std::size_t i = l; i < n; ++i) {
-                t += b.At(i, l) * a.At(i, j);
-            }
-            t = -t / rho;
-            for (std::size_t i = l; i < n; ++i) {
-                a.At(i, j) += t * b.At(i, l);
-            }
-        }
+        ApplyColumnReflector(b, b, l, l1, rho);
+        ApplyColumnReflector(a, b, l, 0, rho);
         b.At(l, l) = -s * r;
         for (std::size_t i = l1; i < n; ++i) {
             b.At(i, l) = 0.0;
         }
     }
+}
 
-    if (n == 2) {
-        return;
-    }
-
-    // 2. Reduce A to upper Hessenberg while keeping B upper triangular
+void ReduceAWithUpperB(DenseMatrix &a, DenseMatrix &b) {
+    const std::size_t n = a.Rows();
     for (std::size_t k = 0; k < n - 2; ++k) {
         for (std::size_t lb = 1; lb <= n - 1 - (k + 1); ++lb) {
             const std::size_t l = (n - 1) - lb;
             const std::size_t l1 = l + 1;
 
-            // Annihilate A(l1, k)
-            double s = std::abs(a.At(l, k)) + std::abs(a.At(l1, k));
-            if (s != 0.0) {
-                const double u1 = a.At(l, k) / s;
-                double u2 = a.At(l1, k) / s;
-                const double r = std::copysign(std::sqrt(u1 * u1 + u2 * u2), u1);
-                const double v1 = -(u1 + r) / r;
-                const double v2 = -u2 / r;
-                u2 = v2 / v1;
-
-                for (std::size_t j = k; j < n; ++j) {
-                    const double t = a.At(l, j) + u2 * a.At(l1, j);
-                    a.At(l, j) += t * v1;
-                    a.At(l1, j) += t * v2;
-                }
+            // Annihilate A(l1, k) from the left
+            if (const Householder2 h = MakeHouseholder2(a.At(l, k), a.At(l1, k)); h.Active) {
+                ApplyLeftHouseholder2(a, l, l1, k, n, h);
                 a.At(l1, k) = 0.0;
-
-                for (std::size_t j = l; j < n; ++j) {
-                    const double t = b.At(l, j) + u2 * b.At(l1, j);
-                    b.At(l, j) += t * v1;
-                    b.At(l1, j) += t * v2;
-                }
+                ApplyLeftHouseholder2(b, l, l1, l, n, h);
             }
 
-            // Annihilate B(l1, l) from the right
-            s = std::abs(b.At(l1, l1)) + std::abs(b.At(l1, l));
-            if (s != 0.0) {
-                const double u1 = b.At(l1, l1) / s;
-                double u2 = b.At(l1, l) / s;
-                const double r = std::copysign(std::sqrt(u1 * u1 + u2 * u2), u1);
-                const double v1 = -(u1 + r) / r;
-                const double v2 = -u2 / r;
-                u2 = v2 / v1;
-
-                for (std::size_t i = 0; i <= l1; ++i) {
-                    const double t = b.At(i, l1) + u2 * b.At(i, l);
-                    b.At(i, l1) += t * v1;
-                    b.At(i, l) += t * v2;
-                }
+            // Restore upper triangular B by annihilating B(l1, l) from the right
+            if (const Householder2 h = MakeHouseholder2(b.At(l1, l1), b.At(l1, l)); h.Active) {
+                ApplyRightHouseholder2(b, l1, l, 0, l1 + 1, h);
                 b.At(l1, l) = 0.0;
-
-                for (std::size_t i = 0; i < n; ++i) {
-                    const double t = a.At(i, l1) + u2 * a.At(i, l);
-                    a.At(i, l1) += t * v1;
-                    a.At(i, l) += t * v2;
-                }
+                ApplyRightHouseholder2(a, l1, l, 0, n, h);
             }
+        }
+    }
+}
+
+/**
+ * @brief   Reduces matrix pair (A, B) to upper Hessenberg-triangular form in place.
+ * @param[in,out] a  Matrix A reduced to upper Hessenberg form.
+ * @param[in,out] b  Matrix B reduced to upper triangular form.
+ */
+void ReduceToHessenbergTriangular(DenseMatrix &a, DenseMatrix &b) {
+    const std::size_t n = a.Rows();
+    if (n <= 1) {
+        return;
+    }
+    TriangularizeB(a, b);
+    if (n > 2) {
+        ReduceAWithUpperB(a, b);
+    }
+}
+
+// Phase 2: Iterative QZ steps (Qzit)
+
+std::pair<double, double> ComputePencilTolerances(const DenseMatrix &a, const DenseMatrix &b) {
+    const std::size_t n = a.Rows();
+    double anorm = 0.0;
+    double bnorm = 0.0;
+    for (std::size_t i = 0; i < n; ++i) {
+        double ani = (i > 0) ? std::abs(a.At(i, i - 1)) : 0.0;
+        double bni = 0.0;
+        for (std::size_t j = i; j < n; ++j) {
+            ani += std::abs(a.At(i, j));
+            bni += std::abs(b.At(i, j));
+        }
+        anorm = std::max(anorm, ani);
+        bnorm = std::max(bnorm, bni);
+    }
+    const double ep = std::numeric_limits<double>::epsilon();
+    return {ep * (anorm == 0.0 ? 1.0 : anorm), ep * (bnorm == 0.0 ? 1.0 : bnorm)};
+}
+
+std::pair<std::size_t, bool> FindSubdiagonalSplit(DenseMatrix &a, const std::size_t en, const double epsa) {
+    for (std::size_t ll = 0; ll <= en; ++ll) {
+        const std::size_t l = en - ll;
+        if (l == 0) {
+            return {0, false};
+        }
+        if (std::abs(a.At(l, l - 1)) <= epsa) {
+            a.At(l, l - 1) = 0.0;
+            return {l, true};
+        }
+    }
+    return {0, false};
+}
+
+bool DeflateZeroBDiagonal(DenseMatrix &a, DenseMatrix &b, std::size_t &l, const std::size_t en, const double epsb) {
+    const std::size_t na = en - 1;
+    while (std::abs(b.At(l, l)) <= epsb) {
+        const std::size_t l1 = l + 1;
+        b.At(l, l) = 0.0;
+        if (const Householder2 h = MakeHouseholder2(a.At(l, l), a.At(l1, l)); h.Active) {
+            ApplyLeftHouseholder2(a, l, l1, l, en + 1, h);
+            ApplyLeftHouseholder2(b, l, l1, l, en + 1, h);
+        }
+        if (l > 0) {
+            a.At(l, l - 1) = -a.At(l, l - 1);
+        }
+        l = l1;
+        a.At(l, l - 1) = 0.0;
+        if (l >= na) {
+            return true;
+        }
+    }
+    return false;
+}
+
+std::size_t FindSingleShiftStart(const DenseMatrix &a,
+                                 const DenseMatrix &b,
+                                 const std::size_t ld,
+                                 const std::size_t enm2,
+                                 const double sh,
+                                 const double epsa,
+                                 const double epsb) {
+    for (std::size_t ll = ld; ll <= enm2; ++ll) {
+        const std::size_t l = enm2 + ld - ll;
+        if (l == ld) {
+            return ld;
+        }
+        double t_val = a.At(l, l);
+        if (std::abs(b.At(l, l)) > epsb) {
+            t_val -= sh * b.At(l, l);
+        }
+        if (std::abs(a.At(l, l - 1)) <= std::abs(t_val / a.At(l + 1, l)) * epsa) {
+            return l;
+        }
+    }
+    return ld;
+}
+
+QzShift ComputeQzShift(DenseMatrix &a,
+                       const DenseMatrix &b,
+                       const std::size_t ld,
+                       const std::size_t en,
+                       const std::size_t its,
+                       const double epsa,
+                       const double epsb) {
+    if (its == 10) {
+        return {.Order = 2, .Start = ld, .A1 = 0.0, .A2 = 1.0, .A3 = 1.1605};
+    }
+
+    const std::size_t l1 = ld + 1;
+    const std::size_t na = en - 1;
+    const double a11 = a.At(ld, ld) / b.At(ld, ld);
+    const double a21 = a.At(l1, ld) / b.At(ld, ld);
+    const double b22 = std::abs(b.At(l1, l1)) < epsb ? epsb : b.At(l1, l1);
+    const double b33 = std::abs(b.At(na, na)) < epsb ? epsb : b.At(na, na);
+    const double b44 = std::abs(b.At(en, en)) < epsb ? epsb : b.At(en, en);
+
+    const double a33 = a.At(na, na) / b33;
+    const double a34 = a.At(na, en) / b44;
+    const double a43 = a.At(en, na) / b33;
+    const double a44 = a.At(en, en) / b44;
+    const double b34 = b.At(na, en) / b44;
+
+    const double t = 0.5 * (a43 * b34 - a33 - a44);
+    const double r = t * t + a34 * a43 - a33 * a44;
+    if (r >= 0.0) {
+        const double sqrt_r = std::sqrt(r);
+        double sh = -t + sqrt_r;
+        const double s = -t - sqrt_r;
+        if (std::abs(s - a44) < std::abs(sh - a44)) {
+            sh = s;
+        }
+        const std::size_t start = FindSingleShiftStart(a, b, ld, na - 1, sh, epsa, epsb);
+        if (start != ld) {
+            a.At(start, start - 1) = -a.At(start, start - 1);
+        }
+        return {.Order = 1, .Start = start, .A1 = a11 - sh, .A2 = a21, .A3 = 0.0};
+    }
+
+    const double a12 = a.At(ld, l1) / b22;
+    const double a22 = a.At(l1, l1) / b22;
+    const double b12 = b.At(ld, l1) / b22;
+    return {
+        .Order = 2,
+        .Start = ld,
+        .A1 = ((a33 - a11) * (a44 - a11) - a34 * a43 + a43 * b34 * a11) / a21 + a12 - a11 * b12,
+        .A2 = (a22 - a11) - a21 * b12 - (a33 - a11) - (a44 - a11) + a43 * b34,
+        .A3 = a.At(l1 + 1, l1) / b22,
+    };
+}
+
+void ChaseSingleShiftStep(DenseMatrix &a,
+                          DenseMatrix &b,
+                          const std::size_t k,
+                          const std::size_t l,
+                          const std::size_t ld,
+                          const std::size_t en,
+                          const std::size_t ll_bound,
+                          const double init_a1,
+                          const double init_a2) {
+    const std::size_t k1 = k + 1;
+    const std::size_t km1 = std::max(k > 0 ? k - 1 : 0, l);
+    const double a1 = (k == l) ? init_a1 : a.At(k, km1);
+    const double a2 = (k == l) ? init_a2 : a.At(k1, km1);
+
+    const Householder2 left = MakeHouseholder2(a1, a2);
+    if (!left.Active) {
+        return;
+    }
+    ApplyLeftHouseholder2(a, k, k1, km1, en + 1, left);
+    ApplyLeftHouseholder2(b, k, k1, km1, en + 1, left);
+    if (k != l) {
+        a.At(k1, km1) = 0.0;
+    }
+
+    if (const Householder2 right = MakeHouseholder2(b.At(k1, k1), b.At(k1, k)); right.Active) {
+        ApplyRightHouseholder2(a, k1, k, ld, ll_bound + 1, right);
+        ApplyRightHouseholder2(b, k1, k, ld, ll_bound + 1, right);
+        b.At(k1, k) = 0.0;
+    }
+}
+
+void ChaseDoubleShiftStep(DenseMatrix &a,
+                          DenseMatrix &b,
+                          const std::size_t k,
+                          const std::size_t l,
+                          const std::size_t ld,
+                          const std::size_t en,
+                          const std::size_t ll_bound,
+                          const double init_a1,
+                          const double init_a2,
+                          const double init_a3) {
+    const std::size_t k1 = k + 1;
+    const std::size_t k2 = k + 2;
+    const std::size_t km1 = std::max(k > 0 ? k - 1 : 0, l);
+    const double a1 = (k == l) ? init_a1 : a.At(k, km1);
+    const double a2 = (k == l) ? init_a2 : a.At(k1, km1);
+    const double a3 = (k == l) ? init_a3 : a.At(k2, km1);
+
+    const Householder3 left = MakeHouseholder3(a1, a2, a3);
+    if (!left.Active) {
+        return;
+    }
+    ApplyLeftHouseholder3(a, k, k1, k2, km1, en + 1, left);
+    ApplyLeftHouseholder3(b, k, k1, k2, km1, en + 1, left);
+    if (k != l) {
+        a.At(k1, km1) = 0.0;
+        a.At(k2, km1) = 0.0;
+    }
+
+    if (const Householder3 right3 = MakeHouseholder3(b.At(k2, k2), b.At(k2, k1), b.At(k2, k)); right3.Active) {
+        ApplyRightHouseholder3(a, k2, k1, k, ld, ll_bound + 1, right3);
+        ApplyRightHouseholder3(b, k2, k1, k, ld, ll_bound + 1, right3);
+        b.At(k2, k) = 0.0;
+        b.At(k2, k1) = 0.0;
+    }
+    if (const Householder2 right2 = MakeHouseholder2(b.At(k1, k1), b.At(k1, k)); right2.Active) {
+        ApplyRightHouseholder2(a, k1, k, ld, ll_bound + 1, right2);
+        ApplyRightHouseholder2(b, k1, k, ld, ll_bound + 1, right2);
+        b.At(k1, k) = 0.0;
+    }
+}
+
+void ChaseQzBulge(DenseMatrix &a, DenseMatrix &b, const QzShift &shift, const std::size_t ld, const std::size_t en) {
+    const std::size_t na = en - 1;
+    for (std::size_t k = shift.Start; k <= na; ++k) {
+        const std::size_t ll_bound = std::min(en, k + 1 + static_cast<std::size_t>(shift.Order));
+        if (k != na && shift.Order == 2) {
+            ChaseDoubleShiftStep(a, b, k, shift.Start, ld, en, ll_bound, shift.A1, shift.A2, shift.A3);
+        } else {
+            ChaseSingleShiftStep(a, b, k, shift.Start, ld, en, ll_bound, shift.A1, shift.A2);
         }
     }
 }
@@ -154,32 +492,7 @@ void IterateQz(DenseMatrix &a, DenseMatrix &b, double &epsb_out) {
         return;
     }
 
-    double anorm = 0.0;
-    double bnorm = 0.0;
-    for (std::size_t i = 0; i < n; ++i) {
-        double ani = (i > 0) ? std::abs(a.At(i, i - 1)) : 0.0;
-        double bni = 0.0;
-        for (std::size_t j = i; j < n; ++j) {
-            ani += std::abs(a.At(i, j));
-            bni += std::abs(b.At(i, j));
-        }
-        if (ani > anorm) {
-            anorm = ani;
-        }
-        if (bni > bnorm) {
-            bnorm = bni;
-        }
-    }
-    if (anorm == 0.0) {
-        anorm = 1.0;
-    }
-    if (bnorm == 0.0) {
-        bnorm = 1.0;
-    }
-
-    const double ep = std::numeric_limits<double>::epsilon();
-    const double epsa = ep * anorm;
-    const double epsb = ep * bnorm;
+    const auto [epsa, epsb] = ComputePencilTolerances(a, b);
     epsb_out = epsb;
 
     std::size_t en = n - 1;
@@ -188,286 +501,217 @@ void IterateQz(DenseMatrix &a, DenseMatrix &b, double &epsb_out) {
 
     while (en >= 2) {
         const std::size_t na = en - 1;
-        const std::size_t enm2 = na - 1;
-        int ish = 2;
-
-        std::size_t l = 0;
-        bool split = false;
-        for (std::size_t ll = 0; ll <= en; ++ll) {
-            l = en - ll;
-            if (l == 0) {
-                break;
-            }
-            if (std::abs(a.At(l, l - 1)) <= epsa) {
-                a.At(l, l - 1) = 0.0;
-                split = true;
-                break;
-            }
-        }
-
+        auto [l, split] = FindSubdiagonalSplit(a, en, epsa);
         if (split && l >= na) {
             en = l - 1;
             its = 0;
             continue;
         }
-
-        const std::size_t ld = l;
-        bool goto_next_qz = false;
-        while (true) {
-            const std::size_t l1 = l + 1;
-            const double b11 = b.At(l, l);
-            if (std::abs(b11) > epsb) {
-                break;
-            }
-            b.At(l, l) = 0.0;
-            const double s = std::abs(a.At(l, l)) + std::abs(a.At(l1, l));
-            const double u1 = a.At(l, l) / s;
-            double u2 = a.At(l1, l) / s;
-            const double r = std::copysign(std::sqrt(u1 * u1 + u2 * u2), u1);
-            const double v1 = -(u1 + r) / r;
-            const double v2 = -u2 / r;
-            u2 = v2 / v1;
-
-            for (std::size_t j = l; j <= en; ++j) {
-                const double t = a.At(l, j) + u2 * a.At(l1, j);
-                a.At(l, j) += t * v1;
-                a.At(l1, j) += t * v2;
-                const double tb = b.At(l, j) + u2 * b.At(l1, j);
-                b.At(l, j) += tb * v1;
-                b.At(l1, j) += tb * v2;
-            }
-
-            if (l > 0) {
-                a.At(l, l - 1) = -a.At(l, l - 1);
-            }
-            l = l1;
-            a.At(l, l - 1) = 0.0;
-            if (l >= na) {
-                en = l - 1;
-                its = 0;
-                goto_next_qz = true;
-                break;
-            }
-        }
-        if (goto_next_qz) {
+        if (DeflateZeroBDiagonal(a, b, l, en, epsb)) {
+            en = l - 1;
+            its = 0;
             continue;
         }
-
         if (itn == 0) {
             return;
         }
 
-        const std::size_t l1 = l + 1;
-        const double a11 = a.At(l, l) / b.At(l, l);
-        const double a21 = a.At(l1, l) / b.At(l, l);
+        const QzShift shift = ComputeQzShift(a, b, l, en, its, epsa, epsb);
+        ++its;
+        --itn;
+        ChaseQzBulge(a, b, shift, l, en);
+    }
+}
 
-        double a1 = 0.0;
-        double a2 = 0.0;
-        double a3 = 0.0;
+// Phase 3: Eigenvalue extraction (Qzval)
 
-        if (its == 10) {
-            a1 = 0.0;
-            a2 = 1.0;
-            a3 = 1.1605;
-        } else {
-            const double b22 = std::abs(b.At(l1, l1)) < epsb ? epsb : b.At(l1, l1);
-            const double b33 = std::abs(b.At(na, na)) < epsb ? epsb : b.At(na, na);
-            const double b44 = std::abs(b.At(en, en)) < epsb ? epsb : b.At(en, en);
+void RecordRealEigenvalue(const DenseMatrix &a, const DenseMatrix &b, const std::size_t idx, EigenvalueArrays &out) {
+    out.Alfr[idx] = (b.At(idx, idx) < 0.0) ? -a.At(idx, idx) : a.At(idx, idx);
+    out.Beta[idx] = std::abs(b.At(idx, idx));
+    out.Alfi[idx] = 0.0;
+}
 
-            const double a33 = a.At(na, na) / b33;
-            const double a34 = a.At(na, en) / b44;
-            const double a43 = a.At(en, na) / b33;
-            const double a44 = a.At(en, en) / b44;
-            const double b34 = b.At(na, en) / b44;
+void RecordRealBlock2x2(DenseMatrix &a,
+                        DenseMatrix &b,
+                        const std::size_t na,
+                        const std::size_t en,
+                        EigenvalueArrays &out) {
+    a.At(en, na) = 0.0;
+    b.At(en, na) = 0.0;
+    RecordRealEigenvalue(a, b, na, out);
+    RecordRealEigenvalue(a, b, en, out);
+}
 
-            const double t = 0.5 * (a43 * b34 - a33 - a44);
-            const double r = t * t + a34 * a43 - a33 * a44;
-
-            if (r >= 0.0) {
-                ish = 1;
-                const double sqrt_r = std::sqrt(r);
-                double sh = -t + sqrt_r;
-                const double s = -t - sqrt_r;
-                if (std::abs(s - a44) < std::abs(sh - a44)) {
-                    sh = s;
-                }
-
-                for (std::size_t ll = ld; ll <= enm2; ++ll) {
-                    l = enm2 + ld - ll;
-                    if (l == ld) {
-                        break;
-                    }
-                    double t_val = a.At(l, l);
-                    if (std::abs(b.At(l, l)) > epsb) {
-                        t_val -= sh * b.At(l, l);
-                    }
-                    if (std::abs(a.At(l, l - 1)) <= std::abs(t_val / a.At(l + 1, l)) * epsa) {
-                        break;
-                    }
-                }
-
-                a1 = a11 - sh;
-                a2 = a21;
-                if (l != ld) {
-                    a.At(l, l - 1) = -a.At(l, l - 1);
-                }
-            } else {
-                const double a12 = a.At(l, l1) / b22;
-                const double a22 = a.At(l1, l1) / b22;
-                const double b12 = b.At(l, l1) / b22;
-
-                a1 = ((a33 - a11) * (a44 - a11) - a34 * a43 + a43 * b34 * a11) / a21 + a12 - a11 * b12;
-                a2 = (a22 - a11) - a21 * b12 - (a33 - a11) - (a44 - a11) + a43 * b34;
-                a3 = a.At(l1 + 1, l1) / b22;
-            }
+void DeflateSingularBlock2x2(DenseMatrix &a,
+                             DenseMatrix &b,
+                             const std::size_t na,
+                             const std::size_t en,
+                             const bool upper_singular,
+                             EigenvalueArrays &out) {
+    if (upper_singular) {
+        if (const Householder2 h = MakeHouseholder2(a.At(na, na), a.At(en, na)); h.Active) {
+            ApplyLeftHouseholder2(a, na, en, na, a.Rows(), h);
+            ApplyLeftHouseholder2(b, na, en, na, a.Rows(), h);
         }
+    } else if (const Householder2 h = MakeHouseholder2(a.At(en, en), a.At(en, na)); h.Active) {
+        ApplyRightHouseholder2(a, en, na, 0, en + 1, h);
+        ApplyRightHouseholder2(b, en, na, 0, en + 1, h);
+    }
+    RecordRealBlock2x2(a, b, na, en, out);
+}
 
-        its++;
-        itn--;
+ScaledBlock2x2 ScaleBlock2x2(const DenseMatrix &a, const DenseMatrix &b, const std::size_t na, const std::size_t en) {
+    const double an = std::abs(a.At(na, na)) + std::abs(a.At(na, en)) + std::abs(a.At(en, na)) + std::abs(a.At(en, en));
+    const double bn = std::abs(b.At(na, na)) + std::abs(b.At(na, en)) + std::abs(b.At(en, en));
+    return {
+        .An = an,
+        .Bn = bn,
+        .A11 = a.At(na, na) / an,
+        .A12 = a.At(na, en) / an,
+        .A21 = a.At(en, na) / an,
+        .A22 = a.At(en, en) / an,
+        .B11 = b.At(na, na) / bn,
+        .B12 = b.At(na, en) / bn,
+        .B22 = b.At(en, en) / bn,
+    };
+}
 
-        for (std::size_t k = l; k <= na; ++k) {
-            const bool notlas = (k != na && ish == 2);
-            const std::size_t k1 = k + 1;
-            const std::size_t k2 = k + 2;
-            const std::size_t km1 = std::max(k > 0 ? k - 1 : 0, l);
-            const std::size_t ll_bound = std::min(en, k1 + static_cast<std::size_t>(ish));
+void ExtractRealBlock2x2(DenseMatrix &a,
+                         DenseMatrix &b,
+                         const std::size_t na,
+                         const std::size_t en,
+                         const ScaledBlock2x2 &blk,
+                         const double shift_e,
+                         EigenvalueArrays &out) {
+    const double a11 = blk.A11 - shift_e * blk.B11;
+    const double a12 = blk.A12 - shift_e * blk.B12;
+    const double a22 = blk.A22 - shift_e * blk.B22;
+    const bool use_lower = (std::abs(a11) + std::abs(a12) < std::abs(blk.A21) + std::abs(a22));
+    const double r1 = use_lower ? a22 : a12;
+    const double r2 = use_lower ? blk.A21 : a11;
 
-            if (!notlas) {
-                if (k != l) {
-                    a1 = a.At(k, km1);
-                    a2 = a.At(k1, km1);
-                }
-                const double s = std::abs(a1) + std::abs(a2);
-                if (s == 0.0) {
-                    continue;
-                }
-                const double u1 = a1 / s;
-                double u2 = a2 / s;
-                const double r = std::copysign(std::sqrt(u1 * u1 + u2 * u2), u1);
-                const double v1 = -(u1 + r) / r;
-                const double v2 = -u2 / r;
-                u2 = v2 / v1;
+    if (const Householder2 right = MakeHouseholder2(r1, r2); right.Active) {
+        ApplyRightHouseholder2(a, en, na, 0, en + 1, right);
+        ApplyRightHouseholder2(b, en, na, 0, en + 1, right);
+    }
 
-                for (std::size_t j = km1; j <= en; ++j) {
-                    const double t = a.At(k, j) + u2 * a.At(k1, j);
-                    a.At(k, j) += t * v1;
-                    a.At(k1, j) += t * v2;
-                    const double tb = b.At(k, j) + u2 * b.At(k1, j);
-                    b.At(k, j) += tb * v1;
-                    b.At(k1, j) += tb * v2;
-                }
-                if (k != l) {
-                    a.At(k1, km1) = 0.0;
-                }
+    const bool use_a = (blk.An < std::abs(shift_e) * blk.Bn);
+    const double l1 = use_a ? a.At(na, na) : b.At(na, na);
+    const double l2 = use_a ? a.At(en, na) : b.At(en, na);
+    if (const Householder2 left = MakeHouseholder2(l1, l2); left.Active) {
+        ApplyLeftHouseholder2(a, na, en, na, a.Rows(), left);
+        ApplyLeftHouseholder2(b, na, en, na, a.Rows(), left);
+    }
+    RecordRealBlock2x2(a, b, na, en, out);
+}
 
-                const double sb = std::abs(b.At(k1, k1)) + std::abs(b.At(k1, k));
-                if (sb != 0.0) {
-                    const double ub1 = b.At(k1, k1) / sb;
-                    double ub2 = b.At(k1, k) / sb;
-                    const double rb = std::copysign(std::sqrt(ub1 * ub1 + ub2 * ub2), ub1);
-                    const double vb1 = -(ub1 + rb) / rb;
-                    const double vb2 = -ub2 / rb;
-                    ub2 = vb2 / vb1;
+void RecordComplexRoot(const double tr,
+                       const double ti,
+                       const double dr,
+                       const double di,
+                       const double an,
+                       const double bn,
+                       const std::size_t na,
+                       const std::size_t en,
+                       EigenvalueArrays &out) {
+    const double t_val = ti * dr - tr * di;
+    const std::size_t j_idx = (t_val < 0.0) ? en : na;
+    const double r = std::sqrt(dr * dr + di * di);
+    out.Beta[j_idx] = bn * r;
+    out.Alfr[j_idx] = an * (tr * dr + ti * di) / r;
+    out.Alfi[j_idx] = an * t_val / r;
+}
 
-                    for (std::size_t i = ld; i <= ll_bound; ++i) {
-                        const double t = a.At(i, k1) + ub2 * a.At(i, k);
-                        a.At(i, k1) += t * vb1;
-                        a.At(i, k) += t * vb2;
-                        const double tb = b.At(i, k1) + ub2 * b.At(i, k);
-                        b.At(i, k1) += tb * vb1;
-                        b.At(i, k) += tb * vb2;
-                    }
-                    b.At(k1, k) = 0.0;
-                }
-            } else {
-                if (k != l) {
-                    a1 = a.At(k, km1);
-                    a2 = a.At(k1, km1);
-                    a3 = a.At(k2, km1);
-                }
-                const double s = std::abs(a1) + std::abs(a2) + std::abs(a3);
-                if (s == 0.0) {
-                    continue;
-                }
-                const double u1 = a1 / s;
-                double u2 = a2 / s;
-                double u3 = a3 / s;
-                const double r = std::copysign(std::sqrt(u1 * u1 + u2 * u2 + u3 * u3), u1);
-                const double v1 = -(u1 + r) / r;
-                const double v2 = -u2 / r;
-                const double v3 = -u3 / r;
-                u2 = v2 / v1;
-                u3 = v3 / v1;
+void ExtractComplexBlock2x2(const std::size_t na,
+                            const std::size_t en,
+                            const ScaledBlock2x2 &blk,
+                            const double e_real,
+                            const double e_imag,
+                            EigenvalueArrays &out) {
+    const double a11r = blk.A11 - e_real * blk.B11;
+    const double a11i = e_imag * blk.B11;
+    const double a12r = blk.A12 - e_real * blk.B12;
+    const double a12i = e_imag * blk.B12;
+    const double a22r = blk.A22 - e_real * blk.B22;
+    const double a22i = e_imag * blk.B22;
 
-                for (std::size_t j = km1; j <= en; ++j) {
-                    const double t = a.At(k, j) + u2 * a.At(k1, j) + u3 * a.At(k2, j);
-                    a.At(k, j) += t * v1;
-                    a.At(k1, j) += t * v2;
-                    a.At(k2, j) += t * v3;
-                    const double tb = b.At(k, j) + u2 * b.At(k1, j) + u3 * b.At(k2, j);
-                    b.At(k, j) += tb * v1;
-                    b.At(k1, j) += tb * v2;
-                    b.At(k2, j) += tb * v3;
-                }
-                if (k != l) {
-                    a.At(k1, km1) = 0.0;
-                    a.At(k2, km1) = 0.0;
-                }
+    const bool use_lower = (std::abs(a11r) + std::abs(a11i) + std::abs(a12r) + std::abs(a12i)
+                            < std::abs(blk.A21) + std::abs(a22r) + std::abs(a22i));
+    const ComplexRotation z =
+        use_lower ? MakeComplexRotation(a22r, a22i, -blk.A21, 0.0) : MakeComplexRotation(a12r, a12i, -a11r, -a11i);
 
-                const double sb2 = std::abs(b.At(k2, k2)) + std::abs(b.At(k2, k1)) + std::abs(b.At(k2, k));
-                if (sb2 != 0.0) {
-                    const double ub1 = b.At(k2, k2) / sb2;
-                    double ub2 = b.At(k2, k1) / sb2;
-                    double ub3 = b.At(k2, k) / sb2;
-                    const double rb = std::copysign(std::sqrt(ub1 * ub1 + ub2 * ub2 + ub3 * ub3), ub1);
-                    const double vb1 = -(ub1 + rb) / rb;
-                    const double vb2 = -ub2 / rb;
-                    const double vb3 = -ub3 / rb;
-                    ub2 = vb2 / vb1;
-                    ub3 = vb3 / vb1;
+    const bool use_a = (blk.An < (std::abs(e_real) + e_imag) * blk.Bn);
+    const ComplexRotation q =
+        use_a ? MakeComplexRotation(z.C * blk.A11 + z.Sr * blk.A12,
+                                    z.Si * blk.A12,
+                                    z.C * blk.A21 + z.Sr * blk.A22,
+                                    z.Si * blk.A22)
+              : MakeComplexRotation(z.C * blk.B11 + z.Sr * blk.B12, z.Si * blk.B12, z.Sr * blk.B22, z.Si * blk.B22);
 
-                    for (std::size_t i = ld; i <= ll_bound; ++i) {
-                        const double t = a.At(i, k2) + ub2 * a.At(i, k1) + ub3 * a.At(i, k);
-                        a.At(i, k2) += t * vb1;
-                        a.At(i, k1) += t * vb2;
-                        a.At(i, k) += t * vb3;
-                        const double tb = b.At(i, k2) + ub2 * b.At(i, k1) + ub3 * b.At(i, k);
-                        b.At(i, k2) += tb * vb1;
-                        b.At(i, k1) += tb * vb2;
-                        b.At(i, k) += tb * vb3;
-                    }
-                    b.At(k2, k) = 0.0;
-                    b.At(k2, k1) = 0.0;
-                }
+    const double ssr = q.Sr * z.Sr + q.Si * z.Si;
+    const double ssi = q.Sr * z.Si - q.Si * z.Sr;
 
-                const double sb1 = std::abs(b.At(k1, k1)) + std::abs(b.At(k1, k));
-                if (sb1 != 0.0) {
-                    const double ub1 = b.At(k1, k1) / sb1;
-                    double ub2 = b.At(k1, k) / sb1;
-                    const double rb = std::copysign(std::sqrt(ub1 * ub1 + ub2 * ub2), ub1);
-                    const double vb1 = -(ub1 + rb) / rb;
-                    const double vb2 = -ub2 / rb;
-                    ub2 = vb2 / vb1;
+    // First complex root
+    RecordComplexRoot(q.C * z.C * blk.A11 + q.C * z.Sr * blk.A12 + q.Sr * z.C * blk.A21 + ssr * blk.A22,
+                      q.C * z.Si * blk.A12 - q.Si * z.C * blk.A21 + ssi * blk.A22,
+                      q.C * z.C * blk.B11 + q.C * z.Sr * blk.B12 + ssr * blk.B22,
+                      q.C * z.Si * blk.B12 + ssi * blk.B22,
+                      blk.An,
+                      blk.Bn,
+                      na,
+                      en,
+                      out);
 
-                    for (std::size_t i = ld; i <= ll_bound; ++i) {
-                        const double t = a.At(i, k1) + ub2 * a.At(i, k);
-                        a.At(i, k1) += t * vb1;
-                        a.At(i, k) += t * vb2;
-                        const double tb = b.At(i, k1) + ub2 * b.At(i, k);
-                        b.At(i, k1) += tb * vb1;
-                        b.At(i, k) += tb * vb2;
-                    }
-                    b.At(k1, k) = 0.0;
-                }
-            }
-        }
+    // Second complex root
+    RecordComplexRoot(ssr * blk.A11 - q.Sr * z.C * blk.A12 - q.C * z.Sr * blk.A21 + q.C * z.C * blk.A22,
+                      -ssi * blk.A11 - q.Si * z.C * blk.A12 + q.C * z.Si * blk.A21,
+                      ssr * blk.B11 - q.Sr * z.C * blk.B12 + q.C * z.C * blk.B22,
+                      -ssi * blk.B11 - q.Si * z.C * blk.B12,
+                      blk.An,
+                      blk.Bn,
+                      na,
+                      en,
+                      out);
+}
+
+void ExtractBlock2x2(DenseMatrix &a,
+                     DenseMatrix &b,
+                     const std::size_t na,
+                     const std::size_t en,
+                     const double epsb,
+                     EigenvalueArrays &out) {
+    if (std::abs(b.At(na, na)) <= epsb) {
+        DeflateSingularBlock2x2(a, b, na, en, true, out);
+        return;
+    }
+    if (std::abs(b.At(en, en)) <= epsb) {
+        DeflateSingularBlock2x2(a, b, na, en, false, out);
+        return;
+    }
+
+    const ScaledBlock2x2 blk = ScaleBlock2x2(a, b, na, en);
+    double e = blk.A11 / blk.B11;
+    const double ei_val = blk.A22 / blk.B22;
+    const double s = blk.A21 / (blk.B11 * blk.B22);
+    double t = (blk.A22 - e * blk.B22) / blk.B22;
+    if (std::abs(e) > std::abs(ei_val)) {
+        e = ei_val;
+        t = (blk.A11 - e * blk.B11) / blk.B11;
+    }
+    const double c = 0.5 * (t - s * blk.B12);
+    const double d = c * c + s * (blk.A12 - e * blk.B12);
+
+    if (d >= 0.0) {
+        ExtractRealBlock2x2(a, b, na, en, blk, e + c + std::copysign(std::sqrt(d), c), out);
+    } else {
+        ExtractComplexBlock2x2(na, en, blk, e + c, std::sqrt(-d), out);
     }
 }
 
 /**
  * @brief   Extracts finite eigenvalues from quasi-triangular A and triangular B.
- * @param[in,out] a     Quasi-triangular matrix.
- * @param[in,out] b     Upper triangular matrix.
+ * @param[in,out] a              Quasi-triangular matrix.
+ * @param[in,out] b              Upper triangular matrix.
  * @param[in]     epsb           Singularity floor for B diagonal.
  * @param[in]     infinite_beta  Largest beta that still counts as an infinite eigenvalue.
  * @return  Vector of finite complex eigenvalues.
@@ -475,293 +719,32 @@ void IterateQz(DenseMatrix &a, DenseMatrix &b, double &epsb_out) {
 std::vector<std::complex<double>>
 ExtractEigenvalues(DenseMatrix &a, DenseMatrix &b, const double epsb, const double infinite_beta) {
     const std::size_t n = a.Rows();
-    std::vector<double> alfr(n, 0.0);
-    std::vector<double> alfi(n, 0.0);
-    std::vector<double> beta(n, 0.0);
-    int isw = 1;
+    EigenvalueArrays out{
+        .Alfr = std::vector<double>(n, 0.0),
+        .Alfi = std::vector<double>(n, 0.0),
+        .Beta = std::vector<double>(n, 0.0),
+    };
+    bool skip_next = false;
 
     for (std::size_t nn = 0; nn < n; ++nn) {
+        if (skip_next) {
+            skip_next = false;
+            continue;
+        }
         const std::size_t en = n - 1 - nn;
         const std::size_t na = (en > 0) ? en - 1 : 0;
-
-        if (isw == 2) {
-            isw = 1;
-            continue;
-        }
-
         if (en == 0 || a.At(en, na) == 0.0) {
-            // 1-by-1 block
-            alfr[en] = a.At(en, en);
-            if (b.At(en, en) < 0.0) {
-                alfr[en] = -alfr[en];
-            }
-            beta[en] = std::abs(b.At(en, en));
-            alfi[en] = 0.0;
-            continue;
-        }
-
-        // 2-by-2 block
-        if (std::abs(b.At(na, na)) <= epsb) {
-            const double a1 = a.At(na, na);
-            const double a2 = a.At(en, na);
-            const double s = std::abs(a1) + std::abs(a2);
-            if (s != 0.0) {
-                const double u1 = a1 / s;
-                double u2 = a2 / s;
-                const double r = std::copysign(std::sqrt(u1 * u1 + u2 * u2), u1);
-                const double v1 = -(u1 + r) / r;
-                const double v2 = -u2 / r;
-                u2 = v2 / v1;
-                for (std::size_t j = na; j < n; ++j) {
-                    const double t = a.At(na, j) + u2 * a.At(en, j);
-                    a.At(na, j) += t * v1;
-                    a.At(en, j) += t * v2;
-                    const double tb = b.At(na, j) + u2 * b.At(en, j);
-                    b.At(na, j) += tb * v1;
-                    b.At(en, j) += tb * v2;
-                }
-            }
-            a.At(en, na) = 0.0;
-            b.At(en, na) = 0.0;
-            alfr[na] = a.At(na, na);
-            alfr[en] = a.At(en, en);
-            if (b.At(na, na) < 0.0) {
-                alfr[na] = -alfr[na];
-            }
-            if (b.At(en, en) < 0.0) {
-                alfr[en] = -alfr[en];
-            }
-            beta[na] = std::abs(b.At(na, na));
-            beta[en] = std::abs(b.At(en, en));
-            alfi[en] = 0.0;
-            alfi[na] = 0.0;
-            isw = 2;
-            continue;
-        }
-
-        if (std::abs(b.At(en, en)) <= epsb) {
-            const double a1 = a.At(en, en);
-            const double a2 = a.At(en, na);
-            const double s = std::abs(a1) + std::abs(a2);
-            const double u1 = a1 / s;
-            double u2 = a2 / s;
-            const double r = std::copysign(std::sqrt(u1 * u1 + u2 * u2), u1);
-            const double v1 = -(u1 + r) / r;
-            const double v2 = -u2 / r;
-            u2 = v2 / v1;
-            for (std::size_t i = 0; i <= en; ++i) {
-                const double t = a.At(i, en) + u2 * a.At(i, na);
-                a.At(i, en) += t * v1;
-                a.At(i, na) += t * v2;
-                const double tb = b.At(i, en) + u2 * b.At(i, na);
-                b.At(i, en) += tb * v1;
-                b.At(i, na) += tb * v2;
-            }
-            a.At(en, na) = 0.0;
-            b.At(en, na) = 0.0;
-            alfr[na] = a.At(na, na);
-            alfr[en] = a.At(en, en);
-            if (b.At(na, na) < 0.0) {
-                alfr[na] = -alfr[na];
-            }
-            if (b.At(en, en) < 0.0) {
-                alfr[en] = -alfr[en];
-            }
-            beta[na] = std::abs(b.At(na, na));
-            beta[en] = std::abs(b.At(en, en));
-            alfi[en] = 0.0;
-            alfi[na] = 0.0;
-            isw = 2;
-            continue;
-        }
-
-        const double an =
-            std::abs(a.At(na, na)) + std::abs(a.At(na, en)) + std::abs(a.At(en, na)) + std::abs(a.At(en, en));
-        const double bn = std::abs(b.At(na, na)) + std::abs(b.At(na, en)) + std::abs(b.At(en, en));
-        double a11 = a.At(na, na) / an;
-        double a12 = a.At(na, en) / an;
-        const double a21 = a.At(en, na) / an;
-        double a22 = a.At(en, en) / an;
-        const double b11 = b.At(na, na) / bn;
-        const double b12 = b.At(na, en) / bn;
-        const double b22 = b.At(en, en) / bn;
-
-        double e = a11 / b11;
-        const double ei_val = a22 / b22;
-        const double s = a21 / (b11 * b22);
-        double t = (a22 - e * b22) / b22;
-        if (std::abs(e) > std::abs(ei_val)) {
-            e = ei_val;
-            t = (a11 - e * b11) / b11;
-        }
-        const double c = 0.5 * (t - s * b12);
-        const double d = c * c + s * (a12 - e * b12);
-
-        if (d >= 0.0) {
-            e += (c + std::copysign(std::sqrt(d), c));
-            a11 -= e * b11;
-            a12 -= e * b12;
-            a22 -= e * b22;
-            double a1 = 0.0;
-            double a2 = 0.0;
-            if (std::abs(a11) + std::abs(a12) < std::abs(a21) + std::abs(a22)) {
-                a1 = a22;
-                a2 = a21;
-            } else {
-                a1 = a12;
-                a2 = a11;
-            }
-            const double s_val = std::abs(a1) + std::abs(a2);
-            const double u1 = a1 / s_val;
-            double u2 = a2 / s_val;
-            const double r = std::copysign(std::sqrt(u1 * u1 + u2 * u2), u1);
-            const double v1 = -(u1 + r) / r;
-            const double v2 = -u2 / r;
-            u2 = v2 / v1;
-
-            for (std::size_t i = 0; i <= en; ++i) {
-                const double t_val = a.At(i, en) + u2 * a.At(i, na);
-                a.At(i, en) += t_val * v1;
-                a.At(i, na) += t_val * v2;
-                const double tb_val = b.At(i, en) + u2 * b.At(i, na);
-                b.At(i, en) += tb_val * v1;
-                b.At(i, na) += tb_val * v2;
-            }
-
-            if (an < std::abs(e) * bn) {
-                a1 = a.At(na, na);
-                a2 = a.At(en, na);
-            } else {
-                a1 = b.At(na, na);
-                a2 = b.At(en, na);
-            }
-            const double sb = std::abs(a1) + std::abs(a2);
-            if (sb != 0.0) {
-                const double ub1 = a1 / sb;
-                double ub2 = a2 / sb;
-                const double rb = std::copysign(std::sqrt(ub1 * ub1 + ub2 * ub2), ub1);
-                const double vb1 = -(ub1 + rb) / rb;
-                const double vb2 = -ub2 / rb;
-                ub2 = vb2 / vb1;
-                for (std::size_t j = na; j < n; ++j) {
-                    const double t_val = a.At(na, j) + ub2 * a.At(en, j);
-                    a.At(na, j) += t_val * vb1;
-                    a.At(en, j) += t_val * vb2;
-                    const double tb_val = b.At(na, j) + ub2 * b.At(en, j);
-                    b.At(na, j) += tb_val * vb1;
-                    b.At(en, j) += tb_val * vb2;
-                }
-            }
-            a.At(en, na) = 0.0;
-            b.At(en, na) = 0.0;
-            alfr[na] = a.At(na, na);
-            alfr[en] = a.At(en, en);
-            if (b.At(na, na) < 0.0) {
-                alfr[na] = -alfr[na];
-            }
-            if (b.At(en, en) < 0.0) {
-                alfr[en] = -alfr[en];
-            }
-            beta[na] = std::abs(b.At(na, na));
-            beta[en] = std::abs(b.At(en, en));
-            alfi[en] = 0.0;
-            alfi[na] = 0.0;
+            RecordRealEigenvalue(a, b, en, out);
         } else {
-            e += c;
-            const double ei = std::sqrt(-d);
-            const double a11r = a11 - e * b11;
-            const double a11i = ei * b11;
-            const double a12r = a12 - e * b12;
-            const double a12i = ei * b12;
-            const double a22r = a22 - e * b22;
-            const double a22i = ei * b22;
-
-            double a1 = 0.0;
-            double a1i = 0.0;
-            double a2 = 0.0;
-            double a2i = 0.0;
-            if (std::abs(a11r) + std::abs(a11i) + std::abs(a12r) + std::abs(a12i)
-                < std::abs(a21) + std::abs(a22r) + std::abs(a22i)) {
-                a1 = a22r;
-                a1i = a22i;
-                a2 = -a21;
-                a2i = 0.0;
-            } else {
-                a1 = a12r;
-                a1i = a12i;
-                a2 = -a11r;
-                a2i = -a11i;
-            }
-            double cz = std::sqrt(a1 * a1 + a1i * a1i);
-            double szr = 1.0;
-            double szi = 0.0;
-            if (cz != 0.0) {
-                szr = (a1 * a2 + a1i * a2i) / cz;
-                szi = (a1 * a2i - a1i * a2) / cz;
-                const double r = std::sqrt(cz * cz + szr * szr + szi * szi);
-                cz /= r;
-                szr /= r;
-                szi /= r;
-            }
-
-            if (an < (std::abs(e) + ei) * bn) {
-                a1 = cz * a11 + szr * a12;
-                a1i = szi * a12;
-                a2 = cz * a21 + szr * a22;
-                a2i = szi * a22;
-            } else {
-                a1 = cz * b11 + szr * b12;
-                a1i = szi * b12;
-                a2 = szr * b22;
-                a2i = szi * b22;
-            }
-            double cq = std::sqrt(a1 * a1 + a1i * a1i);
-            double sqr = 1.0;
-            double sqi = 0.0;
-            if (cq != 0.0) {
-                sqr = (a1 * a2 + a1i * a2i) / cq;
-                sqi = (a1 * a2i - a1i * a2) / cq;
-                const double r = std::sqrt(cq * cq + sqr * sqr + sqi * sqi);
-                cq /= r;
-                sqr /= r;
-                sqi /= r;
-            }
-
-            const double ssr = sqr * szr + sqi * szi;
-            const double ssi = sqr * szi - sqi * szr;
-
-            // First complex root
-            double tr = cq * cz * a11 + cq * szr * a12 + sqr * cz * a21 + ssr * a22;
-            double ti = cq * szi * a12 - sqi * cz * a21 + ssi * a22;
-            double dr = cq * cz * b11 + cq * szr * b12 + ssr * b22;
-            double di = cq * szi * b12 + ssi * b22;
-            double t_val = ti * dr - tr * di;
-            std::size_t j_idx = (t_val < 0.0) ? en : na;
-            double r = std::sqrt(dr * dr + di * di);
-            beta[j_idx] = bn * r;
-            alfr[j_idx] = an * (tr * dr + ti * di) / r;
-            alfi[j_idx] = an * t_val / r;
-
-            // Second complex root
-            tr = ssr * a11 - sqr * cz * a12 - cq * szr * a21 + cq * cz * a22;
-            ti = -ssi * a11 - sqi * cz * a12 + cq * szi * a21;
-            dr = ssr * b11 - sqr * cz * b12 + cq * cz * b22;
-            di = -ssi * b11 - sqi * cz * b12;
-            t_val = ti * dr - tr * di;
-            j_idx = (t_val < 0.0) ? en : na;
-            r = std::sqrt(dr * dr + di * di);
-            beta[j_idx] = bn * r;
-            alfr[j_idx] = an * (tr * dr + ti * di) / r;
-            alfi[j_idx] = an * t_val / r;
+            ExtractBlock2x2(a, b, na, en, epsb, out);
+            skip_next = true;
         }
-
-        isw = 2;
     }
 
     std::vector<std::complex<double>> eigenvalues;
     for (std::size_t i = 0; i < n; ++i) {
-        if (beta[i] > infinite_beta) {
-            eigenvalues.emplace_back(alfr[i] / beta[i], alfi[i] / beta[i]);
+        if (out.Beta[i] > infinite_beta) {
+            eigenvalues.emplace_back(out.Alfr[i] / out.Beta[i], out.Alfi[i] / out.Beta[i]);
         }
     }
     return eigenvalues;

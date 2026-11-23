@@ -10,6 +10,127 @@
 
 namespace Nodalys {
 
+namespace {
+
+/**
+ * @brief   Evaluates a smooth product-based gate (AND, NAND, OR, NOR) and its analytical input derivatives.
+ * @param[in]  s              Normalized per-input smooth logic levels in [0, 1].
+ * @param[in]  s_deriv        Partial derivatives ds_i/dv_i for each input.
+ * @param[in]  invert_inputs  True to use (1 - s_i) factors (OR/NOR), false for s_i (AND/NAND).
+ * @param[in]  invert_output  True to complement the product (NAND/OR).
+ * @param[out] derivatives    Filled with d(level)/dv_i for each input.
+ * @return  Normalized output logic level in [0, 1].
+ */
+double EvaluateProductGate(const std::vector<double> &s,
+                           const std::vector<double> &s_deriv,
+                           const bool invert_inputs,
+                           const bool invert_output,
+                           std::vector<double> &derivatives) {
+    const std::size_t input_count = s.size();
+    double product = 1.0;
+    for (const double val : s) {
+        product *= invert_inputs ? (1.0 - val) : val;
+    }
+
+    const double signed_scale = (invert_inputs == invert_output) ? 1.0 : -1.0;
+    for (std::size_t k = 0; k < input_count; ++k) {
+        double prod = s_deriv[k];
+        for (std::size_t j = 0; j < input_count; ++j) {
+            if (j != k) {
+                prod *= invert_inputs ? (1.0 - s[j]) : s[j];
+            }
+        }
+        derivatives[k] = signed_scale * prod;
+    }
+    return invert_output ? (1.0 - product) : product;
+}
+
+/**
+ * @brief   Evaluates a smooth two-input XOR or XNOR gate and its analytical input derivatives.
+ * @param[in]  s              Normalized per-input smooth logic levels in [0, 1].
+ * @param[in]  s_deriv        Partial derivatives ds_i/dv_i for each input.
+ * @param[in]  invert_output  True for XNOR, false for XOR.
+ * @param[out] derivatives    Filled with d(level)/dv_i for inputs 0 and 1.
+ * @return  Normalized output logic level in [0, 1].
+ */
+double EvaluateXorGate(const std::vector<double> &s,
+                       const std::vector<double> &s_deriv,
+                       const bool invert_output,
+                       std::vector<double> &derivatives) {
+    if (s.size() < 2) {
+        return 0.0;
+    }
+    const double s0 = s[0];
+    const double s1 = s[1];
+    const double sign = invert_output ? -1.0 : 1.0;
+    derivatives[0] = sign * s_deriv[0] * (1.0 - 2.0 * s1);
+    derivatives[1] = sign * s_deriv[1] * (1.0 - 2.0 * s0);
+    const double xor_level = s0 + s1 - 2.0 * s0 * s1;
+    return invert_output ? (1.0 - xor_level) : xor_level;
+}
+
+/**
+ * @brief   Evaluates a single-input gate (NOT, BUFFER, SCHMITT_TRIGGER).
+ * @param[in]  type            Single-input gate kind.
+ * @param[in]  s               Normalized input smooth logic levels.
+ * @param[in]  s_deriv         Partial derivatives ds_i/dv_i.
+ * @param[in]  d_vth_dvout     Threshold feedback derivative for Schmitt triggers.
+ * @param[out] derivatives     Input derivatives vector.
+ * @param[out] output_deriv    Output feedback derivative (non-zero for Schmitt triggers).
+ * @return  Normalized output logic level in [0, 1].
+ */
+double EvaluateUnaryGate(const LogicGateType type,
+                         const std::vector<double> &s,
+                         const std::vector<double> &s_deriv,
+                         const double d_vth_dvout,
+                         std::vector<double> &derivatives,
+                         double &output_deriv) {
+    if (s.empty()) {
+        return 0.0;
+    }
+    if (type == LogicGateType::NOT) {
+        derivatives[0] = -s_deriv[0];
+        return 1.0 - s[0];
+    }
+    derivatives[0] = s_deriv[0];
+    if (type == LogicGateType::SCHMITT_TRIGGER) {
+        output_deriv = -s_deriv[0] * d_vth_dvout;
+    }
+    return s[0];
+}
+
+/**
+ * @brief   Dispatches smooth logic level and derivative evaluation by gate kind.
+ */
+double EvaluateGateLevel(const LogicGateType type,
+                         const std::vector<double> &s,
+                         const std::vector<double> &s_deriv,
+                         const double d_vth_dvout,
+                         std::vector<double> &derivatives,
+                         double &output_deriv) {
+    switch (type) {
+    case LogicGateType::NOT:
+    case LogicGateType::BUFFER:
+    case LogicGateType::SCHMITT_TRIGGER:
+        return EvaluateUnaryGate(type, s, s_deriv, d_vth_dvout, derivatives, output_deriv);
+    case LogicGateType::AND:
+        return EvaluateProductGate(s, s_deriv, false, false, derivatives);
+    case LogicGateType::NAND:
+        return EvaluateProductGate(s, s_deriv, false, true, derivatives);
+    case LogicGateType::OR:
+        return EvaluateProductGate(s, s_deriv, true, true, derivatives);
+    case LogicGateType::NOR:
+        return EvaluateProductGate(s, s_deriv, true, false, derivatives);
+    case LogicGateType::XOR:
+        return EvaluateXorGate(s, s_deriv, false, derivatives);
+    case LogicGateType::XNOR:
+        return EvaluateXorGate(s, s_deriv, true, derivatives);
+    }
+    return 0.0;
+}
+
+} // namespace
+
 /**
  * @brief   Constructs a smooth continuous logic gate.
  * @param[in] type      Kind of logic function (AND, OR, NOT, etc.).
@@ -261,117 +382,8 @@ SmoothLogicDevice::LogicEvaluation SmoothLogicDevice::Evaluate(const std::vector
         s_deriv[i] = 0.5 * (1.0 - th * th) / delta;
     }
 
-    double logic_level = 0.0;
-    switch (m_Type) {
-    case LogicGateType::NOT: {
-        if (!s.empty()) {
-            logic_level = 1.0 - s[0];
-            eval.Derivatives[0] = -s_deriv[0];
-        }
-        break;
-    }
-    case LogicGateType::BUFFER: {
-        if (!s.empty()) {
-            logic_level = s[0];
-            eval.Derivatives[0] = s_deriv[0];
-        }
-        break;
-    }
-    case LogicGateType::SCHMITT_TRIGGER: {
-        if (!s.empty()) {
-            logic_level = s[0];
-            eval.Derivatives[0] = s_deriv[0];
-            eval.OutputDerivative = -s_deriv[0] * d_vth_dvout;
-        }
-        break;
-    }
-    case LogicGateType::AND: {
-        logic_level = 1.0;
-        for (const double val : s) {
-            logic_level *= val;
-        }
-        for (std::size_t k = 0; k < input_count; ++k) {
-            double prod = s_deriv[k];
-            for (std::size_t j = 0; j < input_count; ++j) {
-                if (j != k) {
-                    prod *= s[j];
-                }
-            }
-            eval.Derivatives[k] = prod;
-        }
-        break;
-    }
-    case LogicGateType::NAND: {
-        double and_level = 1.0;
-        for (const double val : s) {
-            and_level *= val;
-        }
-        logic_level = 1.0 - and_level;
-        for (std::size_t k = 0; k < input_count; ++k) {
-            double prod = s_deriv[k];
-            for (std::size_t j = 0; j < input_count; ++j) {
-                if (j != k) {
-                    prod *= s[j];
-                }
-            }
-            eval.Derivatives[k] = -prod;
-        }
-        break;
-    }
-    case LogicGateType::OR: {
-        double nor_level = 1.0;
-        for (const double val : s) {
-            nor_level *= (1.0 - val);
-        }
-        logic_level = 1.0 - nor_level;
-        for (std::size_t k = 0; k < input_count; ++k) {
-            double prod = s_deriv[k];
-            for (std::size_t j = 0; j < input_count; ++j) {
-                if (j != k) {
-                    prod *= (1.0 - s[j]);
-                }
-            }
-            eval.Derivatives[k] = prod;
-        }
-        break;
-    }
-    case LogicGateType::NOR: {
-        logic_level = 1.0;
-        for (const double val : s) {
-            logic_level *= (1.0 - val);
-        }
-        for (std::size_t k = 0; k < input_count; ++k) {
-            double prod = s_deriv[k];
-            for (std::size_t j = 0; j < input_count; ++j) {
-                if (j != k) {
-                    prod *= (1.0 - s[j]);
-                }
-            }
-            eval.Derivatives[k] = -prod;
-        }
-        break;
-    }
-    case LogicGateType::XOR: {
-        if (input_count >= 2) {
-            const double s0 = s[0];
-            const double s1 = s[1];
-            logic_level = s0 + s1 - 2.0 * s0 * s1;
-            eval.Derivatives[0] = s_deriv[0] * (1.0 - 2.0 * s1);
-            eval.Derivatives[1] = s_deriv[1] * (1.0 - 2.0 * s0);
-        }
-        break;
-    }
-    case LogicGateType::XNOR: {
-        if (input_count >= 2) {
-            const double s0 = s[0];
-            const double s1 = s[1];
-            logic_level = 1.0 - (s0 + s1 - 2.0 * s0 * s1);
-            eval.Derivatives[0] = -s_deriv[0] * (1.0 - 2.0 * s1);
-            eval.Derivatives[1] = -s_deriv[1] * (1.0 - 2.0 * s0);
-        }
-        break;
-    }
-    }
+    const double logic_level =
+        EvaluateGateLevel(m_Type, s, s_deriv, d_vth_dvout, eval.Derivatives, eval.OutputDerivative);
 
     const double v_span = m_Params.VHigh - m_Params.VLow;
     eval.TargetVoltage = m_Params.VLow + v_span * logic_level;
