@@ -7,6 +7,7 @@
 #define NODALYS_PASSIVE_DEVICES_H
 
 #include "devices/device.h"
+#include "devices/sensitivity.h"
 #include <map>
 
 namespace Nodalys {
@@ -19,7 +20,7 @@ namespace Nodalys {
  *          operating point the capacitor is an open circuit. With an initial condition and uic, the first point starts
  *          from it.
  */
-class CapacitorDevice : public Device {
+class CapacitorDevice : public Device, public SensitiveDevice {
 public:
     CapacitorDevice(int node_a, int node_b, double capacitance, double initial_voltage, bool has_initial);
 
@@ -42,6 +43,12 @@ public:
     bool HasTransientState() const override;
     void AcceptStep(const std::vector<double> &x) override;
     void RejectStep() override;
+
+    [[nodiscard]] const SensitiveDevice *AsSensitive() const override { return this; }
+
+    [[nodiscard]] std::optional<SensitivityDescriptor> DescribeSensitivity() const override;
+    [[nodiscard]] double DcSensitivityDerivative(const DcAdjointView &point) const override;
+    [[nodiscard]] std::complex<double> AcSensitivityDerivative(const AcAdjointView &point) const override;
     [[nodiscard]] std::unique_ptr<Device> Clone() const override;
 
 private:
@@ -114,7 +121,7 @@ private:
  *          short (v = 0). In a transient with the trapezoidal rule, v(t+h) = (2L/h)(i(t+h) − i(t)) − v(t) stamps a
  *          resistance 2L/h on the branch row.
  */
-class InductorDevice : public Device {
+class InductorDevice : public Device, public SensitiveDevice {
 public:
     InductorDevice(int node_a, int node_b, int branch, double inductance, double initial_current, bool has_initial);
 
@@ -136,6 +143,12 @@ public:
     bool HasTransientState() const override;
     void AcceptStep(const std::vector<double> &x) override;
     void RejectStep() override;
+
+    [[nodiscard]] const SensitiveDevice *AsSensitive() const override { return this; }
+
+    [[nodiscard]] std::optional<SensitivityDescriptor> DescribeSensitivity() const override;
+    [[nodiscard]] double DcSensitivityDerivative(const DcAdjointView &point) const override;
+    [[nodiscard]] std::complex<double> AcSensitivityDerivative(const AcAdjointView &point) const override;
     [[nodiscard]] std::unique_ptr<Device> Clone() const override;
 
 private:
@@ -154,7 +167,7 @@ private:
  * @class   ResistorDevice
  * @brief   A resistor between two nodes; also the model of a closed or open contact.
  */
-class ResistorDevice : public Device {
+class ResistorDevice : public Device, public SensitiveDevice {
 public:
     ResistorDevice(int node_a, int node_b, double resistance, bool noisy = true);
 
@@ -175,6 +188,13 @@ public:
                                const std::vector<std::complex<double>> &adjoint,
                                double frequency_hz) const override;
     void SetTemperature(const ThermalConditions &thermal) override;
+
+    [[nodiscard]] const SensitiveDevice *AsSensitive() const override { return this; }
+
+    bool ApplyLiveChange(LiveQuantity quantity, double value) override;
+    [[nodiscard]] std::optional<SensitivityDescriptor> DescribeSensitivity() const override;
+    [[nodiscard]] double DcSensitivityDerivative(const DcAdjointView &point) const override;
+    [[nodiscard]] std::complex<double> AcSensitivityDerivative(const AcAdjointView &point) const override;
     [[nodiscard]] std::unique_ptr<Device> Clone() const override;
 
 private:

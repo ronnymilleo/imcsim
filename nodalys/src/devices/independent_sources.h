@@ -7,6 +7,7 @@
 #define NODALYS_INDEPENDENT_SOURCES_H
 
 #include "devices/device.h"
+#include "devices/sensitivity.h"
 #include "devices/waveforms.h"
 
 namespace Nodalys {
@@ -43,7 +44,7 @@ struct SourcePeriodicity {
  *          report the level they start from, like the netlist writes them, so the operating point matches the start
  *          of the transient.
  */
-class IndependentSourceDevice : public Device {
+class IndependentSourceDevice : public Device, public SensitiveDevice {
 public:
     virtual bool IsVoltageSource() const = 0;
 
@@ -66,6 +67,12 @@ public:
     void SetSourceScale(double scale) override;
     double NextBreakpoint(double time) const override;
     void SetRandomSeed(std::uint64_t seed) override;
+
+    [[nodiscard]] const SensitiveDevice *AsSensitive() const override { return this; }
+
+    [[nodiscard]] IndependentSourceDevice *AsIndependentSource() override { return this; }
+
+    [[nodiscard]] const IndependentSourceDevice *AsIndependentSource() const override { return this; }
 
 protected:
     IndependentSourceDevice(int node_a,
@@ -115,6 +122,9 @@ public:
                                            const std::vector<double> &x_dc,
                                            const std::vector<std::complex<double>> &x_ac,
                                            double omega) const override;
+    [[nodiscard]] std::optional<SensitivityDescriptor> DescribeSensitivity() const override;
+    [[nodiscard]] double DcSensitivityDerivative(const DcAdjointView &point) const override;
+    [[nodiscard]] std::complex<double> AcSensitivityDerivative(const AcAdjointView &point) const override;
     [[nodiscard]] std::unique_ptr<Device> Clone() const override;
 
 private:
@@ -146,6 +156,10 @@ public:
                                            const std::vector<double> &x_dc,
                                            const std::vector<std::complex<double>> &x_ac,
                                            double omega) const override;
+    bool ApplyLiveChange(LiveQuantity quantity, double value) override;
+    [[nodiscard]] std::optional<SensitivityDescriptor> DescribeSensitivity() const override;
+    [[nodiscard]] double DcSensitivityDerivative(const DcAdjointView &point) const override;
+    [[nodiscard]] std::complex<double> AcSensitivityDerivative(const AcAdjointView &point) const override;
     [[nodiscard]] std::unique_ptr<Device> Clone() const override;
 
 private:

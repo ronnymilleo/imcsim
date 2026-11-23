@@ -30,7 +30,12 @@ constexpr int UNBOUND_CONTROL_BRANCH = -1;
 
 const VoltageSourceDevice *FindVoltageSource(const DevicesByName &sources, const std::string_view name) {
     const auto found = sources.find(name);
-    return found == sources.end() ? nullptr : dynamic_cast<const VoltageSourceDevice *>(found->second);
+    if (found == sources.end() || found->second == nullptr) {
+        return nullptr;
+    }
+    const IndependentSourceDevice *source = found->second->AsIndependentSource();
+    return (source != nullptr && source->IsVoltageSource()) ? static_cast<const VoltageSourceDevice *>(source)
+                                                            : nullptr;
 }
 
 DiodeParameters ScaleByArea(DiodeParameters parameters, const double area) {
@@ -237,7 +242,9 @@ void CircuitCompiler::Lower(const CapacitorSpec &spec) {
     if (has_ic) {
         m_Compiled.HasInitialConditions = true;
     }
-    Device *dev = AddDevice(std::make_unique<CapacitorDevice>(u1, u2, spec.Capacitance, spec.InitialVoltage, has_ic));
+    auto capacitor = std::make_unique<CapacitorDevice>(u1, u2, spec.Capacitance, spec.InitialVoltage, has_ic);
+    m_Capacitors.push_back(capacitor.get());
+    Device *dev = AddDevice(std::move(capacitor));
     RegisterElement(spec.Name, dev);
 }
 
@@ -436,12 +443,11 @@ void CircuitCompiler::MaterializeNodeDirectives() {
         m_Compiled.InitialConditions.push_back({.Node = node, .Voltage = voltage});
     }
     if (!m_InitialNodeVoltages.empty()) {
-        for (const auto &device : m_Compiled.Devices) {
-            if (auto *capacitor = dynamic_cast<CapacitorDevice *>(device.get())) {
-                capacitor->TakeInitialVoltageFrom(m_InitialNodeVoltages);
-            }
+        for (CapacitorDevice *capacitor : m_Capacitors) {
+            capacitor->TakeInitialVoltageFrom(m_InitialNodeVoltages);
         }
     }
+    m_Capacitors.clear();
     m_InitialNodeVoltages.clear();
     for (const auto &[node, voltage] : m_NodesetVoltages) {
         m_Compiled.Nodesets.push_back({.Node = node, .Voltage = voltage});

@@ -13,6 +13,7 @@
 #include "devices/integration.h"
 #include "devices/thermal.h"
 #include "mna/mna_system.h"
+#include "nodalys/types.h"
 #include <complex>
 #include <cstdint>
 #include <limits>
@@ -21,6 +22,9 @@
 #include <vector>
 
 namespace Nodalys {
+
+class IndependentSourceDevice;
+class SensitiveDevice;
 
 /**
  * @class   Device
@@ -179,6 +183,22 @@ public:
      * @param[in] seed  Independent 64-bit stream seed for this device.
      */
     virtual void SetRandomSeed(std::uint64_t seed) { (void)seed; }
+
+    /// Returns the sensitivity capability when this device supports analytical DC/AC sensitivity, or null.
+    [[nodiscard]] virtual const SensitiveDevice *AsSensitive() const { return nullptr; }
+
+    /// Returns this device as an IndependentSourceDevice when it is one, or null.
+    [[nodiscard]] virtual IndependentSourceDevice *AsIndependentSource() { return nullptr; }
+
+    /// Returns this device as a const IndependentSourceDevice when it is one, or null.
+    [[nodiscard]] virtual const IndependentSourceDevice *AsIndependentSource() const { return nullptr; }
+
+    /// Applies an interactive live parameter change during transient simulation; returns true if supported.
+    virtual bool ApplyLiveChange(LiveQuantity quantity, double value) {
+        (void)quantity;
+        (void)value;
+        return false;
+    }
 
     /**
      * @brief   Creates an independent copy of this device for an isolated simulation run.

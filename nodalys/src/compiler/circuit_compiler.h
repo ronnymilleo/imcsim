@@ -24,6 +24,8 @@
 
 namespace Nodalys {
 
+class CapacitorDevice;
+
 /**
  * @class   CircuitCompiler
  * @brief   Lowers a passive CircuitDescription into a CompiledCircuit: allocates MNA unknowns, lowers primitives and
@@ -74,6 +76,7 @@ private:
 
     std::vector<PendingCurrent> m_PendingCurrents;
     std::vector<PendingControl> m_PendingControls;
+    std::vector<CapacitorDevice *> m_Capacitors;
     std::vector<std::string> m_Errors;
     std::vector<bool> m_IsNodeUnknown;
     std::vector<bool> m_DynamicUnknown;

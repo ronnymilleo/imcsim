@@ -116,6 +116,21 @@ std::complex<double> CurrentSourceDevice::AcTerminalCurrent(const int terminal,
     return terminal == 0 ? current : -current;
 }
 
+std::optional<SensitivityDescriptor> CurrentSourceDevice::DescribeSensitivity() const {
+    return SensitivityDescriptor{.Parameter = SensitivityParameter::CURRENT,
+                                 .Value = GetDcValue(),
+                                 .SubcircuitPrefix = "i.",
+                                 .IsGainParameter = false};
+}
+
+double CurrentSourceDevice::DcSensitivityDerivative(const DcAdjointView &point) const {
+    return point.AdjointAt(GetNodeB()) - point.AdjointAt(GetNodeA());
+}
+
+std::complex<double> CurrentSourceDevice::AcSensitivityDerivative(const AcAdjointView &point) const {
+    return point.BiasAdjointAcross(GetNodeB(), GetNodeA());
+}
+
 std::unique_ptr<Device> CurrentSourceDevice::Clone() const {
     auto copy = std::make_unique<CurrentSourceDevice>(*this);
     copy->RefreshClonedCallbacks();
@@ -160,6 +175,29 @@ std::complex<double> VoltageSourceDevice::AcTerminalCurrent(const int terminal,
                                                             const double /*omega*/) const {
     const std::complex<double> current = x_ac[static_cast<std::size_t>(m_Branch)];
     return terminal == 0 ? current : -current;
+}
+
+bool VoltageSourceDevice::ApplyLiveChange(const LiveQuantity quantity, const double value) {
+    if (quantity != LiveQuantity::DC_VOLTAGE) {
+        return false;
+    }
+    SetDcValue(value);
+    return true;
+}
+
+std::optional<SensitivityDescriptor> VoltageSourceDevice::DescribeSensitivity() const {
+    return SensitivityDescriptor{.Parameter = SensitivityParameter::VOLTAGE,
+                                 .Value = GetDcValue(),
+                                 .SubcircuitPrefix = "v.",
+                                 .IsGainParameter = false};
+}
+
+double VoltageSourceDevice::DcSensitivityDerivative(const DcAdjointView &point) const {
+    return point.AdjointAt(m_Branch);
+}
+
+std::complex<double> VoltageSourceDevice::AcSensitivityDerivative(const AcAdjointView &point) const {
+    return point.BiasAdjointAt(m_Branch);
 }
 
 std::unique_ptr<Device> VoltageSourceDevice::Clone() const {

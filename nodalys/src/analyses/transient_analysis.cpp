@@ -167,25 +167,6 @@ private:
     std::vector<double> m_CurrentsScratch;
 };
 
-bool ApplyLiveChange(Device &device, const LiveChange &change) {
-    switch (change.Quantity) {
-    case LiveQuantity::RESISTANCE:
-        if (auto *resistor = dynamic_cast<ResistorDevice *>(&device)) {
-            resistor->SetResistance(change.Value);
-            return true;
-        }
-        return false;
-    case LiveQuantity::DC_VOLTAGE:
-        if (auto *source = dynamic_cast<VoltageSourceDevice *>(&device)) {
-            source->SetDcValue(change.Value);
-            return true;
-        }
-        return false;
-    default:
-        return false;
-    }
-}
-
 void ApplyLiveChanges(CompiledCircuit &compiled, const RunMonitor &monitor, std::vector<DiagnosticMessage> *messages) {
     if (!monitor.TakeLiveChanges) {
         return;
@@ -195,7 +176,7 @@ void ApplyLiveChanges(CompiledCircuit &compiled, const RunMonitor &monitor, std:
         if (found == compiled.ElementsByName.end()) {
             continue;
         }
-        if (!ApplyLiveChange(*found->second, change) && messages) {
+        if (!found->second->ApplyLiveChange(change.Quantity, change.Value) && messages) {
             messages->push_back({std::format("nodalys: cannot apply live change to {}", change.Element), true});
         }
     }
