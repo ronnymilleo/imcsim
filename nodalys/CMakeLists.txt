@@ -65,12 +65,17 @@ add_library(nodalys STATIC
     src/linear/dense_matrix.cpp
     src/linear/eigen/pencil_reduction.cpp
     src/linear/eigen/qz.cpp
+    src/linear/eigen/qz_extract.cpp
+    src/linear/eigen/qz_householder.cpp
     src/linear/eigen/root_refinement.cpp
     src/linear/fft.cpp
     src/mna/mna_system.cpp
     src/newton/newton.cpp
     src/parser/netlist/netlist_deck.cpp
+    src/parser/netlist/netlist_directive_settings.cpp
     src/parser/netlist/netlist_directives.cpp
+    src/parser/netlist/netlist_element_devices.cpp
+    src/parser/netlist/netlist_element_sources.cpp
     src/parser/netlist/netlist_elements.cpp
     src/parser/netlist/netlist_nodes.cpp
     src/parser/netlist/netlist_subcircuits.cpp

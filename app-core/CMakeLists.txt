@@ -17,6 +17,8 @@ add_library(imcsim-core-lib
             backends/ngspice/ngspice_read_transient.cpp
             backends/ngspice/ngspice_vectors.cpp
             backends/nodalys/compiler.cpp
+            backends/nodalys/compiler_logic.cpp
+            backends/nodalys/compiler_parts.cpp
             backends/nodalys/model_parser.cpp
             backends/nodalys/nodalys_backend.cpp
             backends/nodalys/parameter_conversion.cpp
