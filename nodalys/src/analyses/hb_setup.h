@@ -25,8 +25,6 @@ namespace Nodalys {
 struct PartitionedCircuit {
     std::vector<Device *> LinearDevices;
     std::vector<Device *> NonlinearDevices;
-    /// The nodesets, which only guide the DC bias that starts the balance.
-    std::vector<Device *> Nodesets;
     std::vector<VoltageSourceDevice *> VoltageSources;
     std::vector<CurrentSourceDevice *> CurrentSources;
 };

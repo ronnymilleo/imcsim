@@ -296,7 +296,7 @@ std::expected<std::vector<double>, std::string> SolveStart(CompiledCircuit &comp
                                                                      .TimeStep = output_step}
                                                        : TimeContext{.IsTransientStart = true};
     std::vector<double> x(static_cast<std::size_t>(compiled.System->GetSize()), 0.0);
-    const NewtonOutcome outcome = SolveNewton(*compiled.System, compiled.Devices, x, initial, options);
+    const NewtonOutcome outcome = SolveNewton(compiled, x, initial, options);
     if (!outcome.Converged) {
         return std::unexpected(DescribeFailure(has_initial_conditions
                                                    ? "Nodalys could not start the transient from the initial conditions"
@@ -344,7 +344,7 @@ NewtonOutcome SolveStep(CompiledCircuit &compiled,
                               .PreviousTimeStep = state.PreviousStep,
                               .Time = state.Time + state.Step,
                               .TimeStep = state.Step};
-    return SolveNewton(*compiled.System, compiled.Devices, x_new, context, options);
+    return SolveNewton(compiled, x_new, context, options);
 }
 
 /**

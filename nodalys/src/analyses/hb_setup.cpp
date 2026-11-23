@@ -5,7 +5,6 @@
 
 #include "analyses/hb_setup.h"
 
-#include "devices/constraint_devices.h"
 #include "linear/fft.h"
 #include <algorithm>
 #include <cmath>
@@ -187,7 +186,7 @@ std::optional<std::string> FindSharpEdgeWarning(const CompiledCircuit &compiled,
 }
 
 /**
- * @brief   Sorts the devices into linear, nonlinear, nodesets and independent sources.
+ * @brief   Sorts the devices into linear, nonlinear and independent sources.
  * @param[in] compiled  The circuit, which must have passed ValidateDevices().
  * @return  The devices of each role, in circuit order.
  */
@@ -200,9 +199,7 @@ PartitionedCircuit PartitionDevices(const CompiledCircuit &compiled) {
             partitioned.CurrentSources.push_back(cs);
         }
 
-        if (dynamic_cast<const NodesetDevice *>(device.get()) != nullptr) {
-            partitioned.Nodesets.push_back(device.get());
-        } else if (device->IsLinear()) {
+        if (device->IsLinear()) {
             partitioned.LinearDevices.push_back(device.get());
         } else {
             partitioned.NonlinearDevices.push_back(device.get());

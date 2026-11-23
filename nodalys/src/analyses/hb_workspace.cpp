@@ -89,6 +89,7 @@ MakeHbWorkspace(const CompiledCircuit &compiled, const HarmonicBalanceConfig &co
 
     HbWorkspace ws(unknown_count, config.Harmonics, sample_count, config.FundamentalFrequency, std::move(node_flags));
     ws.ShouldStop = config.ShouldStop;
+    ws.Nodesets = compiled.Nodesets;
     return ws;
 }
 

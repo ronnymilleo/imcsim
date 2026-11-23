@@ -51,12 +51,6 @@ std::vector<double> ReadNodeVoltages(const CompiledCircuit &compiled, const std:
     return voltages;
 }
 
-void SeedOperatingPoint(const std::vector<std::unique_ptr<Device>> &devices, std::vector<double> &x) {
-    for (const auto &device : devices) {
-        device->SeedOperatingPoint(x);
-    }
-}
-
 bool SetSourceValue(Device *device, const double value) {
     if (auto *voltage = dynamic_cast<VoltageSourceDevice *>(device)) {
         voltage->SetDcValue(value);
@@ -125,8 +119,7 @@ std::expected<DcSweepCurve, std::string> SweepCurve(SweepRun &run, const double 
         if (!SetSourceValue(run.Swept, swept_value)) {
             return std::unexpected(std::format("Nodalys cannot sweep the source {}", run.SweptName));
         }
-        run.LastOutcome =
-            SolveNewton(*run.Compiled.System, run.Compiled.Devices, run.Solution, run.Context, run.Options);
+        run.LastOutcome = SolveNewton(run.Compiled, run.Solution, run.Context, run.Options);
         run.Context.AppliesNodesets = false;
         if (!run.LastOutcome.Converged) {
             return std::unexpected(
@@ -144,8 +137,7 @@ std::expected<OperatingPointResult, std::string> ComputeOperatingPoint(CompiledC
                                                                        const ConvergenceOptions &options,
                                                                        std::vector<DiagnosticMessage> *messages) {
     std::vector<double> x(static_cast<std::size_t>(compiled.System->GetSize()), 0.0);
-    SeedOperatingPoint(compiled.Devices, x);
-    const NewtonOutcome outcome = SolveNewton(*compiled.System, compiled.Devices, x, TimeContext{}, options);
+    const NewtonOutcome outcome = SolveNewton(compiled, x, TimeContext{}, options);
     if (!outcome.Converged) {
         return std::unexpected(DescribeFailure("Nodalys found no operating point; the circuit may have no DC path to "
                                                "ground or need initial conditions",

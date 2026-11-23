@@ -61,6 +61,9 @@ CompiledCircuit CloneCompiledCircuit(const CompiledCircuit &blueprint) {
     copy.CircuitNodeCount = blueprint.CircuitNodeCount;
     copy.DynamicNode = blueprint.DynamicNode;
     copy.Ports = blueprint.Ports;
+    copy.InitialConditions = blueprint.InitialConditions;
+    copy.Nodesets = blueprint.Nodesets;
+    copy.NodeSeeds = blueprint.NodeSeeds;
     copy.HasInitialConditions = blueprint.HasInitialConditions;
     copy.Thermal = blueprint.Thermal;
 
