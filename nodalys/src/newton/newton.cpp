@@ -4,17 +4,18 @@
  *          fallback strategies (`gmin stepping` and `source stepping`).
  * @details
  * ### How the Newton-Raphson Loop Works (`RunNewton`)
- * Each iteration $k = 1 \dots \text{MaxIterations}$ performs 5 steps:
- * 1. **Linearize & Stamp**: Clear $A$ and $\text{rhs}$, stamp every device linearized at $x^{(k-1)}$, apply active
- *    `.ic` / `.nodeset` clamps, and add $G_{\min}$ to all node diagonals.
- * 2. **Solve**: Factorize $A$ with partial-pivoting LU and solve $A \cdot x_{\text{cand}} = \text{rhs}$.
+ * Each iteration \f$k = 1 \dots \text{MaxIterations}\f$ performs 5 steps:
+ * 1. **Linearize & Stamp**: Clear \f$A\f$ and \f$\text{rhs}\f$, stamp every device linearized at \f$x^{(k-1)}\f$, apply
+ * active
+ *    `.ic` / `.nodeset` clamps, and add \f$G_{\min}\f$ to all node diagonals.
+ * 2. **Solve**: Factorize \f$A\f$ with partial-pivoting LU and solve \f$A \cdot x_{\text{cand}} = \text{rhs}\f$.
  * 3. **Damp / Limit (`PNJLIM`)**: Call `device->Limit(x_cand, x_prev)` so forward-biased PN junctions cannot jump by
- *    more than a few thermal voltages $V_T$ in a single step.
- * 4. **Step-Delta Convergence Check**: Require that no junction was limited on this step and that every unknown $i$
- *    changed by less than its tolerance. (For node voltages, $0.1 \times \text{RelTol}$ is used on the step delta so
- *    that exponential junction currents $I \propto e^{V/V_T}$ also settle within $\text{RelTol}$.)
- * 5. **KCL Residual Verification**: Re-stamp at the converged candidate $x$ and verify $|A(x)\cdot x - \text{rhs}(x)|$
- *    satisfies KCL at every node and voltage law on every branch.
+ *    more than a few thermal voltages \f$V_T\f$ in a single step.
+ * 4. **Step-Delta Convergence Check**: Require that no junction was limited on this step and that every unknown \f$i\f$
+ *    changed by less than its tolerance. (For node voltages, \f$0.1 \times \text{RelTol}\f$ is used on the step delta
+ * so that exponential junction currents \f$I \propto e^{V/V_T}\f$ also settle within \f$\text{RelTol}\f$.)
+ * 5. **KCL Residual Verification**: Re-stamp at the converged candidate \f$x\f$ and verify \f$|A(x)\cdot x -
+ * \text{rhs}(x)|\f$ satisfies KCL at every node and voltage law on every branch.
  */
 
 #include "newton/newton.h"
@@ -33,7 +34,9 @@ namespace {
 /// Stiff Norton conductance in siemens used to clamp `.ic` and `.nodeset` node voltages to ground.
 constexpr double NODE_CLAMP_CONDUCTANCE = 1e9;
 
-/// The first fault among the devices at their last stamp, or an empty text.
+/**
+ * @brief   The first fault among the devices at their last stamp, or an empty text.
+ */
 std::string_view FindFault(const std::vector<std::unique_ptr<Device>> &devices) {
     for (const std::unique_ptr<Device> &device : devices) {
         if (const std::string_view fault = device->GetFault(); !fault.empty()) {
@@ -122,8 +125,10 @@ int RunNewton(CompiledCircuit &compiled,
     return 0;
 }
 
-/// Whether the solve finds an operating point, which is what nodesets guide: a DC solve, or the one that starts a
-/// transient from its operating point.
+/**
+ * @brief   Whether the solve finds an operating point, which is what nodesets guide: a DC solve, or the one that starts
+ * a transient from its operating point.
+ */
 bool IsOperatingPointSolve(const TimeContext &time) {
     return !time.IsTransient || (time.IsTransientStart && !time.UseInitialConditions);
 }

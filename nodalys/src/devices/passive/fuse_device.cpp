@@ -27,7 +27,9 @@ constexpr double OPENING_TIME_SHARE = 1e-4;
 /// error is that small a share of the time constant.
 constexpr double MIN_BREAKPOINT_SHARE = 1e-6;
 
-/// Smooth step from 0 to 1, with a zero slope at both ends.
+/**
+ * @brief   Smooth step from 0 to 1, with a zero slope at both ends.
+ */
 double SmoothStep(const double fraction) {
     const double clamped = std::clamp(fraction, 0.0, 1.0);
     return clamped * clamped * (3.0 - 2.0 * clamped);
@@ -35,6 +37,12 @@ double SmoothStep(const double fraction) {
 
 } // namespace
 
+/**
+ * @brief   Constructs a thermal fuse between two nodes.
+ * @param[in] node_a      First terminal MNA node index.
+ * @param[in] node_b      Second terminal MNA node index.
+ * @param[in] parameters  Rated current, melting \f$I^2 t\f$, cold resistance, and blown resistance.
+ */
 FuseDevice::FuseDevice(const int node_a, const int node_b, const FuseParameters parameters)
     : m_NodeA(node_a), m_NodeB(node_b), m_Parameters(parameters),
       m_CoolingTimeConstant(parameters.MeltingI2t / (parameters.RatedCurrent * parameters.RatedCurrent)),
@@ -95,6 +103,9 @@ FuseDevice::State FuseDevice::Advance(const State &state, const double time, con
  *          DC sweep and the small-signal analyses always see a whole fuse. The pending state is computed here, from the
  *          solution the Newton iteration stamps at, so that the converged one, which it stamps last, is the one that
  *          AcceptStep() keeps.
+ * @param[in,out] sys   MNA system to stamp into.
+ * @param[in]     x     Current Newton iterate.
+ * @param[in]     time  Analysis time context.
  */
 void FuseDevice::Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) {
     m_IsStep = time.IsTransient && !time.UseInitialConditions;
@@ -121,6 +132,7 @@ std::complex<double> FuseDevice::AcTerminalCurrent(const int terminal,
  * @brief   Keeps the state of the step that converged, or starts the run from a whole, cold fuse.
  * @details The first call after an operating point or an initial point has no step to advance: the heat starts at zero,
  *          as the gate of the ngspice model holds it until the transient starts.
+ * @param[in] x  Converged solution vector of the accepted time point.
  */
 void FuseDevice::AcceptStep(const std::vector<double> &x) {
     if (m_IsStep) {
@@ -145,6 +157,8 @@ bool FuseDevice::HasSwitched() const {
  *          point: the closed form of the heat equation at a constant power. When the current changes, the prediction
  *          is wrong and the transient asks again at the next point, so it closes in on the blow. After it, the
  *          instant the resistance has reached its blown value.
+ * @param[in] time  Instant already reached in seconds.
+ * @return  Next predicted breakpoint instant, or infinity if none is pending.
  */
 double FuseDevice::NextBreakpoint(const double time) const {
     const double min_gap = MIN_BREAKPOINT_SHARE * m_CoolingTimeConstant;

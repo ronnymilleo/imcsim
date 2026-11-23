@@ -24,7 +24,9 @@ class CardReader {
 public:
     explicit CardReader(const ParsedModel &model) : m_Model(model) {}
 
-    /// The value of a parameter set to the card, or the default when it does not give it.
+    /**
+     * @brief   Returns the value of a parameter set on the card, or the default when absent.
+     */
     double Get(const std::string &key, const double default_value) {
         const auto found = m_Model.Params.find(key);
         if (found == m_Model.Params.end()) {
@@ -34,7 +36,9 @@ public:
         return found->second;
     }
 
-    /// The value of the first of several names for one parameter that the card gives, or the default.
+    /**
+     * @brief   Returns the value of the first matching parameter alias on the card, or the default.
+     */
     double GetAny(const std::initializer_list<std::string_view> keys, const double default_value) {
         for (const std::string_view key : keys) {
             if (m_Model.Params.contains(std::string(key))) {
@@ -44,7 +48,9 @@ public:
         return default_value;
     }
 
-    /// The parameters built so far with the names the device read, which leaves the reader without them.
+    /**
+     * @brief   Packages the built parameters together with the set of keys read from the card.
+     */
     template <typename T>
     BuiltParameters<T> Finish(T parameters) {
         return {.Parameters = std::move(parameters), .ReadKeys = std::move(m_ReadKeys)};
@@ -121,7 +127,9 @@ std::optional<ParsedModel::ModelKind> FindModelKind(const std::string_view type)
 }
 
 /**
- * @brief   The diode parameters a card gives, the others at the defaults of the device.
+ * @brief   Builds DiodeParameters from a `.model` card, keeping device defaults for omitted keys.
+ * @param[in] model  Parsed `.model` card.
+ * @return  Populated DiodeParameters and the set of consumed parameter keys.
  */
 BuiltParameters<DiodeParameters> BuildDiodeParameters(const ParsedModel &model) {
     CardReader card(model);
@@ -141,7 +149,9 @@ BuiltParameters<DiodeParameters> BuildDiodeParameters(const ParsedModel &model) 
 }
 
 /**
- * @brief   The bipolar transistor parameters a card gives, the others at the defaults of the device.
+ * @brief   Builds BjtParameters from a `.model` card, keeping device defaults for omitted keys.
+ * @param[in] model  Parsed `.model` card.
+ * @return  Populated BjtParameters and the set of consumed parameter keys.
  */
 BuiltParameters<BjtParameters> BuildBjtParameters(const ParsedModel &model) {
     CardReader card(model);
@@ -166,7 +176,9 @@ BuiltParameters<BjtParameters> BuildBjtParameters(const ParsedModel &model) {
 }
 
 /**
- * @brief   The MOSFET parameters a card gives, the others at the defaults of the device.
+ * @brief   Builds MosfetParameters from a `.model` card, keeping device defaults for omitted keys.
+ * @param[in] model  Parsed `.model` card.
+ * @return  Populated MosfetParameters and the set of consumed parameter keys.
  */
 BuiltParameters<MosfetParameters> BuildMosfetParameters(const ParsedModel &model) {
     CardReader card(model);
@@ -185,7 +197,9 @@ BuiltParameters<MosfetParameters> BuildMosfetParameters(const ParsedModel &model
 }
 
 /**
- * @brief   The switch parameters a card gives, the others at the defaults of the device.
+ * @brief   Builds SwitchParameters from a `.model` card, keeping device defaults for omitted keys.
+ * @param[in] model  Parsed `.model` card.
+ * @return  Populated SwitchParameters and the set of consumed parameter keys.
  */
 BuiltParameters<SwitchParameters> BuildSwitchParameters(const ParsedModel &model) {
     CardReader card(model);

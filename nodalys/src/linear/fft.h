@@ -21,8 +21,16 @@ class FftPlan {
 public:
     explicit FftPlan(std::size_t size);
 
+    /**
+     * @brief   Reports whether this plan was initialized with a valid power-of-two size.
+     * @return  True when the plan is ready to run transforms.
+     */
     bool IsValid() const { return m_Size != 0; }
 
+    /**
+     * @brief   Returns the transform length (number of samples).
+     * @return  Power-of-two FFT size, or `0` if invalid.
+     */
     std::size_t GetSize() const { return m_Size; }
 
     void Forward(std::vector<std::complex<double>> &data) const;

@@ -17,6 +17,8 @@ namespace Nodalys {
 
 /**
  * @brief   Compiles a potentiometer macromodel as two series resistors meeting at the wiper node.
+ * @param[in,out] compiler  Circuit compiler receiving the generated devices and readouts.
+ * @param[in]     spec      Potentiometer terminals, total resistance, and wiper position.
  */
 void CompilePotentiometer(CircuitCompiler &compiler, const PotentiometerSpec &spec) {
     const double frac = std::clamp(spec.WiperFraction, 1e-6, 1.0 - 1e-6);
@@ -39,6 +41,8 @@ void CompilePotentiometer(CircuitCompiler &compiler, const PotentiometerSpec &sp
 
 /**
  * @brief   Compiles a relay macromodel as an RL coil driving a voltage-controlled contact switch.
+ * @param[in,out] compiler  Circuit compiler receiving the generated devices and readouts.
+ * @param[in]     spec      Relay coil and contact specification.
  */
 void CompileRelay(CircuitCompiler &compiler, const RelaySpec &spec) {
     const int u_cp = compiler.MapNode(spec.CoilPos);
@@ -57,6 +61,8 @@ void CompileRelay(CircuitCompiler &compiler, const RelaySpec &spec) {
 
 /**
  * @brief   Compiles a transformer macromodel as two winding resistors feeding a coupled-inductor pair.
+ * @param[in,out] compiler  Circuit compiler receiving the generated devices and readouts.
+ * @param[in]     spec      Transformer windings, inductances, coupling coefficient, and winding resistance.
  */
 void CompileTransformer(CircuitCompiler &compiler, const TransformerSpec &spec) {
     const int up1 = compiler.MapNode(spec.Primary1);

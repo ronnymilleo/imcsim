@@ -21,6 +21,14 @@ namespace Nodalys {
 // - Gear-2:                    a = a0,       b = a1 q(t) + a2 q(t - hp)
 // ============================================================================
 
+/**
+ * @brief   Constructs a linear capacitor device.
+ * @param[in] node_a           First terminal MNA node index.
+ * @param[in] node_b           Second terminal MNA node index.
+ * @param[in] capacitance      Capacitance in Farads.
+ * @param[in] initial_voltage  Initial voltage across `node_a - node_b` in Volts.
+ * @param[in] has_initial      True if an explicit initial condition was specified.
+ */
 CapacitorDevice::CapacitorDevice(const int node_a,
                                  const int node_b,
                                  const double capacitance,
@@ -33,6 +41,10 @@ CapacitorDevice::CapacitorDevice(const int node_a,
     }
 }
 
+/**
+ * @brief   Derives the capacitor's initial voltage from `.ic` node voltages when it has no explicit `IC=` value.
+ * @param[in] node_voltages  Map from MNA node unknown index to initial voltage in Volts.
+ */
 void CapacitorDevice::TakeInitialVoltageFrom(const std::map<int, double> &node_voltages) {
     if (m_HasInitial) {
         return;
@@ -137,6 +149,18 @@ std::unique_ptr<Device> CapacitorDevice::Clone() const {
 // where a and b are the coefficient and the offset of the integration method, b taken from the history of each flux.
 // ============================================================================
 
+/**
+ * @brief   Constructs a pair of magnetically coupled inductors (transformer windings).
+ * @param[in] primary_a             Primary dotted terminal MNA node index.
+ * @param[in] primary_b             Primary return terminal MNA node index.
+ * @param[in] secondary_a           Secondary dotted terminal MNA node index.
+ * @param[in] secondary_b           Secondary return terminal MNA node index.
+ * @param[in] branch1               Primary winding branch-current unknown index.
+ * @param[in] branch2               Secondary winding branch-current unknown index.
+ * @param[in] primary_inductance    Primary self-inductance \f$L_1\f$ in Henries.
+ * @param[in] secondary_inductance  Secondary self-inductance \f$L_2\f$ in Henries.
+ * @param[in] mutual                Mutual inductance \f$M = k\sqrt{L_1 L_2}\f$ in Henries.
+ */
 CoupledInductorDevice::CoupledInductorDevice(const int primary_a,
                                              const int primary_b,
                                              const int secondary_a,
@@ -226,6 +250,15 @@ std::unique_ptr<Device> CoupledInductorDevice::Clone() const {
 // - Gear-2:                    a = a0,       b = a1 phi(t) + a2 phi(t - hp)
 // ============================================================================
 
+/**
+ * @brief   Constructs a linear inductor device.
+ * @param[in] node_a           First terminal MNA node index.
+ * @param[in] node_b           Second terminal MNA node index.
+ * @param[in] branch           Allocated branch-current unknown index.
+ * @param[in] inductance       Inductance in Henries.
+ * @param[in] initial_current  Initial current from `node_a` to `node_b` in Amperes.
+ * @param[in] has_initial      True if an explicit initial condition was specified.
+ */
 InductorDevice::InductorDevice(const int node_a,
                                const int node_b,
                                const int branch,
@@ -315,14 +348,29 @@ std::unique_ptr<Device> InductorDevice::Clone() const {
 // ResistorDevice
 // ============================================================================
 
+/**
+ * @brief   Constructs a linear resistor device.
+ * @param[in] node_a      First terminal MNA node index.
+ * @param[in] node_b      Second terminal MNA node index.
+ * @param[in] resistance  Resistance in Ohms.
+ * @param[in] noisy       True to include Johnson-Nyquist thermal noise in `.noise` analysis.
+ */
 ResistorDevice::ResistorDevice(const int node_a, const int node_b, const double resistance, const bool noisy)
     : m_NodeA(node_a), m_NodeB(node_b), m_Conductance(1.0 / resistance), m_Noisy(noisy) {
 }
 
+/**
+ * @brief   Returns the current resistance in Ohms.
+ * @return  Resistance in Ohms.
+ */
 double ResistorDevice::GetResistance() const {
     return 1.0 / m_Conductance;
 }
 
+/**
+ * @brief   Updates the resistance value (used by live interactive transient edits).
+ * @param[in] resistance  New resistance in Ohms.
+ */
 void ResistorDevice::SetResistance(const double resistance) {
     m_Conductance = 1.0 / resistance;
 }

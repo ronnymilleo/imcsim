@@ -108,6 +108,7 @@ class ClassDiagramTests(unittest.TestCase):
         self.assertEqual(by_id["A1"]["status"], "open")
         self.assertEqual(by_id["A6"]["count"], 1)
         self.assertEqual(by_id["A9"]["count"], 1)
+        self.assertEqual(by_id["A11"]["status"], "resolved")
         self.assertEqual(by_id["A12"]["status"], "resolved")
 
 

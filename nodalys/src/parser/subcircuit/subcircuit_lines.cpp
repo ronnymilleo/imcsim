@@ -18,8 +18,9 @@ constexpr std::size_t FIRST_NODE_INDEX = 1;
 } // namespace
 
 /**
- * @brief   Tells whether a token starts the parameters of a .subckt or an X line: the PARAMS: word or a NAME=VALUE.
+ * @brief   Tells whether a token starts the parameters of a `.subckt` or an `X` line: `PARAMS:` or `NAME=VALUE`.
  * @param[in] token  Token of the line, after its nodes.
+ * @return  True if `token` begins the parameter section.
  */
 bool IsParameterStart(const std::string &token) {
     return ToUpper(token).starts_with(PARAMETER_LIST_MARK)
@@ -53,7 +54,7 @@ std::vector<std::pair<std::string, std::string>> SplitParameterTokens(const std:
 /**
  * @brief   Splits an X line into its nodes, the subcircuit it calls and its parameters.
  * @param[in] tokens  The tokens of the line, as SplitTokens() gives them.
- * @return  The parts, or none when the line is not written X<name> <nodes> <subcircuit>.
+ * @return  The parts, or none when the line is not written `X<name> <nodes> <subcircuit>`.
  */
 std::optional<InstanceLine> SplitInstanceLine(const std::vector<std::string> &tokens) {
     std::size_t parameters_start = FIRST_NODE_INDEX + 1;

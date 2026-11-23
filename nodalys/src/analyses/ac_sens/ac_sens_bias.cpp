@@ -164,8 +164,8 @@ std::vector<JacobianDerivative> FindJacobianDerivatives(const CompiledCircuit &c
 
 /**
  * @brief   Weighs how the output of the AC solution moves with each DC unknown, at one frequency.
- * @details The weight of unknown k is $-\lambda^T (\partial Y / \partial x_k) x_{ac}$, which the DC adjoint then turns
- *          into the change of the output for the change of the operating point that a value causes.
+ * @details The weight of unknown k is \f$-\lambda^T (\partial Y / \partial x_k) x_{ac}\f$, which the DC adjoint then
+ * turns into the change of the output for the change of the operating point that a value causes.
  * @param[in] derivatives  Derivatives of the nonlinear stamps.
  * @param[in] size         Number of unknowns of the system.
  * @param[in] adjoint      Solution of the transposed small-signal system for the output.

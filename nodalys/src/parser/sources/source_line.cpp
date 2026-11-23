@@ -41,13 +41,15 @@ SourceLineReader::SourceLineReader(const std::vector<std::string> &tokens,
 
 /**
  * @brief   Tells whether every word of the line has been read.
+ * @return  True when the reader cursor is past the last token.
  */
 bool SourceLineReader::IsAtEnd() const {
     return m_Index >= m_Tokens.size();
 }
 
 /**
- * @brief   The index of the word the reader reads next.
+ * @brief   Returns the index of the word the reader will inspect next.
+ * @return  Zero-based token index.
  */
 std::size_t SourceLineReader::GetIndex() const {
     return m_Index;
@@ -55,6 +57,7 @@ std::size_t SourceLineReader::GetIndex() const {
 
 /**
  * @brief   Moves past words the caller read itself.
+ * @param[in] count  Number of tokens to skip.
  */
 void SourceLineReader::Skip(const std::size_t count) {
     m_Index += count;

@@ -111,7 +111,9 @@ void PrepareDeviceStates(HbWorkspace &ws, const std::vector<double> &x_hb, const
     }
 }
 
-/// The phasors of the current an independent source drives, from its waveform over the period.
+/**
+ * @brief   The phasors of the current an independent source drives, from its waveform over the period.
+ */
 std::vector<std::complex<double>>
 FindSourcePhasors(CurrentContext &context, const CurrentSourceDevice &source, const int terminal) {
     HbWorkspace &ws = context.Ws;
@@ -122,7 +124,9 @@ FindSourcePhasors(CurrentContext &context, const CurrentSourceDevice &source, co
     return CoefficientsToPhasors(ws.CoeffsScratch);
 }
 
-/// The phasors of the current of a linear device, from its small-signal relation to the state.
+/**
+ * @brief   The phasors of the current of a linear device, from its small-signal relation to the state.
+ */
 std::vector<std::complex<double>>
 FindLinearDevicePhasors(const CurrentContext &context, const Device &element, const int terminal) {
     const HbWorkspace &ws = context.Ws;
@@ -139,8 +143,10 @@ FindLinearDevicePhasors(const CurrentContext &context, const Device &element, co
     return phasors;
 }
 
-/// The phasors of the current of a nonlinear device: its conduction current plus the displacement current of its
-/// charge.
+/**
+ * @brief   The phasors of the current of a nonlinear device: its conduction current plus the displacement current of
+ * its charge.
+ */
 std::vector<std::complex<double>>
 FindNonlinearDevicePhasors(CurrentContext &context, const Device &element, const int terminal) {
     HbWorkspace &ws = context.Ws;
@@ -208,8 +214,10 @@ void FillCurrents(HbWorkspace &ws,
     }
 }
 
-/// Finds the first node whose highest harmonic still carries a share of the fundamental, which hints at a truncated
-/// expansion.
+/**
+ * @brief   Finds the first node whose highest harmonic still carries a share of the fundamental, which hints at a
+ * truncated expansion.
+ */
 std::optional<std::string>
 FindTruncationWarning(const HarmonicBalanceResult &result, const int node_count, const int harmonics) {
     if (harmonics < 2) {

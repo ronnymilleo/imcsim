@@ -45,28 +45,21 @@ public:
 private:
     /// The state of the element at one instant.
     struct State {
-        /// Heat of the element, where 1 is what the rated current settles at.
-        double Heat = 0.0;
+        double Heat = 0.0; ///< Heat of the element, where 1 is what the rated current settles at.
         /// Heat that the current of the instant settles at: the current squared over the rated current squared.
         double Power = 0.0;
-        /// Instant of the state, in seconds.
-        double Time = 0.0;
+        double Time = 0.0; ///< Instant of the state, in seconds.
         bool IsBlown = false;
-        /// Instant the heat reached the blow level, in seconds; meaningful only when blown.
-        double BlowTime = 0.0;
+        double BlowTime = 0.0; ///< Instant the heat reached the blow level, in seconds; meaningful only when blown.
     };
 
     int m_NodeA;
     int m_NodeB;
     FuseParameters m_Parameters;
-    /// Time constant of the heat, I2t over the rated current squared.
-    double m_CoolingTimeConstant;
-    /// State at the last accepted point.
-    State m_Accepted;
-    /// State the step being solved ends in, worked out by each stamp of it.
-    State m_Pending;
-    /// Resistance of the last stamp, which the currents of the results divide by.
-    double m_Resistance;
+    double m_CoolingTimeConstant; ///< Time constant of the heat, I2t over the rated current squared.
+    State m_Accepted;             ///< State at the last accepted point.
+    State m_Pending;              ///< State the step being solved ends in, worked out by each stamp of it.
+    double m_Resistance;          ///< Resistance of the last stamp, which the currents of the results divide by.
     /// True while the stamps are those of a transient step, whose end the accepted state moves to.
     bool m_IsStep = false;
 

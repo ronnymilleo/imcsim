@@ -57,7 +57,9 @@ private:
     bool m_Factored = false;
 };
 
+/// Double-precision dense matrix alias.
 using DenseMatrix = BasicDenseMatrix<double>;
+/// Double-precision complex dense matrix alias.
 using ComplexDenseMatrix = BasicDenseMatrix<std::complex<double>>;
 
 } // namespace Nodalys

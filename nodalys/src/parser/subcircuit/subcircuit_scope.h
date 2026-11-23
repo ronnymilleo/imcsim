@@ -31,8 +31,7 @@ class TextScope;
  */
 struct TextModel {
     std::string Name;
-    /// The type as the card writes it, upper case, such as "D" or "NJF".
-    std::string TypeName;
+    std::string TypeName; ///< The type as the card writes it, upper case, such as "D" or "NJF".
     /// False when the engine has no device for the type, which refuses an element that uses the model.
     bool IsSupported = false;
     ParsedModel Card;
@@ -58,14 +57,12 @@ struct TextSubcircuit {
  */
 struct ExpansionContext {
     CircuitBuilder &Builder;
-    /// Name of the subcircuit that was asked for, for the messages.
-    std::string SubcircuitName;
+    std::string SubcircuitName; ///< Name of the subcircuit that was asked for, for the messages.
     std::vector<std::string> Warnings;
     /// Upper-case names of the models whose ignored parameters were already reported, so each is named once however
     /// often it is used.
     std::set<std::string> ReportedModels;
-    /// What the caller wants to hear about the nodes and sources the expansion makes.
-    InstanceObservers Observers;
+    InstanceObservers Observers; ///< What the caller wants to hear about the nodes and sources the expansion makes.
 };
 
 /**

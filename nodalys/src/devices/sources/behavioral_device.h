@@ -22,8 +22,7 @@ namespace Nodalys {
 struct BehavioralBinding {
     /// Unknown of the node the voltage is read at, or of the branch whose current is read; -1 for ground.
     int Unknown = -1;
-    /// Unknown of the node the voltage is measured from, or -1 for ground; a current has none.
-    int Reference = -1;
+    int Reference = -1; ///< Unknown of the node the voltage is measured from, or -1 for ground; a current has none.
     bool IsCurrent = false;
 };
 
@@ -55,7 +54,6 @@ protected:
     void StampPartials(MnaSystem &sys, int row, double sign) const;
     double EvaluateAt(const std::vector<double> &x) const;
     std::complex<double> SmallSignalValue(const std::vector<std::complex<double>> &x_ac) const;
-    /// The constant of the linearization: the value minus the sum of each derivative times its input at the iterate.
     double GetOffset() const;
 
 private:
@@ -67,8 +65,7 @@ private:
     double m_TemperatureCelsius = 27.0;
     double m_Value = 0.0;
     double m_Offset = 0.0;
-    /// Derivative of the value with respect to each input at the last stamp.
-    std::vector<double> m_Partials;
+    std::vector<double> m_Partials; ///< Derivative of the value with respect to each input at the last stamp.
 
     std::vector<double> ReadInputs(const std::vector<double> &x) const;
 };

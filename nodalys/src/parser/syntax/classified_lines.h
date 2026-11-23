@@ -30,10 +30,8 @@ struct TextElement {
  *          use them whatever the order they are written in.
  */
 struct ClassifiedLines {
-    /// The tokens of each .param line, in order.
-    std::vector<std::vector<std::string>> Parameters;
-    /// The tokens of each .model card, in order.
-    std::vector<std::vector<std::string>> Models;
+    std::vector<std::vector<std::string>> Parameters; ///< The tokens of each .param line, in order.
+    std::vector<std::vector<std::string>> Models;     ///< The tokens of each .model card, in order.
     /// The .subckt blocks written in the text, with their lines; the scope they sit in is left for the caller to set.
     std::vector<TextSubcircuit> Subcircuits;
     std::vector<TextElement> Elements;

@@ -37,8 +37,7 @@ struct ElementLine {
     const std::vector<std::string> &Tokens;
     /// The element letter in upper case, such as 'V', which tells a handler that reads two letters which one it has.
     char Letter;
-    /// The name the element has in the circuit, with the instance it sits in.
-    std::string Name;
+    std::string Name; ///< The name the element has in the circuit, with the instance it sits in.
 
     NodeId ResolveNode(std::size_t position) const;
     CircuitBuilder &GetBuilder() const;

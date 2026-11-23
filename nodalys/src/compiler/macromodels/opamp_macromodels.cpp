@@ -290,6 +290,8 @@ Device *AddBoyleRailLimiter(CircuitCompiler &compiler,
 
 /**
  * @brief   Compiles the dominant-pole ideal op-amp macromodel into MNA devices.
+ * @param[in,out] compiler  Circuit compiler receiving the generated devices and readouts.
+ * @param[in]     spec      Ideal op-amp terminals and gain-bandwidth specification.
  */
 void CompileIdealOpAmp(CircuitCompiler &compiler, const IdealOpAmpSpec &spec) {
     const IdealOpAmpValues figures = ComputeIdealOpAmpValues(spec.BandwidthHz);
@@ -313,6 +315,8 @@ void CompileIdealOpAmp(CircuitCompiler &compiler, const IdealOpAmpSpec &spec) {
 
 /**
  * @brief   Compiles the five-stage Boyle op-amp macromodel into MNA devices.
+ * @param[in,out] compiler  Circuit compiler receiving the generated devices and readouts.
+ * @param[in]     spec      Boyle op-amp terminals and datasheet parameters.
  */
 void CompileBoyleOpAmp(CircuitCompiler &compiler, const BoyleOpAmpSpec &spec) {
     const BoyleOpAmpValues v = ComputeBoyleOpAmpValues(spec.Params);

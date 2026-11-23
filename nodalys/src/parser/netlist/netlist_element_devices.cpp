@@ -126,7 +126,11 @@ std::optional<GateKind> FindGateKind(const std::vector<std::string> &tokens) {
 } // namespace
 
 /**
- * @brief   The value of a NAME=VALUE word among the tokens from first on, such as IC=2 or W=10u.
+ * @brief   Finds the value of a `NAME=VALUE` word among `tokens` from `first` onward, such as `IC=2` or `W=10u`.
+ * @param[in] tokens  Tokenized element statement.
+ * @param[in] first   Index of the first option token to inspect.
+ * @param[in] key     Upper-case option key to match.
+ * @return  Last parsed numeric value matching `key`, or empty if absent.
  */
 std::optional<double>
 FindElementOptionValue(const std::vector<std::string> &tokens, const std::size_t first, const std::string_view key) {
@@ -143,7 +147,10 @@ FindElementOptionValue(const std::vector<std::string> &tokens, const std::size_t
 }
 
 /**
- * @brief   D<name> <anode> <cathode> <model> [area].
+ * @brief   Parses `D<name> <anode> <cathode> <model> [area]`.
+ * @param[in,out] context  Parser deck context receiving the diode.
+ * @param[in]     line     Tokenized diode statement.
+ * @return  Empty expected on success, or a parse error message.
  */
 std::expected<void, std::string> ReadDiode(DeckContext &context, const DeckLine &line) {
     const std::vector<std::string> &tokens = line.Tokens;
@@ -159,7 +166,11 @@ std::expected<void, std::string> ReadDiode(DeckContext &context, const DeckLine 
 }
 
 /**
- * @brief   Q<name> <c> <b> <e> <model> [area]; a transistor whose model is not found is an NPN at the defaults.
+ * @brief   Parses `Q<name> <c> <b> <e> <model> [area]`; a transistor whose model is not found is an NPN at the
+ *          defaults.
+ * @param[in,out] context  Parser deck context receiving the BJT.
+ * @param[in]     line     Tokenized BJT statement.
+ * @return  Empty expected on success, or a parse error message.
  */
 std::expected<void, std::string> ReadBjt(DeckContext &context, const DeckLine &line) {
     const std::vector<std::string> &tokens = line.Tokens;
@@ -179,7 +190,10 @@ std::expected<void, std::string> ReadBjt(DeckContext &context, const DeckLine &l
 }
 
 /**
- * @brief   M<name> <d> <g> <s> <b> <model> [L=<length>] [W=<width>]; one whose model is not found is an NMOS.
+ * @brief   Parses `M<name> <d> <g> <s> <b> <model> [L=<length>] [W=<width>]`; one whose model is not found is an NMOS.
+ * @param[in,out] context  Parser deck context receiving the MOSFET.
+ * @param[in]     line     Tokenized MOSFET statement.
+ * @return  Empty expected on success, or a parse error message.
  */
 std::expected<void, std::string> ReadMosfet(DeckContext &context, const DeckLine &line) {
     constexpr std::size_t FIRST_OPTION = 6;
@@ -202,7 +216,10 @@ std::expected<void, std::string> ReadMosfet(DeckContext &context, const DeckLine
 }
 
 /**
- * @brief   S<name> <a1> <a2> <c1> <c2> <model>.
+ * @brief   Parses `S<name> <a1> <a2> <c1> <c2> <model>`.
+ * @param[in,out] context  Parser deck context receiving the switch.
+ * @param[in]     line     Tokenized switch statement.
+ * @return  Empty expected on success, or a parse error message.
  */
 std::expected<void, std::string> ReadSwitch(DeckContext &context, const DeckLine &line) {
     const std::vector<std::string> &tokens = line.Tokens;
@@ -220,7 +237,9 @@ std::expected<void, std::string> ReadSwitch(DeckContext &context, const DeckLine
 }
 
 /**
- * @brief   The nodes of a U line: every token before the kind of gate and the first NAME=VALUE.
+ * @brief   Lists the nodes of a `U` line: every token before the gate kind and the first `NAME=VALUE` option.
+ * @param[in] line  Tokenized logic-gate statement.
+ * @return  List of node names referenced by the gate.
  */
 std::vector<std::string> ListGateNodes(const DeckLine &line) {
     const std::vector<std::string> &tokens = line.Tokens;
@@ -235,7 +254,10 @@ std::vector<std::string> ListGateNodes(const DeckLine &line) {
 }
 
 /**
- * @brief   U<name> <out> <in1> [<in2> ...] <kind> [VHIGH=5] [VLOW=0] [VTH=2.5] [TPD=1n] [ROUT=50] [HYST=0.5].
+ * @brief   Parses `U<name> <out> <in1> [<in2> ...] <kind> [VHIGH=5] [VLOW=0] [VTH=2.5] [TPD=1n] [ROUT=50] [HYST=0.5]`.
+ * @param[in,out] context  Parser deck context receiving the logic gate.
+ * @param[in]     line     Tokenized logic-gate statement.
+ * @return  Empty expected on success, or a parse error message.
  */
 std::expected<void, std::string> ReadLogicGate(DeckContext &context, const DeckLine &line) {
     const std::vector<std::string> &tokens = line.Tokens;

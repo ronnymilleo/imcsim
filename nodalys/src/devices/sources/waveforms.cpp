@@ -80,10 +80,20 @@ double FindNextPulseCorner(const PulseParameters &pulse, const double time) {
     return NO_CORNER;
 }
 
+/**
+ * @brief   Creates a breakpoint callback returning the next transition corner of a pulse waveform.
+ * @param[in] pulse  Pulse waveform parameters.
+ * @return  Breakpoint callback queried by transient step control.
+ */
 BreakpointCallback MakePulseBreakpoints(const PulseParameters &pulse) {
     return [pulse](const double time) { return FindNextPulseCorner(pulse, time); };
 }
 
+/**
+ * @brief   Creates a breakpoint callback returning the rise and fall delay corners of an exponential waveform.
+ * @param[in] exp  Exponential waveform parameters.
+ * @return  Breakpoint callback queried by transient step control.
+ */
 BreakpointCallback MakeExpBreakpoints(const ExpParameters &exp) {
     return [exp](const double time) {
         for (const double corner : {exp.RiseDelay, exp.FallDelay}) {
@@ -95,6 +105,11 @@ BreakpointCallback MakeExpBreakpoints(const ExpParameters &exp) {
     };
 }
 
+/**
+ * @brief   Creates a breakpoint callback returning each knot time of a piecewise-linear waveform.
+ * @param[in] pwl  Piecewise-linear waveform points.
+ * @return  Breakpoint callback queried by transient step control.
+ */
 BreakpointCallback MakePwlBreakpoints(const PwlParameters &pwl) {
     return [pwl](const double time) {
         for (const PwlPoint &point : pwl.Points) {
@@ -106,14 +121,30 @@ BreakpointCallback MakePwlBreakpoints(const PwlParameters &pwl) {
     };
 }
 
+/**
+ * @brief   Creates a breakpoint callback returning the startup delay corner of an AM waveform.
+ * @param[in] am  AM waveform parameters.
+ * @return  Breakpoint callback queried by transient step control.
+ */
 BreakpointCallback MakeAmBreakpoints(const AmParameters &am) {
     return [am](const double time) { return IsAfter(am.Delay, time) ? am.Delay : NO_CORNER; };
 }
 
+/**
+ * @brief   Creates a breakpoint callback returning the edge corners of a periodic digital clock.
+ * @param[in] parameters  Clock waveform parameters.
+ * @return  Breakpoint callback queried by transient step control.
+ */
 BreakpointCallback MakeClockBreakpoints(const ClockParameters &parameters) {
     return MakePulseBreakpoints(ClockPulse(parameters));
 }
 
+/**
+ * @brief   Evaluates a SPICE PULSE waveform at time `time`.
+ * @param[in] pulse  Pulse waveform parameters.
+ * @param[in] time   Simulation instant in seconds.
+ * @return  Waveform value in Volts or Amperes.
+ */
 double EvaluatePulse(const PulseParameters &pulse, const double time) {
     if (time < pulse.Delay) {
         return pulse.Low;
@@ -131,6 +162,12 @@ double EvaluatePulse(const PulseParameters &pulse, const double time) {
     return pulse.Low;
 }
 
+/**
+ * @brief   Evaluates a SPICE EXP waveform at time `time`.
+ * @param[in] exp   Exponential waveform parameters.
+ * @param[in] time  Simulation instant in seconds.
+ * @return  Waveform value in Volts or Amperes.
+ */
 double EvaluateExp(const ExpParameters &exp, const double time) {
     if (time < exp.RiseDelay) {
         return exp.InitialValue;
@@ -146,12 +183,24 @@ double EvaluateExp(const ExpParameters &exp, const double time) {
     return exp.InitialValue + (peak - exp.InitialValue) * std::exp(-(time - exp.FallDelay) / exp.FallTimeConstant);
 }
 
+/**
+ * @brief   Evaluates a SPICE SIN waveform at time `time`.
+ * @param[in] sine  Sinusoidal waveform parameters.
+ * @param[in] time  Simulation instant in seconds.
+ * @return  Waveform value in Volts or Amperes.
+ */
 double EvaluateSine(const SineParameters &sine, const double time) {
     const double omega = 2.0 * std::numbers::pi * sine.Frequency;
     const double phase_rad = sine.PhaseDegrees * (std::numbers::pi / 180.0);
     return sine.Offset + sine.Amplitude * std::sin(omega * time + phase_rad);
 }
 
+/**
+ * @brief   Evaluates a SPICE PWL piecewise-linear waveform at time `time`.
+ * @param[in] pwl   Piecewise-linear knot points.
+ * @param[in] time  Simulation instant in seconds.
+ * @return  Linearly interpolated waveform value in Volts or Amperes.
+ */
 double EvaluatePwl(const PwlParameters &pwl, const double time) {
     const std::vector<PwlPoint> &points = pwl.Points;
     if (points.empty()) {
@@ -171,12 +220,24 @@ double EvaluatePwl(const PwlParameters &pwl, const double time) {
     return points.back().Value;
 }
 
+/**
+ * @brief   Evaluates a SPICE SFFM single-frequency FM waveform at time `time`.
+ * @param[in] sffm  SFFM waveform parameters.
+ * @param[in] time  Simulation instant in seconds.
+ * @return  Waveform value in Volts or Amperes.
+ */
 double EvaluateSffm(const SffmParameters &sffm, const double time) {
     const double phase = 2.0 * std::numbers::pi * sffm.CarrierFrequency * time
                        + sffm.ModulationIndex * std::sin(2.0 * std::numbers::pi * sffm.SignalFrequency * time);
     return sffm.Offset + sffm.Amplitude * std::sin(phase);
 }
 
+/**
+ * @brief   Evaluates a SPICE AM amplitude-modulated waveform at time `time`.
+ * @param[in] am    AM waveform parameters.
+ * @param[in] time  Simulation instant in seconds.
+ * @return  Waveform value in Volts or Amperes.
+ */
 double EvaluateAm(const AmParameters &am, const double time) {
     if (time < am.Delay) {
         return 0.0;
@@ -187,11 +248,22 @@ double EvaluateAm(const AmParameters &am, const double time) {
                * std::sin(2.0 * std::numbers::pi * am.CarrierFrequency * local);
 }
 
-WaveformCallback MakeDcWaveform(const double) {
+/**
+ * @brief   Builds a constant DC waveform callback.
+ * @param[in] dc_value  Unused nominal level (the source passes its current DC level at evaluation time).
+ * @return  Waveform callback returning the source's DC level.
+ */
+WaveformCallback MakeDcWaveform([[maybe_unused]] const double dc_value) {
     return [](const double dc, const TimeContext &) { return dc; };
 }
 
-WaveformCallback MakePulseWaveform(const double, const PulseParameters &pulse) {
+/**
+ * @brief   Builds a pulse waveform callback supporting transient and periodic steady-state evaluation.
+ * @param[in] dc_value  Unused nominal level (the source supplies its DC level during non-transient solves).
+ * @param[in] pulse     Pulse waveform parameters.
+ * @return  Waveform callback.
+ */
+WaveformCallback MakePulseWaveform([[maybe_unused]] const double dc_value, const PulseParameters &pulse) {
     return [pulse](const double dc, const TimeContext &time) {
         if (time.IsTransient) {
             return EvaluatePulse(pulse, time.Time);
@@ -206,32 +278,67 @@ WaveformCallback MakePulseWaveform(const double, const PulseParameters &pulse) {
     };
 }
 
-WaveformCallback MakeSineWaveform(const double, const SineParameters &sine) {
+/**
+ * @brief   Builds a sinusoidal waveform callback supporting transient and periodic steady-state evaluation.
+ * @param[in] dc_value  Unused nominal level.
+ * @param[in] sine      Sinusoidal waveform parameters.
+ * @return  Waveform callback.
+ */
+WaveformCallback MakeSineWaveform([[maybe_unused]] const double dc_value, const SineParameters &sine) {
     return [sine](const double dc, const TimeContext &time) {
         return (time.IsTransient || time.IsPeriodicSteadyState) ? EvaluateSine(sine, time.Time) : dc;
     };
 }
 
-WaveformCallback MakeExpWaveform(const double, const ExpParameters &exp) {
+/**
+ * @brief   Builds an exponential waveform callback for transient evaluation.
+ * @param[in] dc_value  Unused nominal level.
+ * @param[in] exp       Exponential waveform parameters.
+ * @return  Waveform callback.
+ */
+WaveformCallback MakeExpWaveform([[maybe_unused]] const double dc_value, const ExpParameters &exp) {
     return
         [exp](const double dc, const TimeContext &time) { return time.IsTransient ? EvaluateExp(exp, time.Time) : dc; };
 }
 
-WaveformCallback MakePwlWaveform(const double, const PwlParameters &pwl) {
+/**
+ * @brief   Builds a piecewise-linear waveform callback for transient evaluation.
+ * @param[in] dc_value  Unused nominal level.
+ * @param[in] pwl       Piecewise-linear knot points.
+ * @return  Waveform callback.
+ */
+WaveformCallback MakePwlWaveform([[maybe_unused]] const double dc_value, const PwlParameters &pwl) {
     return
         [pwl](const double dc, const TimeContext &time) { return time.IsTransient ? EvaluatePwl(pwl, time.Time) : dc; };
 }
 
-WaveformCallback MakeSffmWaveform(const double, const SffmParameters &sffm) {
+/**
+ * @brief   Builds a single-frequency FM waveform callback for transient evaluation.
+ * @param[in] dc_value  Unused nominal level.
+ * @param[in] sffm      SFFM waveform parameters.
+ * @return  Waveform callback.
+ */
+WaveformCallback MakeSffmWaveform([[maybe_unused]] const double dc_value, const SffmParameters &sffm) {
     return [sffm](const double dc, const TimeContext &time) {
         return time.IsTransient ? EvaluateSffm(sffm, time.Time) : dc;
     };
 }
 
-WaveformCallback MakeAmWaveform(const double, const AmParameters &am) {
+/**
+ * @brief   Builds an amplitude-modulated waveform callback for transient evaluation.
+ * @param[in] dc_value  Unused nominal level.
+ * @param[in] am        AM waveform parameters.
+ * @return  Waveform callback.
+ */
+WaveformCallback MakeAmWaveform([[maybe_unused]] const double dc_value, const AmParameters &am) {
     return [am](const double dc, const TimeContext &time) { return time.IsTransient ? EvaluateAm(am, time.Time) : dc; };
 }
 
+/**
+ * @brief   Builds a periodic digital clock waveform callback.
+ * @param[in] parameters  Clock waveform parameters.
+ * @return  Waveform callback.
+ */
 WaveformCallback MakeClockWaveform(const ClockParameters &parameters) {
     const PulseParameters pulse = ClockPulse(parameters);
     return [pulse](const double, const TimeContext &time) {

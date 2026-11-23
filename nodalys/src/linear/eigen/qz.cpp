@@ -386,10 +386,12 @@ void IterateQz(DenseMatrix &a, DenseMatrix &b, double &epsb_out) {
 } // namespace
 
 /**
- * @brief   Computes the finite generalized eigenvalues lambda of the real matrix pencil (mat_a, mat_b).
+ * @brief   Computes the finite generalized eigenvalues lambda of the real matrix pencil (mat_a, mat_b) such that
+ *          det(mat_a - lambda * mat_b) = 0.
  * @param[in] mat_a  Real square matrix of size N x N.
  * @param[in] mat_b  Real square matrix of size N x N.
- * @return  Vector of finite complex generalized eigenvalues in rad/s.
+ * @return  Vector of finite complex generalized eigenvalues in rad/s. Infinite and indeterminate eigenvalues are
+ *          deflated.
  */
 std::vector<std::complex<double>> ComputeGeneralizedEigenvalues(const DenseMatrix &mat_a, const DenseMatrix &mat_b) {
     if (mat_a.Rows() == 0 || mat_a.Cols() != mat_a.Rows() || mat_b.Rows() != mat_a.Rows()

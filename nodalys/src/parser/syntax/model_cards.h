@@ -22,6 +22,7 @@ namespace Nodalys {
  * @brief   One .model card: the kind of device and its parameters by upper-case name.
  */
 struct ParsedModel {
+    /// Semiconductor or switch device family recognized on a `.model` card.
     enum class ModelKind {
         DIODE,
         BJT_NPN,
@@ -40,8 +41,7 @@ struct ParsedModel {
  */
 struct ModelCardWords {
     std::string Name;
-    /// The type in upper case, such as "D" or "NPN".
-    std::string TypeName;
+    std::string TypeName; ///< The type in upper case, such as "D" or "NPN".
     /// What follows the type, without the parentheses around the list, one token each, expected to be NAME=VALUE.
     std::vector<std::string> Assignments;
 };

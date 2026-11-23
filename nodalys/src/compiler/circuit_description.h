@@ -28,6 +28,7 @@ struct BehavioralCurrentInput {
     std::string Source;
 };
 
+/// Specification for a behavioral voltage or current source (`B` element).
 struct BehavioralSpec {
     std::string Name;
     NodeId Pos = 0;
@@ -38,6 +39,7 @@ struct BehavioralSpec {
     std::vector<BehavioralCurrentInput> CurrentInputs;
 };
 
+/// Specification for an NPN or PNP bipolar junction transistor (`Q` element).
 struct BjtSpec {
     std::string Name;
     NodeId Collector = 0;
@@ -48,6 +50,7 @@ struct BjtSpec {
     double Area = 1.0;
 };
 
+/// Specification for a Boyle operational amplifier macromodel.
 struct BoyleOpAmpSpec {
     std::string Name;
     NodeId Out = 0;
@@ -58,6 +61,7 @@ struct BoyleOpAmpSpec {
     BoyleOpAmpParameters Params;
 };
 
+/// Specification for a linear capacitor (`C` element).
 struct CapacitorSpec {
     std::string Name;
     NodeId N1 = 0;
@@ -66,6 +70,7 @@ struct CapacitorSpec {
     double InitialVoltage = 0.0;
 };
 
+/// Specification for a linear current-controlled current source (`F` element).
 struct CccsSpec {
     std::string Name;
     NodeId Pos = 0;
@@ -74,6 +79,7 @@ struct CccsSpec {
     double Gain = 0.0;
 };
 
+/// Specification for a linear current-controlled voltage source (`H` element).
 struct CcvsSpec {
     std::string Name;
     NodeId Pos = 0;
@@ -82,6 +88,7 @@ struct CcvsSpec {
     double Transresistance = 0.0;
 };
 
+/// Specification for an edge-triggered D flip-flop macromodel.
 struct DFlipFlopSpec {
     std::string Name;
     NodeId Q = 0;
@@ -93,6 +100,7 @@ struct DFlipFlopSpec {
     std::optional<NodeId> Reset;
 };
 
+/// Specification for a semiconductor diode (`D` element).
 struct DiodeSpec {
     std::string Name;
     NodeId Anode = 0;
@@ -101,6 +109,7 @@ struct DiodeSpec {
     double Area = 1.0;
 };
 
+/// Specification for an \f$I^2 t\f$ thermal fuse.
 struct FuseSpec {
     std::string Name;
     NodeId NodeA = 0;
@@ -108,6 +117,7 @@ struct FuseSpec {
     FuseParameters Params;
 };
 
+/// Specification for a single-pole rail-clamped ideal operational amplifier macromodel.
 struct IdealOpAmpSpec {
     std::string Name;
     NodeId Out = 0;
@@ -118,6 +128,7 @@ struct IdealOpAmpSpec {
     double BandwidthHz = 0.0;
 };
 
+/// Specification for an independent voltage or current source (`V` or `I` element).
 struct IndependentSourceSpec {
     std::string Name;
     NodeId Pos = 0;
@@ -126,6 +137,7 @@ struct IndependentSourceSpec {
     SourceSpec Spec;
 };
 
+/// Specification for a linear inductor (`L` element).
 struct InductorSpec {
     std::string Name;
     NodeId N1 = 0;
@@ -134,11 +146,13 @@ struct InductorSpec {
     double InitialCurrent = 0.0;
 };
 
+/// Specification for a `.ic` initial node voltage directive.
 struct InitialVoltageSpec {
     NodeId Node = 0;
     double Voltage = 0.0;
 };
 
+/// Specification for a smooth continuous-time logic gate (`U` element).
 struct LogicGateSpec {
     std::string Name;
     LogicGateType Type = LogicGateType::AND;
@@ -147,6 +161,7 @@ struct LogicGateSpec {
     SmoothLogicParameters Params;
 };
 
+/// Specification for an NMOS or PMOS field-effect transistor (`M` element).
 struct MosfetSpec {
     std::string Name;
     NodeId Drain = 0;
@@ -156,11 +171,13 @@ struct MosfetSpec {
     MosfetParameters Params;
 };
 
+/// Specification for a `.nodeset` DC operating-point hint directive.
 struct NodesetSpec {
     NodeId Node = 0;
     double Voltage = 0.0;
 };
 
+/// Specification for a three-terminal potentiometer macromodel.
 struct PotentiometerSpec {
     std::string Name;
     NodeId TerminalA = 0;
@@ -170,6 +187,7 @@ struct PotentiometerSpec {
     double WiperFraction = 0.5;
 };
 
+/// Specification for an electromechanical relay macromodel.
 struct RelaySpec {
     std::string Name;
     NodeId CoilPos = 0;
@@ -181,6 +199,7 @@ struct RelaySpec {
     SwitchParameters ContactParams;
 };
 
+/// Specification for a linear resistor (`R` element).
 struct ResistorSpec {
     std::string Name;
     NodeId N1 = 0;
@@ -188,6 +207,7 @@ struct ResistorSpec {
     double Resistance = 0.0;
 };
 
+/// Specification for a voltage-controlled hysteretic switch (`S` element).
 struct SwitchSpec {
     std::string Name;
     NodeId NodeA = 0;
@@ -197,6 +217,7 @@ struct SwitchSpec {
     SwitchParameters Params;
 };
 
+/// Specification for a two-winding magnetically coupled transformer macromodel.
 struct TransformerSpec {
     std::string Name;
     NodeId Primary1 = 0;
@@ -209,6 +230,7 @@ struct TransformerSpec {
     double WindingResistance = 0.1;
 };
 
+/// Specification for a linear voltage-controlled current source (`G` element).
 struct VccsSpec {
     std::string Name;
     NodeId Pos = 0;
@@ -218,6 +240,7 @@ struct VccsSpec {
     double Transconductance = 0.0;
 };
 
+/// Specification for a linear voltage-controlled voltage source (`E` element).
 struct VcvsSpec {
     std::string Name;
     NodeId Pos = 0;
@@ -265,17 +288,29 @@ struct CircuitDescription {
     std::vector<std::string> Errors;
     bool HasInitialConditions = false;
 
+    /**
+     * @brief   Sets the minimum top-level circuit node count (clamped to at least 1 for ground).
+     * @param[in] count  Total top-level node count including ground.
+     */
     void SetCircuitNodeCount(int count) {
         CircuitNodeCount = std::max(count, 1);
         MaxNode = std::max(MaxNode, CircuitNodeCount - 1);
     }
 
+    /**
+     * @brief   Updates `MaxNode` to include `node`.
+     * @param[in] node  Circuit node identifier to record.
+     */
     void TrackNode(NodeId node) {
         if (node > MaxNode) {
             MaxNode = node;
         }
     }
 
+    /**
+     * @brief   Updates `MaxNode` to include every node in `nodes`.
+     * @param[in] nodes  Circuit node identifiers to record.
+     */
     void TrackNodes(std::initializer_list<NodeId> nodes) {
         for (const NodeId node : nodes) {
             TrackNode(node);
@@ -283,6 +318,7 @@ struct CircuitDescription {
     }
 };
 
+/// Alias for CircuitDescription::ElementSpec.
 using CircuitElementSpec = CircuitDescription::ElementSpec;
 
 } // namespace Nodalys

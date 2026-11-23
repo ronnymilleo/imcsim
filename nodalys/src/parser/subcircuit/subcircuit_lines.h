@@ -21,7 +21,7 @@ constexpr std::string_view PARAMETER_LIST_MARK = "PARAMS:";
 
 /**
  * @struct  InstanceLine
- * @brief   The parts of an X line: X<name> <nodes> <subcircuit> [params:] [NAME=VALUE...].
+ * @brief   The parts of an X line: `X<name> <nodes> <subcircuit> [params:] [NAME=VALUE...]`.
  */
 struct InstanceLine {
     std::vector<std::string> NodeNames;

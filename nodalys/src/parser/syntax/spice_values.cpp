@@ -117,7 +117,9 @@ std::string SubstituteParameters(const std::string_view text, const ParameterLoo
 }
 
 /**
- * @brief   Removes the braces or single quotes that wrap a value in SPICE text.
+ * @brief   Removes matching surrounding braces `{...}` or single quotes `'...'` from a SPICE value token.
+ * @param[in] text  Raw value token.
+ * @return  Trimmed inner expression or literal view.
  */
 std::string_view StripValueBrackets(std::string_view text) {
     text = TrimSpaces(text);

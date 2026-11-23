@@ -39,8 +39,7 @@ struct DeviceRestoreGuard {
  * @brief   What each port needs to be excited and read, one entry per port in the order of the ports.
  */
 struct PortDrives {
-    /// Unknown of the port node, or -1 when the port is on ground.
-    std::vector<int> Unknowns;
+    std::vector<int> Unknowns; ///< Unknown of the port node, or -1 when the port is on ground.
     std::vector<double> SqrtConductances;
     /// Norton current source of each port, as the right-hand side that excites it.
     std::vector<std::vector<std::complex<double>>> Excitations;

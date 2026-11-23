@@ -73,8 +73,7 @@ struct RunMonitor {
 struct AcSensitivityConfig {
     int OutputPositiveNode = 0;
     int OutputNegativeNode = 0;
-    /// Independent source with an AC magnitude; the others are silent for this analysis.
-    std::string InputSource;
+    std::string InputSource; ///< Independent source with an AC magnitude; the others are silent for this analysis.
     double StartFrequency = 1.0;
     double StopFrequency = 1e6;
     /// Points per decade or per octave of a logarithmic sweep, or the points in all of a linear one.
@@ -189,8 +188,7 @@ struct TransientConfig {
     double MaxStep = 0.0;
     bool UseInitialConditions = false;
     IntegrationMethod Method = IntegrationMethod::TRAPEZOIDAL;
-    /// Seed for TRNOISE and TRRANDOM sources; 0 draws a new sequence on each run.
-    unsigned int Seed = 0;
+    unsigned int Seed = 0; ///< Seed for TRNOISE and TRRANDOM sources; 0 draws a new sequence on each run.
 };
 
 // Top-level analysis entry points

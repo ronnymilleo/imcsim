@@ -109,7 +109,9 @@ void UpdateBestColumnPivot(const DenseMatrix &a, const DenseMatrix &b, Algebraic
     }
 }
 
-/// Clears the pivot row with operations on the columns, which leave the eigenvalues alone.
+/**
+ * @brief   Clears the pivot row with operations on the columns, which leave the eigenvalues alone.
+ */
 void EliminateRowPivot(DenseMatrix &a, DenseMatrix &b, const std::size_t pivot_row, const std::size_t pivot_col) {
     const std::size_t n = a.Rows();
     const double pivot = a.At(pivot_row, pivot_col);
@@ -128,7 +130,9 @@ void EliminateRowPivot(DenseMatrix &a, DenseMatrix &b, const std::size_t pivot_r
     }
 }
 
-/// Clears the pivot column with operations on the rows, which leave the eigenvalues alone.
+/**
+ * @brief   Clears the pivot column with operations on the rows, which leave the eigenvalues alone.
+ */
 void EliminateColumnPivot(DenseMatrix &a, DenseMatrix &b, const std::size_t pivot_row, const std::size_t pivot_col) {
     const std::size_t n = a.Rows();
     const double pivot = a.At(pivot_row, pivot_col);
@@ -147,7 +151,9 @@ void EliminateColumnPivot(DenseMatrix &a, DenseMatrix &b, const std::size_t pivo
     }
 }
 
-/// Scales every row, or every column, so that its entries of A and B add up to about 1.
+/**
+ * @brief   Scales every row, or every column, so that its entries of A and B add up to about 1.
+ */
 void EquilibrateRows(DenseMatrix &a, DenseMatrix &b) {
     for (std::size_t r = 0; r < a.Rows(); ++r) {
         double size = 0.0;

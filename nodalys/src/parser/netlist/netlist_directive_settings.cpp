@@ -126,7 +126,8 @@ void ApplyOption(DeckContext &context, const std::string &name, const double val
 } // namespace
 
 /**
- * @brief   Reads the nodes of an output written V(node) or V(positive, negative); a bare name is the node itself.
+ * @brief   Reads the nodes of an output written `V(node)` or `V(positive, negative)`; a bare name is the node itself.
+ * @param[in] text  Output expression text.
  * @return  The nodes; the negative one is ground when the output names one node.
  */
 OutputNodes ReadOutputNodes(std::string_view text) {
@@ -144,6 +145,11 @@ OutputNodes ReadOutputNodes(std::string_view text) {
             .Negative = std::string(TrimSpaces(inner.substr(comma + 1)))};
 }
 
+/**
+ * @brief   Maps a SPICE frequency sweep keyword (`DEC`, `OCT`, `LIN`) to FrequencySweepType.
+ * @param[in] word  Case-insensitive sweep keyword.
+ * @return  Matching sweep type, or empty if unrecognized.
+ */
 std::optional<FrequencySweepType> FindSweepType(const std::string_view word) {
     const std::string upper = ToUpper(word);
     if (upper == "DEC") {
@@ -159,11 +165,17 @@ std::optional<FrequencySweepType> FindSweepType(const std::string_view word) {
 }
 
 /**
- * @brief   Reads "[DEC|OCT|LIN] <np> <fstart> <fstop>" from the tokens of a directive.
- * @details The point count is a whole number of at least 1 and the range needs 0 < fstart <= fstop, for a linear
+ * @brief   Reads `[DEC|OCT|LIN] <np> <fstart> <fstop>` from the tokens of a directive.
+ * @details The point count is a whole number of at least 1 and the range needs `0 < fstart <= fstop`, for a linear
  *          sweep too: the engine solves at each frequency as it is asked, and a zero start has no meaning for the
  *          noise of a part that falls with frequency. ngspice accepts a start of 0 in a linear sweep; this reader
  *          does not.
+ * @param[in] tokens            Tokenized directive line.
+ * @param[in] first_token       Index of the first sweep token.
+ * @param[in] is_type_required  True if an explicit `DEC`/`OCT`/`LIN` keyword is mandatory.
+ * @param[in] directive         Directive name used in error diagnostics.
+ * @param[in] line              Original directive text used in error diagnostics.
+ * @return  Parsed sweep parameters, or a parse error message.
  */
 std::expected<FrequencySweepWords, std::string> ReadFrequencySweep(const std::vector<std::string> &tokens,
                                                                    const std::size_t first_token,
@@ -208,7 +220,10 @@ std::expected<FrequencySweepWords, std::string> ReadFrequencySweep(const std::ve
 }
 
 /**
- * @brief   .options with NAME=VALUE words: METHOD picks the integration method, the others are numbers.
+ * @brief   Parses `.options` with `NAME=VALUE` words: `METHOD` picks the integration method, the others are numbers.
+ * @param[in,out] context  Parser deck context receiving updated convergence and solver settings.
+ * @param[in]     line     Tokenized `.options` directive.
+ * @return  Empty expected on success, or a parse error message.
  */
 std::expected<void, std::string> ReadOptions(DeckContext &context, const DeckLine &line) {
     for (std::size_t index = 1; index < line.Tokens.size(); ++index) {
@@ -235,7 +250,10 @@ std::expected<void, std::string> ReadOptions(DeckContext &context, const DeckLin
 }
 
 /**
- * @brief   .temp <celsius>.
+ * @brief   Parses `.temp <celsius>`.
+ * @param[in,out] context  Parser deck context receiving the simulation temperature.
+ * @param[in]     line     Tokenized `.temp` directive.
+ * @return  Empty expected on success, or a parse error message.
  */
 std::expected<void, std::string> ReadTemperature(DeckContext &context, const DeckLine &line) {
     if (line.Tokens.size() < 2) {
@@ -249,10 +267,22 @@ std::expected<void, std::string> ReadTemperature(DeckContext &context, const Dec
     return {};
 }
 
+/**
+ * @brief   Parses a `.ic` initial-condition node voltage directive.
+ * @param[in,out] context  Parser deck context receiving initial voltages.
+ * @param[in]     line     Tokenized `.ic` directive.
+ * @return  Empty expected on success, or a parse error message.
+ */
 std::expected<void, std::string> ReadInitialConditions(DeckContext &context, const DeckLine &line) {
     return ReadNodeVoltages(context, line, false);
 }
 
+/**
+ * @brief   Parses a `.nodeset` DC operating-point hint directive.
+ * @param[in,out] context  Parser deck context receiving nodeset hints.
+ * @param[in]     line     Tokenized `.nodeset` directive.
+ * @return  Empty expected on success, or a parse error message.
+ */
 std::expected<void, std::string> ReadNodesets(DeckContext &context, const DeckLine &line) {
     return ReadNodeVoltages(context, line, true);
 }

@@ -12,14 +12,6 @@
 
 namespace Nodalys {
 
-/**
- * @brief   Computes the finite generalized eigenvalues lambda of the real matrix pencil (A, B) such that
- *          det(A - lambda * B) = 0.
- * @param[in] mat_a  Real square matrix of size N x N.
- * @param[in] mat_b  Real square matrix of size N x N.
- * @return  Vector of finite complex generalized eigenvalues in rad/s. Infinite and indeterminate eigenvalues are
- *          deflated.
- */
 std::vector<std::complex<double>> ComputeGeneralizedEigenvalues(const DenseMatrix &mat_a, const DenseMatrix &mat_b);
 
 } // namespace Nodalys

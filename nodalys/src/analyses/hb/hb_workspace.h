@@ -29,8 +29,7 @@ namespace Nodalys {
 struct ActiveMatrixTraces {
     std::vector<std::pair<int, int>> Pairs;
     std::vector<int> SlotByFlatIndex;
-    /// Flat, `[pair_index * SampleCount + sample]`.
-    std::vector<double> Traces;
+    std::vector<double> Traces; ///< Flat, `[pair_index * SampleCount + sample]`.
     int UnknownCount = 0;
     std::size_t SampleCount = 0;
 
@@ -46,8 +45,7 @@ struct ActiveMatrixTraces {
 struct HbWorkspace {
     /// Asked before each Newton iteration, or empty.
     std::function<bool()> ShouldStop;
-    /// Set once ShouldStop() asked for a stop, so the continuation strategies end too.
-    bool IsStopped = false;
+    bool IsStopped = false; ///< Set once ShouldStop() asked for a stop, so the continuation strategies end too.
     /// True when the last evaluation of the residual met a device that has no value at the state, such as a behavioral
     /// source whose expression is out of range; the state it gave cannot be a solution.
     bool IsFaulty = false;
@@ -64,22 +62,17 @@ struct HbWorkspace {
     MnaSystem GLin;
     MnaSystem CLin;
     std::vector<Device *> NonlinearDevices;
-    /// The nodesets, stamped in the pulled pass of the DC bias only.
-    std::vector<NodeVoltageDirective> Nodesets;
-    /// The excitation B, in `[unknown * CoeffsPerUnknown + coefficient]`.
-    std::vector<double> BaseRhsHarmonics;
+    std::vector<NodeVoltageDirective> Nodesets; ///< The nodesets, stamped in the pulled pass of the DC bias only.
+    std::vector<double> BaseRhsHarmonics;       ///< The excitation B, in `[unknown * CoeffsPerUnknown + coefficient]`.
 
     // Scratch buffers reused across Newton iterations
     std::vector<std::complex<double>> FftScratch;
     std::vector<double> CoeffsScratch;
     std::vector<double> TimeSeriesScratch;
     std::vector<std::complex<double>> SpectrumScratch;
-    /// The state at each sample, `[sample][unknown]`.
-    std::vector<std::vector<double>> StateSamples;
-    /// The nonlinear currents, `[unknown * SampleCount + sample]`.
-    std::vector<double> FnlTraces;
-    /// The nonlinear charges, `[unknown * SampleCount + sample]`.
-    std::vector<double> QnlTraces;
+    std::vector<std::vector<double>> StateSamples; ///< The state at each sample, `[sample][unknown]`.
+    std::vector<double> FnlTraces;                 ///< The nonlinear currents, `[unknown * SampleCount + sample]`.
+    std::vector<double> QnlTraces;                 ///< The nonlinear charges, `[unknown * SampleCount + sample]`.
     ActiveMatrixTraces GTraces;
     ActiveMatrixTraces CTraces;
     MnaSystem SampleG;
@@ -94,6 +87,9 @@ struct HbWorkspace {
     /**
      * @brief   Position of one coefficient of one unknown in the packed harmonic vectors.
      * @details Inline because every loop over the coefficients calls it.
+     * @param[in] unknown     Zero-based MNA unknown index.
+     * @param[in] coeff_slot  Harmonic coefficient slot in `[0, CoeffsPerUnknown)`.
+     * @return  Flat index into packed harmonic state/residual vectors.
      */
     std::size_t Index(const int unknown, const int coeff_slot) const {
         return static_cast<std::size_t>(unknown) * static_cast<std::size_t>(CoeffsPerUnknown)

@@ -76,14 +76,11 @@ enum class Operation {
  */
 struct ExpressionNode {
     Operation Kind = Operation::CONSTANT;
-    /// Operands, or -1 where the operation takes fewer.
-    int First = -1;
+    int First = -1; ///< Operands, or -1 where the operation takes fewer.
     int Second = -1;
     int Third = -1;
-    /// Value of a CONSTANT.
-    double Constant = 0.0;
-    /// Index into the inputs of an INPUT.
-    int Input = -1;
+    double Constant = 0.0; ///< Value of a CONSTANT.
+    int Input = -1;        ///< Index into the inputs of an INPUT.
 };
 
 /**
@@ -92,10 +89,8 @@ struct ExpressionNode {
  */
 struct ExpressionProgram {
     std::vector<ExpressionNode> Nodes;
-    /// The node whose value is the expression, the last one.
-    int Root = -1;
-    /// Distinct inputs, in the order they first appear.
-    std::vector<ExpressionInput> Inputs;
+    int Root = -1;                       ///< The node whose value is the expression, the last one.
+    std::vector<ExpressionInput> Inputs; ///< Distinct inputs, in the order they first appear.
     std::vector<ExpressionReference> References;
     bool IsTimeDependent = false;
 };

@@ -15,22 +15,42 @@ namespace Nodalys {
 // IndependentSourceDevice
 // ============================================================================
 
+/**
+ * @brief   Returns the source's DC operating level.
+ * @return  DC voltage in Volts or DC current in Amperes.
+ */
 double IndependentSourceDevice::GetDcValue() const {
     return m_DcValue;
 }
 
+/**
+ * @brief   Updates the source's DC operating level (used by DC sweeps and live edits).
+ * @param[in] value  New DC level in Volts or Amperes.
+ */
 void IndependentSourceDevice::SetDcValue(const double value) {
     m_DcValue = value;
 }
 
+/**
+ * @brief   Installs the transient breakpoint callback for this source's waveform.
+ * @param[in] breakpoints  Callback returning the next waveform corner strictly after a given time.
+ */
 void IndependentSourceDevice::SetBreakpoints(BreakpointCallback breakpoints) {
     m_Breakpoints = std::move(breakpoints);
 }
 
+/**
+ * @brief   Installs the random seed callback for stochastic waveform sources.
+ * @param[in] set_seed  Callback resetting the source's RNG stream from a 64-bit seed.
+ */
 void IndependentSourceDevice::SetSeedCallback(SeedCallback set_seed) {
     m_SetSeed = std::move(set_seed);
 }
 
+/**
+ * @brief   Installs a factory creating independent callback state when the device is cloned.
+ * @param[in] factory  Callback factory invoked by Clone().
+ */
 void IndependentSourceDevice::SetCallbackFactory(SourceCallbackFactory factory) {
     m_CallbackFactory = std::move(factory);
 }
@@ -53,6 +73,15 @@ void IndependentSourceDevice::SetRandomSeed(const std::uint64_t seed) {
     }
 }
 
+/**
+ * @brief   Constructs the shared base for an independent voltage or current source.
+ * @param[in] node_a        Positive terminal MNA node index.
+ * @param[in] node_b        Negative terminal MNA node index.
+ * @param[in] dc_value      Nominal DC level.
+ * @param[in] waveform      Waveform evaluation callback.
+ * @param[in] ac_magnitude  Small-signal AC excitation magnitude.
+ * @param[in] periodicity   Harmonic Balance periodicity metadata.
+ */
 IndependentSourceDevice::IndependentSourceDevice(const int node_a,
                                                  const int node_b,
                                                  const double dc_value,
@@ -63,10 +92,18 @@ IndependentSourceDevice::IndependentSourceDevice(const int node_a,
       m_AcMagnitude(ac_magnitude), m_Periodicity(periodicity) {
 }
 
+/**
+ * @brief   Evaluates the scaled source value at the given analysis context.
+ * @param[in] time  Analysis time context.
+ * @return  Scaled source value in Volts or Amperes.
+ */
 double IndependentSourceDevice::EvaluateValue(const TimeContext &time) const {
     return m_Scale * m_Waveform(m_DcValue, time);
 }
 
+/**
+ * @brief   Rebuilds stateful waveform callbacks after copying so cloned runs share no mutable RNG state.
+ */
 void IndependentSourceDevice::RefreshClonedCallbacks() {
     if (m_CallbackFactory) {
         SourceCallbacks callbacks = m_CallbackFactory();
@@ -80,6 +117,15 @@ void IndependentSourceDevice::RefreshClonedCallbacks() {
 // CurrentSourceDevice
 // ============================================================================
 
+/**
+ * @brief   Constructs an independent current source (`I` element).
+ * @param[in] node_a        Positive terminal MNA node index (current leaves here).
+ * @param[in] node_b        Negative terminal MNA node index (current enters here).
+ * @param[in] dc_value      Nominal DC current in Amperes.
+ * @param[in] waveform      Time-domain waveform callback.
+ * @param[in] ac_magnitude  Small-signal AC magnitude in Amperes.
+ * @param[in] periodicity   Harmonic Balance periodicity metadata.
+ */
 CurrentSourceDevice::CurrentSourceDevice(const int node_a,
                                          const int node_b,
                                          const double dc_value,
@@ -89,6 +135,12 @@ CurrentSourceDevice::CurrentSourceDevice(const int node_a,
     : IndependentSourceDevice(node_a, node_b, dc_value, std::move(waveform), ac_magnitude, periodicity) {
 }
 
+/**
+ * @brief   Samples this current source's periodic steady-state terminal current for Harmonic Balance.
+ * @param[in] terminal      Zero-based terminal index (`0` positive, `1` negative).
+ * @param[in] time_seconds  Sample instant within the fundamental period in seconds.
+ * @return  Terminal current in Amperes.
+ */
 double CurrentSourceDevice::SamplePeriodicCurrent(const int terminal, const double time_seconds) const {
     const TimeContext steady_state{.IsPeriodicSteadyState = true, .Time = time_seconds};
     const double current = EvaluateValue(steady_state);
@@ -141,6 +193,16 @@ std::unique_ptr<Device> CurrentSourceDevice::Clone() const {
 // VoltageSourceDevice
 // ============================================================================
 
+/**
+ * @brief   Constructs an independent voltage source (`V` element).
+ * @param[in] node_a        Positive terminal MNA node index.
+ * @param[in] node_b        Negative terminal MNA node index.
+ * @param[in] branch        Allocated branch-current unknown index.
+ * @param[in] dc_value      Nominal DC voltage in Volts.
+ * @param[in] waveform      Time-domain waveform callback.
+ * @param[in] ac_magnitude  Small-signal AC magnitude in Volts.
+ * @param[in] periodicity   Harmonic Balance periodicity metadata.
+ */
 VoltageSourceDevice::VoltageSourceDevice(const int node_a,
                                          const int node_b,
                                          const int branch,

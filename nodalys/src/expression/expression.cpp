@@ -106,8 +106,10 @@ private:
         return {};
     }
 
-    /// Applies the chain rule: the derivative of the node is the sum, over its operands, of the partial derivative of
-    /// the operation with respect to the operand times the derivative of the operand.
+    /**
+     * @brief   Applies the chain rule: the derivative of the node is the sum, over its operands, of the partial
+     * derivative of the operation with respect to the operand times the derivative of the operand.
+     */
     std::expected<void, std::string> EvaluateOperation(const ExpressionNode &node, const std::size_t slot) {
         if (const auto first = Evaluate(node.First); !first) {
             return first;

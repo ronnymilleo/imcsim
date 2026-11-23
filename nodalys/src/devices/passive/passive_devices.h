@@ -24,13 +24,24 @@ class CapacitorDevice : public Device, public SensitiveDevice {
 public:
     CapacitorDevice(int node_a, int node_b, double capacitance, double initial_voltage, bool has_initial);
 
+    /**
+     * @brief   Returns the first terminal MNA node index.
+     * @return  Node unknown index, or `-1` for ground.
+     */
     int GetNodeA() const { return m_NodeA; }
 
+    /**
+     * @brief   Returns the second terminal MNA node index.
+     * @return  Node unknown index, or `-1` for ground.
+     */
     int GetNodeB() const { return m_NodeB; }
 
+    /**
+     * @brief   Returns the capacitance in Farads.
+     * @return  Capacitance in Farads.
+     */
     double GetCapacitance() const { return m_Capacitance; }
 
-    /// A capacitor with no IC= of its own starts at the difference of the initial voltages of its nodes, as in SPICE.
     void TakeInitialVoltageFrom(const std::map<int, double> &node_voltages);
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
@@ -55,8 +66,7 @@ private:
     int m_NodeA;
     int m_NodeB;
     double m_Capacitance;
-    /// Charge C v and its current at the last accepted points.
-    ChargeHistory m_History;
+    ChargeHistory m_History; ///< Charge C v and its current at the last accepted points.
     ChargeHistory m_SavedHistory;
     double m_InitialVoltage;
     bool m_HasInitial;
@@ -73,8 +83,6 @@ private:
  */
 class CoupledInductorDevice : public Device {
 public:
-    /// primary_a/primary_b are the nodes of the primary branch, secondary_a/secondary_b of the secondary, with the
-    /// branch currents flowing from the first node to the second; branch1 and branch2 are the branch unknowns.
     CoupledInductorDevice(int primary_a,
                           int primary_b,
                           int secondary_a,
@@ -107,8 +115,7 @@ private:
     double m_L1;
     double m_L2;
     double m_M;
-    /// Fluxes of the two windings and their voltages at the last accepted points.
-    ChargeHistory m_History1;
+    ChargeHistory m_History1; ///< Fluxes of the two windings and their voltages at the last accepted points.
     ChargeHistory m_History2;
     ChargeHistory m_SavedHistory1;
     ChargeHistory m_SavedHistory2;
@@ -125,12 +132,28 @@ class InductorDevice : public Device, public SensitiveDevice {
 public:
     InductorDevice(int node_a, int node_b, int branch, double inductance, double initial_current, bool has_initial);
 
+    /**
+     * @brief   Returns the first terminal MNA node index.
+     * @return  Node unknown index, or `-1` for ground.
+     */
     int GetNodeA() const { return m_NodeA; }
 
+    /**
+     * @brief   Returns the second terminal MNA node index.
+     * @return  Node unknown index, or `-1` for ground.
+     */
     int GetNodeB() const { return m_NodeB; }
 
+    /**
+     * @brief   Returns the inductor branch-current unknown index.
+     * @return  Branch unknown index.
+     */
     int GetBranch() const { return m_Branch; }
 
+    /**
+     * @brief   Returns the inductance in Henries.
+     * @return  Inductance in Henries.
+     */
     double GetInductance() const { return m_Inductance; }
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
@@ -156,8 +179,7 @@ private:
     int m_NodeB;
     int m_Branch;
     double m_Inductance;
-    /// Flux L i and its derivative, the voltage, at the last accepted points.
-    ChargeHistory m_History;
+    ChargeHistory m_History; ///< Flux L i and its derivative, the voltage, at the last accepted points.
     ChargeHistory m_SavedHistory;
     double m_InitialCurrent;
     bool m_HasInitial;
@@ -174,8 +196,16 @@ public:
     double GetResistance() const;
     void SetResistance(double resistance);
 
+    /**
+     * @brief   Returns the first terminal MNA node index.
+     * @return  Node unknown index, or `-1` for ground.
+     */
     int GetNodeA() const { return m_NodeA; }
 
+    /**
+     * @brief   Returns the second terminal MNA node index.
+     * @return  Node unknown index, or `-1` for ground.
+     */
     int GetNodeB() const { return m_NodeB; }
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
@@ -202,7 +232,8 @@ private:
     int m_NodeB;
     double m_Conductance;
     bool m_Noisy;
-    /// $4kT$ of the thermal noise; a resistor keeps its value at any temperature, as no temperature coefficient is set.
+    /// \f$4kT\f$ of the thermal noise; a resistor keeps its value at any temperature, as no temperature coefficient is
+    /// set.
     double m_FourKt = FOUR_KT_NOMINAL;
 };
 

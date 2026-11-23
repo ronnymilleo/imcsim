@@ -33,7 +33,6 @@ class CapacitorDevice;
  */
 class CircuitCompiler {
 public:
-    /// Compiles a collected circuit description into an executable MNA CompiledCircuit.
     [[nodiscard]] std::expected<CompiledCircuit, std::string> Compile(CircuitDescription description);
 
     // MNA unknown allocation and registration primitives (shared with macromodel modules)

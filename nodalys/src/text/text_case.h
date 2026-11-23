@@ -18,6 +18,7 @@ namespace Nodalys {
  * @details It is transparent, so a lookup can take a std::string_view without building a std::string.
  */
 struct CaseInsensitiveLess {
+    /// Enables heterogeneous lookup with `std::string_view` in associative containers.
     // NOLINTNEXTLINE(readability-identifier-naming): the standard library looks for this exact name
     using is_transparent = void;
 

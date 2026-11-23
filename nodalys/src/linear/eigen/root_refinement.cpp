@@ -68,7 +68,9 @@ double Norm(const std::vector<Complex> &vector) {
     return std::sqrt(sum);
 }
 
-/// The product (A - shift B) x, or (B x) when use_a is false.
+/**
+ * @brief   The product (A - shift B) x, or (B x) when use_a is false.
+ */
 std::vector<Complex>
 Apply(const DenseMatrix &a, const DenseMatrix &b, const Complex shift, const std::vector<Complex> &x) {
     const std::size_t n = a.Rows();
@@ -136,7 +138,10 @@ bool InverseIterationStep(const DenseMatrix &a, const DenseMatrix &b, Complex &s
     return std::abs(shift - previous) > STEP_TOLERANCE * std::abs(shift);
 }
 
-/// A start vector that no eigenvector is orthogonal to by construction of the pencils here: all entries different.
+/**
+ * @brief   A start vector that no eigenvector is orthogonal to by construction of the pencils here: all entries
+ * different.
+ */
 std::vector<Complex> StartVector(const std::size_t n) {
     std::vector<Complex> x(n);
     for (std::size_t index = 0; index < n; ++index) {
@@ -199,7 +204,9 @@ void RevertCollisions(const std::vector<Complex> &roots, std::vector<Complex> &r
     }
 }
 
-/// Refines the roots with a non-negative imaginary part; returns which of them were accepted.
+/**
+ * @brief   Refines the roots with a non-negative imaginary part; returns which of them were accepted.
+ */
 std::vector<bool> RefineUpperHalf(const DenseMatrix &a,
                                   const DenseMatrix &b,
                                   const std::vector<Complex> &roots,
@@ -228,7 +235,9 @@ std::vector<bool> RefineUpperHalf(const DenseMatrix &a,
     return is_done;
 }
 
-/// The index of the root with a positive imaginary part nearest to the conjugate of roots[index], or none.
+/**
+ * @brief   The index of the root with a positive imaginary part nearest to the conjugate of roots[index], or none.
+ */
 std::optional<std::size_t> FindUpperPartner(const std::vector<Complex> &roots, const std::size_t index) {
     const Complex mirrored = std::conj(roots[index]);
     std::optional<std::size_t> partner;
@@ -257,8 +266,8 @@ std::optional<std::size_t> FindUpperPartner(const std::vector<Complex> &roots, c
  * @param[in] roots  Finite eigenvalues from QZ.
  * @return  The refined roots, in the order of the input.
  */
-std::vector<Complex>
-RefineRoots(const DenseMatrix &mat_a, const DenseMatrix &mat_b, const std::vector<Complex> &roots) {
+std::vector<std::complex<double>>
+RefineRoots(const DenseMatrix &mat_a, const DenseMatrix &mat_b, const std::vector<std::complex<double>> &roots) {
     std::vector<Complex> result = roots;
     std::vector<bool> is_done(roots.size(), false);
     if (mat_a.Rows() <= MAX_REFINED_SIZE) {

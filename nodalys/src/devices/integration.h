@@ -21,12 +21,10 @@ namespace Nodalys {
  * @brief   What a storage element remembers of the accepted points, as the three formulas need it.
  */
 struct ChargeHistory {
-    /// Charge or flux at the last accepted point.
-    double Charge = 0.0;
+    double Charge = 0.0; ///< Charge or flux at the last accepted point.
     /// Its derivative at that point (the capacitor current, or the inductor voltage); the trapezoidal rule needs it.
     double Current = 0.0;
-    /// Charge or flux at the point before the last one; Gear-2 needs it.
-    double PreviousCharge = 0.0;
+    double PreviousCharge = 0.0; ///< Charge or flux at the point before the last one; Gear-2 needs it.
 };
 
 /**

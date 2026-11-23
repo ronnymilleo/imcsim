@@ -178,6 +178,11 @@ const char *DescribeParameter(const SensitivityParameter parameter) {
 
 } // namespace
 
+/**
+ * @brief   Serializes a DC operating point (.op) result to JSON text.
+ * @param[in] result  Simulation result to export.
+ * @return  Formatted JSON string.
+ */
 std::string ExportJson(const OperatingPointResult &result) {
     std::ostringstream ss;
     BeginDocument(ss, "operating_point");
@@ -203,6 +208,11 @@ std::string ExportJson(const OperatingPointResult &result) {
     return ss.str();
 }
 
+/**
+ * @brief   Serializes a time-domain transient (.tran) result to JSON text.
+ * @param[in] result  Simulation result to export.
+ * @return  Formatted JSON string.
+ */
 std::string ExportJson(const TransientResult &result) {
     std::ostringstream ss;
     BeginDocument(ss, "transient");
@@ -223,6 +233,11 @@ std::string ExportJson(const TransientResult &result) {
     return ss.str();
 }
 
+/**
+ * @brief   Serializes a DC sweep (.dc) result to JSON text.
+ * @param[in] result  Simulation result to export.
+ * @return  Formatted JSON string.
+ */
 std::string ExportJson(const DcSweepResult &result) {
     std::ostringstream ss;
     BeginDocument(ss, "dc_sweep");
@@ -244,6 +259,11 @@ std::string ExportJson(const DcSweepResult &result) {
     return ss.str();
 }
 
+/**
+ * @brief   Serializes a small-signal AC sweep (.ac) result to JSON text.
+ * @param[in] result  Simulation result to export.
+ * @return  Formatted JSON string.
+ */
 std::string ExportJson(const AcSweepResult &result) {
     std::ostringstream ss;
     BeginDocument(ss, "ac_sweep");
@@ -257,6 +277,11 @@ std::string ExportJson(const AcSweepResult &result) {
     return ss.str();
 }
 
+/**
+ * @brief   Serializes a small-signal DC transfer function (.tf) result to JSON text.
+ * @param[in] result  Simulation result to export.
+ * @return  Formatted JSON string.
+ */
 std::string ExportJson(const TransferFunctionResult &result) {
     std::ostringstream ss;
     BeginDocument(ss, "transfer_function");
@@ -268,6 +293,11 @@ std::string ExportJson(const TransferFunctionResult &result) {
     return ss.str();
 }
 
+/**
+ * @brief   Serializes a small-signal AC noise (.noise) result to JSON text.
+ * @param[in] result  Simulation result to export.
+ * @return  Formatted JSON string.
+ */
 std::string ExportJson(const NoiseResult &result) {
     std::ostringstream ss;
     BeginDocument(ss, "noise");
@@ -284,6 +314,11 @@ std::string ExportJson(const NoiseResult &result) {
     return ss.str();
 }
 
+/**
+ * @brief   Serializes a multiport S/Z/Y scattering parameter (.sp) result to JSON text.
+ * @param[in] result  Simulation result to export.
+ * @return  Formatted JSON string.
+ */
 std::string ExportJson(const SParameterResult &result) {
     std::ostringstream ss;
     BeginDocument(ss, "s_parameters");
@@ -320,6 +355,11 @@ std::string ExportJson(const SParameterResult &result) {
     return ss.str();
 }
 
+/**
+ * @brief   Serializes a small-signal pole-zero (.pz) result to JSON text.
+ * @param[in] result  Simulation result to export.
+ * @return  Formatted JSON string.
+ */
 std::string ExportJson(const PoleZeroResult &result) {
     std::ostringstream ss;
     BeginDocument(ss, "pole_zero");
@@ -331,6 +371,11 @@ std::string ExportJson(const PoleZeroResult &result) {
     return ss.str();
 }
 
+/**
+ * @brief   Serializes a DC sensitivity (.sens) result to JSON text.
+ * @param[in] result  Simulation result to export.
+ * @return  Formatted JSON string.
+ */
 std::string ExportJson(const SensitivityResult &result) {
     std::ostringstream ss;
     BeginDocument(ss, "sensitivity");
@@ -349,6 +394,11 @@ std::string ExportJson(const SensitivityResult &result) {
     return ss.str();
 }
 
+/**
+ * @brief   Serializes a small-signal AC sensitivity (.sens ... ac) result to JSON text.
+ * @param[in] result  Simulation result to export.
+ * @return  Formatted JSON string.
+ */
 std::string ExportJson(const AcSensitivityResult &result) {
     std::ostringstream ss;
     BeginDocument(ss, "ac_sensitivity");
@@ -387,6 +437,11 @@ std::string ExportJson(const AcSensitivityResult &result) {
     return ss.str();
 }
 
+/**
+ * @brief   Serializes a periodic steady-state Harmonic Balance (.hb) result to JSON text.
+ * @param[in] result  Simulation result to export.
+ * @return  Formatted JSON string.
+ */
 std::string ExportJson(const HarmonicBalanceResult &result) {
     std::ostringstream ss;
     BeginDocument(ss, "harmonic_balance");

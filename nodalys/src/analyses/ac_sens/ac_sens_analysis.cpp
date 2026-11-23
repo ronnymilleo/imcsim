@@ -1,11 +1,12 @@
 /**
  * @file    ac_sens_analysis.cpp
  * @brief   Small-signal AC sensitivity analysis: how the complex output voltage changes with every element value.
- * @details At each frequency the small-signal system is $Y(j\omega) x = b$ and the output is $V = d^T x$. One
- *          transposed solve $Y^T \lambda = d$ gives the derivative with respect to every element, $-\lambda^T
- *          (\partial Y / \partial p) x$. A nonlinear device also moves with the operating point, which an element
- *          value shifts: its weights $w_k = -\lambda^T (\partial Y / \partial x_k) x$ go through the DC adjoint
- *          $J^T \mu = w$ and add $-\mu^T g_p$, where $g_p$ is the derivative of the DC equations with respect to $p$.
+ * @details At each frequency the small-signal system is \f$Y(j\omega) x = b\f$ and the output is \f$V = d^T x\f$. One
+ *          transposed solve \f$Y^T \lambda = d\f$ gives the derivative with respect to every element, \f$-\lambda^T
+ *          (\partial Y / \partial p) x\f$. A nonlinear device also moves with the operating point, which an element
+ *          value shifts: its weights \f$w_k = -\lambda^T (\partial Y / \partial x_k) x\f$ go through the DC adjoint
+ *          \f$J^T \mu = w\f$ and add \f$-\mu^T g_p\f$, where \f$g_p\f$ is the derivative of the DC equations with
+ * respect to \f$p\f$.
  */
 
 #include "analyses/analyses.h"

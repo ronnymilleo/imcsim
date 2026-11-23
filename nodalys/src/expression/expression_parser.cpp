@@ -150,6 +150,28 @@ private:
             && ToLower(first.Second) == ToLower(second.Second);
     }
 
+    static bool IsBareArgumentName(const std::string_view name) {
+        return !name.empty() && std::ranges::none_of(name, IsSpace) && !name.contains(',');
+    }
+
+    static std::optional<ExpressionInput> ReadReferenceInput(const std::string_view arguments, const bool is_voltage) {
+        const std::size_t comma = arguments.find(',');
+        const std::string_view first = Trim(arguments.substr(0, comma));
+        if (!IsBareArgumentName(first)) {
+            return std::nullopt;
+        }
+        ExpressionInput input{.Type = is_voltage ? ExpressionInput::Kind::VOLTAGE : ExpressionInput::Kind::CURRENT,
+                              .First = std::string(first)};
+        if (comma != std::string_view::npos) {
+            const std::string_view second = Trim(arguments.substr(comma + 1));
+            if (!is_voltage || !IsBareArgumentName(second)) {
+                return std::nullopt;
+            }
+            input.Second = std::string(second);
+        }
+        return input;
+    }
+
     // Text
     char Peek(const std::size_t offset = 0) const {
         return m_Position + offset < m_Text.size() ? m_Text[m_Position + offset] : '\0';
@@ -317,7 +339,9 @@ private:
         return left;
     }
 
-    /// A sign or a negation binds looser than the power, so -2^2 is -(2^2), as in ngspice.
+    /**
+     * @brief   A sign or a negation binds looser than the power, so -2^2 is -(2^2), as in ngspice.
+     */
     int ParseUnary() {
         if (!Enter()) {
             return -1;
@@ -337,7 +361,9 @@ private:
         return result;
     }
 
-    /// Powers group from the left, so 2^3^2 is (2^3)^2 = 64, as in ngspice.
+    /**
+     * @brief   Powers group from the left, so 2^3^2 is (2^3)^2 = 64, as in ngspice.
+     */
     int ParsePower() {
         int base = ParsePrimary();
         while (base >= 0 && (Consume("**") || Consume("^"))) {
@@ -346,7 +372,9 @@ private:
         return base;
     }
 
-    /// The exponent may carry a sign, 2^-1, which then binds to the number alone.
+    /**
+     * @brief   The exponent may carry a sign, 2^-1, which then binds to the number alone.
+     */
     int ParsePowerOperand() {
         if (!Enter()) {
             return -1;
@@ -387,8 +415,10 @@ private:
         return Fail(DescribeUnexpected());
     }
 
-    /// A number with its SPICE suffix: digits, a point, an exponent when digits follow it, then the letters of the
-    /// scale and of any unit, which SPICE reads and ignores after the scale.
+    /**
+     * @brief   A number with its SPICE suffix: digits, a point, an exponent when digits follow it, then the letters of
+     * the scale and of any unit, which SPICE reads and ignores after the scale.
+     */
     int ParseNumber() {
         const std::size_t start = m_Position;
         while (IsDigit(Peek())) {
@@ -418,7 +448,9 @@ private:
         return AddNode({.Kind = Operation::CONSTANT, .Constant = *value});
     }
 
-    /// A reference, a function call, a constant or a variable.
+    /**
+     * @brief   A reference, a function call, a constant or a variable.
+     */
     int ParseName() {
         const std::size_t start = m_Position;
         while (IsIdentifierCharacter(Peek())) {
@@ -469,7 +501,10 @@ private:
                                 written));
     }
 
-    /// Reads `v(node)`, `v(node, reference)` or `i(source)`; the names go up to the closing parenthesis unchanged.
+    /**
+     * @brief   Reads `v(node)`, `v(node, reference)` or `i(source)`; the names go up to the closing parenthesis
+     * unchanged.
+     */
     int ParseReference(const std::size_t start, const bool is_voltage) {
         const std::size_t open = m_Position;
         const std::size_t close = m_Text.find(')', open);
@@ -477,29 +512,19 @@ private:
             return Fail("A parenthesis is not closed");
         }
         const std::string_view arguments = m_Text.substr(open + 1, close - open - 1);
-        const std::string_view reader = is_voltage ? "v" : "i";
         if (arguments.contains('(')) {
             return Fail(std::format("{}() takes the name of {}, not an expression",
-                                    reader,
+                                    is_voltage ? "v" : "i",
                                     is_voltage ? "a node" : "a source"));
         }
-        ExpressionInput input{.Type = is_voltage ? ExpressionInput::Kind::VOLTAGE : ExpressionInput::Kind::CURRENT};
-        const std::size_t comma = arguments.find(',');
-        input.First = std::string(Trim(arguments.substr(0, comma)));
-        if (comma != std::string_view::npos) {
-            input.Second = std::string(Trim(arguments.substr(comma + 1)));
-        }
-        const auto has_space = [](const std::string &name) { return std::ranges::any_of(name, IsSpace); };
-        const bool is_malformed = input.First.empty() || has_space(input.First) || has_space(input.Second)
-                               || (comma != std::string_view::npos && input.Second.empty())
-                               || input.Second.contains(',') || (!is_voltage && comma != std::string_view::npos);
-        if (is_malformed) {
+        const std::optional<ExpressionInput> input = ReadReferenceInput(arguments, is_voltage);
+        if (!input) {
             return Fail(is_voltage ? "v() takes one or two node names, such as v(out) or v(in, out)"
                                    : "i() takes the name of one source, such as i(vsense)");
         }
         m_Position = close + 1;
-        m_Program.References.push_back({.Input = input, .Start = start, .Length = m_Position - start});
-        return AddNode({.Kind = Operation::INPUT, .Input = FindOrAddInput(input)});
+        m_Program.References.push_back({.Input = *input, .Start = start, .Length = m_Position - start});
+        return AddNode({.Kind = Operation::INPUT, .Input = FindOrAddInput(*input)});
     }
 
     int FindOrAddInput(const ExpressionInput &input) {
@@ -513,7 +538,9 @@ private:
         return static_cast<int>(m_Program.Inputs.size()) - 1;
     }
 
-    /// Reads a function and its operands, `max(a, b)`.
+    /**
+     * @brief   Reads a function and its operands, `max(a, b)`.
+     */
     int ParseCall(const std::string_view written, const std::string &name) {
         const auto refused =
             std::ranges::find_if(REFUSED_FUNCTIONS, [&name](const RefusedName &entry) { return entry.Name == name; });

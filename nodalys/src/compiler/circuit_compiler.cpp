@@ -60,6 +60,11 @@ BjtParameters ScaleByArea(BjtParameters parameters, const double area) {
 
 } // namespace
 
+/**
+ * @brief   Compiles a collected CircuitDescription into an executable MNA CompiledCircuit.
+ * @param[in] description  Collected element specifications, ports, and thermal conditions.
+ * @return  Compiled circuit ready for simulation, or a diagnostic error message.
+ */
 std::expected<CompiledCircuit, std::string> CircuitCompiler::Compile(CircuitDescription description) {
     const int total_top_nodes = std::max(description.CircuitNodeCount, description.MaxNode + 1);
     const int circuit_node_count = std::max(total_top_nodes, 1);
@@ -93,10 +98,19 @@ std::expected<CompiledCircuit, std::string> CircuitCompiler::Compile(CircuitDesc
     return std::move(m_Compiled);
 }
 
+/**
+ * @brief   Maps a 1-based circuit NodeId to its 0-based MNA unknown index.
+ * @param[in] node  Circuit node identifier (`0` for ground).
+ * @return  Zero-based MNA unknown index, or `-1` for ground.
+ */
 int CircuitCompiler::MapNode(const NodeId node) const {
     return node <= 0 ? -1 : node - 1;
 }
 
+/**
+ * @brief   Allocates a new internal node-voltage unknown in the MNA system.
+ * @return  Zero-based unknown index of the newly allocated internal node.
+ */
 int CircuitCompiler::AllocateInternalNode() {
     const int index = static_cast<int>(m_IsNodeUnknown.size());
     m_IsNodeUnknown.push_back(true);
@@ -104,6 +118,10 @@ int CircuitCompiler::AllocateInternalNode() {
     return index;
 }
 
+/**
+ * @brief   Allocates a new branch-current unknown in the MNA system.
+ * @return  Zero-based unknown index of the newly allocated branch current.
+ */
 int CircuitCompiler::AllocateBranch() {
     const int index = static_cast<int>(m_IsNodeUnknown.size());
     m_IsNodeUnknown.push_back(false);
@@ -111,27 +129,52 @@ int CircuitCompiler::AllocateBranch() {
     return index;
 }
 
+/**
+ * @brief   Marks an unknown as connected to a dynamic energy-storage element for transient LTE monitoring.
+ * @param[in] unknown  Zero-based MNA unknown index (negative indices are ignored).
+ */
 void CircuitCompiler::MarkDynamic(const int unknown) {
     if (unknown >= 0 && static_cast<std::size_t>(unknown) < m_DynamicUnknown.size()) {
         m_DynamicUnknown[static_cast<std::size_t>(unknown)] = true;
     }
 }
 
+/**
+ * @brief   Takes ownership of a device and appends it to the compiled circuit.
+ * @param[in] device  Device instance to register.
+ * @return  Non-owning pointer to the stored device.
+ */
 Device *CircuitCompiler::AddDevice(std::unique_ptr<Device> device) {
     Device *ptr = device.get();
     m_Compiled.Devices.push_back(std::move(device));
     return ptr;
 }
 
+/**
+ * @brief   Registers a named element for lookup and records a single-terminal current readout for terminal 0.
+ * @param[in] name    Element designator.
+ * @param[in] device  Non-owning pointer to the compiled device.
+ */
 void CircuitCompiler::RegisterElement(const std::string &name, Device *device) {
     m_Compiled.ElementsByName[name] = device;
     m_Compiled.Currents.push_back({name, {{device, 0}}});
 }
 
+/**
+ * @brief   Registers an element name in the lookup table without creating a default current readout.
+ * @param[in] name    Element designator or alias.
+ * @param[in] device  Non-owning pointer to the compiled device.
+ */
 void CircuitCompiler::RegisterElementAlias(const std::string &name, Device *device) {
     m_Compiled.ElementsByName[name] = device;
 }
 
+/**
+ * @brief   Registers named multi-terminal current readouts (`<name>.<terminal>`) for a device.
+ * @param[in] name       Element designator prefix.
+ * @param[in] device     Non-owning pointer to the compiled device.
+ * @param[in] terminals  Ordered terminal suffixes matching terminal indices `0, 1, ...`.
+ */
 void CircuitCompiler::RegisterTerminalCurrents(const std::string &name,
                                                const Device *device,
                                                const std::initializer_list<std::string_view> terminals) {
@@ -141,22 +184,46 @@ void CircuitCompiler::RegisterTerminalCurrents(const std::string &name,
     }
 }
 
+/**
+ * @brief   Appends a composite current readout summing contributions from one or more device terminals.
+ * @param[in] name           Readout label exposed in analysis results.
+ * @param[in] contributions  List of `(device, terminal)` contributions to sum.
+ */
 void CircuitCompiler::AddCurrentReadout(std::string name, std::vector<CurrentContribution> contributions) {
     m_Compiled.Currents.push_back({std::move(name), std::move(contributions)});
 }
 
+/**
+ * @brief   Groups one or more internal devices under a single element name for `.noise` reporting.
+ * @param[in] name     Element designator shown in noise breakdown results.
+ * @param[in] devices  Non-owning pointers to the contributing devices.
+ */
 void CircuitCompiler::AddNoiseGroup(std::string name, std::vector<const Device *> devices) {
     m_Compiled.NoiseGroups.push_back({std::move(name), std::move(devices)});
 }
 
+/**
+ * @brief   Records an internal DC operating-point initial guess for a node unknown.
+ * @param[in] node     Zero-based MNA node unknown index.
+ * @param[in] voltage  Seed voltage in Volts.
+ */
 void CircuitCompiler::AddNodeSeed(const int node, const double voltage) {
     m_Compiled.NodeSeeds.push_back({.Node = node, .Voltage = voltage});
 }
 
+/**
+ * @brief   Returns the number of devices added to the compiled circuit so far.
+ * @return  Current device count.
+ */
 std::size_t CircuitCompiler::DeviceCount() const {
     return m_Compiled.Devices.size();
 }
 
+/**
+ * @brief   Collects non-owning pointers to all devices added at or after `first_index`.
+ * @param[in] first_index  Starting index in the compiled device list.
+ * @return  Vector of device pointers from `first_index` to the end.
+ */
 std::vector<const Device *> CircuitCompiler::DevicesFrom(const std::size_t first_index) const {
     std::vector<const Device *> devices;
     for (std::size_t i = first_index; i < m_Compiled.Devices.size(); ++i) {
@@ -165,6 +232,14 @@ std::vector<const Device *> CircuitCompiler::DevicesFrom(const std::size_t first
     return devices;
 }
 
+/**
+ * @brief   Compiles a smooth logic gate directly on MNA unknown indices (used by macromodels like flip-flops).
+ * @param[in] name      Element designator.
+ * @param[in] type      Logic gate function.
+ * @param[in] u_out     Output MNA unknown index.
+ * @param[in] u_inputs  Input MNA unknown indices.
+ * @param[in] params    Smooth logic gate parameters.
+ */
 void CircuitCompiler::AddRawLogicGate(std::string name,
                                       const LogicGateType type,
                                       const int u_out,

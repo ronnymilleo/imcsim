@@ -2,19 +2,20 @@
  * @file    thermal.h
  * @brief   The SPICE temperature laws the semiconductor devices of Nodalys share: the thermal voltage, the silicon
  *          band gap, the growth of a saturation current and the shift of a junction potential and capacitance.
- * @details The laws are those of ngspice 47 (`diotemp.c`, `bjttemp.c`, `mos1temp.c`, with the default `tlev` and
- *          `tlevc` of 0), written once here so the diode, the BJT and the MOSFET agree. A model is given at the
- *          nominal temperature $T_{\text{nom}}$ (`TNOM`, 27 °C unless the deck says otherwise) and simulated at $T$:
+ * @details
+ * The laws are those of ngspice 47 (`diotemp.c`, `bjttemp.c`, `mos1temp.c`, with the default `tlev` and `tlevc` of 0),
+ * written once here so the diode, the BJT and the MOSFET agree. A model is given at the nominal temperature
+ * \f$T_{\text{nom}}\f$ (`TNOM`, 27 °C unless the deck says otherwise) and simulated at \f$T\f$:
  *
- *          $$V_t = \frac{k T}{q}, \qquad E_g(T) = 1.16 - \frac{7.02\cdot10^{-4}\, T^2}{T + 1108}$$
+ * \f[V_t = \frac{k T}{q}, \qquad E_g(T) = 1.16 - \frac{7.02\cdot10^{-4}\, T^2}{T + 1108}\f]
  *
- *          A saturation current grows as $I_S(T) = I_S \exp\left(\left(\frac{T}{T_{nom}} - 1\right)
- *          \frac{E_G}{V_t(T)} + X_{TI} \ln\frac{T}{T_{nom}}\right)$ (a diode divides the exponent by its emission
- *          coefficient, a BJT leakage current too). A junction potential follows the band gap and the thermal voltage:
- *          $V_J(T) = \frac{T}{T_{ref}} V_{J0} + P(T)$ with $V_{J0} = (V_J - P(T_{nom})) \frac{T_{ref}}{T_{nom}}$ and
- *          $P(T) = E_g(T) - 1.1150877 \frac{T}{T_{ref}} - 3 V_t(T) \ln\frac{T}{T_{ref}}$, where $T_{ref} = 300.15$ K;
- *          the zero-bias capacitance follows it through $C_{J}(T) = C_J (1 + M (4\cdot10^{-4}(T - T_{ref}) -
- *          \gamma_T))$ with $\gamma_T = (V_J(T) - V_{J0}) / V_{J0}$, divided by the same factor at $T_{nom}$.
+ * A saturation current grows as \f$I_S(T) = I_S \exp\left(\left(\frac{T}{T_{nom}} - 1\right) \frac{E_G}{V_t(T)} +
+ * X_{TI} \ln\frac{T}{T_{nom}}\right)\f$ (a diode divides the exponent by its emission coefficient, a BJT leakage
+ * current too). A junction potential follows the band gap and the thermal voltage:
+ * \f$V_J(T) = \frac{T}{T_{ref}} V_{J0} + P(T)\f$ with \f$V_{J0} = (V_J - P(T_{nom})) \frac{T_{ref}}{T_{nom}}\f$ and
+ * \f$P(T) = E_g(T) - 1.1150877 \frac{T}{T_{ref}} - 3 V_t(T) \ln\frac{T}{T_{ref}}\f$, where \f$T_{ref} = 300.15\f$ K;
+ * the zero-bias capacitance follows it through \f$C_{J}(T) = C_J (1 + M (4\cdot10^{-4}(T - T_{ref}) - \gamma_T))\f$
+ * with \f$\gamma_T = (V_J(T) - V_{J0}) / V_{J0}\f$, divided by the same factor at \f$T_{nom}\f$.
  */
 
 #ifndef NODALYS_THERMAL_H
@@ -32,7 +33,7 @@ inline constexpr double BAND_GAP_SLOPE = 7.02e-4;
 // Temperature scale and SPICE reference
 /// Offset between degrees Celsius and kelvin, as ngspice (`CONSTCtoK`).
 inline constexpr double CELSIUS_TO_KELVIN = 273.15;
-/// The temperature the junction laws of SPICE refer to, $27\,^\circ\text{C}$ (`REFTEMP`), whatever `TNOM` is.
+/// The temperature the junction laws of SPICE refer to, \f$27\,^\circ\text{C}\f$ (`REFTEMP`), whatever `TNOM` is.
 inline constexpr double REFERENCE_TEMPERATURE_KELVIN = 300.15;
 
 /**
@@ -43,6 +44,10 @@ struct ThermalConditions {
     double TemperatureKelvin = NOMINAL_TEMPERATURE_KELVIN;
     double NominalKelvin = NOMINAL_TEMPERATURE_KELVIN;
 
+    /**
+     * @brief   Compares two ThermalConditions values for equality.
+     * @return  True when both simulation and nominal temperatures match.
+     */
     bool operator==(const ThermalConditions &) const = default;
 };
 

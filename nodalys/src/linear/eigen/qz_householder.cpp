@@ -9,6 +9,12 @@
 
 namespace Nodalys {
 
+/**
+ * @brief   Builds a 2-element Householder reflector zeroing the second component of `(x1, x2)`.
+ * @param[in] x1  First vector component.
+ * @param[in] x2  Second vector component to eliminate.
+ * @return  Reflector parameters (with `Active = false` when both inputs are zero).
+ */
 Householder2 MakeHouseholder2(const double x1, const double x2) {
     const double s = std::abs(x1) + std::abs(x2);
     if (s == 0.0) {
@@ -22,6 +28,13 @@ Householder2 MakeHouseholder2(const double x1, const double x2) {
     return {.V1 = v1, .V2 = v2, .U2 = v2 / v1, .Active = true};
 }
 
+/**
+ * @brief   Builds a 3-element Householder reflector zeroing the trailing components of `(x1, x2, x3)`.
+ * @param[in] x1  First vector component.
+ * @param[in] x2  Second vector component to eliminate.
+ * @param[in] x3  Third vector component to eliminate.
+ * @return  Reflector parameters (with `Active = false` when all inputs are zero).
+ */
 Householder3 MakeHouseholder3(const double x1, const double x2, const double x3) {
     const double s = std::abs(x1) + std::abs(x2) + std::abs(x3);
     if (s == 0.0) {
@@ -37,6 +50,15 @@ Householder3 MakeHouseholder3(const double x1, const double x2, const double x3)
     return {.V1 = v1, .V2 = v2, .V3 = v3, .U2 = v2 / v1, .U3 = v3 / v1, .Active = true};
 }
 
+/**
+ * @brief   Applies a 2-element Householder reflector from the left across rows `(r0, r1)`.
+ * @param[in,out] mat        Matrix to transform in place.
+ * @param[in]     r0         First row index.
+ * @param[in]     r1         Second row index.
+ * @param[in]     col_start  Inclusive starting column index.
+ * @param[in]     col_end    Exclusive ending column index.
+ * @param[in]     h          Precomputed 2-element Householder reflector.
+ */
 void ApplyLeftHouseholder2(DenseMatrix &mat,
                            const std::size_t r0,
                            const std::size_t r1,
@@ -50,6 +72,15 @@ void ApplyLeftHouseholder2(DenseMatrix &mat,
     }
 }
 
+/**
+ * @brief   Applies a 2-element Householder reflector from the right across columns `(c0, c1)`.
+ * @param[in,out] mat        Matrix to transform in place.
+ * @param[in]     c0         First column index.
+ * @param[in]     c1         Second column index.
+ * @param[in]     row_start  Inclusive starting row index.
+ * @param[in]     row_end    Exclusive ending row index.
+ * @param[in]     h          Precomputed 2-element Householder reflector.
+ */
 void ApplyRightHouseholder2(DenseMatrix &mat,
                             const std::size_t c0,
                             const std::size_t c1,
@@ -63,6 +94,16 @@ void ApplyRightHouseholder2(DenseMatrix &mat,
     }
 }
 
+/**
+ * @brief   Applies a 3-element Householder reflector from the left across rows `(r0, r1, r2)`.
+ * @param[in,out] mat        Matrix to transform in place.
+ * @param[in]     r0         First row index.
+ * @param[in]     r1         Second row index.
+ * @param[in]     r2         Third row index.
+ * @param[in]     col_start  Inclusive starting column index.
+ * @param[in]     col_end    Exclusive ending column index.
+ * @param[in]     h          Precomputed 3-element Householder reflector.
+ */
 void ApplyLeftHouseholder3(DenseMatrix &mat,
                            const std::size_t r0,
                            const std::size_t r1,
@@ -78,6 +119,16 @@ void ApplyLeftHouseholder3(DenseMatrix &mat,
     }
 }
 
+/**
+ * @brief   Applies a 3-element Householder reflector from the right across columns `(c0, c1, c2)`.
+ * @param[in,out] mat        Matrix to transform in place.
+ * @param[in]     c0         First column index.
+ * @param[in]     c1         Second column index.
+ * @param[in]     c2         Third column index.
+ * @param[in]     row_start  Inclusive starting row index.
+ * @param[in]     row_end    Exclusive ending row index.
+ * @param[in]     h          Precomputed 3-element Householder reflector.
+ */
 void ApplyRightHouseholder3(DenseMatrix &mat,
                             const std::size_t c0,
                             const std::size_t c1,

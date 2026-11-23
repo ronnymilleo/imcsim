@@ -15,13 +15,24 @@ namespace Nodalys {
 
 namespace {
 
-/// Default SPICE junction potential ($VJ = 0.75\text{ V}$) and grading coefficient ($M = 0.33$) used when BJT
+/// Default SPICE junction potential (\f$VJ = 0.75\text{ V}\f$) and grading coefficient (\f$M = 0.33\f$) used when BJT
 /// parameters omit them.
 constexpr double BJT_JUNCTION_POTENTIAL = 0.75;
 constexpr double BJT_GRADING_COEFFICIENT = 0.33;
 
 } // namespace
 
+/**
+ * @brief   Constructs an NPN or PNP Gummel-Poon bipolar transistor (`Q` element).
+ * @param[in] collector           External collector MNA node index.
+ * @param[in] base                External base MNA node index.
+ * @param[in] emitter             External emitter MNA node index.
+ * @param[in] internal_collector  Internal collector MNA node index (negative if \f$R_C = 0\f$).
+ * @param[in] internal_base       Internal base MNA node index (negative if \f$R_B = 0\f$).
+ * @param[in] internal_emitter    Internal emitter MNA node index (negative if \f$R_E = 0\f$).
+ * @param[in] parameters          Gummel-Poon model parameters at nominal temperature.
+ * @param[in] pnp                 True for PNP polarity, false for NPN.
+ */
 BjtDevice::BjtDevice(const int collector,
                      const int base,
                      const int emitter,
@@ -40,9 +51,9 @@ BjtDevice::BjtDevice(const int collector,
 
 /**
  * @brief   Scales the saturation currents, the current gains and the junction capacitances with the temperature.
- * @details The laws are those of ngspice with the default `TLEV` and `TLEVC`: $I_S(T) = I_S e^{f}$ with $f$ from
- *          GetSaturationCurrentLogRatio(), the base-emitter leakage $I_{SE}(T) = I_{SE} e^{f/N_E} / b$ and the gains
- *          $eta(T) = eta b$ with $b = (T/T_{nom})^{X_{TB}}$, and the junction potential and capacitances of
+ * @details The laws are those of ngspice with the default `TLEV` and `TLEVC`: \f$I_S(T) = I_S e^{f}\f$ with \f$f\f$
+ * from GetSaturationCurrentLogRatio(), the base-emitter leakage \f$I_{SE}(T) = I_{SE} e^{f/N_E} / b\f$ and the gains
+ *          \f$eta(T) = eta b\f$ with \f$b = (T/T_{nom})^{X_{TB}}\f$, and the junction potential and capacitances of
  *          GetJunctionPotential() and GetJunctionCapacitance(). The resistances, the transit time and the Early
  *          voltage have no coefficient set, so they stay.
  */

@@ -1,10 +1,10 @@
 /**
  * @file    ac_sens_elements.h
  * @brief   The elements an AC sensitivity analysis varies, and the derivative of the output with respect to each.
- * @details With the small-signal solution $x_{ac}$, the adjoint $\lambda$ of the output and the bias adjoint $\mu$, the
- *          change of the output with a value $p$ is
- *          $\partial V / \partial p = -\lambda^T (\partial Y / \partial p) x_{ac} - \mu^T g_p$, where $Y$ is the
- *          small-signal matrix and $g_p$ the derivative of the DC equations with respect to $p$.
+ * @details With the small-signal solution \f$x_{ac}\f$, the adjoint \f$\lambda\f$ of the output and the bias adjoint
+ * \f$\mu\f$, the change of the output with a value \f$p\f$ is
+ *          \f$\partial V / \partial p = -\lambda^T (\partial Y / \partial p) x_{ac} - \mu^T g_p\f$, where \f$Y\f$ is
+ * the small-signal matrix and \f$g_p\f$ the derivative of the DC equations with respect to \f$p\f$.
  */
 
 #ifndef NODALYS_AC_SENS_ELEMENTS_H
@@ -38,8 +38,7 @@ struct AcSensitivityPoint {
     double Omega = 0.0;
     const std::vector<double> &DcSolution;
     const std::vector<std::complex<double>> &AcSolution;
-    /// Adjoint of the output in the small-signal system.
-    const std::vector<std::complex<double>> &Adjoint;
+    const std::vector<std::complex<double>> &Adjoint; ///< Adjoint of the output in the small-signal system.
     /// Adjoint of the bias weights in the DC system; all zero for a circuit without nonlinear devices.
     const std::vector<std::complex<double>> &BiasAdjoint;
 };

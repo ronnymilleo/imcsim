@@ -23,6 +23,7 @@ void BehavioralSourceDevice::BindCurrent(const std::size_t input, const int bran
 
 /**
  * @brief   Tells that the device is nonlinear: its expression is evaluated again at every iterate.
+ * @return  Always false.
  */
 bool BehavioralSourceDevice::IsLinear() const {
     return false;
@@ -49,6 +50,12 @@ void BehavioralSourceDevice::SetTemperature(const ThermalConditions &thermal) {
     m_TemperatureCelsius = thermal.TemperatureKelvin - CELSIUS_TO_KELVIN;
 }
 
+/**
+ * @brief   Constructs the shared base for behavioral voltage and current sources.
+ * @param[in] name        Element designator used in fault diagnostics.
+ * @param[in] expression  Parsed mathematical expression.
+ * @param[in] bindings    Unknown-index bindings matching the expression inputs.
+ */
 BehavioralSourceDevice::BehavioralSourceDevice(std::string name,
                                                Expression expression,
                                                std::vector<BehavioralBinding> bindings)
@@ -114,6 +121,7 @@ double BehavioralSourceDevice::EvaluateAt(const std::vector<double> &x) const {
  * @brief   Gives the small-signal value of the expression: the sum of each derivative at the operating point times
  *          the phasor of its input.
  * @param[in] x_ac  Small-signal solution.
+ * @return  Small-signal complex phasor of the behavioral expression.
  */
 std::complex<double> BehavioralSourceDevice::SmallSignalValue(const std::vector<std::complex<double>> &x_ac) const {
     std::complex<double> value;
@@ -127,6 +135,10 @@ std::complex<double> BehavioralSourceDevice::SmallSignalValue(const std::vector<
     return value;
 }
 
+/**
+ * @brief   Returns the constant term of the current linearization: value minus sum of derivatives times inputs.
+ * @return  Linearization offset.
+ */
 double BehavioralSourceDevice::GetOffset() const {
     return m_Offset;
 }
@@ -144,6 +156,15 @@ std::vector<double> BehavioralSourceDevice::ReadInputs(const std::vector<double>
     return values;
 }
 
+/**
+ * @brief   Constructs a SPICE B behavioral voltage source.
+ * @param[in] name        Element designator.
+ * @param[in] node_a      Positive terminal MNA node index.
+ * @param[in] node_b      Negative terminal MNA node index.
+ * @param[in] branch      Allocated branch-current unknown index.
+ * @param[in] expression  Parsed voltage expression.
+ * @param[in] bindings    Input unknown bindings.
+ */
 BehavioralVoltageDevice::BehavioralVoltageDevice(std::string name,
                                                  const int node_a,
                                                  const int node_b,
@@ -154,12 +175,19 @@ BehavioralVoltageDevice::BehavioralVoltageDevice(std::string name,
       m_NodeB(node_b), m_Branch(branch) {
 }
 
+/**
+ * @brief   Returns the branch-current unknown index of this behavioral voltage source.
+ * @return  Branch unknown index.
+ */
 int BehavioralVoltageDevice::GetBranch() const {
     return m_Branch;
 }
 
 /**
  * @brief   Stamps the branch equation v(a) - v(b) - F = 0 linearized at the iterate.
+ * @param[in,out] sys   MNA system to stamp into.
+ * @param[in]     x     Current Newton iterate.
+ * @param[in]     time  Analysis time context.
  */
 void BehavioralVoltageDevice::Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) {
     Linearize(x, time);
@@ -188,6 +216,14 @@ std::unique_ptr<Device> BehavioralVoltageDevice::Clone() const {
     return std::make_unique<BehavioralVoltageDevice>(*this);
 }
 
+/**
+ * @brief   Constructs a SPICE B behavioral current source.
+ * @param[in] name        Element designator.
+ * @param[in] node_a      Positive terminal MNA node index (current leaves here).
+ * @param[in] node_b      Negative terminal MNA node index (current enters here).
+ * @param[in] expression  Parsed current expression.
+ * @param[in] bindings    Input unknown bindings.
+ */
 BehavioralCurrentDevice::BehavioralCurrentDevice(std::string name,
                                                  const int node_a,
                                                  const int node_b,
@@ -199,6 +235,9 @@ BehavioralCurrentDevice::BehavioralCurrentDevice(std::string name,
 
 /**
  * @brief   Stamps the current F leaving node a and entering node b, linearized at the iterate.
+ * @param[in,out] sys   MNA system to stamp into.
+ * @param[in]     x     Current Newton iterate.
+ * @param[in]     time  Analysis time context.
  */
 void BehavioralCurrentDevice::Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) {
     Linearize(x, time);

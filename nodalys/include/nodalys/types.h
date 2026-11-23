@@ -35,13 +35,16 @@ enum class DigitalLevel {
  *          corner, whatever the method.
  */
 enum class IntegrationMethod {
-    /// A-stable, keeps the amplitude of a lossless resonance, but rings on a stiff mode.
-    TRAPEZOIDAL,
+    TRAPEZOIDAL, ///< A-stable, keeps the amplitude of a lossless resonance, but rings on a stiff mode.
     /// Variable-step BDF-2 (SPICE `method=gear`): L-stable, so it settles stiff switching without ringing, at the
     /// cost of some numerical damping of a lightly damped resonance.
     GEAR2
 };
 
+/**
+ * @enum    LiveQuantity
+ * @brief   Device parameter kinds that can be modified interactively during a transient simulation.
+ */
 enum class LiveQuantity {
     RESISTANCE,
     DC_VOLTAGE
@@ -74,6 +77,10 @@ enum class RandomDistribution {
     POISSON = 4
 };
 
+/**
+ * @enum    SemiconductorPolarity
+ * @brief   Conduction polarity of a bipolar or MOS transistor.
+ */
 enum class SemiconductorPolarity {
     NPN,
     PNP,
@@ -92,6 +99,10 @@ struct CircuitPort {
     NodeId Node = 0;
     double ReferenceOhms = 50.0;
 
+    /**
+     * @brief   Compares two port descriptors for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const CircuitPort &) const = default;
 };
 
@@ -104,11 +115,19 @@ struct DiagnosticMessage {
     bool IsError = false;
 };
 
+/**
+ * @struct  LiveChange
+ * @brief   An interactive parameter update queued for an element during a live transient run.
+ */
 struct LiveChange {
     std::string Element;
     LiveQuantity Quantity = LiveQuantity::RESISTANCE;
     double Value = 0.0;
 
+    /**
+     * @brief   Compares two live parameter change requests for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const LiveChange &) const = default;
 };
 
@@ -136,9 +155,12 @@ struct BjtParameters {
     double EnergyGap = 1.11;
     /// Exponent `XTI` of the temperature ratio in the growth of the saturation currents.
     double SaturationCurrentExponent = 3.0;
-    /// Exponent `XTB` of the temperature ratio in the forward and reverse current gains.
-    double BetaExponent = 0.0;
+    double BetaExponent = 0.0; ///< Exponent `XTB` of the temperature ratio in the forward and reverse current gains.
 
+    /**
+     * @brief   Compares two BjtParameters values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const BjtParameters &) const = default;
 };
 
@@ -150,8 +172,7 @@ struct BoyleOpAmpParameters {
     bool IsPnpInput = false;
     double OpenLoopGainDecibels = 106.0;
     double GainBandwidth = 1e6;
-    /// Volts per microsecond, as datasheets specify.
-    double SlewRateVoltsPerMicrosecond = 0.5;
+    double SlewRateVoltsPerMicrosecond = 0.5; ///< Volts per microsecond, as datasheets specify.
     double PhaseMarginDegrees = 60.0;
     double InputBiasCurrent = 80e-9;
     double CommonModeRejectionDecibels = 90.0;
@@ -162,6 +183,10 @@ struct BoyleOpAmpParameters {
     double SupplyCurrent = 1.7e-3;
     double InputOffsetVoltage = 0.0;
 
+    /**
+     * @brief   Compares two BoyleOpAmpParameters values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const BoyleOpAmpParameters &) const = default;
 };
 
@@ -184,6 +209,10 @@ struct DiodeParameters {
     /// Exponent `XTI` of the temperature ratio in the growth of the saturation current.
     double SaturationCurrentExponent = 3.0;
 
+    /**
+     * @brief   Compares two DiodeParameters values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const DiodeParameters &) const = default;
 };
 
@@ -195,13 +224,15 @@ struct DiodeParameters {
  *          duration reaches the melting I2t.
  */
 struct FuseParameters {
-    /// Largest current the fuse carries for ever, in amperes.
-    double RatedCurrent = 1.0;
-    /// Current squared times time that melts the element in a short overload, in A^2 s.
-    double MeltingI2t = 1.045;
+    double RatedCurrent = 1.0; ///< Largest current the fuse carries for ever, in amperes.
+    double MeltingI2t = 1.045; ///< Current squared times time that melts the element in a short overload, in A^2 s.
     double ColdResistance = 0.0964;
     double BlownResistance = 1e9;
 
+    /**
+     * @brief   Compares two FuseParameters values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const FuseParameters &) const = default;
 };
 
@@ -222,6 +253,10 @@ struct MosfetParameters {
     /// Surface potential `PHI` in volts, which the threshold voltage follows with the temperature.
     double SurfacePotential = 0.6;
 
+    /**
+     * @brief   Compares two MosfetParameters values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const MosfetParameters &) const = default;
 };
 
@@ -230,23 +265,19 @@ struct MosfetParameters {
  * @brief   Physical and analog parameters for C^inf smooth continuous logic gates.
  */
 struct SmoothLogicParameters {
-    /// Low logic level voltage in Volts.
-    double VLow = 0.0;
-    /// High logic level voltage in Volts.
-    double VHigh = 5.0;
-    /// Input switching threshold in Volts.
-    double VThreshold = 2.5;
-    /// Delta transition width in Volts for smooth tanh saturation.
-    double TransitionWidth = 0.1;
-    /// Inertial dynamic propagation delay in seconds.
-    double PropagationDelay = 1e-9;
-    /// Thevenin output stage resistance in Ohms.
-    double OutputResistance = 50.0;
-    /// High-impedance input leakage resistance in Ohms.
-    double InputResistance = 1e9;
-    /// Hysteresis voltage span for Schmitt triggers in Volts.
-    double Hysteresis = 0.5;
+    double VLow = 0.0;              ///< Low logic level voltage in Volts.
+    double VHigh = 5.0;             ///< High logic level voltage in Volts.
+    double VThreshold = 2.5;        ///< Input switching threshold in Volts.
+    double TransitionWidth = 0.1;   ///< Delta transition width in Volts for smooth tanh saturation.
+    double PropagationDelay = 1e-9; ///< Inertial dynamic propagation delay in seconds.
+    double OutputResistance = 50.0; ///< Thevenin output stage resistance in Ohms.
+    double InputResistance = 1e9;   ///< High-impedance input leakage resistance in Ohms.
+    double Hysteresis = 0.5;        ///< Hysteresis voltage span for Schmitt triggers in Volts.
 
+    /**
+     * @brief   Compares two SmoothLogicParameters values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const SmoothLogicParameters &) const = default;
 };
 
@@ -260,6 +291,10 @@ struct SwitchParameters {
     double OnResistance = 0.01;
     double OffResistance = 1e9;
 
+    /**
+     * @brief   Compares two SwitchParameters values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const SwitchParameters &) const = default;
 };
 
@@ -276,6 +311,10 @@ struct AmParameters {
     double CarrierFrequency = 1e3;
     double Delay = 0.0;
 
+    /**
+     * @brief   Compares two AmParameters values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const AmParameters &) const = default;
 };
 
@@ -289,6 +328,10 @@ struct ClockParameters {
     double LogicLevel = 5.0;
     double StartDelay = 0.0;
 
+    /**
+     * @brief   Compares two ClockParameters values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const ClockParameters &) const = default;
 };
 
@@ -304,6 +347,10 @@ struct ExpParameters {
     double FallDelay = 5e-3;
     double FallTimeConstant = 1e-3;
 
+    /**
+     * @brief   Compares two ExpParameters values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const ExpParameters &) const = default;
 };
 
@@ -321,6 +368,10 @@ struct NoiseParameters {
     double CaptureTime = 1e-3;
     double EmissionTime = 1e-3;
 
+    /**
+     * @brief   Compares two NoiseParameters values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const NoiseParameters &) const = default;
 };
 
@@ -337,6 +388,10 @@ struct PulseParameters {
     double Width = 0.5e-3;
     double Period = 1e-3;
 
+    /**
+     * @brief   Compares two PulseParameters values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const PulseParameters &) const = default;
 };
 
@@ -348,6 +403,10 @@ struct PwlPoint {
     double Time = 0.0;
     double Value = 0.0;
 
+    /**
+     * @brief   Compares two PwlPoint values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const PwlPoint &) const = default;
 };
 
@@ -358,6 +417,10 @@ struct PwlPoint {
 struct PwlParameters {
     std::vector<PwlPoint> Points = {{0.0, 0.0}, {1e-3, 5.0}, {2e-3, 0.0}};
 
+    /**
+     * @brief   Compares two PwlParameters values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const PwlParameters &) const = default;
 };
 
@@ -372,6 +435,10 @@ struct RandomParameters {
     double First = 0.1;
     double Second = 0.0;
 
+    /**
+     * @brief   Compares two RandomParameters values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const RandomParameters &) const = default;
 };
 
@@ -386,6 +453,10 @@ struct SffmParameters {
     double ModulationIndex = 5.0;
     double SignalFrequency = 100.0;
 
+    /**
+     * @brief   Compares two SffmParameters values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const SffmParameters &) const = default;
 };
 
@@ -398,9 +469,12 @@ struct SineParameters {
     double Frequency = 1e3;
     double Offset = 0.0;
     double Magnitude = 1.0;
-    /// Phase angle in degrees.
-    double PhaseDegrees = 0.0;
+    double PhaseDegrees = 0.0; ///< Phase angle in degrees.
 
+    /**
+     * @brief   Compares two SineParameters values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const SineParameters &) const = default;
 };
 

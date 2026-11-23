@@ -22,6 +22,9 @@ constexpr SourcePeriodicity NON_PERIODIC{.Kind = SourceWaveformKind::NON_PERIODI
 
 /**
  * @brief   Describes an amplitude-modulated source.
+ * @param[in] params        AM waveform parameters.
+ * @param[in] ac_magnitude  AC small-signal excitation magnitude.
+ * @return  Configured SourceSpec.
  */
 SourceSpec MakeAmSpec(const AmParameters &params, const double ac_magnitude) {
     return {.Dc = params.Offset,
@@ -33,6 +36,8 @@ SourceSpec MakeAmSpec(const AmParameters &params, const double ac_magnitude) {
 
 /**
  * @brief   Describes a periodic square-wave clock voltage source.
+ * @param[in] params  Clock waveform parameters.
+ * @return  Configured SourceSpec.
  */
 SourceSpec MakeClockSpec(const ClockParameters &params) {
     const double period = params.Frequency > 0.0 ? 1.0 / params.Frequency : 0.0;
@@ -48,6 +53,9 @@ SourceSpec MakeClockSpec(const ClockParameters &params) {
 
 /**
  * @brief   Describes a source that holds a constant level.
+ * @param[in] dc            Constant DC level.
+ * @param[in] ac_magnitude  AC small-signal excitation magnitude.
+ * @return  Configured SourceSpec.
  */
 SourceSpec MakeDcSpec(const double dc, const double ac_magnitude) {
     return {.Dc = dc, .Waveform = MakeDcWaveform(dc), .AcMagnitude = ac_magnitude};
@@ -55,6 +63,9 @@ SourceSpec MakeDcSpec(const double dc, const double ac_magnitude) {
 
 /**
  * @brief   Describes an exponential source.
+ * @param[in] params        Exponential waveform parameters.
+ * @param[in] ac_magnitude  AC small-signal excitation magnitude.
+ * @return  Configured SourceSpec.
  */
 SourceSpec MakeExpSpec(const ExpParameters &params, const double ac_magnitude) {
     return {.Dc = params.InitialValue,
@@ -66,6 +77,9 @@ SourceSpec MakeExpSpec(const ExpParameters &params, const double ac_magnitude) {
 
 /**
  * @brief   Describes a noise source, which redraws its samples when the seed is reset.
+ * @param[in] params        Transient noise waveform parameters.
+ * @param[in] ac_magnitude  AC small-signal excitation magnitude.
+ * @return  Configured SourceSpec with cloneable noise callback state.
  */
 SourceSpec MakeNoiseSpec(const NoiseParameters &params, const double ac_magnitude) {
     TransientNoiseSource noise = MakeNoiseSource(params);
@@ -85,6 +99,9 @@ SourceSpec MakeNoiseSpec(const NoiseParameters &params, const double ac_magnitud
 
 /**
  * @brief   Describes a pulse source, which is periodic when the pulse has a period.
+ * @param[in] params        Pulse waveform parameters.
+ * @param[in] ac_magnitude  AC small-signal excitation magnitude.
+ * @return  Configured SourceSpec.
  */
 SourceSpec MakePulseSpec(const PulseParameters &params, const double ac_magnitude) {
     return {.Dc = params.Low,
@@ -99,6 +116,9 @@ SourceSpec MakePulseSpec(const PulseParameters &params, const double ac_magnitud
 
 /**
  * @brief   Describes a piecewise linear source, which starts from the value of its first point.
+ * @param[in] params        Piecewise-linear waveform parameters.
+ * @param[in] ac_magnitude  AC small-signal excitation magnitude.
+ * @return  Configured SourceSpec.
  */
 SourceSpec MakePwlSpec(const PwlParameters &params, const double ac_magnitude) {
     const double dc = params.Points.empty() ? 0.0 : params.Points.front().Value;
@@ -111,6 +131,9 @@ SourceSpec MakePwlSpec(const PwlParameters &params, const double ac_magnitude) {
 
 /**
  * @brief   Describes a source of random levels, which redraws them when the seed is reset.
+ * @param[in] params        Random-sample waveform parameters.
+ * @param[in] ac_magnitude  AC small-signal excitation magnitude.
+ * @return  Configured SourceSpec with cloneable RNG callback state.
  */
 SourceSpec MakeRandomSpec(const RandomParameters &params, const double ac_magnitude) {
     TransientNoiseSource random = MakeRandomSource(params);
@@ -130,6 +153,9 @@ SourceSpec MakeRandomSpec(const RandomParameters &params, const double ac_magnit
 
 /**
  * @brief   Describes a single-frequency FM source.
+ * @param[in] params        SFFM waveform parameters.
+ * @param[in] ac_magnitude  AC small-signal excitation magnitude.
+ * @return  Configured SourceSpec.
  */
 SourceSpec MakeSffmSpec(const SffmParameters &params, const double ac_magnitude) {
     return {.Dc = params.Offset,
@@ -139,7 +165,11 @@ SourceSpec MakeSffmSpec(const SffmParameters &params, const double ac_magnitude)
 }
 
 /**
- * @brief   Describes a sine source; a damped one is not periodic, so the harmonic balance cannot take it.
+ * @brief   Describes a sine source; a damped one is not periodic, so harmonic balance cannot take it.
+ * @param[in] params        Sine waveform parameters.
+ * @param[in] ac_magnitude  AC small-signal excitation magnitude.
+ * @param[in] is_damped     True when exponential damping is active.
+ * @return  Configured SourceSpec.
  */
 SourceSpec MakeSineSpec(const SineParameters &params, const double ac_magnitude, const bool is_damped) {
     return {.Dc = params.Offset,
