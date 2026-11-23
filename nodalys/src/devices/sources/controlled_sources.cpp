@@ -14,6 +14,13 @@ namespace Nodalys {
 // CccsDevice
 // ============================================================================
 
+/**
+ * @brief   Constructs a current-controlled current source (`F` element).
+ * @param[in] node_a          Positive output MNA node index (current leaves here).
+ * @param[in] node_b          Negative output MNA node index (current enters here).
+ * @param[in] control_branch  Controlling branch-current unknown index.
+ * @param[in] gain            Dimensionless current gain.
+ */
 CccsDevice::CccsDevice(const int node_a, const int node_b, const int control_branch, const double gain)
     : m_NodeA(node_a), m_NodeB(node_b), m_ControlBranch(control_branch), m_Gain(gain) {
 }
@@ -58,6 +65,14 @@ std::unique_ptr<Device> CccsDevice::Clone() const {
 // CcvsDevice
 // ============================================================================
 
+/**
+ * @brief   Constructs a current-controlled voltage source (`H` element).
+ * @param[in] node_a          Positive output MNA node index.
+ * @param[in] node_b          Negative output MNA node index.
+ * @param[in] branch          Allocated output branch-current unknown index.
+ * @param[in] control_branch  Controlling branch-current unknown index.
+ * @param[in] gain            Transresistance in Ohms.
+ */
 CcvsDevice::CcvsDevice(const int node_a,
                        const int node_b,
                        const int branch,
@@ -109,6 +124,14 @@ std::unique_ptr<Device> CcvsDevice::Clone() const {
 // VccsDevice
 // ============================================================================
 
+/**
+ * @brief   Constructs a voltage-controlled current source (`G` element).
+ * @param[in] node_a            Positive output MNA node index (current leaves here).
+ * @param[in] node_b            Negative output MNA node index (current enters here).
+ * @param[in] control_positive  Controlling positive MNA node index.
+ * @param[in] control_negative  Controlling negative MNA node index.
+ * @param[in] gain              Transconductance in Siemens.
+ */
 VccsDevice::VccsDevice(const int node_a,
                        const int node_b,
                        const int control_positive,
@@ -162,6 +185,15 @@ std::unique_ptr<Device> VccsDevice::Clone() const {
 // VcvsDevice
 // ============================================================================
 
+/**
+ * @brief   Constructs a voltage-controlled voltage source (`E` element).
+ * @param[in] node_a            Positive output MNA node index.
+ * @param[in] node_b            Negative output MNA node index.
+ * @param[in] control_positive  Controlling positive MNA node index.
+ * @param[in] control_negative  Controlling negative MNA node index.
+ * @param[in] branch            Allocated output branch-current unknown index.
+ * @param[in] gain              Dimensionless voltage gain.
+ */
 VcvsDevice::VcvsDevice(const int node_a,
                        const int node_b,
                        const int control_positive,

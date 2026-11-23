@@ -94,6 +94,9 @@ struct HbWorkspace {
     /**
      * @brief   Position of one coefficient of one unknown in the packed harmonic vectors.
      * @details Inline because every loop over the coefficients calls it.
+     * @param[in] unknown     Zero-based MNA unknown index.
+     * @param[in] coeff_slot  Harmonic coefficient slot in `[0, CoeffsPerUnknown)`.
+     * @return  Flat index into packed harmonic state/residual vectors.
      */
     std::size_t Index(const int unknown, const int coeff_slot) const {
         return static_cast<std::size_t>(unknown) * static_cast<std::size_t>(CoeffsPerUnknown)

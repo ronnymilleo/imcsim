@@ -13,6 +13,13 @@
 
 namespace Nodalys {
 
+/**
+ * @brief   Constructs a Shockley semiconductor diode (`D` element).
+ * @param[in] anode       External anode MNA node index.
+ * @param[in] cathode     External cathode MNA node index.
+ * @param[in] internal    Internal cathode MNA node index (negative if \f$R_S = 0\f$).
+ * @param[in] parameters  Diode model parameters at nominal temperature.
+ */
 DiodeDevice::DiodeDevice(const int anode, const int cathode, const int internal, DiodeParameters parameters)
     : m_Anode(anode), m_Cathode(cathode), m_Internal(internal), m_JunctionNode(internal >= 0 ? internal : cathode),
       m_Given(parameters), m_Parameters(parameters), m_Vt(parameters.EmissionCoefficient * THERMAL_VOLTAGE),
@@ -23,9 +30,10 @@ DiodeDevice::DiodeDevice(const int anode, const int cathode, const int internal,
 /**
  * @brief   Scales the saturation current, the junction potential and the junction capacitance with the temperature.
  * @details The breakdown voltage and current keep their values: ngspice solves its breakdown knee again at the new
- *          temperature, but a model without `TCV` keeps the current at the breakdown voltage at $I_{BV}$, which is
+ *          temperature, but a model without `TCV` keeps the current at the breakdown voltage at \f$I_{BV}\f$, which is
  *          what the exponential here is anchored to. The exponent of the junction uses the emission coefficient, as
- *          ngspice divides the growth of $I_S$ by it. The series resistance and the transit time have no coefficient.
+ *          ngspice divides the growth of \f$I_S\f$ by it. The series resistance and the transit time have no
+ * coefficient.
  */
 void DiodeDevice::ApplyTemperature(const ThermalConditions &thermal) {
     m_Thermal = thermal;

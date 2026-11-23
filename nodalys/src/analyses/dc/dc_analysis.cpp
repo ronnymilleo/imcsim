@@ -126,6 +126,13 @@ std::expected<DcSweepCurve, std::string> SweepCurve(SweepRun &run, const double 
 
 } // namespace
 
+/**
+ * @brief   Computes the DC operating point (`.op`) on a mutable compiled circuit.
+ * @param[in,out] compiled  Compiled circuit workspace for this run.
+ * @param[in]     options   Newton-Raphson tolerances and convergence controls.
+ * @param[out]    messages  Optional sink for convergence diagnostics.
+ * @return  DC operating point result, or an error message if Newton-Raphson fails to converge.
+ */
 std::expected<OperatingPointResult, std::string> ComputeOperatingPoint(CompiledCircuit &compiled,
                                                                        const ConvergenceOptions &options,
                                                                        std::vector<DiagnosticMessage> *messages) {

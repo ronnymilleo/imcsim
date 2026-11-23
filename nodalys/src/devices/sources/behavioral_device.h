@@ -55,7 +55,6 @@ protected:
     void StampPartials(MnaSystem &sys, int row, double sign) const;
     double EvaluateAt(const std::vector<double> &x) const;
     std::complex<double> SmallSignalValue(const std::vector<std::complex<double>> &x_ac) const;
-    /// The constant of the linearization: the value minus the sum of each derivative times its input at the iterate.
     double GetOffset() const;
 
 private:

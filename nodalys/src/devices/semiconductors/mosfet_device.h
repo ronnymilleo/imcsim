@@ -14,7 +14,7 @@ namespace Nodalys {
 /**
  * @class   MosfetDevice
  * @brief   An N-channel or P-channel MOSFET using the SPICE level-1 (Shichman-Hodges) model with symmetric
- *          source/drain reversal for $V_{DS} < 0$, body-drain diode, and gate-overlap capacitances.
+ *          source/drain reversal for \f$V_{DS} < 0\f$, body-drain diode, and gate-overlap capacitances.
  * @details
  * Terminal indices: `0 = Drain`, `1 = Gate`, `2 = Source`.
  */
@@ -52,18 +52,26 @@ public:
 
 private:
     struct Channel {
-        double Current; ///< Magnitude of channel current ($\ge 0$) in the effective drain-to-source frame.
-        double Gm;      ///< Transconductance $\partial I / \partial v_{gs,\text{eff}} \ge 0$.
-        double Gds;     ///< Output conductance $\partial I / \partial v_{ds,\text{eff}} \ge 0$.
+        /// Magnitude of channel current (\f$\ge 0\f$) in the effective drain-to-source frame.
+        double Current;
+        /// Transconductance \f$\partial I / \partial v_{gs,\text{eff}} \ge 0\f$.
+        double Gm;
+        /// Output conductance \f$\partial I / \partial v_{ds,\text{eff}} \ge 0\f$.
+        double Gds;
     };
 
     /// The channel in the frame where the drain sits at the higher potential, after the source and drain swap.
     struct ChannelState {
-        int Drain;          ///< Node acting as the drain; the intrinsic source when the channel is reversed.
-        int Source;         ///< Node acting as the source; the intrinsic drain when the channel is reversed.
-        bool IsReversed;    ///< Whether the source and drain swapped roles because $v_{ds}$ has the wrong sign.
-        double Polarity;    ///< $+1$ for NMOS and $-1$ for PMOS.
-        Channel Conduction; ///< Current and conductances in the effective frame.
+        /// Node acting as the drain; the intrinsic source when the channel is reversed.
+        int Drain;
+        /// Node acting as the source; the intrinsic drain when the channel is reversed.
+        int Source;
+        /// Whether the source and drain swapped roles because \f$v_{ds}\f$ has the wrong sign.
+        bool IsReversed;
+        /// \f$+1\f$ for NMOS and \f$-1\f$ for PMOS.
+        double Polarity;
+        /// Current and conductances in the effective frame.
+        Channel Conduction;
     };
 
     /// The two terminals of the body-drain diode, in the direction it conducts.
@@ -75,31 +83,31 @@ private:
     int m_Drain;
     int m_Gate;
     int m_Source;
-    int m_D; ///< Intrinsic drain node (`internal_drain` if $R_D > 0$, else `m_Drain`).
-    int m_S; ///< Intrinsic source node (`internal_source` if $R_S > 0$, else `m_Source`).
+    /// Intrinsic drain node (`internal_drain` if \f$R_D > 0\f$, else `m_Drain`).
+    int m_D;
+    /// Intrinsic source node (`internal_source` if \f$R_S > 0\f$, else `m_Source`).
+    int m_S;
     /// The parameters as the model gives them, at the nominal temperature.
     MosfetParameters m_Given;
     /// The parameters at the temperature of the run, which every evaluation reads.
     MosfetParameters m_Parameters;
     ThermalConditions m_Thermal;
     bool m_Pmos;
-    double m_Beta; ///< $\text{KP} \cdot (W / L)$.
+    /// \f$\text{KP} \cdot (W / L)\f$.
+    double m_Beta;
     double m_Vt;
-    /// Gate-source ($C_{GSO} \cdot W$) and gate-drain ($C_{GDO} \cdot W$) linear overlap capacitances.
+    /// Gate-source (\f$C_{GSO} \cdot W\f$) and gate-drain (\f$C_{GDO} \cdot W\f$) linear overlap capacitances.
     double m_Cgs;
     double m_Cgd;
     ChargeHistory m_HistoryGs, m_SavedHistoryGs;
     ChargeHistory m_HistoryGd, m_SavedHistoryGd;
     double m_Gcgs = 0.0, m_Ieqgs = 0.0, m_Gcgd = 0.0, m_Ieqgd = 0.0;
-    double m_Critical; ///< `PNJLIM` critical voltage of the body-drain junction diode.
+    /// `PNJLIM` critical voltage of the body-drain junction diode.
+    double m_Critical;
 
-    /// Recomputes the parameters at the temperature, from the ones given at the nominal temperature.
     void ApplyTemperature(const ThermalConditions &thermal);
-    /// Evaluates the level-1 channel equations for nonnegative effective $v_{ds} \ge 0$.
     Channel Evaluate(double vgs_eff, double vds_eff) const;
-    /// Finds which terminal acts as the drain at the solution `x` and evaluates the channel in that frame.
     ChannelState EvaluateChannel(const std::vector<double> &x) const;
-    /// Finds the anode and the cathode of the body-drain diode, which depend on the polarity.
     BodyDiodeNodes GetBodyDiodeNodes() const;
 };
 

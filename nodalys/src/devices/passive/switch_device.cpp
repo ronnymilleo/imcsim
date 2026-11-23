@@ -9,6 +9,14 @@
 
 namespace Nodalys {
 
+/**
+ * @brief   Constructs a voltage-controlled hysteretic switch (`S` element).
+ * @param[in] node_a            First switched terminal MNA node index.
+ * @param[in] node_b            Second switched terminal MNA node index.
+ * @param[in] control_positive  Controlling positive MNA node index.
+ * @param[in] control_negative  Controlling negative MNA node index.
+ * @param[in] parameters        Threshold, hysteresis, on-resistance, and off-resistance parameters.
+ */
 SwitchDevice::SwitchDevice(const int node_a,
                            const int node_b,
                            const int control_positive,

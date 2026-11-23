@@ -36,6 +36,7 @@ struct ExpressionProgram;
  * @brief   A voltage or a current an expression reads, as it is named in the text.
  */
 struct ExpressionInput {
+    /// Whether the expression input reads a node voltage (`v(...)`) or a source branch current (`i(...)`).
     enum class Kind {
         VOLTAGE,
         CURRENT

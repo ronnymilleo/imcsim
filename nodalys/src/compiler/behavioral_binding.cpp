@@ -71,6 +71,12 @@ std::optional<std::string> BindExpressionInputs(CircuitDescription &description,
 /**
  * @brief   Parses a behavioral source expression during collection, tracks referenced nodes, and appends a
  *          BehavioralSpec (or records an error on the description).
+ * @param[in,out] description  Circuit description receiving the element or diagnostic error.
+ * @param[in]     name         Behavioral element designator.
+ * @param[in]     pos          Positive terminal node.
+ * @param[in]     neg          Negative terminal node.
+ * @param[in]     text         Raw mathematical expression string.
+ * @param[in]     is_voltage   True for a voltage source (`V=...`), false for a current source (`I=...`).
  */
 void AppendBehavioralElement(CircuitDescription &description,
                              std::string name,

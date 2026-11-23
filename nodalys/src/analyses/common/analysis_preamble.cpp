@@ -39,6 +39,7 @@ const IndependentSourceDevice &InputSource::GetSource() const {
 
 /**
  * @brief   Returns the source as a voltage source when it is one, or null for a current source.
+ * @return  Pointer to the VoltageSourceDevice, or nullptr for a current source.
  */
 const VoltageSourceDevice *InputSource::AsVoltage() const {
     return IsVoltage() ? static_cast<const VoltageSourceDevice *>(Source) : nullptr;

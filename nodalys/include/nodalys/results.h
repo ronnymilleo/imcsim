@@ -42,9 +42,9 @@ enum class SensitivityParameter {
 /**
  * @struct  AcElementSensitivity
  * @brief   How the complex output of an AC analysis changes with the value of one element, at every frequency.
- * @details Derivatives are $\partial V / \partial p$ in volts per unit of the value. The two figures are what a user
- *          reads: the change of the magnitude in decibels and of the phase in degrees for a 1 % change of the value,
- *          none at a frequency where the output is too small for a relative change to mean anything.
+ * @details Derivatives are \f$\partial V / \partial p\f$ in volts per unit of the value. The two figures are what a
+ * user reads: the change of the magnitude in decibels and of the phase in degrees for a 1 % change of the value, none
+ * at a frequency where the output is too small for a relative change to mean anything.
  */
 struct AcElementSensitivity {
     /// Lower case name of the element, as the netlist writes it ("r1", "x1.r1" inside a block).
@@ -150,8 +150,8 @@ struct DcSweepResult {
 /**
  * @struct  HarmonicBalanceResult
  * @brief   Periodic steady-state Harmonic Balance (.hb) spectra, one-cycle waveforms, and diagnostics.
- * @details Phasors use peak amplitude convention: $x(t) = X_0 + \sum_{k=1}^{H} \text{Re}(X_k e^{j k \omega_0 t})$,
- *          where DC ($k = 0$) has zero imaginary part.
+ * @details Phasors use peak amplitude convention: \f$x(t) = X_0 + \sum_{k=1}^{H} \text{Re}(X_k e^{j k \omega_0 t})\f$,
+ *          where DC (\f$k = 0\f$) has zero imaginary part.
  */
 struct HarmonicBalanceResult {
     std::vector<double> Frequencies;
@@ -233,26 +233,55 @@ struct SParameterResult {
     /// Diagnostic warnings.
     std::vector<std::string> Warnings;
 
+    /**
+     * @brief   Returns the number of configured RF ports.
+     * @return  Port count.
+     */
     int GetPortCount() const { return static_cast<int>(ReferenceOhms.size()); }
 
+    /**
+     * @brief   Reads scattering parameter \f$S_{\text{row},\text{column}}\f$ at one frequency point.
+     * @param[in] frequency_idx  Zero-based index into `Frequencies`.
+     * @param[in] row            One-based destination port index.
+     * @param[in] column         One-based source port index.
+     * @return  Complex scattering parameter.
+     */
     std::complex<double> Get(const std::size_t frequency_idx, const int row, const int column) const {
         const auto ports = static_cast<std::size_t>(GetPortCount());
         return Values[(frequency_idx * ports + static_cast<std::size_t>(row - 1)) * ports
                       + static_cast<std::size_t>(column - 1)];
     }
 
-    /// Z(row, column) at a frequency; none when the result has no impedance matrices or the circuit has no finite Z.
+    /**
+     * @brief   Reads impedance parameter \f$Z_{\text{row},\text{column}}\f$ at one frequency point.
+     * @param[in] frequency_idx  Zero-based index into `Frequencies`.
+     * @param[in] row            One-based port row index.
+     * @param[in] column         One-based port column index.
+     * @return  Complex impedance in Ohms, or empty when no finite Z matrix exists at that frequency.
+     */
     [[nodiscard]] std::optional<std::complex<double>>
     Impedance(const std::size_t frequency_idx, const int row, const int column) const {
         return ReadMatrix(ImpedanceMatrices, frequency_idx, row, column);
     }
 
-    /// Y(row, column) at a frequency; none when the result has no admittance matrices or the circuit has no finite Y.
+    /**
+     * @brief   Reads admittance parameter \f$Y_{\text{row},\text{column}}\f$ at one frequency point.
+     * @param[in] frequency_idx  Zero-based index into `Frequencies`.
+     * @param[in] row            One-based port row index.
+     * @param[in] column         One-based port column index.
+     * @return  Complex admittance in Siemens, or empty when no finite Y matrix exists at that frequency.
+     */
     [[nodiscard]] std::optional<std::complex<double>>
     Admittance(const std::size_t frequency_idx, const int row, const int column) const {
         return ReadMatrix(AdmittanceMatrices, frequency_idx, row, column);
     }
 
+    /**
+     * @brief   Computes port return loss \f$-20 \log_{10} |S_{pp}|\f$ in dB at one frequency point.
+     * @param[in] frequency_idx  Zero-based index into `Frequencies`.
+     * @param[in] port           One-based port index.
+     * @return  Return loss in dB, or empty when \f$|S_{pp}|\f$ is effectively zero.
+     */
     [[nodiscard]] std::optional<double> ReturnLossDb(const std::size_t frequency_idx, const int port) const {
         constexpr double MIN_MAG = 1e-15;
         const auto s = Get(frequency_idx, port, port);
@@ -263,6 +292,13 @@ struct SParameterResult {
         return -20.0 * std::log10(mag);
     }
 
+    /**
+     * @brief   Computes insertion loss \f$-20 \log_{10} |S_{\text{to},\text{from}}|\f$ in dB at one frequency point.
+     * @param[in] frequency_idx  Zero-based index into `Frequencies`.
+     * @param[in] to_port        One-based receiving port index.
+     * @param[in] from_port      One-based exciting port index.
+     * @return  Insertion loss in dB, or empty when the transmission magnitude is effectively zero.
+     */
     [[nodiscard]] std::optional<double>
     InsertionLossDb(const std::size_t frequency_idx, const int to_port, const int from_port) const {
         constexpr double MIN_MAG = 1e-15;
@@ -274,6 +310,12 @@ struct SParameterResult {
         return -20.0 * std::log10(mag);
     }
 
+    /**
+     * @brief   Computes voltage standing-wave ratio \f$(1 + |S_{pp}|) / (1 - |S_{pp}|)\f$ at one frequency point.
+     * @param[in] frequency_idx  Zero-based index into `Frequencies`.
+     * @param[in] port           One-based port index.
+     * @return  VSWR, or empty when \f$|S_{pp}| \ge 1\f$.
+     */
     [[nodiscard]] std::optional<double> Vswr(const std::size_t frequency_idx, const int port) const {
         constexpr double TOL = 1e-12;
         const double mag = std::abs(Get(frequency_idx, port, port));
@@ -283,6 +325,12 @@ struct SParameterResult {
         return (1.0 + mag) / (1.0 - mag);
     }
 
+    /**
+     * @brief   Computes single-port input impedance \f$Z_0 (1 + S_{pp}) / (1 - S_{pp})\f$ at one frequency point.
+     * @param[in] frequency_idx  Zero-based index into `Frequencies`.
+     * @param[in] port           One-based port index.
+     * @return  Complex input impedance in Ohms, or empty when the port is out of range or open-circuited.
+     */
     [[nodiscard]] std::optional<std::complex<double>> InputImpedance(const std::size_t frequency_idx,
                                                                      const int port) const {
         constexpr double TOL = 1e-12;
@@ -355,6 +403,7 @@ struct TransientResult {
     bool IsComplete = true;
 };
 
+/// Discriminated union covering all supported Nodalys analysis result types.
 using SimulationResult = std::variant<OperatingPointResult,
                                       TransientResult,
                                       DcSweepResult,

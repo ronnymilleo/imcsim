@@ -20,14 +20,34 @@ class CccsDevice : public Device, public SensitiveDevice {
 public:
     CccsDevice(int node_a, int node_b, int control_branch, double gain);
 
+    /**
+     * @brief   Returns the positive terminal MNA node index.
+     * @return  Node unknown index, or `-1` for ground.
+     */
     int GetNodeA() const { return m_NodeA; }
 
+    /**
+     * @brief   Returns the negative terminal MNA node index.
+     * @return  Node unknown index, or `-1` for ground.
+     */
     int GetNodeB() const { return m_NodeB; }
 
+    /**
+     * @brief   Returns the controlling branch unknown index.
+     * @return  Branch unknown index.
+     */
     int ControlBranch() const { return m_ControlBranch; }
 
+    /**
+     * @brief   Binds the controlling branch unknown index after all voltage sources are compiled.
+     * @param[in] branch  Controlling branch unknown index.
+     */
     void BindControlBranch(int branch) { m_ControlBranch = branch; }
 
+    /**
+     * @brief   Returns the current gain factor.
+     * @return  Dimensionless current gain.
+     */
     double GetGain() const { return m_Gain; }
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
@@ -59,16 +79,40 @@ class CcvsDevice : public Device, public SensitiveDevice {
 public:
     CcvsDevice(int node_a, int node_b, int branch, int control_branch, double gain);
 
+    /**
+     * @brief   Returns the positive terminal MNA node index.
+     * @return  Node unknown index, or `-1` for ground.
+     */
     int GetNodeA() const { return m_NodeA; }
 
+    /**
+     * @brief   Returns the negative terminal MNA node index.
+     * @return  Node unknown index, or `-1` for ground.
+     */
     int GetNodeB() const { return m_NodeB; }
 
+    /**
+     * @brief   Returns the output voltage-source branch unknown index.
+     * @return  Branch unknown index.
+     */
     int GetBranch() const { return m_Branch; }
 
+    /**
+     * @brief   Returns the controlling branch unknown index.
+     * @return  Controlling branch unknown index.
+     */
     int ControlBranch() const { return m_ControlBranch; }
 
+    /**
+     * @brief   Binds the controlling branch unknown index after all voltage sources are compiled.
+     * @param[in] branch  Controlling branch unknown index.
+     */
     void BindControlBranch(int branch) { m_ControlBranch = branch; }
 
+    /**
+     * @brief   Returns the transresistance gain in Ohms.
+     * @return  Transresistance in Ohms.
+     */
     double GetGain() const { return m_Gain; }
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
@@ -101,14 +145,34 @@ class VccsDevice : public Device, public SensitiveDevice {
 public:
     VccsDevice(int node_a, int node_b, int control_positive, int control_negative, double gain);
 
+    /**
+     * @brief   Returns the positive output MNA node index.
+     * @return  Node unknown index, or `-1` for ground.
+     */
     int GetNodeA() const { return m_NodeA; }
 
+    /**
+     * @brief   Returns the negative output MNA node index.
+     * @return  Node unknown index, or `-1` for ground.
+     */
     int GetNodeB() const { return m_NodeB; }
 
+    /**
+     * @brief   Returns the positive controlling MNA node index.
+     * @return  Node unknown index, or `-1` for ground.
+     */
     int GetControlPositive() const { return m_ControlPositive; }
 
+    /**
+     * @brief   Returns the negative controlling MNA node index.
+     * @return  Node unknown index, or `-1` for ground.
+     */
     int GetControlNegative() const { return m_ControlNegative; }
 
+    /**
+     * @brief   Returns the transconductance gain in Siemens.
+     * @return  Transconductance in Siemens.
+     */
     double GetGain() const { return m_Gain; }
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
@@ -141,16 +205,40 @@ class VcvsDevice : public Device, public SensitiveDevice {
 public:
     VcvsDevice(int node_a, int node_b, int control_positive, int control_negative, int branch, double gain);
 
+    /**
+     * @brief   Returns the positive output MNA node index.
+     * @return  Node unknown index, or `-1` for ground.
+     */
     int GetNodeA() const { return m_NodeA; }
 
+    /**
+     * @brief   Returns the negative output MNA node index.
+     * @return  Node unknown index, or `-1` for ground.
+     */
     int GetNodeB() const { return m_NodeB; }
 
+    /**
+     * @brief   Returns the positive controlling MNA node index.
+     * @return  Node unknown index, or `-1` for ground.
+     */
     int GetControlPositive() const { return m_ControlPositive; }
 
+    /**
+     * @brief   Returns the negative controlling MNA node index.
+     * @return  Node unknown index, or `-1` for ground.
+     */
     int GetControlNegative() const { return m_ControlNegative; }
 
+    /**
+     * @brief   Returns the output voltage-source branch unknown index.
+     * @return  Branch unknown index.
+     */
     int GetBranch() const { return m_Branch; }
 
+    /**
+     * @brief   Returns the voltage gain factor.
+     * @return  Dimensionless voltage gain.
+     */
     double GetGain() const { return m_Gain; }
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;

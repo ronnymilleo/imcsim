@@ -26,7 +26,9 @@ std::size_t IndexOf(const std::size_t size, const std::size_t row, const std::si
     return row * size + column;
 }
 
-/// Computes I + sign * S, with sign +1 or -1.
+/**
+ * @brief   Computes I + sign * S, with sign +1 or -1.
+ */
 PortMatrix AddIdentity(const PortMatrix &scattering, const std::size_t size, const double sign) {
     PortMatrix result(scattering.size());
     for (std::size_t row = 0; row < size; ++row) {
@@ -98,7 +100,10 @@ std::optional<PortMatrix> Invert(PortMatrix matrix, const std::size_t size) {
     return inverse;
 }
 
-/// Scales entry (row, column) by the square roots of the references of its port row and column, raised to power.
+/**
+ * @brief   Scales entry (row, column) by the square roots of the references of its port row and column, raised to
+ * power.
+ */
 void ScaleByReferences(PortMatrix &matrix, const std::vector<double> &reference_ohms, const double power) {
     const std::size_t size = reference_ohms.size();
     for (std::size_t row = 0; row < size; ++row) {

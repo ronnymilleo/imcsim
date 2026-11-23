@@ -48,6 +48,12 @@ std::string_view Trim(std::string_view text) {
 
 } // namespace
 
+/**
+ * @brief   Parses a SPICE numeric literal with optional engineering suffix (`f`, `p`, `n`, `u`, `m`, `k`, `meg`,
+ *          `g`, `t`, `mil`) and trailing unit letters.
+ * @param[in] text  Raw numeric token.
+ * @return  Parsed finite double value, or empty if `text` is not a valid SPICE number.
+ */
 std::optional<double> ParseSpiceNumber(std::string_view text) {
     text = Trim(text);
     if (text.empty()) {

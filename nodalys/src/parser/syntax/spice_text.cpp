@@ -96,7 +96,9 @@ void FlushToken(std::string &token, std::vector<std::string> &tokens) {
 } // namespace
 
 /**
- * @brief   Removes the spaces at both ends of a text.
+ * @brief   Removes leading and trailing ASCII whitespace from a string view.
+ * @param[in] text  Input string view.
+ * @return  Trimmed view.
  */
 std::string_view TrimSpaces(std::string_view text) {
     while (!text.empty() && IsSpace(text.front())) {
@@ -109,8 +111,9 @@ std::string_view TrimSpaces(std::string_view text) {
 }
 
 /**
- * @brief   Tells whether a node name is ground, as ngspice reads it: 0, or GND, which it takes for 0.
+ * @brief   Tells whether a node name is ground, as ngspice reads it: `0`, or `GND`, which it takes for `0`.
  * @param[in] upper_name  Node name in upper case; an empty name is ground too.
+ * @return  True if `upper_name` denotes ground.
  */
 bool IsGroundName(const std::string_view upper_name) {
     return upper_name.empty() || upper_name == "0" || upper_name == "GND";

@@ -3,20 +3,23 @@
  * @brief   Periodic steady-state Harmonic Balance (.hb) solver via Alternating Frequency-Time (AFT) Newton-Raphson.
  * @details
  * ### Mathematical Formulation
- * Each MNA unknown $x_u(t)$ is expanded in a truncated real Fourier series up to harmonic $H$:
- * $$x_u(t) = a_{u,0} + \sum_{k=1}^{H} \left( a_{u,k} \cos(k \omega_0 t) + b_{u,k} \sin(k \omega_0 t) \right)$$
- * which corresponds to peak complex phasors $X_{u,0} = a_{u,0}$ and $X_{u,k} = a_{u,k} - j b_{u,k}$ for $k \ge 1$.
+ * Each MNA unknown \f$x_u(t)\f$ is expanded in a truncated real Fourier series up to harmonic \f$H\f$:
+ * \f[x_u(t) = a_{u,0} + \sum_{k=1}^{H} \left( a_{u,k} \cos(k \omega_0 t) + b_{u,k} \sin(k \omega_0 t) \right)\f]
+ * which corresponds to peak complex phasors \f$X_{u,0} = a_{u,0}\f$ and \f$X_{u,k} = a_{u,k} - j b_{u,k}\f$ for \f$k
+ * \ge 1\f$.
  *
- * Separating linear devices ($\mathbf{G}_{\text{lin}}, \mathbf{C}_{\text{lin}}$) from nonlinear devices
- * ($\mathbf{f}_{\text{nl}},
- * \mathbf{q}_{\text{nl}}$) yields the real harmonic residual:
- * $$\mathbf{F}(\mathbf{X}) = \mathbf{Y}_{\text{lin}} \mathbf{X} + \Gamma \,
+ * Separating linear devices (\f$\mathbf{G}_{\text{lin}}, \mathbf{C}_{\text{lin}}\f$) from nonlinear devices
+ * (\f$\mathbf{f}_{\text{nl}},
+ * \mathbf{q}_{\text{nl}}\f$) yields the real harmonic residual:
+ * \f[\mathbf{F}(\mathbf{X}) = \mathbf{Y}_{\text{lin}} \mathbf{X} + \Gamma \,
  * \mathbf{f}_{\text{nl}}(\Gamma^{-1}\mathbf{X})
- *   + \Omega \, \Gamma \, \mathbf{q}_{\text{nl}}(\Gamma^{-1}\mathbf{X}) - \mathbf{B} = \mathbf{0}$$
- * where $\mathbf{Y}_{\text{lin}}$ has $2\times 2$ blocks $\begin{bmatrix} \mathbf{G}_{\text{lin}} & k\omega_0
- * \mathbf{C}_{\text{lin}} \\ -k\omega_0 \mathbf{C}_{\text{lin}} & \mathbf{G}_{\text{lin}} \end{bmatrix}$ for $k \ge 1$,
- * $\Gamma$ / $\Gamma^{-1}$ are the real-complex radix-2 FFT operators over $M$ samples, and $\Omega$ applies
- * $\frac{d}{dt}$ in the cosine/sine basis.
+ *   + \Omega \, \Gamma \, \mathbf{q}_{\text{nl}}(\Gamma^{-1}\mathbf{X}) - \mathbf{B} = \mathbf{0}\f]
+ * where \f$\mathbf{Y}_{\text{lin}}\f$ has \f$2\times 2\f$ blocks \f$\begin{bmatrix} \mathbf{G}_{\text{lin}} & k\omega_0
+ * \mathbf{C}_{\text{lin}} \\ -k\omega_0 \mathbf{C}_{\text{lin}} & \mathbf{G}_{\text{lin}} \end{bmatrix}\f$ for \f$k \ge
+ * 1\f$,
+ * \f$\Gamma\f$ / \f$\Gamma^{-1}\f$ are the real-complex radix-2 FFT operators over \f$M\f$ samples, and \f$\Omega\f$
+ * applies
+ * \f$\frac{d}{dt}\f$ in the cosine/sine basis.
  */
 
 #include "analyses/analyses.h"
@@ -94,7 +97,8 @@ void ReportOutcome(const HarmonicBalanceConfig &settings,
 /**
  * @brief   Computes Total Harmonic Distortion (THD) as a dimensionless ratio from harmonic phasors.
  * @param[in] phasors  Complex phasor spectrum indexed `[0 .. H]` where index `1` is the fundamental.
- * @return  $\sqrt{\sum_{k=2}^{H} |X_k|^2} / |X_1|$, or `0.0` when the fundamental is zero or fewer than 3 bins exist.
+ * @return  \f$\sqrt{\sum_{k=2}^{H} |X_k|^2} / |X_1|\f$, or `0.0` when the fundamental is zero or fewer than 3 bins
+ * exist.
  */
 double ComputeThd(const std::span<const std::complex<double>> phasors) {
     if (phasors.size() < 3) {

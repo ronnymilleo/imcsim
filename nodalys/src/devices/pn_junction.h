@@ -14,12 +14,12 @@
 
 namespace Nodalys {
 
-/// Elementary charge $q$ (C) and Boltzmann constant $k_B$ (J/K) matching modern ngspice (`ngspice/const.h`),
-/// evaluated at nominal temperature $T_{\text{nom}} = 300.15\text{ K}$ ($27\,^\circ\text{C}$).
+/// Elementary charge \f$q\f$ (C) and Boltzmann constant \f$k_B\f$ (J/K) matching modern ngspice (`ngspice/const.h`),
+/// evaluated at nominal temperature \f$T_{\text{nom}} = 300.15\text{ K}\f$ (\f$27\,^\circ\text{C}\f$).
 inline constexpr double ELEMENTARY_CHARGE = 1.602176634e-19;
 inline constexpr double BOLTZMANN_CONSTANT = 1.380649e-23;
 inline constexpr double NOMINAL_TEMPERATURE_KELVIN = 300.15;
-/// $k/q$ in volts per kelvin, so the thermal voltage at any temperature is this times the temperature.
+/// \f$k/q\f$ in volts per kelvin, so the thermal voltage at any temperature is this times the temperature.
 inline constexpr double BOLTZMANN_OVER_CHARGE = 8.617087399994e-5;
 inline constexpr double THERMAL_VOLTAGE = BOLTZMANN_OVER_CHARGE * NOMINAL_TEMPERATURE_KELVIN;
 inline constexpr double FOUR_KT_NOMINAL = 4.0 * BOLTZMANN_CONSTANT * NOMINAL_TEMPERATURE_KELVIN;
@@ -29,6 +29,7 @@ inline constexpr double TWO_Q = 2.0 * ELEMENTARY_CHARGE;
  * @brief   The junction voltage above which limiting starts: vt · ln(vt / (IS·√2)).
  * @param[in] saturation_current  IS of the junction.
  * @param[in] thermal_voltage     n·Vt of the junction.
+ * @return  Critical forward voltage \f$V_{\text{crit}}\f$ in Volts.
  */
 inline double PnCriticalVoltage(const double saturation_current, const double thermal_voltage) {
     return thermal_voltage * std::log(thermal_voltage / (saturation_current * std::sqrt(2.0)));

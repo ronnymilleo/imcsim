@@ -85,8 +85,10 @@ double TruthValue(const bool is_true) {
     return is_true ? 1.0 : 0.0;
 }
 
-/// A slope as a quotient, where a divisor of 0 gives the unbounded slope, so the first iteration of a Newton solve,
-/// where every node is still at 0 V, can linearize a square root or a logarithm of a node voltage.
+/**
+ * @brief   A slope as a quotient, where a divisor of 0 gives the unbounded slope, so the first iteration of a Newton
+ * solve, where every node is still at 0 V, can linearize a square root or a logarithm of a node voltage.
+ */
 double SlopeOfQuotient(const double dividend, const double divisor) {
     return divisor == 0.0 ? UNBOUNDED_SLOPE : dividend / divisor;
 }
@@ -108,7 +110,10 @@ OperationResult Divide(const double dividend, const double divisor) {
     return {.Value = quotient, .PartialFirst = 1.0 / divisor, .PartialSecond = -quotient / divisor};
 }
 
-/// Derivative of the power with respect to the base at a base of 0, where it is 1, 0 or without bound by the exponent.
+/**
+ * @brief   Derivative of the power with respect to the base at a base of 0, where it is 1, 0 or without bound by the
+ * exponent.
+ */
 double SlopeOfPowerAtZero(const double exponent) {
     if (exponent == 1.0) {
         return 1.0;
@@ -216,7 +221,9 @@ Result InverseHyperbolic(const Operation operation, const double argument) {
     }
 }
 
-/// A function whose slope is zero wherever it is defined: the steps, which jump, and the roundings.
+/**
+ * @brief   A function whose slope is zero wherever it is defined: the steps, which jump, and the roundings.
+ */
 OperationResult Flat(const double value) {
     return OperationResult{.Value = value};
 }

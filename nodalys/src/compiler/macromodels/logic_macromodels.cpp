@@ -62,6 +62,13 @@ void AddFlipFlopSeed(CircuitCompiler &compiler, const FlipFlopNodes &n, const Sm
 
 /**
  * @brief   Appends a smooth SR latch composed of two cross-coupled NOR gates into a CircuitDescription.
+ * @param[in,out] description  Circuit description receiving the latch gates.
+ * @param[in]     name         Latch designator prefix.
+ * @param[in]     q            Primary output node Q.
+ * @param[in]     q_bar        Complementary output node Q-bar.
+ * @param[in]     set          Active-high Set input node.
+ * @param[in]     reset        Active-high Reset input node.
+ * @param[in]     params       Smooth logic gate parameters.
  */
 void AppendSRLatch(CircuitDescription &description,
                    const std::string &name,
@@ -91,6 +98,8 @@ void AppendSRLatch(CircuitDescription &description,
 
 /**
  * @brief   Compiles the six-NAND 7474 edge-triggered D flip-flop macromodel into MNA devices and Newton seeds.
+ * @param[in,out] compiler  Circuit compiler receiving the generated logic gates and node seeds.
+ * @param[in]     spec      Flip-flop terminals, parameters, and optional set/reset pins.
  */
 void CompileDFlipFlop(CircuitCompiler &compiler, const DFlipFlopSpec &spec) {
     const int u_d = compiler.MapNode(spec.D);

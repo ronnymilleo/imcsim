@@ -15,11 +15,21 @@ namespace Nodalys {
 
 namespace {
 
-/// Default SPICE saturation current ($I_S = 10^{-14}\text{ A}$) of the level-1 MOSFET body-drain diode.
+/// Default SPICE saturation current (\f$I_S = 10^{-14}\text{ A}\f$) of the level-1 MOSFET body-drain diode.
 constexpr double MOSFET_BODY_SATURATION_CURRENT = 1e-14;
 
 } // namespace
 
+/**
+ * @brief   Constructs an NMOS or PMOS Shichman-Hodges level-1 MOSFET (`M` element).
+ * @param[in] drain            External drain MNA node index.
+ * @param[in] gate             External gate MNA node index.
+ * @param[in] source           External source MNA node index.
+ * @param[in] internal_drain   Internal drain MNA node index (negative if \f$R_D = 0\f$).
+ * @param[in] internal_source  Internal source MNA node index (negative if \f$R_S = 0\f$).
+ * @param[in] parameters       MOSFET model parameters at nominal temperature.
+ * @param[in] pmos             True for PMOS polarity, false for NMOS.
+ */
 MosfetDevice::MosfetDevice(const int drain,
                            const int gate,
                            const int source,
@@ -37,10 +47,10 @@ MosfetDevice::MosfetDevice(const int drain,
 
 /**
  * @brief   Scales the transconductance, the threshold voltage and the body-diode thermal voltage with the temperature.
- * @details In SPICE level 1 (`mos1temp.c`), the mobility drops as $(T / T_{nom})^{-3/2}$ and the threshold voltage
- *          follows half the shift of the surface potential $\phi$ and the silicon band gap:
- *          $V_{TO}(T) = V_{TO} + \frac{1}{2} (s (\phi(T) - \phi) - (E_g(T) - E_g(T_{nom})))$ with $s = +1$ for NMOS
- *          and $-1$ for PMOS. The series resistances and overlap capacitances have no coefficient set, so they stay.
+ * @details In SPICE level 1 (`mos1temp.c`), the mobility drops as \f$(T / T_{nom})^{-3/2}\f$ and the threshold voltage
+ *          follows half the shift of the surface potential \f$\phi\f$ and the silicon band gap:
+ *          \f$V_{TO}(T) = V_{TO} + \frac{1}{2} (s (\phi(T) - \phi) - (E_g(T) - E_g(T_{nom})))\f$ with \f$s = +1\f$ for
+ * NMOS and \f$-1\f$ for PMOS. The series resistances and overlap capacitances have no coefficient set, so they stay.
  */
 void MosfetDevice::ApplyTemperature(const ThermalConditions &thermal) {
     m_Thermal = thermal;
@@ -82,8 +92,8 @@ MosfetDevice::Channel MosfetDevice::Evaluate(const double vgs_eff, const double 
 
 /**
  * @brief   Finds which terminal acts as the drain and evaluates the channel in that frame.
- * @details The level-1 equations only hold for $v_{ds} \ge 0$, so when the intrinsic drain sits on the wrong side of
- *          the source (judged on the circuit voltages, with the sign of the polarity) the two swap roles.
+ * @details The level-1 equations only hold for \f$v_{ds} \ge 0\f$, so when the intrinsic drain sits on the wrong side
+ * of the source (judged on the circuit voltages, with the sign of the polarity) the two swap roles.
  * @param[in] x  Solution vector.
  * @return  The effective drain and source nodes, whether they swapped, and the channel evaluated between them.
  */

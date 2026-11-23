@@ -211,8 +211,11 @@ ElementResult ReadCurrentControlled(DeckContext &context,
 } // namespace
 
 /**
- * @brief   V or I lines: a source with its DC value, its AC magnitude and phase and its waveform, or an S-parameter
- *          port when it gives PORTNUM or Z0.
+ * @brief   Parses `V` or `I` lines: a source with its DC value, AC magnitude/phase, and waveform, or an S-parameter
+ *          port when it specifies `PORTNUM` or `Z0`.
+ * @param[in,out] context  Parser deck context receiving the source or port.
+ * @param[in]     line     Tokenized source statement.
+ * @return  Empty expected on success, or a parse error message.
  */
 std::expected<void, std::string> ReadSource(DeckContext &context, const DeckLine &line) {
     const std::vector<std::string> &tokens = line.Tokens;
@@ -241,8 +244,11 @@ std::expected<void, std::string> ReadSource(DeckContext &context, const DeckLine
 }
 
 /**
- * @brief   P<name> <pos> <neg> [PORTNUM=<n>] [Z0=<ohms>], or with the impedance alone; the number defaults to the one
- *          in the name.
+ * @brief   Parses `P<name> <pos> <neg> [PORTNUM=<n>] [Z0=<ohms>]` (or with impedance alone); the number defaults to
+ *          the one in the name.
+ * @param[in,out] context  Parser deck context receiving the port.
+ * @param[in]     line     Tokenized port statement.
+ * @return  Empty expected on success, or a parse error message.
  */
 std::expected<void, std::string> ReadPort(DeckContext &context, const DeckLine &line) {
     const std::vector<std::string> &tokens = line.Tokens;
@@ -266,25 +272,51 @@ std::expected<void, std::string> ReadPort(DeckContext &context, const DeckLine &
     return {};
 }
 
+/**
+ * @brief   Parses an `E` voltage-controlled voltage source statement.
+ * @param[in,out] context  Parser deck context receiving the VCVS.
+ * @param[in]     line     Tokenized VCVS statement.
+ * @return  Empty expected on success, or a parse error message.
+ */
 std::expected<void, std::string> ReadVcvs(DeckContext &context, const DeckLine &line) {
     return ReadVoltageControlled(context, line, "VCVS", "gain", &CircuitBuilder::AddVcvs);
 }
 
+/**
+ * @brief   Parses a `G` voltage-controlled current source statement.
+ * @param[in,out] context  Parser deck context receiving the VCCS.
+ * @param[in]     line     Tokenized VCCS statement.
+ * @return  Empty expected on success, or a parse error message.
+ */
 std::expected<void, std::string> ReadVccs(DeckContext &context, const DeckLine &line) {
     return ReadVoltageControlled(context, line, "VCCS", "transconductance", &CircuitBuilder::AddVccs);
 }
 
+/**
+ * @brief   Parses an `H` current-controlled voltage source statement.
+ * @param[in,out] context  Parser deck context receiving the CCVS.
+ * @param[in]     line     Tokenized CCVS statement.
+ * @return  Empty expected on success, or a parse error message.
+ */
 std::expected<void, std::string> ReadCcvs(DeckContext &context, const DeckLine &line) {
     return ReadCurrentControlled(context, line, "CCVS", "transresistance", &CircuitBuilder::AddCcvs);
 }
 
+/**
+ * @brief   Parses an `F` current-controlled current source statement.
+ * @param[in,out] context  Parser deck context receiving the CCCS.
+ * @param[in]     line     Tokenized CCCS statement.
+ * @return  Empty expected on success, or a parse error message.
+ */
 std::expected<void, std::string> ReadCccs(DeckContext &context, const DeckLine &line) {
     return ReadCurrentControlled(context, line, "CCCS", "gain", &CircuitBuilder::AddCccs);
 }
 
 /**
- * @brief   The nodes of a B line, and those its expression reads, which are circuit nodes even when no other element
- *          touches them.
+ * @brief   Lists the nodes of a `B` line, including those its expression reads, which are circuit nodes even when no
+ *          other element touches them.
+ * @param[in] line  Tokenized behavioral source statement.
+ * @return  List of referenced node names.
  */
 std::vector<std::string> ListBehavioralNodes(const DeckLine &line) {
     std::vector<std::string> nodes;
@@ -307,9 +339,12 @@ std::vector<std::string> ListBehavioralNodes(const DeckLine &line) {
 }
 
 /**
- * @brief   B<name> <pos> <neg> V=<expression> or I=<expression>.
- * @details The builder reads nodes by number, so every v(...) is written with the numbers this netlist gave them;
+ * @brief   Parses `B<name> <pos> <neg> V=<expression>` or `I=<expression>`.
+ * @details The builder reads nodes by number, so every `v(...)` is written with the numbers this netlist gave them;
  *          a current keeps the source it names.
+ * @param[in,out] context  Parser deck context receiving the behavioral source.
+ * @param[in]     line     Tokenized behavioral source statement.
+ * @return  Empty expected on success, or a parse error message.
  */
 std::expected<void, std::string> ReadBehavioral(DeckContext &context, const DeckLine &line) {
     const std::string &name = line.Tokens.front();

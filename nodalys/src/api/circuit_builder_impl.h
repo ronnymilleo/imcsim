@@ -23,12 +23,24 @@ public:
     CircuitDescription Description;
     bool HasBuilt = false;
 
+    /**
+     * @brief   Initializes the builder storage with an optional initial circuit node count.
+     * @param[in] num_circuit_nodes  Minimum number of top-level nodes (including ground).
+     */
     explicit CircuitBuilderImpl(int num_circuit_nodes) {
         if (num_circuit_nodes > 0) {
             Description.SetCircuitNodeCount(num_circuit_nodes);
         }
     }
 
+    /**
+     * @brief   Appends an independent voltage or current source specification and tracks its terminals.
+     * @param[in] name        Element designator.
+     * @param[in] pos         Positive terminal node.
+     * @param[in] neg         Negative terminal node.
+     * @param[in] is_voltage  True for a voltage source, false for a current source.
+     * @param[in] spec        Waveform and AC excitation specification.
+     */
     void AddSource(std::string name, NodeId pos, NodeId neg, bool is_voltage, SourceSpec spec) {
         Description.TrackNodes({pos, neg});
         Description.Elements.push_back(IndependentSourceSpec{

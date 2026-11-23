@@ -16,7 +16,9 @@ namespace Nodalys {
 
 namespace {
 
-/// The header of the columns of a matrix of ports, such as Z11_re,Z11_im for the impedance.
+/**
+ * @brief   Writes the CSV header columns of a port matrix, such as `Z11_re,Z11_im` for impedance.
+ */
 void WritePortMatrixHeader(std::ostringstream &ss, const char letter, const int ports) {
     for (int i = 1; i <= ports; ++i) {
         for (int j = 1; j <= ports; ++j) {
@@ -25,7 +27,9 @@ void WritePortMatrixHeader(std::ostringstream &ss, const char letter, const int 
     }
 }
 
-/// The columns of a matrix of ports at one frequency, empty where the circuit has no finite matrix.
+/**
+ * @brief   Writes the CSV columns of a port matrix at one frequency, leaving cells empty when no finite matrix exists.
+ */
 void WritePortMatrixRow(std::ostringstream &ss, const std::optional<PortMatrix> &matrix, const int ports) {
     for (int i = 0; i < ports; ++i) {
         for (int j = 0; j < ports; ++j) {
@@ -41,6 +45,11 @@ void WritePortMatrixRow(std::ostringstream &ss, const std::optional<PortMatrix> 
 
 } // namespace
 
+/**
+ * @brief   Serializes a DC operating point (.op) result to CSV text.
+ * @param[in] result  Simulation result to export.
+ * @return  Formatted CSV string.
+ */
 std::string ExportCsv(const OperatingPointResult &result) {
     std::ostringstream ss;
     ss << "Variable,Type,Value,Unit\n";
@@ -53,6 +62,11 @@ std::string ExportCsv(const OperatingPointResult &result) {
     return ss.str();
 }
 
+/**
+ * @brief   Serializes a time-domain transient (.tran) result to CSV text.
+ * @param[in] result  Simulation result to export.
+ * @return  Formatted CSV string.
+ */
 std::string ExportCsv(const TransientResult &result) {
     std::ostringstream ss;
     ss << "Time";
@@ -80,6 +94,11 @@ std::string ExportCsv(const TransientResult &result) {
     return ss.str();
 }
 
+/**
+ * @brief   Serializes a DC sweep (.dc) result to CSV text.
+ * @param[in] result  Simulation result to export.
+ * @return  Formatted CSV string.
+ */
 std::string ExportCsv(const DcSweepResult &result) {
     std::ostringstream ss;
     if (result.Curves.empty() || result.SweptValues.empty()) {
@@ -118,6 +137,11 @@ std::string ExportCsv(const DcSweepResult &result) {
     return ss.str();
 }
 
+/**
+ * @brief   Serializes a small-signal AC sweep (.ac) result to CSV text.
+ * @param[in] result  Simulation result to export.
+ * @return  Formatted CSV string.
+ */
 std::string ExportCsv(const AcSweepResult &result) {
     std::ostringstream ss;
     ss << "Frequency_Hz";
@@ -151,6 +175,11 @@ std::string ExportCsv(const AcSweepResult &result) {
     return ss.str();
 }
 
+/**
+ * @brief   Serializes a small-signal DC transfer function (.tf) result to CSV text.
+ * @param[in] result  Simulation result to export.
+ * @return  Formatted CSV string.
+ */
 std::string ExportCsv(const TransferFunctionResult &result) {
     std::ostringstream ss;
     ss << "Metric,Value,Unit\n";
@@ -160,6 +189,11 @@ std::string ExportCsv(const TransferFunctionResult &result) {
     return ss.str();
 }
 
+/**
+ * @brief   Serializes a small-signal AC noise (.noise) result to CSV text.
+ * @param[in] result  Simulation result to export.
+ * @return  Formatted CSV string.
+ */
 std::string ExportCsv(const NoiseResult &result) {
     std::ostringstream ss;
     ss << "Frequency_Hz,OutputDensity_V_rtHz,InputDensity";
@@ -182,6 +216,11 @@ std::string ExportCsv(const NoiseResult &result) {
     return ss.str();
 }
 
+/**
+ * @brief   Serializes a multiport S/Z/Y scattering parameter (.sp) result to CSV text.
+ * @param[in] result  Simulation result to export.
+ * @return  Formatted CSV string.
+ */
 std::string ExportCsv(const SParameterResult &result) {
     std::ostringstream ss;
     ss << "Frequency_Hz";
@@ -220,6 +259,11 @@ std::string ExportCsv(const SParameterResult &result) {
     return ss.str();
 }
 
+/**
+ * @brief   Serializes a small-signal pole-zero (.pz) result to CSV text.
+ * @param[in] result  Simulation result to export.
+ * @return  Formatted CSV string.
+ */
 std::string ExportCsv(const PoleZeroResult &result) {
     std::ostringstream ss;
     constexpr double TWO_PI = 2.0 * std::numbers::pi;
@@ -237,6 +281,11 @@ std::string ExportCsv(const PoleZeroResult &result) {
     return ss.str();
 }
 
+/**
+ * @brief   Serializes a DC sensitivity (.sens) result to CSV text.
+ * @param[in] result  Simulation result to export.
+ * @return  Formatted CSV string.
+ */
 std::string ExportCsv(const SensitivityResult &result) {
     std::ostringstream ss;
     ss << "Vector,Value\n";
@@ -246,6 +295,11 @@ std::string ExportCsv(const SensitivityResult &result) {
     return ss.str();
 }
 
+/**
+ * @brief   Serializes a small-signal AC sensitivity (.sens ... ac) result to CSV text.
+ * @param[in] result  Simulation result to export.
+ * @return  Formatted CSV string.
+ */
 std::string ExportCsv(const AcSensitivityResult &result) {
     std::ostringstream ss;
     ss << "Frequency,Output_re,Output_im";
@@ -274,6 +328,11 @@ std::string ExportCsv(const AcSensitivityResult &result) {
     return ss.str();
 }
 
+/**
+ * @brief   Serializes a periodic steady-state Harmonic Balance (.hb) result to CSV text.
+ * @param[in] result  Simulation result to export.
+ * @return  Formatted CSV string.
+ */
 std::string ExportCsv(const HarmonicBalanceResult &result) {
     std::ostringstream ss;
     constexpr double RAD_TO_DEG = 180.0 / std::numbers::pi;

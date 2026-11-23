@@ -36,6 +36,9 @@ class SensitiveDevice;
  */
 class Device {
 public:
+    /**
+     * @brief   Destroys the device instance.
+     */
     virtual ~Device() = default;
 
     /**
@@ -47,10 +50,10 @@ public:
     virtual void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) = 0;
 
     /**
-     * @brief   Stamps this device's small-signal reactive coefficients ($C$ or $-L$, multiplied by $j\omega$ during an
-     *          AC sweep) into `reactive.AddA()` and its AC source excitation into `reactive.AddRhs()`.
-     * @param[in,out] reactive  System holding the imaginary-part coefficients $C_{\text{AC}}$ and AC excitation
-     *                          $b_{\text{AC}}$.
+     * @brief   Stamps this device's small-signal reactive coefficients (\f$C\f$ or \f$-L\f$, multiplied by
+     * \f$j\omega\f$ during an AC sweep) into `reactive.AddA()` and its AC source excitation into `reactive.AddRhs()`.
+     * @param[in,out] reactive  System holding the imaginary-part coefficients \f$C_{\text{AC}}\f$ and AC excitation
+     *                          \f$b_{\text{AC}}\f$.
      * @param[in]     x_dc      Converged DC operating point around which the circuit is linearized.
      */
     virtual void StampAc(MnaSystem &reactive, const std::vector<double> &x_dc) const {
@@ -72,19 +75,34 @@ public:
         return false;
     }
 
-    /// Current entering the device at the given terminal, evaluated at x.
+    /**
+     * @brief   Computes the current entering the device at the given terminal.
+     * @param[in] terminal  Zero-based terminal index in the device's pin order.
+     * @param[in] x         Solution vector at which to evaluate the current.
+     * @return  Current entering the terminal in Amperes.
+     */
     virtual double TerminalCurrent(int terminal, const std::vector<double> &x) const = 0;
 
-    /// Small-signal complex current entering the device at the given terminal at angular frequency `omega`.
+    /**
+     * @brief   Computes the small-signal complex current entering the device at the given terminal.
+     * @param[in] terminal  Zero-based terminal index in the device's pin order.
+     * @param[in] x_dc      Converged DC operating point vector.
+     * @param[in] x_ac      Small-signal complex phasor solution vector.
+     * @param[in] omega     Angular frequency \f$\omega = 2\pi f\f$ in rad/s.
+     * @return  Complex current phasor entering the terminal in Amperes.
+     */
     virtual std::complex<double> AcTerminalCurrent(int terminal,
                                                    const std::vector<double> &x_dc,
                                                    const std::vector<std::complex<double>> &x_ac,
                                                    double omega) const = 0;
 
     /**
-     * @brief   Output voltage noise power spectral density ($\text{V}^2/\text{Hz}$) contributed by this device at the
-     *          operating point `x_dc` and frequency `frequency_hz`, given the adjoint vector `adjoint` (solution of
-     *          $Y(j\omega)^T \cdot \lambda = e_{\text{out}}$).
+     * @brief   Computes the output voltage noise power spectral density (\f$\text{V}^2/\text{Hz}\f$) contributed by
+     *          this device.
+     * @param[in] x_dc          Converged DC operating point vector.
+     * @param[in] adjoint       Adjoint vector solving \f$Y(j\omega)^T \cdot \lambda = e_{\text{out}}\f$.
+     * @param[in] frequency_hz  Evaluation frequency in Hertz.
+     * @return  Output noise variance density in \f$\text{V}^2/\text{Hz}\f$.
      */
     virtual double OutputNoiseVariance(const std::vector<double> &x_dc,
                                        const std::vector<std::complex<double>> &adjoint,
@@ -95,16 +113,23 @@ public:
         return 0.0;
     }
 
-    /// True when the device is linear and time-invariant; nonlinear devices evaluate via AFT in Harmonic Balance.
+    /**
+     * @brief   Reports whether the device is linear and time-invariant.
+     * @details Nonlinear devices evaluate via alternating frequency-time (AFT) in Harmonic Balance.
+     * @return  True when the device is linear and time-invariant.
+     */
     virtual bool IsLinear() const { return true; }
 
-    /// False when the device cannot be simulated by Harmonic Balance (e.g., hysteretic switches).
+    /**
+     * @brief   Reports whether the device can be simulated by Harmonic Balance.
+     * @return  False when the device cannot be simulated by Harmonic Balance (e.g., hysteretic switches).
+     */
     virtual bool SupportsHarmonicBalance() const { return true; }
 
     /**
      * @brief   Stamps this nonlinear device's charge-voltage differential capacitances into `sys.AddA()` and
      *          linearized equivalent charge into `sys.AddRhs()` at state `x`, for Harmonic Balance AFT.
-     * @param[in,out] sys  System holding $\mathbf{C}_{\text{nl}}(x)$ and $-\mathbf{q}_{\text{eq}}(x)$.
+     * @param[in,out] sys  System holding \f$\mathbf{C}_{\text{nl}}(x)\f$ and \f$-\mathbf{q}_{\text{eq}}(x)\f$.
      * @param[in]     x    Time-sample iterate vector.
      */
     virtual void StampCharge(MnaSystem &sys, const std::vector<double> &x) const {
@@ -112,20 +137,34 @@ public:
         (void)x;
     }
 
-    /// Charge associated with the given terminal at state `x`, for Harmonic Balance current phasors.
+    /**
+     * @brief   Computes the charge associated with the given terminal at state `x`, for Harmonic Balance current
+     *          phasors.
+     * @param[in] terminal  Zero-based terminal index in the device's pin order.
+     * @param[in] x         State vector at which to evaluate the charge.
+     * @return  Terminal charge in Coulombs.
+     */
     virtual double TerminalCharge(int terminal, const std::vector<double> &x) const {
         (void)terminal;
         (void)x;
         return 0.0;
     }
 
-    /// True when the device carries state between time points (companion models of C, L and junction charges).
+    /**
+     * @brief   Reports whether the device carries state between transient time points.
+     * @return  True for devices with companion-model history (capacitors, inductors, junction charges).
+     */
     virtual bool HasTransientState() const { return false; }
 
-    /// Saves the state of the accepted point x (called after each converged transient step).
+    /**
+     * @brief   Saves the state of the accepted point `x` after each converged transient step.
+     * @param[in] x  Converged solution vector of the accepted time point.
+     */
     virtual void AcceptStep(const std::vector<double> &x) { (void)x; }
 
-    /// Restores the state saved before a step that the LTE control rejected.
+    /**
+     * @brief   Restores the state saved before a step that the LTE control rejected.
+     */
     virtual void RejectStep() {}
 
     /**
@@ -184,16 +223,30 @@ public:
      */
     virtual void SetRandomSeed(std::uint64_t seed) { (void)seed; }
 
-    /// Returns the sensitivity capability when this device supports analytical DC/AC sensitivity, or null.
+    /**
+     * @brief   Returns the sensitivity capability when this device supports analytical DC/AC sensitivity.
+     * @return  Pointer to the SensitiveDevice interface, or nullptr when unsupported.
+     */
     [[nodiscard]] virtual const SensitiveDevice *AsSensitive() const { return nullptr; }
 
-    /// Returns this device as an IndependentSourceDevice when it is one, or null.
+    /**
+     * @brief   Returns this device as a mutable IndependentSourceDevice when it is one.
+     * @return  Pointer to the IndependentSourceDevice view, or nullptr.
+     */
     [[nodiscard]] virtual IndependentSourceDevice *AsIndependentSource() { return nullptr; }
 
-    /// Returns this device as a const IndependentSourceDevice when it is one, or null.
+    /**
+     * @brief   Returns this device as a const IndependentSourceDevice when it is one.
+     * @return  Pointer to the const IndependentSourceDevice view, or nullptr.
+     */
     [[nodiscard]] virtual const IndependentSourceDevice *AsIndependentSource() const { return nullptr; }
 
-    /// Applies an interactive live parameter change during transient simulation; returns true if supported.
+    /**
+     * @brief   Applies an interactive live parameter change during transient simulation.
+     * @param[in] quantity  Parameter kind to update.
+     * @param[in] value     New parameter value in SI units.
+     * @return  True if this device supports changing `quantity`.
+     */
     virtual bool ApplyLiveChange(LiveQuantity quantity, double value) {
         (void)quantity;
         (void)value;

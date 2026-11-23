@@ -42,6 +42,10 @@ enum class IntegrationMethod {
     GEAR2
 };
 
+/**
+ * @enum    LiveQuantity
+ * @brief   Device parameter kinds that can be modified interactively during a transient simulation.
+ */
 enum class LiveQuantity {
     RESISTANCE,
     DC_VOLTAGE
@@ -74,6 +78,10 @@ enum class RandomDistribution {
     POISSON = 4
 };
 
+/**
+ * @enum    SemiconductorPolarity
+ * @brief   Conduction polarity of a bipolar or MOS transistor.
+ */
 enum class SemiconductorPolarity {
     NPN,
     PNP,
@@ -92,6 +100,10 @@ struct CircuitPort {
     NodeId Node = 0;
     double ReferenceOhms = 50.0;
 
+    /**
+     * @brief   Compares two port descriptors for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const CircuitPort &) const = default;
 };
 
@@ -104,11 +116,19 @@ struct DiagnosticMessage {
     bool IsError = false;
 };
 
+/**
+ * @struct  LiveChange
+ * @brief   An interactive parameter update queued for an element during a live transient run.
+ */
 struct LiveChange {
     std::string Element;
     LiveQuantity Quantity = LiveQuantity::RESISTANCE;
     double Value = 0.0;
 
+    /**
+     * @brief   Compares two live parameter change requests for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const LiveChange &) const = default;
 };
 
@@ -139,6 +159,10 @@ struct BjtParameters {
     /// Exponent `XTB` of the temperature ratio in the forward and reverse current gains.
     double BetaExponent = 0.0;
 
+    /**
+     * @brief   Compares two BjtParameters values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const BjtParameters &) const = default;
 };
 
@@ -162,6 +186,10 @@ struct BoyleOpAmpParameters {
     double SupplyCurrent = 1.7e-3;
     double InputOffsetVoltage = 0.0;
 
+    /**
+     * @brief   Compares two BoyleOpAmpParameters values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const BoyleOpAmpParameters &) const = default;
 };
 
@@ -184,6 +212,10 @@ struct DiodeParameters {
     /// Exponent `XTI` of the temperature ratio in the growth of the saturation current.
     double SaturationCurrentExponent = 3.0;
 
+    /**
+     * @brief   Compares two DiodeParameters values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const DiodeParameters &) const = default;
 };
 
@@ -202,6 +234,10 @@ struct FuseParameters {
     double ColdResistance = 0.0964;
     double BlownResistance = 1e9;
 
+    /**
+     * @brief   Compares two FuseParameters values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const FuseParameters &) const = default;
 };
 
@@ -222,6 +258,10 @@ struct MosfetParameters {
     /// Surface potential `PHI` in volts, which the threshold voltage follows with the temperature.
     double SurfacePotential = 0.6;
 
+    /**
+     * @brief   Compares two MosfetParameters values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const MosfetParameters &) const = default;
 };
 
@@ -247,6 +287,10 @@ struct SmoothLogicParameters {
     /// Hysteresis voltage span for Schmitt triggers in Volts.
     double Hysteresis = 0.5;
 
+    /**
+     * @brief   Compares two SmoothLogicParameters values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const SmoothLogicParameters &) const = default;
 };
 
@@ -260,6 +304,10 @@ struct SwitchParameters {
     double OnResistance = 0.01;
     double OffResistance = 1e9;
 
+    /**
+     * @brief   Compares two SwitchParameters values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const SwitchParameters &) const = default;
 };
 
@@ -276,6 +324,10 @@ struct AmParameters {
     double CarrierFrequency = 1e3;
     double Delay = 0.0;
 
+    /**
+     * @brief   Compares two AmParameters values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const AmParameters &) const = default;
 };
 
@@ -289,6 +341,10 @@ struct ClockParameters {
     double LogicLevel = 5.0;
     double StartDelay = 0.0;
 
+    /**
+     * @brief   Compares two ClockParameters values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const ClockParameters &) const = default;
 };
 
@@ -304,6 +360,10 @@ struct ExpParameters {
     double FallDelay = 5e-3;
     double FallTimeConstant = 1e-3;
 
+    /**
+     * @brief   Compares two ExpParameters values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const ExpParameters &) const = default;
 };
 
@@ -321,6 +381,10 @@ struct NoiseParameters {
     double CaptureTime = 1e-3;
     double EmissionTime = 1e-3;
 
+    /**
+     * @brief   Compares two NoiseParameters values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const NoiseParameters &) const = default;
 };
 
@@ -337,6 +401,10 @@ struct PulseParameters {
     double Width = 0.5e-3;
     double Period = 1e-3;
 
+    /**
+     * @brief   Compares two PulseParameters values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const PulseParameters &) const = default;
 };
 
@@ -348,6 +416,10 @@ struct PwlPoint {
     double Time = 0.0;
     double Value = 0.0;
 
+    /**
+     * @brief   Compares two PwlPoint values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const PwlPoint &) const = default;
 };
 
@@ -358,6 +430,10 @@ struct PwlPoint {
 struct PwlParameters {
     std::vector<PwlPoint> Points = {{0.0, 0.0}, {1e-3, 5.0}, {2e-3, 0.0}};
 
+    /**
+     * @brief   Compares two PwlParameters values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const PwlParameters &) const = default;
 };
 
@@ -372,6 +448,10 @@ struct RandomParameters {
     double First = 0.1;
     double Second = 0.0;
 
+    /**
+     * @brief   Compares two RandomParameters values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const RandomParameters &) const = default;
 };
 
@@ -386,6 +466,10 @@ struct SffmParameters {
     double ModulationIndex = 5.0;
     double SignalFrequency = 100.0;
 
+    /**
+     * @brief   Compares two SffmParameters values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const SffmParameters &) const = default;
 };
 
@@ -401,6 +485,10 @@ struct SineParameters {
     /// Phase angle in degrees.
     double PhaseDegrees = 0.0;
 
+    /**
+     * @brief   Compares two SineParameters values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const SineParameters &) const = default;
 };
 

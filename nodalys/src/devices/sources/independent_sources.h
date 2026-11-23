@@ -46,17 +46,37 @@ struct SourcePeriodicity {
  */
 class IndependentSourceDevice : public Device, public SensitiveDevice {
 public:
+    /**
+     * @brief   Reports whether this independent source is a voltage source (`true`) or a current source (`false`).
+     * @return  True for VoltageSourceDevice, false for CurrentSourceDevice.
+     */
     virtual bool IsVoltageSource() const = 0;
 
     double GetDcValue() const;
     void SetDcValue(double value);
 
+    /**
+     * @brief   Returns the small-signal AC excitation magnitude.
+     * @return  AC magnitude in Volts or Amperes.
+     */
     double GetAcMagnitude() const { return m_AcMagnitude; }
 
+    /**
+     * @brief   Returns the positive terminal MNA node index.
+     * @return  Node unknown index, or `-1` for ground.
+     */
     int GetNodeA() const { return m_NodeA; }
 
+    /**
+     * @brief   Returns the negative terminal MNA node index.
+     * @return  Node unknown index, or `-1` for ground.
+     */
     int GetNodeB() const { return m_NodeB; }
 
+    /**
+     * @brief   Returns the waveform periodicity metadata for Harmonic Balance validation.
+     * @return  Const reference to the periodicity descriptor.
+     */
     const SourcePeriodicity &GetPeriodicity() const { return m_Periodicity; }
 
     void SetBreakpoints(BreakpointCallback breakpoints);
@@ -147,6 +167,10 @@ public:
 
     bool IsVoltageSource() const override { return true; }
 
+    /**
+     * @brief   Returns the branch-current unknown index of this voltage source.
+     * @return  Branch unknown index.
+     */
     int GetBranch() const { return m_Branch; }
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;

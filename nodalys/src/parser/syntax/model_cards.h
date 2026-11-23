@@ -22,6 +22,7 @@ namespace Nodalys {
  * @brief   One .model card: the kind of device and its parameters by upper-case name.
  */
 struct ParsedModel {
+    /// Semiconductor or switch device family recognized on a `.model` card.
     enum class ModelKind {
         DIODE,
         BJT_NPN,

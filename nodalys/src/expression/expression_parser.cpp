@@ -317,7 +317,9 @@ private:
         return left;
     }
 
-    /// A sign or a negation binds looser than the power, so -2^2 is -(2^2), as in ngspice.
+    /**
+     * @brief   A sign or a negation binds looser than the power, so -2^2 is -(2^2), as in ngspice.
+     */
     int ParseUnary() {
         if (!Enter()) {
             return -1;
@@ -337,7 +339,9 @@ private:
         return result;
     }
 
-    /// Powers group from the left, so 2^3^2 is (2^3)^2 = 64, as in ngspice.
+    /**
+     * @brief   Powers group from the left, so 2^3^2 is (2^3)^2 = 64, as in ngspice.
+     */
     int ParsePower() {
         int base = ParsePrimary();
         while (base >= 0 && (Consume("**") || Consume("^"))) {
@@ -346,7 +350,9 @@ private:
         return base;
     }
 
-    /// The exponent may carry a sign, 2^-1, which then binds to the number alone.
+    /**
+     * @brief   The exponent may carry a sign, 2^-1, which then binds to the number alone.
+     */
     int ParsePowerOperand() {
         if (!Enter()) {
             return -1;
@@ -387,8 +393,10 @@ private:
         return Fail(DescribeUnexpected());
     }
 
-    /// A number with its SPICE suffix: digits, a point, an exponent when digits follow it, then the letters of the
-    /// scale and of any unit, which SPICE reads and ignores after the scale.
+    /**
+     * @brief   A number with its SPICE suffix: digits, a point, an exponent when digits follow it, then the letters of
+     * the scale and of any unit, which SPICE reads and ignores after the scale.
+     */
     int ParseNumber() {
         const std::size_t start = m_Position;
         while (IsDigit(Peek())) {
@@ -418,7 +426,9 @@ private:
         return AddNode({.Kind = Operation::CONSTANT, .Constant = *value});
     }
 
-    /// A reference, a function call, a constant or a variable.
+    /**
+     * @brief   A reference, a function call, a constant or a variable.
+     */
     int ParseName() {
         const std::size_t start = m_Position;
         while (IsIdentifierCharacter(Peek())) {
@@ -469,7 +479,10 @@ private:
                                 written));
     }
 
-    /// Reads `v(node)`, `v(node, reference)` or `i(source)`; the names go up to the closing parenthesis unchanged.
+    /**
+     * @brief   Reads `v(node)`, `v(node, reference)` or `i(source)`; the names go up to the closing parenthesis
+     * unchanged.
+     */
     int ParseReference(const std::size_t start, const bool is_voltage) {
         const std::size_t open = m_Position;
         const std::size_t close = m_Text.find(')', open);
@@ -513,7 +526,9 @@ private:
         return static_cast<int>(m_Program.Inputs.size()) - 1;
     }
 
-    /// Reads a function and its operands, `max(a, b)`.
+    /**
+     * @brief   Reads a function and its operands, `max(a, b)`.
+     */
     int ParseCall(const std::string_view written, const std::string &name) {
         const auto refused =
             std::ranges::find_if(REFUSED_FUNCTIONS, [&name](const RefusedName &entry) { return entry.Name == name; });

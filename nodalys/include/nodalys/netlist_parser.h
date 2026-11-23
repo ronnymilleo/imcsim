@@ -24,17 +24,28 @@ namespace Nodalys {
  * @brief  Type of simulation directive found in the SPICE netlist.
  */
 enum class AnalysisKind {
-    OPERATING_POINT,   ///< .op
-    TRANSIENT,         ///< .tran
-    DC_SWEEP,          ///< .dc
-    AC_SWEEP,          ///< .ac
-    TRANSFER_FUNCTION, ///< .tf
-    NOISE,             ///< .noise
-    S_PARAMETERS,      ///< .sp
-    POLE_ZERO,         ///< .pz
-    SENSITIVITY,       ///< .sens
-    AC_SENSITIVITY,    ///< .sens ... ac
-    HARMONIC_BALANCE   ///< .hb
+    /// .op
+    OPERATING_POINT,
+    /// .tran
+    TRANSIENT,
+    /// .dc
+    DC_SWEEP,
+    /// .ac
+    AC_SWEEP,
+    /// .tf
+    TRANSFER_FUNCTION,
+    /// .noise
+    NOISE,
+    /// .sp
+    S_PARAMETERS,
+    /// .pz
+    POLE_ZERO,
+    /// .sens
+    SENSITIVITY,
+    /// .sens ... ac
+    AC_SENSITIVITY,
+    /// .hb
+    HARMONIC_BALANCE
 };
 
 /**

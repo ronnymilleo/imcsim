@@ -98,7 +98,9 @@ std::optional<Sample> SolveAt(const SmallSignalSystem &system, const double omeg
     return sample;
 }
 
-/// The frequencies, in rad/s, to solve at: a log grid that reaches past the lowest and the highest root.
+/**
+ * @brief   The frequencies, in rad/s, to solve at: a log grid that reaches past the lowest and the highest root.
+ */
 std::vector<double> ChooseFrequencies(const PoleZeroResult &roots) {
     double lowest = std::numeric_limits<double>::infinity();
     double highest = 0.0;
@@ -149,8 +151,10 @@ std::complex<double> LogShape(const PoleZeroResult &roots, const double omega) {
     return total;
 }
 
-/// The log of the ratio of the response to the shape of the roots, which is the same at every frequency when the roots
-/// are right: the log of a real gain.
+/**
+ * @brief   The log of the ratio of the response to the shape of the roots, which is the same at every frequency when
+ * the roots are right: the log of a real gain.
+ */
 std::complex<double> LogGain(const PoleZeroResult &roots, const Sample &sample) {
     return std::log(sample.Output) - LogShape(roots, sample.Omega);
 }

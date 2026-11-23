@@ -23,7 +23,8 @@ NodeId ElementLine::ResolveNode(const std::size_t position) const {
 }
 
 /**
- * @brief   The builder of the expansion the line is added to.
+ * @brief   Returns the builder of the expansion the line is added to.
+ * @return  Mutable reference to the target CircuitBuilder.
  */
 CircuitBuilder &ElementLine::GetBuilder() const {
     return Scope.GetContext().Builder;
