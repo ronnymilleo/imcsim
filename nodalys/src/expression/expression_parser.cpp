@@ -6,7 +6,7 @@
 #include "expression/expression_parser.h"
 
 #include "expression/expression_math.h"
-#include "parser/spice_number.h"
+#include "text/spice_number.h"
 #include "text/text_case.h"
 #include <algorithm>
 #include <array>

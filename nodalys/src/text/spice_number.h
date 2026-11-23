@@ -3,8 +3,8 @@
  * @brief   Parses SPICE numeric literals with engineering scale suffixes.
  */
 
-#ifndef NODALYS_PARSER_SPICE_NUMBER_H
-#define NODALYS_PARSER_SPICE_NUMBER_H
+#ifndef NODALYS_TEXT_SPICE_NUMBER_H
+#define NODALYS_TEXT_SPICE_NUMBER_H
 
 #include <optional>
 #include <string_view>
@@ -16,4 +16,4 @@ namespace Nodalys {
 
 } // namespace Nodalys
 
-#endif // NODALYS_PARSER_SPICE_NUMBER_H
+#endif // NODALYS_TEXT_SPICE_NUMBER_H

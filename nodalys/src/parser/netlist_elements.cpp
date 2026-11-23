@@ -9,9 +9,9 @@
 #include "parser/expression_references.h"
 #include "parser/source_line.h"
 #include "parser/source_waveforms.h"
-#include "parser/spice_number.h"
 #include "parser/spice_text.h"
 #include "parser/subcircuit_lines.h"
+#include "text/spice_number.h"
 #include "text/text_case.h"
 
 #include <algorithm>
