@@ -5,8 +5,8 @@
 
 #include "parser/netlist_directives.h"
 
-#include "parser/spice_number.h"
 #include "parser/spice_text.h"
+#include "text/spice_number.h"
 #include "text/text_case.h"
 
 #include <algorithm>

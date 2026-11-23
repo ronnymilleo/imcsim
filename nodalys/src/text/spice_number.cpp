@@ -3,7 +3,7 @@
  * @brief   Parses SPICE numeric literals with engineering scale suffixes.
  */
 
-#include "parser/spice_number.h"
+#include "text/spice_number.h"
 
 #include "text/text_case.h"
 

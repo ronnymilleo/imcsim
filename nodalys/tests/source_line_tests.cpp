@@ -9,8 +9,8 @@
 #include <catch2/matchers/catch_matchers_string.hpp>
 
 #include "parser/source_line.h"
-#include "parser/spice_number.h"
 #include "parser/spice_text.h"
+#include "text/spice_number.h"
 
 #include <cstddef>
 #include <expected>

@@ -74,7 +74,6 @@ add_library(nodalys STATIC
     src/parser/netlist_subcircuits.cpp
     src/parser/source_line.cpp
     src/parser/source_waveforms.cpp
-    src/parser/spice_number.cpp
     src/parser/spice_text.cpp
     src/parser/spice_values.cpp
     src/parser/subcircuit_elements.cpp
@@ -83,6 +82,7 @@ add_library(nodalys STATIC
     src/parser/subcircuit_models.cpp
     src/parser/subcircuit_scope.cpp
     src/parser/subcircuit_text.cpp
+    src/text/spice_number.cpp
     src/text/text_case.cpp
 )
 
