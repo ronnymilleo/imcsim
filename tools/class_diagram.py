@@ -732,11 +732,12 @@ def scan_long_functions(files: list[SourceFile], threshold: int = 40) -> list[di
 
 DYN_CAST_RE = re.compile(r"dynamic_cast\s*<\s*(?:const\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*[*&]")
 NODISCARD_RE = re.compile(
-    r"^[ \t]*(?:virtual\s+|static\s+)?(std::(?:expected|optional)<[^>]+>)\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(",
+    r"^[ \t]*(?:virtual\s+|static\s+)?(std::(?:expected|optional)<(?:[^<>]+|<[^<>]+>)+>)\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(",
     re.MULTILINE,
 )
 VOID_PARAM_RE = re.compile(r"^\s*\(void\)\s*([a-z_][a-z0-9_]*)\s*;\s*$")
-HEADER_CONST_PARAM_RE = re.compile(r"\bconst\s+(?:int|double|bool|std::size_t|float)\s+[a-z_]")
+HEADER_CONST_PARAM_RE = re.compile(r"\bconst\s+(?:int|double|bool|std::size_t|float)\s+[a-z_][a-z0-9_]*\s*(?:=|,|$)")
+HEADER_DECL_PARAMS_RE = re.compile(r"[A-Za-z_~][A-Za-z0-9_]*\s*\(([^;{}()]*)\)\s*(?:const\s*)?(?:noexcept\s*)?(?:override\s*)?(?:=\s*0\s*)?;")
 TODO_MARKER_RE = re.compile(r"\b(TODO|FIXME|HACK|XXX)\b")
 HYGIENE_LINE_CHECKS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("#pragma once", re.compile(r"^\s*#pragma\s+once\b")),
@@ -786,15 +787,19 @@ def _scan_raw_lines(f: SourceFile, raw_lines: list[str], findings: _AuditFinding
 def _scan_header_declarations(
     f: SourceFile, clean: str, clean_lines: list[str], findings: _AuditFindings
 ) -> None:
+    del clean_lines
     for m in NODISCARD_RE.finditer(clean):
         line_start = clean.rfind("\n", 0, m.start()) + 1
         prev_start = clean.rfind("\n", 0, max(0, line_start - 1)) + 1
         if "[[nodiscard]]" not in clean[prev_start : m.start()]:
             line_no = clean[: m.start()].count("\n") + 1
             findings.missing_nodiscard.append(f"{f.rel_path}:{line_no} — {m.group(1)} {m.group(2)}()")
-    for idx, line in enumerate(clean_lines, 1):
-        if HEADER_CONST_PARAM_RE.search(line) and "{" not in line:
-            findings.header_const_params.append(f"{f.rel_path}:{idx} — {line.strip()[:90]}")
+    for m in HEADER_DECL_PARAMS_RE.finditer(clean):
+        params = m.group(1)
+        for pm in HEADER_CONST_PARAM_RE.finditer(params):
+            offset = m.start(1) + pm.start()
+            line_no = clean[:offset].count("\n") + 1
+            findings.header_const_params.append(f"{f.rel_path}:{line_no} — {pm.group(0).strip()[:90]}")
 
 
 def _scan_codebase_findings(files: list[SourceFile]) -> _AuditFindings:

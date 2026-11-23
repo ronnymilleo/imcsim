@@ -85,7 +85,7 @@ private:
     Result ReadBareValue(SourceValues &values);
 
     // Numbers
-    std::expected<double, std::string> ReadNumberOr(std::string_view text, double fallback) const;
+    [[nodiscard]] std::expected<double, std::string> ReadNumberOr(std::string_view text, double fallback) const;
     bool HasNext() const;
     bool IsSkippingUnknown() const;
 };

@@ -16,7 +16,7 @@
 namespace Nodalys {
 
 // Elements
-std::expected<void, std::string>
+[[nodiscard]] std::expected<void, std::string>
 AddTextElement(TextScope &scope, std::string_view line, const std::vector<std::string> &tokens);
 
 } // namespace Nodalys

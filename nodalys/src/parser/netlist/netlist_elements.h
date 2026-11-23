@@ -19,7 +19,7 @@ namespace Nodalys {
 std::vector<std::string> ListElementNodes(const DeckLine &line);
 
 // Elements
-std::expected<void, std::string> ReadElement(DeckContext &context, const DeckLine &line);
+[[nodiscard]] std::expected<void, std::string> ReadElement(DeckContext &context, const DeckLine &line);
 
 } // namespace Nodalys
 

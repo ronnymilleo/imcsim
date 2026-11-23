@@ -52,7 +52,7 @@ struct RefusedLine {
 };
 
 // Sorting
-std::expected<ClassifiedLines, RefusedLine> ClassifyLines(const std::vector<std::string> &lines);
+[[nodiscard]] std::expected<ClassifiedLines, RefusedLine> ClassifyLines(const std::vector<std::string> &lines);
 
 } // namespace Nodalys
 

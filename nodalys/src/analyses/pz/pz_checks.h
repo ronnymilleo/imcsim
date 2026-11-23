@@ -34,8 +34,9 @@ struct SmallSignalSystem {
 };
 
 // Checks
-std::optional<std::string> FindUndrivenOutput(const SmallSignalSystem &system, const PoleZeroResult &roots);
-std::optional<std::string> FindRootMismatch(const SmallSignalSystem &system, const PoleZeroResult &roots);
+[[nodiscard]] std::optional<std::string> FindUndrivenOutput(const SmallSignalSystem &system,
+                                                            const PoleZeroResult &roots);
+[[nodiscard]] std::optional<std::string> FindRootMismatch(const SmallSignalSystem &system, const PoleZeroResult &roots);
 
 } // namespace Nodalys
 

@@ -13,10 +13,10 @@
 namespace Nodalys {
 
 // Conversions
-std::optional<PortMatrix> ComputeImpedanceMatrix(const PortMatrix &scattering,
-                                                 const std::vector<double> &reference_ohms);
-std::optional<PortMatrix> ComputeAdmittanceMatrix(const PortMatrix &scattering,
-                                                  const std::vector<double> &reference_ohms);
+[[nodiscard]] std::optional<PortMatrix> ComputeImpedanceMatrix(const PortMatrix &scattering,
+                                                               const std::vector<double> &reference_ohms);
+[[nodiscard]] std::optional<PortMatrix> ComputeAdmittanceMatrix(const PortMatrix &scattering,
+                                                                const std::vector<double> &reference_ohms);
 
 } // namespace Nodalys
 

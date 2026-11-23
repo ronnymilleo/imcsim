@@ -242,18 +242,18 @@ struct SParameterResult {
     }
 
     /// Z(row, column) at a frequency; none when the result has no impedance matrices or the circuit has no finite Z.
-    std::optional<std::complex<double>>
+    [[nodiscard]] std::optional<std::complex<double>>
     Impedance(const std::size_t frequency_idx, const int row, const int column) const {
         return ReadMatrix(ImpedanceMatrices, frequency_idx, row, column);
     }
 
     /// Y(row, column) at a frequency; none when the result has no admittance matrices or the circuit has no finite Y.
-    std::optional<std::complex<double>>
+    [[nodiscard]] std::optional<std::complex<double>>
     Admittance(const std::size_t frequency_idx, const int row, const int column) const {
         return ReadMatrix(AdmittanceMatrices, frequency_idx, row, column);
     }
 
-    std::optional<double> ReturnLossDb(const std::size_t frequency_idx, const int port) const {
+    [[nodiscard]] std::optional<double> ReturnLossDb(const std::size_t frequency_idx, const int port) const {
         constexpr double MIN_MAG = 1e-15;
         const auto s = Get(frequency_idx, port, port);
         const double mag = std::abs(s);
@@ -263,7 +263,7 @@ struct SParameterResult {
         return -20.0 * std::log10(mag);
     }
 
-    std::optional<double>
+    [[nodiscard]] std::optional<double>
     InsertionLossDb(const std::size_t frequency_idx, const int to_port, const int from_port) const {
         constexpr double MIN_MAG = 1e-15;
         const auto s = Get(frequency_idx, to_port, from_port);
@@ -274,7 +274,7 @@ struct SParameterResult {
         return -20.0 * std::log10(mag);
     }
 
-    std::optional<double> Vswr(const std::size_t frequency_idx, const int port) const {
+    [[nodiscard]] std::optional<double> Vswr(const std::size_t frequency_idx, const int port) const {
         constexpr double TOL = 1e-12;
         const double mag = std::abs(Get(frequency_idx, port, port));
         if (mag >= 1.0 - TOL) {
@@ -283,7 +283,8 @@ struct SParameterResult {
         return (1.0 + mag) / (1.0 - mag);
     }
 
-    std::optional<std::complex<double>> InputImpedance(const std::size_t frequency_idx, const int port) const {
+    [[nodiscard]] std::optional<std::complex<double>> InputImpedance(const std::size_t frequency_idx,
+                                                                     const int port) const {
         constexpr double TOL = 1e-12;
         if (port < 1 || static_cast<std::size_t>(port) > ReferenceOhms.size()) {
             return std::nullopt;
@@ -298,10 +299,10 @@ struct SParameterResult {
     }
 
 private:
-    std::optional<std::complex<double>> ReadMatrix(const std::vector<std::optional<PortMatrix>> &matrices,
-                                                   const std::size_t frequency_idx,
-                                                   const int row,
-                                                   const int column) const {
+    [[nodiscard]] std::optional<std::complex<double>> ReadMatrix(const std::vector<std::optional<PortMatrix>> &matrices,
+                                                                 const std::size_t frequency_idx,
+                                                                 const int row,
+                                                                 const int column) const {
         if (frequency_idx >= matrices.size()) {
             return std::nullopt;
         }

@@ -21,7 +21,7 @@ namespace Nodalys {
 std::vector<std::string> ListDirectiveNodes(const DeckLine &line);
 
 // Directives
-std::expected<void, std::string> ReadDirective(DeckContext &context, const DeckLine &line);
+[[nodiscard]] std::expected<void, std::string> ReadDirective(DeckContext &context, const DeckLine &line);
 void ApplyDeckSettings(const DeckSettings &settings, CircuitBuilder &builder, std::vector<ParsedAnalysis> &analyses);
 
 } // namespace Nodalys

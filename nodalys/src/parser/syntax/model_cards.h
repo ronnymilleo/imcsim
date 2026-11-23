@@ -58,8 +58,8 @@ struct BuiltParameters {
 };
 
 // Cards
-std::optional<ModelCardWords> SplitModelCard(const std::vector<std::string> &tokens);
-std::optional<ParsedModel::ModelKind> FindModelKind(std::string_view type);
+[[nodiscard]] std::optional<ModelCardWords> SplitModelCard(const std::vector<std::string> &tokens);
+[[nodiscard]] std::optional<ParsedModel::ModelKind> FindModelKind(std::string_view type);
 
 // Device parameters
 BuiltParameters<DiodeParameters> BuildDiodeParameters(const ParsedModel &model);

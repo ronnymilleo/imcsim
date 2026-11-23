@@ -65,9 +65,12 @@ TEST_CASE("Every model figure of a semiconductor reaches Nodalys, and the rating
 
 TEST_CASE("A waveform reaches Nodalys as it is, and an AC source starts at phase 0", "[parameter_conversion]") {
     const Core::ACParameters ac{.Amplitude = 2.0, .Frequency = 50.0, .Offset = 1.0, .Magnitude = 0.5};
-    CHECK(
-        Core::ToNodalys(ac)
-        == Nodalys::SineParameters{.Amplitude = 2.0, .Frequency = 50.0, .Offset = 1.0, .Magnitude = 0.5, .Phase = 0.0});
+    CHECK(Core::ToNodalys(ac)
+          == Nodalys::SineParameters{.Amplitude = 2.0,
+                                     .Frequency = 50.0,
+                                     .Offset = 1.0,
+                                     .Magnitude = 0.5,
+                                     .PhaseDegrees = 0.0});
 
     const Core::PWLParameters pwl{.Points = {{0.0, 1.0}, {1e-3, -1.0}}};
     CHECK(Core::ToNodalys(pwl) == Nodalys::PwlParameters{.Points = {{0.0, 1.0}, {1e-3, -1.0}}});
