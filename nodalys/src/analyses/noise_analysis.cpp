@@ -202,7 +202,6 @@ std::expected<NoiseResult, std::string> ComputeNoise(CompiledCircuit &compiled,
                                                      const NoiseConfig &settings,
                                                      const ConvergenceOptions &options,
                                                      std::vector<DiagnosticMessage> *messages) {
-
     const std::expected<InputSource, std::string> input = ResolveNoiseInput(compiled, settings);
     if (!input) {
         return std::unexpected(input.error());

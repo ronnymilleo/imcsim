@@ -522,7 +522,6 @@ std::expected<TransientResult, std::string> ComputeTransient(CompiledCircuit &co
                                                              const RunMonitor &monitor,
                                                              const ConvergenceOptions &options,
                                                              std::vector<DiagnosticMessage> *messages) {
-
     const double output_step = settings.TimeStep > 0.0 ? settings.TimeStep : (settings.StopTime / 1000.0);
     TransientCollector collector(compiled, output_step);
     SeedDeviceRandomness(compiled, settings);

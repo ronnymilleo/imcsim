@@ -257,7 +257,6 @@ std::expected<SParameterResult, std::string> ComputeSParameters(CompiledCircuit 
                                                                 const SParameterConfig &settings,
                                                                 const ConvergenceOptions &options,
                                                                 std::vector<DiagnosticMessage> *messages) {
-
     const auto validated_ports =
         ValidatePorts(settings.Ports.empty() ? compiled.Ports : settings.Ports, compiled.CircuitNodeCount);
     if (!validated_ports) {
