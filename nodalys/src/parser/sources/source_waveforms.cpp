@@ -34,8 +34,7 @@ constexpr double DEFAULT_FLICKER_EXPONENT = 1.0;
 struct SourcePlacement {
     CircuitBuilder &Builder;
     const std::string &Name;
-    /// True for a V source, false for an I source.
-    bool IsVoltage;
+    bool IsVoltage; ///< True for a V source, false for an I source.
     NodeId Positive;
     NodeId Negative;
     const SourceLevels &Levels;

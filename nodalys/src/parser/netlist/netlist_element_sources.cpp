@@ -60,8 +60,7 @@ struct PortWords {
 struct SourceWords {
     SourceValues Values;
     PortWords Port;
-    /// Whether a port option made the line an S-parameter port.
-    bool IsPort = false;
+    bool IsPort = false; ///< Whether a port option made the line an S-parameter port.
 };
 
 /**

@@ -20,12 +20,9 @@ namespace Nodalys {
  * @brief   Which of the passes of a solve with nodesets is being run.
  */
 enum class NodesetPass {
-    /// The nodes are pulled to their guesses.
-    PULLED,
-    /// The nodesets are let go, starting from the point the pulled pass found.
-    RELEASED,
-    /// No nodeset acts, as a solve of a circuit without any.
-    PLAIN,
+    PULLED,   ///< The nodes are pulled to their guesses.
+    RELEASED, ///< The nodesets are let go, starting from the point the pulled pass found.
+    PLAIN,    ///< No nodeset acts, as a solve of a circuit without any.
 };
 
 /**

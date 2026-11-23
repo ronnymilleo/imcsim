@@ -73,8 +73,7 @@ struct RunMonitor {
 struct AcSensitivityConfig {
     int OutputPositiveNode = 0;
     int OutputNegativeNode = 0;
-    /// Independent source with an AC magnitude; the others are silent for this analysis.
-    std::string InputSource;
+    std::string InputSource; ///< Independent source with an AC magnitude; the others are silent for this analysis.
     double StartFrequency = 1.0;
     double StopFrequency = 1e6;
     /// Points per decade or per octave of a logarithmic sweep, or the points in all of a linear one.
@@ -114,14 +113,10 @@ struct DcSweepConfig {
  * @brief   Configuration for periodic steady-state Harmonic Balance analysis (.hb).
  */
 struct HarmonicBalanceConfig {
-    /// Fundamental frequency f0 in Hz.
-    double FundamentalFrequency = 1e3;
-    /// Highest harmonic order H >= 0 (solves DC + harmonics 1..H).
-    int Harmonics = 8;
-    /// Time samples M per period (power of two); 0 chooses >= max(4H, 16).
-    int Samples = 0;
-    /// Amplitude homotopy steps on failure; 0 uses ConvergenceOptions.SourceSteps.
-    int SourceSteps = 0;
+    double FundamentalFrequency = 1e3; ///< Fundamental frequency f0 in Hz.
+    int Harmonics = 8;                 ///< Highest harmonic order H >= 0 (solves DC + harmonics 1..H).
+    int Samples = 0;                   ///< Time samples M per period (power of two); 0 chooses >= max(4H, 16).
+    int SourceSteps = 0;               ///< Amplitude homotopy steps on failure; 0 uses ConvergenceOptions.SourceSteps.
     /// Asked before each Newton iteration, since one run can take long; returning true stops it with an error.
     std::function<bool()> ShouldStop = nullptr;
 };
@@ -193,8 +188,7 @@ struct TransientConfig {
     double MaxStep = 0.0;
     bool UseInitialConditions = false;
     IntegrationMethod Method = IntegrationMethod::TRAPEZOIDAL;
-    /// Seed for TRNOISE and TRRANDOM sources; 0 draws a new sequence on each run.
-    unsigned int Seed = 0;
+    unsigned int Seed = 0; ///< Seed for TRNOISE and TRRANDOM sources; 0 draws a new sequence on each run.
 };
 
 // Top-level analysis entry points

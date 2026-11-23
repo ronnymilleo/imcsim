@@ -43,8 +43,7 @@ struct ExpressionInput {
     };
 
     Kind Type = Kind::VOLTAGE;
-    /// The node of a voltage, or the source of a current, as written.
-    std::string First;
+    std::string First; ///< The node of a voltage, or the source of a current, as written.
     /// The reference node of `v(node, reference)`, or empty for a voltage to ground and for a current.
     std::string Second;
 };
@@ -55,10 +54,8 @@ struct ExpressionInput {
  */
 struct ExpressionReference {
     ExpressionInput Input;
-    /// Character of the `v` or the `i`.
-    std::size_t Start = 0;
-    /// Characters from Start to the closing parenthesis, included.
-    std::size_t Length = 0;
+    std::size_t Start = 0;  ///< Character of the `v` or the `i`.
+    std::size_t Length = 0; ///< Characters from Start to the closing parenthesis, included.
 };
 
 /**
@@ -67,8 +64,7 @@ struct ExpressionReference {
  */
 struct ExpressionResult {
     double Value = 0.0;
-    /// One per input, in the order of Expression::GetInputs().
-    std::vector<double> Partials;
+    std::vector<double> Partials; ///< One per input, in the order of Expression::GetInputs().
 };
 
 /**

@@ -22,8 +22,7 @@ namespace Nodalys {
 struct JacobianEntry {
     int Row = 0;
     int Column = 0;
-    /// Derivative of the conductance part, in siemens per volt or per ampere.
-    double Conductance = 0.0;
+    double Conductance = 0.0; ///< Derivative of the conductance part, in siemens per volt or per ampere.
     /// Derivative of the coefficient that multiplies \f$j\omega\f$, in farads per volt or per ampere.
     double Reactive = 0.0;
 };

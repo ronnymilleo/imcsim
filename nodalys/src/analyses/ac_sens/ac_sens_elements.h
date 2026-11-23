@@ -38,8 +38,7 @@ struct AcSensitivityPoint {
     double Omega = 0.0;
     const std::vector<double> &DcSolution;
     const std::vector<std::complex<double>> &AcSolution;
-    /// Adjoint of the output in the small-signal system.
-    const std::vector<std::complex<double>> &Adjoint;
+    const std::vector<std::complex<double>> &Adjoint; ///< Adjoint of the output in the small-signal system.
     /// Adjoint of the bias weights in the DC system; all zero for a circuit without nonlinear devices.
     const std::vector<std::complex<double>> &BiasAdjoint;
 };

@@ -34,10 +34,8 @@ struct ProbeSpec {
 struct CompileScope {
     /// The circuit whose entries are compiled, where the nets and the controlling currents are looked up.
     const Circuit &Owner;
-    /// The node of the compiled circuit that each node of the owner stands for.
-    const std::vector<int> &NodeMap;
-    /// The value of each parameter the instance of this level passes; empty at the top.
-    const Parameters &Values;
+    const std::vector<int> &NodeMap; ///< The node of the compiled circuit that each node of the owner stands for.
+    const Parameters &Values; ///< The value of each parameter the instance of this level passes; empty at the top.
     /// Dotted name of the instance, empty at the top, which keeps the names of the devices apart between instances.
     const std::string &Prefix;
     /// entry_index -> terminal_index -> probe_node, the nodes that replace a terminal whose current is read.
@@ -55,8 +53,7 @@ struct EntryContext {
     std::string Name;
     /// The compiled nodes of the terminals, with a probe node in place of each probed terminal.
     std::vector<int> Nodes;
-    /// The value with its parameter references resolved; zero for a part that has none.
-    double Value = 0.0;
+    double Value = 0.0; ///< The value with its parameter references resolved; zero for a part that has none.
 };
 
 // Shared probe and error helpers

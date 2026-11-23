@@ -48,8 +48,7 @@ private:
     bool m_IsComplex;
     std::vector<Variable> m_Variables;
     std::size_t m_PointCount = 0;
-    /// The rows written so far, in the text of the rawfile.
-    std::string m_Values;
+    std::string m_Values; ///< The rows written so far, in the text of the rawfile.
     /// Whether the next cell is the first of its point, the one that carries the point number.
     bool m_IsPointStart = false;
 };

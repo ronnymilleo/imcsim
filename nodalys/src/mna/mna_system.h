@@ -63,8 +63,7 @@ struct TimeContext {
     double PreviousTimeStep = 0.0;
     /// True while evaluating periodic steady-state waveforms over one Harmonic Balance cycle.
     bool IsPeriodicSteadyState = false;
-    /// Current simulation time \f$t\f$, in seconds.
-    double Time = 0.0;
+    double Time = 0.0; ///< Current simulation time \f$t\f$, in seconds.
     /// Integration step size \f$h = \Delta t\f$, in seconds (used only when `IsTransient` is true).
     double TimeStep = 0.0;
 };

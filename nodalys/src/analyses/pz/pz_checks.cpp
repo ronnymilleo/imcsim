@@ -42,8 +42,7 @@ constexpr double DECIBELS_PER_NEPER = 20.0 / std::numbers::ln10;
  * @brief   The sample where the gain read from the roots drifts the most.
  */
 struct Mismatch {
-    /// Distance in the log plane, in nepers, which counts the magnitude and the angle together.
-    double Size = 0.0;
+    double Size = 0.0; ///< Distance in the log plane, in nepers, which counts the magnitude and the angle together.
     double Omega = 0.0;
     double Decibels = 0.0;
     double Degrees = 0.0;

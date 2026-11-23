@@ -30,8 +30,7 @@ namespace Nodalys {
  */
 struct SubcircuitText {
     std::string Name;
-    /// The node names of the .subckt line, in order.
-    std::vector<std::string> Ports;
+    std::vector<std::string> Ports; ///< The node names of the .subckt line, in order.
     /// Everything between the .subckt line and its .ends, the .param and .model definitions it uses included.
     std::string Body;
 };
@@ -55,8 +54,7 @@ struct InstanceObservers {
 struct SubcircuitTextInstance {
     /// Put before the name of each element, such as "X1" for "X1.R1", so that the elements of two instances differ.
     std::string Prefix;
-    /// The node of the circuit each port is connected to, in the order of the ports.
-    std::vector<NodeId> PortNodes;
+    std::vector<NodeId> PortNodes; ///< The node of the circuit each port is connected to, in the order of the ports.
     /// The value of each parameter of the .subckt line, defaults and overrides settled; they win over a .param line of
     /// the text with the same name.
     std::map<std::string, double> Parameters;

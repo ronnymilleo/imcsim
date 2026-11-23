@@ -776,10 +776,40 @@ def _scan_clean_lines(f: SourceFile, clean_lines: list[str], findings: _AuditFin
                 findings.ignored_params.append(f"{f.rel_path}:{idx} — (void){vm.group(1)};")
 
 
+NON_FIELD_DECL_RE = re.compile(
+    r"^(struct|class|enum|using|typedef|namespace|template|public:|private:|protected:|#|inline\b|static\s+constexpr\b|constexpr\b)"
+)
+ENUM_VAL_DECL_RE = re.compile(r"^[A-Z][A-Z0-9_]*(\s*=\s*[^,;]+)?\s*,?$")
+
+
 def _scan_raw_lines(f: SourceFile, raw_lines: list[str], findings: _AuditFindings) -> None:
     for idx, raw_line in enumerate(raw_lines, 1):
         if "///<" in raw_line:
-            findings.trailing_doxygen.append(f"{f.rel_path}:{idx} — {raw_line.strip()[:90]}")
+            before = raw_line.split("///<")[0].strip()
+            if not before or (" " not in before and before.endswith(";")):
+                findings.trailing_doxygen.append(f"{f.rel_path}:{idx} — wrapped ///<: {raw_line.strip()[:80]}")
+        elif (
+            idx < len(raw_lines)
+            and raw_line.strip().startswith("///")
+            and not (idx > 1 and raw_lines[idx - 2].strip().startswith("///"))
+            and not raw_lines[idx].strip().startswith("///")
+        ):
+            decl = raw_lines[idx]
+            decl_s = decl.strip()
+            indent = len(decl) - len(decl.lstrip())
+            is_field = (
+                indent >= 4
+                and not NON_FIELD_DECL_RE.match(decl_s)
+                and decl_s.endswith(";")
+                and "(" not in decl_s.split("=")[0]
+            )
+            is_enum_val = indent >= 4 and ENUM_VAL_DECL_RE.match(decl_s) is not None
+            if is_field or is_enum_val:
+                combined = f"{decl} ///< {raw_line.strip()[3:].strip()}"
+                if len(combined) <= 120:
+                    findings.trailing_doxygen.append(
+                        f"{f.rel_path}:{idx} — fits on same line as ///<: {combined.strip()[:80]}"
+                    )
         if TODO_MARKER_RE.search(raw_line):
             findings.hygiene_issues.append(f"TODO/FIXME in {f.rel_path}:{idx}")
 
@@ -956,9 +986,9 @@ AUDIT_CHECK_METADATA: tuple[tuple[str, str, str, str, str, str], ...] = (
         "A11",
         "low",
         "Doxygen Style (CLAUDE.md)",
-        "Trailing ///< comments instead of /// above declarations",
-        "The guideline places /// comments above each individual declaration instead of trailing ///< comments.",
-        "Convert ///< comments to /// above each declaration (tracked alongside #275).",
+        "Field/enum /// comments that fit as ///< or multi-line ///< wraps",
+        "The guideline uses trailing ///< on the same line when a field or enum-value comment fits in <= 120 columns, and /// above when it does not.",
+        "Use ///< on the same line when <= 120 columns; move to /// above when a trailing comment wraps.",
     ),
     (
         "A12",

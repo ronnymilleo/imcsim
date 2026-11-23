@@ -46,10 +46,8 @@ struct NewtonBuffers {
     HarmonicResidual Residual;
     std::vector<double> RhsNegative;
     std::vector<double> Delta;
-    /// The full Newton step from the state.
-    std::vector<double> Candidate;
-    /// The state the iteration moves to, after the limiting or the line search.
-    std::vector<double> Next;
+    std::vector<double> Candidate; ///< The full Newton step from the state.
+    std::vector<double> Next;      ///< The state the iteration moves to, after the limiting or the line search.
     std::vector<std::vector<double>> CandidateSamples;
     std::vector<std::vector<double>> PreviousSamples;
 

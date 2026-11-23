@@ -57,17 +57,13 @@ private:
     int m_Anode;
     int m_Cathode;
     int m_Internal;
-    /// Cathode side of the intrinsic junction (`m_Internal` when \f$R_S > 0\f$, else `m_Cathode`).
-    int m_JunctionNode;
-    /// The parameters as the model gives them, at the nominal temperature.
-    DiodeParameters m_Given;
-    /// The parameters at the temperature of the run, which every evaluation reads.
-    DiodeParameters m_Parameters;
+    int m_JunctionNode; ///< Cathode side of the intrinsic junction (`m_Internal` when \f$R_S > 0\f$, else `m_Cathode`).
+    DiodeParameters m_Given;      ///< The parameters as the model gives them, at the nominal temperature.
+    DiodeParameters m_Parameters; ///< The parameters at the temperature of the run, which every evaluation reads.
     ThermalConditions m_Thermal;
     double m_Vt;
     double m_Critical;
-    /// Trapezoidal charge history at the last accepted time point.
-    ChargeHistory m_History;
+    ChargeHistory m_History; ///< Trapezoidal charge history at the last accepted time point.
     ChargeHistory m_SavedHistory;
     /// Companion model of the junction capacitance from the most recent transient stamp.
     double m_CapConductance = 0.0;

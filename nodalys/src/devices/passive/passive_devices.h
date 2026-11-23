@@ -66,8 +66,7 @@ private:
     int m_NodeA;
     int m_NodeB;
     double m_Capacitance;
-    /// Charge C v and its current at the last accepted points.
-    ChargeHistory m_History;
+    ChargeHistory m_History; ///< Charge C v and its current at the last accepted points.
     ChargeHistory m_SavedHistory;
     double m_InitialVoltage;
     bool m_HasInitial;
@@ -116,8 +115,7 @@ private:
     double m_L1;
     double m_L2;
     double m_M;
-    /// Fluxes of the two windings and their voltages at the last accepted points.
-    ChargeHistory m_History1;
+    ChargeHistory m_History1; ///< Fluxes of the two windings and their voltages at the last accepted points.
     ChargeHistory m_History2;
     ChargeHistory m_SavedHistory1;
     ChargeHistory m_SavedHistory2;
@@ -181,8 +179,7 @@ private:
     int m_NodeB;
     int m_Branch;
     double m_Inductance;
-    /// Flux L i and its derivative, the voltage, at the last accepted points.
-    ChargeHistory m_History;
+    ChargeHistory m_History; ///< Flux L i and its derivative, the voltage, at the last accepted points.
     ChargeHistory m_SavedHistory;
     double m_InitialCurrent;
     bool m_HasInitial;

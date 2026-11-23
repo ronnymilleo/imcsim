@@ -32,14 +32,11 @@ struct DeckLine {
  * @brief   The lines of a netlist sorted by what reads them.
  */
 struct Deck {
-    /// The first line, which SPICE takes as the title whatever it says.
-    std::string Title;
-    /// The elements and the directives outside the subcircuits, up to .end.
-    std::vector<DeckLine> CircuitLines;
+    std::string Title;                  ///< The first line, which SPICE takes as the title whatever it says.
+    std::vector<DeckLine> CircuitLines; ///< The elements and the directives outside the subcircuits, up to .end.
     /// The .subckt blocks, .model cards and .param lines, which every X line is placed over.
     std::vector<std::string> DefinitionLines;
-    /// The .model cards outside the subcircuits, by upper-case name.
-    std::map<std::string, ParsedModel> Models;
+    std::map<std::string, ParsedModel> Models; ///< The .model cards outside the subcircuits, by upper-case name.
     /// What the reading noticed without refusing the netlist, such as a model type the engine has no device for.
     std::vector<DiagnosticMessage> Diagnostics;
 };

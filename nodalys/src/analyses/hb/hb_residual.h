@@ -21,8 +21,7 @@ namespace Nodalys {
  */
 struct HarmonicResidual {
     std::vector<double> Values;
-    /// Largest term added to each row, which the tolerance of the row scales with.
-    std::vector<double> RowScale;
+    std::vector<double> RowScale; ///< Largest term added to each row, which the tolerance of the row scales with.
 };
 
 // Evaluation

@@ -29,12 +29,9 @@ enum class SensitivityParameter {
     RESISTANCE,
     CAPACITANCE,
     INDUCTANCE,
-    /// DC value of a voltage source.
-    VOLTAGE,
-    /// DC value of a current source.
-    CURRENT,
-    /// Gain of a controlled source.
-    GAIN
+    VOLTAGE, ///< DC value of a voltage source.
+    CURRENT, ///< DC value of a current source.
+    GAIN     ///< Gain of a controlled source.
 };
 
 // Shared result records
@@ -47,11 +44,9 @@ enum class SensitivityParameter {
  * at a frequency where the output is too small for a relative change to mean anything.
  */
 struct AcElementSensitivity {
-    /// Lower case name of the element, as the netlist writes it ("r1", "x1.r1" inside a block).
-    std::string Name;
+    std::string Name; ///< Lower case name of the element, as the netlist writes it ("r1", "x1.r1" inside a block).
     SensitivityParameter Parameter = SensitivityParameter::RESISTANCE;
-    /// Value of the element: ohms, farads, henries, volts, amperes or the gain.
-    double Value = 0.0;
+    double Value = 0.0; ///< Value of the element: ohms, farads, henries, volts, amperes or the gain.
     std::vector<std::complex<double>> Derivatives;
     std::vector<std::optional<double>> MagnitudeDecibelsPerPercent;
     std::vector<std::optional<double>> PhaseDegreesPerPercent;
@@ -157,16 +152,12 @@ struct HarmonicBalanceResult {
     std::vector<double> Frequencies;
     /// Complex peak phasors indexed [node][harmonic], node 0 is ground.
     std::vector<std::vector<std::complex<double>>> NodePhasors;
-    /// Complex peak current phasors per monitored component.
-    std::vector<ComponentPhasors> CurrentPhasors;
-    /// Reconstructed time points over one period [0, T0).
-    std::vector<double> Times;
+    std::vector<ComponentPhasors> CurrentPhasors; ///< Complex peak current phasors per monitored component.
+    std::vector<double> Times;                    ///< Reconstructed time points over one period [0, T0).
     /// Reconstructed periodic node voltage waveforms indexed [node][sample].
     std::vector<std::vector<double>> NodeWaveforms;
-    /// Reconstructed periodic component current waveforms.
-    std::vector<ComponentTrace> CurrentWaveforms;
-    /// Diagnostic warnings emitted during analysis.
-    std::vector<std::string> Warnings;
+    std::vector<ComponentTrace> CurrentWaveforms; ///< Reconstructed periodic component current waveforms.
+    std::vector<std::string> Warnings;            ///< Diagnostic warnings emitted during analysis.
     int Iterations = 0;
     /// Recovery strategy used when plain Newton did not converge ("", "source stepping", or "gmin stepping").
     std::string Strategy;
@@ -193,12 +184,9 @@ struct NoiseResult {
  * @brief   DC Operating Point (.op) node voltages and branch currents.
  */
 struct OperatingPointResult {
-    /// Node voltages indexed by NodeId (node 0 is ground and always 0 V).
-    std::vector<double> NodeVoltages;
-    /// Component currents.
-    std::vector<ComponentCurrent> Currents;
-    /// Warnings emitted during solution.
-    std::vector<std::string> Warnings;
+    std::vector<double> NodeVoltages;       ///< Node voltages indexed by NodeId (node 0 is ground and always 0 V).
+    std::vector<ComponentCurrent> Currents; ///< Component currents.
+    std::vector<std::string> Warnings;      ///< Warnings emitted during solution.
 };
 
 /**
@@ -222,16 +210,14 @@ struct PoleZeroResult {
  */
 struct SParameterResult {
     std::vector<double> Frequencies;
-    /// Reference impedance in Ohms per port, ordered by 1-based port index.
-    std::vector<double> ReferenceOhms;
+    std::vector<double> ReferenceOhms; ///< Reference impedance in Ohms per port, ordered by 1-based port index.
     /// Flattened complex S-matrix values stored as: [freq_idx][row - 1][col - 1].
     std::vector<std::complex<double>> Values;
     /// Impedance matrix Z in ohms of each frequency, or none where no finite one exists.
     std::vector<std::optional<PortMatrix>> ImpedanceMatrices;
     /// Admittance matrix Y in siemens of each frequency, or none where no finite one exists.
     std::vector<std::optional<PortMatrix>> AdmittanceMatrices;
-    /// Diagnostic warnings.
-    std::vector<std::string> Warnings;
+    std::vector<std::string> Warnings; ///< Diagnostic warnings.
 
     /**
      * @brief   Returns the number of configured RF ports.
@@ -393,14 +379,10 @@ struct TransferFunctionResult {
  */
 struct TransientResult {
     std::vector<double> Times;
-    /// Indexed by node number, then by time point.
-    std::vector<std::vector<double>> NodeVoltages;
-    /// Currents for each monitored component over time.
-    std::vector<ComponentTrace> Currents;
-    /// Diagnostic warnings.
-    std::vector<std::string> Warnings;
-    /// False if simulation was interrupted or cut short.
-    bool IsComplete = true;
+    std::vector<std::vector<double>> NodeVoltages; ///< Indexed by node number, then by time point.
+    std::vector<ComponentTrace> Currents;          ///< Currents for each monitored component over time.
+    std::vector<std::string> Warnings;             ///< Diagnostic warnings.
+    bool IsComplete = true;                        ///< False if simulation was interrupted or cut short.
 };
 
 /// Discriminated union covering all supported Nodalys analysis result types.

@@ -35,8 +35,7 @@ enum class DigitalLevel {
  *          corner, whatever the method.
  */
 enum class IntegrationMethod {
-    /// A-stable, keeps the amplitude of a lossless resonance, but rings on a stiff mode.
-    TRAPEZOIDAL,
+    TRAPEZOIDAL, ///< A-stable, keeps the amplitude of a lossless resonance, but rings on a stiff mode.
     /// Variable-step BDF-2 (SPICE `method=gear`): L-stable, so it settles stiff switching without ringing, at the
     /// cost of some numerical damping of a lightly damped resonance.
     GEAR2
@@ -156,8 +155,7 @@ struct BjtParameters {
     double EnergyGap = 1.11;
     /// Exponent `XTI` of the temperature ratio in the growth of the saturation currents.
     double SaturationCurrentExponent = 3.0;
-    /// Exponent `XTB` of the temperature ratio in the forward and reverse current gains.
-    double BetaExponent = 0.0;
+    double BetaExponent = 0.0; ///< Exponent `XTB` of the temperature ratio in the forward and reverse current gains.
 
     /**
      * @brief   Compares two BjtParameters values for equality.
@@ -174,8 +172,7 @@ struct BoyleOpAmpParameters {
     bool IsPnpInput = false;
     double OpenLoopGainDecibels = 106.0;
     double GainBandwidth = 1e6;
-    /// Volts per microsecond, as datasheets specify.
-    double SlewRateVoltsPerMicrosecond = 0.5;
+    double SlewRateVoltsPerMicrosecond = 0.5; ///< Volts per microsecond, as datasheets specify.
     double PhaseMarginDegrees = 60.0;
     double InputBiasCurrent = 80e-9;
     double CommonModeRejectionDecibels = 90.0;
@@ -227,10 +224,8 @@ struct DiodeParameters {
  *          duration reaches the melting I2t.
  */
 struct FuseParameters {
-    /// Largest current the fuse carries for ever, in amperes.
-    double RatedCurrent = 1.0;
-    /// Current squared times time that melts the element in a short overload, in A^2 s.
-    double MeltingI2t = 1.045;
+    double RatedCurrent = 1.0; ///< Largest current the fuse carries for ever, in amperes.
+    double MeltingI2t = 1.045; ///< Current squared times time that melts the element in a short overload, in A^2 s.
     double ColdResistance = 0.0964;
     double BlownResistance = 1e9;
 
@@ -270,22 +265,14 @@ struct MosfetParameters {
  * @brief   Physical and analog parameters for C^inf smooth continuous logic gates.
  */
 struct SmoothLogicParameters {
-    /// Low logic level voltage in Volts.
-    double VLow = 0.0;
-    /// High logic level voltage in Volts.
-    double VHigh = 5.0;
-    /// Input switching threshold in Volts.
-    double VThreshold = 2.5;
-    /// Delta transition width in Volts for smooth tanh saturation.
-    double TransitionWidth = 0.1;
-    /// Inertial dynamic propagation delay in seconds.
-    double PropagationDelay = 1e-9;
-    /// Thevenin output stage resistance in Ohms.
-    double OutputResistance = 50.0;
-    /// High-impedance input leakage resistance in Ohms.
-    double InputResistance = 1e9;
-    /// Hysteresis voltage span for Schmitt triggers in Volts.
-    double Hysteresis = 0.5;
+    double VLow = 0.0;              ///< Low logic level voltage in Volts.
+    double VHigh = 5.0;             ///< High logic level voltage in Volts.
+    double VThreshold = 2.5;        ///< Input switching threshold in Volts.
+    double TransitionWidth = 0.1;   ///< Delta transition width in Volts for smooth tanh saturation.
+    double PropagationDelay = 1e-9; ///< Inertial dynamic propagation delay in seconds.
+    double OutputResistance = 50.0; ///< Thevenin output stage resistance in Ohms.
+    double InputResistance = 1e9;   ///< High-impedance input leakage resistance in Ohms.
+    double Hysteresis = 0.5;        ///< Hysteresis voltage span for Schmitt triggers in Volts.
 
     /**
      * @brief   Compares two SmoothLogicParameters values for equality.
@@ -482,8 +469,7 @@ struct SineParameters {
     double Frequency = 1e3;
     double Offset = 0.0;
     double Magnitude = 1.0;
-    /// Phase angle in degrees.
-    double PhaseDegrees = 0.0;
+    double PhaseDegrees = 0.0; ///< Phase angle in degrees.
 
     /**
      * @brief   Compares two SineParameters values for equality.

@@ -22,8 +22,7 @@ namespace Nodalys {
 struct HbSolveOutcome {
     bool Converged = false;
     int Iterations = 0;
-    /// The strategy that converged, or empty when none did.
-    std::string Strategy;
+    std::string Strategy; ///< The strategy that converged, or empty when none did.
 };
 
 // Linear circuit
