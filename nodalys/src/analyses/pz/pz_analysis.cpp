@@ -35,8 +35,8 @@ SmallSignalSystem BuildSmallSignalSystem(CompiledCircuit &compiled,
     const int size = compiled.System->GetSize();
     const MnaSystem reactive = BuildReactiveSystem(compiled, x_dc);
 
-    SmallSignalSystem system{.Conductance = compiled.System->Matrix(),
-                             .Reactive = reactive.Matrix(),
+    SmallSignalSystem system{.Conductance = compiled.System->ToDenseMatrix(),
+                             .Reactive = reactive.ToDenseMatrix(),
                              .Input = std::vector<double>(static_cast<std::size_t>(size), 0.0),
                              .Output = std::vector<double>(static_cast<std::size_t>(size), 0.0)};
     if (const VoltageSourceDevice *voltage = input.AsVoltage()) {

@@ -145,7 +145,7 @@ TEST_CASE("An empty system made like another has its unknowns and no stamps", "[
     for (int index = 0; index < original.GetSize(); ++index) {
         CHECK(empty.IsNodeUnknown(index) == original.IsNodeUnknown(index));
         for (int column = 0; column < original.GetSize(); ++column) {
-            CHECK(empty.Matrix().At(static_cast<std::size_t>(index), static_cast<std::size_t>(column)) == 0.0);
+            CHECK(empty.Entry(index, column) == 0.0);
         }
     }
 }
@@ -158,8 +158,8 @@ TEST_CASE("The reactive system holds the capacitance of a capacitor and the AC e
 
     const Nodalys::MnaSystem reactive = Nodalys::BuildReactiveSystem(compiled, x_dc);
 
-    const auto middle = static_cast<std::size_t>(compiled.System->NodeIndex(2));
-    CHECK_THAT(reactive.Matrix().At(middle, middle), WithinRel(1e-6, 1e-12));
+    const int middle = compiled.System->NodeIndex(2);
+    CHECK_THAT(reactive.Entry(middle, middle), WithinRel(1e-6, 1e-12));
     const auto branch = static_cast<std::size_t>(
         dynamic_cast<const Nodalys::VoltageSourceDevice *>(compiled.SourcesByName.at("V1"))->GetBranch());
     CHECK_THAT(reactive.Rhs()[branch], WithinRel(1.0, 1e-12));

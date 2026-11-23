@@ -8,7 +8,6 @@
 
 #include "compiler/compiled_circuit.h"
 #include "devices/device.h"
-#include "linear/dense_matrix.h"
 #include "linear/fft.h"
 #include "mna/mna_system.h"
 #include "nodalys/analyses.h"
@@ -37,7 +36,7 @@ struct ActiveMatrixTraces {
 
     // Recording
     void Reset(int unknown_count, std::size_t sample_count);
-    void RecordMatrix(const DenseMatrix &matrix, std::size_t sample_index);
+    void RecordMatrix(const MnaSystem &system, std::size_t sample_index);
 };
 
 /**

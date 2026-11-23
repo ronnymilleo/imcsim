@@ -19,11 +19,41 @@ namespace {
 constexpr double BRANCH_ROW_WEIGHT = 1e-3;
 
 /**
- * @brief   Conductance of one entry of the linear matrix, with the gmin that holds each node unknown to ground.
+ * @brief   Adds the linear contribution of one matrix position `(r, col)` to the harmonic residual.
  */
-double LinearConductance(const HbWorkspace &ws, const int row, const int col, const double gmin) {
-    return ws.GLin.Matrix().At(static_cast<std::size_t>(row), static_cast<std::size_t>(col))
-         + ((row == col && ws.IsNodeUnknown[static_cast<std::size_t>(row)]) ? gmin : 0.0);
+void AddLinearResidualEntry(const HbWorkspace &ws,
+                            const std::vector<double> &x_hb,
+                            const int r,
+                            const int col,
+                            const double g_val,
+                            const double c_val,
+                            HarmonicResidual &residual) {
+    if (g_val != 0.0) {
+        const double term0 = g_val * x_hb[ws.Index(col, 0)];
+        residual.Values[ws.Index(r, 0)] += term0;
+        residual.RowScale[ws.Index(r, 0)] = std::max(residual.RowScale[ws.Index(r, 0)], std::abs(term0));
+    }
+
+    if (g_val == 0.0 && c_val == 0.0) {
+        return;
+    }
+
+    for (int k = 1; k <= ws.Harmonics; ++k) {
+        const std::size_t rc = ws.Index(r, 2 * k - 1);
+        const std::size_t rs = ws.Index(r, 2 * k);
+        const std::size_t cc = ws.Index(col, 2 * k - 1);
+        const std::size_t cs = ws.Index(col, 2 * k);
+        const double kw_c = static_cast<double>(k) * ws.Omega0 * c_val;
+
+        const double xa = x_hb[cc];
+        const double xb = x_hb[cs];
+        const double y_cos = g_val * xa + kw_c * xb;
+        const double y_sin = -kw_c * xa + g_val * xb;
+        residual.Values[rc] += y_cos;
+        residual.Values[rs] += y_sin;
+        residual.RowScale[rc] = std::max(residual.RowScale[rc], std::abs(g_val * xa) + std::abs(kw_c * xb));
+        residual.RowScale[rs] = std::max(residual.RowScale[rs], std::abs(kw_c * xa) + std::abs(g_val * xb));
+    }
 }
 
 /**
@@ -56,38 +86,37 @@ void AddLinearResidual(const HbWorkspace &ws,
                        const std::vector<double> &x_hb,
                        const double gmin,
                        HarmonicResidual &residual) {
-    const int n = ws.UnknownCount;
-    const DenseMatrix &c_lin = ws.CLin.Matrix();
-    for (int r = 0; r < n; ++r) {
-        for (int col = 0; col < n; ++col) {
-            const double g_val = LinearConductance(ws, r, col, gmin);
-            const double c_val = c_lin.At(static_cast<std::size_t>(r), static_cast<std::size_t>(col));
-
-            if (g_val != 0.0) {
-                const double term0 = g_val * x_hb[ws.Index(col, 0)];
-                residual.Values[ws.Index(r, 0)] += term0;
-                residual.RowScale[ws.Index(r, 0)] = std::max(residual.RowScale[ws.Index(r, 0)], std::abs(term0));
-            }
-
-            if (g_val != 0.0 || c_val != 0.0) {
-                for (int k = 1; k <= ws.Harmonics; ++k) {
-                    const std::size_t rc = ws.Index(r, 2 * k - 1);
-                    const std::size_t rs = ws.Index(r, 2 * k);
-                    const std::size_t cc = ws.Index(col, 2 * k - 1);
-                    const std::size_t cs = ws.Index(col, 2 * k);
-                    const double kw_c = static_cast<double>(k) * ws.Omega0 * c_val;
-
-                    const double xa = x_hb[cc];
-                    const double xb = x_hb[cs];
-                    const double y_cos = g_val * xa + kw_c * xb;
-                    const double y_sin = -kw_c * xa + g_val * xb;
-                    residual.Values[rc] += y_cos;
-                    residual.Values[rs] += y_sin;
-                    residual.RowScale[rc] = std::max(residual.RowScale[rc], std::abs(g_val * xa) + std::abs(kw_c * xb));
-                    residual.RowScale[rs] = std::max(residual.RowScale[rs], std::abs(kw_c * xa) + std::abs(g_val * xb));
-                }
+    ws.GLin.ForEachNonZero([&](const int r, const int col, const double val) {
+        const double g_val = val + ((r == col && ws.IsNodeUnknown[static_cast<std::size_t>(r)]) ? gmin : 0.0);
+        AddLinearResidualEntry(ws, x_hb, r, col, g_val, ws.CLin.Entry(r, col), residual);
+    });
+    if (gmin != 0.0) {
+        for (int r = 0; r < ws.UnknownCount; ++r) {
+            if (ws.IsNodeUnknown[static_cast<std::size_t>(r)] && ws.GLin.Entry(r, r) == 0.0) {
+                AddLinearResidualEntry(ws, x_hb, r, r, gmin, ws.CLin.Entry(r, r), residual);
             }
         }
+    }
+    ws.CLin.ForEachNonZero([&](const int r, const int col, const double c_val) {
+        const bool has_gmin_only = (r == col && ws.IsNodeUnknown[static_cast<std::size_t>(r)] && gmin != 0.0);
+        if (ws.GLin.Entry(r, col) == 0.0 && !has_gmin_only) {
+            AddLinearResidualEntry(ws, x_hb, r, col, 0.0, c_val, residual);
+        }
+    });
+}
+
+/**
+ * @brief   Stamps one conductance entry into the DC and harmonic diagonal blocks of the Jacobian.
+ */
+void StampLinearConductanceEntry(const HbWorkspace &ws,
+                                 const int r,
+                                 const int col,
+                                 const double g_val,
+                                 DenseMatrix &jacobian) {
+    jacobian.Add(ws.Index(r, 0), ws.Index(col, 0), g_val);
+    for (int k = 1; k <= ws.Harmonics; ++k) {
+        jacobian.Add(ws.Index(r, 2 * k - 1), ws.Index(col, 2 * k - 1), g_val);
+        jacobian.Add(ws.Index(r, 2 * k), ws.Index(col, 2 * k), g_val);
     }
 }
 
@@ -95,33 +124,23 @@ void AddLinearResidual(const HbWorkspace &ws,
  * @brief   Stamps the blocks of the linear part into the Jacobian; they do not depend on the state.
  */
 void StampLinearJacobian(const HbWorkspace &ws, const double gmin, DenseMatrix &jacobian) {
-    const int n = ws.UnknownCount;
-    const DenseMatrix &c_lin = ws.CLin.Matrix();
-    for (int r = 0; r < n; ++r) {
-        for (int col = 0; col < n; ++col) {
-            const double g_val = LinearConductance(ws, r, col, gmin);
-            const double c_val = c_lin.At(static_cast<std::size_t>(r), static_cast<std::size_t>(col));
-
-            if (g_val != 0.0) {
-                jacobian.Add(ws.Index(r, 0), ws.Index(col, 0), g_val);
-            }
-
-            if (g_val != 0.0 || c_val != 0.0) {
-                for (int k = 1; k <= ws.Harmonics; ++k) {
-                    const std::size_t rc = ws.Index(r, 2 * k - 1);
-                    const std::size_t rs = ws.Index(r, 2 * k);
-                    const std::size_t cc = ws.Index(col, 2 * k - 1);
-                    const std::size_t cs = ws.Index(col, 2 * k);
-                    const double kw_c = static_cast<double>(k) * ws.Omega0 * c_val;
-
-                    jacobian.Add(rc, cc, g_val);
-                    jacobian.Add(rc, cs, kw_c);
-                    jacobian.Add(rs, cc, -kw_c);
-                    jacobian.Add(rs, cs, g_val);
-                }
+    ws.GLin.ForEachNonZero([&](const int r, const int col, const double g_val) {
+        StampLinearConductanceEntry(ws, r, col, g_val, jacobian);
+    });
+    if (gmin != 0.0) {
+        for (int r = 0; r < ws.UnknownCount; ++r) {
+            if (ws.IsNodeUnknown[static_cast<std::size_t>(r)]) {
+                StampLinearConductanceEntry(ws, r, r, gmin, jacobian);
             }
         }
     }
+    ws.CLin.ForEachNonZero([&](const int r, const int col, const double c_val) {
+        for (int k = 1; k <= ws.Harmonics; ++k) {
+            const double kw_c = static_cast<double>(k) * ws.Omega0 * c_val;
+            jacobian.Add(ws.Index(r, 2 * k - 1), ws.Index(col, 2 * k), kw_c);
+            jacobian.Add(ws.Index(r, 2 * k), ws.Index(col, 2 * k - 1), -kw_c);
+        }
+    });
 }
 
 /**
@@ -148,27 +167,22 @@ void SampleNonlinearDevices(HbWorkspace &ws, const bool is_recording_matrices) {
             }
         }
 
-        const DenseMatrix &gm = ws.SampleG.Matrix();
-        const DenseMatrix &cm = ws.SampleC.Matrix();
         const std::vector<double> &rhsg = ws.SampleG.Rhs();
         const std::vector<double> &rhsc = ws.SampleC.Rhs();
-
         for (int r = 0; r < n; ++r) {
-            double fnl_r = -rhsg[static_cast<std::size_t>(r)];
-            double qnl_r = -rhsc[static_cast<std::size_t>(r)];
-            for (int c = 0; c < n; ++c) {
-                fnl_r +=
-                    gm.At(static_cast<std::size_t>(r), static_cast<std::size_t>(c)) * xm[static_cast<std::size_t>(c)];
-                qnl_r +=
-                    cm.At(static_cast<std::size_t>(r), static_cast<std::size_t>(c)) * xm[static_cast<std::size_t>(c)];
-            }
-            ws.FnlTraces[static_cast<std::size_t>(r) * ws.SampleCount + m] = fnl_r;
-            ws.QnlTraces[static_cast<std::size_t>(r) * ws.SampleCount + m] = qnl_r;
+            ws.FnlTraces[static_cast<std::size_t>(r) * ws.SampleCount + m] = -rhsg[static_cast<std::size_t>(r)];
+            ws.QnlTraces[static_cast<std::size_t>(r) * ws.SampleCount + m] = -rhsc[static_cast<std::size_t>(r)];
         }
+        ws.SampleG.ForEachNonZero([&](const int r, const int c, const double val) {
+            ws.FnlTraces[static_cast<std::size_t>(r) * ws.SampleCount + m] += val * xm[static_cast<std::size_t>(c)];
+        });
+        ws.SampleC.ForEachNonZero([&](const int r, const int c, const double val) {
+            ws.QnlTraces[static_cast<std::size_t>(r) * ws.SampleCount + m] += val * xm[static_cast<std::size_t>(c)];
+        });
 
         if (is_recording_matrices) {
-            ws.GTraces.RecordMatrix(gm, m);
-            ws.CTraces.RecordMatrix(cm, m);
+            ws.GTraces.RecordMatrix(ws.SampleG, m);
+            ws.CTraces.RecordMatrix(ws.SampleC, m);
         }
     }
 }

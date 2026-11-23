@@ -35,6 +35,7 @@ add_executable(nodalys-tests
     expression/expression_tests.cpp
     linear/fft_tests.cpp
     linear/linear_tests.cpp
+    mna/mna_system_tests.cpp
     parser/classified_lines_tests.cpp
     parser/netlist_deck_tests.cpp
     parser/netlist_elements_tests.cpp

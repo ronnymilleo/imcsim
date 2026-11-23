@@ -13,19 +13,6 @@ namespace Nodalys {
 
 namespace {
 
-void AddMatrixScaled(MnaSystem &target, const MnaSystem &source) {
-    const int n = source.GetSize();
-    const DenseMatrix &src_mat = source.Matrix();
-    for (int r = 0; r < n; ++r) {
-        for (int c = 0; c < n; ++c) {
-            const double v = src_mat.At(static_cast<std::size_t>(r), static_cast<std::size_t>(c));
-            if (v != 0.0) {
-                target.AddA(r, c, v);
-            }
-        }
-    }
-}
-
 /**
  * @brief   The first fault among the devices at their last stamp, or an empty text.
  */
@@ -60,7 +47,7 @@ void StampDcSystem(const HbWorkspace &ws,
                    const std::vector<double> &x,
                    MnaSystem &sys) {
     sys.Clear();
-    AddMatrixScaled(sys, ws.GLin);
+    sys.AddMatrixFrom(ws.GLin);
     for (int u = 0; u < ws.UnknownCount; ++u) {
         sys.AddRhs(u, b0_scale * b0[static_cast<std::size_t>(u)]);
     }

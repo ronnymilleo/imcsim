@@ -5,6 +5,7 @@
 
 #include "mna/mna_system.h"
 
+#include "linear/dense_matrix.h"
 #include <algorithm>
 #include <cmath>
 #include <utility>
@@ -126,21 +127,47 @@ bool SolveComplexSystem(const ComplexDenseMatrix &y_orig,
 
 } // namespace
 
+struct MnaSystem::Storage {
+    DenseMatrix Matrix;
+
+    explicit Storage(const std::size_t size) : Matrix(size, size) {}
+};
+
 MnaSystem::MnaSystem(const int node_count, const int branch_count)
-    : m_A(static_cast<std::size_t>(node_count + branch_count), static_cast<std::size_t>(node_count + branch_count)),
+    : m_Storage(std::make_unique<Storage>(static_cast<std::size_t>(node_count + branch_count))),
       m_Rhs(static_cast<std::size_t>(node_count + branch_count), 0.0),
       m_IsNodeUnknown(static_cast<std::size_t>(node_count + branch_count), false), m_NodeUnknowns(node_count) {
     std::fill_n(m_IsNodeUnknown.begin(), node_count, true);
 }
 
 MnaSystem::MnaSystem(std::vector<bool> is_node_unknown)
-    : m_A(is_node_unknown.size(), is_node_unknown.size()), m_Rhs(is_node_unknown.size(), 0.0),
+    : m_Storage(std::make_unique<Storage>(is_node_unknown.size())), m_Rhs(is_node_unknown.size(), 0.0),
       m_IsNodeUnknown(std::move(is_node_unknown)),
       m_NodeUnknowns(static_cast<int>(std::ranges::count(m_IsNodeUnknown, true))) {
 }
 
+MnaSystem::MnaSystem(const MnaSystem &other)
+    : m_Storage(other.m_Storage ? std::make_unique<Storage>(*other.m_Storage) : nullptr), m_Rhs(other.m_Rhs),
+      m_IsNodeUnknown(other.m_IsNodeUnknown), m_NodeUnknowns(other.m_NodeUnknowns) {
+}
+
+MnaSystem &MnaSystem::operator=(const MnaSystem &other) {
+    if (this == &other) {
+        return *this;
+    }
+    m_Storage = other.m_Storage ? std::make_unique<Storage>(*other.m_Storage) : nullptr;
+    m_Rhs = other.m_Rhs;
+    m_IsNodeUnknown = other.m_IsNodeUnknown;
+    m_NodeUnknowns = other.m_NodeUnknowns;
+    return *this;
+}
+
+MnaSystem::MnaSystem(MnaSystem &&other) noexcept = default;
+MnaSystem &MnaSystem::operator=(MnaSystem &&other) noexcept = default;
+MnaSystem::~MnaSystem() = default;
+
 int MnaSystem::GetSize() const {
-    return static_cast<int>(m_A.Rows());
+    return static_cast<int>(m_Storage->Matrix.Rows());
 }
 
 int MnaSystem::NodeIndex(const int node) const {
@@ -155,8 +182,29 @@ int MnaSystem::GetNodeUnknownCount() const {
     return m_NodeUnknowns;
 }
 
-const DenseMatrix &MnaSystem::Matrix() const {
-    return m_A;
+double MnaSystem::Entry(const int row, const int col) const {
+    const int size = GetSize();
+    if (row < 0 || col < 0 || row >= size || col >= size) {
+        return 0.0;
+    }
+    return m_Storage->Matrix.At(static_cast<std::size_t>(row), static_cast<std::size_t>(col));
+}
+
+void MnaSystem::VisitNonZeros(void (*callback)(int, int, double, const void *), const void *context) const {
+    const DenseMatrix &matrix = m_Storage->Matrix;
+    const std::size_t n = matrix.Rows();
+    for (std::size_t r = 0; r < n; ++r) {
+        for (std::size_t c = 0; c < n; ++c) {
+            const double val = matrix.At(r, c);
+            if (val != 0.0) {
+                callback(static_cast<int>(r), static_cast<int>(c), val, context);
+            }
+        }
+    }
+}
+
+DenseMatrix MnaSystem::ToDenseMatrix() const {
+    return m_Storage->Matrix;
 }
 
 const std::vector<double> &MnaSystem::Rhs() const {
@@ -172,7 +220,11 @@ void MnaSystem::AddA(const int row, const int col, const double value) {
     if (row < 0 || col < 0) {
         return;
     }
-    m_A.Add(static_cast<std::size_t>(row), static_cast<std::size_t>(col), value);
+    m_Storage->Matrix.Add(static_cast<std::size_t>(row), static_cast<std::size_t>(col), value);
+}
+
+void MnaSystem::AddMatrixFrom(const MnaSystem &source) {
+    source.ForEachNonZero([this](const int row, const int col, const double value) { AddA(row, col, value); });
 }
 
 void MnaSystem::AddRhs(const int row, const double value) {
@@ -192,7 +244,7 @@ void MnaSystem::AddGminToNodes(const double conductance) {
 }
 
 void MnaSystem::Clear() {
-    m_A.Reset();
+    m_Storage->Matrix.Reset();
     std::ranges::fill(m_Rhs, 0.0);
 }
 
@@ -201,54 +253,72 @@ void MnaSystem::ClearRhs() {
 }
 
 bool MnaSystem::Solve(std::vector<double> &x) const {
-    return SolveRealSystem(m_A, m_Rhs, x);
+    return SolveRealSystem(m_Storage->Matrix, m_Rhs, x);
 }
 
 bool MnaSystem::SolveTranspose(const std::vector<double> &rhs, std::vector<double> &x) const {
-    const std::size_t n = m_A.Rows();
+    const DenseMatrix &matrix = m_Storage->Matrix;
+    const std::size_t n = matrix.Rows();
     if (rhs.size() != n) {
         return false;
     }
     DenseMatrix a_transpose(n, n);
     for (std::size_t r = 0; r < n; ++r) {
         for (std::size_t c = 0; c < n; ++c) {
-            a_transpose.At(r, c) = m_A.At(c, r);
+            a_transpose.At(r, c) = matrix.At(c, r);
         }
     }
     return SolveRealSystem(a_transpose, rhs, x);
 }
 
 bool MnaSystem::SolveAc(const MnaSystem &reactive, const double omega, std::vector<std::complex<double>> &x_ac) const {
-    const std::size_t n = m_A.Rows();
-    if (reactive.m_A.Rows() != n) {
+    const std::size_t n = m_Storage->Matrix.Rows();
+    if (reactive.m_Storage->Matrix.Rows() != n) {
         return false;
     }
-
-    // Assemble Y(j * omega) = A_dc + j * omega * C_ac and complex RHS b_ac
-    ComplexDenseMatrix y_orig(n, n);
     std::vector<std::complex<double>> b_orig(n);
     for (std::size_t r = 0; r < n; ++r) {
         b_orig[r] = std::complex<double>(reactive.m_Rhs[r], 0.0);
+    }
+    return SolveAcFor(reactive, omega, b_orig, x_ac);
+}
+
+bool MnaSystem::SolveAcFor(const MnaSystem &reactive,
+                           const double omega,
+                           const std::vector<std::complex<double>> &rhs,
+                           std::vector<std::complex<double>> &x_ac) const {
+    const DenseMatrix &dc_matrix = m_Storage->Matrix;
+    const DenseMatrix &ac_matrix = reactive.m_Storage->Matrix;
+    const std::size_t n = dc_matrix.Rows();
+    if (ac_matrix.Rows() != n || rhs.size() != n) {
+        return false;
+    }
+
+    // Assemble Y(j * omega) = A_dc + j * omega * C_ac
+    ComplexDenseMatrix y_orig(n, n);
+    for (std::size_t r = 0; r < n; ++r) {
         for (std::size_t c = 0; c < n; ++c) {
-            y_orig.At(r, c) = std::complex<double>(m_A.At(r, c), omega * reactive.m_A.At(r, c));
+            y_orig.At(r, c) = std::complex<double>(dc_matrix.At(r, c), omega * ac_matrix.At(r, c));
         }
     }
-    return SolveComplexSystem(y_orig, b_orig, x_ac);
+    return SolveComplexSystem(y_orig, rhs, x_ac);
 }
 
 bool MnaSystem::SolveAcMultiple(const MnaSystem &reactive,
                                 const double omega,
                                 const std::vector<std::vector<std::complex<double>>> &rhs_list,
                                 std::vector<std::vector<std::complex<double>>> &solutions) const {
-    const std::size_t n = m_A.Rows();
-    if (reactive.m_A.Rows() != n) {
+    const DenseMatrix &dc_matrix = m_Storage->Matrix;
+    const DenseMatrix &ac_matrix = reactive.m_Storage->Matrix;
+    const std::size_t n = dc_matrix.Rows();
+    if (ac_matrix.Rows() != n) {
         return false;
     }
 
     ComplexDenseMatrix y_orig(n, n);
     for (std::size_t r = 0; r < n; ++r) {
         for (std::size_t c = 0; c < n; ++c) {
-            y_orig.At(r, c) = std::complex<double>(m_A.At(r, c), omega * reactive.m_A.At(r, c));
+            y_orig.At(r, c) = std::complex<double>(dc_matrix.At(r, c), omega * ac_matrix.At(r, c));
         }
     }
     return SolveComplexSystemMultiple(y_orig, rhs_list, solutions);
@@ -258,35 +328,30 @@ bool MnaSystem::SolveAcTranspose(const MnaSystem &reactive,
                                  const double omega,
                                  const int output_unknown,
                                  std::vector<std::complex<double>> &adjoint) const {
-    const std::size_t n = m_A.Rows();
-    if (reactive.m_A.Rows() != n || output_unknown < 0 || static_cast<std::size_t>(output_unknown) >= n) {
+    const std::size_t n = m_Storage->Matrix.Rows();
+    if (reactive.m_Storage->Matrix.Rows() != n || output_unknown < 0 || static_cast<std::size_t>(output_unknown) >= n) {
         return false;
     }
 
-    // Assemble Y(j * omega)^T and unit basis RHS e_out
-    ComplexDenseMatrix y_transpose(n, n);
     std::vector<std::complex<double>> b_orig(n, std::complex<double>(0.0, 0.0));
     b_orig[static_cast<std::size_t>(output_unknown)] = std::complex<double>(1.0, 0.0);
-    for (std::size_t r = 0; r < n; ++r) {
-        for (std::size_t c = 0; c < n; ++c) {
-            y_transpose.At(r, c) = std::complex<double>(m_A.At(c, r), omega * reactive.m_A.At(c, r));
-        }
-    }
-    return SolveComplexSystem(y_transpose, b_orig, adjoint);
+    return SolveAcTransposeFor(reactive, omega, b_orig, adjoint);
 }
 
 bool MnaSystem::SolveAcTransposeFor(const MnaSystem &reactive,
                                     const double omega,
                                     const std::vector<std::complex<double>> &rhs,
                                     std::vector<std::complex<double>> &adjoint) const {
-    const std::size_t n = m_A.Rows();
-    if (reactive.m_A.Rows() != n || rhs.size() != n) {
+    const DenseMatrix &dc_matrix = m_Storage->Matrix;
+    const DenseMatrix &ac_matrix = reactive.m_Storage->Matrix;
+    const std::size_t n = dc_matrix.Rows();
+    if (ac_matrix.Rows() != n || rhs.size() != n) {
         return false;
     }
     ComplexDenseMatrix y_transpose(n, n);
     for (std::size_t r = 0; r < n; ++r) {
         for (std::size_t c = 0; c < n; ++c) {
-            y_transpose.At(r, c) = std::complex<double>(m_A.At(c, r), omega * reactive.m_A.At(c, r));
+            y_transpose.At(r, c) = std::complex<double>(dc_matrix.At(c, r), omega * ac_matrix.At(c, r));
         }
     }
     return SolveComplexSystem(y_transpose, rhs, adjoint);
@@ -294,14 +359,15 @@ bool MnaSystem::SolveAcTransposeFor(const MnaSystem &reactive,
 
 bool MnaSystem::SolveTransposeComplex(const std::vector<std::complex<double>> &rhs,
                                       std::vector<std::complex<double>> &x) const {
-    const std::size_t n = m_A.Rows();
+    const DenseMatrix &matrix = m_Storage->Matrix;
+    const std::size_t n = matrix.Rows();
     if (rhs.size() != n) {
         return false;
     }
     ComplexDenseMatrix a_transpose(n, n);
     for (std::size_t r = 0; r < n; ++r) {
         for (std::size_t c = 0; c < n; ++c) {
-            a_transpose.At(r, c) = std::complex<double>(m_A.At(c, r), 0.0);
+            a_transpose.At(r, c) = std::complex<double>(matrix.At(c, r), 0.0);
         }
     }
     return SolveComplexSystem(a_transpose, rhs, x);
@@ -311,12 +377,13 @@ bool MnaSystem::CheckResidual(const std::vector<double> &x,
                               const double voltage_abstol,
                               const double current_abstol,
                               const double reltol) const {
+    const DenseMatrix &matrix = m_Storage->Matrix;
     const int size = GetSize();
     for (int row = 0; row < size; ++row) {
         double sum = 0.0;
         double sum_abs = 0.0;
         for (int col = 0; col < size; ++col) {
-            const double val = m_A.At(static_cast<std::size_t>(row), static_cast<std::size_t>(col));
+            const double val = matrix.At(static_cast<std::size_t>(row), static_cast<std::size_t>(col));
             const double term = val * x[static_cast<std::size_t>(col)];
             sum += term;
             sum_abs += std::fabs(term);

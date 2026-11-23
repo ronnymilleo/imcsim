@@ -23,30 +23,24 @@ void ActiveMatrixTraces::Reset(const int unknown_count, const std::size_t sample
 }
 
 /**
- * @brief   Writes the entries of a matrix that are not zero into their traces at one sample.
- * @param[in] matrix        The matrix of the devices at the sample.
- * @param[in] sample_index  Which sample of the period the matrix belongs to.
+ * @brief   Writes the non-zero entries of an MNA system matrix into their traces at one sample.
+ * @param[in] system        The MNA system stamped at the sample.
+ * @param[in] sample_index  Which sample of the period the system belongs to.
  * @note    Reset() must have been called first.
  */
-void ActiveMatrixTraces::RecordMatrix(const DenseMatrix &matrix, const std::size_t sample_index) {
-    for (int r = 0; r < UnknownCount; ++r) {
-        for (int c = 0; c < UnknownCount; ++c) {
-            const double val = matrix.At(static_cast<std::size_t>(r), static_cast<std::size_t>(c));
-            if (val == 0.0) {
-                continue;
-            }
-            const std::size_t flat =
-                static_cast<std::size_t>(r) * static_cast<std::size_t>(UnknownCount) + static_cast<std::size_t>(c);
-            int slot = SlotByFlatIndex[flat];
-            if (slot < 0) {
-                slot = static_cast<int>(Pairs.size());
-                SlotByFlatIndex[flat] = slot;
-                Pairs.emplace_back(r, c);
-                Traces.resize(Pairs.size() * SampleCount, 0.0);
-            }
-            Traces[static_cast<std::size_t>(slot) * SampleCount + sample_index] = val;
+void ActiveMatrixTraces::RecordMatrix(const MnaSystem &system, const std::size_t sample_index) {
+    system.ForEachNonZero([this, sample_index](const int r, const int c, const double val) {
+        const std::size_t flat =
+            static_cast<std::size_t>(r) * static_cast<std::size_t>(UnknownCount) + static_cast<std::size_t>(c);
+        int slot = SlotByFlatIndex[flat];
+        if (slot < 0) {
+            slot = static_cast<int>(Pairs.size());
+            SlotByFlatIndex[flat] = slot;
+            Pairs.emplace_back(r, c);
+            Traces.resize(Pairs.size() * SampleCount, 0.0);
         }
-    }
+        Traces[static_cast<std::size_t>(slot) * SampleCount + sample_index] = val;
+    });
 }
 
 /**
