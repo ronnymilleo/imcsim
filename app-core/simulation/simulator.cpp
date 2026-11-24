@@ -19,6 +19,7 @@
 #include "simulation/check_transient.h"
 #include "simulation/check_truth_table.h"
 #include "simulation/circuit_checks.h"
+#include "simulation/parallel_runs.h"
 #include "simulation/simulation_backend.h"
 #include "simulation/stepped_circuit.h"
 #include <algorithm>
@@ -28,6 +29,27 @@
 namespace Core {
 
 namespace {
+
+/// The chosen logic inputs as copies that each row of a truth table sets, and the circuit that uses them in place of
+/// the originals.
+struct InputCopies {
+    std::vector<LogicInput> Inputs;
+    Circuit Simulated;
+};
+
+/// Why the first combination without an operating point failed, and what ngspice printed for it.
+struct FirstFailure {
+    std::optional<std::string> Reason;
+    std::vector<SimulatorMessage> Messages;
+};
+
+/**
+ * @brief   What one combination of a truth table leaves behind before the table is assembled in counting order.
+ */
+struct CombinationOutcome {
+    TruthTableRow Row;
+    OperatingPointRun Point;
+};
 
 /**
  * @brief   What stops a run before it reaches the backend: the circuit, the settings the analysis takes, and a part or
@@ -59,13 +81,6 @@ std::expected<ParameterCircuit, std::string> ApplyRunParameter(const Circuit &ci
     }
     return applied;
 }
-
-/// The chosen logic inputs as copies that each row of a truth table sets, and the circuit that uses them in place of
-/// the originals.
-struct InputCopies {
-    std::vector<LogicInput> Inputs;
-    Circuit Simulated;
-};
 
 InputCopies CopyInputs(const Circuit &circuit, const std::vector<std::string> &names) {
     InputCopies copies;
@@ -99,24 +114,24 @@ TruthTableRow SetCombination(std::vector<LogicInput> &inputs, const std::size_t 
 }
 
 /**
- * @brief   Tells whether a stop was asked, and otherwise reports the share of combinations done.
+ * @brief   Runs all combinations of a truth table on the active backend, in parallel when supported.
  */
-bool IsStopped(RunControl *control, const std::size_t done, const std::size_t total) {
-    if (control == nullptr) {
-        return false;
-    }
-    if (control->IsCancelled()) {
+std::vector<std::optional<CombinationOutcome>> RunCombinations(const Circuit &circuit,
+                                                               const std::vector<std::string> &input_names,
+                                                               const std::size_t row_count,
+                                                               RunControl *control) {
+    std::vector<std::optional<CombinationOutcome>> outcomes(row_count);
+    SimulationBackend &backend = GetBackend();
+    const bool is_concurrent = backend.GetCapabilities().SupportsConcurrentRuns;
+    RunBatch(row_count, is_concurrent, control, [&](const std::size_t combination) {
+        InputCopies copies = CopyInputs(circuit, input_names);
+        TruthTableRow row = SetCombination(copies.Inputs, combination);
+        OperatingPointRun point = backend.RunOperatingPoint(copies.Simulated, std::nullopt);
+        outcomes[combination] = CombinationOutcome{.Row = std::move(row), .Point = std::move(point)};
         return true;
-    }
-    control->SetProgress(static_cast<double>(done) / static_cast<double>(total));
-    return false;
+    });
+    return outcomes;
 }
-
-/// Why the first combination without an operating point failed, and what ngspice printed for it.
-struct FirstFailure {
-    std::optional<std::string> Reason;
-    std::vector<SimulatorMessage> Messages;
-};
 
 /**
  * @brief   Reads the output voltages of a combination, or remembers the first failure.
@@ -403,26 +418,33 @@ TruthTableRun RunTruthTable(const Circuit &circuit, const TruthTableSettings &se
         return {std::unexpected(*error), {}};
     }
 
-    InputCopies copies = CopyInputs(circuit, settings.Inputs);
+    const InputCopies prototype = CopyInputs(circuit, settings.Inputs);
     TruthTable table{.InputNames = settings.Inputs, .InputLevels = {}, .OutputNodes = settings.OutputNodes};
-    for (const LogicInput &input : copies.Inputs) {
+    for (const LogicInput &input : prototype.Inputs) {
         table.InputLevels.push_back(input.GetParameters().LogicLevel);
+    }
+
+    const std::size_t row_count = std::size_t{1} << prototype.Inputs.size();
+    std::vector<std::optional<CombinationOutcome>> outcomes =
+        RunCombinations(circuit, settings.Inputs, row_count, control);
+    if (control != nullptr && control->IsCancelled()) {
+        return {std::unexpected("Stopped"), {}};
     }
 
     TruthTableRun run;
     FirstFailure failure;
-    const std::size_t row_count = std::size_t{1} << copies.Inputs.size();
+    table.Rows.reserve(row_count);
     for (std::size_t combination = 0; combination < row_count; ++combination) {
-        if (IsStopped(control, combination, row_count)) {
+        std::optional<CombinationOutcome> &slot = outcomes[combination];
+        if (!slot) {
             return {std::unexpected("Stopped"), {}};
         }
-        TruthTableRow row = SetCombination(copies.Inputs, combination);
-        OperatingPointRun point = RunOperatingPoint(copies.Simulated);
-        ReadRow(row, point, settings.OutputNodes, failure);
+        CombinationOutcome &outcome = *slot;
+        ReadRow(outcome.Row, outcome.Point, settings.OutputNodes, failure);
         if (combination == 0) {
-            run.Messages = std::move(point.Messages);
+            run.Messages = std::move(outcome.Point.Messages);
         }
-        table.Rows.push_back(std::move(row));
+        table.Rows.push_back(std::move(outcome.Row));
     }
     return ConcludeTable(std::move(table), std::move(run), std::move(failure));
 }

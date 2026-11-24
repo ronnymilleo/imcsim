@@ -67,6 +67,7 @@ struct SParameterLimits {
  */
 struct BackendCapabilities {
     std::set<AnalysisKind> Analyses;
+    bool SupportsConcurrentRuns = false; ///< Whether the backend can run independent simulations concurrently.
     /// Parts the backend cannot simulate, each with the reason shown to the user.
     std::map<ComponentType, std::string> UnsupportedParts;
     /// Parts the backend cannot simulate in one analysis only, each with the reason shown to the user.

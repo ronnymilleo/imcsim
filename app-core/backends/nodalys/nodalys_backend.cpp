@@ -145,6 +145,7 @@ Run RunOnNodalys(const Circuit &circuit,
  */
 NodalysBackend::NodalysBackend() {
     m_Capabilities.Analyses = NODALYS_ANALYSES;
+    m_Capabilities.SupportsConcurrentRuns = true;
     m_Capabilities.FindPartProblem = FindPartProblem;
     for (int index = 0; index <= static_cast<int>(LAST_COMPONENT_TYPE); ++index) {
         const auto type = static_cast<ComponentType>(index);
