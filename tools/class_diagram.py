@@ -1173,6 +1173,13 @@ def main(argv: list[str] | None = None) -> int:
     html = render_html(payload)
 
     if args.check:
+        open_checks = [c for c in payload["checks"] if c["status"] == "open"]
+        if open_checks:
+            for c in open_checks:
+                print(f"[{c['id']}] {c['title']} ({c['count']} open):", file=sys.stderr)
+                for item in c["items"][:10]:
+                    print(f"  - {item}", file=sys.stderr)
+            return 1
         if not out_path.exists():
             print(f"Missing diagram: {out_path}", file=sys.stderr)
             return 1
@@ -1180,7 +1187,7 @@ def main(argv: list[str] | None = None) -> int:
         if existing != html:
             print(f"Out of date: {out_path}. Regenerate with: .venv/bin/python tools/class_diagram.py {args.target}", file=sys.stderr)
             return 1
-        print(f"Up to date: {out_path}")
+        print(f"Up to date: {out_path} (0 open audit checks)")
         return 0
 
     out_path.parent.mkdir(parents=True, exist_ok=True)

@@ -106,11 +106,17 @@ jobs:
       - name: Trust the checkout
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
-      - name: Test the include check
+      - name: Test the architecture tools
         run: python -m unittest discover -s tools -p '*_tests.py'
 
       - name: Check the include layers and the diagram
         run: python tools/include_layers.py --check
+
+      - name: Check the Nodalys class diagram and architecture scorecard
+        run: python tools/class_diagram.py nodalys --check
+
+      - name: Check the Nodalys declaration ordering
+        run: python tools/file_order_check.py nodalys
 
   # clang-tidy takes longer than the build and the tests together, so it runs beside them; it needs a build for the
   # compile database and the generated headers, which the compiler cache of its own makes quick
