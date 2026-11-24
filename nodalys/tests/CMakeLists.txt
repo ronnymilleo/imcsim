@@ -30,6 +30,7 @@ add_executable(nodalys-tests
     devices/smooth_logic_tests.cpp
     devices/thermal_tests.cpp
     devices/transient_noise_tests.cpp
+    devices/waveforms_tests.cpp
     export/json_exporter_tests.cpp
     export/raw_plot_tests.cpp
     expression/expression_tests.cpp
