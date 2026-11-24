@@ -3,7 +3,7 @@
 **Implementation files:**
 - [`nodalys/src/analyses/transient/transient_analysis.cpp`](../../nodalys/src/analyses/transient/transient_analysis.cpp) (`ComputeTransient`, `TransientCollector`, `FindNextCorner`)
 - [`nodalys/src/devices/integration.cpp`](../../nodalys/src/devices/integration.cpp) (`MakeCompanion`, `AdvanceHistory`: the Backward Euler, trapezoidal and Gear-2 formulas, shared by every device)
-- [`nodalys/src/devices/devices.cpp`](../../nodalys/src/devices/devices.cpp) (`CapacitorDevice::Stamp`, `InductorDevice::Stamp`, `CoupledInductorDevice::Stamp`, `SwitchDevice::HasSwitched`)
+- [`nodalys/src/devices/passive/passive_devices.cpp`](../../nodalys/src/devices/passive/passive_devices.cpp) and [`nodalys/src/devices/passive/switch_device.cpp`](../../nodalys/src/devices/passive/switch_device.cpp) (`CapacitorDevice::Stamp`, `InductorDevice::Stamp`, `CoupledInductorDevice::Stamp`, `SwitchDevice::HasSwitched`)
 - [`nodalys/src/devices/semiconductor_math.h`](../../nodalys/src/devices/semiconductor_math.h) (`ChargeModel` for diode, BJT, and MOSFET junction/diffusion charges)
 - [`nodalys/src/devices/sources/waveforms.cpp`](../../nodalys/src/devices/sources/waveforms.cpp) (`SIN`, `PULSE`, `EXP`, `PWL`, `SFFM`, `AM` and the corners of each, `FindNextPulseCorner`)
 

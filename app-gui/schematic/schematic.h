@@ -164,7 +164,7 @@ public:
 
     // Derived data
     const Connectivity &GetConnectivity();
-    Core::Circuit BuildCircuit();
+    const Core::Circuit &GetCircuit();
     std::size_t GetCircuitVersion() const;
     std::size_t GetDocumentVersion() const;
     std::string BuildSpiceNetlist();
@@ -227,8 +227,9 @@ private:
     // History
     UndoHistory m_History;
 
-    // Derived data, dropped on every change: nodes are rebuilt on first use
+    // Derived data, dropped on every change: nodes and circuit topology are rebuilt on first use
     std::optional<Connectivity> m_Connectivity;
+    std::optional<Core::Circuit> m_Circuit;
 
     void InvalidateDerivedData();
     void FollowDefinitionChange(const DefinitionChange &change);

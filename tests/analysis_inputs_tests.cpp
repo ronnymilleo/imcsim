@@ -124,7 +124,7 @@ TEST_CASE("The stepped parameter has the unit of its part, or degrees Celsius fo
 TEST_CASE("The output node is the stored point's, else a measured node that no source holds", "[analysis_inputs]") {
     GUI::Schematic schematic;
     OpenRCFilter(schematic);
-    const Core::Circuit circuit = schematic.BuildCircuit();
+    const Core::Circuit circuit = schematic.GetCircuit();
 
     // The example measures the source node, which the source holds, and the node of the capacitor
     const std::optional<int> measured = GUI::ResolveOutputNode(std::nullopt, circuit, schematic);
@@ -143,7 +143,7 @@ TEST_CASE("The output node is the stored point's, else a measured node that no s
 TEST_CASE("The nodes a truth table reads are named as the plots name them, one after the other", "[analysis_inputs]") {
     GUI::Schematic schematic;
     OpenRCFilter(schematic);
-    const std::vector<int> nodes = GUI::ListMeasuredNodes(schematic.BuildCircuit(), schematic);
+    const std::vector<int> nodes = GUI::ListMeasuredNodes(schematic.GetCircuit(), schematic);
     REQUIRE(nodes.size() == 2);
     const GUI::Connectivity &connectivity = schematic.GetConnectivity();
     CHECK(GUI::FormatMeasuredNodeLabels(connectivity, nodes)
@@ -175,7 +175,7 @@ TEST_CASE("The ports of a small-signal analysis come back resolved, or with the 
           "[analysis_inputs]") {
     GUI::Schematic schematic;
     OpenRCFilter(schematic);
-    const Core::Circuit circuit = schematic.BuildCircuit();
+    const Core::Circuit circuit = schematic.GetCircuit();
     // The filter's source can be swept, and a stored name that left the circuit gives way to it
     const auto swept = GUI::ResolveSweepableInput(circuit, "Vgone", "A pole-zero analysis");
     REQUIRE(swept.has_value());

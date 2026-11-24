@@ -160,7 +160,7 @@ void RunModeSettingsPanel::Load(const SimulationSettings &settings) {
  * @brief   The part or the temperature, and its values as a range or a typed list.
  */
 void RunModeSettingsPanel::DrawParameterStepSettings(ParameterStepSettings &step) {
-    const Core::Circuit circuit = m_Schematic.BuildCircuit();
+    const Core::Circuit &circuit = m_Schematic.GetCircuit();
     DrawParameterPicker(step, circuit);
     DrawStepValues(step, GetParameterUnit(circuit, step.Part));
 }
@@ -330,7 +330,7 @@ void RunModeSettingsPanel::ApplyToleranceToAll(const std::span<const Core::Compo
  * @brief   Which parts vary, or why the run cannot start.
  */
 void RunModeSettingsPanel::DrawMonteCarloSummary(const Core::MonteCarloSettings &monte_carlo) {
-    const Core::Circuit circuit = m_Schematic.BuildCircuit();
+    const Core::Circuit &circuit = m_Schematic.GetCircuit();
     ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetFontSize() * 20.0f);
     if (const std::optional<std::string> problem = Core::CheckMonteCarlo(circuit, monte_carlo)) {
         ImGui::TextColored(GetErrorTextColor(), "%s", problem->c_str());

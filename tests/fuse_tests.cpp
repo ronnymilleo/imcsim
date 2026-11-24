@@ -736,7 +736,7 @@ TEST_CASE("The fast and slow-blow fuses of the example blow at the same times on
                       std::move(loaded->Settings),
                       std::move(loaded->Subcircuits),
                       std::move(loaded->Models));
-    const Core::Circuit circuit = schematic.BuildCircuit();
+    const Core::Circuit circuit = schematic.GetCircuit();
     const Core::TransientSettings settings = schematic.GetSimulationSettings().Transient;
     const Core::TransientRun on_ngspice = Core::RunTransient(circuit, settings);
     const Core::TransientRun on_nodalys = [&] {

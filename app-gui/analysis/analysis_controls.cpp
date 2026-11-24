@@ -41,7 +41,7 @@ void AnalysisControls::RunSelected() {
     }
     const SimulationSettings &settings = m_Schematic.GetSimulationSettings();
     const Analysis analysis = settings.Selected;
-    const Core::Circuit circuit = m_Schematic.BuildCircuit();
+    const Core::Circuit &circuit = m_Schematic.GetCircuit();
     std::expected<RunRepeat, std::string> repeat = PlanRunRepeat(settings, circuit);
     if (!repeat) {
         Refuse(analysis, std::move(repeat.error()));

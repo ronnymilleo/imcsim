@@ -253,7 +253,7 @@ TEST_CASE("An initial voltage has a value in volts, no name, and is found by its
 
 TEST_CASE("A marker on a wire gives its node an initial voltage and stays out of the parts", "[initial_voltage]") {
     MarkedResistor setup(3.0);
-    const Core::Circuit circuit = setup.Schematic.BuildCircuit();
+    const Core::Circuit circuit = setup.Schematic.GetCircuit();
     // The resistor and the ground only: the marker writes no element
     CHECK(circuit.GetEntries().size() == 2);
     REQUIRE(circuit.GetInitialVoltages().size() == 1);
@@ -266,7 +266,7 @@ TEST_CASE("A marker on a wire gives its node an initial voltage and stays out of
 TEST_CASE("A marker needs no Ground of its own and a circuit of only markers is empty", "[initial_voltage]") {
     GUI::Schematic schematic;
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::INITIAL_VOLTAGE, {4, 4}, GUI::Rotation::R0));
-    const std::optional<std::string> problem = Core::CheckCircuit(schematic.BuildCircuit());
+    const std::optional<std::string> problem = Core::CheckCircuit(schematic.GetCircuit());
     REQUIRE(problem.has_value());
     CHECK_THAT(*problem, ContainsSubstring("empty"));
 }
@@ -276,7 +276,7 @@ TEST_CASE("Two markers on one node agree or are refused, naming both voltages", 
         MarkedResistor setup(3.0);
         setup.AddMarker({10, 6}, 3.0);
         setup.Schematic.AddWire({10, 6}, {10, 8});
-        const Core::Circuit circuit = setup.Schematic.BuildCircuit();
+        const Core::Circuit circuit = setup.Schematic.GetCircuit();
         CHECK(circuit.GetInitialVoltages().size() == 2);
         CHECK_FALSE(Core::CheckCircuit(circuit).has_value());
         const std::string netlist = circuit.ToSpiceNetlist();
@@ -288,7 +288,7 @@ TEST_CASE("Two markers on one node agree or are refused, naming both voltages", 
         MarkedResistor setup(3.0);
         setup.AddMarker({10, 6}, 1.5);
         setup.Schematic.AddWire({10, 6}, {10, 8});
-        const std::optional<std::string> problem = Core::CheckCircuit(setup.Schematic.BuildCircuit());
+        const std::optional<std::string> problem = Core::CheckCircuit(setup.Schematic.GetCircuit());
         REQUIRE(problem.has_value());
         CHECK_THAT(*problem, ContainsSubstring("two initial voltages"));
         CHECK_THAT(*problem, ContainsSubstring("3 V"));
@@ -301,14 +301,14 @@ TEST_CASE("A marker on ground or on a node nothing is connected to is refused", 
         MarkedResistor setup(3.0);
         setup.AddMarker({10, 16}, 1.0);
         setup.Schematic.AddWire({10, 14}, {10, 16});
-        const std::optional<std::string> problem = Core::CheckCircuit(setup.Schematic.BuildCircuit());
+        const std::optional<std::string> problem = Core::CheckCircuit(setup.Schematic.GetCircuit());
         REQUIRE(problem.has_value());
         CHECK_THAT(*problem, ContainsSubstring("ground"));
     }
     SECTION("A loose marker has no node to start") {
         MarkedResistor setup(3.0);
         setup.AddMarker({30, 30}, 1.0);
-        const std::optional<std::string> problem = Core::CheckCircuit(setup.Schematic.BuildCircuit());
+        const std::optional<std::string> problem = Core::CheckCircuit(setup.Schematic.GetCircuit());
         REQUIRE(problem.has_value());
         CHECK_THAT(*problem, ContainsSubstring("no part is connected"));
     }
@@ -451,8 +451,8 @@ TEST_CASE("The circuit copies carry the initial voltages", "[initial_voltage]") 
 
 TEST_CASE("The netlist writes the initial voltage of a node as .ic and no element", "[initial_voltage]") {
     MarkedResistor setup(3.0);
-    const std::string netlist = setup.Schematic.BuildCircuit().ToSpiceNetlist();
-    const Core::Circuit circuit = setup.Schematic.BuildCircuit();
+    const std::string netlist = setup.Schematic.GetCircuit().ToSpiceNetlist();
+    const Core::Circuit circuit = setup.Schematic.GetCircuit();
     CHECK_THAT(netlist, ContainsSubstring(std::format(".ic V({})=3\n", circuit.GetEntries()[0].Nodes[0])));
     CHECK(std::ranges::count(netlist, '\n') == 4);
 }
@@ -610,7 +610,7 @@ TEST_CASE("The astable multivibrator example needs its initial voltage to start 
                       std::move(loaded->Settings),
                       std::move(loaded->Subcircuits),
                       std::move(loaded->Models));
-    const Core::Circuit circuit = schematic.BuildCircuit();
+    const Core::Circuit circuit = schematic.GetCircuit();
     REQUIRE(circuit.GetInitialVoltages().size() == 1);
     CHECK(circuit.GetInitialVoltages()[0].Volts == 5.0);
 
@@ -631,7 +631,7 @@ TEST_CASE("The astable multivibrator example needs its initial voltage to start 
     });
     schematic.SelectElement(static_cast<std::size_t>(marker - schematic.GetElements().begin()));
     schematic.DeleteSelection();
-    const Core::Circuit bare = schematic.BuildCircuit();
+    const Core::Circuit bare = schematic.GetCircuit();
     REQUIRE(bare.GetInitialVoltages().empty());
     // The nodes are numbered again without the part, so the collectors are found from the transistors
     std::vector<std::size_t> collectors;
