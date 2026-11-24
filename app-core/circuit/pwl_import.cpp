@@ -139,51 +139,100 @@ std::string_view FourCC(const std::span<const std::byte> data, const std::size_t
     return {reinterpret_cast<const char *>(data.data() + offset), 4};
 }
 
+constexpr std::array<std::uint16_t, 4> SUPPORTED_PCM_BITS = {8, 16, 24, 32};
+constexpr std::array<std::uint16_t, 2> SUPPORTED_FLOAT_BITS = {32, 64};
+
+struct WavChunks {
+    WavFormat Format;
+    std::span<const std::byte> Data;
+};
+
+bool IsCsvIgnoredLine(const std::string_view trimmed) {
+    return trimmed.empty() || trimmed.starts_with('#') || trimmed.starts_with("//");
+}
+
+std::expected<void, std::string> AppendCsvRow(const std::string_view trimmed,
+                                              const std::size_t line_number,
+                                              bool &skipped_header,
+                                              std::vector<PWLPoint> &points) {
+    const std::optional<PWLPoint> point = ParseCsvRow(trimmed);
+    if (!point) {
+        if (points.empty() && !skipped_header) {
+            skipped_header = true;
+            return {};
+        }
+        return std::unexpected(std::format("Invalid time/value pair on line {}", line_number));
+    }
+    if (point->Time < 0.0) {
+        return std::unexpected(std::format("Negative time on line {}", line_number));
+    }
+    if (!points.empty() && point->Time <= points.back().Time) {
+        return std::unexpected(std::format("Times must strictly increase (line {})", line_number));
+    }
+    points.push_back(*point);
+    return {};
+}
+
+std::expected<std::uint16_t, std::string> ResolveExtensibleFormat(const std::span<const std::byte> chunk) {
+    if (chunk.size() < FMT_EXTENSIBLE_SIZE) {
+        return std::unexpected("The extensible WAV fmt chunk is truncated");
+    }
+    const auto matches_tail = std::ranges::equal(chunk.subspan(28, WAVE_EXTENSIBLE_GUID_TAIL.size()),
+                                                 WAVE_EXTENSIBLE_GUID_TAIL,
+                                                 [](const std::byte raw, const std::uint8_t expected) {
+                                                     return std::to_integer<std::uint8_t>(raw) == expected;
+                                                 });
+    if (!matches_tail) {
+        return std::unexpected("Unsupported WAV extensible subformat");
+    }
+    const std::uint32_t subformat = ReadU32LE(chunk, 24);
+    if (subformat != WAVE_FORMAT_PCM && subformat != WAVE_FORMAT_IEEE_FLOAT) {
+        return std::unexpected("Only uncompressed PCM or IEEE float WAV files are supported");
+    }
+    return static_cast<std::uint16_t>(subformat);
+}
+
+std::expected<AudioSampleFormat, std::string> ResolveSampleFormat(const std::uint16_t format_code,
+                                                                  const std::uint16_t bits_per_sample) {
+    if (format_code == WAVE_FORMAT_PCM) {
+        if (!std::ranges::contains(SUPPORTED_PCM_BITS, bits_per_sample)) {
+            return std::unexpected(std::format("Unsupported PCM bit depth: {} bits", bits_per_sample));
+        }
+        return AudioSampleFormat::PCM;
+    }
+    if (format_code == WAVE_FORMAT_IEEE_FLOAT) {
+        if (!std::ranges::contains(SUPPORTED_FLOAT_BITS, bits_per_sample)) {
+            return std::unexpected(std::format("Unsupported IEEE float bit depth: {} bits", bits_per_sample));
+        }
+        return AudioSampleFormat::IEEE_FLOAT;
+    }
+    return std::unexpected("Only uncompressed PCM or IEEE float WAV files are supported");
+}
+
 std::expected<WavFormat, std::string> ParseFmtChunk(const std::span<const std::byte> chunk) {
     if (chunk.size() < FMT_MIN_SIZE) {
         return std::unexpected("The WAV fmt chunk is truncated");
     }
     std::uint16_t format_code = ReadU16LE(chunk, 0);
+    if (format_code == WAVE_FORMAT_EXTENSIBLE) {
+        const auto resolved = ResolveExtensibleFormat(chunk);
+        if (!resolved) {
+            return std::unexpected(resolved.error());
+        }
+        format_code = *resolved;
+    }
     const std::uint16_t channels = ReadU16LE(chunk, 2);
     const std::uint32_t sample_rate = ReadU32LE(chunk, 4);
     const std::uint16_t bits_per_sample = ReadU16LE(chunk, 14);
-
-    if (format_code == WAVE_FORMAT_EXTENSIBLE) {
-        if (chunk.size() < FMT_EXTENSIBLE_SIZE) {
-            return std::unexpected("The extensible WAV fmt chunk is truncated");
-        }
-        for (std::size_t index = 0; index < WAVE_EXTENSIBLE_GUID_TAIL.size(); ++index) {
-            if (std::to_integer<std::uint8_t>(chunk[28 + index]) != WAVE_EXTENSIBLE_GUID_TAIL[index]) {
-                return std::unexpected("Unsupported WAV extensible subformat");
-            }
-        }
-        const std::uint32_t subformat = ReadU32LE(chunk, 24);
-        if (subformat != WAVE_FORMAT_PCM && subformat != WAVE_FORMAT_IEEE_FLOAT) {
-            return std::unexpected("Only uncompressed PCM or IEEE float WAV files are supported");
-        }
-        format_code = static_cast<std::uint16_t>(subformat);
-    }
-
-    AudioSampleFormat sample_format = AudioSampleFormat::PCM;
-    if (format_code == WAVE_FORMAT_PCM) {
-        if (bits_per_sample != 8 && bits_per_sample != 16 && bits_per_sample != 24 && bits_per_sample != 32) {
-            return std::unexpected(std::format("Unsupported PCM bit depth: {} bits", bits_per_sample));
-        }
-    } else if (format_code == WAVE_FORMAT_IEEE_FLOAT) {
-        sample_format = AudioSampleFormat::IEEE_FLOAT;
-        if (bits_per_sample != 32 && bits_per_sample != 64) {
-            return std::unexpected(std::format("Unsupported IEEE float bit depth: {} bits", bits_per_sample));
-        }
-    } else {
-        return std::unexpected("Only uncompressed PCM or IEEE float WAV files are supported");
-    }
-
     if (channels == 0 || sample_rate == 0) {
         return std::unexpected("The WAV file has an invalid channel count or sample rate");
     }
-
+    const auto sample_format = ResolveSampleFormat(format_code, bits_per_sample);
+    if (!sample_format) {
+        return std::unexpected(sample_format.error());
+    }
     return WavFormat{
-        .Format = sample_format,
+        .Format = *sample_format,
         .Channels = channels,
         .SampleRate = sample_rate,
         .BitsPerSample = bits_per_sample,
@@ -263,6 +312,89 @@ std::string LowerExtension(const std::filesystem::path &path) {
     return ext;
 }
 
+std::expected<void, std::string> ProcessWavChunk(const std::string_view id,
+                                                 const std::span<const std::byte> payload,
+                                                 std::optional<WavFormat> &format,
+                                                 std::optional<std::span<const std::byte>> &data_chunk) {
+    if (id == "fmt ") {
+        const auto parsed = ParseFmtChunk(payload);
+        if (!parsed) {
+            return std::unexpected(parsed.error());
+        }
+        format = *parsed;
+    } else if (id == "data" && !data_chunk) {
+        data_chunk = payload;
+    }
+    return {};
+}
+
+std::expected<WavChunks, std::string> ExtractWavChunks(const std::span<const std::byte> bytes) {
+    if (bytes.size() < RIFF_HEADER_SIZE || FourCC(bytes, 0) != "RIFF" || FourCC(bytes, 8) != "WAVE") {
+        return std::unexpected("Not a valid RIFF/WAVE file");
+    }
+    std::optional<WavFormat> format;
+    std::optional<std::span<const std::byte>> data_chunk;
+    std::size_t offset = RIFF_HEADER_SIZE;
+
+    while (offset + CHUNK_HEADER_SIZE <= bytes.size()) {
+        const std::string_view id = FourCC(bytes, offset);
+        const std::uint32_t chunk_size = ReadU32LE(bytes, offset + 4);
+        const std::size_t payload_offset = offset + CHUNK_HEADER_SIZE;
+        if (chunk_size > bytes.size() - payload_offset) {
+            return std::unexpected("The WAV file ends inside a chunk");
+        }
+        if (const auto status = ProcessWavChunk(id, bytes.subspan(payload_offset, chunk_size), format, data_chunk);
+            !status) {
+            return std::unexpected(status.error());
+        }
+        const std::size_t padding = (chunk_size % 2U != 0U) ? 1U : 0U;
+        if (bytes.size() - payload_offset - chunk_size < padding) {
+            break;
+        }
+        offset = payload_offset + chunk_size + padding;
+    }
+
+    if (!format) {
+        return std::unexpected("The WAV file has no fmt chunk");
+    }
+    if (!data_chunk) {
+        return std::unexpected("The WAV file has no data chunk");
+    }
+    return WavChunks{.Format = *format, .Data = *data_chunk};
+}
+
+std::expected<std::vector<PWLPoint>, std::string>
+DecodeWavFrames(const WavFormat &format, const std::span<const std::byte> data, const double peak_amplitude) {
+    const std::size_t bytes_per_sample = format.BitsPerSample / 8U;
+    const std::size_t frame_bytes = bytes_per_sample * format.Channels;
+    const std::size_t frames = data.size() / frame_bytes;
+    if (frames < 2) {
+        return std::unexpected("The WAV file needs at least two audio frames");
+    }
+    if (frames > MAX_WAV_SAMPLES) {
+        return std::unexpected(
+            std::format("The WAV file exceeds the {} sample limit ({} samples)", MAX_WAV_SAMPLES, frames));
+    }
+
+    std::vector<PWLPoint> points;
+    points.reserve(frames);
+    const double sample_period = 1.0 / static_cast<double>(format.SampleRate);
+    for (std::size_t frame = 0; frame < frames; ++frame) {
+        double sum = 0.0;
+        const std::size_t frame_offset = frame * frame_bytes;
+        for (std::uint16_t ch = 0; ch < format.Channels; ++ch) {
+            const auto decoded = DecodeSample(data, frame_offset + ch * bytes_per_sample, format);
+            if (!decoded) {
+                return std::unexpected(decoded.error());
+            }
+            sum += *decoded;
+        }
+        const double averaged = sum / static_cast<double>(format.Channels);
+        points.push_back({.Time = static_cast<double>(frame) * sample_period, .Value = averaged * peak_amplitude});
+    }
+    return points;
+}
+
 } // namespace
 
 /**
@@ -291,25 +423,11 @@ std::expected<std::vector<PWLPoint>, std::string> ParsePWLCSV(std::string_view t
         ++line_number;
 
         const std::string_view trimmed = Trim(line);
-        if (!trimmed.empty() && !trimmed.starts_with('#') && !trimmed.starts_with("//")) {
-            const std::optional<PWLPoint> point = ParseCsvRow(trimmed);
-            if (!point) {
-                if (points.empty() && !skipped_header) {
-                    skipped_header = true;
-                } else {
-                    return std::unexpected(std::format("Invalid time/value pair on line {}", line_number));
-                }
-            } else {
-                if (point->Time < 0.0) {
-                    return std::unexpected(std::format("Negative time on line {}", line_number));
-                }
-                if (!points.empty() && point->Time <= points.back().Time) {
-                    return std::unexpected(std::format("Times must strictly increase (line {})", line_number));
-                }
-                points.push_back(*point);
+        if (!IsCsvIgnoredLine(trimmed)) {
+            if (const auto status = AppendCsvRow(trimmed, line_number, skipped_header, points); !status) {
+                return std::unexpected(status.error());
             }
         }
-
         if (end == std::string_view::npos) {
             break;
         }
@@ -334,74 +452,11 @@ std::expected<std::vector<PWLPoint>, std::string> ParsePWLWAV(const std::span<co
     if (!std::isfinite(peak_amplitude) || peak_amplitude <= 0.0) {
         return std::unexpected("The WAV peak amplitude must be positive");
     }
-    if (bytes.size() < RIFF_HEADER_SIZE || FourCC(bytes, 0) != "RIFF" || FourCC(bytes, 8) != "WAVE") {
-        return std::unexpected("Not a valid RIFF/WAVE file");
+    const auto chunks = ExtractWavChunks(bytes);
+    if (!chunks) {
+        return std::unexpected(chunks.error());
     }
-
-    std::optional<WavFormat> format;
-    std::optional<std::span<const std::byte>> data_chunk;
-    std::size_t offset = RIFF_HEADER_SIZE;
-
-    while (offset + CHUNK_HEADER_SIZE <= bytes.size()) {
-        const std::string_view id = FourCC(bytes, offset);
-        const std::uint32_t chunk_size = ReadU32LE(bytes, offset + 4);
-        const std::size_t payload_offset = offset + CHUNK_HEADER_SIZE;
-        if (chunk_size > bytes.size() - payload_offset) {
-            return std::unexpected("The WAV file ends inside a chunk");
-        }
-        const std::span<const std::byte> payload = bytes.subspan(payload_offset, chunk_size);
-        if (id == "fmt ") {
-            const auto parsed = ParseFmtChunk(payload);
-            if (!parsed) {
-                return std::unexpected(parsed.error());
-            }
-            format = *parsed;
-        } else if (id == "data" && !data_chunk) {
-            data_chunk = payload;
-        }
-        const std::size_t padding = (chunk_size % 2U != 0U) ? 1U : 0U;
-        if (bytes.size() - payload_offset - chunk_size < padding) {
-            break;
-        }
-        offset = payload_offset + chunk_size + padding;
-    }
-
-    if (!format) {
-        return std::unexpected("The WAV file has no fmt chunk");
-    }
-    if (!data_chunk) {
-        return std::unexpected("The WAV file has no data chunk");
-    }
-
-    const std::size_t bytes_per_sample = format->BitsPerSample / 8U;
-    const std::size_t frame_bytes = bytes_per_sample * format->Channels;
-    const std::size_t frames = data_chunk->size() / frame_bytes;
-    if (frames < 2) {
-        return std::unexpected("The WAV file needs at least two audio frames");
-    }
-    if (frames > MAX_WAV_SAMPLES) {
-        return std::unexpected(
-            std::format("The WAV file exceeds the {} sample limit ({} samples)", MAX_WAV_SAMPLES, frames));
-    }
-
-    std::vector<PWLPoint> points;
-    points.reserve(frames);
-    const double sample_period = 1.0 / static_cast<double>(format->SampleRate);
-
-    for (std::size_t frame = 0; frame < frames; ++frame) {
-        double sum = 0.0;
-        const std::size_t frame_offset = frame * frame_bytes;
-        for (std::uint16_t ch = 0; ch < format->Channels; ++ch) {
-            const auto decoded = DecodeSample(*data_chunk, frame_offset + ch * bytes_per_sample, *format);
-            if (!decoded) {
-                return std::unexpected(decoded.error());
-            }
-            sum += *decoded;
-        }
-        const double averaged = sum / static_cast<double>(format->Channels);
-        points.push_back({.Time = static_cast<double>(frame) * sample_period, .Value = averaged * peak_amplitude});
-    }
-    return points;
+    return DecodeWavFrames(chunks->Format, chunks->Data, peak_amplitude);
 }
 
 /**
