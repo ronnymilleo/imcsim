@@ -165,7 +165,6 @@ public:
     // Derived data
     const Connectivity &GetConnectivity();
     const Core::Circuit &GetCircuit();
-    Core::Circuit BuildCircuit();
     std::size_t GetCircuitVersion() const;
     std::size_t GetDocumentVersion() const;
     std::string BuildSpiceNetlist();

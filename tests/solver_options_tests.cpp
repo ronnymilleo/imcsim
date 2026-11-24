@@ -315,7 +315,7 @@ TEST_CASE("The circuit of a schematic takes the solver options of its settings",
     GUI::SimulationSettings settings = schematic.GetSimulationSettings();
     settings.Solver = {.RelativeTolerance = 2e-4, .NominalTemperatureCelsius = 35.0};
     schematic.SetSimulationSettings(settings);
-    CHECK(schematic.BuildCircuit().GetSolverOptions() == settings.Solver);
+    CHECK(schematic.GetCircuit().GetSolverOptions() == settings.Solver);
 }
 
 TEST_CASE("The solver options load back unchanged and an old file has the defaults", "[solver_options]") {

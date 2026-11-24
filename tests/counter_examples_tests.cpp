@@ -51,7 +51,7 @@ LoadedExample LoadCounterExample(const std::string_view file_name) {
                        std::move(loaded->Settings),
                        std::move(loaded->Subcircuits),
                        std::move(loaded->Models));
-    Core::Circuit circuit = schematic->BuildCircuit();
+    Core::Circuit circuit = schematic->GetCircuit();
     const Core::TransientSettings settings = schematic->GetSimulationSettings().Transient;
     return {.Schematic = std::move(schematic), .Circuit = std::move(circuit), .Settings = settings};
 }

@@ -90,7 +90,7 @@ LoadedExample LoadExample(const std::string_view file_name, const std::optional<
                               std::move(loaded->Subcircuits),
                               std::move(loaded->Models));
     result.Schematic->RestoreMeasurements(loaded->Measurements);
-    result.Circuit = result.Schematic->BuildCircuit();
+    result.Circuit = result.Schematic->GetCircuit();
     const auto output = GUI::ResolveOutputNode(std::nullopt, result.Circuit, *result.Schematic);
     if (!output) {
         return result;

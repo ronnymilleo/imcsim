@@ -73,7 +73,7 @@ TEST_CASE("A 7-segment display has its inputs a to g down its left side", "[seve
 
 TEST_CASE("A 7-segment display stays out of the circuit, which needs no Ground for it", "[seven_segment]") {
     GUI::Schematic schematic = MakeDrivenDisplay("bc");
-    const Core::Circuit circuit = schematic.BuildCircuit();
+    const Core::Circuit circuit = schematic.GetCircuit();
     CHECK(circuit.GetEntries().size() == Core::SEGMENT_NAMES.size());
     CHECK(std::ranges::none_of(circuit.GetEntries(), [](const auto &entry) {
         return entry.Part->GetType() == Core::ComponentType::SEVEN_SEGMENT;
@@ -84,7 +84,7 @@ TEST_CASE("A 7-segment display stays out of the circuit, which needs no Ground f
 TEST_CASE("A 7-segment display reads every input against its level, in segment order", "[seven_segment]") {
     // The segments of a 2
     GUI::Schematic schematic = MakeDrivenDisplay("abdeg");
-    const Core::OperatingPointRun run = Core::RunOperatingPoint(schematic.BuildCircuit());
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(schematic.GetCircuit());
     if (!run.Result) {
         FAIL(run.Result.error());
     }

@@ -52,7 +52,7 @@ TEST_CASE("A logic output has no name, no value and a logic level to read agains
 
 TEST_CASE("A logic output stays out of the circuit the simulator gets", "[logic_outputs]") {
     OutputOnInput setup;
-    const Core::Circuit circuit = setup.Schematic.BuildCircuit();
+    const Core::Circuit circuit = setup.Schematic.GetCircuit();
     REQUIRE(circuit.GetEntries().size() == 1);
     CHECK(circuit.GetEntries()[0].Part->GetType() == Core::ComponentType::LOGIC_INPUT);
     // A logic input and an output need no Ground, as the output adds nothing
@@ -115,7 +115,7 @@ TEST_CASE("Logic outputs show what a decoder gives, with no LED, resistor or Gro
     for (std::size_t output = 3; output < 7; ++output) {
         schematic.AddElement(GUI::CreateElement(Core::ComponentType::LOGIC_OUTPUT, pins[output], GUI::Rotation::R0));
     }
-    const Core::Circuit circuit = schematic.BuildCircuit();
+    const Core::Circuit circuit = schematic.GetCircuit();
     REQUIRE_FALSE(Core::CheckCircuit(circuit).has_value());
     const Core::OperatingPointRun run = Core::RunOperatingPoint(circuit);
     if (!run.Result) {

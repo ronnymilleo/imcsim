@@ -58,9 +58,9 @@ struct SavedSubcircuitPin {
 /**
  * @struct  SavedSubcircuit
  * @brief   A block definition as the schematic keeps it: its pins in order, its parameters and its contents.
- * @details The contents are drawn parts and wires, like a schematic of their own; Schematic::BuildCircuit() turns them
- *          into a Core::SubcircuitDefinition for each run. A block imported from a SPICE library keeps its text in
- * Spice instead, and has no parts or wires.
+ * @details The contents are drawn parts and wires, like a schematic of their own; BlockLibrary turns them into a
+ *          Core::SubcircuitDefinition for the circuit of the schematic. A block imported from a SPICE library keeps its
+ *          text in Spice instead, and has no parts or wires.
  */
 struct SavedSubcircuit {
     std::string Name;

@@ -849,14 +849,6 @@ const Core::Circuit &Schematic::GetCircuit() {
 }
 
 /**
- * @brief   Builds the circuit topology of the schematic, for the simulator, with the solver options of its settings.
- * @return  The circuit; it points at the components of this schematic, so use it before the next change.
- */
-Core::Circuit Schematic::BuildCircuit() {
-    return GetCircuit();
-}
-
-/**
  * @brief   Returns a number that changes whenever the circuit does.
  * @return  A count of the edits that drop the results; it differs from an earlier value once the circuit was edited.
  */
