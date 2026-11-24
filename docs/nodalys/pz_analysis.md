@@ -95,7 +95,7 @@ The raw poles and zeros are post-processed through `Core::BuildPoleZero`:
 - **Pole-Zero Cancellation:** Any pole and zero within $1\%$ of each other are identified as cancelling pairs.
 
 ### 1.6 Stability Comparison: Nodalys vs. ngspice
-In `ngspice`, `.pz` relies on a heuristic numerical root-finding algorithm (Muller's method on determinant evaluations) which frequently fails to converge, diverges, or misses high-frequency poles on feedback op-amp circuits (documented in `AGENTS.md` and jay #182).
+In `ngspice`, `.pz` relies on a heuristic numerical root-finding algorithm (Muller's method on determinant evaluations) which frequently fails to converge, diverges, or misses high-frequency poles on feedback op-amp circuits (see [`tests/pole_zero_robustness_tests.cpp`](../../tests/pole_zero_robustness_tests.cpp) and jay #182).
 In contrast, **Nodalys** solves the generalized eigenvalue problem globally via the QZ algorithm on the exact linearized MNA pencil. It requires no initial frequency guesses, exhibits no divergence, and finds all theoretical poles and zeros deterministically.
 
 ---

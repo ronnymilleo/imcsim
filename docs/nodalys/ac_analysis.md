@@ -4,7 +4,7 @@
 - [`nodalys/src/analyses/ac/ac_analysis.cpp`](../../nodalys/src/analyses/ac/ac_analysis.cpp) (`ComputeACSweep`)
 - [`nodalys/src/mna/mna_system.cpp`](../../nodalys/src/mna/mna_system.cpp) (`MnaSystem::SolveAc`, `MnaSystem::SolveAcMultiple`)
 - [`nodalys/src/linear/dense_matrix.cpp`](../../nodalys/src/linear/dense_matrix.cpp) (`BasicDenseMatrix<std::complex<double>>`)
-- [`nodalys/src/devices/devices.cpp`](../../nodalys/src/devices/devices.cpp), [`nodalys/src/devices/semiconductors/diode_device.cpp`](../../nodalys/src/devices/semiconductors/diode_device.cpp), [`nodalys/src/devices/semiconductors/bjt_device.cpp`](../../nodalys/src/devices/semiconductors/bjt_device.cpp) and [`nodalys/src/devices/semiconductors/mosfet_device.cpp`](../../nodalys/src/devices/semiconductors/mosfet_device.cpp) (`StampAc`, `AcTerminalCurrent`)
+- [`nodalys/src/devices/passive/passive_devices.cpp`](../../nodalys/src/devices/passive/passive_devices.cpp), [`nodalys/src/devices/sources/controlled_sources.cpp`](../../nodalys/src/devices/sources/controlled_sources.cpp), [`nodalys/src/devices/semiconductors/diode_device.cpp`](../../nodalys/src/devices/semiconductors/diode_device.cpp), [`nodalys/src/devices/semiconductors/bjt_device.cpp`](../../nodalys/src/devices/semiconductors/bjt_device.cpp) and [`nodalys/src/devices/semiconductors/mosfet_device.cpp`](../../nodalys/src/devices/semiconductors/mosfet_device.cpp) (`StampAc`, `AcTerminalCurrent`)
 
 ---
 
@@ -31,7 +31,7 @@ The directive is `.ac [dec|oct|lin] <np> <fstart> <fstop>`, read into `AcSweepCo
 - `lin` gives `<np>` points in all, spaced evenly, with both ends.
 - `<np>` is a whole number of at least 1 and `0 < fstart <= fstop`, for a linear sweep too (ngspice lets a linear sweep start at 0; Nodalys does not). A bad number or range is refused with a message that quotes the line.
 
-The grid comes from one function, `MakeFrequencySweep()` (`src/analyses/frequency_sweep.h`), shared with the noise, AC sensitivity and S-parameter analyses, so they space their points alike.
+The grid comes from one function, `MakeFrequencySweep()` ([`nodalys/src/analyses/common/frequency_sweep.h`](../../nodalys/src/analyses/common/frequency_sweep.h)), shared with the noise, AC sensitivity and S-parameter analyses, so they space their points alike.
 
 ### 1.3 Solving the Complex MNA System $\mathbf{Y}(j\omega)\,\tilde{\mathbf{x}} = \tilde{\mathbf{b}}_{\text{AC}}$
 At each frequency $f_k$ on the logarithmic grid ($N_{\text{dec}}$ points per decade, $\omega_k = 2\pi f_k$):
@@ -40,7 +40,7 @@ At each frequency $f_k$ on the logarithmic grid ($N_{\text{dec}}$ points per dec
 - `MnaSystem::SolveAc` solves the dense complex system $\mathbf{Y}(j\omega_k)\,\tilde{\mathbf{x}} = \tilde{\mathbf{b}}_{\text{AC}}$ using **complex magnitude row equilibration**, **partial-pivoting $PA = LU$ in $\mathbb{C}$**, and **1 step of complex iterative refinement**.
 
 ### 1.4 Magnitude in dB and Phase
-- **Magnitude:** $|H|_{\text{dB}} = 20\log_{10}\bigl(\max(|\tilde{X}(j\omega_k)|, 10^{-20})\bigr)$.
+- **Magnitude:** $|H|_{\text{dB}} = 20\log_{10}\bigl(\max(|\tilde{X}(j\omega_k)|, 10^{-15})\bigr)$.
 - **Phase:** `std::arg` in degrees, wrapped into $(-180^\circ, +180^\circ]$ as the ngspice backend reports it, so a filter whose phase passes $-180^\circ$ jumps by $360^\circ$ on both backends.
 
 ---

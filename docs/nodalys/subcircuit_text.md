@@ -14,10 +14,15 @@ struct SubcircuitText {
     std::vector<std::string> Ports;    // the node names of the .subckt line
     std::string Body;                  // everything between .subckt and .ends
 };
+struct InstanceObservers {
+    std::function<void(const std::string &name, NodeId node)> OnInternalNode;
+    std::function<void(const std::string &name, NodeId positive, NodeId negative)> OnSource;
+};
 struct SubcircuitTextInstance {
     std::string Prefix;                // "X1": the elements are named X1.R1, X1.D3...
     std::vector<NodeId> PortNodes;     // one node of the circuit per port
     std::map<std::string, double> Parameters;  // defaults and overrides, settled by the caller
+    InstanceObservers Observers;       // optional node/source discovery callbacks
 };
 
 std::expected<std::vector<std::string>, std::string>
@@ -75,7 +80,7 @@ Each refusal names the subcircuit and the line: `Nodalys cannot simulate the sub
 
 ## 5. Subcircuits of a netlist
 
-`ParseNetlist()` no longer flattens `.subckt` blocks into text lines. It keeps what a netlist defines for its instances, in the order written: the `.subckt` blocks (with their `.ends`, nested blocks included), the `.model` cards and the `.param` lines of the top level. Each `X` line is then placed by [`AddNetlistInstance()`](../../nodalys/src/parser/netlist/netlist_subcircuits.h), which builds a `SubcircuitText` whose body is those definitions followed by the line itself, with a port for each node of the line, and hands it to `AddSubcircuitText()`. The definitions are therefore the text around the instance, as the text of a block is for the blocks nested in it.
+`ParseNetlist()` no longer flattens `.subckt` blocks into text lines. It keeps what a netlist defines for its instances, in the order written: the `.subckt` blocks (with their `.ends`, nested blocks included), the `.model` cards and the `.param` lines of the top level. Each `X` line is then placed by [`AddNetlistInstance()`](../../nodalys/src/parser/netlist/netlist_subcircuits.h), which opens a root `TextScope` for the netlist, maps the instance's port nodes, and expands the call directly via `ExpandTextInstance()` ([`netlist_subcircuits.cpp`](../../nodalys/src/parser/netlist/netlist_subcircuits.cpp)). The definitions are therefore the text around the instance, as the text of a block is for the blocks nested in it.
 
 | In a netlist | Reading |
 | :--- | :--- |
@@ -86,6 +91,6 @@ Each refusal names the subcircuit and the line: `Nodalys cannot simulate the sub
 | `B`, `E`, `G`, `H`, `F`, `S` and waveform sources inside a block | Everything the reader of a block accepts, with the names of the instance. |
 | Nested `.subckt` | Accepted, up to 16 levels. |
 
-Names: the elements are named `X1.R1` and `X1.XLOAD.R2`, as before, so the names of the currents of a result and the sources named by `.dc`, `.tf` and `.noise` keep their meaning. The internal nodes are named the same way, in upper case: `X1.MID`, `X1.X2.N`. `AddSubcircuitText()` tells its caller each one through `SubcircuitTextInstance::OnInternalNode` (and each independent source through `OnSource`), and `ParseNetlist()` binds the names to the nodes, so `.noise V(X1.MID) ...`, `.tf`, `.ic` and `.pz` at the top level can name a node inside a block, wherever the directive stands in the netlist, and a `.pz` written by the nodes of its input finds a source inside a block. The instances are placed before the directives are read for that reason. The nodes get numbers after those of the netlist, so results list them after the others; `imcsim` places its blocks without those callbacks and keeps only the nodes of its own circuit in the results, as before.
+Names: the elements are named `X1.R1` and `X1.XLOAD.R2`, as before, so the names of the currents of a result and the sources named by `.dc`, `.tf` and `.noise` keep their meaning. The internal nodes are named the same way, in upper case: `X1.MID`, `X1.X2.N`. `AddSubcircuitText()` tells its caller each one through `SubcircuitTextInstance::Observers` (`InstanceObservers::OnInternalNode` and `InstanceObservers::OnSource`), and `ParseNetlist()` binds the names to the nodes, so `.noise V(X1.MID) ...`, `.tf`, `.ic` and `.pz` at the top level can name a node inside a block, wherever the directive stands in the netlist, and a `.pz` written by the nodes of its input finds a source inside a block. The instances are placed before the directives are read for that reason. The nodes get numbers after those of the netlist, so results list them after the others; `imcsim` places its blocks without those callbacks and keeps only the nodes of its own circuit in the results, as before.
 
 The refusals are those of section 3, with the called subcircuit as the name in the message, and a netlist whose `.subckt` has no `.ends` is refused. A `.model` card that a block does not use is not checked for its type; the warnings about the parameters a device does not read reach `ParsedNetlist::Diagnostics`, once each.
