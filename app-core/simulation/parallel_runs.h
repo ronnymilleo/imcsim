@@ -36,45 +36,37 @@ inline std::size_t GetBatchThreadCount(const std::size_t count, const bool is_co
 }
 
 /**
- * @brief   Runs a batch of independent indexed items, in parallel when the backend supports concurrent runs.
- * @details Each call `run_item(index)` returns true to keep going or false to stop scheduling further items (for
- *          example, when a step fails). On a single thread, progress is reported as `(index + progress_offset) /
- *          progress_total` before each item starts; on multiple threads, as `(done + progress_offset) /
- *          progress_total` as items complete. No new items are started once `control` is cancelled.
- * @param[in]     count            Number of items (`0` to `count - 1`).
- * @param[in]     is_concurrent    Whether the backend allows concurrent runs.
- * @param[in,out] control          Optional run control for stop requests and progress reporting, or null.
- * @param[in]     run_item         Callable `bool(std::size_t index)` executed once per scheduled item.
- * @param[in]     progress_offset  Completed items before this batch starts (for example, 1 after a nominal run).
- * @param[in]     progress_total   Total items for the progress denominator, or 0 to use `count + progress_offset`.
+ * @brief   Runs a batch sequentially on the calling thread, reporting progress before each item starts.
  */
 template <typename RunItem>
-void RunBatch(const std::size_t count,
-              const bool is_concurrent,
-              RunControl *control,
-              const RunItem &run_item,
-              const std::size_t progress_offset = 0,
-              const std::size_t progress_total = 0) {
-    if (count == 0) {
-        return;
-    }
-    const std::size_t total = progress_total > 0 ? progress_total : count + progress_offset;
-    const std::size_t thread_count = GetBatchThreadCount(count, is_concurrent);
-    if (thread_count <= 1) {
-        for (std::size_t index = 0; index < count; ++index) {
-            if (control != nullptr) {
-                if (control->IsCancelled()) {
-                    return;
-                }
-                control->SetProgress(static_cast<double>(index + progress_offset) / static_cast<double>(total));
-            }
-            if (!run_item(index)) {
+void RunSerialBatch(const std::size_t count,
+                    RunControl *control,
+                    const RunItem &run_item,
+                    const std::size_t progress_offset,
+                    const std::size_t total) {
+    for (std::size_t index = 0; index < count; ++index) {
+        if (control != nullptr) {
+            if (control->IsCancelled()) {
                 return;
             }
+            control->SetProgress(static_cast<double>(index + progress_offset) / static_cast<double>(total));
         }
-        return;
+        if (!run_item(index)) {
+            return;
+        }
     }
+}
 
+/**
+ * @brief   Runs a batch concurrently across a team of worker threads pulling indices from an atomic counter.
+ */
+template <typename RunItem>
+void RunConcurrentBatch(const std::size_t count,
+                        const std::size_t thread_count,
+                        RunControl *control,
+                        const RunItem &run_item,
+                        const std::size_t progress_offset,
+                        const std::size_t total) {
     std::atomic<std::size_t> next_index = 0;
     std::atomic<std::size_t> finished_count = progress_offset;
     std::atomic<bool> should_stop = false;
@@ -105,6 +97,38 @@ void RunBatch(const std::size_t count,
         workers.emplace_back(worker);
     }
     worker();
+}
+
+/**
+ * @brief   Runs a batch of independent indexed items, in parallel when the backend supports concurrent runs.
+ * @details Each call `run_item(index)` returns true to keep going or false to stop scheduling further items (for
+ *          example, when a step fails). On a single thread, progress is reported as `(index + progress_offset) /
+ *          progress_total` before each item starts; on multiple threads, as `(done + progress_offset) /
+ *          progress_total` as items complete. No new items are started once `control` is cancelled.
+ * @param[in]     count            Number of items (`0` to `count - 1`).
+ * @param[in]     is_concurrent    Whether the backend allows concurrent runs.
+ * @param[in,out] control          Optional run control for stop requests and progress reporting, or null.
+ * @param[in]     run_item         Callable `bool(std::size_t index)` executed once per scheduled item.
+ * @param[in]     progress_offset  Completed items before this batch starts (for example, 1 after a nominal run).
+ * @param[in]     progress_total   Total items for the progress denominator, or 0 to use `count + progress_offset`.
+ */
+template <typename RunItem>
+void RunBatch(const std::size_t count,
+              const bool is_concurrent,
+              RunControl *control,
+              const RunItem &run_item,
+              const std::size_t progress_offset = 0,
+              const std::size_t progress_total = 0) {
+    if (count == 0) {
+        return;
+    }
+    const std::size_t total = progress_total > 0 ? progress_total : count + progress_offset;
+    const std::size_t thread_count = GetBatchThreadCount(count, is_concurrent);
+    if (thread_count <= 1) {
+        RunSerialBatch(count, control, run_item, progress_offset, total);
+        return;
+    }
+    RunConcurrentBatch(count, thread_count, control, run_item, progress_offset, total);
 }
 
 } // namespace Core
