@@ -104,6 +104,7 @@ add_executable(imcsim-tests
             pole_zero_view_tests.cpp
             preferences_tests.cpp
             probing_tests.cpp
+            pwl_import_tests.cpp
             readout_placement_tests.cpp
             ready_blocks_tests.cpp
             result_store_tests.cpp

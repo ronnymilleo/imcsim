@@ -112,9 +112,14 @@ BreakpointCallback MakeExpBreakpoints(const ExpParameters &exp) {
  */
 BreakpointCallback MakePwlBreakpoints(const PwlParameters &pwl) {
     return [pwl](const double time) {
-        for (const PwlPoint &point : pwl.Points) {
-            if (IsAfter(point.Time, time)) {
-                return point.Time;
+        const auto first =
+            std::lower_bound(pwl.Points.begin(),
+                             pwl.Points.end(),
+                             time,
+                             [](const PwlPoint &point, const double target) { return point.Time <= target; });
+        for (auto it = first; it != pwl.Points.end(); ++it) {
+            if (IsAfter(it->Time, time)) {
+                return it->Time;
             }
         }
         return NO_CORNER;
@@ -209,15 +214,24 @@ double EvaluatePwl(const PwlParameters &pwl, const double time) {
     if (time <= points.front().Time) {
         return points.front().Value;
     }
-    for (std::size_t index = 1; index < points.size(); ++index) {
-        if (time <= points[index].Time) {
-            const PwlPoint &before = points[index - 1];
-            const PwlPoint &after = points[index];
-            const double share = (time - before.Time) / (after.Time - before.Time);
-            return before.Value + share * (after.Value - before.Value);
-        }
+    if (time >= points.back().Time) {
+        return points.back().Value;
     }
-    return points.back().Value;
+    const auto after_it =
+        std::lower_bound(points.begin(), points.end(), time, [](const PwlPoint &point, const double target) {
+            return point.Time < target;
+        });
+    const PwlPoint &after = *after_it;
+    if (time == after.Time) {
+        return after.Value;
+    }
+    const PwlPoint &before = *(after_it - 1);
+    const double span = after.Time - before.Time;
+    if (span <= 0.0) {
+        return after.Value;
+    }
+    const double share = (time - before.Time) / span;
+    return before.Value + share * (after.Value - before.Value);
 }
 
 /**

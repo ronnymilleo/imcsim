@@ -6,10 +6,13 @@
 #ifndef IMCSIM_PART_EDITOR_SOURCES_H
 #define IMCSIM_PART_EDITOR_SOURCES_H
 
+#include "base/file_dialog.h"
 #include "base/value_field.h"
 #include "circuit/components/source.h"
 #include "schematic/schematic.h"
 #include <array>
+#include <cstddef>
+#include <optional>
 #include <string>
 
 namespace GUI {
@@ -21,6 +24,11 @@ namespace GUI {
  *          a piecewise linear source are one text of "time value" pairs.
  */
 struct SourceFields {
+    enum class ImportKind {
+        CSV,
+        WAV
+    };
+
     std::array<ValueField, 4> AC;
     std::array<ValueField, 7> Pulse;
     std::array<ValueField, 6> EXP;
@@ -30,6 +38,13 @@ struct SourceFields {
     std::array<ValueField, 4> Random;
     /// The "time value" points of a PWL source being typed, as long as the user wants them.
     std::string PWLText;
+    /// Full-scale amplitude used when importing a normalized WAV recording into PWL points.
+    ValueField WavPeak;
+    double WavPeakValue = 1.0;
+    FileDialog PWLImportDialog;
+    ImportKind PendingImportKind = ImportKind::CSV;
+    std::optional<std::size_t> PendingImportSelection;
+    std::string PWLImportError;
 };
 
 // Loading
