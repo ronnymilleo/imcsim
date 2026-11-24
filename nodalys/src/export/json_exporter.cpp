@@ -18,10 +18,7 @@ namespace {
 void WriteDoubleArray(std::ostringstream &ss, const std::vector<double> &arr) {
     ss << "[";
     for (std::size_t i = 0; i < arr.size(); ++i) {
-        if (i > 0) {
-            ss << ", ";
-        }
-        ss << std::format("{:.8g}", arr[i]);
+        ss << (i > 0 ? ", " : "") << std::format("{:.8g}", arr[i]);
     }
     ss << "]";
 }
@@ -62,6 +59,15 @@ void WriteQuoted(std::ostringstream &ss, std::string_view text) {
         ss << ch;
     }
     ss << '"';
+}
+
+void WriteStringArray(std::ostringstream &ss, const std::vector<std::string> &values) {
+    ss << "[";
+    for (std::size_t i = 0; i < values.size(); ++i) {
+        ss << (i > 0 ? ", " : "");
+        WriteQuoted(ss, values[i]);
+    }
+    ss << "]";
 }
 
 /**
@@ -119,6 +125,15 @@ void WriteNodeSeries(std::ostringstream &ss,
     }
 }
 
+void WriteTraceSeries(std::ostringstream &ss, const std::vector<ComponentTrace> &traces) {
+    for (std::size_t c = 0; c < traces.size(); ++c) {
+        ss << (c > 0 ? ",\n    " : "    ");
+        WriteQuoted(ss, traces[c].Name);
+        ss << ": ";
+        WriteDoubleArray(ss, traces[c].Values);
+    }
+}
+
 /**
  * @brief   Writes the real and imaginary parts, the magnitude and the phase of each phasor of a series as an array.
  */
@@ -126,17 +141,23 @@ void WritePhasorArray(std::ostringstream &ss, const std::vector<std::complex<dou
     constexpr double RAD_TO_DEG = 180.0 / std::numbers::pi;
     ss << "[";
     for (std::size_t k = 0; k < phasors.size(); ++k) {
-        if (k > 0) {
-            ss << ", ";
-        }
         const std::complex<double> &p = phasors[k];
         const double mag = std::abs(p);
         const double phase_deg = std::arg(p) * RAD_TO_DEG;
-        ss << "{\"re\": " << std::format("{:.8g}", p.real()) << ", \"im\": " << std::format("{:.8g}", p.imag())
-           << ", \"mag\": " << std::format("{:.8g}", mag) << ", \"phase_deg\": " << std::format("{:.8g}", phase_deg)
-           << "}";
+        ss << (k > 0 ? ", " : "") << "{\"re\": " << std::format("{:.8g}", p.real())
+           << ", \"im\": " << std::format("{:.8g}", p.imag()) << ", \"mag\": " << std::format("{:.8g}", mag)
+           << ", \"phase_deg\": " << std::format("{:.8g}", phase_deg) << "}";
     }
     ss << "]";
+}
+
+void WritePhasorSeries(std::ostringstream &ss, const std::vector<ComponentPhasors> &currents) {
+    for (std::size_t c = 0; c < currents.size(); ++c) {
+        ss << (c > 0 ? ",\n    " : "    ");
+        WriteQuoted(ss, currents[c].Name);
+        ss << ": ";
+        WritePhasorArray(ss, currents[c].Phasors);
+    }
 }
 
 /**
@@ -146,11 +167,8 @@ void WriteRootList(std::ostringstream &ss, const std::vector<std::complex<double
     constexpr double TWO_PI = 2.0 * std::numbers::pi;
     ss << "[";
     for (std::size_t i = 0; i < roots.size(); ++i) {
-        if (i > 0) {
-            ss << ", ";
-        }
         const double f_hz = std::abs(roots[i]) / TWO_PI;
-        ss << "{\"real\": " << std::format("{:.8g}", roots[i].real())
+        ss << (i > 0 ? ", " : "") << "{\"real\": " << std::format("{:.8g}", roots[i].real())
            << ", \"imag\": " << std::format("{:.8g}", roots[i].imag())
            << ", \"frequency_hz\": " << std::format("{:.8g}", f_hz) << "}";
     }
@@ -173,6 +191,20 @@ const char *DescribeParameter(const SensitivityParameter parameter) {
         return "gain";
     default:
         return "unknown";
+    }
+}
+
+void WriteHarmonicBalanceThd(std::ostringstream &ss, const HarmonicBalanceResult &result) {
+    bool first_thd = true;
+    for (std::size_t node = 1; node < result.NodePhasors.size(); ++node) {
+        ss << (first_thd ? "" : ",\n") << "    \"v(" << node
+           << ")\": " << std::format("{:.6g}", ComputeThd(result.NodePhasors[node]) * 100.0);
+        first_thd = false;
+    }
+    for (const auto &cur : result.CurrentPhasors) {
+        ss << (first_thd ? "" : ",\n") << "    \"i(" << cur.Name
+           << ")\": " << std::format("{:.6g}", ComputeThd(cur.Phasors) * 100.0);
+        first_thd = false;
     }
 }
 
@@ -222,13 +254,7 @@ std::string ExportJson(const TransientResult &result) {
     ss << ",\n  \"node_voltages\": {\n";
     WriteNodeSeries(ss, "    ", result.NodeVoltages, WriteDoubleArray);
     ss << "\n  },\n  \"currents\": {\n";
-    for (std::size_t c = 0; c < result.Currents.size(); ++c) {
-        if (c > 0) {
-            ss << ",\n";
-        }
-        ss << "    \"" << result.Currents[c].Name << "\": ";
-        WriteDoubleArray(ss, result.Currents[c].Values);
-    }
+    WriteTraceSeries(ss, result.Currents);
     ss << "\n  }\n}\n";
     return ss.str();
 }
@@ -412,12 +438,9 @@ std::string ExportJson(const AcSensitivityResult &result) {
     WriteComplexPart(ss, result.Output, true);
     ss << ",\n  \"output_im\": ";
     WriteComplexPart(ss, result.Output, false);
-    ss << ",\n  \"warnings\": [";
-    for (std::size_t i = 0; i < result.Warnings.size(); ++i) {
-        ss << (i > 0 ? ", " : "");
-        WriteQuoted(ss, result.Warnings[i]);
-    }
-    ss << "],\n  \"elements\": [\n";
+    ss << ",\n  \"warnings\": ";
+    WriteStringArray(ss, result.Warnings);
+    ss << ",\n  \"elements\": [\n";
     for (std::size_t index = 0; index < result.Elements.size(); ++index) {
         const AcElementSensitivity &element = result.Elements[index];
         ss << "    {\"name\": ";
@@ -445,67 +468,24 @@ std::string ExportJson(const AcSensitivityResult &result) {
 std::string ExportJson(const HarmonicBalanceResult &result) {
     std::ostringstream ss;
     BeginDocument(ss, "harmonic_balance");
-    ss << "  \"iterations\": " << result.Iterations << ",\n";
-    ss << "  \"strategy\": ";
+    ss << "  \"iterations\": " << result.Iterations << ",\n  \"strategy\": ";
     WriteQuoted(ss, result.Strategy);
-    ss << ",\n  \"warnings\": [";
-    for (std::size_t i = 0; i < result.Warnings.size(); ++i) {
-        if (i > 0) {
-            ss << ", ";
-        }
-        WriteQuoted(ss, result.Warnings[i]);
-    }
-    ss << "],\n  \"frequencies\": ";
+    ss << ",\n  \"warnings\": ";
+    WriteStringArray(ss, result.Warnings);
+    ss << ",\n  \"frequencies\": ";
     WriteDoubleArray(ss, result.Frequencies);
-
     ss << ",\n  \"node_phasors\": {\n";
     WriteNodeSeries(ss, "    ", result.NodePhasors, WritePhasorArray);
-
     ss << "\n  },\n  \"current_phasors\": {\n";
-    for (std::size_t c = 0; c < result.CurrentPhasors.size(); ++c) {
-        if (c > 0) {
-            ss << ",\n";
-        }
-        ss << "    ";
-        WriteQuoted(ss, result.CurrentPhasors[c].Name);
-        ss << ": ";
-        WritePhasorArray(ss, result.CurrentPhasors[c].Phasors);
-    }
-
+    WritePhasorSeries(ss, result.CurrentPhasors);
     ss << "\n  },\n  \"thd_percent\": {\n";
-    bool first_thd = true;
-    for (std::size_t node = 1; node < result.NodePhasors.size(); ++node) {
-        if (!first_thd) {
-            ss << ",\n";
-        }
-        first_thd = false;
-        ss << "    \"v(" << node << ")\": " << std::format("{:.6g}", ComputeThd(result.NodePhasors[node]) * 100.0);
-    }
-    for (const auto &cur : result.CurrentPhasors) {
-        if (!first_thd) {
-            ss << ",\n";
-        }
-        first_thd = false;
-        ss << "    \"i(" << cur.Name << ")\": " << std::format("{:.6g}", ComputeThd(cur.Phasors) * 100.0);
-    }
-
+    WriteHarmonicBalanceThd(ss, result);
     ss << "\n  },\n  \"times\": ";
     WriteDoubleArray(ss, result.Times);
-
     ss << ",\n  \"node_waveforms\": {\n";
     WriteNodeSeries(ss, "    ", result.NodeWaveforms, WriteDoubleArray);
-
     ss << "\n  },\n  \"current_waveforms\": {\n";
-    for (std::size_t c = 0; c < result.CurrentWaveforms.size(); ++c) {
-        if (c > 0) {
-            ss << ",\n";
-        }
-        ss << "    ";
-        WriteQuoted(ss, result.CurrentWaveforms[c].Name);
-        ss << ": ";
-        WriteDoubleArray(ss, result.CurrentWaveforms[c].Values);
-    }
-
+    WriteTraceSeries(ss, result.CurrentWaveforms);
     ss << "\n  }\n}\n";
     return ss.str();
 }

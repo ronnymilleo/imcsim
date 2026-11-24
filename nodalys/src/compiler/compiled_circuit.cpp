@@ -31,6 +31,37 @@ std::unique_ptr<MnaSystem> MakeEmptySystemFrom(const MnaSystem &system) {
     return std::make_unique<MnaSystem>(std::move(node_flags));
 }
 
+std::vector<CurrentRef> RemapCurrentRefs(const std::vector<CurrentRef> &refs,
+                                         const std::unordered_map<const Device *, Device *> &device_map) {
+    std::vector<CurrentRef> mapped_refs;
+    mapped_refs.reserve(refs.size());
+    for (const CurrentRef &ref : refs) {
+        CurrentRef mapped{.Name = ref.Name, .Contributions = {}};
+        mapped.Contributions.reserve(ref.Contributions.size());
+        for (const CurrentContribution &contribution : ref.Contributions) {
+            mapped.Contributions.push_back(
+                {.Element = RemapDevice(device_map, contribution.Element), .Terminal = contribution.Terminal});
+        }
+        mapped_refs.push_back(std::move(mapped));
+    }
+    return mapped_refs;
+}
+
+std::vector<NoiseGroup> RemapNoiseGroups(const std::vector<NoiseGroup> &groups,
+                                         const std::unordered_map<const Device *, Device *> &device_map) {
+    std::vector<NoiseGroup> mapped_groups;
+    mapped_groups.reserve(groups.size());
+    for (const NoiseGroup &group : groups) {
+        NoiseGroup mapped{.Name = group.Name, .Devices = {}};
+        mapped.Devices.reserve(group.Devices.size());
+        for (const Device *const device : group.Devices) {
+            mapped.Devices.push_back(RemapDevice(device_map, device));
+        }
+        mapped_groups.push_back(std::move(mapped));
+    }
+    return mapped_groups;
+}
+
 } // namespace
 
 /**
@@ -42,10 +73,21 @@ std::unique_ptr<MnaSystem> MakeEmptySystemFrom(const MnaSystem &system) {
  * @return  An independent CompiledCircuit ready for a single analysis run.
  */
 CompiledCircuit CloneCompiledCircuit(const CompiledCircuit &blueprint) {
-    CompiledCircuit copy;
-    if (blueprint.System) {
-        copy.System = MakeEmptySystemFrom(*blueprint.System);
-    }
+    CompiledCircuit copy{.System = blueprint.System ? MakeEmptySystemFrom(*blueprint.System) : nullptr,
+                         .Devices = {},
+                         .CompiledNodeCount = blueprint.CompiledNodeCount,
+                         .CircuitNodeCount = blueprint.CircuitNodeCount,
+                         .Currents = {},
+                         .NoiseGroups = {},
+                         .DynamicNode = blueprint.DynamicNode,
+                         .SourcesByName = {},
+                         .ElementsByName = {},
+                         .Ports = blueprint.Ports,
+                         .InitialConditions = blueprint.InitialConditions,
+                         .Nodesets = blueprint.Nodesets,
+                         .NodeSeeds = blueprint.NodeSeeds,
+                         .HasInitialConditions = blueprint.HasInitialConditions,
+                         .Thermal = blueprint.Thermal};
 
     copy.Devices.reserve(blueprint.Devices.size());
     std::unordered_map<const Device *, Device *> device_map;
@@ -57,45 +99,14 @@ CompiledCircuit CloneCompiledCircuit(const CompiledCircuit &blueprint) {
         copy.Devices.push_back(std::move(cloned));
     }
 
-    copy.CompiledNodeCount = blueprint.CompiledNodeCount;
-    copy.CircuitNodeCount = blueprint.CircuitNodeCount;
-    copy.DynamicNode = blueprint.DynamicNode;
-    copy.Ports = blueprint.Ports;
-    copy.InitialConditions = blueprint.InitialConditions;
-    copy.Nodesets = blueprint.Nodesets;
-    copy.NodeSeeds = blueprint.NodeSeeds;
-    copy.HasInitialConditions = blueprint.HasInitialConditions;
-    copy.Thermal = blueprint.Thermal;
-
-    copy.Currents.reserve(blueprint.Currents.size());
-    for (const CurrentRef &ref : blueprint.Currents) {
-        CurrentRef mapped{.Name = ref.Name, .Contributions = {}};
-        mapped.Contributions.reserve(ref.Contributions.size());
-        for (const CurrentContribution &contribution : ref.Contributions) {
-            mapped.Contributions.push_back(
-                {.Element = RemapDevice(device_map, contribution.Element), .Terminal = contribution.Terminal});
-        }
-        copy.Currents.push_back(std::move(mapped));
-    }
-
-    copy.NoiseGroups.reserve(blueprint.NoiseGroups.size());
-    for (const NoiseGroup &group : blueprint.NoiseGroups) {
-        NoiseGroup mapped{.Name = group.Name, .Devices = {}};
-        mapped.Devices.reserve(group.Devices.size());
-        for (const Device *const device : group.Devices) {
-            mapped.Devices.push_back(RemapDevice(device_map, device));
-        }
-        copy.NoiseGroups.push_back(std::move(mapped));
-    }
-
+    copy.Currents = RemapCurrentRefs(blueprint.Currents, device_map);
+    copy.NoiseGroups = RemapNoiseGroups(blueprint.NoiseGroups, device_map);
     for (const auto &[name, device] : blueprint.SourcesByName) {
         copy.SourcesByName.emplace(name, RemapDevice(device_map, device));
     }
-
     for (const auto &[name, device] : blueprint.ElementsByName) {
         copy.ElementsByName.emplace(name, RemapDevice(device_map, device));
     }
-
     return copy;
 }
 

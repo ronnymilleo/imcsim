@@ -55,18 +55,22 @@ void IndependentSourceDevice::SetCallbackFactory(SourceCallbackFactory factory) 
     m_CallbackFactory = std::move(factory);
 }
 
-bool IndependentSourceDevice::SupportsHarmonicBalance() const {
-    return m_Periodicity.IsSupportedInHb;
-}
-
+/**
+ * @brief   Scales the source output level for the source-stepping homotopy fallback of Newton-Raphson.
+ * @param[in] scale  Scale factor in `[0, 1]`.
+ */
 void IndependentSourceDevice::SetSourceScale(const double scale) {
     m_Scale = scale;
 }
 
 double IndependentSourceDevice::NextBreakpoint(const double time) const {
-    return m_Breakpoints ? m_Breakpoints(time) : Device::NextBreakpoint(time);
+    return m_Breakpoints ? m_Breakpoints(time) : TransientDevice::NextBreakpoint(time);
 }
 
+/**
+ * @brief   Assigns the deterministic 64-bit random stream seed for transient noise or random waveforms.
+ * @param[in] seed  Independent 64-bit stream seed for this source.
+ */
 void IndependentSourceDevice::SetRandomSeed(const std::uint64_t seed) {
     if (m_SetSeed) {
         m_SetSeed(seed);

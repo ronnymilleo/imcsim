@@ -245,7 +245,6 @@ private:
             return std::unexpected(resolved.error());
         }
         const EntryContext &entry = *resolved;
-
         switch (GetFamily(entry.Type)) {
         case ComponentFamily::MARKER:
             return {};
@@ -262,19 +261,15 @@ private:
         case ComponentFamily::SWITCHING:
             return AddSwitchingPart(*m_Builder, entry);
         case ComponentFamily::TRANSFORMER:
-            AddTransformer(*m_Builder, entry);
-            return {};
+            return AddTransformer(*m_Builder, entry), std::expected<void, std::string>{};
         case ComponentFamily::AMPLIFIER:
-            AddOpAmp(*m_Builder, entry);
-            return {};
+            return AddOpAmp(*m_Builder, entry), std::expected<void, std::string>{};
         case ComponentFamily::BLOCK:
             return AddSubcircuitInstance(entry, scope);
         case ComponentFamily::LOGIC_GATE:
-            AddGatePart(*m_Builder, entry);
-            return {};
+            return AddGatePart(*m_Builder, entry), std::expected<void, std::string>{};
         case ComponentFamily::FLIP_FLOP:
-            AddFlipFlopPart(*m_Builder, entry);
-            return {};
+            return AddFlipFlopPart(*m_Builder, entry), std::expected<void, std::string>{};
         case ComponentFamily::LOGIC_DISPLAY:
         default:
             return std::unexpected(NoDeviceMessage(entry));

@@ -140,7 +140,7 @@ std::vector<JacobianDerivative> FindJacobianDerivatives(const CompiledCircuit &c
     StampProbe probe(compiled);
     std::map<int, std::map<std::pair<int, int>, JacobianEntry>> total;
     for (const std::unique_ptr<Device> &device : compiled.Devices) {
-        if (device->IsLinear()) {
+        if (device->AsNonlinear() == nullptr) {
             continue;
         }
         probe.Stamp(*device, x_dc);

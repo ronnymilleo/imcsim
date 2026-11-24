@@ -267,41 +267,33 @@ void AddWaveformSource(CircuitBuilder &builder,
                        const SourceWaveform waveform,
                        const std::vector<double> &values,
                        const SourceLevels &levels) {
-    const SourcePlacement source{.Builder = builder,
-                                 .Name = name,
-                                 .IsVoltage = is_voltage,
-                                 .Positive = positive,
-                                 .Negative = negative,
-                                 .Levels = levels};
+    const SourcePlacement source{builder, name, is_voltage, positive, negative, levels};
     switch (waveform) {
     case SourceWaveform::PULSE:
-        AddWithPhase(source, ReadPulse(values), &CircuitBuilder::AddVpulse, &CircuitBuilder::AddIpulse);
-        break;
+        return AddWithPhase(source, ReadPulse(values), &CircuitBuilder::AddVpulse, &CircuitBuilder::AddIpulse);
     case SourceWaveform::SINE:
-        AddSine(source, values);
-        break;
+        return AddSine(source, values);
     case SourceWaveform::EXP:
-        AddWithPhase(source, ReadExp(values), &CircuitBuilder::AddVexp, &CircuitBuilder::AddIexp);
-        break;
+        return AddWithPhase(source, ReadExp(values), &CircuitBuilder::AddVexp, &CircuitBuilder::AddIexp);
     case SourceWaveform::PWL:
-        AddWithPhase(source, ReadPwl(values), &CircuitBuilder::AddVpwl, &CircuitBuilder::AddIpwl);
-        break;
+        return AddWithPhase(source, ReadPwl(values), &CircuitBuilder::AddVpwl, &CircuitBuilder::AddIpwl);
     case SourceWaveform::SFFM:
-        AddWithPhase(source, ReadSffm(values), &CircuitBuilder::AddVsffm, &CircuitBuilder::AddIsffm);
-        break;
+        return AddWithPhase(source, ReadSffm(values), &CircuitBuilder::AddVsffm, &CircuitBuilder::AddIsffm);
     case SourceWaveform::AM:
-        AddWithPhase(source, ReadAm(values), &CircuitBuilder::AddVam, &CircuitBuilder::AddIam);
-        break;
+        return AddWithPhase(source, ReadAm(values), &CircuitBuilder::AddVam, &CircuitBuilder::AddIam);
     case SourceWaveform::TRNOISE:
-        AddWithMagnitude(source, ReadNoise(values, levels), &CircuitBuilder::AddVnoise, &CircuitBuilder::AddInoise);
-        break;
+        return AddWithMagnitude(source,
+                                ReadNoise(values, levels),
+                                &CircuitBuilder::AddVnoise,
+                                &CircuitBuilder::AddInoise);
     case SourceWaveform::TRRANDOM:
-        AddWithMagnitude(source, ReadRandom(values, levels), &CircuitBuilder::AddVrandom, &CircuitBuilder::AddIrandom);
-        break;
+        return AddWithMagnitude(source,
+                                ReadRandom(values, levels),
+                                &CircuitBuilder::AddVrandom,
+                                &CircuitBuilder::AddIrandom);
     case SourceWaveform::NONE:
     default:
-        AddWithPhase(source, levels.Dc, &CircuitBuilder::AddVdc, &CircuitBuilder::AddIdc);
-        break;
+        return AddWithPhase(source, levels.Dc, &CircuitBuilder::AddVdc, &CircuitBuilder::AddIdc);
     }
 }
 

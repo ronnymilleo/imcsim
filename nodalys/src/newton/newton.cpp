@@ -20,6 +20,7 @@
 
 #include "newton/newton.h"
 
+#include "devices/sources/independent_sources.h"
 #include "devices/stamp_helpers.h"
 #include <algorithm>
 #include <cmath>
@@ -39,8 +40,10 @@ constexpr double NODE_CLAMP_CONDUCTANCE = 1e9;
  */
 std::string_view FindFault(const std::vector<std::unique_ptr<Device>> &devices) {
     for (const std::unique_ptr<Device> &device : devices) {
-        if (const std::string_view fault = device->GetFault(); !fault.empty()) {
-            return fault;
+        if (const NonlinearDevice *nonlinear = device->AsNonlinear()) {
+            if (const std::string_view fault = nonlinear->GetFault(); !fault.empty()) {
+                return fault;
+            }
         }
     }
     return {};
@@ -66,6 +69,34 @@ void StampCircuit(CompiledCircuit &compiled,
     sys.AddGminToNodes(gmin);
 }
 
+bool LimitDevices(const std::vector<std::unique_ptr<Device>> &devices,
+                  std::vector<double> &candidate,
+                  const std::vector<double> &x) {
+    bool any_limited = false;
+    for (const std::unique_ptr<Device> &device : devices) {
+        if (const NonlinearDevice *nonlinear = device->AsNonlinear();
+            nonlinear != nullptr && nonlinear->Limit(candidate, x)) {
+            any_limited = true;
+        }
+    }
+    return any_limited;
+}
+
+bool IsStepDeltaWithinTolerance(const MnaSystem &sys,
+                                const std::vector<double> &candidate,
+                                const std::vector<double> &x,
+                                const ConvergenceOptions &options) {
+    const int size = sys.GetSize();
+    for (int index = 0; index < size; ++index) {
+        const double abs_tol = sys.IsNodeUnknown(index) ? options.VoltageAbsTol : options.CurrentAbsTol;
+        const double tolerance = options.RelTol * std::fabs(candidate[static_cast<std::size_t>(index)]) + abs_tol;
+        if (std::fabs(candidate[static_cast<std::size_t>(index)] - x[static_cast<std::size_t>(index)]) > tolerance) {
+            return false;
+        }
+    }
+    return true;
+}
+
 int RunNewton(CompiledCircuit &compiled,
               std::vector<double> &x,
               const ConvergenceOptions &options,
@@ -74,50 +105,26 @@ int RunNewton(CompiledCircuit &compiled,
               const bool is_nodeset_pass,
               std::string &fault) {
     MnaSystem &sys = *compiled.System;
-    const int size = sys.GetSize();
-    std::vector<double> candidate(static_cast<std::size_t>(size), 0.0);
+    std::vector<double> candidate(static_cast<std::size_t>(sys.GetSize()), 0.0);
 
     for (int iteration = 1; iteration <= options.MaxIterations; ++iteration) {
-        // Step 1: Linearize and stamp all devices and active node clamps at current iterate `x`
         StampCircuit(compiled, x, time, gmin, is_nodeset_pass);
-        // An iterate where a device has no value stamps a placeholder, so it cannot count as converged
         const std::string_view stamp_fault = FindFault(compiled.Devices);
         if (!stamp_fault.empty()) {
             fault = stamp_fault;
         }
-
-        // Step 2: Solve the linearized MNA system
         if (!sys.Solve(candidate)) {
             return 0;
         }
-
-        // Step 3: Apply PN-junction voltage damping (PNJLIM)
-        bool any_limited = false;
-        for (const std::unique_ptr<Device> &device : compiled.Devices) {
-            if (device->Limit(candidate, x)) {
-                any_limited = true;
-            }
-        }
-
-        // Step 4: Check step delta |candidate - x|
-        bool converged = iteration >= 2 && !any_limited && stamp_fault.empty();
-        for (int index = 0; index < size && converged; ++index) {
-            const bool is_node = sys.IsNodeUnknown(index);
-            const double abs_tol = is_node ? options.VoltageAbsTol : options.CurrentAbsTol;
-            const double tolerance = options.RelTol * std::fabs(candidate[static_cast<std::size_t>(index)]) + abs_tol;
-            if (std::fabs(candidate[static_cast<std::size_t>(index)] - x[static_cast<std::size_t>(index)])
-                > tolerance) {
-                converged = false;
-            }
-        }
-
+        const bool any_limited = LimitDevices(compiled.Devices, candidate, x);
+        const bool converged = iteration >= 2 && !any_limited && stamp_fault.empty()
+                            && IsStepDeltaWithinTolerance(sys, candidate, x, options);
         x = candidate;
 
-        // Step 5: Verify the true equation residual |A(x)*x - rhs(x)| at the un-damped solution `x`
         if (converged) {
             StampCircuit(compiled, x, time, gmin, is_nodeset_pass);
-            const bool is_faulty = !FindFault(compiled.Devices).empty();
-            if (!is_faulty && sys.CheckResidual(x, options.VoltageAbsTol, options.CurrentAbsTol, options.RelTol)) {
+            if (FindFault(compiled.Devices).empty()
+                && sys.CheckResidual(x, options.VoltageAbsTol, options.CurrentAbsTol, options.RelTol)) {
                 return iteration;
             }
         }
@@ -140,7 +147,9 @@ bool IsOperatingPointSolve(const TimeContext &time) {
 void SeedOperatingPoint(const CompiledCircuit &compiled, std::vector<double> &x, const TimeContext &time) {
     if (!time.IsTransient || time.IsTransientStart) {
         for (const std::unique_ptr<Device> &device : compiled.Devices) {
-            device->SeedOperatingPoint(x);
+            if (const NonlinearDevice *nonlinear = device->AsNonlinear()) {
+                nonlinear->SeedOperatingPoint(x);
+            }
         }
         for (const NodeVoltageDirective &seed : compiled.NodeSeeds) {
             if (seed.Node >= 0 && static_cast<std::size_t>(seed.Node) < x.size()) {
@@ -193,12 +202,16 @@ bool TrySourceStepping(CompiledCircuit &compiled,
     for (int step = 1; step <= SOURCE_STEPS && has_converged; ++step) {
         const double scale = static_cast<double>(step) / static_cast<double>(SOURCE_STEPS);
         for (const std::unique_ptr<Device> &device : compiled.Devices) {
-            device->SetSourceScale(scale);
+            if (IndependentSourceDevice *source = device->AsIndependentSource()) {
+                source->SetSourceScale(scale);
+            }
         }
         has_converged = RunNewton(compiled, x, options, options.Gmin, time, is_nodeset_pass, outcome.Fault) != 0;
     }
     for (const std::unique_ptr<Device> &device : compiled.Devices) {
-        device->SetSourceScale(1.0);
+        if (IndependentSourceDevice *source = device->AsIndependentSource()) {
+            source->SetSourceScale(1.0);
+        }
     }
     if (has_converged) {
         outcome.Converged = true;

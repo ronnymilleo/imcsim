@@ -25,7 +25,7 @@ using DevicesByName = std::map<std::string, Device *, CaseInsensitiveLess>;
  * @brief   One device terminal whose entering current adds to a reported component current.
  */
 struct CurrentContribution {
-    const Device *Element;
+    Device *Element;
     int Terminal;
 };
 

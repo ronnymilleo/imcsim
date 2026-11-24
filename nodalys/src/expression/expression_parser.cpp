@@ -6,6 +6,7 @@
 #include "expression/expression_parser.h"
 
 #include "expression/expression_math.h"
+#include "expression/expression_vocabulary.h"
 #include "text/spice_number.h"
 #include "text/text_case.h"
 #include <algorithm>
@@ -19,28 +20,9 @@ namespace Nodalys {
 
 namespace {
 
-constexpr std::string_view HERTZ_REASON =
-    "hertz, the frequency, is not supported by Nodalys in an expression: it would make the small-signal gain depend on "
-    "the frequency, which an AC sweep cannot stamp once";
 /// Deepest nesting of parentheses, operators and calls, so a hostile text cannot exhaust the stack of the parser or of
 /// the evaluation that follows its shape.
 constexpr int MAX_NESTING_DEPTH = 200;
-constexpr double NOMINAL_E = 2.718281828459045;
-constexpr double NOMINAL_PI = 3.141592653589793;
-constexpr std::string_view RANDOM_REASON = "draws random numbers, which Nodalys does not run in an expression";
-
-/// A function the language knows, and how many operands it takes.
-struct FunctionEntry {
-    std::string_view Name;
-    Operation Kind;
-    int OperandCount;
-};
-
-/// A name that ngspice reads and Nodalys does not, with what to tell the user.
-struct RefusedName {
-    std::string_view Name;
-    std::string_view Reason;
-};
 
 /**
  * @class   Parser
@@ -71,60 +53,13 @@ public:
     }
 
 private:
-    static constexpr auto FUNCTIONS = std::to_array<FunctionEntry>({
-        {"abs", Operation::ABS, 1},
-        {"sqrt", Operation::SQRT, 1},
-        {"exp", Operation::EXP, 1},
-        // ngspice reads log() as the natural logarithm, like ln(), and log10() as the decimal one
-        {"ln", Operation::LN, 1},
-        {"log", Operation::LN, 1},
-        {"log10", Operation::LOG10, 1},
-        {"sin", Operation::SIN, 1},
-        {"cos", Operation::COS, 1},
-        {"tan", Operation::TAN, 1},
-        {"asin", Operation::ASIN, 1},
-        {"acos", Operation::ACOS, 1},
-        {"atan", Operation::ATAN, 1},
-        {"sinh", Operation::SINH, 1},
-        {"cosh", Operation::COSH, 1},
-        {"tanh", Operation::TANH, 1},
-        {"asinh", Operation::ASINH, 1},
-        {"acosh", Operation::ACOSH, 1},
-        {"atanh", Operation::ATANH, 1},
-        {"sgn", Operation::SIGN, 1},
-        {"u", Operation::STEP, 1},
-        {"u2", Operation::RAMP_STEP, 1},
-        {"uramp", Operation::RAMP, 1},
-        {"floor", Operation::FLOOR, 1},
-        {"ceil", Operation::CEIL, 1},
-        {"nint", Operation::NEAREST_INTEGER, 1},
-        {"min", Operation::MIN, 2},
-        {"max", Operation::MAX, 2},
-        {"pow", Operation::POW, 2},
-        {"pwr", Operation::PWR, 2},
-    });
-
-    static constexpr auto REFUSED_FUNCTIONS = std::to_array<RefusedName>({
-        {"limit",
-         "limit() is a Monte Carlo function of ngspice (the nominal value plus or minus a deviation, chosen at "
-         "random), not a clamp; clamp with min(max(x, low), high)"},
-        {"atan2", "atan2() is not available in a behavioral expression of ngspice either; use atan(y / x)"},
-        {"gauss", RANDOM_REASON},
-        {"agauss", RANDOM_REASON},
-        {"unif", RANDOM_REASON},
-        {"aunif", RANDOM_REASON},
-        {"rnd", RANDOM_REASON},
-        {"random", RANDOM_REASON},
-        {"exponential", RANDOM_REASON},
-    });
-
     std::string_view m_Text;
     std::size_t m_Position = 0;
     int m_Depth = 0;
     std::string m_Error;
     ExpressionProgram m_Program;
 
-    // Character and input helpers
+    // Character helpers
     static bool IsSpace(const char character) { return std::isspace(static_cast<unsigned char>(character)) != 0; }
 
     static bool IsDigit(const char character) { return std::isdigit(static_cast<unsigned char>(character)) != 0; }
@@ -133,43 +68,6 @@ private:
 
     static bool IsIdentifierCharacter(const char character) {
         return IsLetter(character) || IsDigit(character) || character == '_';
-    }
-
-    static std::string_view Trim(std::string_view text) {
-        while (!text.empty() && IsSpace(text.front())) {
-            text.remove_prefix(1);
-        }
-        while (!text.empty() && IsSpace(text.back())) {
-            text.remove_suffix(1);
-        }
-        return text;
-    }
-
-    static bool IsSameInput(const ExpressionInput &first, const ExpressionInput &second) {
-        return first.Type == second.Type && ToLower(first.First) == ToLower(second.First)
-            && ToLower(first.Second) == ToLower(second.Second);
-    }
-
-    static bool IsBareArgumentName(const std::string_view name) {
-        return !name.empty() && std::ranges::none_of(name, IsSpace) && !name.contains(',');
-    }
-
-    static std::optional<ExpressionInput> ReadReferenceInput(const std::string_view arguments, const bool is_voltage) {
-        const std::size_t comma = arguments.find(',');
-        const std::string_view first = Trim(arguments.substr(0, comma));
-        if (!IsBareArgumentName(first)) {
-            return std::nullopt;
-        }
-        ExpressionInput input{.Type = is_voltage ? ExpressionInput::Kind::VOLTAGE : ExpressionInput::Kind::CURRENT,
-                              .First = std::string(first)};
-        if (comma != std::string_view::npos) {
-            const std::string_view second = Trim(arguments.substr(comma + 1));
-            if (!is_voltage || !IsBareArgumentName(second)) {
-                return std::nullopt;
-            }
-            input.Second = std::string(second);
-        }
-        return input;
     }
 
     // Text
@@ -460,8 +358,7 @@ private:
         const std::string name = ToLower(written);
         const std::size_t after_name = m_Position;
         SkipSpaces();
-        const bool has_parenthesis = Peek() == '(';
-        if (!has_parenthesis) {
+        if (Peek() != '(') {
             m_Position = after_name;
             return ParseWord(written, name);
         }
@@ -472,11 +369,8 @@ private:
     }
 
     int ParseWord(const std::string_view written, const std::string &name) {
-        if (name == "pi") {
-            return AddNode({.Kind = Operation::CONSTANT, .Constant = NOMINAL_PI});
-        }
-        if (name == "e") {
-            return AddNode({.Kind = Operation::CONSTANT, .Constant = NOMINAL_E});
+        if (const std::optional<double> constant = LookupBuiltinConstant(name)) {
+            return AddNode({.Kind = Operation::CONSTANT, .Constant = *constant});
         }
         if (name == "time") {
             m_Program.IsTimeDependent = true;
@@ -491,9 +385,7 @@ private:
         if (name == "v" || name == "i") {
             return Fail(std::format("\"{}\" is followed by the name it reads, as in {}(NAME)", written, name));
         }
-        const bool is_function =
-            std::ranges::any_of(FUNCTIONS, [&name](const FunctionEntry &entry) { return entry.Name == name; });
-        if (is_function) {
+        if (LookupExpressionFunction(name).has_value()) {
             return Fail(std::format("\"{}\" is a function and takes its operands in parentheses", written));
         }
         return Fail(std::format("\"{}\" is not a number, a constant (pi, e), a variable (time, temper), v(...) or "
@@ -529,7 +421,7 @@ private:
 
     int FindOrAddInput(const ExpressionInput &input) {
         const auto found = std::ranges::find_if(m_Program.Inputs, [&input](const ExpressionInput &known) {
-            return IsSameInput(known, input);
+            return IsSameExpressionInput(known, input);
         });
         if (found != m_Program.Inputs.end()) {
             return static_cast<int>(found - m_Program.Inputs.begin());
@@ -538,42 +430,46 @@ private:
         return static_cast<int>(m_Program.Inputs.size()) - 1;
     }
 
+    int ReadCallOperands(std::array<int, 2> &operands) {
+        int count = 0;
+        if (Consume(")")) {
+            return count;
+        }
+        while (true) {
+            const int operand = ParseTernary();
+            if (operand < 0) {
+                return -1;
+            }
+            if (count < 2) {
+                operands[static_cast<std::size_t>(count)] = operand;
+            }
+            ++count;
+            if (Consume(",")) {
+                continue;
+            }
+            if (!Consume(")")) {
+                return Fail("A parenthesis is not closed");
+            }
+            return count;
+        }
+    }
+
     /**
      * @brief   Reads a function and its operands, `max(a, b)`.
      */
     int ParseCall(const std::string_view written, const std::string &name) {
-        const auto refused =
-            std::ranges::find_if(REFUSED_FUNCTIONS, [&name](const RefusedName &entry) { return entry.Name == name; });
-        if (refused != REFUSED_FUNCTIONS.end()) {
-            const bool is_random = refused->Reason == RANDOM_REASON;
-            return Fail(is_random ? std::format("{}() {}", written, RANDOM_REASON) : std::string(refused->Reason));
+        if (const std::optional<std::string> reason = LookupRefusedFunctionReason(written, name)) {
+            return Fail(*reason);
         }
-        const auto function =
-            std::ranges::find_if(FUNCTIONS, [&name](const FunctionEntry &entry) { return entry.Name == name; });
-        if (function == FUNCTIONS.end()) {
+        const std::optional<FunctionEntry> function = LookupExpressionFunction(name);
+        if (!function) {
             return Fail(std::format("\"{}\" is not a function Nodalys knows", written));
         }
         ++m_Position;
         std::array<int, 2> operands{-1, -1};
-        int count = 0;
-        if (!Consume(")")) {
-            while (true) {
-                const int operand = ParseTernary();
-                if (operand < 0) {
-                    return -1;
-                }
-                if (count < 2) {
-                    operands[static_cast<std::size_t>(count)] = operand;
-                }
-                ++count;
-                if (Consume(",")) {
-                    continue;
-                }
-                if (!Consume(")")) {
-                    return Fail("A parenthesis is not closed");
-                }
-                break;
-            }
+        const int count = ReadCallOperands(operands);
+        if (count < 0) {
+            return -1;
         }
         if (count != function->OperandCount) {
             return Fail(std::format("{}() takes {} operand{}, not {}",

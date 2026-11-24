@@ -17,9 +17,11 @@ namespace {
  * @brief   The first fault among the devices at their last stamp, or an empty text.
  */
 std::string_view FindFault(const std::vector<Device *> &devices) {
-    for (const Device *device : devices) {
-        if (const std::string_view fault = device->GetFault(); !fault.empty()) {
-            return fault;
+    for (Device *device : devices) {
+        if (const NonlinearDevice *nonlinear = device->AsNonlinear()) {
+            if (const std::string_view fault = nonlinear->GetFault(); !fault.empty()) {
+                return fault;
+            }
         }
     }
     return {};
@@ -63,9 +65,40 @@ void StampDcSystem(const HbWorkspace &ws,
  */
 void SeedDcGuess(const HbWorkspace &ws, std::vector<double> &x) {
     x.assign(static_cast<std::size_t>(ws.UnknownCount), 0.0);
-    for (const Device *device : ws.NonlinearDevices) {
-        device->SeedOperatingPoint(x);
+    for (Device *device : ws.NonlinearDevices) {
+        if (const NonlinearDevice *nonlinear = device->AsNonlinear()) {
+            nonlinear->SeedOperatingPoint(x);
+        }
     }
+}
+
+/**
+ * @brief   Limits the Newton candidate across nonlinear devices and checks whether the update is within tolerances.
+ */
+bool ApplyLimitsAndCheckStep(const HbWorkspace &ws,
+                             const ConvergenceOptions &options,
+                             const int iteration,
+                             std::vector<double> &candidate,
+                             const std::vector<double> &x) {
+    bool any_limited = false;
+    for (Device *device : ws.NonlinearDevices) {
+        if (const NonlinearDevice *nonlinear = device->AsNonlinear();
+            nonlinear != nullptr && nonlinear->Limit(candidate, x)) {
+            any_limited = true;
+        }
+    }
+    if (iteration < 2 || any_limited || !FindFault(ws.NonlinearDevices).empty()) {
+        return false;
+    }
+    for (int index = 0; index < ws.UnknownCount; ++index) {
+        const std::size_t u = static_cast<std::size_t>(index);
+        const double abs_tol = ws.IsNodeUnknown[u] ? options.VoltageAbsTol : options.CurrentAbsTol;
+        const double tol = options.RelTol * std::fabs(candidate[u]) + abs_tol;
+        if (std::fabs(candidate[u] - x[u]) > tol) {
+            return false;
+        }
+    }
+    return true;
 }
 
 bool RunDcNewtonWithB0(const HbWorkspace &ws,
@@ -75,36 +108,16 @@ bool RunDcNewtonWithB0(const HbWorkspace &ws,
                        const ConvergenceOptions &options,
                        const bool is_nodeset_pass,
                        std::vector<double> &x) {
-    const int n = ws.UnknownCount;
     MnaSystem sys(ws.IsNodeUnknown);
-    std::vector<double> candidate(static_cast<std::size_t>(n), 0.0);
+    std::vector<double> candidate(static_cast<std::size_t>(ws.UnknownCount), 0.0);
 
     for (int iteration = 1; iteration <= options.MaxIterations; ++iteration) {
         StampDcSystem(ws, b0, b0_scale, gmin, is_nodeset_pass, x, sys);
-
         if (!sys.Solve(candidate)) {
             return false;
         }
-
-        bool any_limited = false;
-        for (const Device *device : ws.NonlinearDevices) {
-            if (device->Limit(candidate, x)) {
-                any_limited = true;
-            }
-        }
-
-        bool converged = iteration >= 2 && !any_limited && FindFault(ws.NonlinearDevices).empty();
-        for (int index = 0; index < n && converged; ++index) {
-            const double abs_tol =
-                ws.IsNodeUnknown[static_cast<std::size_t>(index)] ? options.VoltageAbsTol : options.CurrentAbsTol;
-            const double tol = options.RelTol * std::fabs(candidate[static_cast<std::size_t>(index)]) + abs_tol;
-            if (std::fabs(candidate[static_cast<std::size_t>(index)] - x[static_cast<std::size_t>(index)]) > tol) {
-                converged = false;
-            }
-        }
-
+        const bool converged = ApplyLimitsAndCheckStep(ws, options, iteration, candidate, x);
         x = candidate;
-
         if (converged) {
             StampDcSystem(ws, b0, b0_scale, gmin, is_nodeset_pass, x, sys);
             if (FindFault(ws.NonlinearDevices).empty()
@@ -114,6 +127,23 @@ bool RunDcNewtonWithB0(const HbWorkspace &ws,
         }
     }
     return false;
+}
+
+/**
+ * @brief   Steps gmin down the ladder from GMIN_START to options.Gmin.
+ */
+bool RunDcGminLadder(const HbWorkspace &ws,
+                     const std::vector<double> &b0,
+                     const ConvergenceOptions &options,
+                     const bool is_nodeset_pass,
+                     std::vector<double> &x_dc) {
+    SeedDcGuess(ws, x_dc);
+    for (int step = 0; step <= options.GminSteps; ++step) {
+        if (!RunDcNewtonWithB0(ws, b0, 1.0, GminAtStep(step, options), options, is_nodeset_pass, x_dc)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 /**
@@ -136,20 +166,8 @@ bool SolveDcBiasPass(const HbWorkspace &ws,
         return RunDcNewtonWithB0(ws, b0, 1.0, options.Gmin, options, false, x_dc);
     }
     SeedDcGuess(ws, x_dc);
-    if (RunDcNewtonWithB0(ws, b0, 1.0, options.Gmin, options, is_nodeset_pass, x_dc)) {
-        return true;
-    }
-
-    // Fallback 1: Gmin stepping
-    SeedDcGuess(ws, x_dc);
-    bool gmin_ok = true;
-    for (int step = 0; step <= options.GminSteps; ++step) {
-        if (!RunDcNewtonWithB0(ws, b0, 1.0, GminAtStep(step, options), options, is_nodeset_pass, x_dc)) {
-            gmin_ok = false;
-            break;
-        }
-    }
-    if (gmin_ok) {
+    if (RunDcNewtonWithB0(ws, b0, 1.0, options.Gmin, options, is_nodeset_pass, x_dc)
+        || RunDcGminLadder(ws, b0, options, is_nodeset_pass, x_dc)) {
         return true;
     }
 

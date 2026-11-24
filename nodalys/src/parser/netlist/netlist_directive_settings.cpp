@@ -123,6 +123,22 @@ void ApplyOption(DeckContext &context, const std::string &name, const double val
     }
 }
 
+/**
+ * @brief   Parses and validates a positive integer sweep point count.
+ */
+std::expected<int, std::string>
+ParseSweepPoints(const std::string_view token, const std::string_view directive, const std::string_view line) {
+    const std::optional<double> points = ParseSpiceNumber(token);
+    if (!points || *points < 1.0 || std::floor(*points) != *points
+        || *points > static_cast<double>(std::numeric_limits<int>::max())) {
+        return std::unexpected(
+            std::format("Invalid number of points in {}, it must be a whole number of at least 1: '{}'",
+                        directive,
+                        line));
+    }
+    return static_cast<int>(*points);
+}
+
 } // namespace
 
 /**
@@ -199,15 +215,11 @@ std::expected<FrequencySweepWords, std::string> ReadFrequencySweep(const std::ve
     if (tokens.size() < number_token + SWEEP_NUMBER_COUNT) {
         return std::unexpected(std::format("Malformed {} directive: '{}'", directive, line));
     }
-    const std::optional<double> points = ParseSpiceNumber(tokens[number_token]);
-    if (!points || *points < 1.0 || std::floor(*points) != *points
-        || *points > static_cast<double>(std::numeric_limits<int>::max())) {
-        return std::unexpected(
-            std::format("Invalid number of points in {}, it must be a whole number of at least 1: '{}'",
-                        directive,
-                        line));
+    const std::expected<int, std::string> points = ParseSweepPoints(tokens[number_token], directive, line);
+    if (!points) {
+        return std::unexpected(points.error());
     }
-    sweep.Points = static_cast<int>(*points);
+    sweep.Points = *points;
     const std::optional<double> start = ParseSpiceNumber(tokens[number_token + 1]);
     const std::optional<double> stop = ParseSpiceNumber(tokens[number_token + 2]);
     if (!start || !stop || *start <= 0.0 || *stop < *start) {

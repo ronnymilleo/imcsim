@@ -26,7 +26,7 @@ namespace Nodalys {
  *          linear problem for Newton. The heat advances once the step has converged, by the exact solution of the
  *          equation over the step with the mean of the powers at its two ends.
  */
-class FuseDevice : public Device {
+class FuseDevice : public Device, public TransientDevice {
 public:
     FuseDevice(int node_a, int node_b, FuseParameters parameters);
 
@@ -40,6 +40,9 @@ public:
     void RejectStep() override;
     bool HasSwitched() const override;
     double NextBreakpoint(double time) const override;
+
+    [[nodiscard]] DeviceRoles GetRoles() override { return {.Transient = this}; }
+
     [[nodiscard]] std::unique_ptr<Device> Clone() const override;
 
 private:

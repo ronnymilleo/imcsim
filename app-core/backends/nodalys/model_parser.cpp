@@ -104,6 +104,23 @@ std::expected<const LibraryModel *, std::string> FindModel(const Circuit &circui
     return model;
 }
 
+std::expected<void, std::string> CheckMosfetLevel(const LibraryModel &model,
+                                                  const std::map<std::string, std::string> &values) {
+    if (const auto level = values.find("LEVEL"); level != values.end()) {
+        const auto number = Number(model, "LEVEL", level->second);
+        if (!number) {
+            return std::unexpected(number.error());
+        }
+        if (*number != 1.0) {
+            return std::unexpected(
+                std::format("Nodalys simulates MOSFETs with the level 1 model only, and the model {} is level {}",
+                            model.Name,
+                            *number));
+        }
+    }
+    return {};
+}
+
 } // namespace
 
 std::expected<DiodeParameters, std::string> ResolveParameters(const Circuit &circuit, const Diode &diode) {
@@ -154,22 +171,8 @@ std::expected<BJTParameters, std::string> ResolveParameters(const Circuit &circu
     if (!model) {
         return std::unexpected(model.error());
     }
-    // Unset parameters keep the ngspice defaults, which BJTParameters starts from; junction potentials and grading
-    // coefficients a vendor model sets stay at the ngspice defaults, which Nodalys evaluates with
     BJTParameters parameters;
     const std::map<std::string, std::string> values = ParameterList((*model)->Text);
-    const auto set = [&](const char *key, double &target) -> std::expected<void, std::string> {
-        const auto found = values.find(key);
-        if (found == values.end()) {
-            return {};
-        }
-        const auto number = Number(**model, key, found->second);
-        if (!number) {
-            return std::unexpected(number.error());
-        }
-        target = *number;
-        return {};
-    };
     for (const auto &[key, target] :
          std::vector<std::pair<const char *, double *>>{{"IS", &parameters.SaturationCurrent},
                                                         {"BF", &parameters.ForwardBeta},
@@ -184,8 +187,12 @@ std::expected<BJTParameters, std::string> ResolveParameters(const Circuit &circu
                                                         {"CJE", &parameters.EmitterCapacitance},
                                                         {"CJC", &parameters.CollectorCapacitance},
                                                         {"TF", &parameters.TransitTime}}) {
-        if (const auto error = set(key, *target); !error) {
-            return std::unexpected(error.error());
+        if (const auto found = values.find(key); found != values.end()) {
+            const auto number = Number(**model, key, found->second);
+            if (!number) {
+                return std::unexpected(number.error());
+            }
+            *target = *number;
         }
     }
     return parameters;
@@ -200,50 +207,29 @@ std::expected<MOSFETParameters, std::string> ResolveParameters(const Circuit &ci
         return std::unexpected(model.error());
     }
     const std::map<std::string, std::string> values = ParameterList((*model)->Text);
-    // The netlist writes no W= and L= with a library model, so ngspice takes the channel size from the model or its
-    // own instance defaults of 100 microns, never from the part; Nodalys does the same
-    MOSFETParameters parameters;
-    parameters.Width = 100e-6;
-    parameters.Length = 100e-6;
-    const auto set = [&](const char *key, double &target) -> std::expected<void, std::string> {
-        const auto found = values.find(key);
-        if (found == values.end()) {
-            return {};
-        }
-        const auto number = Number(**model, key, found->second);
-        if (!number) {
-            return std::unexpected(number.error());
-        }
-        target = *number;
-        return {};
-    };
-    if (const auto level = values.find("LEVEL"); level != values.end()) {
-        const auto number = Number(**model, "LEVEL", level->second);
-        if (!number) {
-            return std::unexpected(number.error());
-        }
-        if (*number != 1.0) {
-            return std::unexpected(std::format("Nodalys simulates MOSFETs with the level 1 model only, and "
-                                               "the model {} is level {}",
-                                               (*model)->Name,
-                                               *number));
+    if (const auto level_ok = CheckMosfetLevel(**model, values); !level_ok) {
+        return std::unexpected(level_ok.error());
+    }
+    // Without W= and L= on a library part, ngspice uses the model's size or its 100 micron instance defaults
+    MOSFETParameters p{.Width = 100e-6, .Length = 100e-6};
+    for (const auto &[key, target] : std::vector<std::pair<const char *, double *>>{{"VTO", &p.ThresholdVoltage},
+                                                                                    {"KP", &p.Transconductance},
+                                                                                    {"LAMBDA", &p.ChannelModulation},
+                                                                                    {"RD", &p.DrainResistance},
+                                                                                    {"RS", &p.SourceResistance},
+                                                                                    {"CGSO", &p.GateSourceOverlap},
+                                                                                    {"CGDO", &p.GateDrainOverlap},
+                                                                                    {"W", &p.Width},
+                                                                                    {"L", &p.Length}}) {
+        if (const auto found = values.find(key); found != values.end()) {
+            const auto number = Number(**model, key, found->second);
+            if (!number) {
+                return std::unexpected(number.error());
+            }
+            *target = *number;
         }
     }
-    for (const auto &[key, target] :
-         std::vector<std::pair<const char *, double *>>{{"VTO", &parameters.ThresholdVoltage},
-                                                        {"KP", &parameters.Transconductance},
-                                                        {"LAMBDA", &parameters.ChannelModulation},
-                                                        {"RD", &parameters.DrainResistance},
-                                                        {"RS", &parameters.SourceResistance},
-                                                        {"CGSO", &parameters.GateSourceOverlap},
-                                                        {"CGDO", &parameters.GateDrainOverlap},
-                                                        {"W", &parameters.Width},
-                                                        {"L", &parameters.Length}}) {
-        if (const auto error = set(key, *target); !error) {
-            return std::unexpected(error.error());
-        }
-    }
-    return parameters;
+    return p;
 }
 
 } // namespace Core

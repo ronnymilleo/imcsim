@@ -55,6 +55,19 @@ PortMatrix Multiply(const PortMatrix &left, const PortMatrix &right, const std::
 }
 
 /**
+ * @brief   Finds the row with the largest magnitude entry in column at or below the diagonal.
+ */
+std::size_t FindPivotRow(const PortMatrix &matrix, const std::size_t size, const std::size_t column) {
+    std::size_t pivot_row = column;
+    for (std::size_t row = column + 1; row < size; ++row) {
+        if (std::abs(matrix[IndexOf(size, row, column)]) > std::abs(matrix[IndexOf(size, pivot_row, column)])) {
+            pivot_row = row;
+        }
+    }
+    return pivot_row;
+}
+
+/**
  * @brief   Inverts a matrix by Gauss-Jordan elimination with partial pivoting.
  * @return  The inverse; none when a pivot is too small, which is a matrix with no usable inverse.
  */
@@ -68,12 +81,7 @@ std::optional<PortMatrix> Invert(PortMatrix matrix, const std::size_t size) {
         inverse[IndexOf(size, index, index)] = 1.0;
     }
     for (std::size_t column = 0; column < size; ++column) {
-        std::size_t pivot_row = column;
-        for (std::size_t row = column + 1; row < size; ++row) {
-            if (std::abs(matrix[IndexOf(size, row, column)]) > std::abs(matrix[IndexOf(size, pivot_row, column)])) {
-                pivot_row = row;
-            }
-        }
+        const std::size_t pivot_row = FindPivotRow(matrix, size, column);
         const Complex pivot = matrix[IndexOf(size, pivot_row, column)];
         if (std::abs(pivot) < SINGULAR_PIVOT_RATIO * largest_entry) {
             return std::nullopt;
@@ -81,8 +89,6 @@ std::optional<PortMatrix> Invert(PortMatrix matrix, const std::size_t size) {
         for (std::size_t other = 0; other < size; ++other) {
             std::swap(matrix[IndexOf(size, column, other)], matrix[IndexOf(size, pivot_row, other)]);
             std::swap(inverse[IndexOf(size, column, other)], inverse[IndexOf(size, pivot_row, other)]);
-        }
-        for (std::size_t other = 0; other < size; ++other) {
             matrix[IndexOf(size, column, other)] /= pivot;
             inverse[IndexOf(size, column, other)] /= pivot;
         }

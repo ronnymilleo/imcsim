@@ -57,7 +57,7 @@ public:
                                            const std::vector<std::complex<double>> &x_ac,
                                            double omega) const override;
 
-    [[nodiscard]] const SensitiveDevice *AsSensitive() const override { return this; }
+    [[nodiscard]] DeviceRoles GetRoles() override { return {.Sensitive = this}; }
 
     [[nodiscard]] std::optional<SensitivityDescriptor> DescribeSensitivity() const override;
     [[nodiscard]] double DcSensitivityDerivative(const DcAdjointView &point) const override;
@@ -122,7 +122,7 @@ public:
                                            const std::vector<std::complex<double>> &x_ac,
                                            double omega) const override;
 
-    [[nodiscard]] const SensitiveDevice *AsSensitive() const override { return this; }
+    [[nodiscard]] DeviceRoles GetRoles() override { return {.Sensitive = this}; }
 
     [[nodiscard]] std::optional<SensitivityDescriptor> DescribeSensitivity() const override;
     [[nodiscard]] double DcSensitivityDerivative(const DcAdjointView &point) const override;
@@ -182,7 +182,7 @@ public:
                                            const std::vector<std::complex<double>> &x_ac,
                                            double omega) const override;
 
-    [[nodiscard]] const SensitiveDevice *AsSensitive() const override { return this; }
+    [[nodiscard]] DeviceRoles GetRoles() override { return {.Sensitive = this}; }
 
     [[nodiscard]] std::optional<SensitivityDescriptor> DescribeSensitivity() const override;
     [[nodiscard]] double DcSensitivityDerivative(const DcAdjointView &point) const override;
@@ -248,7 +248,7 @@ public:
                                            const std::vector<std::complex<double>> &x_ac,
                                            double omega) const override;
 
-    [[nodiscard]] const SensitiveDevice *AsSensitive() const override { return this; }
+    [[nodiscard]] DeviceRoles GetRoles() override { return {.Sensitive = this}; }
 
     [[nodiscard]] std::optional<SensitivityDescriptor> DescribeSensitivity() const override;
     [[nodiscard]] double DcSensitivityDerivative(const DcAdjointView &point) const override;

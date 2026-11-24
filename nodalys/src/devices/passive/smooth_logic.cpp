@@ -151,6 +151,31 @@ SmoothLogicDevice::SmoothLogicDevice(const LogicGateType type,
     }
 }
 
+void SmoothLogicDevice::StampLinearizedDrive(MnaSystem &sys,
+                                             const int target_node,
+                                             const double conductance,
+                                             const LogicEvaluation &eval,
+                                             const std::vector<double> &x) const {
+    if (target_node < 0) {
+        return;
+    }
+    sys.AddA(target_node, target_node, conductance);
+    double sum_lin = 0.0;
+    for (std::size_t i = 0; i < m_Inputs.size(); ++i) {
+        const int u_in = m_Inputs[i];
+        const double deriv = eval.Derivatives[i];
+        if (u_in >= 0) {
+            sys.AddA(target_node, u_in, -conductance * deriv);
+            sum_lin += deriv * x[static_cast<std::size_t>(u_in)];
+        }
+    }
+    if (eval.OutputDerivative != 0.0 && m_Output >= 0) {
+        sys.AddA(target_node, m_Output, -conductance * eval.OutputDerivative);
+        sum_lin += eval.OutputDerivative * x[static_cast<std::size_t>(m_Output)];
+    }
+    sys.AddRhs(target_node, conductance * (eval.TargetVoltage - sum_lin));
+}
+
 /**
  * @brief   Stamps the linearized Newton-Raphson companion model and dynamic state into the MNA system.
  * @param[in,out] sys   MNA system to stamp into.
@@ -158,7 +183,6 @@ SmoothLogicDevice::SmoothLogicDevice(const LogicGateType type,
  * @param[in]     time  Transient time context.
  */
 void SmoothLogicDevice::Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) {
-    // High-impedance pull-down leakage conductances to prevent floating nodes
     const double g_in = 1.0 / std::max(m_Params.InputResistance, 1.0);
     for (const int u_in : m_Inputs) {
         if (u_in >= 0) {
@@ -167,9 +191,9 @@ void SmoothLogicDevice::Stamp(MnaSystem &sys, const std::vector<double> &x, cons
     }
 
     const LogicEvaluation eval = Evaluate(x);
+    const double g_out = 1.0 / std::max(m_Params.OutputResistance, 1e-6);
 
-    if (m_Internal >= 0 && m_FilterCapacitance > 0.0) {
-        // Internal low-pass RC inertial delay stage
+    if (HasTransientState()) {
         if (time.IsTransient) {
             const Companion companion = MakeCompanion(m_History, time);
             m_CapConductance = companion.Coefficient * m_FilterCapacitance;
@@ -180,52 +204,14 @@ void SmoothLogicDevice::Stamp(MnaSystem &sys, const std::vector<double> &x, cons
             m_CapConductance = 0.0;
             m_CapEquivalent = 0.0;
         }
-
-        const double g_drv = m_FilterConductance;
-        sys.AddA(m_Internal, m_Internal, g_drv);
-
-        double sum_lin = 0.0;
-        for (std::size_t i = 0; i < m_Inputs.size(); ++i) {
-            const int u_in = m_Inputs[i];
-            const double deriv = eval.Derivatives[i];
-            if (u_in >= 0) {
-                sys.AddA(m_Internal, u_in, -g_drv * deriv);
-                sum_lin += deriv * x[static_cast<std::size_t>(u_in)];
-            }
-        }
-        if (eval.OutputDerivative != 0.0 && m_Output >= 0) {
-            sys.AddA(m_Internal, m_Output, -g_drv * eval.OutputDerivative);
-            sum_lin += eval.OutputDerivative * x[static_cast<std::size_t>(m_Output)];
-        }
-        sys.AddRhs(m_Internal, g_drv * (eval.TargetVoltage - sum_lin));
-
-        // Buffered Thevenin output stage between internal delay node and output pin
-        const double g_out = 1.0 / std::max(m_Params.OutputResistance, 1e-6);
+        StampLinearizedDrive(sys, m_Internal, m_FilterConductance, eval, x);
         if (m_Output >= 0) {
             sys.AddA(m_Output, m_Output, g_out);
             sys.AddA(m_Output, m_Internal, -g_out);
         }
-    } else {
-        // Direct output drive with finite output resistance
-        const double g_out = 1.0 / std::max(m_Params.OutputResistance, 1e-6);
-        if (m_Output >= 0) {
-            sys.AddA(m_Output, m_Output, g_out);
-            double sum_lin = 0.0;
-            for (std::size_t i = 0; i < m_Inputs.size(); ++i) {
-                const int u_in = m_Inputs[i];
-                const double deriv = eval.Derivatives[i];
-                if (u_in >= 0) {
-                    sys.AddA(m_Output, u_in, -g_out * deriv);
-                    sum_lin += deriv * x[static_cast<std::size_t>(u_in)];
-                }
-            }
-            if (eval.OutputDerivative != 0.0) {
-                sys.AddA(m_Output, m_Output, -g_out * eval.OutputDerivative);
-                sum_lin += eval.OutputDerivative * x[static_cast<std::size_t>(m_Output)];
-            }
-            sys.AddRhs(m_Output, g_out * (eval.TargetVoltage - sum_lin));
-        }
+        return;
     }
+    StampLinearizedDrive(sys, m_Output, g_out, eval, x);
 }
 
 /**
@@ -353,45 +339,34 @@ std::unique_ptr<Device> SmoothLogicDevice::Clone() const {
  * @return  Evaluation containing target voltage and partial derivatives.
  */
 SmoothLogicDevice::LogicEvaluation SmoothLogicDevice::Evaluate(const std::vector<double> &x) const {
-    LogicEvaluation eval;
-    eval.Derivatives.resize(m_Inputs.size(), 0.0);
-
     const std::size_t input_count = m_Inputs.size();
+    LogicEvaluation eval{.TargetVoltage = 0.0, .Derivatives = std::vector<double>(input_count, 0.0)};
     std::vector<double> s(input_count, 0.0);
     std::vector<double> s_deriv(input_count, 0.0);
 
+    const double v_span = m_Params.VHigh - m_Params.VLow;
     double v_th = m_Params.VThreshold;
     double d_vth_dvout = 0.0;
-
-    if (m_Type == LogicGateType::SCHMITT_TRIGGER) {
-        const double v_out = ReadVoltage(x, m_Output);
+    if (m_Type == LogicGateType::SCHMITT_TRIGGER && std::abs(v_span) > 1e-9) {
         const double v_mid = 0.5 * (m_Params.VHigh + m_Params.VLow);
-        const double v_span = m_Params.VHigh - m_Params.VLow;
-        if (std::abs(v_span) > 1e-9) {
-            v_th -= (m_Params.Hysteresis / v_span) * (v_out - v_mid);
-            d_vth_dvout = -m_Params.Hysteresis / v_span;
-        }
+        d_vth_dvout = -m_Params.Hysteresis / v_span;
+        v_th += d_vth_dvout * (ReadVoltage(x, m_Output) - v_mid);
     }
 
     const double delta = std::max(m_Params.TransitionWidth, 1e-6);
     for (std::size_t i = 0; i < input_count; ++i) {
-        const double v_in = ReadVoltage(x, m_Inputs[i]);
-        const double arg = std::clamp((v_in - v_th) / delta, -40.0, 40.0);
-        const double th = std::tanh(arg);
+        const double th = std::tanh(std::clamp((ReadVoltage(x, m_Inputs[i]) - v_th) / delta, -40.0, 40.0));
         s[i] = 0.5 * (1.0 + th);
         s_deriv[i] = 0.5 * (1.0 - th * th) / delta;
     }
 
     const double logic_level =
         EvaluateGateLevel(m_Type, s, s_deriv, d_vth_dvout, eval.Derivatives, eval.OutputDerivative);
-
-    const double v_span = m_Params.VHigh - m_Params.VLow;
     eval.TargetVoltage = m_Params.VLow + v_span * logic_level;
     for (double &deriv : eval.Derivatives) {
         deriv *= v_span;
     }
     eval.OutputDerivative *= v_span;
-
     return eval;
 }
 

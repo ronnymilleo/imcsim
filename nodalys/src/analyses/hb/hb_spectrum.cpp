@@ -80,6 +80,36 @@ std::vector<double> PhasorsToCoefficients(const std::span<const std::complex<dou
     return coeffs;
 }
 
+namespace {
+
+void StampHarmonicConversionCell(DenseMatrix &jacobian,
+                                 const std::size_t cos_row,
+                                 const std::size_t sin_row,
+                                 const std::size_t cos_col,
+                                 const std::size_t sin_col,
+                                 const std::complex<double> &g_minus,
+                                 const std::complex<double> &g_plus,
+                                 const double kw,
+                                 const bool apply_omega) {
+    const double cc = g_minus.real() + g_plus.real();
+    const double cs = g_minus.imag() - g_plus.imag();
+    const double sc = -(g_minus.imag() + g_plus.imag());
+    const double ss = g_minus.real() - g_plus.real();
+    if (!apply_omega) {
+        jacobian.Add(cos_row, cos_col, cc);
+        jacobian.Add(cos_row, sin_col, cs);
+        jacobian.Add(sin_row, cos_col, sc);
+        jacobian.Add(sin_row, sin_col, ss);
+    } else {
+        jacobian.Add(cos_row, cos_col, kw * sc);
+        jacobian.Add(cos_row, sin_col, kw * ss);
+        jacobian.Add(sin_row, cos_col, -kw * cc);
+        jacobian.Add(sin_row, sin_col, -kw * cs);
+    }
+}
+
+} // namespace
+
 /**
  * @brief   Stamps a (2H+1) x (2H+1) harmonic conversion matrix block into the real Jacobian from a
  *          1/M-normalized time-domain entry spectrum \f$\hat{g}_n\f$.
@@ -103,11 +133,9 @@ void StampConversionBlock(DenseMatrix &jacobian,
     if (!apply_omega) {
         jacobian.Add(row_offset, col_offset, spectrum[0].real());
         for (int l = 1; l <= harmonics; ++l) {
-            const std::size_t cos_col = col_offset + static_cast<std::size_t>(2 * l - 1);
-            const std::size_t sin_col = col_offset + static_cast<std::size_t>(2 * l);
             const std::complex<double> &gl = spectrum[static_cast<std::size_t>(l)];
-            jacobian.Add(row_offset, cos_col, gl.real());
-            jacobian.Add(row_offset, sin_col, -gl.imag());
+            jacobian.Add(row_offset, col_offset + static_cast<std::size_t>(2 * l - 1), gl.real());
+            jacobian.Add(row_offset, col_offset + static_cast<std::size_t>(2 * l), -gl.imag());
         }
     }
 
@@ -115,46 +143,22 @@ void StampConversionBlock(DenseMatrix &jacobian,
         const std::size_t cos_row = row_offset + static_cast<std::size_t>(2 * k - 1);
         const std::size_t sin_row = row_offset + static_cast<std::size_t>(2 * k);
         const double kw = static_cast<double>(k) * omega0;
-
-        // Column l = 0 (DC)
         const std::complex<double> &gk = spectrum[static_cast<std::size_t>(k)];
-        if (!apply_omega) {
-            jacobian.Add(cos_row, col_offset, 2.0 * gk.real());
-            jacobian.Add(sin_row, col_offset, -2.0 * gk.imag());
-        } else {
-            jacobian.Add(cos_row, col_offset, kw * (-2.0 * gk.imag()));
-            jacobian.Add(sin_row, col_offset, -kw * (2.0 * gk.real()));
-        }
+        jacobian.Add(cos_row, col_offset, apply_omega ? kw * (-2.0 * gk.imag()) : 2.0 * gk.real());
+        jacobian.Add(sin_row, col_offset, apply_omega ? -kw * (2.0 * gk.real()) : -2.0 * gk.imag());
 
-        // Columns l = 1 .. H
         for (int l = 1; l <= harmonics; ++l) {
-            const std::size_t cos_col = col_offset + static_cast<std::size_t>(2 * l - 1);
-            const std::size_t sin_col = col_offset + static_cast<std::size_t>(2 * l);
             const std::complex<double> g_minus = (k >= l) ? spectrum[static_cast<std::size_t>(k - l)]
                                                           : std::conj(spectrum[static_cast<std::size_t>(l - k)]);
-            const std::complex<double> &g_plus = spectrum[static_cast<std::size_t>(k + l)];
-
-            const double a_minus = g_minus.real();
-            const double b_minus = g_minus.imag();
-            const double a_plus = g_plus.real();
-            const double b_plus = g_plus.imag();
-
-            const double cc = a_minus + a_plus;
-            const double cs = b_minus - b_plus;
-            const double sc = -(b_minus + b_plus);
-            const double ss = a_minus - a_plus;
-
-            if (!apply_omega) {
-                jacobian.Add(cos_row, cos_col, cc);
-                jacobian.Add(cos_row, sin_col, cs);
-                jacobian.Add(sin_row, cos_col, sc);
-                jacobian.Add(sin_row, sin_col, ss);
-            } else {
-                jacobian.Add(cos_row, cos_col, kw * sc);
-                jacobian.Add(cos_row, sin_col, kw * ss);
-                jacobian.Add(sin_row, cos_col, -kw * cc);
-                jacobian.Add(sin_row, sin_col, -kw * cs);
-            }
+            StampHarmonicConversionCell(jacobian,
+                                        cos_row,
+                                        sin_row,
+                                        col_offset + static_cast<std::size_t>(2 * l - 1),
+                                        col_offset + static_cast<std::size_t>(2 * l),
+                                        g_minus,
+                                        spectrum[static_cast<std::size_t>(k + l)],
+                                        kw,
+                                        apply_omega);
         }
     }
 }

@@ -20,7 +20,7 @@ namespace Nodalys {
  *          discontinuous events. Supports configurable threshold, transition width, inertial delay, and output
  * resistance.
  */
-class SmoothLogicDevice : public Device {
+class SmoothLogicDevice : public Device, public NonlinearDevice, public TransientDevice {
 public:
     SmoothLogicDevice(LogicGateType type,
                       int output,
@@ -31,9 +31,6 @@ public:
     // Simulation
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     void StampAc(MnaSystem &reactive, const std::vector<double> &x_dc) const override;
-
-    bool IsLinear() const override { return false; }
-
     void StampCharge(MnaSystem &sys, const std::vector<double> &x) const override;
     bool Limit(std::vector<double> &x_new, const std::vector<double> &x_old) const override;
 
@@ -45,9 +42,11 @@ public:
                                            double omega) const override;
 
     // Transient State
-    bool HasTransientState() const override;
     void AcceptStep(const std::vector<double> &x) override;
     void RejectStep() override;
+
+    [[nodiscard]] DeviceRoles GetRoles() override { return {.Nonlinear = this, .Transient = this}; }
+
     [[nodiscard]] std::unique_ptr<Device> Clone() const override;
 
 private:
@@ -74,6 +73,12 @@ private:
     ChargeHistory m_History;
     ChargeHistory m_SavedHistory;
 
+    bool HasTransientState() const;
+    void StampLinearizedDrive(MnaSystem &sys,
+                              int target_node,
+                              double conductance,
+                              const LogicEvaluation &eval,
+                              const std::vector<double> &x) const;
     LogicEvaluation Evaluate(const std::vector<double> &x) const;
     double ReadVoltage(const std::vector<double> &x, int node) const;
 };

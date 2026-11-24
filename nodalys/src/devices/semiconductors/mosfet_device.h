@@ -18,7 +18,7 @@ namespace Nodalys {
  * @details
  * Terminal indices: `0 = Drain`, `1 = Gate`, `2 = Source`.
  */
-class MosfetDevice : public Device {
+class MosfetDevice : public Device, public NonlinearDevice, public TransientDevice {
 public:
     MosfetDevice(int drain,
                  int gate,
@@ -30,9 +30,6 @@ public:
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     void StampAc(MnaSystem &reactive, const std::vector<double> &x_dc) const override;
-
-    bool IsLinear() const override { return false; }
-
     void StampCharge(MnaSystem &sys, const std::vector<double> &x) const override;
     bool Limit(std::vector<double> &x_new, const std::vector<double> &x_old) const override;
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
@@ -44,10 +41,12 @@ public:
     double OutputNoiseVariance(const std::vector<double> &x_dc,
                                const std::vector<std::complex<double>> &adjoint,
                                double frequency_hz) const override;
-    bool HasTransientState() const override;
     void AcceptStep(const std::vector<double> &x) override;
     void RejectStep() override;
     void SetTemperature(const ThermalConditions &thermal) override;
+
+    [[nodiscard]] DeviceRoles GetRoles() override { return {.Nonlinear = this, .Transient = this}; }
+
     [[nodiscard]] std::unique_ptr<Device> Clone() const override;
 
 private:
@@ -91,7 +90,9 @@ private:
     double m_Gcgs = 0.0, m_Ieqgs = 0.0, m_Gcgd = 0.0, m_Ieqgd = 0.0;
     double m_Critical; ///< `PNJLIM` critical voltage of the body-drain junction diode.
 
+    bool HasTransientState() const;
     void ApplyTemperature(const ThermalConditions &thermal);
+    void StampOverlapCapacitances(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time);
     Channel Evaluate(double vgs_eff, double vds_eff) const;
     ChannelState EvaluateChannel(const std::vector<double> &x) const;
     BodyDiodeNodes GetBodyDiodeNodes() const;

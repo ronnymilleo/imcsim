@@ -18,13 +18,11 @@ namespace Nodalys {
  * @details The state follows the control voltage of the current iterate and keeps itself between the thresholds,
  *          so noise around the threshold does not chatter; the state persists across the points of a transient.
  */
-class SwitchDevice : public Device {
+class SwitchDevice : public Device, public NonlinearDevice, public TransientDevice {
 public:
     SwitchDevice(int node_a, int node_b, int control_positive, int control_negative, SwitchParameters parameters);
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
-
-    bool IsLinear() const override { return false; }
 
     bool SupportsHarmonicBalance() const override { return false; }
 
@@ -36,6 +34,9 @@ public:
     void AcceptStep(const std::vector<double> &x) override;
     void RejectStep() override;
     bool HasSwitched() const override;
+
+    [[nodiscard]] DeviceRoles GetRoles() override { return {.Nonlinear = this, .Transient = this}; }
+
     [[nodiscard]] std::unique_ptr<Device> Clone() const override;
 
 private:

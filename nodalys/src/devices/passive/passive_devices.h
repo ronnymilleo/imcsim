@@ -20,7 +20,7 @@ namespace Nodalys {
  *          operating point the capacitor is an open circuit. With an initial condition and uic, the first point starts
  *          from it.
  */
-class CapacitorDevice : public Device, public SensitiveDevice {
+class CapacitorDevice : public Device, public SensitiveDevice, public TransientDevice {
 public:
     CapacitorDevice(int node_a, int node_b, double capacitance, double initial_voltage, bool has_initial);
 
@@ -51,11 +51,10 @@ public:
                                            const std::vector<double> &x_dc,
                                            const std::vector<std::complex<double>> &x_ac,
                                            double omega) const override;
-    bool HasTransientState() const override;
     void AcceptStep(const std::vector<double> &x) override;
     void RejectStep() override;
 
-    [[nodiscard]] const SensitiveDevice *AsSensitive() const override { return this; }
+    [[nodiscard]] DeviceRoles GetRoles() override { return {.Sensitive = this, .Transient = this}; }
 
     [[nodiscard]] std::optional<SensitivityDescriptor> DescribeSensitivity() const override;
     [[nodiscard]] double DcSensitivityDerivative(const DcAdjointView &point) const override;
@@ -81,7 +80,7 @@ private:
  *          and v2 = M di1/dt + L2 di2/dt, with the companion built from the fluxes of the windings, which gives
  *          exact shorts at the operating point.
  */
-class CoupledInductorDevice : public Device {
+class CoupledInductorDevice : public Device, public TransientDevice {
 public:
     CoupledInductorDevice(int primary_a,
                           int primary_b,
@@ -100,9 +99,11 @@ public:
                                            const std::vector<double> &x_dc,
                                            const std::vector<std::complex<double>> &x_ac,
                                            double omega) const override;
-    bool HasTransientState() const override;
     void AcceptStep(const std::vector<double> &x) override;
     void RejectStep() override;
+
+    [[nodiscard]] DeviceRoles GetRoles() override { return {.Transient = this}; }
+
     [[nodiscard]] std::unique_ptr<Device> Clone() const override;
 
 private:
@@ -128,7 +129,7 @@ private:
  *          short (v = 0). In a transient with the trapezoidal rule, v(t+h) = (2L/h)(i(t+h) − i(t)) − v(t) stamps a
  *          resistance 2L/h on the branch row.
  */
-class InductorDevice : public Device, public SensitiveDevice {
+class InductorDevice : public Device, public SensitiveDevice, public TransientDevice {
 public:
     InductorDevice(int node_a, int node_b, int branch, double inductance, double initial_current, bool has_initial);
 
@@ -163,11 +164,10 @@ public:
                                            const std::vector<double> &x_dc,
                                            const std::vector<std::complex<double>> &x_ac,
                                            double omega) const override;
-    bool HasTransientState() const override;
     void AcceptStep(const std::vector<double> &x) override;
     void RejectStep() override;
 
-    [[nodiscard]] const SensitiveDevice *AsSensitive() const override { return this; }
+    [[nodiscard]] DeviceRoles GetRoles() override { return {.Sensitive = this, .Transient = this}; }
 
     [[nodiscard]] std::optional<SensitivityDescriptor> DescribeSensitivity() const override;
     [[nodiscard]] double DcSensitivityDerivative(const DcAdjointView &point) const override;
@@ -189,7 +189,7 @@ private:
  * @class   ResistorDevice
  * @brief   A resistor between two nodes; also the model of a closed or open contact.
  */
-class ResistorDevice : public Device, public SensitiveDevice {
+class ResistorDevice : public Device, public SensitiveDevice, public TransientDevice {
 public:
     ResistorDevice(int node_a, int node_b, double resistance, bool noisy = true);
 
@@ -219,7 +219,7 @@ public:
                                double frequency_hz) const override;
     void SetTemperature(const ThermalConditions &thermal) override;
 
-    [[nodiscard]] const SensitiveDevice *AsSensitive() const override { return this; }
+    [[nodiscard]] DeviceRoles GetRoles() override { return {.Sensitive = this, .Transient = this}; }
 
     bool ApplyLiveChange(LiveQuantity quantity, double value) override;
     [[nodiscard]] std::optional<SensitivityDescriptor> DescribeSensitivity() const override;

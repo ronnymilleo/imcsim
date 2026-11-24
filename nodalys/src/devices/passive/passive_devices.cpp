@@ -102,10 +102,6 @@ std::complex<double> CapacitorDevice::AcTerminalCurrent(const int terminal,
     return terminal == 0 ? current : -current;
 }
 
-bool CapacitorDevice::HasTransientState() const {
-    return true;
-}
-
 void CapacitorDevice::AcceptStep(const std::vector<double> &x) {
     const double voltage = BranchVoltage(x, m_NodeA, m_NodeB);
     const double current = m_LastConductance * voltage + m_EquivalentCurrent;
@@ -216,10 +212,6 @@ std::complex<double> CoupledInductorDevice::AcTerminalCurrent(const int terminal
     return x_ac[static_cast<std::size_t>(branch)];
 }
 
-bool CoupledInductorDevice::HasTransientState() const {
-    return true;
-}
-
 void CoupledInductorDevice::AcceptStep(const std::vector<double> &x) {
     const double current1 = x[static_cast<std::size_t>(m_Branch1)];
     const double current2 = x[static_cast<std::size_t>(m_Branch2)];
@@ -308,10 +300,6 @@ std::complex<double> InductorDevice::AcTerminalCurrent(const int terminal,
                                                        const double /*omega*/) const {
     const std::complex<double> current = x_ac[static_cast<std::size_t>(m_Branch)];
     return terminal == 0 ? current : -current;
-}
-
-bool InductorDevice::HasTransientState() const {
-    return true;
 }
 
 void InductorDevice::AcceptStep(const std::vector<double> &x) {

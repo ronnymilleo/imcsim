@@ -104,52 +104,31 @@ void AppendSRLatch(CircuitDescription &description,
 void CompileDFlipFlop(CircuitCompiler &compiler, const DFlipFlopSpec &spec) {
     const int u_d = compiler.MapNode(spec.D);
     const int u_clk = compiler.MapNode(spec.Clk);
-    const FlipFlopNodes n{
-        .Q = compiler.MapNode(spec.Q),
-        .QBar = compiler.MapNode(spec.QBar),
-        .N1 = compiler.AllocateInternalNode(),
-        .N2 = compiler.AllocateInternalNode(),
-        .N3 = compiler.AllocateInternalNode(),
-        .N4 = compiler.AllocateInternalNode(),
-    };
+    const FlipFlopNodes n{.Q = compiler.MapNode(spec.Q),
+                          .QBar = compiler.MapNode(spec.QBar),
+                          .N1 = compiler.AllocateInternalNode(),
+                          .N2 = compiler.AllocateInternalNode(),
+                          .N3 = compiler.AllocateInternalNode(),
+                          .N4 = compiler.AllocateInternalNode()};
 
-    // The set and reset inputs are active high, so each goes through an inverter into the active-low
-    // inputs of the gates, as in the classic 7474 (preset on G1 and G5, clear on G2, G4 and G6)
     const std::optional<int> set_bar = AddActiveLowInput(compiler, spec.Name + ".NOT_SET", spec.Set, spec.Params);
     const std::optional<int> reset_bar = AddActiveLowInput(compiler, spec.Name + ".NOT_RESET", spec.Reset, spec.Params);
+    const auto add_nand = [&](const std::string_view suffix,
+                              const int out,
+                              const std::vector<int> &inputs,
+                              const SmoothLogicParameters &params) {
+        compiler.AddRawLogicGate(spec.Name + std::string(suffix), LogicGateType::NAND, out, inputs, params);
+    };
 
-    // Master latch and edge-steering section
-    compiler.AddRawLogicGate(spec.Name + ".G1",
-                             LogicGateType::NAND,
-                             n.N1,
-                             WithOptionalInput({n.N4, n.N2}, set_bar),
-                             spec.Params);
-    compiler.AddRawLogicGate(spec.Name + ".G2",
-                             LogicGateType::NAND,
-                             n.N2,
-                             WithOptionalInput({n.N1, u_clk}, reset_bar),
-                             spec.Params);
-    compiler.AddRawLogicGate(spec.Name + ".G3", LogicGateType::NAND, n.N3, {n.N2, u_clk, n.N4}, spec.Params);
-    compiler.AddRawLogicGate(spec.Name + ".G4",
-                             LogicGateType::NAND,
-                             n.N4,
-                             WithOptionalInput({n.N3, u_d}, reset_bar),
-                             spec.Params);
+    add_nand(".G1", n.N1, WithOptionalInput({n.N4, n.N2}, set_bar), spec.Params);
+    add_nand(".G2", n.N2, WithOptionalInput({n.N1, u_clk}, reset_bar), spec.Params);
+    add_nand(".G3", n.N3, {n.N2, u_clk, n.N4}, spec.Params);
+    add_nand(".G4", n.N4, WithOptionalInput({n.N3, u_d}, reset_bar), spec.Params);
 
-    // Slave output latch (slight asymmetry breaks DC operating point metastability in the reset state)
     SmoothLogicParameters g5_params = spec.Params;
     g5_params.VThreshold *= LATCH_THRESHOLD_ASYMMETRY;
-    compiler.AddRawLogicGate(spec.Name + ".G5",
-                             LogicGateType::NAND,
-                             n.Q,
-                             WithOptionalInput({n.N2, n.QBar}, set_bar),
-                             g5_params);
-    compiler.AddRawLogicGate(spec.Name + ".G6",
-                             LogicGateType::NAND,
-                             n.QBar,
-                             WithOptionalInput({n.N3, n.Q}, reset_bar),
-                             spec.Params);
-
+    add_nand(".G5", n.Q, WithOptionalInput({n.N2, n.QBar}, set_bar), g5_params);
+    add_nand(".G6", n.QBar, WithOptionalInput({n.N3, n.Q}, reset_bar), spec.Params);
     AddFlipFlopSeed(compiler, n, spec.Params);
 }
 
