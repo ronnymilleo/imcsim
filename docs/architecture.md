@@ -25,7 +25,7 @@ flowchart TD
     app_core[app-core]
     nodalys[nodalys]
     app_core -->|8| nodalys
-    app_gui -->|318| app_core
+    app_gui -->|319| app_core
 ```
 
 ## app-core
