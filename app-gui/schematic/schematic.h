@@ -164,6 +164,7 @@ public:
 
     // Derived data
     const Connectivity &GetConnectivity();
+    const Core::Circuit &GetCircuit();
     Core::Circuit BuildCircuit();
     std::size_t GetCircuitVersion() const;
     std::size_t GetDocumentVersion() const;
@@ -227,8 +228,9 @@ private:
     // History
     UndoHistory m_History;
 
-    // Derived data, dropped on every change: nodes are rebuilt on first use
+    // Derived data, dropped on every change: nodes and circuit topology are rebuilt on first use
     std::optional<Connectivity> m_Connectivity;
+    std::optional<Core::Circuit> m_Circuit;
 
     void InvalidateDerivedData();
     void FollowDefinitionChange(const DefinitionChange &change);

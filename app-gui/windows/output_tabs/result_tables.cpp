@@ -148,7 +148,7 @@ void DrawSensitivity(const Core::Sensitivity &sensitivity, Schematic &schematic)
  * @param[in] schematic  The circuit as it is now, for the logic levels and the current inputs.
  */
 void DrawTruthTable(const Core::TruthTable &table, Schematic &schematic) {
-    const Core::Circuit circuit = schematic.BuildCircuit();
+    const Core::Circuit &circuit = schematic.GetCircuit();
     const std::vector<LogicNode> logic_nodes = FindLogicNodes(circuit);
     std::vector<std::string> output_labels;
     for (const int node : table.OutputNodes) {
