@@ -44,7 +44,7 @@ struct SourcePeriodicity {
  *          report the level they start from, like the netlist writes them, so the operating point matches the start
  *          of the transient.
  */
-class IndependentSourceDevice : public Device, public SensitiveDevice {
+class IndependentSourceDevice : public Device, public SensitiveDevice, public TransientDevice {
 public:
     /**
      * @brief   Reports whether this independent source is a voltage source (`true`) or a current source (`false`).
@@ -82,17 +82,14 @@ public:
     void SetBreakpoints(BreakpointCallback breakpoints);
     void SetSeedCallback(SeedCallback set_seed);
     void SetCallbackFactory(SourceCallbackFactory factory);
+    void SetSourceScale(double scale);
+    void SetRandomSeed(std::uint64_t seed);
 
-    bool SupportsHarmonicBalance() const override;
-    void SetSourceScale(double scale) override;
     double NextBreakpoint(double time) const override;
-    void SetRandomSeed(std::uint64_t seed) override;
 
-    [[nodiscard]] const SensitiveDevice *AsSensitive() const override { return this; }
-
-    [[nodiscard]] IndependentSourceDevice *AsIndependentSource() override { return this; }
-
-    [[nodiscard]] const IndependentSourceDevice *AsIndependentSource() const override { return this; }
+    [[nodiscard]] DeviceRoles GetRoles() override {
+        return {.Sensitive = this, .IndependentSource = this, .Transient = this};
+    }
 
 protected:
     IndependentSourceDevice(int node_a,

@@ -38,14 +38,15 @@ struct BehavioralBinding {
  *          The small-signal analyses use the derivatives of the last stamp, which is the one at the operating point.
  *          `time` reads 0 outside a transient, as in ngspice.
  */
-class BehavioralSourceDevice : public Device {
+class BehavioralSourceDevice : public Device, public NonlinearDevice {
 public:
     void BindCurrent(std::size_t input, int branch);
 
-    bool IsLinear() const override;
     bool SupportsHarmonicBalance() const override;
     std::string_view GetFault() const override;
     void SetTemperature(const ThermalConditions &thermal) override;
+
+    [[nodiscard]] DeviceRoles GetRoles() override { return {.Nonlinear = this}; }
 
 protected:
     BehavioralSourceDevice(std::string name, Expression expression, std::vector<BehavioralBinding> bindings);

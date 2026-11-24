@@ -27,13 +27,16 @@ add_library(nodalys STATIC
     src/analyses/sp/sp_analysis.cpp
     src/analyses/tf/tf_analysis.cpp
     src/analyses/transient/transient_analysis.cpp
+    src/analyses/transient/transient_collector.cpp
     src/api/circuit.cpp
     src/api/circuit_builder.cpp
+    src/api/circuit_builder_macromodels.cpp
     src/api/circuit_builder_sources.cpp
     src/api/nodalys.cpp
     src/bridge/logic_bridge.cpp
     src/compiler/behavioral_binding.cpp
     src/compiler/circuit_compiler.cpp
+    src/compiler/circuit_lowering.cpp
     src/compiler/compiled_circuit.cpp
     src/compiler/macromodels/electromechanical_macromodels.cpp
     src/compiler/macromodels/logic_macromodels.cpp
@@ -62,6 +65,7 @@ add_library(nodalys STATIC
     src/expression/expression.cpp
     src/expression/expression_math.cpp
     src/expression/expression_parser.cpp
+    src/expression/expression_vocabulary.cpp
     src/linear/dense_matrix.cpp
     src/linear/eigen/pencil_reduction.cpp
     src/linear/eigen/qz.cpp
@@ -69,6 +73,7 @@ add_library(nodalys STATIC
     src/linear/eigen/qz_householder.cpp
     src/linear/eigen/root_refinement.cpp
     src/linear/fft.cpp
+    src/mna/mna_solve.cpp
     src/mna/mna_system.cpp
     src/newton/newton.cpp
     src/parser/netlist/netlist_deck.cpp
@@ -82,6 +87,7 @@ add_library(nodalys STATIC
     src/parser/netlist_parser.cpp
     src/parser/sources/source_line.cpp
     src/parser/sources/source_waveforms.cpp
+    src/parser/subcircuit/subcircuit_element_sources.cpp
     src/parser/subcircuit/subcircuit_elements.cpp
     src/parser/subcircuit/subcircuit_expansion.cpp
     src/parser/subcircuit/subcircuit_lines.cpp
@@ -117,6 +123,7 @@ endif()
 # The command line is a library apart from main(), so the tests run it in their own process
 add_library(nodalys-cli-lib STATIC
     src/cli/cli.cpp
+    src/cli/cli_runner.cpp
 )
 
 target_include_directories(nodalys-cli-lib

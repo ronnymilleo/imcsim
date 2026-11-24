@@ -22,15 +22,12 @@ namespace Nodalys {
  * ```
  * When \f$R_S = 0\f$, `internal` is `-1` and the intrinsic junction connects directly between `anode` and `cathode`.
  */
-class DiodeDevice : public Device {
+class DiodeDevice : public Device, public NonlinearDevice, public TransientDevice {
 public:
     DiodeDevice(int anode, int cathode, int internal, DiodeParameters parameters);
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     void StampAc(MnaSystem &reactive, const std::vector<double> &x_dc) const override;
-
-    bool IsLinear() const override { return false; }
-
     void StampCharge(MnaSystem &sys, const std::vector<double> &x) const override;
     bool Limit(std::vector<double> &x_new, const std::vector<double> &x_old) const override;
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
@@ -42,10 +39,12 @@ public:
     double OutputNoiseVariance(const std::vector<double> &x_dc,
                                const std::vector<std::complex<double>> &adjoint,
                                double frequency_hz) const override;
-    bool HasTransientState() const override;
     void AcceptStep(const std::vector<double> &x) override;
     void RejectStep() override;
     void SetTemperature(const ThermalConditions &thermal) override;
+
+    [[nodiscard]] DeviceRoles GetRoles() override { return {.Nonlinear = this, .Transient = this}; }
+
     [[nodiscard]] std::unique_ptr<Device> Clone() const override;
 
 private:
@@ -69,6 +68,7 @@ private:
     double m_CapConductance = 0.0;
     double m_CapEquivalent = 0.0;
 
+    bool HasTransientState() const;
     void ApplyTemperature(const ThermalConditions &thermal);
     Junction Evaluate(double voltage) const;
     double Charge(double voltage) const;

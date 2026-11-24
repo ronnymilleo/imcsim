@@ -147,12 +147,14 @@ FindLinearDevicePhasors(const CurrentContext &context, const Device &element, co
  * @brief   The phasors of the current of a nonlinear device: its conduction current plus the displacement current of
  * its charge.
  */
-std::vector<std::complex<double>>
-FindNonlinearDevicePhasors(CurrentContext &context, const Device &element, const int terminal) {
+std::vector<std::complex<double>> FindNonlinearDevicePhasors(CurrentContext &context,
+                                                             const Device &element,
+                                                             const NonlinearDevice &nonlinear,
+                                                             const int terminal) {
     HbWorkspace &ws = context.Ws;
     for (std::size_t m = 0; m < ws.SampleCount; ++m) {
         context.CurrentSamples[m] = element.TerminalCurrent(terminal, ws.StateSamples[m]);
-        context.ChargeSamples[m] = element.TerminalCharge(terminal, ws.StateSamples[m]);
+        context.ChargeSamples[m] = nonlinear.TerminalCharge(terminal, ws.StateSamples[m]);
     }
     (void)ws.Plan.RealToHarmonics(context.CurrentSamples, ws.Harmonics, ws.CoeffsScratch, ws.FftScratch);
     (void)ws.Plan.RealToHarmonics(context.ChargeSamples, ws.Harmonics, context.ChargeCoeffs, ws.FftScratch);
@@ -171,8 +173,8 @@ FindNonlinearDevicePhasors(CurrentContext &context, const Device &element, const
 
 std::vector<std::complex<double>> FindContributionPhasors(CurrentContext &context,
                                                           const CurrentContribution &contribution) {
-    if (!contribution.Element->IsLinear()) {
-        return FindNonlinearDevicePhasors(context, *contribution.Element, contribution.Terminal);
+    if (const NonlinearDevice *nonlinear = contribution.Element->AsNonlinear()) {
+        return FindNonlinearDevicePhasors(context, *contribution.Element, *nonlinear, contribution.Terminal);
     }
     if (const IndependentSourceDevice *source = contribution.Element->AsIndependentSource();
         source != nullptr && !source->IsVoltageSource()) {

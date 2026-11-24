@@ -7,7 +7,7 @@
 
 #include "analyses/common/analysis_preamble.h"
 #include "analyses/common/solution_readout.h"
-#include "devices/passive/passive_devices.h"
+#include "analyses/transient/transient_collector.h"
 #include "devices/sources/independent_sources.h"
 #include "devices/sources/transient_noise.h"
 #include <algorithm>
@@ -17,15 +17,12 @@
 #include <limits>
 #include <optional>
 #include <random>
-#include <thread>
 #include <utility>
 
 namespace Nodalys {
 
 namespace {
 
-constexpr std::chrono::duration<double> CHUNK_INTERVAL{0.03};
-constexpr std::size_t CHUNK_POINT_LIMIT = 4096;
 constexpr double LTE_REJECT_FACTOR = 2.0;
 constexpr double LTE_SAFETY = 0.9;
 constexpr double STEP_GROW_LIMIT = 3.0;
@@ -44,31 +41,6 @@ constexpr double MIN_ERROR_RATIO = 1e-3;
 constexpr double STEP_ERROR_EXPONENT = -1.0 / 3.0;
 /// How many times the voltage tolerance the local truncation error may be.
 constexpr double TRUNCATION_TOLERANCE_FACTOR = 7.0;
-/// Relative margin within which a time counts as the stop time or as an output point.
-constexpr double TIME_TOLERANCE = 1e-12;
-/// Relative margin within which the last output point counts as the stop time.
-constexpr double STOP_POINT_TOLERANCE = 1e-9;
-
-/**
- * @struct  ChunkPublisher
- * @brief   When the points solved so far were last handed to the monitor, and how many of them it has.
- */
-struct ChunkPublisher {
-    const RunMonitor &Monitor;
-    std::chrono::steady_clock::time_point LastSend;
-    double ChunkEnd = 0.0;
-    std::size_t Sent = 0;
-};
-
-/**
- * @struct  SolutionPoint
- * @brief   The solution of the circuit at one instant, with the currents read from it.
- */
-struct SolutionPoint {
-    double Time;
-    const std::vector<double> &X;
-    const std::vector<double> &Currents;
-};
 
 /**
  * @struct  StepState
@@ -89,98 +61,14 @@ struct StepState {
     std::vector<double> CurrentsNow;
 };
 
-class TransientCollector {
-public:
-    TransientCollector(const CompiledCircuit &compiled, const double output_step)
-        : m_Compiled(compiled), m_OutputStep(output_step) {
-        m_Result.NodeVoltages.resize(static_cast<std::size_t>(compiled.CircuitNodeCount));
-        for (const CurrentRef &current : compiled.Currents) {
-            m_Result.Currents.push_back({current.Name, {}});
-        }
-    }
-
-    void Append(const double time, const std::vector<double> &x, const std::vector<double> &currents) {
-        m_Result.Times.push_back(time);
-        for (int node = 0; node < m_Compiled.CircuitNodeCount; ++node) {
-            const double voltage = node == 0 ? 0.0 : x[static_cast<std::size_t>(m_Compiled.System->NodeIndex(node))];
-            m_Result.NodeVoltages[static_cast<std::size_t>(node)].push_back(voltage);
-        }
-        for (std::size_t index = 0; index < currents.size(); ++index) {
-            m_Result.Currents[index].Values.push_back(currents[index]);
-        }
-    }
-
-    void AppendSegment(const SolutionPoint &start, const SolutionPoint &end) {
-        if (m_OutputStep <= 0.0) {
-            Append(end.Time, end.X, end.Currents);
-            return;
-        }
-        const double segment_duration = end.Time - start.Time;
-        if (segment_duration <= 0.0) {
-            return;
-        }
-
-        m_Scratch.resize(start.X.size());
-        m_CurrentsScratch.resize(start.Currents.size());
-
-        while (true) {
-            const double target_time = static_cast<double>(m_NextGrid) * m_OutputStep;
-            if (target_time > end.Time + TIME_TOLERANCE * m_OutputStep) {
-                break;
-            }
-            const double alpha = std::clamp((target_time - start.Time) / segment_duration, 0.0, 1.0);
-            for (std::size_t i = 0; i < m_Scratch.size(); ++i) {
-                m_Scratch[i] = start.X[i] + alpha * (end.X[i] - start.X[i]);
-            }
-            for (std::size_t i = 0; i < m_CurrentsScratch.size(); ++i) {
-                m_CurrentsScratch[i] = start.Currents[i] + alpha * (end.Currents[i] - start.Currents[i]);
-            }
-            Append(target_time, m_Scratch, m_CurrentsScratch);
-            ++m_NextGrid;
-        }
-    }
-
-    /**
-     * @brief   Keeps the point solved on a corner of a source, which the output grid would otherwise smooth away.
-     */
-    void AppendCorner(const double time, const std::vector<double> &x, const std::vector<double> &currents) {
-        const std::vector<double> &times = m_Result.Times;
-        if (!times.empty()
-            && std::fabs(times.back() - time) <= TIME_TOLERANCE * std::max(std::fabs(time), m_OutputStep)) {
-            return;
-        }
-        Append(time, x, currents);
-    }
-
-    std::size_t PointCount() const { return m_Result.Times.size(); }
-
-    const TransientResult &View() const { return m_Result; }
-
-    TransientResult Take() { return std::move(m_Result); }
-
-private:
-    const CompiledCircuit &m_Compiled;
-    double m_OutputStep;
-    long m_NextGrid = 1;
-    TransientResult m_Result;
-    std::vector<double> m_Scratch;
-    std::vector<double> m_CurrentsScratch;
+/**
+ * @struct  SteppingOutcome
+ * @brief   Outcome of the adaptive transient time-stepping loop.
+ */
+struct SteppingOutcome {
+    bool IsStopped = false;
+    std::optional<std::string> Failure;
 };
-
-void ApplyLiveChanges(CompiledCircuit &compiled, const RunMonitor &monitor, std::vector<DiagnosticMessage> *messages) {
-    if (!monitor.TakeLiveChanges) {
-        return;
-    }
-    for (const LiveChange &change : monitor.TakeLiveChanges()) {
-        const auto found = compiled.ElementsByName.find(change.Element);
-        if (found == compiled.ElementsByName.end()) {
-            continue;
-        }
-        if (!found->second->ApplyLiveChange(change.Quantity, change.Value) && messages) {
-            messages->push_back({std::format("nodalys: cannot apply live change to {}", change.Element), true});
-        }
-    }
-}
 
 /**
  * @brief   Finds the next corner of any source waveform after an instant, so the step never jumps over an edge.
@@ -188,7 +76,9 @@ void ApplyLiveChanges(CompiledCircuit &compiled, const RunMonitor &monitor, std:
 double FindNextCorner(const CompiledCircuit &compiled, const double time) {
     double corner = std::numeric_limits<double>::infinity();
     for (const std::unique_ptr<Device> &device : compiled.Devices) {
-        corner = std::min(corner, device->NextBreakpoint(time));
+        if (const TransientDevice *transient = device->AsTransient()) {
+            corner = std::min(corner, transient->NextBreakpoint(time));
+        }
     }
     return corner;
 }
@@ -256,7 +146,9 @@ void SeedDeviceRandomness(CompiledCircuit &compiled, const TransientConfig &sett
     const std::uint64_t base_seed =
         settings.Seed != 0 ? static_cast<std::uint64_t>(settings.Seed) : std::random_device{}();
     for (std::size_t index = 0; index < compiled.Devices.size(); ++index) {
-        compiled.Devices[index]->SetRandomSeed(MixTransientSeed(base_seed, index));
+        if (IndependentSourceDevice *source = compiled.Devices[index]->AsIndependentSource()) {
+            source->SetRandomSeed(MixTransientSeed(base_seed, index));
+        }
     }
 }
 
@@ -290,13 +182,17 @@ std::expected<std::vector<double>, std::string> SolveStart(CompiledCircuit &comp
 
 void AcceptDeviceStep(CompiledCircuit &compiled, const std::vector<double> &x) {
     for (const std::unique_ptr<Device> &device : compiled.Devices) {
-        device->AcceptStep(x);
+        if (TransientDevice *transient = device->AsTransient()) {
+            transient->AcceptStep(x);
+        }
     }
 }
 
 void RejectDeviceStep(CompiledCircuit &compiled) {
     for (const std::unique_ptr<Device> &device : compiled.Devices) {
-        device->RejectStep();
+        if (TransientDevice *transient = device->AsTransient()) {
+            transient->RejectStep();
+        }
     }
 }
 
@@ -363,15 +259,21 @@ std::optional<std::string> RetryAfterRejection(CompiledCircuit &compiled, StepSt
     return std::nullopt;
 }
 
+void ResetAfterDiscontinuity(StepState &state) {
+    // The slope changes at a corner, and at a switch that flipped inside the step, so the points before it
+    // say nothing about the error after it
+    state.IsRestart = true;
+    state.PreviousStep = 0.0;
+    state.OlderStep = 0.0;
+    state.Old = state.Now;
+    state.Older = state.Now;
+    if (std::isfinite(state.NextCorner)) {
+        state.Step = std::max(std::min(state.Step, CORNER_STEP_SHARE * (state.NextCorner - state.Time)), MIN_STEP);
+    }
+}
+
 /**
  * @brief   Accepts a step: hands it to the devices and the collector, moves the history on and chooses the next step.
- * @param[in,out] compiled        Compiled circuit, whose devices take the step.
- * @param[in,out] state           The stepping, which moves to the end of the step.
- * @param[in,out] collector       Receives the points of the step.
- * @param[in]     x_new           The solution at the end of the step; the history takes it.
- * @param[in]     ratio           Error ratio of the step.
- * @param[in]     reaches_corner  Whether the step ends on a corner of a source.
- * @param[in]     output_step     Largest step, which is the spacing of the output points.
  */
 void AcceptStep(CompiledCircuit &compiled,
                 StepState &state,
@@ -381,7 +283,8 @@ void AcceptStep(CompiledCircuit &compiled,
                 const bool reaches_corner,
                 const double output_step) {
     const bool has_switched = std::ranges::any_of(compiled.Devices, [](const std::unique_ptr<Device> &device) {
-        return device->HasSwitched();
+        const TransientDevice *transient = device->AsTransient();
+        return transient != nullptr && transient->HasSwitched();
     });
     AcceptDeviceStep(compiled, x_new);
     std::vector<double> currents_new = ReadCurrentValues(compiled, x_new);
@@ -403,84 +306,63 @@ void AcceptStep(CompiledCircuit &compiled,
     // A device whose state decides its corners, such as a fuse about to blow, moves its next one at every point
     state.NextCorner = FindNextCorner(compiled, state.Time);
     if (reaches_corner || has_switched) {
-        // The slope changes at a corner, and at a switch that flipped inside the step, so the points before it
-        // say nothing about the error after it
-        state.IsRestart = true;
-        state.PreviousStep = 0.0;
-        state.OlderStep = 0.0;
-        state.Old = state.Now;
-        state.Older = state.Now;
-        if (std::isfinite(state.NextCorner)) {
-            state.Step = std::max(std::min(state.Step, CORNER_STEP_SHARE * (state.NextCorner - state.Time)), MIN_STEP);
+        ResetAfterDiscontinuity(state);
+    }
+}
+
+StepState InitStepState(const CompiledCircuit &compiled,
+                        std::vector<double> x_start,
+                        const double output_step,
+                        const double stop_time,
+                        TransientCollector &collector) {
+    StepState state;
+    state.CurrentsNow = ReadCurrentValues(compiled, x_start);
+    collector.Append(0.0, x_start, state.CurrentsNow);
+    state.Step = std::min(output_step, stop_time);
+    state.Old = x_start;
+    state.Older = x_start;
+    state.Now = std::move(x_start);
+    state.NextCorner = FindNextCorner(compiled, state.Time);
+    return state;
+}
+
+SteppingOutcome RunSteppingLoop(CompiledCircuit &compiled,
+                                const TransientConfig &settings,
+                                const double output_step,
+                                const ConvergenceOptions &options,
+                                StepState &state,
+                                TransientCollector &collector,
+                                ChunkPublisher &publisher,
+                                std::vector<DiagnosticMessage> *messages) {
+    SteppingOutcome result;
+    const double stop_limit = settings.StopTime - TRANSIENT_TIME_TOLERANCE * std::max(1.0, settings.StopTime);
+    while (state.Time < stop_limit) {
+        const bool reaches_corner = PlanStep(state, settings.StopTime);
+        std::vector<double> x_new = state.Now;
+        const NewtonOutcome outcome = SolveStep(compiled, state, settings.Method, options, x_new);
+        if (!outcome.Converged) {
+            result.Failure = RetryAfterNonConvergence(compiled, state, outcome);
+            if (result.Failure) {
+                break;
+            }
+            continue;
+        }
+        const double ratio = EstimateTruncationRatio(compiled, state, x_new, settings.Method, options);
+        if (ratio > LTE_REJECT_FACTOR) {
+            result.Failure = RetryAfterRejection(compiled, state, ratio);
+            if (result.Failure) {
+                break;
+            }
+            continue;
+        }
+        AcceptStep(compiled, state, collector, x_new, ratio, reaches_corner, output_step);
+        if (IsChunkDue(publisher, state.Time, collector.PointCount())
+            && ServeChunk(compiled, publisher, collector.View(), state.Time, settings.StopTime, messages)) {
+            result.IsStopped = true;
+            break;
         }
     }
-}
-
-/**
- * @brief   Copies the points of a result from one on, which are the ones the monitor has not seen yet.
- */
-TransientResult SliceFrom(const TransientResult &result, const std::size_t first) {
-    TransientResult chunk;
-    chunk.Times.assign(result.Times.begin() + static_cast<std::ptrdiff_t>(first), result.Times.end());
-    chunk.NodeVoltages.resize(result.NodeVoltages.size());
-    for (std::size_t node = 0; node < result.NodeVoltages.size(); ++node) {
-        chunk.NodeVoltages[node].assign(result.NodeVoltages[node].begin() + static_cast<std::ptrdiff_t>(first),
-                                        result.NodeVoltages[node].end());
-    }
-    chunk.Currents.resize(result.Currents.size());
-    for (std::size_t i = 0; i < result.Currents.size(); ++i) {
-        chunk.Currents[i].Name = result.Currents[i].Name;
-        chunk.Currents[i].Values.assign(result.Currents[i].Values.begin() + static_cast<std::ptrdiff_t>(first),
-                                        result.Currents[i].Values.end());
-    }
-    chunk.IsComplete = result.IsComplete;
-    return chunk;
-}
-
-void PublishChunk(const TransientResult &result, ChunkPublisher &publisher, const double progress) {
-    const RunMonitor &monitor = publisher.Monitor;
-    if (monitor.OnProgress) {
-        monitor.OnProgress(progress);
-    }
-    if (!monitor.PostTransientChunk || result.Times.size() <= publisher.Sent) {
-        return;
-    }
-    const TransientResult chunk = SliceFrom(result, publisher.Sent);
-    publisher.Sent = result.Times.size();
-    monitor.PostTransientChunk(chunk);
-}
-
-/**
- * @brief   Tells whether the points solved since the last chunk are due to go to the monitor.
- * @details They are when a span of the run, a time or a number of points has passed.
- */
-bool IsChunkDue(const ChunkPublisher &publisher, const double time, const std::size_t point_count) {
-    const bool spans_chunk = publisher.Monitor.ChunkSpan > 0.0 && time >= publisher.ChunkEnd;
-    return spans_chunk || std::chrono::steady_clock::now() - publisher.LastSend > CHUNK_INTERVAL
-        || point_count - publisher.Sent > CHUNK_POINT_LIMIT;
-}
-
-/**
- * @brief   Hands the points to the monitor, lets it hold the run, and applies the changes it asks for.
- * @return  True when the monitor asked the run to stop.
- */
-bool ServeChunk(CompiledCircuit &compiled,
-                ChunkPublisher &publisher,
-                const TransientResult &result,
-                const double time,
-                const double stop_time,
-                std::vector<DiagnosticMessage> *messages) {
-    const RunMonitor &monitor = publisher.Monitor;
-    PublishChunk(result, publisher, std::min(1.0, time / stop_time));
-    // The caller may hold here, to pace a live run or while it is paused, so the changes come after
-    const bool goes_on = !monitor.AfterChunk || monitor.AfterChunk(time);
-    if (!goes_on || (monitor.ShouldStop && monitor.ShouldStop())) {
-        return true;
-    }
-    ApplyLiveChanges(compiled, monitor, messages);
-    publisher.LastSend = std::chrono::steady_clock::now();
-    publisher.ChunkEnd = time + monitor.ChunkSpan;
-    return false;
+    return result;
 }
 
 } // namespace
@@ -514,60 +396,23 @@ std::expected<TransientResult, std::string> ComputeTransient(CompiledCircuit &co
     }
     AcceptDeviceStep(compiled, *x_start);
 
-    StepState state;
-    state.CurrentsNow = ReadCurrentValues(compiled, *x_start);
-    collector.Append(0.0, *x_start, state.CurrentsNow);
-    state.Step = std::min(output_step, settings.StopTime);
-    state.Old = *x_start;
-    state.Older = *x_start;
-    state.Now = std::move(*x_start);
-    state.NextCorner = FindNextCorner(compiled, state.Time);
+    StepState state = InitStepState(compiled, std::move(*x_start), output_step, settings.StopTime, collector);
     ChunkPublisher publisher{.Monitor = monitor,
                              .LastSend = std::chrono::steady_clock::now(),
                              .ChunkEnd = monitor.ChunkSpan,
                              .Sent = 0};
 
-    bool is_stopped = false;
-    std::optional<std::string> failure;
-    while (state.Time < settings.StopTime - TIME_TOLERANCE * std::max(1.0, settings.StopTime)) {
-        const bool reaches_corner = PlanStep(state, settings.StopTime);
-        std::vector<double> x_new = state.Now;
-        const NewtonOutcome outcome = SolveStep(compiled, state, settings.Method, options, x_new);
-        if (!outcome.Converged) {
-            failure = RetryAfterNonConvergence(compiled, state, outcome);
-            if (failure) {
-                break;
-            }
-            continue;
-        }
-        const double ratio = EstimateTruncationRatio(compiled, state, x_new, settings.Method, options);
-        if (ratio > LTE_REJECT_FACTOR) {
-            failure = RetryAfterRejection(compiled, state, ratio);
-            if (failure) {
-                break;
-            }
-            continue;
-        }
-        AcceptStep(compiled, state, collector, x_new, ratio, reaches_corner, output_step);
-        if (IsChunkDue(publisher, state.Time, collector.PointCount())
-            && ServeChunk(compiled, publisher, collector.View(), state.Time, settings.StopTime, messages)) {
-            is_stopped = true;
-            break;
-        }
-    }
-
-    const bool is_complete = !is_stopped && !failure;
-    if (is_complete
-        && (collector.View().Times.empty()
-            || std::fabs(collector.View().Times.back() - settings.StopTime)
-                   > STOP_POINT_TOLERANCE * std::max(1.0, settings.StopTime))) {
-        collector.Append(settings.StopTime, state.Now, state.CurrentsNow);
+    const SteppingOutcome stepping =
+        RunSteppingLoop(compiled, settings, output_step, options, state, collector, publisher, messages);
+    const bool is_complete = !stepping.IsStopped && !stepping.Failure;
+    if (is_complete) {
+        collector.AppendFinalPointIfNeeded(settings.StopTime, state.Now, state.CurrentsNow);
     }
     TransientResult result = collector.Take();
     result.IsComplete = is_complete;
     PublishChunk(result, publisher, is_complete ? 1.0 : state.Time / settings.StopTime);
-    if (failure) {
-        return std::unexpected(*failure);
+    if (stepping.Failure) {
+        return std::unexpected(*stepping.Failure);
     }
     if (messages) {
         messages->push_back({std::format("nodalys: transient made {} output points", result.Times.size()), false});

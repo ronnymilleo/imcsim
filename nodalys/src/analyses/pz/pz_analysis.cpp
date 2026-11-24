@@ -95,6 +95,30 @@ std::vector<std::complex<double>> FindZeros(const SmallSignalSystem &system) {
     return ComputeGeneralizedEigenvalues(constant_part, dynamic_part);
 }
 
+/**
+ * @brief   Finds the requested poles and zeros of the small-signal system and validates the response reconstruction.
+ */
+std::expected<PoleZeroResult, std::string> EvaluateSystemRoots(const SmallSignalSystem &system,
+                                                               const PoleZeroConfig &settings) {
+    PoleZeroResult result;
+    if (settings.FindPoles) {
+        result.Poles = FindPoles(system);
+    }
+    if (settings.FindZeros) {
+        result.Zeros = FindZeros(system);
+    }
+    if (const std::optional<std::string> reason = FindUndrivenOutput(system, result)) {
+        return std::unexpected(*reason);
+    }
+    // A partial list cannot rebuild the response, so the check only applies when both lists were asked for
+    if (settings.FindPoles && settings.FindZeros) {
+        if (const std::optional<std::string> warning = FindRootMismatch(system, result)) {
+            result.Warnings.push_back(*warning);
+        }
+    }
+    return result;
+}
+
 } // namespace
 
 /**
@@ -133,28 +157,11 @@ std::expected<PoleZeroResult, std::string> ComputePoleZero(CompiledCircuit &comp
     }
 
     const SmallSignalSystem system = BuildSmallSignalSystem(compiled, *x_dc, out_node, *input);
-
-    PoleZeroResult result;
-    if (settings.FindPoles) {
-        result.Poles = FindPoles(system);
-    }
-    if (settings.FindZeros) {
-        result.Zeros = FindZeros(system);
-    }
-
-    if (const std::optional<std::string> reason = FindUndrivenOutput(system, result)) {
-        return std::unexpected(*reason);
-    }
-    // A partial list cannot rebuild the response, so the check only applies when both lists were asked for
-    if (settings.FindPoles && settings.FindZeros) {
-        if (const std::optional<std::string> warning = FindRootMismatch(system, result)) {
-            result.Warnings.push_back(*warning);
-        }
-    }
-
-    if (messages != nullptr) {
+    std::expected<PoleZeroResult, std::string> result = EvaluateSystemRoots(system, settings);
+    if (result && messages != nullptr) {
         messages->push_back(
-            {std::format("nodalys: computed {} poles and {} zeros", result.Poles.size(), result.Zeros.size()), false});
+            {std::format("nodalys: computed {} poles and {} zeros", result->Poles.size(), result->Zeros.size()),
+             false});
     }
     return result;
 }

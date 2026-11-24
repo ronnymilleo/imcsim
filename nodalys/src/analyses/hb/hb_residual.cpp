@@ -144,6 +144,24 @@ void StampLinearJacobian(const HbWorkspace &ws, const double gmin, DenseMatrix &
 }
 
 /**
+ * @brief   Stamps all nonlinear devices into SampleG and SampleC at state xm, recording any device fault.
+ */
+void StampNonlinearAtSample(HbWorkspace &ws, const std::vector<double> &xm) {
+    ws.SampleG.Clear();
+    ws.SampleC.Clear();
+    for (Device *device : ws.NonlinearDevices) {
+        device->Stamp(ws.SampleG, xm, TimeContext{});
+        if (const NonlinearDevice *nonlinear = device->AsNonlinear()) {
+            nonlinear->StampCharge(ws.SampleC, xm);
+            if (const std::string_view fault = nonlinear->GetFault(); !fault.empty()) {
+                ws.IsFaulty = true;
+                ws.Fault = fault;
+            }
+        }
+    }
+}
+
+/**
  * @brief   Evaluates the nonlinear devices at every time sample of the state, filling the traces of their currents and
  *          charges.
  */
@@ -156,16 +174,7 @@ void SampleNonlinearDevices(HbWorkspace &ws, const bool is_recording_matrices) {
 
     for (std::size_t m = 0; m < ws.SampleCount; ++m) {
         const std::vector<double> &xm = ws.StateSamples[m];
-        ws.SampleG.Clear();
-        ws.SampleC.Clear();
-        for (Device *device : ws.NonlinearDevices) {
-            device->Stamp(ws.SampleG, xm, TimeContext{});
-            device->StampCharge(ws.SampleC, xm);
-            if (const std::string_view fault = device->GetFault(); !fault.empty()) {
-                ws.IsFaulty = true;
-                ws.Fault = fault;
-            }
-        }
+        StampNonlinearAtSample(ws, xm);
 
         const std::vector<double> &rhsg = ws.SampleG.Rhs();
         const std::vector<double> &rhsc = ws.SampleC.Rhs();

@@ -24,7 +24,7 @@ flowchart TD
     app_gui[app-gui]
     app_core[app-core]
     nodalys[nodalys]
-    app_core -->|6| nodalys
+    app_core -->|8| nodalys
     app_gui -->|318| app_core
 ```
 
@@ -36,8 +36,8 @@ flowchart TD
     app_core_circuit[circuit]
     app_core_simulation[simulation]
     app_core_backends[backends]
-    app_core_backends -->|72| app_core_circuit
-    app_core_backends -->|48| app_core_simulation
+    app_core_backends -->|73| app_core_circuit
+    app_core_backends -->|51| app_core_simulation
     app_core_backends -->|5| app_core_spice
     app_core_circuit -->|11| app_core_spice
     app_core_simulation -->|83| app_core_circuit

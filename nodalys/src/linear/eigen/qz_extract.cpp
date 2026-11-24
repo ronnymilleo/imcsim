@@ -148,24 +148,25 @@ void RecordComplexRoot(const double tr,
     out.Alfi[j_idx] = an * t_val / r;
 }
 
-void ExtractComplexBlock2x2(const std::size_t na,
-                            const std::size_t en,
-                            const ScaledBlock2x2 &blk,
-                            const double e_real,
-                            const double e_imag,
-                            EigenvalueArrays &out) {
+ComplexRotation ChooseRightRotation(const ScaledBlock2x2 &blk, const double e_real, const double e_imag) {
     const double a11r = blk.A11 - e_real * blk.B11;
     const double a11i = e_imag * blk.B11;
     const double a12r = blk.A12 - e_real * blk.B12;
     const double a12i = e_imag * blk.B12;
     const double a22r = blk.A22 - e_real * blk.B22;
     const double a22i = e_imag * blk.B22;
-
     const bool use_lower = (std::abs(a11r) + std::abs(a11i) + std::abs(a12r) + std::abs(a12i)
                             < std::abs(blk.A21) + std::abs(a22r) + std::abs(a22i));
-    const ComplexRotation z =
-        use_lower ? MakeComplexRotation(a22r, a22i, -blk.A21, 0.0) : MakeComplexRotation(a12r, a12i, -a11r, -a11i);
+    return use_lower ? MakeComplexRotation(a22r, a22i, -blk.A21, 0.0) : MakeComplexRotation(a12r, a12i, -a11r, -a11i);
+}
 
+void ExtractComplexBlock2x2(const std::size_t na,
+                            const std::size_t en,
+                            const ScaledBlock2x2 &blk,
+                            const double e_real,
+                            const double e_imag,
+                            EigenvalueArrays &out) {
+    const ComplexRotation z = ChooseRightRotation(blk, e_real, e_imag);
     const bool use_a = (blk.An < (std::abs(e_real) + e_imag) * blk.Bn);
     const ComplexRotation q =
         use_a ? MakeComplexRotation(z.C * blk.A11 + z.Sr * blk.A12,
@@ -177,7 +178,6 @@ void ExtractComplexBlock2x2(const std::size_t na,
     const double ssr = q.Sr * z.Sr + q.Si * z.Si;
     const double ssi = q.Sr * z.Si - q.Si * z.Sr;
 
-    // First complex root
     RecordComplexRoot(q.C * z.C * blk.A11 + q.C * z.Sr * blk.A12 + q.Sr * z.C * blk.A21 + ssr * blk.A22,
                       q.C * z.Si * blk.A12 - q.Si * z.C * blk.A21 + ssi * blk.A22,
                       q.C * z.C * blk.B11 + q.C * z.Sr * blk.B12 + ssr * blk.B22,
@@ -187,8 +187,6 @@ void ExtractComplexBlock2x2(const std::size_t na,
                       na,
                       en,
                       out);
-
-    // Second complex root
     RecordComplexRoot(ssr * blk.A11 - q.Sr * z.C * blk.A12 - q.C * z.Sr * blk.A21 + q.C * z.C * blk.A22,
                       -ssi * blk.A11 - q.Si * z.C * blk.A12 + q.C * z.Si * blk.A21,
                       ssr * blk.B11 - q.Sr * z.C * blk.B12 + q.C * z.C * blk.B22,

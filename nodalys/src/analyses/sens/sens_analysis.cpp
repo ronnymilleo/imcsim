@@ -70,7 +70,7 @@ void StoreSensitivity(SensitivityResult &result,
 }
 
 void StoreDeviceSensitivity(SensitivityResult &result,
-                            const Device &device,
+                            Device &device,
                             const std::string &lower_name,
                             const DcAdjointView &point) {
     const SensitiveDevice *sensitive = device.AsSensitive();

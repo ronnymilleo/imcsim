@@ -17,6 +17,43 @@ namespace {
 constexpr double OPEN_CIRCUIT_IMPEDANCE = 1e20;
 constexpr double SHORT_CIRCUIT_THRESHOLD = 1e-15;
 
+bool SolveInputExcitation(MnaSystem &system, const InputSource &input, std::vector<double> &dx_in) {
+    system.ClearRhs();
+    if (const VoltageSourceDevice *voltage_source = input.AsVoltage()) {
+        system.AddRhs(voltage_source->GetBranch(), 1.0);
+    } else {
+        const IndependentSourceDevice &source = input.GetSource();
+        system.AddRhs(source.GetNodeA(), -1.0);
+        system.AddRhs(source.GetNodeB(), 1.0);
+    }
+    return system.Solve(dx_in);
+}
+
+double ComputeInputImpedance(const InputSource &input, const std::vector<double> &dx_in, const double gmin) {
+    if (const VoltageSourceDevice *voltage_source = input.AsVoltage()) {
+        const double current_into_circuit = -dx_in[static_cast<std::size_t>(voltage_source->GetBranch())];
+        return std::fabs(current_into_circuit) <= 1.01 * gmin ? OPEN_CIRCUIT_IMPEDANCE : 1.0 / current_into_circuit;
+    }
+    const IndependentSourceDevice &source = input.GetSource();
+    const double va = source.GetNodeA() < 0 ? 0.0 : dx_in[static_cast<std::size_t>(source.GetNodeA())];
+    const double vb = source.GetNodeB() < 0 ? 0.0 : dx_in[static_cast<std::size_t>(source.GetNodeB())];
+    return std::min(vb - va, OPEN_CIRCUIT_IMPEDANCE);
+}
+
+/**
+ * @brief   Injects a unit test current at the output node and returns the clamped small-signal output impedance.
+ */
+std::expected<double, std::string> SolveOutputImpedance(MnaSystem &system, const int out_idx) {
+    system.ClearRhs();
+    system.AddRhs(out_idx, 1.0);
+    std::vector<double> dx_out(static_cast<std::size_t>(system.GetSize()), 0.0);
+    if (!system.Solve(dx_out)) {
+        return std::unexpected("Nodalys encountered a singular matrix while computing the output impedance");
+    }
+    const double z_out = dx_out[static_cast<std::size_t>(out_idx)];
+    return std::fabs(z_out) < SHORT_CIRCUIT_THRESHOLD ? 0.0 : std::min(z_out, OPEN_CIRCUIT_IMPEDANCE);
+}
+
 } // namespace
 
 /**
@@ -35,69 +72,37 @@ std::expected<TransferFunctionResult, std::string> ComputeTransferFunction(Compi
     if (const std::optional<std::string> refusal = CheckOutputNode(compiled, out_node)) {
         return std::unexpected(*refusal);
     }
-    const std::expected<InputSource, std::string> input =
-        ResolveInputSource(compiled, settings.InputSource, "a transfer function");
+    const auto input = ResolveInputSource(compiled, settings.InputSource, "a transfer function");
     if (!input) {
         return std::unexpected(input.error());
     }
-    const VoltageSourceDevice *voltage_source = input->AsVoltage();
-    const IndependentSourceDevice &input_source = input->GetSource();
-
-    const int size = compiled.System->GetSize();
-    const std::expected<std::vector<double>, std::string> x_dc =
-        SolveOperatingPoint(compiled, options, "Nodalys found no operating point for the transfer function", messages);
-    if (!x_dc) {
+    if (const auto x_dc = SolveOperatingPoint(compiled,
+                                              options,
+                                              "Nodalys found no operating point for the transfer function",
+                                              messages);
+        !x_dc) {
         return std::unexpected(x_dc.error());
     }
 
     const int out_idx = compiled.System->NodeIndex(out_node);
-
-    compiled.System->ClearRhs();
-    if (voltage_source != nullptr) {
-        compiled.System->AddRhs(voltage_source->GetBranch(), 1.0);
-    } else {
-        compiled.System->AddRhs(input_source.GetNodeA(), -1.0);
-        compiled.System->AddRhs(input_source.GetNodeB(), 1.0);
-    }
-
-    std::vector<double> dx_in(static_cast<std::size_t>(size), 0.0);
-    if (!compiled.System->Solve(dx_in)) {
+    std::vector<double> dx_in(static_cast<std::size_t>(compiled.System->GetSize()), 0.0);
+    if (!SolveInputExcitation(*compiled.System, *input, dx_in)) {
         return std::unexpected("Nodalys encountered a singular matrix while computing the transfer function");
     }
-
-    TransferFunctionResult result;
-    result.OutputPositiveNode = out_node;
-    result.OutputNegativeNode = settings.OutputNegativeNode;
-    result.InputSource = settings.InputSource;
-    result.GainUnit = voltage_source != nullptr ? "V/V" : "V/A";
-    result.Gain = dx_in[static_cast<std::size_t>(out_idx)];
-
-    if (voltage_source != nullptr) {
-        const double current_into_circuit = -dx_in[static_cast<std::size_t>(voltage_source->GetBranch())];
-        if (std::fabs(current_into_circuit) <= 1.01 * options.Gmin) {
-            result.InputImpedance = OPEN_CIRCUIT_IMPEDANCE;
-        } else {
-            result.InputImpedance = 1.0 / current_into_circuit;
-        }
-    } else {
-        const double va = input_source.GetNodeA() < 0 ? 0.0 : dx_in[static_cast<std::size_t>(input_source.GetNodeA())];
-        const double vb = input_source.GetNodeB() < 0 ? 0.0 : dx_in[static_cast<std::size_t>(input_source.GetNodeB())];
-        result.InputImpedance = std::min(vb - va, OPEN_CIRCUIT_IMPEDANCE);
+    const std::expected<double, std::string> z_out = SolveOutputImpedance(*compiled.System, out_idx);
+    if (!z_out) {
+        return std::unexpected(z_out.error());
     }
-
-    compiled.System->ClearRhs();
-    compiled.System->AddRhs(out_idx, 1.0);
-    std::vector<double> dx_out(static_cast<std::size_t>(size), 0.0);
-    if (!compiled.System->Solve(dx_out)) {
-        return std::unexpected("Nodalys encountered a singular matrix while computing the output impedance");
-    }
-    const double z_out = dx_out[static_cast<std::size_t>(out_idx)];
-    result.OutputImpedance = std::fabs(z_out) < SHORT_CIRCUIT_THRESHOLD ? 0.0 : std::min(z_out, OPEN_CIRCUIT_IMPEDANCE);
-
     if (messages) {
         messages->push_back({"nodalys: computed small-signal transfer function and impedances", false});
     }
-    return result;
+    return TransferFunctionResult{.InputSource = settings.InputSource,
+                                  .OutputPositiveNode = out_node,
+                                  .OutputNegativeNode = settings.OutputNegativeNode,
+                                  .Gain = dx_in[static_cast<std::size_t>(out_idx)],
+                                  .GainUnit = input->IsVoltage() ? "V/V" : "V/A",
+                                  .InputImpedance = ComputeInputImpedance(*input, dx_in, options.Gmin),
+                                  .OutputImpedance = *z_out};
 }
 
 } // namespace Nodalys

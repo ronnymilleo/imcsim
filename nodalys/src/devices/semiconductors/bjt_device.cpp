@@ -20,6 +20,26 @@ namespace {
 constexpr double BJT_JUNCTION_POTENTIAL = 0.75;
 constexpr double BJT_GRADING_COEFFICIENT = 0.33;
 
+struct BaseChargeFactor {
+    double Qb;
+    double DQbDvbe;
+    double DQbDvbc;
+};
+
+BaseChargeFactor
+ComputeBaseChargeFactor(const BjtParameters &p, const double vbc, const double ifwd, const double difwd) {
+    const double q1 = p.EarlyVoltage != 0.0 ? 1.0 / (1.0 - vbc / p.EarlyVoltage) : 1.0;
+    const double dq1_dvbc = p.EarlyVoltage != 0.0 ? (q1 * q1) / p.EarlyVoltage : 0.0;
+    if (p.ForwardKneeCurrent == 0.0) {
+        return {.Qb = q1, .DQbDvbe = 0.0, .DQbDvbc = dq1_dvbc};
+    }
+    const double q2 = ifwd / p.ForwardKneeCurrent;
+    const double sqarg = std::sqrt(std::max(1e-30, 1.0 + 4.0 * q2));
+    return {.Qb = q1 * (1.0 + sqarg) / 2.0,
+            .DQbDvbe = q1 * (difwd / (p.ForwardKneeCurrent * sqarg)),
+            .DQbDvbc = dq1_dvbc * (1.0 + sqarg) / 2.0};
+}
+
 } // namespace
 
 /**
@@ -80,10 +100,6 @@ void BjtDevice::ApplyTemperature(const ThermalConditions &thermal) {
 
 BjtDevice::Intrinsic BjtDevice::Evaluate(const double vbe, const double vbc) const {
     const BjtParameters &p = m_Parameters;
-    Intrinsic result{};
-
-    // 1. Forward (BE) and reverse (BC) ideal diode currents:
-    //    ifwd = IS * (exp(vbe / Vt) - 1),   irev = IS * (exp(vbc / Vt) - 1)
     const double exp_be = Exponential(vbe / m_Vt);
     const double ifwd = p.SaturationCurrent * (exp_be - 1.0);
     const double difwd = p.SaturationCurrent * exp_be / m_Vt;
@@ -92,31 +108,12 @@ BjtDevice::Intrinsic BjtDevice::Evaluate(const double vbe, const double vbc) con
     const double irev = p.SaturationCurrent * (exp_bc - 1.0);
     const double direv = p.SaturationCurrent * exp_bc / m_Vt;
 
-    // 2. Normalized base charge factor qb (Early effect VAF + high-level injection roll-off IKF):
-    //    Following SPICE (bjtload.c):
-    //      q1 = 1 / (1 - vbc / VAF)
-    //      q2 = ifwd / IKF
-    //      qb = (q1 / 2) * (1 + sqrt(1 + 4 * q2))
-    const double q1 = p.EarlyVoltage != 0.0 ? 1.0 / (1.0 - vbc / p.EarlyVoltage) : 1.0;
-    const double dq1_dvbc = p.EarlyVoltage != 0.0 ? (q1 * q1) / p.EarlyVoltage : 0.0;
-    double qb = q1;
-    double dqb_dvbe = 0.0;
-    double dqb_dvbc = dq1_dvbc;
-    if (p.ForwardKneeCurrent != 0.0) {
-        const double q2 = ifwd / p.ForwardKneeCurrent;
-        const double arg = std::max(1e-30, 1.0 + 4.0 * q2);
-        const double sqarg = std::sqrt(arg);
-        qb = q1 * (1.0 + sqarg) / 2.0;
-        dqb_dvbe = q1 * (difwd / (p.ForwardKneeCurrent * sqarg));
-        dqb_dvbc = dq1_dvbc * (1.0 + sqarg) / 2.0;
-    }
+    const BaseChargeFactor base = ComputeBaseChargeFactor(p, vbc, ifwd, difwd);
+    const double qb_sq = base.Qb * base.Qb;
+    const double icc = (ifwd - irev) / base.Qb;
+    const double dicc_dvbe = (difwd * base.Qb - (ifwd - irev) * base.DQbDvbe) / qb_sq;
+    const double dicc_dvbc = (-direv * base.Qb - (ifwd - irev) * base.DQbDvbc) / qb_sq;
 
-    // 3. Transport current from collector to emitter: icc = (ifwd - irev) / qb
-    const double icc = (ifwd - irev) / qb;
-    const double dicc_dvbe = (difwd * qb - (ifwd - irev) * dqb_dvbe) / (qb * qb);
-    const double dicc_dvbc = (-direv * qb - (ifwd - irev) * dqb_dvbc) / (qb * qb);
-
-    // 4. Base currents: ideal forward/reverse + non-ideal BE recombination leakage (ISE, NE)
     double ibe = ifwd / p.ForwardBeta;
     double dibe = difwd / p.ForwardBeta;
     if (p.LeakageSaturationCurrent > 0.0) {
@@ -127,19 +124,19 @@ BjtDevice::Intrinsic BjtDevice::Evaluate(const double vbe, const double vbc) con
     }
     const double ibc = irev / p.ReverseBeta;
     const double dibc = direv / p.ReverseBeta;
+    const double ic = icc - ibc;
+    const double ib = ibe + ibc;
 
-    // 5. Terminal DC currents and conductances
-    result.Ic = icc - ibc;
-    result.Ib = ibe + ibc;
-    result.Ie = -(result.Ic + result.Ib);
-    result.GcBe = dicc_dvbe;
-    result.GcBc = dicc_dvbc - dibc;
-    result.GbBe = dibe;
-    result.GbBc = dibc;
-    result.IfwdQb = ifwd / qb;
-    result.DIfwdQbDvbe = (difwd * qb - ifwd * dqb_dvbe) / (qb * qb);
-    result.DIfwdQbDvbc = (-ifwd * dqb_dvbc) / (qb * qb);
-    return result;
+    return {.Ic = ic,
+            .Ib = ib,
+            .Ie = -(ic + ib),
+            .GcBe = dicc_dvbe,
+            .GcBc = dicc_dvbc - dibc,
+            .GbBe = dibe,
+            .GbBc = dibc,
+            .IfwdQb = ifwd / base.Qb,
+            .DIfwdQbDvbe = (difwd * base.Qb - ifwd * base.DQbDvbe) / qb_sq,
+            .DIfwdQbDvbc = (-ifwd * base.DQbDvbc) / qb_sq};
 }
 
 /**
@@ -188,6 +185,28 @@ BjtDevice::JunctionCharges BjtDevice::EvaluateCharges(const JunctionState &state
             .Transcapacitance = p.TransitTime * state.Dc.DIfwdQbDvbc};
 }
 
+void BjtDevice::StampTransientCharges(MnaSystem &sys, const JunctionState &state, const TimeContext &time) {
+    m_Gqbe = m_Gqbc = m_Ieqbe = m_Ieqbc = 0.0;
+    if (!time.IsTransient || !HasTransientState()) {
+        return;
+    }
+    const JunctionCharges charges = EvaluateCharges(state);
+    const ChargeCompanion cap_be =
+        ChargeModel(charges.BaseEmitterCapacitance, charges.BaseEmitterCharge, state.VbeSigned, m_HistoryBe, time);
+    const ChargeCompanion cap_bc =
+        ChargeModel(charges.BaseCollectorCapacitance, charges.BaseCollectorCharge, state.VbcSigned, m_HistoryBc, time);
+    m_Gqbe = cap_be.Conductance;
+    m_Ieqbe = cap_be.EquivalentCurrent;
+    m_Gqbc = cap_bc.Conductance;
+    m_Ieqbc = cap_bc.EquivalentCurrent;
+
+    const double sign = m_Pnp ? -1.0 : 1.0;
+    StampConductance(sys, m_B, m_E, m_Gqbe);
+    StampCurrentSource(sys, m_B, m_E, sign * m_Ieqbe);
+    StampConductance(sys, m_B, m_C, m_Gqbc);
+    StampCurrentSource(sys, m_B, m_C, sign * m_Ieqbc);
+}
+
 void BjtDevice::Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) {
     const BjtParameters &p = m_Parameters;
     StampSeriesResistor(sys, m_Collector, m_C, p.CollectorResistance);
@@ -196,56 +215,25 @@ void BjtDevice::Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeCo
 
     const JunctionState state = EvaluateState(x);
     const Intrinsic &dc = state.Dc;
-    const double vbe = state.Vbe;
-    const double vbc = state.Vbc;
+    const double ieq_c = dc.Ic - dc.GcBe * state.Vbe - dc.GcBc * state.Vbc;
+    const double ieq_b = dc.Ib - dc.GbBe * state.Vbe - dc.GbBc * state.Vbc;
 
-    // Linearized DC currents around (vbe, vbc):
-    //   Ic(v) ≈ GcBe * (vB - vE) + GcBc * (vB - vC) + ieq_c
-    //   Ib(v) ≈ GbBe * (vB - vE) + GbBc * (vB - vC) + ieq_b
-    //   Ie(v) = -(Ic(v) + Ib(v))
-    const double ieq_c = dc.Ic - dc.GcBe * vbe - dc.GcBc * vbc;
-    const double ieq_b = dc.Ib - dc.GbBe * vbe - dc.GbBc * vbc;
-
-    // Collector KCL row (m_C)
     sys.AddA(m_C, m_B, dc.GcBe + dc.GcBc);
     sys.AddA(m_C, m_E, -dc.GcBe);
     sys.AddA(m_C, m_C, -dc.GcBc);
     sys.AddRhs(m_C, -ieq_c);
 
-    // Base KCL row (m_B)
     sys.AddA(m_B, m_B, dc.GbBe + dc.GbBc);
     sys.AddA(m_B, m_E, -dc.GbBe);
     sys.AddA(m_B, m_C, -dc.GbBc);
     sys.AddRhs(m_B, -ieq_b);
 
-    // Emitter KCL row (m_E): negative sum of Collector and Base rows
     sys.AddA(m_E, m_B, -(dc.GcBe + dc.GcBc + dc.GbBe + dc.GbBc));
     sys.AddA(m_E, m_E, dc.GcBe + dc.GbBe);
     sys.AddA(m_E, m_C, dc.GcBc + dc.GbBc);
     sys.AddRhs(m_E, ieq_c + ieq_b);
 
-    // Transient junction charges (BE depletion + forward transit time TF; BC depletion)
-    m_Gqbe = m_Gqbc = m_Ieqbe = m_Ieqbc = 0.0;
-    if (time.IsTransient && HasTransientState()) {
-        const JunctionCharges charges = EvaluateCharges(state);
-        const ChargeCompanion cap_be =
-            ChargeModel(charges.BaseEmitterCapacitance, charges.BaseEmitterCharge, state.VbeSigned, m_HistoryBe, time);
-        const ChargeCompanion cap_bc = ChargeModel(charges.BaseCollectorCapacitance,
-                                                   charges.BaseCollectorCharge,
-                                                   state.VbcSigned,
-                                                   m_HistoryBc,
-                                                   time);
-        m_Gqbe = cap_be.Conductance;
-        m_Ieqbe = cap_be.EquivalentCurrent;
-        m_Gqbc = cap_bc.Conductance;
-        m_Ieqbc = cap_bc.EquivalentCurrent;
-
-        const double sign = m_Pnp ? -1.0 : 1.0;
-        StampConductance(sys, m_B, m_E, m_Gqbe);
-        StampCurrentSource(sys, m_B, m_E, sign * m_Ieqbe);
-        StampConductance(sys, m_B, m_C, m_Gqbc);
-        StampCurrentSource(sys, m_B, m_C, sign * m_Ieqbc);
-    }
+    StampTransientCharges(sys, state, time);
 }
 
 double BjtDevice::TerminalCurrent(const int terminal, const std::vector<double> &x) const {

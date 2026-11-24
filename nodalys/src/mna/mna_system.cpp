@@ -6,126 +6,12 @@
 #include "mna/mna_system.h"
 
 #include "linear/dense_matrix.h"
+#include "mna/mna_solve.h"
 #include <algorithm>
 #include <cmath>
 #include <utility>
 
 namespace Nodalys {
-
-namespace {
-
-bool SolveRealSystem(const DenseMatrix &a_orig, const std::vector<double> &b_orig, std::vector<double> &x) {
-    const std::size_t n = a_orig.Rows();
-    DenseMatrix factors = a_orig;
-    std::vector<double> row_scale(n, 1.0);
-    std::vector<double> scaled_rhs = b_orig;
-
-    // 1. Row equilibration: scale each row by its largest entry magnitude so tiny conductances (e.g. Gmin = 1e-12)
-    //    and unit branch coefficients (1.0) compete fairly during partial pivoting.
-    for (std::size_t r = 0; r < n; ++r) {
-        double max_entry = 0.0;
-        for (std::size_t c = 0; c < n; ++c) {
-            max_entry = std::max(max_entry, std::fabs(factors.At(r, c)));
-        }
-        if (max_entry > 0.0) {
-            row_scale[r] = 1.0 / max_entry;
-            for (std::size_t c = 0; c < n; ++c) {
-                factors.At(r, c) *= row_scale[r];
-            }
-            scaled_rhs[r] *= row_scale[r];
-        }
-    }
-
-    if (!factors.FactorizeLU() || !factors.Solve(scaled_rhs, x)) {
-        return false;
-    }
-
-    // 2. One step of iterative refinement: r = b - A * x, solve A * dx = r, x += dx
-    std::vector<double> scaled_residual(n, 0.0);
-    for (std::size_t r = 0; r < n; ++r) {
-        double ax = 0.0;
-        for (std::size_t c = 0; c < n; ++c) {
-            ax += a_orig.At(r, c) * x[c];
-        }
-        scaled_residual[r] = (b_orig[r] - ax) * row_scale[r];
-    }
-    std::vector<double> dx;
-    if (factors.Solve(scaled_residual, dx)) {
-        for (std::size_t i = 0; i < n; ++i) {
-            x[i] += dx[i];
-        }
-    }
-    return true;
-}
-
-bool SolveComplexSystemMultiple(const ComplexDenseMatrix &y_orig,
-                                const std::vector<std::vector<std::complex<double>>> &b_orig_list,
-                                std::vector<std::vector<std::complex<double>>> &x_list) {
-    const std::size_t n = y_orig.Rows();
-    ComplexDenseMatrix factors = y_orig;
-    std::vector<double> row_scale(n, 1.0);
-
-    for (std::size_t r = 0; r < n; ++r) {
-        double max_entry = 0.0;
-        for (std::size_t c = 0; c < n; ++c) {
-            max_entry = std::max(max_entry, std::abs(factors.At(r, c)));
-        }
-        if (max_entry > 0.0) {
-            row_scale[r] = 1.0 / max_entry;
-            for (std::size_t c = 0; c < n; ++c) {
-                factors.At(r, c) *= row_scale[r];
-            }
-        }
-    }
-
-    if (!factors.FactorizeLU()) {
-        return false;
-    }
-
-    x_list.resize(b_orig_list.size());
-    for (std::size_t rhs_idx = 0; rhs_idx < b_orig_list.size(); ++rhs_idx) {
-        const auto &b_orig = b_orig_list[rhs_idx];
-        std::vector<std::complex<double>> scaled_rhs = b_orig;
-        for (std::size_t r = 0; r < n; ++r) {
-            scaled_rhs[r] *= row_scale[r];
-        }
-
-        auto &x = x_list[rhs_idx];
-        if (!factors.Solve(scaled_rhs, x)) {
-            return false;
-        }
-
-        std::vector<std::complex<double>> scaled_residual(n, std::complex<double>{0.0, 0.0});
-        for (std::size_t r = 0; r < n; ++r) {
-            std::complex<double> ax{0.0, 0.0};
-            for (std::size_t c = 0; c < n; ++c) {
-                ax += y_orig.At(r, c) * x[c];
-            }
-            scaled_residual[r] = (b_orig[r] - ax) * row_scale[r];
-        }
-        std::vector<std::complex<double>> dx;
-        if (factors.Solve(scaled_residual, dx)) {
-            for (std::size_t i = 0; i < n; ++i) {
-                x[i] += dx[i];
-            }
-        }
-    }
-    return true;
-}
-
-bool SolveComplexSystem(const ComplexDenseMatrix &y_orig,
-                        const std::vector<std::complex<double>> &b_orig,
-                        std::vector<std::complex<double>> &x) {
-    const std::vector<std::vector<std::complex<double>>> b_list = {b_orig};
-    std::vector<std::vector<std::complex<double>>> x_list;
-    if (!SolveComplexSystemMultiple(y_orig, b_list, x_list)) {
-        return false;
-    }
-    x = std::move(x_list[0]);
-    return true;
-}
-
-} // namespace
 
 /**
  * @struct  MnaSystem::Storage
@@ -430,15 +316,7 @@ bool MnaSystem::SolveAcFor(const MnaSystem &reactive,
     if (ac_matrix.Rows() != n || rhs.size() != n) {
         return false;
     }
-
-    // Assemble Y(j * omega) = A_dc + j * omega * C_ac
-    ComplexDenseMatrix y_orig(n, n);
-    for (std::size_t r = 0; r < n; ++r) {
-        for (std::size_t c = 0; c < n; ++c) {
-            y_orig.At(r, c) = std::complex<double>(dc_matrix.At(r, c), omega * ac_matrix.At(r, c));
-        }
-    }
-    return SolveComplexSystem(y_orig, rhs, x_ac);
+    return SolveComplexSystem(AssembleAcMatrix(dc_matrix, ac_matrix, omega), rhs, x_ac);
 }
 
 /**
@@ -459,14 +337,7 @@ bool MnaSystem::SolveAcMultiple(const MnaSystem &reactive,
     if (ac_matrix.Rows() != n) {
         return false;
     }
-
-    ComplexDenseMatrix y_orig(n, n);
-    for (std::size_t r = 0; r < n; ++r) {
-        for (std::size_t c = 0; c < n; ++c) {
-            y_orig.At(r, c) = std::complex<double>(dc_matrix.At(r, c), omega * ac_matrix.At(r, c));
-        }
-    }
-    return SolveComplexSystemMultiple(y_orig, rhs_list, solutions);
+    return SolveComplexSystemMultiple(AssembleAcMatrix(dc_matrix, ac_matrix, omega), rhs_list, solutions);
 }
 
 /**
@@ -512,13 +383,7 @@ bool MnaSystem::SolveAcTransposeFor(const MnaSystem &reactive,
     if (ac_matrix.Rows() != n || rhs.size() != n) {
         return false;
     }
-    ComplexDenseMatrix y_transpose(n, n);
-    for (std::size_t r = 0; r < n; ++r) {
-        for (std::size_t c = 0; c < n; ++c) {
-            y_transpose.At(r, c) = std::complex<double>(dc_matrix.At(c, r), omega * ac_matrix.At(c, r));
-        }
-    }
-    return SolveComplexSystem(y_transpose, rhs, adjoint);
+    return SolveComplexSystem(AssembleAcMatrix(dc_matrix, ac_matrix, omega, true), rhs, adjoint);
 }
 
 /**

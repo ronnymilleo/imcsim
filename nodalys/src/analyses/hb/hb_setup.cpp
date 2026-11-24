@@ -100,7 +100,8 @@ std::expected<void, std::string> ValidateDevices(const CompiledCircuit &compiled
             if (auto ok = CheckSourcePeriodicity(source->GetPeriodicity(), kind_label, config); !ok) {
                 return std::unexpected(ok.error());
             }
-        } else if (!device->SupportsHarmonicBalance()) {
+        } else if (const NonlinearDevice *nonlinear = device->AsNonlinear();
+                   nonlinear != nullptr && !nonlinear->SupportsHarmonicBalance()) {
             return std::unexpected("Harmonic Balance does not support hysteretic switches or relays, nor a "
                                    "behavioral source that reads time");
         }
@@ -184,7 +185,7 @@ PartitionedCircuit PartitionDevices(const CompiledCircuit &compiled) {
             partitioned.Sources.push_back(source);
         }
 
-        if (device->IsLinear()) {
+        if (device->AsNonlinear() == nullptr) {
             partitioned.LinearDevices.push_back(device.get());
         } else {
             partitioned.NonlinearDevices.push_back(device.get());

@@ -202,6 +202,28 @@ std::size_t FindSingleShiftStart(const DenseMatrix &a,
     return ld;
 }
 
+QzShift MakeSingleShift(DenseMatrix &a,
+                        const DenseMatrix &b,
+                        const std::size_t ld,
+                        const std::size_t na,
+                        const double a11,
+                        const double a21,
+                        const double a44,
+                        const double t,
+                        const double r,
+                        const double epsa,
+                        const double epsb) {
+    const double sqrt_r = std::sqrt(r);
+    const double sh1 = -t + sqrt_r;
+    const double sh2 = -t - sqrt_r;
+    const double sh = (std::abs(sh2 - a44) < std::abs(sh1 - a44)) ? sh2 : sh1;
+    const std::size_t start = FindSingleShiftStart(a, b, ld, na - 1, sh, epsa, epsb);
+    if (start != ld) {
+        a.At(start, start - 1) = -a.At(start, start - 1);
+    }
+    return {.Order = 1, .Start = start, .A1 = a11 - sh, .A2 = a21, .A3 = 0.0};
+}
+
 QzShift ComputeQzShift(DenseMatrix &a,
                        const DenseMatrix &b,
                        const std::size_t ld,
@@ -212,7 +234,6 @@ QzShift ComputeQzShift(DenseMatrix &a,
     if (its == 10) {
         return {.Order = 2, .Start = ld, .A1 = 0.0, .A2 = 1.0, .A3 = 1.1605};
     }
-
     const std::size_t l1 = ld + 1;
     const std::size_t na = en - 1;
     const double a11 = a.At(ld, ld) / b.At(ld, ld);
@@ -220,29 +241,16 @@ QzShift ComputeQzShift(DenseMatrix &a,
     const double b22 = std::abs(b.At(l1, l1)) < epsb ? epsb : b.At(l1, l1);
     const double b33 = std::abs(b.At(na, na)) < epsb ? epsb : b.At(na, na);
     const double b44 = std::abs(b.At(en, en)) < epsb ? epsb : b.At(en, en);
-
     const double a33 = a.At(na, na) / b33;
     const double a34 = a.At(na, en) / b44;
     const double a43 = a.At(en, na) / b33;
     const double a44 = a.At(en, en) / b44;
     const double b34 = b.At(na, en) / b44;
-
     const double t = 0.5 * (a43 * b34 - a33 - a44);
     const double r = t * t + a34 * a43 - a33 * a44;
     if (r >= 0.0) {
-        const double sqrt_r = std::sqrt(r);
-        double sh = -t + sqrt_r;
-        const double s = -t - sqrt_r;
-        if (std::abs(s - a44) < std::abs(sh - a44)) {
-            sh = s;
-        }
-        const std::size_t start = FindSingleShiftStart(a, b, ld, na - 1, sh, epsa, epsb);
-        if (start != ld) {
-            a.At(start, start - 1) = -a.At(start, start - 1);
-        }
-        return {.Order = 1, .Start = start, .A1 = a11 - sh, .A2 = a21, .A3 = 0.0};
+        return MakeSingleShift(a, b, ld, na, a11, a21, a44, t, r, epsa, epsb);
     }
-
     const double a12 = a.At(ld, l1) / b22;
     const double a22 = a.At(l1, l1) / b22;
     const double b12 = b.At(ld, l1) / b22;

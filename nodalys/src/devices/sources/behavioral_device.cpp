@@ -22,14 +22,6 @@ void BehavioralSourceDevice::BindCurrent(const std::size_t input, const int bran
 }
 
 /**
- * @brief   Tells that the device is nonlinear: its expression is evaluated again at every iterate.
- * @return  Always false.
- */
-bool BehavioralSourceDevice::IsLinear() const {
-    return false;
-}
-
-/**
  * @brief   Tells whether the harmonic balance can run the device.
  * @return  True unless the expression reads `time`: the balance evaluates a nonlinear device at each sample of the
  *          state without the instant of the sample.

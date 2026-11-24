@@ -261,17 +261,13 @@ std::expected<SParameterResult, std::string> ComputeSParameters(CompiledCircuit 
     if (!validated_ports) {
         return std::unexpected(validated_ports.error());
     }
-    const std::vector<CircuitPort> &ports = *validated_ports;
-
     const auto freq_points = GenerateFrequencyPoints(settings);
     if (!freq_points) {
         return std::unexpected(freq_points.error());
     }
-    const std::vector<double> &frequencies = *freq_points;
 
     // The terminations stay in the circuit until the end of the analysis
-    const DeviceRestoreGuard restore_guard = AddPortTerminations(compiled, ports);
-
+    const DeviceRestoreGuard restore_guard = AddPortTerminations(compiled, *validated_ports);
     const std::expected<std::vector<double>, std::string> x_dc =
         SolveOperatingPoint(compiled,
                             options,
@@ -280,21 +276,20 @@ std::expected<SParameterResult, std::string> ComputeSParameters(CompiledCircuit 
     if (!x_dc) {
         return std::unexpected(x_dc.error());
     }
-    const MnaSystem reactive = BuildReactiveSystem(compiled, *x_dc);
-    const PortDrives drives = MakePortDrives(compiled, ports);
 
-    SParameterResult result = MakeSweepResult(frequencies, ports);
+    const MnaSystem reactive = BuildReactiveSystem(compiled, *x_dc);
+    const PortDrives drives = MakePortDrives(compiled, *validated_ports);
+    SParameterResult result = MakeSweepResult(*freq_points, *validated_ports);
     if (const std::optional<std::string> failure = AddFrequencyPoints(result, compiled, reactive, drives)) {
         return std::unexpected(*failure);
     }
 
     if (messages != nullptr) {
         messages->push_back({std::format("nodalys: computed S-parameters for {} ports across {} frequency points",
-                                         ports.size(),
-                                         frequencies.size()),
+                                         validated_ports->size(),
+                                         freq_points->size()),
                              false});
     }
-
     return result;
 }
 

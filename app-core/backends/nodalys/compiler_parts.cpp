@@ -257,39 +257,30 @@ AddSemiconductor(Nodalys::CircuitBuilder &builder, const Circuit &top_circuit, c
     case ComponentType::DIODE:
     case ComponentType::ZENER_DIODE:
     case ComponentType::LED: {
-        const auto resolved_diode = ResolveParameters(top_circuit, static_cast<const Diode &>(part));
-        if (!resolved_diode) {
-            return std::unexpected(resolved_diode.error());
+        const auto diode = ResolveParameters(top_circuit, static_cast<const Diode &>(part));
+        if (!diode) {
+            return std::unexpected(diode.error());
         }
-        builder.AddDiode(entry.Name, nodes[0], nodes[1], ToNodalys(*resolved_diode));
+        builder.AddDiode(entry.Name, nodes[0], nodes[1], ToNodalys(*diode));
         return {};
     }
     case ComponentType::NPN:
     case ComponentType::PNP: {
-        const auto resolved_bjt = ResolveParameters(top_circuit, static_cast<const BJT &>(part));
-        if (!resolved_bjt) {
-            return std::unexpected(resolved_bjt.error());
+        const auto bjt = ResolveParameters(top_circuit, static_cast<const BJT &>(part));
+        if (!bjt) {
+            return std::unexpected(bjt.error());
         }
-        builder.AddBjt(entry.Name,
-                       nodes[0],
-                       nodes[1],
-                       nodes[2],
-                       entry.Type != ComponentType::PNP,
-                       ToNodalys(*resolved_bjt));
+        builder.AddBjt(entry.Name, nodes[0], nodes[1], nodes[2], entry.Type != ComponentType::PNP, ToNodalys(*bjt));
         return {};
     }
     case ComponentType::NMOS:
     case ComponentType::PMOS: {
-        const auto resolved_mosfet = ResolveParameters(top_circuit, static_cast<const MOSFET &>(part));
-        if (!resolved_mosfet) {
-            return std::unexpected(resolved_mosfet.error());
+        const auto mosfet = ResolveParameters(top_circuit, static_cast<const MOSFET &>(part));
+        if (!mosfet) {
+            return std::unexpected(mosfet.error());
         }
-        builder.AddMosfet(entry.Name,
-                          nodes[0],
-                          nodes[1],
-                          nodes[2],
-                          entry.Type != ComponentType::PMOS,
-                          ToNodalys(*resolved_mosfet));
+        builder
+            .AddMosfet(entry.Name, nodes[0], nodes[1], nodes[2], entry.Type != ComponentType::PMOS, ToNodalys(*mosfet));
         return {};
     }
     default:

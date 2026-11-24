@@ -83,8 +83,9 @@ bool LimitInTimeDomain(HbWorkspace &ws, const std::vector<double> &x_hb, NewtonB
     UnpackCoefficientsToSamples(ws, buffers.Candidate, buffers.CandidateSamples);
     bool any_limited = false;
     for (std::size_t m = 0; m < ws.SampleCount; ++m) {
-        for (const Device *device : ws.NonlinearDevices) {
-            if (device->Limit(buffers.CandidateSamples[m], buffers.PreviousSamples[m])) {
+        for (Device *device : ws.NonlinearDevices) {
+            if (const NonlinearDevice *nonlinear = device->AsNonlinear();
+                nonlinear != nullptr && nonlinear->Limit(buffers.CandidateSamples[m], buffers.PreviousSamples[m])) {
                 any_limited = true;
             }
         }
@@ -254,6 +255,26 @@ HbSolveOutcome MakeOutcome(const int iterations, std::string strategy) {
     return {.Converged = true, .Iterations = iterations, .Strategy = std::move(strategy)};
 }
 
+/**
+ * @brief   Solves the DC harmonic (k = 0) of a linear circuit into coeffs_out.
+ */
+bool SolveLinearDcHarmonic(const HbWorkspace &ws, std::vector<double> &coeffs_out) {
+    const int n = ws.UnknownCount;
+    MnaSystem sys_dc = ws.GLin;
+    sys_dc.ClearRhs();
+    for (int u = 0; u < n; ++u) {
+        sys_dc.AddRhs(u, ws.BaseRhsHarmonics[ws.Index(u, 0)]);
+    }
+    std::vector<double> x0(static_cast<std::size_t>(n), 0.0);
+    if (!sys_dc.Solve(x0)) {
+        return false;
+    }
+    for (int u = 0; u < n; ++u) {
+        coeffs_out[ws.Index(u, 0)] = x0[static_cast<std::size_t>(u)];
+    }
+    return true;
+}
+
 } // namespace
 
 /**
@@ -268,27 +289,13 @@ bool SolveLinearCircuit(const HbWorkspace &ws, std::vector<double> &coeffs_out) 
     if (n == 0) {
         return true;
     }
-
-    // DC harmonic (k = 0)
-    {
-        MnaSystem sys_dc = ws.GLin;
-        sys_dc.ClearRhs();
-        for (int u = 0; u < n; ++u) {
-            sys_dc.AddRhs(u, ws.BaseRhsHarmonics[ws.Index(u, 0)]);
-        }
-        std::vector<double> x0(static_cast<std::size_t>(n), 0.0);
-        if (!sys_dc.Solve(x0)) {
-            return false;
-        }
-        for (int u = 0; u < n; ++u) {
-            coeffs_out[ws.Index(u, 0)] = x0[static_cast<std::size_t>(u)];
-        }
+    if (!SolveLinearDcHarmonic(ws, coeffs_out)) {
+        return false;
     }
 
     // Harmonics k = 1 .. H: solve (G_lin + j * k * omega0 * C_lin) * X_k = B_k
     std::vector<std::complex<double>> rhs_k(static_cast<std::size_t>(n));
     std::vector<std::complex<double>> sol_k(static_cast<std::size_t>(n));
-
     for (int k = 1; k <= ws.Harmonics; ++k) {
         const double kw = static_cast<double>(k) * ws.Omega0;
         for (int r = 0; r < n; ++r) {

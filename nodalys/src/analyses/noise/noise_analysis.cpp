@@ -186,6 +186,31 @@ std::vector<NoiseContribution> BuildContributions(const CompiledCircuit &compile
     return contributions;
 }
 
+std::optional<std::string> SweepNoiseFrequencies(const CompiledCircuit &compiled,
+                                                 const MnaSystem &reactive,
+                                                 const InputSource &input,
+                                                 const std::vector<double> &x_dc,
+                                                 const int out_unknown,
+                                                 NoiseAccumulator &accumulator,
+                                                 NoiseResult &result) {
+    std::vector<std::complex<double>> adjoint(static_cast<std::size_t>(compiled.System->GetSize()));
+    for (std::size_t k = 0; k < result.Frequencies.size(); ++k) {
+        const double frequency = result.Frequencies[k];
+        const double omega = 2.0 * std::numbers::pi * frequency;
+        if (!compiled.System->SolveAcTranspose(reactive, omega, out_unknown, adjoint)) {
+            return std::format("The Nodalys noise solver encountered a singular matrix at f = {} Hz", frequency);
+        }
+        const std::complex<double> gain = FindSourceGain(input, adjoint);
+        const double inv_gain_sq = 1.0 / std::max(std::norm(gain), MIN_GAIN_SQUARED);
+        const double total_out_var =
+            AddDeviceVariances(accumulator, compiled, x_dc, adjoint, result.Frequencies, k, inv_gain_sq);
+        result.OutputDensities[k] = std::sqrt(total_out_var);
+        result.InputDensities[k] = std::sqrt(total_out_var * inv_gain_sq);
+        StoreGroupVariances(accumulator, compiled, k);
+    }
+    return std::nullopt;
+}
+
 } // namespace
 
 /**
@@ -206,53 +231,33 @@ std::expected<NoiseResult, std::string> ComputeNoise(CompiledCircuit &compiled,
     if (!input) {
         return std::unexpected(input.error());
     }
-    const std::expected<std::vector<double>, std::string> x_dc =
-        SolveOperatingPoint(compiled,
-                            options,
-                            "Nodalys found no operating point to linearize the noise analysis around",
-                            messages);
+    const auto x_dc = SolveOperatingPoint(compiled,
+                                          options,
+                                          "Nodalys found no operating point to linearize the noise analysis around",
+                                          messages);
     if (!x_dc) {
         return std::unexpected(x_dc.error());
     }
     const MnaSystem reactive = BuildReactiveSystem(compiled, *x_dc);
-
-    NoiseResult result;
-    result.OutputNode = settings.OutputPositiveNode;
-    result.InputSource = settings.InputSource;
-    result.InputUnit = input->IsVoltage() ? "V" : "A";
-    result.Frequencies = MakeFrequencySweep(settings.SweepType,
-                                            settings.StartFrequency,
-                                            settings.StopFrequency,
-                                            settings.PointsPerDecade);
-
-    const std::size_t point_count = result.Frequencies.size();
-    result.OutputDensities.assign(point_count, 0.0);
-    result.InputDensities.assign(point_count, 0.0);
+    const std::vector<double> frequencies = MakeFrequencySweep(settings.SweepType,
+                                                               settings.StartFrequency,
+                                                               settings.StopFrequency,
+                                                               settings.PointsPerDecade);
+    const std::size_t point_count = frequencies.size();
+    NoiseResult result{.OutputNode = settings.OutputPositiveNode,
+                       .InputSource = settings.InputSource,
+                       .InputUnit = input->IsVoltage() ? "V" : "A",
+                       .Frequencies = frequencies,
+                       .OutputDensities = std::vector<double>(point_count, 0.0),
+                       .InputDensities = std::vector<double>(point_count, 0.0)};
     NoiseAccumulator accumulator = MakeAccumulator(compiled, point_count);
-
     const int out_unknown = compiled.System->NodeIndex(settings.OutputPositiveNode);
-    std::vector<std::complex<double>> adjoint(static_cast<std::size_t>(compiled.System->GetSize()));
-    for (std::size_t k = 0; k < point_count; ++k) {
-        const double frequency = result.Frequencies[k];
-        const double omega = 2.0 * std::numbers::pi * frequency;
-        if (!compiled.System->SolveAcTranspose(reactive, omega, out_unknown, adjoint)) {
-            return std::unexpected(
-                std::format("The Nodalys noise solver encountered a singular matrix at f = {} Hz", frequency));
-        }
-
-        const std::complex<double> gain = FindSourceGain(*input, adjoint);
-        const double inv_gain_sq = 1.0 / std::max(std::norm(gain), MIN_GAIN_SQUARED);
-        const double total_out_var =
-            AddDeviceVariances(accumulator, compiled, *x_dc, adjoint, result.Frequencies, k, inv_gain_sq);
-        result.OutputDensities[k] = std::sqrt(total_out_var);
-        result.InputDensities[k] = std::sqrt(total_out_var * inv_gain_sq);
-        StoreGroupVariances(accumulator, compiled, k);
+    if (const auto error = SweepNoiseFrequencies(compiled, reactive, *input, *x_dc, out_unknown, accumulator, result)) {
+        return std::unexpected(*error);
     }
-
     result.OutputTotal = std::sqrt(accumulator.IntegratedOutputVariance);
     result.InputTotal = std::sqrt(accumulator.IntegratedInputVariance);
     result.Contributions = BuildContributions(compiled, accumulator, point_count);
-
     if (messages) {
         messages->push_back({std::format("nodalys: noise analysis computed {} frequency points", point_count), false});
     }

@@ -44,7 +44,7 @@ public:
     void RegisterElement(const std::string &name, Device *device);
     void RegisterElementAlias(const std::string &name, Device *device);
     void RegisterTerminalCurrents(const std::string &name,
-                                  const Device *device,
+                                  Device *device,
                                   std::initializer_list<std::string_view> terminals);
     void AddCurrentReadout(std::string name, std::vector<CurrentContribution> contributions);
     void AddNoiseGroup(std::string name, std::vector<const Device *> devices);

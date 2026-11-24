@@ -92,7 +92,6 @@ std::expected<AcSweepResult, std::string> ComputeACSweep(CompiledCircuit &compil
     if (!IsValidSweepRange(settings.StartFrequency, settings.StopFrequency, settings.PointsPerDecade)) {
         return std::unexpected("The AC sweep has invalid frequency settings; check start, stop and points per decade");
     }
-
     const std::expected<std::vector<double>, std::string> x_dc =
         SolveOperatingPoint(compiled,
                             options,
@@ -102,12 +101,11 @@ std::expected<AcSweepResult, std::string> ComputeACSweep(CompiledCircuit &compil
         return std::unexpected(x_dc.error());
     }
     const MnaSystem reactive = BuildReactiveSystem(compiled, *x_dc);
-
-    AcSweepResult result = MakeSweepResult(compiled,
-                                           MakeFrequencySweep(settings.SweepType,
-                                                              settings.StartFrequency,
-                                                              settings.StopFrequency,
-                                                              settings.PointsPerDecade));
+    const std::vector<double> frequencies = MakeFrequencySweep(settings.SweepType,
+                                                               settings.StartFrequency,
+                                                               settings.StopFrequency,
+                                                               settings.PointsPerDecade);
+    AcSweepResult result = MakeSweepResult(compiled, frequencies);
 
     std::vector<std::complex<double>> x_ac(static_cast<std::size_t>(compiled.System->GetSize()));
     for (const double frequency : result.Frequencies) {

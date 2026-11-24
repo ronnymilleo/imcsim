@@ -59,7 +59,7 @@ bool SetSourceValue(Device *device, const double value) {
     return false;
 }
 
-std::string SourceUnit(const Device *device) {
+std::string SourceUnit(Device *device) {
     if (const auto *source = device->AsIndependentSource()) {
         return source->IsVoltageSource() ? "V" : "A";
     }
@@ -124,6 +124,21 @@ std::expected<DcSweepCurve, std::string> SweepCurve(SweepRun &run, const double 
     return curve;
 }
 
+std::optional<std::string>
+RunSteppedCurves(SweepRun &run, Device *stepped_device, const std::vector<double> &step_values, DcSweepResult &sweep) {
+    for (const double step_value : step_values) {
+        if (stepped_device != nullptr && !SetSourceValue(stepped_device, step_value)) {
+            return std::format("Nodalys cannot step the source {}", sweep.SteppedSource);
+        }
+        std::expected<DcSweepCurve, std::string> curve = SweepCurve(run, step_value);
+        if (!curve) {
+            return curve.error();
+        }
+        sweep.Curves.push_back(std::move(*curve));
+    }
+    return std::nullopt;
+}
+
 } // namespace
 
 /**
@@ -167,9 +182,8 @@ std::expected<DcSweepResult, std::string> ComputeDCSweep(CompiledCircuit &compil
     if (!swept) {
         return std::unexpected(swept.error());
     }
-    const bool is_stepped = !settings.SteppedSource.empty();
     Device *stepped_device = nullptr;
-    if (is_stepped) {
+    if (!settings.SteppedSource.empty()) {
         const std::expected<Device *, std::string> stepped = FindSourceByName(compiled, settings.SteppedSource);
         if (!stepped) {
             return std::unexpected(stepped.error());
@@ -177,39 +191,24 @@ std::expected<DcSweepResult, std::string> ComputeDCSweep(CompiledCircuit &compil
         stepped_device = *stepped;
     }
 
-    DcSweepResult sweep;
-    sweep.SweptSource = settings.SweptSource;
-    sweep.SweptUnit = SourceUnit(*swept);
-    sweep.SweptValues = GenerateSweepValues(settings.SweptStart, settings.SweptStop, settings.SweptStep);
+    DcSweepResult sweep{.SweptSource = settings.SweptSource,
+                        .SweptUnit = SourceUnit(*swept),
+                        .SweptValues = GenerateSweepValues(settings.SweptStart, settings.SweptStop, settings.SweptStep),
+                        .SteppedSource = stepped_device != nullptr ? settings.SteppedSource : std::string{},
+                        .SteppedUnit = stepped_device != nullptr ? SourceUnit(stepped_device) : std::string{}};
     if (sweep.SweptValues.empty()) {
         return std::unexpected("The DC sweep has no points; check its start, stop and step");
     }
     // Without a stepped source there is one curve, which holds the stepped value at zero
     const std::vector<double> step_values =
-        is_stepped ? GenerateSweepValues(settings.SteppedStart, settings.SteppedStop, settings.SteppedStep)
-                   : std::vector<double>{0.0};
-    if (is_stepped) {
-        sweep.SteppedSource = settings.SteppedSource;
-        sweep.SteppedUnit = SourceUnit(stepped_device);
-    }
+        stepped_device != nullptr
+            ? GenerateSweepValues(settings.SteppedStart, settings.SteppedStop, settings.SteppedStep)
+            : std::vector<double>{0.0};
 
-    SweepRun run{.Compiled = compiled,
-                 .Options = options,
-                 .Swept = *swept,
-                 .SweptName = sweep.SweptSource,
-                 .SweptValues = sweep.SweptValues,
-                 .Solution = std::vector<double>(static_cast<std::size_t>(compiled.System->GetSize()), 0.0),
-                 .Context = {},
-                 .LastOutcome = {}};
-    for (const double step_value : step_values) {
-        if (is_stepped && !SetSourceValue(stepped_device, step_value)) {
-            return std::unexpected(std::format("Nodalys cannot step the source {}", sweep.SteppedSource));
-        }
-        std::expected<DcSweepCurve, std::string> curve = SweepCurve(run, step_value);
-        if (!curve) {
-            return std::unexpected(curve.error());
-        }
-        sweep.Curves.push_back(std::move(*curve));
+    std::vector<double> x0(static_cast<std::size_t>(compiled.System->GetSize()), 0.0);
+    SweepRun run{compiled, options, *swept, sweep.SweptSource, sweep.SweptValues, std::move(x0), {}, {}};
+    if (const std::optional<std::string> error = RunSteppedCurves(run, stepped_device, step_values, sweep)) {
+        return std::unexpected(*error);
     }
     DescribeOutcome(run.LastOutcome, "DC sweep", messages);
     return sweep;

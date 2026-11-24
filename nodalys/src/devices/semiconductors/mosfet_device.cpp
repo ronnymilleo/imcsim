@@ -122,11 +122,29 @@ MosfetDevice::BodyDiodeNodes MosfetDevice::GetBodyDiodeNodes() const {
     return {.Anode = m_Pmos ? m_D : m_Source, .Cathode = m_Pmos ? m_Source : m_D};
 }
 
+void MosfetDevice::StampOverlapCapacitances(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) {
+    m_Gcgs = m_Gcgd = m_Ieqgs = m_Ieqgd = 0.0;
+    if (!time.IsTransient || !HasTransientState()) {
+        return;
+    }
+    const double vgs = NodeVoltage(x, m_Gate) - NodeVoltage(x, m_Source);
+    const double vgd = NodeVoltage(x, m_Gate) - NodeVoltage(x, m_Drain);
+    const ChargeCompanion cap_gs = ChargeModel(m_Cgs, m_Cgs * vgs, vgs, m_HistoryGs, time);
+    const ChargeCompanion cap_gd = ChargeModel(m_Cgd, m_Cgd * vgd, vgd, m_HistoryGd, time);
+    m_Gcgs = cap_gs.Conductance;
+    m_Ieqgs = cap_gs.EquivalentCurrent;
+    m_Gcgd = cap_gd.Conductance;
+    m_Ieqgd = cap_gd.EquivalentCurrent;
+    StampConductance(sys, m_Gate, m_Source, m_Gcgs);
+    StampCurrentSource(sys, m_Gate, m_Source, m_Ieqgs);
+    StampConductance(sys, m_Gate, m_Drain, m_Gcgd);
+    StampCurrentSource(sys, m_Gate, m_Drain, m_Ieqgd);
+}
+
 void MosfetDevice::Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) {
     StampSeriesResistor(sys, m_Drain, m_D, m_Parameters.DrainResistance);
     StampSeriesResistor(sys, m_Source, m_S, m_Parameters.SourceResistance);
 
-    // 1. Channel conduction (with symmetric source/drain role swap when Vds_eff < 0)
     const ChannelState state = EvaluateChannel(x);
     const Channel &channel = state.Conduction;
     const int d_eff = state.Drain;
@@ -135,8 +153,6 @@ void MosfetDevice::Stamp(MnaSystem &sys, const std::vector<double> &x, const Tim
     const double vd_eff = NodeVoltage(x, d_eff);
     const double vs_eff = NodeVoltage(x, s_eff);
 
-    // Small-signal companion between d_eff and s_eff:
-    //   I(d_eff -> s_eff) ≈ Gm * (V(Gate) - V(s_eff)) + Gds * (V(d_eff) - V(s_eff)) + ieq
     const double i_channel = state.Polarity * channel.Current;
     const double ieq = i_channel - channel.Gm * (vg - vs_eff) - channel.Gds * (vd_eff - vs_eff);
 
@@ -147,7 +163,6 @@ void MosfetDevice::Stamp(MnaSystem &sys, const std::vector<double> &x, const Tim
     sys.AddA(s_eff, s_eff, channel.Gm);
     StampCurrentSource(sys, d_eff, s_eff, ieq);
 
-    // 2. Body-drain PN junction diode (body is tied to the external source terminal):
     const BodyDiodeNodes body = GetBodyDiodeNodes();
     const double vbody = NodeVoltage(x, body.Anode) - NodeVoltage(x, body.Cathode);
     const double diode_exp = Exponential(vbody / m_Vt);
@@ -155,22 +170,7 @@ void MosfetDevice::Stamp(MnaSystem &sys, const std::vector<double> &x, const Tim
     const double diode_cond = MOSFET_BODY_SATURATION_CURRENT * diode_exp / m_Vt;
     StampNortonBranch(sys, body.Anode, body.Cathode, diode_cond, diode_current, vbody);
 
-    // 3. Linear gate-overlap capacitances (CGSO*W between Gate-Source, CGDO*W between Gate-Drain)
-    m_Gcgs = m_Gcgd = m_Ieqgs = m_Ieqgd = 0.0;
-    if (time.IsTransient && HasTransientState()) {
-        const double vgs = NodeVoltage(x, m_Gate) - NodeVoltage(x, m_Source);
-        const double vgd = NodeVoltage(x, m_Gate) - NodeVoltage(x, m_Drain);
-        const ChargeCompanion cap_gs = ChargeModel(m_Cgs, m_Cgs * vgs, vgs, m_HistoryGs, time);
-        const ChargeCompanion cap_gd = ChargeModel(m_Cgd, m_Cgd * vgd, vgd, m_HistoryGd, time);
-        m_Gcgs = cap_gs.Conductance;
-        m_Ieqgs = cap_gs.EquivalentCurrent;
-        m_Gcgd = cap_gd.Conductance;
-        m_Ieqgd = cap_gd.EquivalentCurrent;
-        StampConductance(sys, m_Gate, m_Source, m_Gcgs);
-        StampCurrentSource(sys, m_Gate, m_Source, m_Ieqgs);
-        StampConductance(sys, m_Gate, m_Drain, m_Gcgd);
-        StampCurrentSource(sys, m_Gate, m_Drain, m_Ieqgd);
-    }
+    StampOverlapCapacitances(sys, x, time);
 }
 
 double MosfetDevice::TerminalCurrent(const int terminal, const std::vector<double> &x) const {

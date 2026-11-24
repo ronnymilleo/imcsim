@@ -19,7 +19,7 @@ namespace Nodalys {
  * Series resistances \f$R_C, R_B, R_E\f$ place internal nodes (`m_C, m_B, m_E`) between the external pins and the
  * intrinsic transistor when nonzero.
  */
-class BjtDevice : public Device {
+class BjtDevice : public Device, public NonlinearDevice, public TransientDevice {
 public:
     BjtDevice(int collector,
               int base,
@@ -32,9 +32,6 @@ public:
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     void StampAc(MnaSystem &reactive, const std::vector<double> &x_dc) const override;
-
-    bool IsLinear() const override { return false; }
-
     void StampCharge(MnaSystem &sys, const std::vector<double> &x) const override;
     bool Limit(std::vector<double> &x_new, const std::vector<double> &x_old) const override;
     void SeedOperatingPoint(std::vector<double> &x) const override;
@@ -47,10 +44,12 @@ public:
     double OutputNoiseVariance(const std::vector<double> &x_dc,
                                const std::vector<std::complex<double>> &adjoint,
                                double frequency_hz) const override;
-    bool HasTransientState() const override;
     void AcceptStep(const std::vector<double> &x) override;
     void RejectStep() override;
     void SetTemperature(const ThermalConditions &thermal) override;
+
+    [[nodiscard]] DeviceRoles GetRoles() override { return {.Nonlinear = this, .Transient = this}; }
+
     [[nodiscard]] std::unique_ptr<Device> Clone() const override;
 
 private:
@@ -109,7 +108,9 @@ private:
     ChargeHistory m_HistoryBc, m_SavedHistoryBc;
     double m_Gqbe = 0.0, m_Ieqbe = 0.0, m_Gqbc = 0.0, m_Ieqbc = 0.0;
 
+    bool HasTransientState() const;
     void ApplyTemperature(const ThermalConditions &thermal);
+    void StampTransientCharges(MnaSystem &sys, const JunctionState &state, const TimeContext &time);
     Intrinsic Evaluate(double vbe, double vbc) const;
     JunctionState EvaluateState(const std::vector<double> &x) const;
     JunctionCharges EvaluateCharges(const JunctionState &state) const;
