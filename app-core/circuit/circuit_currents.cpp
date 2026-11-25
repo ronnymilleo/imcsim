@@ -75,6 +75,9 @@ std::vector<CurrentProbe> GetCurrentProbes(const Component &component) {
     if (component.GetType() == ComponentType::THYRISTOR) {
         return {{0, "A"}, {1, "K"}, {2, "G"}};
     }
+    if (component.GetType() == ComponentType::TRIAC) {
+        return {{0, "MT2"}, {1, "MT1"}, {2, "G"}};
+    }
     if (component.GetType() == ComponentType::POTENTIOMETER) {
         return {{0, "A"}, {1, "B"}, {2, "W"}};
     }

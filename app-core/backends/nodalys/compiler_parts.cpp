@@ -306,6 +306,7 @@ std::expected<void, std::string> AddSwitchingPart(Nodalys::CircuitBuilder &build
         builder.AddFuse(entry.Name, nodes[0], nodes[1], ToNodalys(static_cast<const Fuse &>(part).GetParameters()));
         return {};
     case ComponentType::THYRISTOR:
+    case ComponentType::TRIAC:
         builder.AddThyristor(entry.Name,
                              nodes[0],
                              nodes[1],
