@@ -104,6 +104,7 @@ private:
     void Lower(const RelaySpec &spec);
     void Lower(const ResistorSpec &spec);
     void Lower(const SwitchSpec &spec);
+    void Lower(const ThyristorSpec &spec);
     void Lower(const TransformerSpec &spec);
     void Lower(const TransmissionLineSpec &spec);
     void Lower(const VccsSpec &spec);

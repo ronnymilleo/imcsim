@@ -217,6 +217,15 @@ struct SwitchSpec {
     SwitchParameters Params;
 };
 
+/// Specification for a latching thyristor (SCR).
+struct ThyristorSpec {
+    std::string Name;
+    NodeId Anode = 0;
+    NodeId Cathode = 0;
+    NodeId Gate = 0;
+    ThyristorParameters Params;
+};
+
 /// Specification for a two-winding magnetically coupled transformer macromodel.
 struct TransformerSpec {
     std::string Name;
@@ -286,6 +295,7 @@ struct CircuitDescription {
                                      RelaySpec,
                                      ResistorSpec,
                                      SwitchSpec,
+                                     ThyristorSpec,
                                      TransformerSpec,
                                      TransmissionLineSpec,
                                      VccsSpec,

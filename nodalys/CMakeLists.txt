@@ -31,6 +31,7 @@ add_library(nodalys STATIC
     src/api/circuit.cpp
     src/api/circuit_builder.cpp
     src/api/circuit_builder_macromodels.cpp
+    src/api/circuit_builder_semiconductors.cpp
     src/api/circuit_builder_sources.cpp
     src/api/nodalys.cpp
     src/bridge/logic_bridge.cpp
@@ -51,6 +52,7 @@ add_library(nodalys STATIC
     src/devices/semiconductors/bjt_device.cpp
     src/devices/semiconductors/diode_device.cpp
     src/devices/semiconductors/mosfet_device.cpp
+    src/devices/semiconductors/thyristor_device.cpp
     src/devices/sources/behavioral_device.cpp
     src/devices/sources/controlled_sources.cpp
     src/devices/sources/independent_sources.cpp

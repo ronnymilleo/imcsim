@@ -172,6 +172,8 @@ public:
                            double area = 1.0);
     CircuitBuilder &
     AddMosfet(std::string name, NodeId drain, NodeId gate, NodeId source, bool is_nmos, const MosfetParameters &params);
+    CircuitBuilder &
+    AddThyristor(std::string name, NodeId anode, NodeId cathode, NodeId gate, const ThyristorParameters &params);
 
     // Switches
     CircuitBuilder &AddSwitch(std::string name,
