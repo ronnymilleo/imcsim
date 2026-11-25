@@ -52,6 +52,7 @@ enum class ComponentType {
     RELAY,
     FUSE,
     TRANSFORMER,
+    TRANSMISSION_LINE,
     AND,
     OR,
     NOT,
@@ -95,6 +96,8 @@ enum class ComponentFamily {
     SWITCHING,
     /// The transformer, which couples two windings.
     TRANSFORMER,
+    /// The two-port TEM transmission line.
+    TRANSMISSION_LINE,
     /// The op-amp.
     AMPLIFIER,
     /// Subcircuit instances: a block with a circuit of its own inside.

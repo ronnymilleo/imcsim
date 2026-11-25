@@ -20,6 +20,7 @@ TEST_CASE("GetPartName names parts as the user reads them", "[element_factory]")
     CHECK(std::string(GUI::GetPartName(Core::ComponentType::V_SWITCH)) == "Voltage-controlled switch");
     CHECK(std::string(GUI::GetPartName(Core::ComponentType::RELAY)) == "Relay");
     CHECK(std::string(GUI::GetPartName(Core::ComponentType::FUSE)) == "Fuse");
+    CHECK(std::string(GUI::GetPartName(Core::ComponentType::TRANSMISSION_LINE)) == "Transmission line");
     CHECK(std::string(GUI::GetPartName(Core::ComponentType::NAND)) == "NAND gate");
     CHECK(std::string(GUI::GetPartName(Core::ComponentType::JK_FLIP_FLOP)) == "JK flip-flop");
     CHECK(std::string(GUI::GetPartName(Core::ComponentType::CLOCK)) == "Clock");
@@ -33,6 +34,7 @@ TEST_CASE("FindParts ignores case, spaces and punctuation", "[element_factory]")
     CHECK(GUI::FindParts("zener diode") == std::vector{ComponentType::ZENER_DIODE});
     CHECK(GUI::FindParts("relay") == std::vector{ComponentType::RELAY});
     CHECK(GUI::FindParts("fuse") == std::vector{ComponentType::FUSE});
+    CHECK(GUI::FindParts("transmission line") == std::vector{ComponentType::TRANSMISSION_LINE});
     CHECK(GUI::FindParts("controlled switch") == std::vector{ComponentType::V_SWITCH});
     CHECK(GUI::FindParts("and") == std::vector{ComponentType::AND, ComponentType::NAND});
     CHECK(GUI::FindParts("inverter") == std::vector{ComponentType::NOT});
@@ -53,8 +55,9 @@ TEST_CASE("FindParts ignores case, spaces and punctuation", "[element_factory]")
     }
     SECTION("an empty query lists every part") {
         const std::vector<ComponentType> all = GUI::FindParts("");
-        CHECK(all.size() == 48);
+        CHECK(all.size() == 49);
         CHECK(std::ranges::contains(all, ComponentType::RESISTOR));
+        CHECK(std::ranges::contains(all, ComponentType::TRANSMISSION_LINE));
         CHECK(std::ranges::contains(all, ComponentType::CLOCK));
         CHECK(std::ranges::contains(all, ComponentType::LOGIC_INPUT));
     }

@@ -11,6 +11,7 @@
 #include "circuit/components/logic_part.h"
 #include "circuit/components/source.h"
 #include "circuit/components/subcircuit.h"
+#include "circuit/components/transmission_line.h"
 #include "simulation/sensitivity.h"
 #include <chrono>
 #include <format>
@@ -63,6 +64,12 @@ std::optional<std::string> FindBehavioralProblem(const Component &part, const An
 std::optional<std::string> FindPartProblem(const Circuit &circuit, const Component &part, const AnalysisKind kind) {
     if (part.GetType() == ComponentType::SUBCIRCUIT) {
         return FindSpiceBlockProblem(circuit, static_cast<const SubcircuitInstance &>(part));
+    }
+    if (part.GetType() == ComponentType::TRANSMISSION_LINE && kind == AnalysisKind::TRANSIENT
+        && static_cast<const TransmissionLine &>(part).GetParameters().IsLossy()) {
+        return std::format("Nodalys transient analysis supports lossless transmission lines only; {} has conductor or "
+                           "dielectric loss, which is simulated in frequency-domain and Harmonic Balance analyses",
+                           part.GetName());
     }
     return FindBehavioralProblem(part, kind);
 }
@@ -164,6 +171,8 @@ NodalysBackend::NodalysBackend() {
         "Nodalys harmonic balance does not support hysteretic switches";
     m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::HARMONIC_BALANCE][ComponentType::RELAY] =
         "Nodalys harmonic balance does not support hysteretic relays";
+    m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::POLE_ZERO][ComponentType::TRANSMISSION_LINE] =
+        "Pole-zero analysis does not support transmission lines, which have infinitely many poles and zeros";
 }
 
 /**

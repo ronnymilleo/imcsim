@@ -262,6 +262,8 @@ private:
             return AddSwitchingPart(*m_Builder, entry);
         case ComponentFamily::TRANSFORMER:
             return AddTransformer(*m_Builder, entry), std::expected<void, std::string>{};
+        case ComponentFamily::TRANSMISSION_LINE:
+            return AddTransmissionLine(*m_Builder, entry), std::expected<void, std::string>{};
         case ComponentFamily::AMPLIFIER:
             return AddOpAmp(*m_Builder, entry), std::expected<void, std::string>{};
         case ComponentFamily::BLOCK:

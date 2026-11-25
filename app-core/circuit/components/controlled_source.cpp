@@ -54,6 +54,7 @@ double DefaultGain(const ComponentType type) {
     case ComponentType::RELAY:
     case ComponentType::FUSE:
     case ComponentType::TRANSFORMER:
+    case ComponentType::TRANSMISSION_LINE:
     case ComponentType::AND:
     case ComponentType::OR:
     case ComponentType::NOT:

@@ -14,6 +14,7 @@
 #include "circuit/components/fuse.h"
 #include "circuit/components/mosfet.h"
 #include "circuit/components/source.h"
+#include "circuit/components/transmission_line.h"
 #include "circuit/components/voltage_controlled_switch.h"
 #include <nodalys/types.h>
 
@@ -40,6 +41,9 @@ Nodalys::SwitchParameters ToNodalys(const SwitchParameters &parameters);
 
 // Fuses
 Nodalys::FuseParameters ToNodalys(const FuseParameters &parameters);
+
+// Transmission lines
+Nodalys::TransmissionLineParameters ToNodalys(double impedance_ohms, const TransmissionLineParameters &parameters);
 
 } // namespace Core
 
