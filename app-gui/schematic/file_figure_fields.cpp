@@ -203,6 +203,7 @@ constexpr auto FIGURE_CODECS = std::to_array<FigureCodec>({
     MakeFigureCodec<Core::ComponentType::RELAY, Core::Relay, RELAY_KEYS>(),
     MakeFigureCodec<Core::ComponentType::FUSE, Core::Fuse, FUSE_KEYS>(),
     MakeFigureCodec<Core::ComponentType::THYRISTOR, Core::Thyristor, THYRISTOR_KEYS>(),
+    MakeFigureCodec<Core::ComponentType::TRIAC, Core::Thyristor, THYRISTOR_KEYS>(),
     MakeFigureCodec<Core::ComponentType::TRANSFORMER, Core::Transformer, TRANSFORMER_KEYS>(),
     MakeFigureCodec<Core::ComponentType::TRANSMISSION_LINE, Core::TransmissionLine, TRANSMISSION_LINE_KEYS>(),
     {&Core::IsLogicPart, &WriteLogicFigures, &ReadLogicFigures},

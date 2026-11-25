@@ -194,6 +194,8 @@ constexpr Tolerance THYRISTOR_INPUT_NOISE_BOUND{NOISE_TOTAL.Relative, 100.0};
 constexpr Tolerance THYRISTOR_OUTPUT_NOISE_BOUND{NOISE_TOTAL.Relative, 3e-5};
 /// Input impedance at DC through blocking thyristors: 7.52 MOhm on ngspice against 7.48 MOhm on Nodalys.
 constexpr Tolerance THYRISTOR_INPUT_IMPEDANCE_BOUND{5e-2, 1e5};
+/// The MT1 current of a TRIAC at the gate-firing instant: 0.059 A apart, the gate stage steering with transistor gain.
+constexpr Tolerance TRIAC_GATE_STEER_BOUND{TRANSIENT_RELATIVE_TOLERANCE, 7e-2};
 
 /// Differences found by this test and investigated; each one is a task of its own. Keep the reason to one line, with
 /// the engine that is right.
@@ -319,6 +321,18 @@ constexpr std::array KNOWN_DIFFERENCES{
                     THYRISTOR_INPUT_IMPEDANCE_BOUND,
                     "the input impedance at DC is set by the paths through the blocking thyristors, the 1 GOhm of "
                     "Nodalys against the leaking pair of the subcircuit, so it is 0.6 % apart on this bridge"},
+    KnownDifference{"triac_dimmer.imcsim",
+                    NOISE_NAME,
+                    "input noise total",
+                    THYRISTOR_INPUT_NOISE_BOUND,
+                    THYRISTOR_INPUT_NOISE},
+    KnownDifference{"triac_dimmer.imcsim",
+                    TRANSIENT_NAME,
+                    "current TR1.MT1",
+                    TRIAC_GATE_STEER_BOUND,
+                    "at the gate-firing instant the ngspice gate stage steers current to the forward core with "
+                    "transistor gain, so MT1 carries about 60 mA more than the single-junction gate of Nodalys; the "
+                    "main MT2 current, the gate current and the load voltage agree"},
 };
 
 using Differences = std::vector<std::string>;
