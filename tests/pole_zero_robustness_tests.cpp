@@ -19,6 +19,7 @@
 #include "schematic/examples.h"
 #include "schematic/schematic.h"
 #include "simulation/analysis_sources.h"
+#include "simulation/simulation_backend.h"
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -206,10 +207,13 @@ TEST_CASE("The transformer power supply has no right-half-plane root and all sev
 }
 
 TEST_CASE("Every example whose input reaches its output has roots that rebuild its AC response", "[pz][robust]") {
-    // The examples whose input is a Vin source; the rest have a supply for input, which no AC sweep can drive
+    // The examples whose input is a Vin source; the rest have a supply for input, which no AC sweep can drive, or
+    // distributed parts with no rational pole-zero form
+    const Core::NodalysBackend nodalys;
     for (const GUI::Example &entry : GUI::GetExamples()) {
         const LoadedExample example = LoadExample(entry.FileName, std::nullopt);
-        if (!example.HasInput || example.HasLogic) {
+        if (!example.HasInput || example.HasLogic
+            || Core::FindUnsupported(nodalys, example.Circuit, Core::AnalysisKind::POLE_ZERO)) {
             continue;
         }
         const auto compiled = Core::CompileCircuit(example.Circuit);

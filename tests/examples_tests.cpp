@@ -1748,3 +1748,68 @@ TEST_CASE("The Sallen-Key sensitivity example ranks the four filter parts at the
     CHECK_THAT(total.real(), Catch::Matchers::WithinRel(2.0 * slope.real(), 0.02));
     CHECK_THAT(total.imag(), Catch::Matchers::WithinRel(2.0 * slope.imag(), 0.02));
 }
+
+TEST_CASE("The transmission line reflections example launches half the step and settles at 1.5 V after one round trip",
+          "[examples]") {
+    const TestSupport::NodalysInUse nodalys;
+    GUI::Schematic schematic;
+    OpenExample("transmission_line_reflections.imcsim", schematic);
+    const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
+    REQUIRE(settings.Selected == GUI::Analysis::TRANSIENT);
+
+    const Core::TransientRun run = Core::RunTransient(schematic.GetCircuit(), settings.Transient);
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const Core::Transient &transient = *run.Result;
+    CHECK(transient.Warnings.empty());
+
+    const std::size_t input = NodeAt(schematic, {9, 4});
+    const std::size_t output = NodeAt(schematic, {15, 4});
+    const auto sample_at = [&](const std::size_t node, const double target_seconds) {
+        const auto found = std::ranges::lower_bound(transient.Times, target_seconds);
+        REQUIRE(found != transient.Times.end());
+        const auto index = static_cast<std::size_t>(found - transient.Times.begin());
+        return transient.NodeVoltages[node][index];
+    };
+
+    // Before Td = 2 ns: matched 50 Ohm source divider gives 1 V at the launch end while the load still reads 0 V
+    CHECK_THAT(sample_at(input, 1.5e-9), Catch::Matchers::WithinAbs(1.0, 0.02));
+    CHECK_THAT(sample_at(output, 1.5e-9), Catch::Matchers::WithinAbs(0.0, 0.02));
+
+    // Between Td and 2 Td: the wave arrives at RL = 150 Ohm (Gamma_L = +0.5 -> 1.5 V), input stays at 1.0 V
+    CHECK_THAT(sample_at(output, 3.5e-9), Catch::Matchers::WithinAbs(1.5, 0.02));
+    CHECK_THAT(sample_at(input, 3.5e-9), Catch::Matchers::WithinAbs(1.0, 0.02));
+
+    // After 2 Td = 4 ns: the +0.5 V reflection reaches the matched source and both ends settle at 1.5 V
+    CHECK_THAT(sample_at(input, 6.0e-9), Catch::Matchers::WithinAbs(1.5, 0.02));
+    CHECK_THAT(sample_at(output, 6.0e-9), Catch::Matchers::WithinAbs(1.5, 0.02));
+}
+
+TEST_CASE("The quarter-wave transformer example matches the 200 Ohm load to 50 Ohm at 250 MHz",
+          "[examples][s_parameters]") {
+    const TestSupport::NodalysInUse nodalys;
+    GUI::Schematic schematic;
+    OpenExample("transmission_line_quarter_wave.imcsim", schematic);
+    const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
+    REQUIRE(settings.Selected == GUI::Analysis::S_PARAMETERS);
+
+    const Core::SParametersRun run = Core::RunSParameters(schematic.GetCircuit(), settings.SParameters);
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const Core::SParameters &spar = *run.Result;
+    CHECK(spar.Warnings.empty());
+    REQUIRE(spar.GetPortCount() == 1);
+    REQUIRE(spar.Frequencies.size() == 100);
+
+    // 10 MHz to 1 GHz in 100 steps puts 10 MHz per step: 250 MHz at index 24, 500 MHz at 49, 750 MHz at 74
+    REQUIRE_THAT(spar.Frequencies[24], Catch::Matchers::WithinRel(250e6, 1e-6));
+    CHECK(std::abs(spar.Get(24, 1, 1)) < 1e-6);
+
+    REQUIRE_THAT(spar.Frequencies[49], Catch::Matchers::WithinRel(500e6, 1e-6));
+    CHECK_THAT(std::abs(spar.Get(49, 1, 1)), Catch::Matchers::WithinAbs(0.6, 1e-4));
+
+    REQUIRE_THAT(spar.Frequencies[74], Catch::Matchers::WithinRel(750e6, 1e-6));
+    CHECK(std::abs(spar.Get(74, 1, 1)) < 1e-6);
+}
