@@ -158,6 +158,13 @@ constexpr std::string_view LOGIC_CURRENTS_MISSING =
 constexpr std::string_view LEAKAGE_BIASED_NODES =
     "a node between an off transistor or switch and a diode is set by pico-ampere leakage, which each engine adds "
     "its own GMIN to, so the voltage is 1 % apart and neither is more right";
+constexpr std::string_view THYRISTOR_INPUT_NOISE =
+    "the input-referred noise divides by the gain through the blocking thyristor, whose off-state is the 1 GOhm "
+    "resistance of Nodalys against the leaking pair of the subcircuit on ngspice, so neither input figure means "
+    "anything; the output totals agree";
+constexpr std::string_view THYRISTOR_OUTPUT_NOISE =
+    "the noise of the blocking state: the junctions of the ngspice pair leak and generate shot noise, while the "
+    "switch model of Nodalys is silent";
 
 // Bounds of the known differences, each a little above what the example measures today
 
@@ -181,6 +188,12 @@ constexpr Tolerance SUPPLY_GAIN_BOUND{SOLVER_RELATIVE_TOLERANCE, 1e-5};
 constexpr Tolerance SUPPLY_SENSITIVITY_BOUND{SOLVER_RELATIVE_TOLERANCE, 2e-4};
 /// Input-referred noise of 2.3e7 on Nodalys against 20 on ngspice.
 constexpr Tolerance DIVIDED_BY_NOTHING_BOUND{NOISE_TOTAL.Relative, 1e8};
+/// Input-referred noise of a blocked thyristor: 31.7 on Nodalys against 0.023 on ngspice, at the bridge.
+constexpr Tolerance THYRISTOR_INPUT_NOISE_BOUND{NOISE_TOTAL.Relative, 100.0};
+/// Output noise of a blocked thyristor: 1.1e-5 V/rtHz on ngspice against 5.2e-7 on Nodalys.
+constexpr Tolerance THYRISTOR_OUTPUT_NOISE_BOUND{NOISE_TOTAL.Relative, 3e-5};
+/// Input impedance at DC through blocking thyristors: 7.52 MOhm on ngspice against 7.48 MOhm on Nodalys.
+constexpr Tolerance THYRISTOR_INPUT_IMPEDANCE_BOUND{5e-2, 1e5};
 
 /// Differences found by this test and investigated; each one is a task of its own. Keep the reason to one line, with
 /// the engine that is right.
@@ -280,6 +293,32 @@ constexpr std::array KNOWN_DIFFERENCES{
                     "V",
                     SUPPLY_SENSITIVITY_BOUND,
                     "the normalized sensitivity to each supply is 1.2e-4 on Nodalys and under 2e-6 on ngspice"},
+    KnownDifference{"controlled_rectifier_half_wave.imcsim",
+                    NOISE_NAME,
+                    "input noise total",
+                    THYRISTOR_INPUT_NOISE_BOUND,
+                    THYRISTOR_INPUT_NOISE},
+    KnownDifference{"controlled_rectifier_inductive_load.imcsim",
+                    NOISE_NAME,
+                    "input noise total",
+                    THYRISTOR_INPUT_NOISE_BOUND,
+                    THYRISTOR_INPUT_NOISE},
+    KnownDifference{"controlled_rectifier_inductive_load.imcsim",
+                    NOISE_NAME,
+                    "output noise total",
+                    THYRISTOR_OUTPUT_NOISE_BOUND,
+                    THYRISTOR_OUTPUT_NOISE},
+    KnownDifference{"controlled_bridge_rectifier.imcsim",
+                    NOISE_NAME,
+                    "input noise total",
+                    THYRISTOR_INPUT_NOISE_BOUND,
+                    THYRISTOR_INPUT_NOISE},
+    KnownDifference{"controlled_bridge_rectifier.imcsim",
+                    TRANSFER_FUNCTION_NAME,
+                    "input impedance",
+                    THYRISTOR_INPUT_IMPEDANCE_BOUND,
+                    "the input impedance at DC is set by the paths through the blocking thyristors, the 1 GOhm of "
+                    "Nodalys against the leaking pair of the subcircuit, so it is 0.6 % apart on this bridge"},
 };
 
 using Differences = std::vector<std::string>;

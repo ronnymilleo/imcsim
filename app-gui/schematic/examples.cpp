@@ -421,6 +421,49 @@ constexpr auto EXAMPLES = std::to_array<Example>({
         .FileName = "buck_converter.imcsim",
     },
     {
+        .Title = "Controlled rectifier (half-wave)",
+        .Group = "Switching",
+        .Description =
+            "A thyristor rectifies a 10 V, 50 Hz sine into a 100 Ohm load: a 5 V gate pulse of half a millisecond, "
+            "referenced to the cathode, fires it at 60 degrees of every positive half-cycle, and it latches on "
+            "after the pulse ends, until the anode current falls below the 5 mA holding current near the zero "
+            "crossing. Run the transient: the load follows the sine from 60 degrees on, and its mean over a period "
+            "is about 2.2 V, where a plain diode would give about 3 V. Both engines run it: Nodalys takes every "
+            "figure as a parameter of its latching device, while ngspice runs the two-transistor pair of the "
+            "imcsim_scr subcircuit. Change the delay of Vin2 to move the firing angle: 90 degrees halves the "
+            "mean, and a delay past the zero crossing leaves the load dark. The step is 0.2 ms, fifty points a "
+            "period, and the solver lands on the commutation instant itself.",
+        .FileName = "controlled_rectifier_half_wave.imcsim",
+    },
+    {
+        .Title = "Controlled rectifier with an inductive load",
+        .Group = "Switching",
+        .Description =
+            "The same thyristor and gate pulse drive a load of 50 Ohm and 0.2 H. The inductor stretches the "
+            "current past the zero of the sine, and the 1N4007 across the load carries it while the thyristor "
+            "is off: run the transient and watch the anode current of SCR1 stop at the zero crossing while the "
+            "load current keeps rippling through D1, waiting for the next gate pulse at 60 degrees. The load "
+            "voltage sits at about minus a diode drop for most of the freewheeling, and its mean is about "
+            "2 V over a period. The gate pulse is referenced to the cathode, as a real gate drive is, "
+            "because the gate current returns through it.",
+        .FileName = "controlled_rectifier_inductive_load.imcsim",
+    },
+    {
+        .Title = "Controlled bridge rectifier",
+        .Group = "Switching",
+        .Description =
+            "Two thyristors over a bridge of diodes rectify both half-cycles: SCR1 and SCR2 fire together at 60 "
+            "degrees, each on the half-cycle its anode sits positive, and D1 and D2 return the current, so the "
+            "100 Ohm load sees a full-wave chopped sine of about 3.8 V mean, nearly twice the half-wave one. The "
+            "two gate pulses are referenced to the common cathode rail, where both cathodes meet, and run at the "
+            "10 ms of the half-cycle, so each thyristor gets one on its turn; the load side is grounded through "
+            "that rail. R2, 1 MOhm from the transformer side to ground, gives the floating source "
+            "the DC reference a simulation of a floating bridge needs, carrying 10 uA at the peak. Both engines "
+            "run it, and both land on each natural commutation; the step is 0.2 ms. Change the delay of both "
+            "gate pulses to move the firing angle, and the mean follows the cosine of it.",
+        .FileName = "controlled_bridge_rectifier.imcsim",
+    },
+    {
         .Title = "Relay driver",
         .Group = "Switching",
         .Description =

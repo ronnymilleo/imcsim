@@ -36,6 +36,17 @@ constexpr auto FUSE_FIELDS = std::to_array<ParameterField<Core::FuseParameters>>
     {"Blown R", &Core::FuseParameters::BlownResistance, "Ohm"},
 });
 
+constexpr auto THYRISTOR_FIELDS = std::to_array<ParameterField<Core::ThyristorParameters>>({
+    {"V0", &Core::ThyristorParameters::OnThresholdVoltage, "V"},
+    {"RT", &Core::ThyristorParameters::OnResistance, "Ohm"},
+    {"Off R", &Core::ThyristorParameters::OffResistance, "Ohm"},
+    {"IH", &Core::ThyristorParameters::HoldingCurrent, "A"},
+    {"IGT", &Core::ThyristorParameters::GateTriggerCurrent, "A"},
+    {"VGT", &Core::ThyristorParameters::GateTriggerVoltage, "V"},
+    {"RG", &Core::ThyristorParameters::GateResistance, "Ohm"},
+    {"VBO", &Core::ThyristorParameters::BreakoverVoltage, "V"},
+});
+
 constexpr auto TRANSFORMER_FIELDS = std::to_array<ParameterField<Core::TransformerParameters>>({
     {"Turns ratio", &Core::TransformerParameters::TurnsRatio, ":1"},
     {"Coupling", &Core::TransformerParameters::Coupling, ""},
@@ -66,6 +77,10 @@ void LoadElectromechanicalFields(ElectromechanicalFields &fields, const Core::Co
         LoadParameterFields(RELAY_FIELDS, fields.Relay, static_cast<const Core::Relay &>(component).GetParameters());
     } else if (type == Core::ComponentType::FUSE) {
         LoadParameterFields(FUSE_FIELDS, fields.Fuse, static_cast<const Core::Fuse &>(component).GetParameters());
+    } else if (type == Core::ComponentType::THYRISTOR) {
+        LoadParameterFields(THYRISTOR_FIELDS,
+                            fields.Thyristor,
+                            static_cast<const Core::Thyristor &>(component).GetParameters());
     } else if (type == Core::ComponentType::TRANSFORMER) {
         LoadParameterFields(TRANSFORMER_FIELDS,
                             fields.Transformer,
@@ -155,6 +170,23 @@ void DrawFuse(Core::Fuse &fuse, ElectromechanicalFields &fields, Schematic &sche
     ImGui::TextDisabled("Cooling time constant: %ss",
                         Core::FormatValue(Core::GetCoolingTimeConstant(parameters)).c_str());
     ImGui::TextDisabled("Never blows below the rated current; blows open for the rest of the run, and starts whole");
+}
+
+/**
+ * @brief   The thyristor fires at the gate trigger current, latches on, and releases below the holding current.
+ */
+void DrawThyristor(Core::Thyristor &thyristor, ElectromechanicalFields &fields, Schematic &schematic) {
+    Core::ThyristorParameters parameters = thyristor.GetParameters();
+    const auto is_valid = [](const Core::ThyristorParameters &candidate) {
+        return Core::Thyristor::IsValidParameters(candidate);
+    };
+    if (DrawParameterFields(THYRISTOR_FIELDS, fields.Thyristor, "", is_valid, parameters)) {
+        thyristor.SetParameters(parameters);
+        schematic.MarkModified();
+    }
+    ImGui::TextDisabled("Fires at IGT, latches on, and releases when the anode current falls below IH");
+    ImGui::TextDisabled("On Nodalys every figure is a parameter; on ngspice only RG and RT are, and IH, IGT and V0"
+                        " follow from the transistor pair");
 }
 
 /**

@@ -23,6 +23,7 @@
 #include "circuit/components/relay.h"
 #include "circuit/components/source.h"
 #include "circuit/components/switch.h"
+#include "circuit/components/thyristor.h"
 #include "circuit/components/transformer.h"
 #include "circuit/components/transmission_line.h"
 #include "circuit/components/voltage_controlled_switch.h"
@@ -303,6 +304,13 @@ std::expected<void, std::string> AddSwitchingPart(Nodalys::CircuitBuilder &build
         return {};
     case ComponentType::FUSE:
         builder.AddFuse(entry.Name, nodes[0], nodes[1], ToNodalys(static_cast<const Fuse &>(part).GetParameters()));
+        return {};
+    case ComponentType::THYRISTOR:
+        builder.AddThyristor(entry.Name,
+                             nodes[0],
+                             nodes[1],
+                             nodes[2],
+                             ToNodalys(static_cast<const Thyristor &>(part).GetParameters()));
         return {};
     case ComponentType::RELAY: {
         const auto &relay = static_cast<const Relay &>(part);

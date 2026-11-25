@@ -98,6 +98,7 @@ public:
     bool HasACSource() const;
     bool HasInitialConditions() const;
     bool HasFuse() const;
+    bool HasThyristor() const;
     std::string ToSpiceNetlist(std::string_view analysis = "", bool add_current_probes = false) const;
 
 private:

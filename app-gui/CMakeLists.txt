@@ -179,6 +179,7 @@ add_library(imcsim-gui-lib
             ui_elements/ui_subcircuit.cpp
             ui_elements/ui_subcircuit_pin.cpp
             ui_elements/ui_switch.cpp
+            ui_elements/ui_thyristor.cpp
             ui_elements/ui_transformer.cpp
             ui_elements/ui_transistor.cpp
             ui_elements/ui_transmission_line.cpp

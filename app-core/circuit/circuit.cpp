@@ -298,6 +298,11 @@ bool Circuit::HasFuse() const {
                                [](const Component *part) { return part->GetType() == ComponentType::FUSE; });
 }
 
+bool Circuit::HasThyristor() const {
+    return std::ranges::any_of(CollectParts(*this),
+                               [](const Component *part) { return part->GetType() == ComponentType::THYRISTOR; });
+}
+
 /**
  * @brief   Writes the circuit as a SPICE netlist, ready to hand to ngspice.
  * @param[in] analysis            Optional analysis command, such as ".op", written right before ".end".

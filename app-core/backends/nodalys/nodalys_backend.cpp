@@ -99,7 +99,8 @@ Nodalys::IntegrationMethod ToNodalysMethod(const Circuit &circuit) {
         return Nodalys::IntegrationMethod::GEAR2;
     case IntegrationMethod::DEFAULT:
     default:
-        return circuit.HasFuse() ? Nodalys::IntegrationMethod::GEAR2 : Nodalys::IntegrationMethod::TRAPEZOIDAL;
+        return (circuit.HasFuse() || circuit.HasThyristor()) ? Nodalys::IntegrationMethod::GEAR2
+                                                             : Nodalys::IntegrationMethod::TRAPEZOIDAL;
     }
 }
 
@@ -171,6 +172,11 @@ NodalysBackend::NodalysBackend() {
         "Nodalys harmonic balance does not support hysteretic switches";
     m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::HARMONIC_BALANCE][ComponentType::RELAY] =
         "Nodalys harmonic balance does not support hysteretic relays";
+    m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::HARMONIC_BALANCE][ComponentType::THYRISTOR] =
+        "Nodalys harmonic balance does not support the latching thyristor";
+    m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::POLE_ZERO][ComponentType::THYRISTOR] =
+        "Pole-zero analysis is small-signal, and a thyristor blocks nearly open or conducts as a switch, whichever "
+        "the circuit last drove, so its frozen state has no roots the solver can place";
     m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::POLE_ZERO][ComponentType::TRANSMISSION_LINE] =
         "Pole-zero analysis does not support transmission lines, which have infinitely many poles and zeros";
 }

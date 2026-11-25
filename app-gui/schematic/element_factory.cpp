@@ -31,6 +31,7 @@
 #include "ui_elements/ui_subcircuit.h"
 #include "ui_elements/ui_subcircuit_pin.h"
 #include "ui_elements/ui_switch.h"
+#include "ui_elements/ui_thyristor.h"
 #include "ui_elements/ui_transformer.h"
 #include "ui_elements/ui_transmission_line.h"
 #include "ui_elements/ui_vcc.h"
@@ -85,6 +86,7 @@ constexpr auto PARTS = std::to_array<PartInfo>({
     {Core::ComponentType::V_SWITCH, "Voltage-controlled switch"},
     {Core::ComponentType::RELAY, "Relay"},
     {Core::ComponentType::FUSE, "Fuse"},
+    {Core::ComponentType::THYRISTOR, "Thyristor (SCR)"},
     {Core::ComponentType::TRANSFORMER, "Transformer"},
     {Core::ComponentType::TRANSMISSION_LINE, "Transmission line"},
     {Core::ComponentType::AND, "AND gate"},
@@ -171,6 +173,8 @@ CreateElement(const Core::ComponentType type, const GridPoint position, const Ro
         return std::make_unique<UIControlledSwitch>(type, position, rotation);
     case Core::ComponentType::FUSE:
         return std::make_unique<UIFuse>(position, rotation);
+    case Core::ComponentType::THYRISTOR:
+        return std::make_unique<UIThyristor>(position, rotation);
     case Core::ComponentType::TRANSFORMER:
         return std::make_unique<UITransformer>(position, rotation);
     case Core::ComponentType::TRANSMISSION_LINE:
