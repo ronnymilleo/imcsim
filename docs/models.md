@@ -248,8 +248,45 @@ blows when the heat reaches 1.015, a margin above the 1 that the rated current s
 - The blown state is read from the voltage across the fuse and its current, so a fuse inside a block is simulated, but
   its blow is not shown on the schematic or warned about; the fuses of the main schematic are.
 
-## Transformers
+## Thyristors
 
+A thyristor (SCR) is a latching switch: it blocks forward voltage until gate current fires it, then stays on with the
+gate removed until the anode current falls below the holding current. Terminal 1 is the anode, terminal 2 the cathode
+and terminal 3 the gate. The part has no value; you set the figures a datasheet gives.
+
+- **On-state line** `VTM = V0 + RT*IT` (**V0** 0.8 V, **RT** 10 mOhm): what it drops while conducting.
+- **Holding current** (`IH`, 5 mA): below it, with the gate off, the latch releases.
+- **Gate trigger** (**IGT** 1 mA behind **VGT** 0.8 V and **RG** 100 Ohm): the gate current that fires it. The gate
+  current returns through the cathode, so the gate drive is referenced to the cathode.
+- **Off resistance** (1 GOhm) and **forward breakover** (`VBO`, 0 = disabled): the voltage that fires it without a
+  gate, which a correctly driven thyristor never reaches.
+
+Nodalys simulates it as one device whose state is a latch, so every figure is a parameter and the commutation is
+landed on exactly. ngspice runs the `imcsim_scr` subcircuit, a PNP and an NPN with the collector of each into the
+base of the other: the pair regenerates once the gate drives the base of the NPN, which is the PNPN structure of the
+real device. Two diodes of a vanishing drop keep the pair's base current from leaking out of the gate, and the drive
+of a reverse-biased thyristor from finding a path through it to the anode, as the junctions of a real device block.
+`RG` and `RT` are parameters of the instance; the holding current, the trigger current and the on-state threshold
+emerge from the transistors, close to the figures of Nodalys. There is no breakover on ngspice: the pair blocks
+whatever forward voltage the circuit puts on it.
+
+- **The engines agree on the rectification**: the half-wave controlled rectifier of the example, fired at 60 degrees
+  into 100 Ohm, averages the same 2.2 V on both, its anode current matches within 1 %, and the bridge example
+  matches to 0.3 %. The differences that remain are listed and bounded in the cross-validation test: at each
+  commutation the current of the ngspice pair decays through the return diode over a tail of about 0.3 ms, while
+  Nodalys cuts at its holding current, so the node behind it stays clamped at the diode drop that much longer; the
+  noise of the blocking state differs, as the junctions of the pair leak and generate shot noise while the switch
+  model of Nodalys is silent; and the figures that divide by the gain through a blocked thyristor, such as its
+  input-referred noise, mean nothing on either engine.
+- **The latching current is not modeled separately** from the holding current: the gate sustains conduction whatever
+  the anode current, and the latch holds above `IH` once it is gone.
+- There is no `dv/dt` triggering, no turn-off time `tq` (the device blocks again as soon as the current releases), no
+  reverse recovery and no temperature dependence of the holding current.
+- Every run starts blocking, and the circuit fires it. In the small-signal analyses the state is frozen at the
+  operating point; a harmonic balance and a pole-zero are refused with the reason, as they are for the hysteretic
+  switch, since the roots through a blocking state are numerically meaningless.
+
+## Transformers
 A transformer is two inductors coupled by a SPICE `K` element: `L-T1p` and `L-T1s`, each behind a resistor for its
 winding (`R-T1p`, `R-T1s`). Its value is the primary inductance; the secondary's is that divided by the square of the
 turns ratio, primary turns over secondary turns, so a 100 mH primary at 2:1 has a 25 mH secondary. The other figures are

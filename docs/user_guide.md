@@ -72,6 +72,13 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   the run: the branch loses its current at that instant, the symbol breaks with a gap, and the Output window warns when
   it blew. A fuse inside a block is simulated, but its blow is not drawn or warned about. Every run starts with a whole fuse, and an operating point, a DC sweep and an AC sweep always see it closed.
   The Protection example compares a fast and a slow-blow fuse (see docs/models.md).
+- **Thyristors**: a thyristor (SCR) is in the Switches and fuses group of the part rail: anode on terminal 1, cathode
+  on terminal 2, gate on terminal 3. Its properties set the on-state line (V0 and RT), the holding and trigger
+  currents, the gate resistance and the breakover voltage. It blocks until the gate is fired and latches on until
+  its current falls below the holding current, and the label under the symbol shows IH. The gate drive must be
+  referenced to the cathode, since the gate current returns through it. The Switching examples drive it: a half-wave
+  controlled rectifier, one with an inductive load and a freewheeling diode, and a controlled bridge (see
+  docs/models.md).
 - **Transformers**: the value of a transformer is its primary inductance, and its properties set the turns ratio, the
   coupling and the resistance of the windings. The secondary needs a path to ground, such as the bridge of the
   Transformers examples.
