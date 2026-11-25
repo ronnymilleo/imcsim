@@ -272,12 +272,11 @@ whatever forward voltage the circuit puts on it.
 
 - **The engines agree on the rectification**: the half-wave controlled rectifier of the example, fired at 60 degrees
   into 100 Ohm, averages the same 2.2 V on both, its anode current matches within 1 %, and the bridge example
-  matches to 0.3 %. The differences that remain are listed and bounded in the cross-validation test: at each
-  commutation the current of the ngspice pair decays through the return diode over a tail of about 0.3 ms, while
-  Nodalys cuts at its holding current, so the node behind it stays clamped at the diode drop that much longer; the
-  noise of the blocking state differs, as the junctions of the pair leak and generate shot noise while the switch
-  model of Nodalys is silent; and the figures that divide by the gain through a blocked thyristor, such as its
-  input-referred noise, mean nothing on either engine.
+  matches to 0.3 %. A circuit with a thyristor runs on the Gear integration, as one with a fuse does: the
+  trapezoidal rule rings for ever on an inductor whose current the release of the latch cuts. The differences that
+  remain are listed and bounded in the cross-validation test: the noise of the blocking state, as the junctions of
+  the pair leak and generate shot noise while the switch model of Nodalys is silent, and the figures that divide
+  by the gain through a blocked thyristor, such as its input-referred noise, which mean nothing on either engine.
 - **The latching current is not modeled separately** from the holding current: the gate sustains conduction whatever
   the anode current, and the latch holds above `IH` once it is gone.
 - There is no `dv/dt` triggering, no turn-off time `tq` (the device blocks again as soon as the current releases), no

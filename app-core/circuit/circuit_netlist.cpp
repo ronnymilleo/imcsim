@@ -203,6 +203,10 @@ struct NetlistExtras {
     int NextExtraNode = 0;
 };
 
+/// The netlist option a circuit with a fuse or a thyristor writes: the Gear integration, since the trapezoidal rule
+/// rings for ever on an inductor whose current an opened fuse or a released thyristor cuts.
+constexpr std::string_view GEAR_INTEGRATION_OPTION = ".options method=gear\n";
+
 /**
  * @brief   A capacitor's initial condition is a voltage and an inductor's a current; ngspice reads both as IC= and
  *          only uses them in a transient with uic.
@@ -257,8 +261,8 @@ std::string FormatSolverOptions(const Circuit &circuit) {
     add("tnom", options.NominalTemperatureCelsius, DEFAULT_NOMINAL_TEMPERATURE_CELSIUS);
     if (options.Method != IntegrationMethod::DEFAULT) {
         line += options.Method == IntegrationMethod::GEAR ? " method=gear" : " method=trap";
-    } else if (circuit.HasFuse()) {
-        return std::string(FUSE_INTEGRATION_OPTION) + (line.empty() ? "" : ".options" + line + "\n");
+    } else if (circuit.HasFuse() || circuit.HasThyristor()) {
+        return std::string(GEAR_INTEGRATION_OPTION) + (line.empty() ? "" : ".options" + line + "\n");
     }
     return line.empty() ? std::string() : ".options" + line + "\n";
 }
@@ -666,8 +670,9 @@ std::string WriteNetlistBody(const Circuit &circuit, const bool add_current_prob
  * changed are one ".options" line with reltol, abstol, vntol, tnom and method. Probes and the
  * gain stage of each ideal op-amp use nodes numbered after GetNodeCount(), so the circuit nodes keep their numbers.
  * Op-amp macromodels are subcircuits, written after the models. A fuse is an instance of a subcircuit written once with
- * the models, and a circuit with a fuse, in a block or not, writes
- *          ".options method=gear" once. A thyristor is an instance of the imcsim_scr two-transistor subcircuit,
+ * the models, and a circuit with a fuse or a thyristor, in a block or not, writes
+ *          ".options method=gear" once: the trapezoidal rule rings for ever on an inductor whose current an opened
+ *          fuse or a released thyristor cuts. A thyristor is an instance of the imcsim_scr two-transistor subcircuit,
  *          written once with the models too.
  */
 std::string WriteSpiceNetlist(const Circuit &circuit, const std::string_view analysis, const bool add_current_probes) {

@@ -165,10 +165,6 @@ constexpr std::string_view THYRISTOR_INPUT_NOISE =
 constexpr std::string_view THYRISTOR_OUTPUT_NOISE =
     "the noise of the blocking state: the junctions of the ngspice pair leak and generate shot noise, while the "
     "switch model of Nodalys is silent";
-constexpr std::string_view THYRISTOR_COMMUTATION_TAIL =
-    "at each commutation the current of the ngspice pair decays through the return diode over a tail of about "
-    "0.3 ms, while Nodalys cuts at its holding current, so the anode-side node stays clamped at the diode drop "
-    "that much longer";
 
 // Bounds of the known differences, each a little above what the example measures today
 
@@ -196,10 +192,6 @@ constexpr Tolerance DIVIDED_BY_NOTHING_BOUND{NOISE_TOTAL.Relative, 1e8};
 constexpr Tolerance THYRISTOR_INPUT_NOISE_BOUND{NOISE_TOTAL.Relative, 100.0};
 /// Output noise of a blocked thyristor: 1.1e-5 V/rtHz on ngspice against 5.2e-7 on Nodalys.
 constexpr Tolerance THYRISTOR_OUTPUT_NOISE_BOUND{NOISE_TOTAL.Relative, 3e-5};
-/// The commutation tail holds the anode-side node 0.6 V apart for about 0.3 ms.
-constexpr Tolerance THYRISTOR_COMMUTATION_TAIL_BOUND{TRANSIENT_RELATIVE_TOLERANCE, 0.8};
-/// The bleeder current mirrors that node: 606 nA against 20 nA.
-constexpr Tolerance THYRISTOR_BLEEDER_TAIL_BOUND{TRANSIENT_RELATIVE_TOLERANCE, 7e-7};
 /// Input impedance at DC through blocking thyristors: 7.52 MOhm on ngspice against 7.48 MOhm on Nodalys.
 constexpr Tolerance THYRISTOR_INPUT_IMPEDANCE_BOUND{5e-2, 1e5};
 
@@ -321,16 +313,6 @@ constexpr std::array KNOWN_DIFFERENCES{
                     "input noise total",
                     THYRISTOR_INPUT_NOISE_BOUND,
                     THYRISTOR_INPUT_NOISE},
-    KnownDifference{"controlled_bridge_rectifier.imcsim",
-                    TRANSIENT_NAME,
-                    "V(2)",
-                    THYRISTOR_COMMUTATION_TAIL_BOUND,
-                    THYRISTOR_COMMUTATION_TAIL},
-    KnownDifference{"controlled_bridge_rectifier.imcsim",
-                    TRANSIENT_NAME,
-                    "current R2",
-                    THYRISTOR_BLEEDER_TAIL_BOUND,
-                    THYRISTOR_COMMUTATION_TAIL},
     KnownDifference{"controlled_bridge_rectifier.imcsim",
                     TRANSFER_FUNCTION_NAME,
                     "input impedance",

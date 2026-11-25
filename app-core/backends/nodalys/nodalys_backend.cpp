@@ -99,7 +99,8 @@ Nodalys::IntegrationMethod ToNodalysMethod(const Circuit &circuit) {
         return Nodalys::IntegrationMethod::GEAR2;
     case IntegrationMethod::DEFAULT:
     default:
-        return circuit.HasFuse() ? Nodalys::IntegrationMethod::GEAR2 : Nodalys::IntegrationMethod::TRAPEZOIDAL;
+        return (circuit.HasFuse() || circuit.HasThyristor()) ? Nodalys::IntegrationMethod::GEAR2
+                                                             : Nodalys::IntegrationMethod::TRAPEZOIDAL;
     }
 }
 
