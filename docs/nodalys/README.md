@@ -53,6 +53,10 @@
 14. **[Transmission Lines (`TL` / `T` element)](./transmission_line.md)**
     - Algorithms: voltage-scaled even/odd telegrapher MNA equations free of half-wave singularities, $\sqrt{f}$ skin-effect and $\omega C \tan\delta$ dielectric dispersion across `.ac`, `.sp`, `.noise`, `.sens ... ac`, and `.hb`, Bosma passive two-port thermal noise, and Bergeron characteristic wave propagation with corner breakpoints in `.tran`.
 
+15. **[Thyristor Device (SCR)](./thyristor_device.md)**
+    - Algorithms: a latching switch fired by gate current or forward breakover and held on by its anode current, the on-state datasheet line $V_0 + R_T I$ stamped as a conductance with a threshold source, and the natural commutation predicted as a transient breakpoint.
+    - Benchmarks: the half-wave controlled rectifier average against $V_m(1+\cos\alpha)/(2\pi)$ and the turn-off against the holding-current crossing.
+
 ---
 
 ## Architecture & Modular Layout

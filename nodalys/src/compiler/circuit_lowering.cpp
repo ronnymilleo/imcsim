@@ -16,6 +16,7 @@
 #include "devices/semiconductors/bjt_device.h"
 #include "devices/semiconductors/diode_device.h"
 #include "devices/semiconductors/mosfet_device.h"
+#include "devices/semiconductors/thyristor_device.h"
 #include "devices/sources/controlled_sources.h"
 #include <cmath>
 #include <format>
@@ -270,6 +271,13 @@ void CircuitCompiler::Lower(const SwitchSpec &spec) {
                                                            MapNode(spec.CtrlNeg),
                                                            spec.Params));
     RegisterElement(spec.Name, dev);
+}
+
+void CircuitCompiler::Lower(const ThyristorSpec &spec) {
+    Device *dev = AddDevice(
+        std::make_unique<ThyristorDevice>(MapNode(spec.Anode), MapNode(spec.Cathode), MapNode(spec.Gate), spec.Params));
+    m_Compiled.ElementsByName[spec.Name] = dev;
+    RegisterTerminalCurrents(spec.Name, dev, {"A", "K", "G"});
 }
 
 void CircuitCompiler::Lower(const TransformerSpec &spec) {
