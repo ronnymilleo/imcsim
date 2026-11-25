@@ -126,7 +126,7 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   characteristics, a current mirror, common-emitter and class AB amplifiers, the stability of a common-emitter stage,
   the Monte Carlo spread of a bias point, an astable multivibrator started by an initial voltage, a bistable whose state
   a nodeset picks, op-amp amplifiers and their input offsets, an integrator, a Schmitt trigger and a Sallen-Key filter
-  with the part that sets its corner, an ideal transformer made of controlled sources, switching circuits, thyristor ones (a half-wave controlled rectifier, one with an inductive load and a freewheeling diode, and a controlled bridge), digital ones
+  with the part that sets its corner, an ideal transformer made of controlled sources, switching circuits, thyristor ones (a half-wave controlled rectifier, one with an inductive load and a freewheeling diode, a controlled bridge, and a TRIAC light dimmer), digital ones
   (gates, a truth table of the basic gates, half and full adders, an SR latch, a ripple counter, a decoder with logic
   outputs and a decade counter on a 7-segment display), and blocks: one RC filter used twice, an 8-bit counter of two
   4-bit blocks, and a precision rectifier from a vendor's op-amp and diode models
