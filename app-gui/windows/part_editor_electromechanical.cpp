@@ -42,6 +42,15 @@ constexpr auto TRANSFORMER_FIELDS = std::to_array<ParameterField<Core::Transform
     {"Winding R", &Core::TransformerParameters::WindingResistance, "Ohm"},
 });
 
+constexpr auto TRANSMISSION_LINE_FIELDS = std::to_array<ParameterField<Core::TransmissionLineParameters>>({
+    {"Delay", &Core::TransmissionLineParameters::Delay, "s"},
+    {"DC R", &Core::TransmissionLineParameters::DcResistance, "Ohm"},
+    {"Skin R", &Core::TransmissionLineParameters::SkinResistance, "Ohm"},
+    {"Ref freq", &Core::TransmissionLineParameters::ReferenceFrequency, "Hz"},
+    {"DC G", &Core::TransmissionLineParameters::DcConductance, "S"},
+    {"Loss tangent", &Core::TransmissionLineParameters::LossTangent, ""},
+});
+
 } // namespace
 
 /**
@@ -61,6 +70,10 @@ void LoadElectromechanicalFields(ElectromechanicalFields &fields, const Core::Co
         LoadParameterFields(TRANSFORMER_FIELDS,
                             fields.Transformer,
                             static_cast<const Core::Transformer &>(component).GetParameters());
+    } else if (type == Core::ComponentType::TRANSMISSION_LINE) {
+        LoadParameterFields(TRANSMISSION_LINE_FIELDS,
+                            fields.TransmissionLine,
+                            static_cast<const Core::TransmissionLine &>(component).GetParameters());
     }
 }
 
@@ -158,6 +171,28 @@ void DrawTransformer(Core::Transformer &transformer, ElectromechanicalFields &fi
     }
     ImGui::TextDisabled("Value is the primary inductance; the secondary is %s",
                         Core::FormatValue(transformer.GetSecondaryInductance()).c_str());
+}
+
+/**
+ * @brief   The value is the characteristic impedance Z0; zero losses run in transient (Bergeron) and frequency domain,
+ *          while skin/dielectric losses run in frequency-domain and Harmonic Balance analyses.
+ */
+void DrawTransmissionLine(Core::TransmissionLine &line, ElectromechanicalFields &fields, Schematic &schematic) {
+    Core::TransmissionLineParameters parameters = line.GetParameters();
+    const auto is_valid = [](const Core::TransmissionLineParameters &candidate) {
+        return Core::TransmissionLine::IsValidParameters(candidate);
+    };
+    if (DrawParameterFields(TRANSMISSION_LINE_FIELDS, fields.TransmissionLine, "", is_valid, parameters)) {
+        line.SetParameters(parameters);
+        schematic.MarkModified();
+    }
+    ImGui::TextDisabled("Value is Z0; quarter-wave at %sHz (Nodalys backend)",
+                        Core::FormatValue(line.GetQuarterWaveFrequency()).c_str());
+    if (line.GetParameters().IsLossy()) {
+        ImGui::TextDisabled("Lossy/dispersive: runs in DC, AC, S-parameters, noise and HB (not transient)");
+    } else {
+        ImGui::TextDisabled("Lossless (0 losses): runs in transient (Bergeron) and all frequency analyses");
+    }
 }
 
 } // namespace GUI

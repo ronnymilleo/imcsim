@@ -6,12 +6,17 @@
 #include "windows/part_editor_sources.h"
 
 #include "base/theme.h"
+#include "circuit/pwl_import.h"
 #include "misc/cpp/imgui_stdlib.h"
 #include "spice/spice_value.h"
 #include "windows/part_fields.h"
+#include <algorithm>
+#include <array>
 #include <cmath>
+#include <filesystem>
 #include <format>
 #include <optional>
+#include <utility>
 #include <vector>
 
 namespace GUI {
@@ -180,21 +185,108 @@ void DrawAM(Core::Source &source, SourceFields &fields, Schematic &schematic) {
     ImGui::TextDisabled("The modulating and carrier sines multiply; the offset shifts the whole waveform");
 }
 
+constexpr std::size_t MAX_INLINE_PWL_POINTS = 64;
+
+constexpr std::array<SDL_DialogFileFilter, 2> CSV_FILTERS = {
+    {{"CSV and text tables", "csv;txt;tsv;dat"}, {"All files", "*"}}};
+constexpr std::array<SDL_DialogFileFilter, 2> WAV_FILTERS = {{{"WAV audio", "wav"}, {"All files", "*"}}};
+
+bool IsPositiveAmplitude(const double value) {
+    return std::isfinite(value) && value > 0.0;
+}
+
+void ApplyImportedPWL(Core::Source &source,
+                      SourceFields &fields,
+                      Schematic &schematic,
+                      const std::filesystem::path &path) {
+    const auto loaded = fields.PendingImportKind == SourceFields::ImportKind::WAV
+                          ? Core::LoadPWLWAVFile(path, fields.WavPeakValue)
+                          : Core::LoadPWLCSVFile(path);
+    if (!loaded) {
+        fields.PWLImportError = loaded.error();
+        return;
+    }
+    const Core::PWLParameters candidate{.Points = *loaded};
+    if (!source.IsValidPWL(candidate)) {
+        fields.PWLImportError = "Imported points are not a valid increasing PWL table";
+        return;
+    }
+    source.SetPWL(candidate);
+    schematic.MarkModified();
+    LoadSourceFields(fields, source);
+}
+
 /**
- * @brief   The points apply as soon as the text reads, so a half-typed field keeps the last valid shape.
+ * @brief   Draws the PWL points field (or a compact summary for large imported tables) and CSV/WAV import controls.
  */
 void DrawPWL(Core::Source &source, SourceFields &fields, Schematic &schematic) {
-    DrawFieldLabel("Points");
-    const bool changed = ImGui::InputText("##pwl", &fields.PWLText);
-    const std::optional<std::vector<Core::PWLPoint>> points = Core::ParsePWLPoints(fields.PWLText);
-    if (changed && points) {
-        source.SetPWL({.Points = *points});
-        schematic.MarkModified();
+    if (const std::optional<std::optional<std::filesystem::path>> chosen = fields.PWLImportDialog.TakeResult()) {
+        const bool same_selection = fields.PendingImportSelection == schematic.GetSelectionVersion();
+        fields.PendingImportSelection.reset();
+        if (same_selection && *chosen) {
+            ApplyImportedPWL(source, fields, schematic, **chosen);
+        }
     }
-    if (!points) {
-        ImGui::TextColored(GetErrorTextColor(), "At least two \"time value\" pairs, times increasing from zero");
+
+    const std::vector<Core::PWLPoint> &current_points = source.GetPWL().Points;
+    if (current_points.size() <= MAX_INLINE_PWL_POINTS) {
+        DrawFieldLabel("Points");
+        const bool changed = ImGui::InputText("##pwl", &fields.PWLText);
+        const std::optional<std::vector<Core::PWLPoint>> points = Core::ParsePWLPoints(fields.PWLText);
+        if (changed && points) {
+            source.SetPWL({.Points = *points});
+            schematic.MarkModified();
+            fields.PWLImportError.clear();
+        }
+        if (!points) {
+            ImGui::TextColored(GetErrorTextColor(), "At least two \"time value\" pairs, times increasing from zero");
+        } else {
+            ImGui::TextDisabled("For example: 0 0, 1m 5, 2m 0");
+        }
     } else {
-        ImGui::TextDisabled("For example: 0 0, 1m 5, 2m 0");
+        const auto [min_it, max_it] =
+            std::ranges::minmax_element(current_points, [](const Core::PWLPoint &left, const Core::PWLPoint &right) {
+                return left.Value < right.Value;
+            });
+        ImGui::TextDisabled("%s",
+                            std::format("{} points (0 to {}s, {} to {}{})",
+                                        current_points.size(),
+                                        Core::FormatValue(current_points.back().Time),
+                                        Core::FormatValue(min_it->Value),
+                                        Core::FormatValue(max_it->Value),
+                                        source.GetUnit())
+                                .c_str());
+        if (ImGui::Button("Reset points")) {
+            source.SetPWL({});
+            schematic.MarkModified();
+            LoadSourceFields(fields, source);
+        }
+    }
+
+    if (const std::optional<double> peak = fields.WavPeak.Draw("WAV peak", source.GetUnit(), IsPositiveAmplitude)) {
+        fields.WavPeakValue = *peak;
+    }
+
+    const auto &file_path = schematic.GetFilePath();
+    const std::string start_location = file_path ? file_path->parent_path().string() : "";
+    ImGui::BeginDisabled(fields.PWLImportDialog.IsPending());
+    if (ImGui::Button("Import CSV...")) {
+        fields.PendingImportKind = SourceFields::ImportKind::CSV;
+        fields.PendingImportSelection = schematic.GetSelectionVersion();
+        fields.PWLImportError.clear();
+        fields.PWLImportDialog.ShowOpen(CSV_FILTERS, start_location);
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Import WAV...")) {
+        fields.PendingImportKind = SourceFields::ImportKind::WAV;
+        fields.PendingImportSelection = schematic.GetSelectionVersion();
+        fields.PWLImportError.clear();
+        fields.PWLImportDialog.ShowOpen(WAV_FILTERS, start_location);
+    }
+    ImGui::EndDisabled();
+
+    if (!fields.PWLImportError.empty()) {
+        ImGui::TextColored(GetErrorTextColor(), "%s", fields.PWLImportError.c_str());
     }
 }
 
@@ -292,7 +384,15 @@ void LoadSourceFields(SourceFields &fields, const Core::Source &source) {
     fields.Random[1].Load(source.GetRandom().Delay);
     fields.Random[2].Load(source.GetRandom().First);
     fields.Random[3].Load(source.GetRandom().Second);
-    fields.PWLText = Core::FormatPWLPoints(source.GetPWL().Points);
+    const std::vector<Core::PWLPoint> &pwl_points = source.GetPWL().Points;
+    if (pwl_points.size() <= MAX_INLINE_PWL_POINTS) {
+        fields.PWLText = Core::FormatPWLPoints(pwl_points);
+    } else {
+        fields.PWLText.clear();
+    }
+    fields.WavPeak.Load(fields.WavPeakValue);
+    fields.PendingImportSelection.reset();
+    fields.PWLImportError.clear();
 }
 
 void DrawSource(Core::Source &source, SourceFields &fields, ValueField &main_value, Schematic &schematic) {

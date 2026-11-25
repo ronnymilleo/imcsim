@@ -3,15 +3,15 @@
  * @brief   The Modified Nodal Analysis (MNA) linear system assembled and solved at each Newton-Raphson iteration.
  * @details
  * ### How Modified Nodal Analysis (MNA) Works
- * A circuit with $N$ non-ground nodes and $M$ voltage-defined branches (independent voltage sources, inductors,
- * VCVS, CCVS, current probes) produces a linear system of size $(N + M) \times (N + M)$:
+ * A circuit with \f$N\f$ non-ground nodes and \f$M\f$ voltage-defined branches (independent voltage sources, inductors,
+ * VCVS, CCVS, current probes) produces a linear system of size \f$(N + M) \times (N + M)\f$:
  *
  * ```text
  *   [ G   B ] [ v ] = [ i_rhs ]   <-- Node rows: KCL (sum of currents leaving node = 0), in Amperes
  *   [ C   D ] [ j ]   [ e_rhs ]   <-- Branch rows: branch constitutive equations (e.g. v_a - v_b = E), in Volts
  * ```
  *
- * - **Ground (node 0)** is the reference potential ($0\text{ V}$) and has index `-1`. Passing `-1` to `AddA()` or
+ * - **Ground (node 0)** is the reference potential (\f$0\text{ V}\f$) and has index `-1`. Passing `-1` to `AddA()` or
  *   `AddRhs()` is a no-op, so device stamps never need special `if (node != ground)` branches.
  * - **Unknown indices (`0 .. GetSize() - 1`)**:
  *   - Top-level circuit nodes `1 .. CircuitNodeCount - 1` map directly to unknown indices `0 .. CircuitNodeCount - 2`
@@ -28,11 +28,53 @@
 #ifndef NODALYS_MNA_SYSTEM_H
 #define NODALYS_MNA_SYSTEM_H
 
-#include "linear/dense_matrix.h"
 #include "nodalys/types.h"
+#include <complex>
+#include <memory>
 #include <vector>
 
 namespace Nodalys {
+
+template <typename Scalar>
+class BasicDenseMatrix;
+/// Double-precision dense matrix alias.
+using DenseMatrix = BasicDenseMatrix<double>;
+
+/**
+ * @struct  ComplexStamper
+ * @brief   Sink receiving complex MNA matrix entries `(row, col, delta)` at angular frequency \f$\omega\f$, ignoring
+ *          negative indices (ground) like `MnaSystem::AddA()`.
+ */
+struct ComplexStamper {
+    using Callback = void (*)(int row, int col, std::complex<double> value, void *context);
+
+    Callback Apply = nullptr;
+    void *Context = nullptr;
+
+    void Add(const int row, const int col, const std::complex<double> value) const {
+        if (row < 0 || col < 0 || Apply == nullptr) {
+            return;
+        }
+        Apply(row, col, value, Context);
+    }
+};
+
+/**
+ * @struct  FrequencyStamp
+ * @brief   Type-erased frequency-dependent matrix delta callback registered on a reactive `MnaSystem`.
+ */
+struct FrequencyStamp {
+    using Callback = void (*)(const void *context, const ComplexStamper &stamper, double omega);
+
+    Callback Stamp = nullptr;
+    const void *Context = nullptr;
+
+    void Apply(const ComplexStamper &stamper, const double omega) const {
+        if (Stamp != nullptr) {
+            Stamp(Context, stamper, omega);
+        }
+    }
+};
 
 /**
  * @struct  TimeContext
@@ -46,10 +88,6 @@ struct TimeContext {
     /// True at t = 0 of a transient solve (both with and without `uic`); `.ic` node voltages clamp only the solve that
     /// is not `uic`, the operating point that starts the transient.
     bool IsTransientStart = false;
-    /// True on the first pass of an operating-point solve that has nodesets: they pull their nodes to their voltages.
-    /// The second pass, which converges again with them released, and every solve that is not an operating point have
-    /// it false.
-    bool IsNodesetPass = false;
     /// False for the solves that continue a sweep, which start from the point before them and not from the nodesets.
     bool AppliesNodesets = true;
     /// True on the first integration step of a transient and on the step that leaves a source corner: uses Backward
@@ -61,123 +99,89 @@ struct TimeContext {
     double PreviousTimeStep = 0.0;
     /// True while evaluating periodic steady-state waveforms over one Harmonic Balance cycle.
     bool IsPeriodicSteadyState = false;
-    /// Current simulation time $t$, in seconds.
-    double Time = 0.0;
-    /// Integration step size $h = \Delta t$, in seconds (used only when `IsTransient` is true).
+    double Time = 0.0; ///< Current simulation time \f$t\f$, in seconds.
+    /// Integration step size \f$h = \Delta t\f$, in seconds (used only when `IsTransient` is true).
     double TimeStep = 0.0;
 };
 
 /**
  * @class   MnaSystem
- * @brief   Holds the linearized matrix $A$ and right-hand side $\text{rhs}$ for one Newton-Raphson step.
+ * @brief   Holds the linearized matrix \f$A\f$ and right-hand side \f$\text{rhs}\f$ for one Newton-Raphson step.
  */
 class MnaSystem {
 public:
     MnaSystem(int node_count, int branch_count);
     explicit MnaSystem(std::vector<bool> is_node_unknown);
+    MnaSystem(const MnaSystem &other);
+    MnaSystem &operator=(const MnaSystem &other);
+    MnaSystem(MnaSystem &&other) noexcept;
+    MnaSystem &operator=(MnaSystem &&other) noexcept;
+    ~MnaSystem();
 
-    /// Total number of unknowns (node voltages + branch currents).
     int GetSize() const;
-
-    /// Maps a 1-based circuit node number to its 0-based unknown index, or -1 for ground (node 0).
     int NodeIndex(int node) const;
-
-    /// Maps a 0-based branch ordinal to its unknown index (used when all nodes precede all branches).
     int BranchIndex(int ordinal) const;
-
-    /// Number of node-voltage unknowns in the system.
     int GetNodeUnknownCount() const;
+    [[nodiscard]] double Entry(int row, int col) const;
 
-    /// The assembled linearized dense matrix A.
-    const DenseMatrix &Matrix() const;
+    /**
+     * @brief   Visits every non-zero entry `(row, col, value)` of the assembled matrix \f$A\f$.
+     * @details Storage-agnostic iteration hook so analyses never depend on dense vs. sparse matrix layout.
+     * @param[in] visitor  Callable invoked as `visitor(row, col, value)` for each non-zero entry.
+     */
+    template <typename Visitor>
+    void ForEachNonZero(const Visitor &visitor) const {
+        VisitNonZeros(
+            [](const int row, const int col, const double value, const void *context) {
+                (*static_cast<const Visitor *>(context))(row, col, value);
+            },
+            &visitor);
+    }
 
-    /// The assembled right-hand side vector.
+    [[nodiscard]] DenseMatrix ToDenseMatrix() const;
     const std::vector<double> &Rhs() const;
-
-    /// True when unknown `index` is a node voltage (KCL row); false when it is a branch current (branch voltage row).
     bool IsNodeUnknown(int index) const;
-
-    /// Adds `value` to matrix entry $A(\text{row}, \text{col})$. Silently ignores negative indices (ground).
     void AddA(int row, int col, double value);
-
-    /// Adds `value` to right-hand side entry $\text{rhs}(\text{row})$. Silently ignores negative indices (ground).
+    void AddMatrixFrom(const MnaSystem &source);
     void AddRhs(int row, double value);
-
-    /// Adds a small conductance $G_{\min}$ from every node unknown to ground to regularize floating/cutset nodes.
     void AddGminToNodes(double conductance);
-
-    /// Zeros both $A$ and $\text{rhs}$ before stamping a new Newton iteration.
+    void AddFrequencyStamp(FrequencyStamp stamp);
+    [[nodiscard]] const std::vector<FrequencyStamp> &FrequencyStamps() const;
     void Clear();
-
-    /// Zeros only $\text{rhs}$ while preserving the linearized matrix $A$ (used for small-signal `.tf` solves).
     void ClearRhs();
-
-    /// Solves $A \cdot x = \text{rhs}$ via LU decomposition with partial pivoting; returns false if singular.
     bool Solve(std::vector<double> &x) const;
-
-    /// Solves the transposed (adjoint) system $A^T \cdot x = \text{rhs}$ via LU decomposition with partial pivoting.
     bool SolveTranspose(const std::vector<double> &rhs, std::vector<double> &x) const;
-
-    /**
-     * @brief   Solves the small-signal complex AC system $(A_{\text{DC}} + j \omega C_{\text{AC}}) \cdot x_{\text{AC}}
-     * = b_{\text{AC}}$.
-     * @param[in]  reactive  System whose matrix holds the reactive coefficients $C_{\text{AC}}$ and whose RHS holds the
-     *                       small-signal AC source excitation $b_{\text{AC}}$.
-     * @param[in]  omega     Angular frequency $\omega = 2\pi f$ in rad/s.
-     * @param[out] x_ac      Complex small-signal solution vector (node phasors and branch current phasors).
-     * @return  False if the complex matrix at frequency $\omega$ is singular.
-     */
     bool SolveAc(const MnaSystem &reactive, double omega, std::vector<std::complex<double>> &x_ac) const;
-
-    /**
-     * @brief   Solves the small-signal complex AC system for multiple right-hand sides, reusing the LU factorization.
-     * @param[in]  reactive  Reactive system (C_ac).
-     * @param[in]  omega     Angular frequency in rad/s.
-     * @param[in]  rhs_list  List of complex right-hand side excitation vectors.
-     * @param[out] solutions Output list of complex solution vectors.
-     * @return  False if the complex matrix at frequency $\omega$ is singular.
-     */
+    [[nodiscard]] bool SolveAcFor(const MnaSystem &reactive,
+                                  double omega,
+                                  const std::vector<std::complex<double>> &rhs,
+                                  std::vector<std::complex<double>> &x_ac) const;
     bool SolveAcMultiple(const MnaSystem &reactive,
                          double omega,
                          const std::vector<std::vector<std::complex<double>>> &rhs_list,
                          std::vector<std::vector<std::complex<double>>> &solutions) const;
-
-    /**
-     * @brief   Solves the transposed (adjoint) small-signal AC system $(A_{\text{DC}} + j \omega C_{\text{AC}})^T \cdot
-     * \lambda = e_{\text{out}}$ for a unit excitation at `output_unknown`, used by small-signal noise analysis
-     * (`.noise`).
-     */
     bool SolveAcTranspose(const MnaSystem &reactive,
                           double omega,
                           int output_unknown,
                           std::vector<std::complex<double>> &adjoint) const;
-
-    /**
-     * @brief   Solves the transposed small-signal system $Y(j\omega)^T \cdot \lambda = \text{rhs}$ for any
-     *          complex right-hand side, which the AC sensitivity uses for an output that is a node difference.
-     * @return  False if the matrix is singular or the sizes differ.
-     */
     bool SolveAcTransposeFor(const MnaSystem &reactive,
                              double omega,
                              const std::vector<std::complex<double>> &rhs,
                              std::vector<std::complex<double>> &adjoint) const;
-
-    /**
-     * @brief   Solves $A^T \cdot x = \text{rhs}$ for a complex right-hand side, where $A$ is the real matrix of the
-     *          system, as the DC adjoint of a small-signal quantity needs.
-     * @return  False if the matrix is singular or the sizes differ.
-     */
     bool SolveTransposeComplex(const std::vector<std::complex<double>> &rhs,
                                std::vector<std::complex<double>> &x) const;
-
-    /// Verifies that the equation residual $|A \cdot x - \text{rhs}|$ satisfies KCL and branch tolerances.
     bool CheckResidual(const std::vector<double> &x, double voltage_abstol, double current_abstol, double reltol) const;
 
 private:
-    DenseMatrix m_A;
+    struct Storage;
+
+    std::unique_ptr<Storage> m_Storage;
     std::vector<double> m_Rhs;
     std::vector<bool> m_IsNodeUnknown;
+    std::vector<FrequencyStamp> m_FrequencyStamps;
     int m_NodeUnknowns = 0;
+
+    void VisitNonZeros(void (*callback)(int, int, double, const void *), const void *context) const;
 };
 
 } // namespace Nodalys

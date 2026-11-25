@@ -12,6 +12,7 @@
 #include "circuit/components/relay.h"
 #include "circuit/components/switch.h"
 #include "circuit/components/transformer.h"
+#include "circuit/components/transmission_line.h"
 #include "circuit/components/voltage_controlled_switch.h"
 #include "schematic/schematic.h"
 #include <array>
@@ -33,6 +34,8 @@ struct ElectromechanicalFields {
     std::array<ValueField, 4> Fuse;
     /// One per member of Core::TransformerParameters.
     std::array<ValueField, 3> Transformer;
+    /// One per member of Core::TransmissionLineParameters.
+    std::array<ValueField, 6> TransmissionLine;
 };
 
 // Loading
@@ -46,6 +49,7 @@ void DrawControlledSwitch(Core::VoltageControlledSwitch &controlled,
 void DrawRelay(Core::Relay &relay, ElectromechanicalFields &fields, Schematic &schematic);
 void DrawFuse(Core::Fuse &fuse, ElectromechanicalFields &fields, Schematic &schematic);
 void DrawTransformer(Core::Transformer &transformer, ElectromechanicalFields &fields, Schematic &schematic);
+void DrawTransmissionLine(Core::TransmissionLine &line, ElectromechanicalFields &fields, Schematic &schematic);
 
 } // namespace GUI
 

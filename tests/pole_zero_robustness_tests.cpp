@@ -5,6 +5,7 @@
  *          says why when a circuit has none to show.
  */
 
+#include "analyses/pz/pole_zero_oracle.h"
 #include "analysis/analysis_inputs.h"
 #include "backends/nodalys/compiler.h"
 #include "backends/nodalys/nodalys_backend.h"
@@ -15,10 +16,10 @@
 #include "circuit/components/resistor.h"
 #include "circuit/components/source.h"
 #include "circuit/components/voltage_source.h"
-#include "pole_zero_oracle.h"
 #include "schematic/examples.h"
 #include "schematic/schematic.h"
 #include "simulation/analysis_sources.h"
+#include "simulation/simulation_backend.h"
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -90,7 +91,7 @@ LoadedExample LoadExample(const std::string_view file_name, const std::optional<
                               std::move(loaded->Subcircuits),
                               std::move(loaded->Models));
     result.Schematic->RestoreMeasurements(loaded->Measurements);
-    result.Circuit = result.Schematic->BuildCircuit();
+    result.Circuit = result.Schematic->GetCircuit();
     const auto output = GUI::ResolveOutputNode(std::nullopt, result.Circuit, *result.Schematic);
     if (!output) {
         return result;
@@ -206,10 +207,13 @@ TEST_CASE("The transformer power supply has no right-half-plane root and all sev
 }
 
 TEST_CASE("Every example whose input reaches its output has roots that rebuild its AC response", "[pz][robust]") {
-    // The examples whose input is a Vin source; the rest have a supply for input, which no AC sweep can drive
+    // The examples whose input is a Vin source; the rest have a supply for input, which no AC sweep can drive, or
+    // distributed parts with no rational pole-zero form
+    const Core::NodalysBackend nodalys;
     for (const GUI::Example &entry : GUI::GetExamples()) {
         const LoadedExample example = LoadExample(entry.FileName, std::nullopt);
-        if (!example.HasInput || example.HasLogic) {
+        if (!example.HasInput || example.HasLogic
+            || Core::FindUnsupported(nodalys, example.Circuit, Core::AnalysisKind::POLE_ZERO)) {
             continue;
         }
         const auto compiled = Core::CompileCircuit(example.Circuit);

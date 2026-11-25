@@ -210,7 +210,7 @@ TEST_CASE("A nodeset has a value in volts, no name, and is found by its name", "
 TEST_CASE("A marker on a wire gives its node a nodeset and stays out of the parts and the initial voltages",
           "[nodeset]") {
     MarkedResistor setup(3.0);
-    const Core::Circuit circuit = setup.Schematic.BuildCircuit();
+    const Core::Circuit circuit = setup.Schematic.GetCircuit();
     // The resistor and the ground only: the marker writes no element
     CHECK(circuit.GetEntries().size() == 2);
     CHECK(circuit.GetInitialVoltages().empty());
@@ -226,7 +226,7 @@ TEST_CASE("A nodeset and an initial voltage on one node may differ, since one is
     initial->GetComponent().SetValue(1.0);
     setup.Schematic.AddElement(std::move(initial));
     setup.Schematic.AddWire({10, 6}, {10, 8});
-    CHECK_FALSE(Core::CheckCircuit(setup.Schematic.BuildCircuit()).has_value());
+    CHECK_FALSE(Core::CheckCircuit(setup.Schematic.GetCircuit()).has_value());
 }
 
 TEST_CASE("Two nodesets on one node agree or are refused, naming both voltages", "[nodeset]") {
@@ -234,7 +234,7 @@ TEST_CASE("Two nodesets on one node agree or are refused, naming both voltages",
         MarkedResistor setup(3.0);
         setup.AddMarker({10, 6}, 3.0);
         setup.Schematic.AddWire({10, 6}, {10, 8});
-        const Core::Circuit circuit = setup.Schematic.BuildCircuit();
+        const Core::Circuit circuit = setup.Schematic.GetCircuit();
         CHECK(circuit.GetNodesets().size() == 2);
         CHECK_FALSE(Core::CheckCircuit(circuit).has_value());
         const std::string netlist = circuit.ToSpiceNetlist();
@@ -246,7 +246,7 @@ TEST_CASE("Two nodesets on one node agree or are refused, naming both voltages",
         MarkedResistor setup(3.0);
         setup.AddMarker({10, 6}, 1.5);
         setup.Schematic.AddWire({10, 6}, {10, 8});
-        const std::optional<std::string> problem = Core::CheckCircuit(setup.Schematic.BuildCircuit());
+        const std::optional<std::string> problem = Core::CheckCircuit(setup.Schematic.GetCircuit());
         REQUIRE(problem.has_value());
         CHECK_THAT(*problem, ContainsSubstring("two nodesets"));
         CHECK_THAT(*problem, ContainsSubstring("3 V"));
@@ -315,7 +315,7 @@ TEST_CASE("A nodeset inside a block is checked where it sits and per instance", 
 
 TEST_CASE("The netlist writes a nodeset as .nodeset and no element, apart from the initial voltages", "[nodeset]") {
     MarkedResistor setup(3.0);
-    const Core::Circuit circuit = setup.Schematic.BuildCircuit();
+    const Core::Circuit circuit = setup.Schematic.GetCircuit();
     const std::string netlist = circuit.ToSpiceNetlist();
     CHECK_THAT(netlist, ContainsSubstring(std::format(".nodeset V({})=3\n", circuit.GetEntries()[0].Nodes[0])));
     CHECK_THAT(netlist, !ContainsSubstring(".ic"));

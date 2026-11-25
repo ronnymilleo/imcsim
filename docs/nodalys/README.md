@@ -14,7 +14,7 @@
    - Algorithms: Norton charge companion models (`ChargeModel`), Backward Euler + Trapezoidal Rule, adaptive step control via 3rd divided-difference LTE (Nagel SPICE2 Eq. 5.26), waveform/switch *breakpoints*, inertial logic propagation delay, and linear output interpolation.
    - Benchmark tables: **Analytical Golden vs. `ngspice` vs. `Nodalys`**.
 4. **[Small-Signal AC / Bode Analysis (`.ac`)](./ac_analysis.md)**
-   - Algorithms: Exact linearization around the DC operating point, complex MNA solver $\mathbf{Y}(j\omega)\mathbf{V} = \mathbf{I}_{\text{AC}}$, $C^1$-continuous depletion capacitance ($f_1, f_2, f_3$) and Gummel-Poon diffusion charge ($Q_{DE} = \tau_F I_{\text{fwd}}/q_b$), and continuous phase unwrapping.
+   - Algorithms: Exact linearization around the DC operating point, complex MNA solver $\mathbf{Y}(j\omega)\mathbf{V} = \mathbf{I}_{\text{AC}}$, $C^1$-continuous depletion capacitance ($f_1, f_2, f_3$) and Gummel-Poon diffusion charge ($Q_{DE} = \tau_F I_{\text{fwd}}/q_b$), and phase in $(-180^\circ, +180^\circ]$.
    - Benchmark tables: **Analytical Golden vs. `ngspice` vs. `Nodalys`** + all shipped AC examples in `imcsim`.
 5. **[Small-Signal DC Transfer Function Analysis (`.tf`)](./tf_analysis.md)**
    - Algorithms: Tangent Jacobian $\mathbf{J}(\mathbf{x}_{\text{DC}})$, unit input excitation ($\delta u_{\text{in}} = 1 \implies \text{Gain}, Z_{\text{in}}$), and unit output test current injection ($\delta I_{\text{out}} = 1\text{ A} \implies Z_{\text{out}}$).
@@ -50,6 +50,9 @@
     - Algorithms: an expansion of the text of a `.subckt` into a `CircuitBuilder` with the scopes of SPICE (parameters, `.model` cards, nested subcircuits), private nodes and element names for each instance, values as expressions of parameters, and a refusal that names the line for everything the engine cannot simulate.
     - Benchmarks: the precision rectifier example, whose op-amp is such a block, against `ngspice`.
 
+14. **[Transmission Lines (`TL` / `T` element)](./transmission_line.md)**
+    - Algorithms: voltage-scaled even/odd telegrapher MNA equations free of half-wave singularities, $\sqrt{f}$ skin-effect and $\omega C \tan\delta$ dielectric dispersion across `.ac`, `.sp`, `.noise`, `.sens ... ac`, and `.hb`, Bosma passive two-port thermal noise, and Bergeron characteristic wave propagation with corner breakpoints in `.tran`.
+
 ---
 
 ## Architecture & Modular Layout
@@ -57,26 +60,40 @@
 ```
 ├── nodalys/                           Autonomous simulation engine (static lib & CLI)
 │   ├── include/nodalys/               Public C++23 API (zero project dependencies)
-│   │   ├── nodalys.h                  Analysis execution entry points
-│   │   ├── types.h                    Parameters, analysis settings, and results
+│   │   ├── nodalys.h                  Umbrella header including all public headers
+│   │   ├── analyses.h                 Analysis configs, options, and Compute* entry points
+│   │   ├── results.h                  Analysis result structures and accessors
+│   │   ├── types.h                    Component parameters, units, and enums
 │   │   ├── circuit.h                  Opaque Circuit handle
+│   │   ├── circuit_builder.h          Fluent CircuitBuilder for components & models
 │   │   ├── expression.h               Expression of voltages, currents and time with exact derivatives
-│   │   └── circuit_builder.h          Fluent CircuitBuilder for components & models
+│   │   ├── netlist_parser.h           SPICE netlist parser and ParseSpiceNumber
+│   │   ├── subcircuit_text.h          SPICE-text .subckt expander API
+│   │   ├── exporters.h                CSV, JSON, SPICE Raw, and Touchstone exporters
+│   │   └── logic_bridge.h             Discrete-to-analog Verilog co-simulation bridge
 │   └── src/
 │       ├── api/                       CircuitBuilder implementation and Circuit internals
 │       ├── analyses/                  Solvers: .op, .dc, .tran, .ac, .tf, .noise, .sp, .pz, .sens (DC and AC), .hb
 │       ├── bridge/                    LogicBridge: Verilog discrete-to-analog co-simulation
 │       ├── cli/                       Standalone CLI binary entry point (`nodalys`)
-│       ├── compiler/                  CompiledCircuit internal representation
-│       ├── devices/                   Passive, source, semiconductor, and smooth logic models
+│       ├── compiler/                  CircuitDescription, CircuitCompiler, macromodels, and CompiledCircuit
+│       ├── devices/                   Passive, source, semiconductor, fuse, switch, and smooth logic models
 │       ├── export/                    CSV, JSON, SPICE Raw, and Touchstone multi-format exporters
 │       ├── expression/                Parser, evaluation and derivatives of behavioral source expressions
-│       ├── linear/                    BasicDenseMatrix (LU) and QZ generalized eigenvalue solver
+│       ├── linear/                    BasicDenseMatrix (LU), FFT, and QZ generalized eigenvalue solver
 │       ├── mna/                       MnaSystem (real and complex matrix assembly)
 │       ├── newton/                    Damped Newton-Raphson, Gmin/Source stepping
-│       └── parser/                    SPICE netlist parser, and the expansion of subcircuits kept as SPICE text
-└── app-core/backends/nodalys/                  imcsim Integration Bridge
+│       ├── parser/                    SPICE netlist parser, and the expansion of subcircuits kept as SPICE text
+│       └── text/                      SPICE number and case-insensitive text helpers
+└── app-core/backends/nodalys/         imcsim Integration Bridge
     ├── compiler.h / .cpp              Translates Core::Circuit to Nodalys::Circuit
+    ├── compiler_context.h             Shared probe planning and node/parameter helpers
+    ├── compiler_parts.h / .cpp        Passives, sources, semiconductors, switches, fuses, and op-amps
+    ├── compiler_logic.h / .cpp        Continuous logic gates and flip-flops
+    ├── model_parser.h / .cpp          SPICE .model card parsing into Nodalys parameters
+    ├── parameter_conversion.h / .cpp  Component parameter mapping
+    ├── spice_block_check.h / .cpp     Pre-run validation for SPICE-text blocks
+    ├── nodalys_results.h / .cpp       Translates Nodalys results to Core result types
     └── nodalys_backend.h / .cpp       Core::SimulationBackend implementation (NodalysBackend)
 ```
 
@@ -84,13 +101,13 @@
 
 | Module / Directory | Responsibility |
 | :--- | :--- |
-| `include/nodalys/` | Public C++23 interface exporting `CircuitBuilder`, `Circuit`, and free analysis functions (`ComputeOperatingPoint`, `ComputeTransient`, `ComputeDCSweep`, `ComputeACSweep`, `ComputeTransferFunction`, `ComputeNoise`, `ComputeSParameters`, `ComputePoleZero`, `ComputeSensitivity`, `ComputeAcSensitivity`, `ComputeHarmonicBalance`). |
+| `include/nodalys/` | Public C++23 interface exporting `CircuitBuilder`, `Circuit`, `AddSubcircuitText`, `ParseNetlist`, and free analysis functions in [`analyses.h`](../../nodalys/include/nodalys/analyses.h) (`ComputeOperatingPoint`, `ComputeTransient`, `ComputeDCSweep`, `ComputeACSweep`, `ComputeTransferFunction`, `ComputeNoise`, `ComputeSParameters`, `ComputePoleZero`, `ComputeSensitivity`, `ComputeAcSensitivity`, `ComputeHarmonicBalance`). |
 | `src/mna/` | Real and complex Modified Nodal Analysis (MNA) matrix assembly, transpose solve, dynamic $G_{\min}$ stabilization, and residual verification. |
 | `src/linear/` | `BasicDenseMatrix<Scalar>` (LU decomposition), Moler-Stewart QZ generalized eigenvalue solver (`ComputeGeneralizedEigenvalues`), and internal radix-2 Cooley-Tukey FFT (`FftPlan`, `RealToHarmonics`, `HarmonicsToReal`). |
 | `src/newton/` | Damped nonlinear Newton-Raphson driver with semiconductor junction damping (`pnjlim`, `fetlim`), logic output limiting, and fallback homotopy strategies (*Gmin stepping* and *Source stepping*). |
 | `src/devices/` | Device models: linear passives, independent/controlled/behavioral sources, hysteretic switches, relays, transformers, fuses, ideal & Boyle op-amps, nonlinear semiconductors (Shockley diode, Gummel-Poon BJT, Shichman-Hodges Level-1 MOSFET), and smooth continuous logic gates. |
 | `src/expression/` | The language of the behavioral source: a recursive-descent parser to a flat program, forward-mode automatic differentiation, and the value and partial derivatives of every operator and function ([`behavioral_source.md`](./behavioral_source.md)). |
-| `src/analyses/` | Complete numerical solvers for DC Operating Point, DC Sweep (1D/2D), Time-Domain Transient, AC Small-Signal Sweep, DC Transfer Function, AC Adjoint Noise, Multiport S-Parameters, Pole-Zero, DC Sensitivity, and Harmonic Balance. |
+| `src/analyses/` | Complete numerical solvers for DC Operating Point, DC Sweep (1D/2D), Time-Domain Transient, AC Small-Signal Sweep, DC Transfer Function, AC Adjoint Noise, Multiport S-Parameters, Pole-Zero, DC and AC Sensitivity, and Harmonic Balance. |
 | `src/bridge/` | `LogicBridge` translating discrete event-driven logic levels (`0`, `1`, `X`, `Z`) into continuous analog waveforms with realistic slew rates and configurable supply rails. |
 | `src/parser/` & `src/export/` | SPICE netlist syntax parser supporting engineering scales (`1k`, `100n`, `4.7u`), the expansion of a subcircuit kept as SPICE text, which the `X` lines of a netlist use too (`subcircuit_*.cpp`, `netlist_subcircuits.cpp`, [`subcircuit_text.md`](./subcircuit_text.md)) and multi-format simulation result export (CSV, JSON, SPICE Raw, Touchstone). |
 | `src/cli/` | Standalone CLI tool (`nodalys`) processing netlists from files or `stdin` with command-line options (`--analysis`, `--format`, `--output`). |
@@ -110,17 +127,17 @@
 
 | Analysis (`AnalysisKind`) | SPICE Command | `ngspice` | `Nodalys` | `Nodalys` Implementation & Notes |
 | :--- | :---: | :---: | :---: | :--- |
-| **Operating Point** | `.op` | ✅ | ✅ **Ready** | [`dc_analysis.cpp`](../../nodalys/src/analyses/dc_analysis.cpp) — Newton-Raphson + `pnjlim`/`fetlim` + *Gmin stepping* + *Source stepping* + bistable logic damping. |
-| **DC Sweep** (1D & 2D) | `.dc` | ✅ | ✅ **Ready** | [`dc_analysis.cpp`](../../nodalys/src/analyses/dc_analysis.cpp) — 1-source or 2-source (`Swept` + `Stepped`) sweep with homotopic warm-start continuation. |
-| **Transient** | `.tran` | ✅ | ✅ **Ready** | [`transient_analysis.cpp`](../../nodalys/src/analyses/transient_analysis.cpp) — Trapezoidal + Backward Euler, 3rd divided-difference LTE, *breakpoints*, live chunk streaming, and logic delays. |
-| **AC Sweep (Bode)** | `.ac` | ✅ | ✅ **Ready** | [`ac_analysis.cpp`](../../nodalys/src/analyses/ac_analysis.cpp) — Operating point linearization + complex MNA solver $\mathbf{Y}(j\omega)\mathbf{V} = \mathbf{I}$ (gain in dB and continuous unwrapped phase), `dec`, `oct` or `lin` sweep. |
-| **Transfer Function** | `.tf` | ✅ | ✅ **Ready** | [`tf_analysis.cpp`](../../nodalys/src/analyses/tf_analysis.cpp) — Small-signal DC gain ($A_v$ or $R_m$), input impedance $Z_{\text{in}}$, and output impedance $Z_{\text{out}}$. |
-| **Noise Analysis** | `.noise` | ✅ | ✅ **Ready** | [`noise_analysis.cpp`](../../nodalys/src/analyses/noise_analysis.cpp) — Adjoint complex solver $\mathbf{Y}(j\omega)^T \lambda = \mathbf{e}_{\text{out}}$, input/output spectral densities ($\text{V}/\sqrt{\text{Hz}}$), log-log RMS integration, and per-component noise shares, `dec`, `oct` or `lin` sweep. |
-| **S-Parameters** | `.sp` | ✅ | ✅ **Ready** | [`sp_analysis.cpp`](../../nodalys/src/analyses/sp_analysis.cpp) — Multiport scattering matrix $\mathbf{S}(j\omega)$ from one port up, single-LU multi-RHS solve, exact $\mathbf{Z}$ and $\mathbf{Y}$ matrices (absent where the circuit has none), Return Loss, Insertion Loss, VSWR, Input Impedance, and Touchstone export. |
-| **Pole-Zero** | `.pz` | ✅ | ✅ **Ready** | [`pz_analysis.cpp`](../../nodalys/src/analyses/pz_analysis.cpp) — Generalized eigenvalue solver $(\mathbf{G}, -\mathbf{C})$ and Rosenbrock pencil $(\mathbf{A}_z, -\mathbf{B}_z)$ via pure C++23 QZ algorithm, after balancing and exact removal of algebraic rows ([`pencil_reduction.cpp`](../../nodalys/src/linear/pencil_reduction.cpp)), with the checks of [`pz_checks.cpp`](../../nodalys/src/analyses/pz_checks.cpp). |
-| **Sensitivity** | `.sens` | ✅ | ✅ **Ready** | [`sens_analysis.cpp`](../../nodalys/src/analyses/sens_analysis.cpp) — Transposed adjoint solve $\mathbf{J}^T \boldsymbol{\lambda} = \mathbf{d}$, analytical device derivatives, 100% normalized scale, and subcircuit/potentiometer aggregation. |
-| **AC Sensitivity** | `.sens ... ac` | ❌ (wrong with forward-biased devices) | ✅ **Ready** | [`ac_sens_analysis.cpp`](../../nodalys/src/analyses/ac_sens_analysis.cpp) — Transposed complex adjoint solve per frequency, the bias term of the nonlinear devices through the DC adjoint, and the change of gain and phase for 1 % of each part, read from `.sens <out> ac dec|oct|lin <np> <fstart> <fstop>` by the netlist parser and the CLI ([`ac_sens_analysis.md`](./ac_sens_analysis.md)). |
-| **Harmonic Balance** | `.hb` | ❌ | ✅ **Ready** | [`hb_analysis.cpp`](../../nodalys/src/analyses/hb_analysis.cpp) — Exclusive AFT Newton-Raphson solver with pure C++23 radix-2 FFT, Toeplitz/circulant conversion Jacobian, and source/gmin stepping continuation. |
+| **Operating Point** | `.op` | ✅ | ✅ **Ready** | [`dc_analysis.cpp`](../../nodalys/src/analyses/dc/dc_analysis.cpp) — Newton-Raphson + `pnjlim`/`fetlim` + *Gmin stepping* + *Source stepping* + bistable logic damping. |
+| **DC Sweep** (1D & 2D) | `.dc` | ✅ | ✅ **Ready** | [`dc_analysis.cpp`](../../nodalys/src/analyses/dc/dc_analysis.cpp) — 1-source or 2-source (`Swept` + `Stepped`) sweep with homotopic warm-start continuation. |
+| **Transient** | `.tran` | ✅ | ✅ **Ready** | [`transient_analysis.cpp`](../../nodalys/src/analyses/transient/transient_analysis.cpp) — Trapezoidal + Backward Euler, 3rd divided-difference LTE, *breakpoints*, live chunk streaming, and logic delays. |
+| **AC Sweep (Bode)** | `.ac` | ✅ | ✅ **Ready** | [`ac_analysis.cpp`](../../nodalys/src/analyses/ac/ac_analysis.cpp) — Operating point linearization + complex MNA solver $\mathbf{Y}(j\omega)\mathbf{V} = \mathbf{I}$ (gain in dB and phase in $(-180^\circ, +180^\circ]$), `dec`, `oct` or `lin` sweep. |
+| **Transfer Function** | `.tf` | ✅ | ✅ **Ready** | [`tf_analysis.cpp`](../../nodalys/src/analyses/tf/tf_analysis.cpp) — Small-signal DC gain ($A_v$ or $R_m$), input impedance $Z_{\text{in}}$, and output impedance $Z_{\text{out}}$. |
+| **Noise Analysis** | `.noise` | ✅ | ✅ **Ready** | [`noise_analysis.cpp`](../../nodalys/src/analyses/noise/noise_analysis.cpp) — Adjoint complex solver $\mathbf{Y}(j\omega)^T \lambda = \mathbf{e}_{\text{out}}$, input/output spectral densities ($\text{V}/\sqrt{\text{Hz}}$), log-log RMS integration, and per-component noise shares, `dec`, `oct` or `lin` sweep. |
+| **S-Parameters** | `.sp` | ✅ | ✅ **Ready** | [`sp_analysis.cpp`](../../nodalys/src/analyses/sp/sp_analysis.cpp) — Multiport scattering matrix $\mathbf{S}(j\omega)$ from one port up, single-LU multi-RHS solve, exact $\mathbf{Z}$ and $\mathbf{Y}$ matrices (absent where the circuit has none), Return Loss, Insertion Loss, VSWR, Input Impedance, and Touchstone export. |
+| **Pole-Zero** | `.pz` | ✅ | ✅ **Ready** | [`pz_analysis.cpp`](../../nodalys/src/analyses/pz/pz_analysis.cpp) — Generalized eigenvalue solver $(\mathbf{G}, -\mathbf{C})$ and Rosenbrock pencil $(\mathbf{A}_z, -\mathbf{B}_z)$ via pure C++23 QZ algorithm, after balancing and exact removal of algebraic rows ([`pencil_reduction.cpp`](../../nodalys/src/linear/eigen/pencil_reduction.cpp)), with the checks of [`pz_checks.cpp`](../../nodalys/src/analyses/pz/pz_checks.cpp). |
+| **Sensitivity** | `.sens` | ✅ | ✅ **Ready** | [`sens_analysis.cpp`](../../nodalys/src/analyses/sens/sens_analysis.cpp) — Transposed adjoint solve $\mathbf{J}^T \boldsymbol{\lambda} = \mathbf{d}$, analytical device derivatives, 100% normalized scale, and subcircuit/potentiometer aggregation. |
+| **AC Sensitivity** | `.sens ... ac` | ❌ (wrong with forward-biased devices) | ✅ **Ready** | [`ac_sens_analysis.cpp`](../../nodalys/src/analyses/ac_sens/ac_sens_analysis.cpp) — Transposed complex adjoint solve per frequency, the bias term of the nonlinear devices through the DC adjoint, and the change of gain and phase for 1 % of each part, read from `.sens <out> ac dec|oct|lin <np> <fstart> <fstop>` by the netlist parser and the CLI ([`ac_sens_analysis.md`](./ac_sens_analysis.md)). |
+| **Harmonic Balance** | `.hb` | ❌ | ✅ **Ready** | [`hb_analysis.cpp`](../../nodalys/src/analyses/hb/hb_analysis.cpp) — Exclusive AFT Newton-Raphson solver with pure C++23 radix-2 FFT, Toeplitz/circulant conversion Jacobian, and source/gmin stepping continuation. |
 | **Truth Table** | Multiple `.op` | ✅ | ✅ **Ready** | Fully supported natively in imcsim UI without ngspice via smooth continuous logic macromodels ($C^\infty$). |
 
 ---
@@ -130,8 +147,9 @@
 | Category | Components / Models | `ngspice` | `Nodalys` | Notes |
 | :--- | :--- | :---: | :---: | :--- |
 | **Passives** | Resistor, Capacitor, Inductor | ✅ | ✅ **Ready** | Exact companion models; Norton charge integration with initial conditions (`uic`). |
+| **Transmission Lines** | Lossless & Dispersive Lossy (`TL` / `T`) | Lossless `T` / `LTRA` (no skin/$\tan\delta$ HB) | ✅ **Ready** | Telegrapher model with $\sqrt{f}$ skin effect and $\tan\delta$ dielectric loss in DC/AC/SP/Noise/AC-Sens/HB, plus Bergeron transient for lossless lines ([`transmission_line.md`](./transmission_line.md)). |
 | **Sources** | DC/AC Voltage & Current, Clock, Pulse, Sine, EXP, PWL, SFFM, AM | ✅ | ✅ **Ready** | Waveform generators; the transient lands on the corners of each. |
-| **Noise & Random Sources** | `TRNOISE`, `TRRANDOM` | ✅ | ✅ **Ready** | Held at their DC level outside a transient; in a transient, white, $1/f$ and telegraph noise and the uniform, Gaussian, exponential and Poisson draws from a `std::mt19937_64` seeded by the run seed. The draws are written out in [`random_draws.cpp`](../../nodalys/src/devices/random_draws.cpp) (top 53 bits for the uniform number, Box-Muller, inversion, Knuth), not taken from the standard distributions, so a seed gives the same run on Linux, Windows and macOS up to the last digit of `log` and `cos`. The values differ from those of `ngspice`. |
+| **Noise & Random Sources** | `TRNOISE`, `TRRANDOM` | ✅ | ✅ **Ready** | Held at their DC level outside a transient; in a transient, white, $1/f$ and telegraph noise and the uniform, Gaussian, exponential and Poisson draws from a `std::mt19937_64` seeded by the run seed. The draws are written out in [`random_draws.cpp`](../../nodalys/src/devices/sources/random_draws.cpp) (top 53 bits for the uniform number, Box-Muller, inversion, Knuth), not taken from the standard distributions, so a seed gives the same run on Linux, Windows and macOS up to the last digit of `log` and `cos`. The values differ from those of `ngspice`. |
 | **Behavioral Sources** | `B` element | ✅ | ✅ **Ready** | An expression of node voltages, currents and time with exact derivatives for Newton, the operators and functions of `ngspice`; what `ngspice` reads and `Nodalys` does not (`limit`, the random functions, `hertz`) is refused by name before the run ([`behavioral_source.md`](./behavioral_source.md)). |
 | **Fuses** | `imcsim_fuse` subcircuit | ✅ | ✅ **Ready** | Native device with a thermal state and a latch, with the blow time of `ngspice` within 3 % ([`fuse_device.md`](./fuse_device.md)). |
 | **Controlled Sources** | VCVS, VCCS, CCCS, CCVS | ✅ | ✅ **Ready** | Stamped into linear MNA system; zero-voltage current probes handled natively. |
@@ -194,44 +212,44 @@ Measured on one development machine with `./out/release/bin/imcsim-tests "[.benc
 
 ### 5. Roadmap
 
-The goal of `Nodalys` is to become the default backend of `imcsim`. Until it covers what `ngspice` does, every gap
-sends the user back to `ngspice`, so the phases go from parity to what only `Nodalys` can offer, and each phase
-starts once the one before it is done.
+`Nodalys` is the default simulation backend of `imcsim`. Having reached feature parity on the analyses and part models used across the shipped examples, the phases below record what has landed alongside the remaining performance and capability work.
 
 #### Done
 
 | Item | SPICE Command | Notes |
 | :--- | :---: | :--- |
+| **Default Backend in `imcsim`** | — | `Nodalys` is the default simulation engine in `imcsim` (`Edit > Preferences > Simulation`). |
 | **Pole-Zero Analysis** | `.pz` | QZ algorithm over $(\mathbf{G}, -\mathbf{C})$ and the Rosenbrock pencil. |
 | **DC Sensitivity** | `.sens` | One transposed adjoint solve $\mathbf{J}^T \boldsymbol{\lambda} = \mathbf{d}$ for every part. |
 | **AC Sensitivity** | `.sens ... ac` | One transposed complex solve per frequency, plus the bias term of the nonlinear devices; the Sensitivity analysis of `imcsim` has an AC kind for it. |
 | **RF S-Parameters** | `.sp` | One or more ports, power waves, Z and Y matrices, Touchstone export, Smith chart in `imcsim`. |
+| **2-Port RF Stability Metrics** | `.sp` | Rollett $K$, Edwards-Sinsky $\mu$/$\mu'$, MAG/MSG, unilateral gain, and Smith-chart stability circles in `imcsim`. |
 | **Harmonic Balance (1-Tone)** | `.hb` | AFT Newton with source and gmin stepping; refused above 4000 dense unknowns. |
 | **Live Transient** | — | Paced against the clock and paused through the pace `imcsim` shares with `ngspice`. |
+| **Gear-2 / BDF-2 Integration** | `.options method=gear` | Variable-step BDF-2 beside Trapezoidal and Backward Euler, used automatically on circuits with a fuse when Integration is Default ([`transient_analysis.md`](./transient_analysis.md)). |
+| **Behavioral Sources** | `B` element | Free expressions of node voltages, currents, and time with forward-mode automatic differentiation ([`behavioral_source.md`](./behavioral_source.md)). |
+| **Temperature** | `.temp`, `tnom` | SPICE temperature laws of the diode, BJT, and MOSFET relative to `tnom`, plus `temper` in expressions. |
+| **Noise & Random Sources in Transient** | `TRNOISE`, `TRRANDOM` | White, $1/f$, and telegraph noise plus uniform, Gaussian, exponential, and Poisson draws from a seeded generator ([`random_draws.cpp`](../../nodalys/src/devices/sources/random_draws.cpp)). |
+| **SPICE-Text Subcircuits** | `.subckt` / `X` | Vendor `.subckt` models kept as SPICE text, with parameters, `{expressions}`, `.model` cards, and nested blocks ([`subcircuit_text.md`](./subcircuit_text.md)). |
+| **Node Initial Conditions** | `.ic`, `.nodeset` | Node `.ic` clamped in transient startup OP ([`transient_analysis.md`](./transient_analysis.md)) and `.nodeset` two-pass pull/release ([`dc_analysis.md`](./dc_analysis.md), 1.7). |
+| **Parallel Monte Carlo, Parameter Steps & Truth Tables** | — | Independent runs dispatched across worker threads via `RunBatch` ([`parallel_runs.h`](../../app-core/simulation/parallel_runs.h)) when `SupportsConcurrentRuns` is true. |
+| **Transmission Lines & Differential Ports** | `T`, `P` | Differential `CircuitPort` (`NegativeNode`), lossless Bergeron `.tran`, and dispersive skin-effect / $\tan\delta$ telegrapher lines in `.ac`, `.sp`, `.noise`, `.sens ... ac`, and `.hb` ([`transmission_line.md`](./transmission_line.md)). |
 
-#### Phase 1 — Parity, to Become the Default Backend
+#### Phase 1 — Remaining Performance Parity
 
 | Item | Why | Today |
 | :--- | :--- | :--- |
-| **Sparse MNA Solver** (KLU-style, AMD ordering, symbolic reuse) | The dense LU makes the analyses users run most the slowest: the transient runs at 0.07x to 0.26x of `ngspice` and the AC sweep of a 100-node network at 0.34x (section 4), and it caps harmonic balance at 4000 unknowns. | Dense LU |
-| **Gear-2 / BDF-2 Integration** | The trapezoidal rule rings on stiff switching, and the fuse needs Gear, as the `ngspice` backend writes `method=gear` for it. | Trapezoidal and Backward Euler |
-| **Behavioral Sources** (`B` element) | Free expressions of node voltages and branch currents, already checked by `imcsim`. | Done ([`behavioral_source.md`](./behavioral_source.md)) |
-| **Temperature** | The SPICE temperature laws of the diode, BJT and MOSFET (`IS`, `VJ`, `EG`, `BF`...), so a stepped temperature runs. | Done |
-| **Noise and Random Sources in a Transient** | White, $1/f$ and telegraph noise, and the random distributions, drawn from a seeded generator written out in `random_draws.cpp`, so a seed repeats on every platform. | Done |
-| **SPICE-Text Subcircuits** | Vendor `.subckt` models kept as SPICE text, such as the op-amp of the precision rectifier example. | Done ([`subcircuit_text.md`](./subcircuit_text.md)) |
-| **Node Initial Conditions** (`.ic`, `.nodeset`) | Starting a transient or guiding an operating point from node voltages, not only from parts. | Done: `.ic` ([`transient_analysis.md`](./transient_analysis.md)) and `.nodeset` ([`dc_analysis.md`](./dc_analysis.md), 1.7) |
+| **Sparse MNA Solver** (KLU-style, AMD ordering, symbolic reuse) | The dense LU makes the analyses users run most the slowest on larger circuits: the transient runs at 0.07x to 0.26x of `ngspice` and the AC sweep of a 100-node network at 0.34x (section 4), and it caps harmonic balance at 4000 unknowns. | Dense LU |
 
-**Done when** every example runs every analysis it offers on `Nodalys` and matches `ngspice` in the parity tests, and
-the transient and AC benchmarks are no slower than `ngspice`.
+**Done when** the transient and AC benchmarks are no slower than `ngspice`.
 
 #### Phase 2 — Cheap Wins for the Users of `imcsim`
 
 | Item | Why |
 | :--- | :--- |
-| **Parallel Monte Carlo, Parameter Steps and Truth Tables** | `ngspice` is one global instance per process, so `imcsim` runs one simulation at a time; `Nodalys` keeps no global state, so independent runs can share the cores, with results that stay reproducible. |
 | **Loop Gain / Stability** (`.stb`, Tian) | Phase and gain margin of a feedback loop without breaking it, over the existing AC solver; it fits the op-amp and regulator circuits `imcsim` is used for. |
 | **Worst-Case (EVA) and RSS Tolerance** | The DC sensitivities times the tolerances `imcsim` already keeps: instant bounds beside Monte Carlo. |
-| **2-Port RF Metrics** (Rollett $K$, $\mu$, MAG/MSG, stability circles, noise figure) | Post-processing of `SParameterResult` shown on the existing Smith chart. |
+| **2-Port RF Noise Figure** (`NF`, `Fmin`, `Rn`, `Sopt`) | Extends the existing S-parameter and two-port stability views with small-signal RF noise figures (`donoise`). |
 
 #### Phase 3 — Extending Harmonic Balance and Sensitivity
 
@@ -259,7 +277,7 @@ Comparison against upstream `ngspice 47` (`src/spicelib/analysis/`): upstream sh
 | **Load-Pull Contours** | RF / Large-Signal | Not available | Planned | Low / Medium | Complex load-impedance sweep via HB plotted as constant-power / efficiency contours on the Smith chart. |
 | **Loop Gain / Stability (`.stb` — Tian)** | Analog / Control | Not available | Planned | Low | Virtual bidirectional V/I probe in feedback loops computing open-loop $T(j\omega)$, phase margin, and gain margin without breaking DC bias or impedance loading. |
 | **Worst-Case (EVA) & RSS Tolerance** | Tolerance / Yield | Not available (manual scripting or Monte Carlo only) | Monte Carlo only | Low | Combines sensitivity vectors with `imcsim` component tolerances for instant RSS bounds and extreme-value corners. |
-| **2-Port RF Stability & Noise (`NF`, `Fmin`, `Rn`, `Sopt`)** | RF / Small-Signal | `.sp` supports `CKTspnoise`, but lacks $K$/$\mu$/circles | `SParameterResult` (no `donoise` or $K$/$\mu$) | Low | Post-processing on `SParameterResult` for Rollett $K$, $\mu$, MAG/MSG, Smith circles, plus multiport RF noise figures. |
+| **2-Port RF Stability & Noise (`NF`, `Fmin`, `Rn`, `Sopt`)** | RF / Small-Signal | `.sp` supports `CKTspnoise`, but lacks $K$/$\mu$/circles | $K$, $\mu$, MAG/MSG & stability circles **Ready**; RF noise (`donoise`) planned | Low | Rollett $K$, $\mu$, $\mu'$, MAG/MSG, and Smith-chart stability circles are live in `imcsim`; multiport RF noise figures remain planned. |
 | **Modal / Eigenvalue & Participation Factors** | Linear Dynamics | SISO `.pz` only | SISO `.pz` only | Low / Medium | Computes all natural poles of $(\mathbf{G}, \mathbf{C})$ via QZ and ranks $L$/$C$ participation per mode to pinpoint resonances without choosing an I/O pair. |
 | **AC Sensitivity** | Sensitivity | Has `.sens ac`, wrong with forward-biased devices | ✅ **Ready** | — | Adjoint solves over the complex AC MNA plus the bias term of the nonlinear devices ([`ac_sens_analysis.md`](./ac_sens_analysis.md)). |
 | **HB & Transient Adjoint Sensitivity** | Sensitivity | Legacy `.sens2` transient unmaintained/off | DC and AC `.sens` only | Medium | Periodic HB Jacobian and time-domain companion matrices. |

@@ -941,7 +941,7 @@ TEST_CASE("The precision rectifier, whose op-amp is SPICE text, gives the same w
                       std::move(loaded->Settings),
                       std::move(loaded->Subcircuits),
                       std::move(loaded->Models));
-    const Core::Circuit circuit = schematic.BuildCircuit();
+    const Core::Circuit circuit = schematic.GetCircuit();
     const Core::TransientSettings settings = schematic.GetSimulationSettings().Transient;
     // The load of the rectifier, where the example reads its output
     const std::optional<int> output_node = schematic.GetConnectivity().GetNode({20, 0});
@@ -1088,7 +1088,7 @@ TEST_CASE("Every example gives the same results on ngspice and on Nodalys", "[cr
                       std::move(loaded->Subcircuits),
                       std::move(loaded->Models));
     schematic.RestoreMeasurements(loaded->Measurements);
-    const Core::Circuit circuit = schematic.BuildCircuit();
+    const Core::Circuit circuit = schematic.GetCircuit();
     const GUI::SimulationSettings settings = schematic.GetSimulationSettings();
     const int node_count = circuit.GetNodeCount();
 

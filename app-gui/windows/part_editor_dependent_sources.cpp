@@ -96,7 +96,7 @@ void DrawBehavioralSource(Core::BehavioralSource &source, std::string &expressio
     if (!parsed) {
         ImGui::TextColored(GetErrorTextColor(), "%s", parsed.error().c_str());
     } else if (const std::optional<std::string> problem =
-                   Core::CheckBehavioralExpression(schematic.BuildCircuit(), source)) {
+                   Core::CheckBehavioralExpression(schematic.GetCircuit(), source)) {
         ImGui::TextColored(GetErrorTextColor(), "%s", problem->c_str());
     }
     ImGui::TextDisabled("%s", is_voltage ? "Drives this voltage from + to -" : "Pushes this current from + to -");

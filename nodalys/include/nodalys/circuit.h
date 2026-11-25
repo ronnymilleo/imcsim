@@ -13,7 +13,7 @@
 namespace Nodalys {
 
 class CircuitImpl;
-class CircuitBuilder;
+struct CircuitAccess;
 
 /**
  * @class   Circuit
@@ -30,29 +30,18 @@ public:
     Circuit(const Circuit &) = delete;
     Circuit &operator=(const Circuit &) = delete;
 
-    /// Number of top-level user-accessible nodes (results report voltages for 0 .. NodeCount - 1).
     int GetNodeCount() const;
-
-    /// Total number of MNA unknowns (including internal nodes and branch currents).
     int GetUnknownCount() const;
-
-    /// Returns true if any reactive element has a non-zero initial condition (uic).
     bool HasInitialConditions() const;
-
-    /// Configured RF ports for S-parameter analysis.
     const std::vector<CircuitPort> &GetPorts() const;
-
-    /// Sets the simulation and nominal temperatures in degrees Celsius for subsequent analyses.
     void SetTemperature(double temperature_celsius, double nominal_celsius = 27.0);
 
-    /// Internal accessor for solver execution.
-    explicit Circuit(std::unique_ptr<CircuitImpl> impl);
-    CircuitImpl &Impl();
-    const CircuitImpl &Impl() const;
-
 private:
-    friend class CircuitBuilder;
+    friend struct CircuitAccess;
+
     std::unique_ptr<CircuitImpl> m_Impl;
+
+    explicit Circuit(std::unique_ptr<CircuitImpl> impl);
 };
 
 } // namespace Nodalys

@@ -88,7 +88,7 @@ TEST_CASE("The copy of every example circuit writes the netlist of the original"
                           std::move(loaded->Settings),
                           std::move(loaded->Subcircuits),
                           std::move(loaded->Models));
-        const Core::Circuit circuit = schematic.BuildCircuit();
+        const Core::Circuit circuit = schematic.GetCircuit();
         const Core::CircuitCopy copy(circuit);
         CHECK(copy.GetCircuit().ToSpiceNetlist("", true) == circuit.ToSpiceNetlist("", true));
         CHECK(copy.GetCircuit().GetEntries().size() == circuit.GetEntries().size());

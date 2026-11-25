@@ -32,6 +32,7 @@
 #include "ui_elements/ui_subcircuit_pin.h"
 #include "ui_elements/ui_switch.h"
 #include "ui_elements/ui_transformer.h"
+#include "ui_elements/ui_transmission_line.h"
 #include "ui_elements/ui_vcc.h"
 #include "ui_elements/ui_voltage_source.h"
 #include <algorithm>
@@ -85,6 +86,7 @@ constexpr auto PARTS = std::to_array<PartInfo>({
     {Core::ComponentType::RELAY, "Relay"},
     {Core::ComponentType::FUSE, "Fuse"},
     {Core::ComponentType::TRANSFORMER, "Transformer"},
+    {Core::ComponentType::TRANSMISSION_LINE, "Transmission line"},
     {Core::ComponentType::AND, "AND gate"},
     {Core::ComponentType::OR, "OR gate"},
     {Core::ComponentType::NOT, "NOT gate (inverter)"},
@@ -171,6 +173,8 @@ CreateElement(const Core::ComponentType type, const GridPoint position, const Ro
         return std::make_unique<UIFuse>(position, rotation);
     case Core::ComponentType::TRANSFORMER:
         return std::make_unique<UITransformer>(position, rotation);
+    case Core::ComponentType::TRANSMISSION_LINE:
+        return std::make_unique<UITransmissionLine>(position, rotation);
     case Core::ComponentType::AND:
     case Core::ComponentType::OR:
     case Core::ComponentType::NOT:

@@ -120,7 +120,7 @@ int ReadNumber(const std::vector<bool> &levels) {
  * @brief   The logic levels of some pins at the operating point.
  */
 std::vector<bool> ReadLevels(Bench &bench, const std::vector<std::string> &pins) {
-    const Core::Circuit circuit = bench.Schematic.BuildCircuit();
+    const Core::Circuit circuit = bench.Schematic.GetCircuit();
     if (const auto problem = Core::CheckCircuit(circuit)) {
         FAIL(*problem);
     }
@@ -141,7 +141,7 @@ std::vector<bool> ReadLevels(Bench &bench, const std::vector<std::string> &pins)
  * @brief   The logic levels of some pins at the end of a transient.
  */
 std::vector<bool> ReadFinalLevels(Bench &bench, const std::vector<std::string> &pins, const double stop_time) {
-    const Core::Circuit circuit = bench.Schematic.BuildCircuit();
+    const Core::Circuit circuit = bench.Schematic.GetCircuit();
     if (const auto problem = Core::CheckCircuit(circuit)) {
         FAIL(*problem);
     }

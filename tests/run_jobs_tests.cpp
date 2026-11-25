@@ -6,15 +6,26 @@
 
 #include "analysis/run_jobs.h"
 
+#include "backends/nodalys/nodalys_backend.h"
+#include "circuit/components/ground.h"
+#include "circuit/components/resistor.h"
+#include "circuit/components/vcc.h"
+#include "nodalys_in_use.h"
 #include "results/monte_carlo_results.h"
 #include "results/parameter_step.h"
 #include "results/result_store.h"
+#include "simulation/simulation_backend.h"
 #include "test_printers.h"
+#include <atomic>
 #include <catch2/catch_test_macros.hpp>
+#include <chrono>
 #include <cstddef>
 #include <expected>
+#include <mutex>
 #include <optional>
+#include <set>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace {
@@ -103,4 +114,111 @@ TEST_CASE("The runs of a Monte Carlo analysis store their traces and then their 
     CHECK(stored.has_value());
     REQUIRE(results.GetMonteCarlo().has_value());
     CHECK(results.GetMonteCarlo()->RequestedRuns == 10);
+}
+
+TEST_CASE("RunSteps and RunMonteCarlo execute concurrently across threads on Nodalys and preserve run order",
+          "[run_jobs]") {
+    using namespace std::chrono_literals;
+    const TestSupport::NodalysInUse nodalys;
+    REQUIRE(Core::GetBackend().GetCapabilities().SupportsConcurrentRuns);
+
+    const GUI::ParameterStepSettings step_settings{.Enabled = true, .Part = "R1"};
+    const std::vector<double> step_values = {1e3, 2e3, 3e3, 4e3, 5e3, 6e3, 7e3, 8e3};
+    Core::RunControl step_control;
+    std::mutex step_mutex;
+    std::set<std::thread::id> step_threads;
+    std::atomic<int> active_steps = 0;
+    std::atomic<int> max_active_steps = 0;
+
+    const GUI::SteppedRuns<double> stepped = GUI::RunSteps<double>(
+        step_settings,
+        "Ohm",
+        step_values,
+        step_control,
+        [&](const Core::ParameterValue &parameter) -> Core::SimulationRun<double> {
+            {
+                const std::lock_guard lock(step_mutex);
+                step_threads.insert(std::this_thread::get_id());
+            }
+            const int current = active_steps.fetch_add(1) + 1;
+            int previous = max_active_steps.load();
+            while (current > previous && !max_active_steps.compare_exchange_weak(previous, current)) {
+            }
+            std::this_thread::sleep_for(5ms);
+            active_steps.fetch_sub(1);
+            return {parameter.Value, {{std::format("ran {}", parameter.Value), false}}};
+        });
+
+    REQUIRE(stepped.Family.has_value());
+    CHECK(stepped.Family->Results == step_values);
+    CHECK(step_threads.size() > 1);
+    CHECK(max_active_steps.load() > 1);
+
+    Core::VCC supply;
+    supply.SetName("V1");
+    supply.SetValue(10.0);
+    Core::Resistor resistor;
+    resistor.SetName("R1");
+    resistor.SetValue(1e3);
+    resistor.SetTolerance(10.0);
+    Core::Ground ground;
+    Core::Circuit circuit;
+    circuit.Add(supply, {1});
+    circuit.Add(resistor, {1, 0});
+    circuit.Add(ground, {0});
+
+    const Core::MonteCarloSettings mc_settings{
+        .Enabled = true,
+        .Runs = 16,
+        .Distribution = Core::ToleranceDistribution::UNIFORM,
+        .Seed = 42,
+    };
+
+    Core::RunControl parallel_control;
+    std::mutex mc_mutex;
+    std::set<std::thread::id> mc_threads;
+    const auto simulate_resistor = [&](const Core::Circuit &varied, const bool record_thread) {
+        if (record_thread) {
+            const std::lock_guard lock(mc_mutex);
+            mc_threads.insert(std::this_thread::get_id());
+            std::this_thread::sleep_for(2ms);
+        }
+        const double value = varied.GetEntries()[1].Part->GetValue();
+        return Core::SimulationRun<double>{value, {{std::format("R1={:.3f}", value), false}}};
+    };
+
+    const GUI::MonteCarloRuns<double> parallel_mc = GUI::RunMonteCarlo<double>(
+        mc_settings,
+        circuit,
+        parallel_control,
+        [&](const Core::Circuit &varied) { return simulate_resistor(varied, true); },
+        MeasureNumber);
+
+    CHECK(mc_threads.size() > 1);
+    REQUIRE(parallel_mc.Family.has_value());
+    REQUIRE(parallel_mc.Table.Runs.size() == 17);
+
+    // Compare against single-threaded default backend (ngspice) to verify identical order of traces, table, and log
+    Core::SetBackend(nullptr);
+    REQUIRE_FALSE(Core::GetBackend().GetCapabilities().SupportsConcurrentRuns);
+    Core::RunControl serial_control;
+    const GUI::MonteCarloRuns<double> serial_mc = GUI::RunMonteCarlo<double>(
+        mc_settings,
+        circuit,
+        serial_control,
+        [&](const Core::Circuit &varied) { return simulate_resistor(varied, false); },
+        MeasureNumber);
+
+    REQUIRE(serial_mc.Family.has_value());
+    CHECK(parallel_mc.Family->Values == serial_mc.Family->Values);
+    CHECK(parallel_mc.Family->Results == serial_mc.Family->Results);
+    REQUIRE(parallel_mc.Table.Runs.size() == serial_mc.Table.Runs.size());
+    for (std::size_t index = 0; index < parallel_mc.Table.Runs.size(); ++index) {
+        CHECK(parallel_mc.Table.Runs[index].Values == serial_mc.Table.Runs[index].Values);
+        CHECK(parallel_mc.Table.Runs[index].Measures == serial_mc.Table.Runs[index].Measures);
+    }
+    REQUIRE(parallel_mc.Messages.size() == serial_mc.Messages.size());
+    for (std::size_t index = 0; index < parallel_mc.Messages.size(); ++index) {
+        CHECK(parallel_mc.Messages[index].Text == serial_mc.Messages[index].Text);
+    }
 }

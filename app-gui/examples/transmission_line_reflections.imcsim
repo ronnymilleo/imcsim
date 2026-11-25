@@ -1,0 +1,198 @@
+{
+  "elements": [
+    {
+      "ac_magnitude": 1.0,
+      "amplitude": 1.0,
+      "frequency": 100000000.0,
+      "name": "Vin1",
+      "offset": 0.0,
+      "pulse": {
+        "delay": 5e-10,
+        "fall": 1e-10,
+        "high": 2.0,
+        "low": 0.0,
+        "period": 4e-08,
+        "rise": 1e-10,
+        "width": 2e-08
+      },
+      "rotation": 90,
+      "source": "Pulse",
+      "type": "VoltageSource",
+      "value": 2.0,
+      "x": 4,
+      "y": 7
+    },
+    {
+      "name": "RS",
+      "rotation": 0,
+      "type": "Resistor",
+      "value": 50.0,
+      "x": 7,
+      "y": 4
+    },
+    {
+      "name": "TL1",
+      "parameters": {
+        "dc_conductance": 0.0,
+        "dc_resistance": 0.0,
+        "delay": 2e-09,
+        "loss_tangent": 0.0,
+        "reference_frequency": 1000000000.0,
+        "skin_resistance": 0.0
+      },
+      "rotation": 0,
+      "type": "TransmissionLine",
+      "value": 50.0,
+      "x": 13,
+      "y": 5
+    },
+    {
+      "name": "RL",
+      "rotation": 90,
+      "type": "Resistor",
+      "value": 150.0,
+      "x": 18,
+      "y": 7
+    },
+    {
+      "rotation": 0,
+      "type": "Ground",
+      "x": 11,
+      "y": 10
+    }
+  ],
+  "format": "imcsim-schematic",
+  "measurements": {
+    "currents": [],
+    "voltages": [
+      [
+        9,
+        4
+      ],
+      [
+        15,
+        4
+      ]
+    ]
+  },
+  "simulation": {
+    "analysis": "transient",
+    "transient": {
+      "step": 5e-11,
+      "stop": 8e-09
+    }
+  },
+  "version": 1,
+  "wires": [
+    {
+      "end": [
+        4,
+        4
+      ],
+      "start": [
+        4,
+        5
+      ]
+    },
+    {
+      "end": [
+        5,
+        4
+      ],
+      "start": [
+        4,
+        4
+      ]
+    },
+    {
+      "end": [
+        11,
+        4
+      ],
+      "start": [
+        9,
+        4
+      ]
+    },
+    {
+      "end": [
+        18,
+        4
+      ],
+      "start": [
+        15,
+        4
+      ]
+    },
+    {
+      "end": [
+        18,
+        5
+      ],
+      "start": [
+        18,
+        4
+      ]
+    },
+    {
+      "end": [
+        11,
+        9
+      ],
+      "start": [
+        11,
+        6
+      ]
+    },
+    {
+      "end": [
+        15,
+        9
+      ],
+      "start": [
+        15,
+        6
+      ]
+    },
+    {
+      "end": [
+        11,
+        9
+      ],
+      "start": [
+        4,
+        9
+      ]
+    },
+    {
+      "end": [
+        15,
+        9
+      ],
+      "start": [
+        11,
+        9
+      ]
+    },
+    {
+      "end": [
+        18,
+        9
+      ],
+      "start": [
+        15,
+        9
+      ]
+    },
+    {
+      "end": [
+        11,
+        10
+      ],
+      "start": [
+        11,
+        9
+      ]
+    }
+  ]
+}

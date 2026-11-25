@@ -17,14 +17,19 @@ constexpr double REFERENCE_BAND_GAP = 1.1150877;
 /// Temperature coefficient of the junction capacitance law, per kelvin, as ngspice writes it.
 constexpr double CAPACITANCE_TEMPERATURE_COEFFICIENT = 4e-4;
 
-/// Potential shift $P(T)$ of the junction potential law at one temperature.
+/**
+ * @brief   Potential shift \f$P(T)\f$ of the junction potential law at one temperature.
+ */
 double GetPotentialShift(const double temperature_kelvin) {
     const double ratio = temperature_kelvin / REFERENCE_TEMPERATURE_KELVIN;
     const double thermal_voltage = BOLTZMANN_OVER_CHARGE * temperature_kelvin;
     return GetBandGap(temperature_kelvin) - REFERENCE_BAND_GAP * ratio - 3.0 * thermal_voltage * std::log(ratio);
 }
 
-/// Potential $V_{J0}$ that a junction potential given at the nominal temperature has at the reference temperature.
+/**
+ * @brief   Potential \f$V_{J0}\f$ that a junction potential given at the nominal temperature has at the reference
+ *          temperature.
+ */
 double GetReferencePotential(const ThermalConditions &thermal, const double potential_at_nominal) {
     const double nominal_ratio = thermal.NominalKelvin / REFERENCE_TEMPERATURE_KELVIN;
     return (potential_at_nominal - GetPotentialShift(thermal.NominalKelvin)) / nominal_ratio;
@@ -53,7 +58,7 @@ bool IsNominal(const ThermalConditions &thermal) {
 }
 
 /**
- * @brief   Returns the thermal voltage $kT/q$ of the run.
+ * @brief   Returns the thermal voltage \f$kT/q\f$ of the run.
  * @param[in] thermal  Conditions of the run.
  * @return  Volts.
  */
@@ -62,7 +67,7 @@ double GetThermalVoltage(const ThermalConditions &thermal) {
 }
 
 /**
- * @brief   Returns $4kT$, the factor of the thermal noise current density $4kT/R$ of a conductance.
+ * @brief   Returns \f$4kT\f$, the factor of the thermal noise current density \f$4kT/R\f$ of a conductance.
  * @param[in] thermal  Conditions of the run.
  * @return  Joules; ngspice evaluates every thermal noise source at the temperature of the circuit.
  */
@@ -73,7 +78,7 @@ double GetFourKt(const ThermalConditions &thermal) {
 /**
  * @brief   Returns the band gap of silicon at a temperature.
  * @param[in] temperature_kelvin  Temperature in kelvin.
- * @return  Electron-volts, from the Varshni law $E_g = 1.16 - 7.02\cdot10^{-4} T^2 / (T + 1108)$.
+ * @return  Electron-volts, from the Varshni law \f$E_g = 1.16 - 7.02\cdot10^{-4} T^2 / (T + 1108)\f$.
  */
 double GetBandGap(const double temperature_kelvin) {
     return BAND_GAP_AT_ZERO_KELVIN

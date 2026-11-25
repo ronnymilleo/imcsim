@@ -767,3 +767,35 @@ TEST_CASE("A schematic moved into another one does not carry the listener, so it
     CHECK(moved.GetElements().size() == 1);
     CHECK(results.GetOperatingPoint());
 }
+
+TEST_CASE("GetCircuit caches the built circuit across calls and rebuilds it on circuit edits while keeping solver "
+          "options in sync",
+          "[schematic]") {
+    GUI::Schematic schematic;
+    schematic.AddElement(MakeResistor({0, 0}));
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::GROUND, {2, 0}, GUI::Rotation::R0));
+
+    const Core::Circuit &first = schematic.GetCircuit();
+    CHECK(&schematic.GetCircuit() == &first);
+    REQUIRE(first.GetEntries().size() == 2);
+    CHECK(first.GetEntries()[0].Part->GetValue() == 1e3);
+
+    // Changing solver options updates the cached circuit in place without dropping the cache
+    GUI::SimulationSettings settings = schematic.GetSimulationSettings();
+    settings.Solver.NominalTemperatureCelsius = 55.0;
+    schematic.SetSimulationSettings(settings);
+    CHECK(&schematic.GetCircuit() == &first);
+    CHECK(schematic.GetCircuit().GetSolverOptions().NominalTemperatureCelsius == 55.0);
+
+    // Editing a component and calling MarkModified invalidates and rebuilds the cached circuit
+    schematic.GetElement(0).GetComponent().SetValue(2.2e3);
+    schematic.MarkModified();
+    const Core::Circuit &rebuilt = schematic.GetCircuit();
+    CHECK(rebuilt.GetEntries()[0].Part->GetValue() == 2.2e3);
+    CHECK(rebuilt.GetSolverOptions().NominalTemperatureCelsius == 55.0);
+
+    // Adding a wire also invalidates and rebuilds the cached circuit
+    schematic.AddWire({0, 0}, {0, 4});
+    CHECK(schematic.GetCircuit().GetEntries().size() == 2);
+    CHECK(&schematic.GetCircuit() == &schematic.GetCircuit());
+}

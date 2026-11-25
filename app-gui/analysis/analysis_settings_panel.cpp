@@ -302,7 +302,7 @@ void AnalysisSettingsPanel::DrawTransientSettings(SimulationSettings &settings) 
     if (const std::optional<double> time_step = m_TimeStep.Draw("Time step", "s", IsPositive)) {
         settings.Transient.TimeStep = *time_step;
     }
-    const auto suggested = Core::SuggestTransientSettings(m_Schematic.BuildCircuit());
+    const auto suggested = Core::SuggestTransientSettings(m_Schematic.GetCircuit());
     if (DrawSuggestButton("Suggest",
                           suggested.has_value(),
                           "Five periods of the slowest source, or the whole span of a one-shot one",
@@ -333,11 +333,11 @@ void AnalysisSettingsPanel::DrawTransientSettings(SimulationSettings &settings) 
 }
 
 void AnalysisSettingsPanel::DrawACSweepSettings(SimulationSettings &settings) {
-    DrawLogarithmicSweep("ac_sweep", settings.ACSweep, m_ACSweepRange, m_Schematic.BuildCircuit());
+    DrawLogarithmicSweep("ac_sweep", settings.ACSweep, m_ACSweepRange, m_Schematic.GetCircuit());
 }
 
 void AnalysisSettingsPanel::DrawDCSweepSettings(SimulationSettings &settings) {
-    const std::vector<SweepSource> sources = ListSweepSources(m_Schematic.BuildCircuit());
+    const std::vector<SweepSource> sources = ListSweepSources(m_Schematic.GetCircuit());
     if (sources.empty()) {
         ImGui::TextDisabled("%s", std::format("Add {} to sweep", Core::SWEEPABLE_SOURCES).c_str());
         return;
@@ -361,7 +361,7 @@ void AnalysisSettingsPanel::DrawDCSweepSettings(SimulationSettings &settings) {
  *          choice follows the node through edits.
  */
 void AnalysisSettingsPanel::DrawNoiseSettings(SimulationSettings &settings) {
-    const Core::Circuit circuit = m_Schematic.BuildCircuit();
+    const Core::Circuit &circuit = m_Schematic.GetCircuit();
     const std::optional<int> output = ResolveOutputNode(settings.NoiseOutput, circuit, m_Schematic);
     if (!output) {
         ImGui::TextDisabled("Connect some parts to measure their noise");
@@ -416,7 +416,7 @@ void AnalysisSettingsPanel::DrawSParameterSettings(SimulationSettings &settings)
  * @brief   Lists the ports of the circuit, or says how to make them.
  */
 void AnalysisSettingsPanel::DrawPortSummary() {
-    std::vector<Core::CircuitPort> ports = m_Schematic.BuildCircuit().GetPorts();
+    std::vector<Core::CircuitPort> ports = m_Schematic.GetCircuit().GetPorts();
     std::ranges::sort(ports, {}, &Core::CircuitPort::Number);
     if (const std::optional<std::string> missing =
             Core::CheckSParameterPortCount(ports.size(), Core::GetBackend().GetCapabilities().SParameters)) {
@@ -456,7 +456,7 @@ void AnalysisSettingsPanel::DrawSourceAndOutputPickers(std::string &source,
                                                        const std::string &id,
                                                        const char *empty_text,
                                                        const char *tooltip) {
-    const Core::Circuit circuit = m_Schematic.BuildCircuit();
+    const Core::Circuit &circuit = m_Schematic.GetCircuit();
     const std::optional<int> output_node = ResolveOutputNode(output, circuit, m_Schematic);
     if (!output_node) {
         ImGui::TextDisabled("%s", empty_text);
@@ -501,7 +501,7 @@ void AnalysisSettingsPanel::DrawOutputPicker(const char *id,
  * @note    The AC kind is disabled, with the reason as its tooltip, when the backend in use cannot run it.
  */
 void AnalysisSettingsPanel::DrawSensitivitySettings(SimulationSettings &settings) {
-    const Core::Circuit circuit = m_Schematic.BuildCircuit();
+    const Core::Circuit &circuit = m_Schematic.GetCircuit();
     const std::optional<int> output = ResolveOutputNode(settings.SensitivityOutput, circuit, m_Schematic);
     if (!output) {
         ImGui::TextDisabled("Connect some parts to measure their sensitivity");
@@ -548,7 +548,7 @@ void AnalysisSettingsPanel::DrawACSensitivityInputs(SimulationSettings &settings
  * @details Nothing stored means every input, and a change stores the whole list.
  */
 void AnalysisSettingsPanel::DrawTruthTableSettings(SimulationSettings &settings) {
-    const Core::Circuit circuit = m_Schematic.BuildCircuit();
+    const Core::Circuit &circuit = m_Schematic.GetCircuit();
     const std::vector<std::string> available = Core::GetTruthTableInputs(circuit);
     if (available.empty()) {
         ImGui::TextDisabled("Add a Logic input to vary");
@@ -614,7 +614,7 @@ void AnalysisSettingsPanel::DrawHarmonicBalanceSettings(SimulationSettings &sett
         }
         ImGui::EndCombo();
     }
-    const auto suggested = Core::SuggestHarmonicBalanceSettings(m_Schematic.BuildCircuit());
+    const auto suggested = Core::SuggestHarmonicBalanceSettings(m_Schematic.GetCircuit());
     if (DrawSuggestButton("From sources",
                           suggested.has_value(),
                           "Set the fundamental frequency and harmonic count from the circuit's periodic sources",

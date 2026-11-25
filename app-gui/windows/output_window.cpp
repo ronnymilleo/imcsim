@@ -412,7 +412,7 @@ void OutputWindow::DrawMathPanel(const std::size_t node_count, const std::vector
 void OutputWindow::DrawBusPanel(const std::size_t node_count) {
     // Buses read the signals of logic parts, so a circuit without any has none to offer
     std::vector<std::string> signals;
-    for (const LogicNode &logic_node : FindLogicNodes(m_Schematic.BuildCircuit())) {
+    for (const LogicNode &logic_node : FindLogicNodes(m_Schematic.GetCircuit())) {
         if (static_cast<std::size_t>(logic_node.Node) < node_count) {
             signals.push_back(GetVoltageLabel(m_Schematic.GetConnectivity(), logic_node.Node));
         }

@@ -176,7 +176,7 @@ std::size_t LaneLayout::GetCount() const {
  *          them while lanes are turned off, though whether the circuit has logic parts is still told.
  */
 LaneLayout FindLaneLayout(Schematic &schematic, const std::size_t node_count, const bool are_lanes_shown) {
-    const std::vector<LogicNode> logic_nodes = FindLogicNodes(schematic.BuildCircuit());
+    const std::vector<LogicNode> logic_nodes = FindLogicNodes(schematic.GetCircuit());
     LaneLayout layout{.Buses = {}, .Signals = {}, .HasLogicParts = !logic_nodes.empty()};
     if (!are_lanes_shown) {
         return layout;

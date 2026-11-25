@@ -356,7 +356,9 @@ const BackendCapabilities &NgspiceBackend::GetCapabilities() const {
                          AnalysisKind::SENSITIVITY,
                          AnalysisKind::POLE_ZERO,
                          AnalysisKind::S_PARAMETERS},
-            .UnsupportedParts = {},
+            .UnsupportedParts = {{ComponentType::TRANSMISSION_LINE,
+                                  "Transmission lines are simulated natively by Nodalys; switch the simulator backend "
+                                  "to Nodalys"}},
             .UnsupportedPartsByAnalysis = {},
             .UnsupportedWithNodesets = {{AnalysisKind::TRANSFER_FUNCTION,
                                          "ngspice crashes in a transfer function when the circuit has a nodeset, and "

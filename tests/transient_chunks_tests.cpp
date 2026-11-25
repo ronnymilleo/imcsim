@@ -245,7 +245,7 @@ TEST_CASE("A chunked transient matches the one-piece run on every example", "[tr
                           std::move(loaded->Settings),
                           std::move(loaded->Subcircuits),
                           std::move(loaded->Models));
-        const Core::Circuit circuit = schematic.BuildCircuit();
+        const Core::Circuit circuit = schematic.GetCircuit();
         // The examples with logic parts, loose or inside blocks, run only where ngspice has the digital models
         if (Core::FindUnsupported(Core::GetBackend(), circuit, Core::AnalysisKind::TRANSIENT)) {
             continue;
@@ -334,7 +334,7 @@ TEST_CASE("A cut in the middle of a ringing edge leaves the buck converter withi
                       std::move(loaded->Settings),
                       std::move(loaded->Subcircuits),
                       std::move(loaded->Models));
-    const Core::Circuit circuit = schematic.BuildCircuit();
+    const Core::Circuit circuit = schematic.GetCircuit();
 
     // The first 2 ms hold the cuts that failed in CI (1.49 ms) and others that make the switch node ring. The
     // reference runs with a step finer than the example's, which resolves the ring: its peak, 19.3 V, is what the

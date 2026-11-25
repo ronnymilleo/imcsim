@@ -38,8 +38,8 @@ public:
     explicit SpiceBlockCheck(Checker checker);
 
     // Asking
-    std::optional<std::string> Find(const Nodalys::SubcircuitText &text,
-                                    const std::map<std::string, double> &parameters);
+    [[nodiscard]] std::optional<std::string> Find(const Nodalys::SubcircuitText &text,
+                                                  const std::map<std::string, double> &parameters);
     std::size_t GetEntryCount() const;
 
 private:

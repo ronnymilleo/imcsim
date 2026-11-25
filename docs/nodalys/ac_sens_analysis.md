@@ -3,13 +3,13 @@
 *Exclusive to Nodalys: ngspice 47 reports a wrong AC sensitivity for circuits with forward-biased diodes or transistors, and for the current of a resistor, so `imcsim` does not use it.*
 
 **Implementation files:**
-- [`nodalys/src/analyses/ac_sens_analysis.cpp`](../../nodalys/src/analyses/ac_sens_analysis.cpp) (`ComputeAcSensitivity`)
-- [`nodalys/src/analyses/ac_sens_elements.cpp`](../../nodalys/src/analyses/ac_sens_elements.cpp) (the elements varied and their derivatives)
-- [`nodalys/src/analyses/ac_sens_bias.cpp`](../../nodalys/src/analyses/ac_sens_bias.cpp) (the bias term of the nonlinear devices)
+- [`nodalys/src/analyses/ac_sens/ac_sens_analysis.cpp`](../../nodalys/src/analyses/ac_sens/ac_sens_analysis.cpp) (`ComputeAcSensitivity`)
+- [`nodalys/src/analyses/ac_sens/ac_sens_elements.cpp`](../../nodalys/src/analyses/ac_sens/ac_sens_elements.cpp) (the elements varied and their derivatives)
+- [`nodalys/src/analyses/ac_sens/ac_sens_bias.cpp`](../../nodalys/src/analyses/ac_sens/ac_sens_bias.cpp) (the bias term of the nonlinear devices)
 - [`nodalys/src/mna/mna_system.cpp`](../../nodalys/src/mna/mna_system.cpp) (`MnaSystem::SolveAcTransposeFor`, `MnaSystem::SolveTransposeComplex`)
 - [`app-core/backends/nodalys/nodalys_backend.cpp`](../../app-core/backends/nodalys/nodalys_backend.cpp) (`NodalysBackend::RunACSensitivity`)
 - [`nodalys/src/parser/netlist_parser.cpp`](../../nodalys/src/parser/netlist_parser.cpp) (`.sens ... ac`), [`nodalys/src/cli/cli.cpp`](../../nodalys/src/cli/cli.cpp) and the exporters of [`nodalys/src/export/`](../../nodalys/src/export/)
-- [`nodalys/tests/ac_sens_analysis_tests.cpp`](../../nodalys/tests/ac_sens_analysis_tests.cpp), [`nodalys/tests/ac_sens_netlist_tests.cpp`](../../nodalys/tests/ac_sens_netlist_tests.cpp)
+- [`nodalys/tests/analyses/ac_sens/ac_sens_analysis_tests.cpp`](../../nodalys/tests/analyses/ac_sens/ac_sens_analysis_tests.cpp), [`nodalys/tests/analyses/ac_sens/ac_sens_netlist_tests.cpp`](../../nodalys/tests/analyses/ac_sens/ac_sens_netlist_tests.cpp)
 
 ---
 
@@ -30,7 +30,7 @@ The first term is the **direct term**: the value appears in $\mathbf{Y}$ (a resi
 
 A nonlinear device linearizes at $\mathbf{x}_{\text{DC}}$, so its conductances and capacitances move when an element value shifts the operating point. That is the second term, the **bias term**, and it is what makes the analysis right for amplifiers:
 
-1. The weights $w_k = -\boldsymbol{\lambda}^T (\partial \mathbf{Y} / \partial x_{\text{DC},k})\,\mathbf{x}$ say how the output moves with each DC unknown. $\partial \mathbf{Y} / \partial x_{\text{DC},k}$ comes from central differences of the conductance and reactive stamps of the nonlinear devices, one DC unknown at a time ([`ac_sens_bias.cpp`](../../nodalys/src/analyses/ac_sens_bias.cpp)).
+1. The weights $w_k = -\boldsymbol{\lambda}^T (\partial \mathbf{Y} / \partial x_{\text{DC},k})\,\mathbf{x}$ say how the output moves with each DC unknown. $\partial \mathbf{Y} / \partial x_{\text{DC},k}$ comes from central differences of the conductance and reactive stamps of the nonlinear devices, one DC unknown at a time ([`ac_sens_bias.cpp`](../../nodalys/src/analyses/ac_sens/ac_sens_bias.cpp)).
 2. The DC adjoint $\mathbf{J}^T \boldsymbol{\mu} = \mathbf{w}$ turns them into the change for the shift of the operating point that a value causes, where $\mathbf{J}$ is the DC Jacobian and $\mathbf{g}_p = \partial \mathbf{f}_{\text{DC}} / \partial p$ the derivative of the DC equations with respect to the value ([`MnaSystem::SolveTransposeComplex`](../../nodalys/src/mna/mna_system.cpp)).
 
 A linear circuit has no weights, so the bias term is zero and only the direct term remains. The DC value of a source moves nothing in a linear circuit and, in a biased stage, everything through the bias.

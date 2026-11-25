@@ -1,11 +1,13 @@
 name: Release
 
 # A version tag, such as v0.6.0, builds the AppImage, the Windows zip and the macOS disk image and publishes them with
-# a GitHub release of that tag; a tag with a suffix, such as v0.6.0-rc1, publishes a pre-release
+# a GitHub release of that tag; a tag with a suffix, such as v0.6.0-rc1, publishes a pre-release. Manual re-runs on an
+# existing tag use: gh workflow run release.yml --ref vX.Y.Z
 on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
 
 jobs:
   appimage:
@@ -105,6 +107,7 @@ jobs:
 
   # One job publishes every file, so the release is created once
   publish:
+    if: github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
     needs: [appimage, windows, macos]
     runs-on: ubuntu-latest
     permissions:
@@ -139,6 +142,7 @@ jobs:
       - name: Publish the release
         uses: softprops/action-gh-release@v3
         with:
+          tag_name: ${{ github.ref_name }}
           files: release/*
           generate_release_notes: true
           # A tag with a suffix, such as v0.5.0-rc1, is a test build and never becomes the latest release

@@ -35,6 +35,10 @@ struct CoSimPin {
     PortDirection Direction = PortDirection::INPUT;
     SmoothLogicParameters Parameters;
 
+    /**
+     * @brief   Compares two co-simulation pin descriptors for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const CoSimPin &) const = default;
 };
 
@@ -48,6 +52,10 @@ struct SmoothTransition {
     double StartVoltage = 0.0;
     double TargetVoltage = 5.0;
 
+    /**
+     * @brief   Compares two smooth transition descriptors for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const SmoothTransition &) const = default;
 };
 

@@ -28,6 +28,13 @@ void WriteComplexPair(std::ostringstream &ss, const std::complex<double> value) 
 
 } // namespace
 
+/**
+ * @brief   Dispatches any SimulationResult variant to its SPICE Nutmeg RAW exporter (or CSV fallback for summary-only
+ *          results).
+ * @param[in] result  Simulation result variant to serialize.
+ * @param[in] title   Header title written into the RAW file.
+ * @return  Formatted SPICE RAW text.
+ */
 std::string ExportRaw(const SimulationResult &result, std::string_view title) {
     return std::visit(
         [&](const auto &res) -> std::string {
@@ -46,10 +53,20 @@ std::string ExportRaw(const SimulationResult &result, std::string_view title) {
         result);
 }
 
+/**
+ * @brief   Dispatches any SimulationResult variant to its CSV exporter.
+ * @param[in] result  Simulation result variant to serialize.
+ * @return  Formatted CSV text.
+ */
 std::string ExportCsv(const SimulationResult &result) {
     return std::visit([](const auto &res) { return ExportCsv(res); }, result);
 }
 
+/**
+ * @brief   Dispatches any SimulationResult variant to its JSON exporter.
+ * @param[in] result  Simulation result variant to serialize.
+ * @return  Formatted JSON text.
+ */
 std::string ExportJson(const SimulationResult &result) {
     return std::visit([](const auto &res) { return ExportJson(res); }, result);
 }
@@ -100,6 +117,12 @@ std::string ExportTouchstone(const SParameterResult &result) {
     return ss.str();
 }
 
+/**
+ * @brief   Writes string content verbatim to a file on disk.
+ * @param[in] filepath  Destination filesystem path.
+ * @param[in] content   Bytes to write.
+ * @return  True if the file opened and wrote cleanly.
+ */
 bool SaveStringToFile(std::string_view filepath, std::string_view content) {
     std::ofstream file{std::string(filepath)};
     if (!file.is_open()) {

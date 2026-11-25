@@ -17,8 +17,11 @@ add_library(imcsim-core-lib
             backends/ngspice/ngspice_read_transient.cpp
             backends/ngspice/ngspice_vectors.cpp
             backends/nodalys/compiler.cpp
+            backends/nodalys/compiler_logic.cpp
+            backends/nodalys/compiler_parts.cpp
             backends/nodalys/model_parser.cpp
             backends/nodalys/nodalys_backend.cpp
+            backends/nodalys/nodalys_results.cpp
             backends/nodalys/parameter_conversion.cpp
             backends/nodalys/spice_block_check.cpp
             circuit/behavioral_expression.cpp
@@ -53,6 +56,7 @@ add_library(imcsim-core-lib
             circuit/components/subcircuit_pin.cpp
             circuit/components/switch.cpp
             circuit/components/transformer.cpp
+            circuit/components/transmission_line.cpp
             circuit/components/vcc.cpp
             circuit/components/voltage_controlled_switch.cpp
             circuit/components/voltage_source.cpp
@@ -61,6 +65,7 @@ add_library(imcsim-core-lib
             circuit/netlist_sources.cpp
             circuit/netlist_subcircuits.cpp
             circuit/node_voltage_targets.cpp
+            circuit/pwl_import.cpp
             circuit/spice_library.cpp
             simulation/ac_sensitivity.cpp
             simulation/analysis_sources.cpp

@@ -12,36 +12,70 @@
 
 namespace Nodalys {
 
+/**
+ * @brief   Constructs a zero-initialized dense matrix of the given dimensions.
+ * @param[in] rows  Number of rows.
+ * @param[in] cols  Number of columns.
+ */
 template <typename Scalar>
 BasicDenseMatrix<Scalar>::BasicDenseMatrix(const std::size_t rows, const std::size_t cols)
     : m_Rows(rows), m_Cols(cols), m_Data(rows * cols, Scalar{0.0}), m_Pivot(rows) {
 }
 
+/**
+ * @brief   Returns the number of rows in the matrix.
+ * @return  Row count.
+ */
 template <typename Scalar>
 std::size_t BasicDenseMatrix<Scalar>::Rows() const {
     return m_Rows;
 }
 
+/**
+ * @brief   Returns the number of columns in the matrix.
+ * @return  Column count.
+ */
 template <typename Scalar>
 std::size_t BasicDenseMatrix<Scalar>::Cols() const {
     return m_Cols;
 }
 
+/**
+ * @brief   Returns a mutable reference to matrix entry `(row, col)`.
+ * @param[in] row  Zero-based row index.
+ * @param[in] col  Zero-based column index.
+ * @return  Reference to the matrix element.
+ */
 template <typename Scalar>
 Scalar &BasicDenseMatrix<Scalar>::At(const std::size_t row, const std::size_t col) {
     return m_Data[row * m_Cols + col];
 }
 
+/**
+ * @brief   Returns the value of matrix entry `(row, col)`.
+ * @param[in] row  Zero-based row index.
+ * @param[in] col  Zero-based column index.
+ * @return  Matrix element value.
+ */
 template <typename Scalar>
 Scalar BasicDenseMatrix<Scalar>::At(const std::size_t row, const std::size_t col) const {
     return m_Data[row * m_Cols + col];
 }
 
+/**
+ * @brief   Adds `value` to matrix entry `(row, col)`.
+ * @param[in] row    Zero-based row index.
+ * @param[in] col    Zero-based column index.
+ * @param[in] value  Increment to accumulate.
+ */
 template <typename Scalar>
 void BasicDenseMatrix<Scalar>::Add(const std::size_t row, const std::size_t col, const Scalar value) {
     At(row, col) += value;
 }
 
+/**
+ * @brief   Zeros all matrix entries and clears the LU factorization flag.
+ */
 template <typename Scalar>
 void BasicDenseMatrix<Scalar>::Reset() {
     std::ranges::fill(m_Data, Scalar{0.0});

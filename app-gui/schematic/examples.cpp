@@ -463,6 +463,28 @@ constexpr auto EXAMPLES = std::to_array<Example>({
         .FileName = "ideal_transformer.imcsim",
     },
     {
+        .Title = "Transmission line reflections",
+        .Group = "Transmission lines",
+        .Description =
+            "A 2 V step through a matched 50 Ohm source resistor drives a lossless 50 Ohm, 2 ns transmission line "
+            "into a 150 Ohm load (reflection coefficient +0.5). Switch the backend to Nodalys and run the transient: "
+            "the input starts at 1 V (half the 2 V pulse), the wave reaches the load 2 ns later and jumps to 1.5 V, "
+            "and the +0.5 V reflection returns to the input 4 ns after launch, settling both ends at 1.5 V with no "
+            "re-reflection because the source matches the line.",
+        .FileName = "transmission_line_reflections.imcsim",
+    },
+    {
+        .Title = "Quarter-wave transformer",
+        .Group = "Transmission lines",
+        .Description =
+            "A lossless 100 Ohm, 1 ns transmission line matches a 50 Ohm port (P1) to a 200 Ohm load at its "
+            "quarter-wave frequency of 250 MHz (1 / 4 ns), where Z0 = sqrt(50 * 200) = 100 Ohm. Switch the backend to "
+            "Nodalys and run S-parameters from 10 MHz to 1 GHz: |S11| dips to zero at 250 MHz and 750 MHz (crossing "
+            "the center of the Smith chart) and returns to 0.6 at DC and 500 MHz. Add Skin R or Loss tangent in "
+            "TL1 properties to see dielectric and skin-effect loss lift the nulls.",
+        .FileName = "transmission_line_quarter_wave.imcsim",
+    },
+    {
         .Title = "Logic gates",
         .Group = "Digital",
         .Description =

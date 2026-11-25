@@ -15,9 +15,13 @@
 #include "simulation/run_control.h"
 #include "simulation/simulator.h"
 #include <catch2/catch_test_macros.hpp>
+#include <chrono>
 #include <memory>
+#include <mutex>
 #include <optional>
+#include <set>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -37,8 +41,15 @@ public:
 
     Core::OperatingPointRun RunOperatingPoint(const Core::Circuit &circuit,
                                               const std::optional<double> &temperature_celsius) override {
-        ++OperatingPointRuns;
-        RecordRun(circuit, temperature_celsius);
+        {
+            const std::lock_guard lock(m_Mutex);
+            ++OperatingPointRuns;
+            OperatingPointThreads.insert(std::this_thread::get_id());
+            RecordRun(circuit, temperature_celsius);
+        }
+        if (m_Capabilities.SupportsConcurrentRuns) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+        }
         // Node 2 follows the first logic input of the circuit, as the output of a buffer would
         Core::OperatingPoint point;
         point.NodeVoltages.assign(static_cast<std::size_t>(circuit.GetNodeCount()), 0.0);
@@ -92,6 +103,7 @@ public:
     }
 
     int OperatingPointRuns = 0;
+    std::set<std::thread::id> OperatingPointThreads;
     std::optional<Core::TransientSettings> LastTransientSettings;
     std::optional<double> LastTemperatureCelsius;
     std::vector<const Core::Component *> LastParts;
@@ -99,6 +111,7 @@ public:
 
 private:
     Core::BackendCapabilities m_Capabilities;
+    std::mutex m_Mutex;
 
     /**
      * @brief   The circuit of a stepped run is gone after the call, so only what the tests compare is kept.
@@ -301,6 +314,21 @@ TEST_CASE("The truth table asks the backend for one operating point per combinat
     CHECK(run.Result->Rows[1].OutputVoltages == std::vector<double>{0.0});
     CHECK(run.Result->Rows[2].OutputVoltages == std::vector<double>{HIGH_LEVEL});
     CHECK(run.Result->Rows[3].OutputVoltages == std::vector<double>{HIGH_LEVEL});
+    CHECK((*backend).OperatingPointThreads.size() == 1);
+
+    Core::BackendCapabilities concurrent_capabilities = AllAnalysesWithoutLogicParts();
+    concurrent_capabilities.SupportsConcurrentRuns = true;
+    const BackendInUse concurrent_backend(std::move(concurrent_capabilities));
+    const Core::TruthTableRun concurrent_run =
+        Core::RunTruthTable(circuit, {.Inputs = {"V1", "V2"}, .OutputNodes = {2}});
+    REQUIRE(concurrent_run.Result.has_value());
+    CHECK((*concurrent_backend).OperatingPointRuns == 4);
+    CHECK((*concurrent_backend).OperatingPointThreads.size() > 1);
+    REQUIRE(concurrent_run.Result->Rows.size() == 4);
+    CHECK(concurrent_run.Result->Rows[0].OutputVoltages == std::vector<double>{0.0});
+    CHECK(concurrent_run.Result->Rows[1].OutputVoltages == std::vector<double>{0.0});
+    CHECK(concurrent_run.Result->Rows[2].OutputVoltages == std::vector<double>{HIGH_LEVEL});
+    CHECK(concurrent_run.Result->Rows[3].OutputVoltages == std::vector<double>{HIGH_LEVEL});
 }
 
 TEST_CASE("The truth table reports its progress and stops between combinations when asked", "[simulation_backend]") {
@@ -337,8 +365,9 @@ TEST_CASE("ngspice is the backend until another one is set, and runs every analy
     const Core::BackendCapabilities &capabilities = backend.GetCapabilities();
     CHECK(capabilities.Analyses.size() == 9);
     CHECK_FALSE(capabilities.Analyses.contains(Core::AnalysisKind::HARMONIC_BALANCE));
+    CHECK(capabilities.UnsupportedParts.contains(Core::ComponentType::TRANSMISSION_LINE));
     // Logic parts are refused only when the digital models are missing, whatever the system ngspice has
-    CHECK(capabilities.UnsupportedParts.empty() == Core::AreDigitalModelsAvailable());
+    CHECK(capabilities.UnsupportedParts.contains(Core::ComponentType::NAND) == !Core::AreDigitalModelsAvailable());
     // ngspice cannot recover from a sensitivity analysis of logic parts, with its digital models or without
     CHECK(Core::FindUnsupported(backend, {Core::ComponentType::NAND}, Core::AnalysisKind::SENSITIVITY).has_value());
     CHECK_FALSE(

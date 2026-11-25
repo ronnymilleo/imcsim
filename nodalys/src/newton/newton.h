@@ -6,14 +6,24 @@
 #ifndef NODALYS_NEWTON_H
 #define NODALYS_NEWTON_H
 
-#include "devices/devices.h"
+#include "compiler/compiled_circuit.h"
 #include "nodalys/analyses.h"
 #include <functional>
-#include <memory>
+#include <span>
 #include <string>
 #include <vector>
 
 namespace Nodalys {
+
+/**
+ * @enum    NodesetPass
+ * @brief   Which of the passes of a solve with nodesets is being run.
+ */
+enum class NodesetPass {
+    PULLED,   ///< The nodes are pulled to their guesses.
+    RELEASED, ///< The nodesets are let go, starting from the point the pulled pass found.
+    PLAIN,    ///< No nodeset acts, as a solve of a circuit without any.
+};
 
 /**
  * @struct  NewtonOutcome
@@ -30,35 +40,27 @@ struct NewtonOutcome {
 };
 
 /**
+ * @brief   Stamps stiff Norton voltage clamps to ground for `.ic` or `.nodeset` node directives.
+ * @param[in,out] sys     System to stamp into.
+ * @param[in]     clamps  Node unknown indices and target voltages to clamp.
+ */
+void StampNodeClamps(MnaSystem &sys, std::span<const NodeVoltageDirective> clamps);
+
+/**
  * @brief   Finds the DC solution of a compiled circuit with Newton-Raphson.
  * @details A solve that finds an operating point and has nodesets runs twice, as SPICE does: first with every nodeset
  *          pulling its node to its voltage, then released, from the point the first pass found. If the pulled pass
- * finds nothing the solve goes on without the nodesets.
- * @param[in,out] sys      The compiled system; devices stamp into it.
- * @param[in,out] devices  The device list of the circuit; holds and limit states.
- * @param[in,out] x        Initial guess in, converged solution out.
- * @param[in]     time     TimeContext indicating DC or transient operating conditions.
- * @param[in]     options  Convergence tolerances and limits.
+ *          finds nothing the solve goes on without the nodesets.
+ * @param[in,out] compiled  The compiled circuit holding the MNA system, devices, and node directives.
+ * @param[in,out] x         Initial guess in, converged solution out.
+ * @param[in]     time      TimeContext indicating DC or transient operating conditions.
+ * @param[in]     options   Convergence tolerances and limits.
  * @return  Outcome with iteration count and whether it converged.
  */
-NewtonOutcome SolveNewton(MnaSystem &sys,
-                          const std::vector<std::unique_ptr<Device>> &devices,
+NewtonOutcome SolveNewton(CompiledCircuit &compiled,
                           std::vector<double> &x,
                           const TimeContext &time,
                           const ConvergenceOptions &options);
-
-/**
- * @enum    NodesetPass
- * @brief   Which of the passes of a solve with nodesets is being run.
- */
-enum class NodesetPass {
-    /// The nodes are pulled to their guesses.
-    PULLED,
-    /// The nodesets are let go, starting from the point the pulled pass found.
-    RELEASED,
-    /// No nodeset acts, as a solve of a circuit without any.
-    PLAIN,
-};
 
 /**
  * @brief   Runs a solve of an operating point through the passes of the nodesets.

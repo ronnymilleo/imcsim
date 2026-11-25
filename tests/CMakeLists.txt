@@ -104,6 +104,7 @@ add_executable(imcsim-tests
             pole_zero_view_tests.cpp
             preferences_tests.cpp
             probing_tests.cpp
+            pwl_import_tests.cpp
             readout_placement_tests.cpp
             ready_blocks_tests.cpp
             result_store_tests.cpp
@@ -154,6 +155,7 @@ add_executable(imcsim-tests
             trace_fit_state_tests.cpp
             trace_math_tests.cpp
             trace_statistics_tests.cpp
+            transmission_line_tests.cpp
             two_port_metrics_tests.cpp
             transient_chunks_tests.cpp
             transient_tab_tests.cpp
@@ -172,7 +174,7 @@ add_executable(imcsim-tests
 # The oracle that rebuilds a response from its poles and zeros is shared with the Nodalys tests
 target_sources(imcsim-tests
         PRIVATE
-            ${PROJECT_SOURCE_DIR}/nodalys/tests/pole_zero_oracle.cpp
+            ${PROJECT_SOURCE_DIR}/nodalys/tests/analyses/pz/pole_zero_oracle.cpp
 )
 
 target_include_directories(imcsim-tests

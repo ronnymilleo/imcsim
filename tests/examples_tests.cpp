@@ -104,11 +104,11 @@ TEST_CASE("Every example opens without warnings, measures existing traces and ru
         CHECK_FALSE(schematic.GetElements().empty());
         // The examples with logic parts, loose or inside blocks, open everywhere, but run only where ngspice has the
         // digital models
-        if (Core::FindUnsupported(Core::GetBackend(), schematic.BuildCircuit(), Core::AnalysisKind::TRANSIENT)) {
+        if (Core::FindUnsupported(Core::GetBackend(), schematic.GetCircuit(), Core::AnalysisKind::TRANSIENT)) {
             continue;
         }
 
-        const Core::OperatingPointRun operating_point = Core::RunOperatingPoint(schematic.BuildCircuit());
+        const Core::OperatingPointRun operating_point = Core::RunOperatingPoint(schematic.GetCircuit());
         REQUIRE(operating_point.Result.has_value());
         const GUI::SavedMeasurements measurements = schematic.SaveMeasurements();
         CHECK_FALSE((measurements.Voltages.empty() && measurements.Currents.empty()));
@@ -117,7 +117,7 @@ TEST_CASE("Every example opens without warnings, measures existing traces and ru
             CHECK(std::ranges::contains(operating_point.Result->Currents, name, &Core::ComponentCurrent::Name));
         }
         const Core::TransientRun transient =
-            Core::RunTransient(schematic.BuildCircuit(), schematic.GetSimulationSettings().Transient);
+            Core::RunTransient(schematic.GetCircuit(), schematic.GetSimulationSettings().Transient);
         CHECK(transient.Result.has_value());
 
         // No example is shown overloading a part
@@ -140,7 +140,7 @@ TEST_CASE("Every example either runs on Nodalys or is flagged unsupported", "[ex
         INFO(example.Title);
         GUI::Schematic schematic;
         OpenOrFail(example, schematic);
-        const Core::Circuit circuit = schematic.BuildCircuit();
+        const Core::Circuit circuit = schematic.GetCircuit();
 
         const auto unsupported = Core::FindUnsupported(nodalys, circuit, Core::AnalysisKind::OPERATING_POINT);
         if (unsupported.has_value()) {
@@ -190,7 +190,7 @@ TEST_CASE("The BJT example draws one collector curve per base current", "[exampl
     const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
     REQUIRE(settings.StepSource);
     const Core::DCSweepRun run =
-        Core::RunDCSweep(schematic.BuildCircuit(), {.Swept = settings.SweptRange, .Stepped = settings.SteppedRange});
+        Core::RunDCSweep(schematic.GetCircuit(), {.Swept = settings.SweptRange, .Stepped = settings.SteppedRange});
     REQUIRE(run.Result.has_value());
     CHECK(run.Result->Curves.size() == 5);
 }
@@ -207,7 +207,7 @@ TEST_CASE("The noise example shows a flat floor at the input that the low-pass c
     Core::TransientSettings seeded = settings.Transient;
     seeded.Seed = NOISE_EXAMPLE_SEED;
     Core::NodalysBackend nodalys;
-    const Core::TransientRun run = nodalys.RunTransient(schematic.BuildCircuit(), seeded, std::nullopt, {});
+    const Core::TransientRun run = nodalys.RunTransient(schematic.GetCircuit(), seeded, std::nullopt, {});
     REQUIRE(run.Result.has_value());
     const Core::Transient &transient = *run.Result;
     // The whole run fits the default window, so the Spectrum tab covers all of it
@@ -258,7 +258,7 @@ TEST_CASE("The noise example reads as broadband noise of 1 mV/sqrt(Hz) at its in
     Core::TransientSettings seeded = schematic.GetSimulationSettings().Transient;
     seeded.Seed = NOISE_EXAMPLE_SEED;
     Core::NodalysBackend nodalys;
-    const Core::TransientRun run = nodalys.RunTransient(schematic.BuildCircuit(), seeded, std::nullopt, {});
+    const Core::TransientRun run = nodalys.RunTransient(schematic.GetCircuit(), seeded, std::nullopt, {});
     REQUIRE(run.Result.has_value());
     const Core::Transient &transient = *run.Result;
     const std::size_t input = NodeAt(schematic, {4, 4});
@@ -296,7 +296,7 @@ TEST_CASE("The RC example measures its corner frequency over the whole sweep", "
     GUI::Schematic schematic;
     OpenOrFail(*example, schematic);
 
-    const Core::ACSweepRun run = Core::RunACSweep(schematic.BuildCircuit(), schematic.GetSimulationSettings().ACSweep);
+    const Core::ACSweepRun run = Core::RunACSweep(schematic.GetCircuit(), schematic.GetSimulationSettings().ACSweep);
     REQUIRE(run.Result.has_value());
     const Core::ACSweep &sweep = *run.Result;
     // Node 2 is the capacitor, the output of the filter
@@ -326,7 +326,7 @@ TEST_CASE("The Monte Carlo example opens with its tolerances and runs as Monte C
     CHECK(settings.MonteCarlo.Enabled);
     CHECK(settings.MonteCarlo.Runs == 100);
     CHECK_FALSE(settings.ParameterStep.Enabled);
-    const Core::Circuit circuit = schematic.BuildCircuit();
+    const Core::Circuit circuit = schematic.GetCircuit();
     const std::vector<const Core::Component *> varied = Core::FindVariedParts(circuit);
     REQUIRE(varied.size() == 2);
     CHECK(varied[0]->GetName() == "R1");
@@ -351,7 +351,7 @@ TEST_CASE("The Monte Carlo example opens with its tolerances and runs as Monte C
 TEST_CASE("The hybrid-pi model has the gain of its transistor in the middle band only", "[examples]") {
     GUI::Schematic schematic;
     OpenExample("hybrid_pi_model.imcsim", schematic);
-    const Core::ACSweepRun run = Core::RunACSweep(schematic.BuildCircuit(), schematic.GetSimulationSettings().ACSweep);
+    const Core::ACSweepRun run = Core::RunACSweep(schematic.GetCircuit(), schematic.GetSimulationSettings().ACSweep);
     REQUIRE(run.Result.has_value());
     const Core::ACSweep &sweep = *run.Result;
     const std::vector<double> &real = sweep.NodeMagnitudesDecibels[NodeAt(schematic, {13, 6})];
@@ -372,7 +372,7 @@ TEST_CASE("The ideal transformer doubles the voltage and halves the current", "[
     GUI::Schematic schematic;
     OpenExample("ideal_transformer.imcsim", schematic);
     const Core::TransientRun run =
-        Core::RunTransient(schematic.BuildCircuit(), schematic.GetSimulationSettings().Transient);
+        Core::RunTransient(schematic.GetCircuit(), schematic.GetSimulationSettings().Transient);
     REQUIRE(run.Result.has_value());
     const Core::Transient &transient = *run.Result;
     const double primary = PeakOf(transient.NodeVoltages[NodeAt(schematic, {4, 6})]);
@@ -392,7 +392,7 @@ TEST_CASE("The ideal transformer doubles the voltage and halves the current", "[
 TEST_CASE("The load pulls the divider output below its unloaded value", "[examples]") {
     GUI::Schematic schematic;
     OpenExample("voltage_divider.imcsim", schematic);
-    const Core::OperatingPointRun run = Core::RunOperatingPoint(schematic.BuildCircuit());
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(schematic.GetCircuit());
     REQUIRE(run.Result.has_value());
     // 10k from 10 V over 10k in parallel with 10k: 10 * 5k / 15k
     CHECK_THAT(run.Result->NodeVoltages[NodeAt(schematic, {6, 10})], Catch::Matchers::WithinRel(10.0 / 3.0, 1e-3));
@@ -409,7 +409,7 @@ TEST_CASE("The Zener holds the output near its breakdown voltage once the supply
     GUI::Schematic schematic;
     OpenExample("zener_regulator.imcsim", schematic);
     const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
-    const Core::DCSweepRun run = Core::RunDCSweep(schematic.BuildCircuit(), {.Swept = settings.SweptRange});
+    const Core::DCSweepRun run = Core::RunDCSweep(schematic.GetCircuit(), {.Swept = settings.SweptRange});
     REQUIRE(run.Result.has_value());
     const Core::DCSweep &sweep = *run.Result;
     REQUIRE(sweep.Curves.size() == 1);
@@ -429,7 +429,7 @@ TEST_CASE("The Schottky conducts first, then the 1N4007, then the 1N4148", "[exa
     GUI::Schematic schematic;
     OpenExample("diode_curves.imcsim", schematic);
     const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
-    const Core::DCSweepRun run = Core::RunDCSweep(schematic.BuildCircuit(), {.Swept = settings.SweptRange});
+    const Core::DCSweepRun run = Core::RunDCSweep(schematic.GetCircuit(), {.Swept = settings.SweptRange});
     REQUIRE(run.Result.has_value());
     const Core::DCSweep &sweep = *run.Result;
     const auto current_at = [&sweep](const std::string &name, const double volts) {
@@ -453,7 +453,7 @@ TEST_CASE("The Schottky conducts first, then the 1N4007, then the 1N4148", "[exa
 TEST_CASE("The series RLC peaks at its resonance with the bandwidth its quality factor gives", "[examples]") {
     GUI::Schematic schematic;
     OpenExample("series_rlc.imcsim", schematic);
-    const Core::ACSweepRun run = Core::RunACSweep(schematic.BuildCircuit(), schematic.GetSimulationSettings().ACSweep);
+    const Core::ACSweepRun run = Core::RunACSweep(schematic.GetCircuit(), schematic.GetSimulationSettings().ACSweep);
     if (!run.Result) {
         FAIL(run.Result.error());
     }
@@ -479,7 +479,7 @@ TEST_CASE("The NMOS pulls its drain low only while the gate is high", "[examples
     GUI::Schematic schematic;
     OpenExample("nmos_switch.imcsim", schematic);
     const Core::TransientRun run =
-        Core::RunTransient(schematic.BuildCircuit(), schematic.GetSimulationSettings().Transient);
+        Core::RunTransient(schematic.GetCircuit(), schematic.GetSimulationSettings().Transient);
     REQUIRE(run.Result.has_value());
     const Core::Transient &transient = *run.Result;
     const std::vector<double> &gate = transient.NodeVoltages[NodeAt(schematic, {2, 12})];
@@ -505,7 +505,7 @@ TEST_CASE("The MOSFET drain current grows with the gate voltage", "[examples]") 
     const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
     REQUIRE(settings.StepSource);
     const Core::DCSweepRun run =
-        Core::RunDCSweep(schematic.BuildCircuit(), {.Swept = settings.SweptRange, .Stepped = settings.SteppedRange});
+        Core::RunDCSweep(schematic.GetCircuit(), {.Swept = settings.SweptRange, .Stepped = settings.SteppedRange});
     REQUIRE(run.Result.has_value());
     const Core::DCSweep &sweep = *run.Result;
     REQUIRE(sweep.Curves.size() == 5);
@@ -524,7 +524,7 @@ TEST_CASE("The class B stage has a dead zone around zero that the class AB stage
     GUI::Schematic schematic;
     OpenExample("class_ab_amplifier.imcsim", schematic);
     const Core::TransientRun run =
-        Core::RunTransient(schematic.BuildCircuit(), schematic.GetSimulationSettings().Transient);
+        Core::RunTransient(schematic.GetCircuit(), schematic.GetSimulationSettings().Transient);
     REQUIRE(run.Result.has_value());
     const Core::Transient &transient = *run.Result;
     const std::vector<double> &input = transient.NodeVoltages[NodeAt(schematic, {2, 18})];
@@ -572,7 +572,7 @@ double GainAt(const Core::ACSweep &sweep, const std::size_t node, const double f
  * @brief   Runs the AC sweep of an example with its own settings.
  */
 Core::ACSweep SweepOf(GUI::Schematic &schematic) {
-    const Core::ACSweepRun run = Core::RunACSweep(schematic.BuildCircuit(), schematic.GetSimulationSettings().ACSweep);
+    const Core::ACSweepRun run = Core::RunACSweep(schematic.GetCircuit(), schematic.GetSimulationSettings().ACSweep);
     if (!run.Result) {
         FAIL(run.Result.error());
     }
@@ -618,7 +618,7 @@ TEST_CASE("The Schmitt trigger flips only when the input crosses its thresholds"
     GUI::Schematic schematic;
     OpenExample("schmitt_trigger.imcsim", schematic);
     const Core::TransientRun run =
-        Core::RunTransient(schematic.BuildCircuit(), schematic.GetSimulationSettings().Transient);
+        Core::RunTransient(schematic.GetCircuit(), schematic.GetSimulationSettings().Transient);
     REQUIRE(run.Result.has_value());
     const Core::Transient &transient = *run.Result;
     const std::vector<double> &input = transient.NodeVoltages[NodeAt(schematic, {2, 7})];
@@ -671,7 +671,7 @@ TEST_CASE(
     const int output = static_cast<int>(NodeAt(schematic, *settings.PoleZeroOutput));
 
     const Core::PoleZeroRun run =
-        Core::RunPoleZero(schematic.BuildCircuit(), {.OutputNode = output, .InputSource = settings.PoleZeroSource});
+        Core::RunPoleZero(schematic.GetCircuit(), {.OutputNode = output, .InputSource = settings.PoleZeroSource});
     if (!run.Result) {
         FAIL(run.Result.error());
     }
@@ -700,7 +700,7 @@ TEST_CASE(
 TEST_CASE("The common-emitter amplifier has a mid-band gain of about 43 dB between its two corners", "[examples]") {
     GUI::Schematic schematic;
     OpenExample("common_emitter_amplifier.imcsim", schematic);
-    const Core::OperatingPointRun operating_point = Core::RunOperatingPoint(schematic.BuildCircuit());
+    const Core::OperatingPointRun operating_point = Core::RunOperatingPoint(schematic.GetCircuit());
     REQUIRE(operating_point.Result.has_value());
     const auto collector = std::ranges::find(operating_point.Result->Currents, "Q1.C", &Core::ComponentCurrent::Name);
     REQUIRE(collector != operating_point.Result->Currents.end());
@@ -725,7 +725,7 @@ TEST_CASE("The bias example finds the divider resistors the most influential on 
     REQUIRE(settings.SensitivityOutput.has_value());
     const int base = static_cast<int>(NodeAt(schematic, *settings.SensitivityOutput));
 
-    const Core::SensitivityRun run = Core::RunSensitivity(schematic.BuildCircuit(), {.OutputNode = base});
+    const Core::SensitivityRun run = Core::RunSensitivity(schematic.GetCircuit(), {.OutputNode = base});
     if (!run.Result) {
         FAIL(run.Result.error());
     }
@@ -758,7 +758,7 @@ TEST_CASE("The current mirror copies the reference current while Q2 is out of sa
     const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
     REQUIRE(settings.StepSource);
     const Core::DCSweepRun run =
-        Core::RunDCSweep(schematic.BuildCircuit(), {.Swept = settings.SweptRange, .Stepped = settings.SteppedRange});
+        Core::RunDCSweep(schematic.GetCircuit(), {.Swept = settings.SweptRange, .Stepped = settings.SteppedRange});
     REQUIRE(run.Result.has_value());
     const Core::DCSweep &sweep = *run.Result;
     REQUIRE(sweep.Curves.size() == 5);
@@ -812,7 +812,7 @@ TEST_CASE("The bistable example lands in the state its nodesets pick, on both en
     REQUIRE(nodesets[1]->GetValue() == SECOND_ON_VOLTS);
 
     const auto check_state = [&](const bool is_first_on) {
-        const Core::OperatingPointRun run = Core::RunOperatingPoint(schematic.BuildCircuit());
+        const Core::OperatingPointRun run = Core::RunOperatingPoint(schematic.GetCircuit());
         REQUIRE(run.Result.has_value());
         const double first = run.Result->NodeVoltages[first_collector];
         const double second = run.Result->NodeVoltages[second_collector];
@@ -873,7 +873,7 @@ TEST_CASE("The LED dimmer lights the LED more as the potentiometer is turned tow
     REQUIRE(pot != schematic.GetElements().end());
     auto &potentiometer = static_cast<Core::Potentiometer &>((*pot)->GetComponent());
     const auto led_current = [&schematic] {
-        const Core::OperatingPointRun run = Core::RunOperatingPoint(schematic.BuildCircuit());
+        const Core::OperatingPointRun run = Core::RunOperatingPoint(schematic.GetCircuit());
         REQUIRE(run.Result.has_value());
         const auto led = std::ranges::find(run.Result->Currents, "D1", &Core::ComponentCurrent::Name);
         REQUIRE(led != run.Result->Currents.end());
@@ -900,7 +900,7 @@ TEST_CASE("The series switches light their LED only when both are closed, and th
         static_cast<Core::Switch &>((*element)->GetComponent()).SetClosed(closed);
     };
     const auto lit = [&schematic](const std::string &led) {
-        const Core::OperatingPointRun run = Core::RunOperatingPoint(schematic.BuildCircuit());
+        const Core::OperatingPointRun run = Core::RunOperatingPoint(schematic.GetCircuit());
         REQUIRE(run.Result.has_value());
         const auto found = std::ranges::find(run.Result->Currents, led, &Core::ComponentCurrent::Name);
         REQUIRE(found != run.Result->Currents.end());
@@ -924,7 +924,7 @@ TEST_CASE("The buck converter settles near its duty cycle times the supply, afte
     GUI::Schematic schematic;
     OpenExample("buck_converter.imcsim", schematic);
     const Core::TransientRun run =
-        Core::RunTransient(schematic.BuildCircuit(), schematic.GetSimulationSettings().Transient);
+        Core::RunTransient(schematic.GetCircuit(), schematic.GetSimulationSettings().Transient);
     REQUIRE(run.Result.has_value());
     const Core::Transient &transient = *run.Result;
     const std::vector<double> &output = transient.NodeVoltages[NodeAt(schematic, {18, 10})];
@@ -950,7 +950,7 @@ TEST_CASE("The buck converter's switch node peaks near its true 19 V on both eng
           "[examples]") {
     GUI::Schematic schematic;
     OpenExample("buck_converter.imcsim", schematic);
-    const Core::Circuit circuit = schematic.BuildCircuit();
+    const Core::Circuit circuit = schematic.GetCircuit();
     const Core::TransientSettings &settings = schematic.GetSimulationSettings().Transient;
     // The diode node rings after each edge at about 17 us, which the step has to resolve in many points
     const std::size_t switch_node = NodeAt(schematic, {14, 10});
@@ -968,7 +968,7 @@ TEST_CASE("The relay contact closes and opens a coil time constant after the tra
     GUI::Schematic schematic;
     OpenExample("relay_driver.imcsim", schematic);
     const Core::TransientRun run =
-        Core::RunTransient(schematic.BuildCircuit(), schematic.GetSimulationSettings().Transient);
+        Core::RunTransient(schematic.GetCircuit(), schematic.GetSimulationSettings().Transient);
     REQUIRE(run.Result.has_value());
     const Core::Transient &transient = *run.Result;
     const std::vector<double> &load = transient.NodeVoltages[NodeAt(schematic, {16, 12})];
@@ -1000,7 +1000,7 @@ TEST_CASE("The transformer steps 34 V down to about half, and the bridge and cap
     GUI::Schematic schematic;
     OpenExample("transformer_power_supply.imcsim", schematic);
     const Core::TransientRun run =
-        Core::RunTransient(schematic.BuildCircuit(), schematic.GetSimulationSettings().Transient);
+        Core::RunTransient(schematic.GetCircuit(), schematic.GetSimulationSettings().Transient);
     REQUIRE(run.Result.has_value());
     const Core::Transient &transient = *run.Result;
     const std::vector<double> &input = transient.NodeVoltages[NodeAt(schematic, {3, 9})];
@@ -1040,7 +1040,7 @@ TEST_CASE("The SR latch is set at the start, and with both inputs idle has no op
     GUI::Schematic schematic;
     OpenExample("sr_latch.imcsim", schematic);
     const Core::TransientRun run =
-        Core::RunTransient(schematic.BuildCircuit(), schematic.GetSimulationSettings().Transient);
+        Core::RunTransient(schematic.GetCircuit(), schematic.GetSimulationSettings().Transient);
     REQUIRE(run.Result.has_value());
     const Core::Transient &transient = *run.Result;
     const std::vector<double> &q = transient.NodeVoltages[NodeAt(schematic, {24, 17})];
@@ -1067,13 +1067,13 @@ TEST_CASE("The SR latch is set at the start, and with both inputs idle has no op
             source.SetValue(5.0);
         }
     }
-    const Core::OperatingPointRun idle = Core::RunOperatingPoint(schematic.BuildCircuit());
+    const Core::OperatingPointRun idle = Core::RunOperatingPoint(schematic.GetCircuit());
     REQUIRE_FALSE(idle.Result.has_value());
     CHECK(idle.Result.error().find("needs one input at a defined level") != std::string::npos);
 
     // A transient starts the idle latch from 0 V instead, and it settles into one of its two states
     const Core::TransientRun power_up =
-        Core::RunTransient(schematic.BuildCircuit(), schematic.GetSimulationSettings().Transient);
+        Core::RunTransient(schematic.GetCircuit(), schematic.GetSimulationSettings().Transient);
     REQUIRE(power_up.Result.has_value());
     CHECK(power_up.Result->Warnings.size() == 1);
     const std::vector<double> &idle_q = power_up.Result->NodeVoltages[NodeAt(schematic, {24, 17})];
@@ -1104,7 +1104,7 @@ void CheckLevel(const Core::Transient &transient, const std::size_t node, const 
 }
 
 Core::TransientRun RunExampleTransient(GUI::Schematic &schematic) {
-    Core::TransientRun run = Core::RunTransient(schematic.BuildCircuit(), schematic.GetSimulationSettings().Transient);
+    Core::TransientRun run = Core::RunTransient(schematic.GetCircuit(), schematic.GetSimulationSettings().Transient);
     REQUIRE(run.Result.has_value());
     return run;
 }
@@ -1141,7 +1141,7 @@ TEST_CASE("Every gate follows a DC sweep of its input, with no transient run bef
     OpenExample("logic_gates.imcsim", schematic);
     Core::DCSweepSettings settings;
     settings.Swept = {.Source = "Vin1", .Start = 0.0, .Stop = 5.0, .Step = 0.5};
-    const Core::DCSweepRun run = Core::RunDCSweep(schematic.BuildCircuit(), settings);
+    const Core::DCSweepRun run = Core::RunDCSweep(schematic.GetCircuit(), settings);
     REQUIRE(run.Result.has_value());
     const Core::DCSweep &sweep = *run.Result;
     const Core::DCSweepCurve &curve = sweep.Curves.front();
@@ -1208,7 +1208,7 @@ TEST_CASE("The truth table example lists the table of each basic gate", "[exampl
     CHECK(settings.Selected == GUI::Analysis::TRUTH_TABLE);
 
     // The example is made only of digital parts, so it runs with no Ground part
-    const Core::Circuit circuit = schematic.BuildCircuit();
+    const Core::Circuit circuit = schematic.GetCircuit();
     REQUIRE_FALSE(circuit.HasGround());
     // The outputs of the six gates sit on the grid points the example measures, one gate every eight rows
     std::vector<int> outputs;
@@ -1244,7 +1244,7 @@ TEST_CASE("The full adder example adds three bits in its truth table", "[example
     OpenExample("full_adder.imcsim", schematic);
     CHECK(schematic.GetSimulationSettings().Selected == GUI::Analysis::TRUTH_TABLE);
 
-    const Core::Circuit circuit = schematic.BuildCircuit();
+    const Core::Circuit circuit = schematic.GetCircuit();
     REQUIRE_FALSE(circuit.HasGround());
     // SUM and COUT are the outputs of the second XOR (row 14) and the OR (row 38)
     const int sum = static_cast<int>(NodeAt(schematic, {39, 14}));
@@ -1270,7 +1270,7 @@ TEST_CASE("The full adder example adds three bits in its truth table", "[example
 TEST_CASE("The two RC blocks have their corners a decade apart, as their parameters set", "[examples]") {
     GUI::Schematic schematic;
     OpenExample("rc_blocks.imcsim", schematic);
-    const Core::ACSweepRun run = Core::RunACSweep(schematic.BuildCircuit(), schematic.GetSimulationSettings().ACSweep);
+    const Core::ACSweepRun run = Core::RunACSweep(schematic.GetCircuit(), schematic.GetSimulationSettings().ACSweep);
     REQUIRE(run.Result.has_value());
     const Core::ACSweep &sweep = *run.Result;
     const auto corner_at = [&](const GUI::GridPoint point) {
@@ -1294,7 +1294,7 @@ TEST_CASE("The precision rectifier passes the positive half of the sine without 
     GUI::Schematic schematic;
     OpenExample("precision_rectifier.imcsim", schematic);
     const Core::TransientRun run =
-        Core::RunTransient(schematic.BuildCircuit(), schematic.GetSimulationSettings().Transient);
+        Core::RunTransient(schematic.GetCircuit(), schematic.GetSimulationSettings().Transient);
     REQUIRE(run.Result.has_value());
     const Core::Transient &transient = *run.Result;
     const std::vector<double> &input = transient.NodeVoltages[NodeAt(schematic, {2, -1})];
@@ -1317,7 +1317,7 @@ TEST_CASE("The decoder example varies A0 and A1 only, and each row raises the ou
     OpenExample("decoder_logic_outputs.imcsim", schematic);
     const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
     CHECK(settings.Selected == GUI::Analysis::TRUTH_TABLE);
-    const Core::Circuit circuit = schematic.BuildCircuit();
+    const Core::Circuit circuit = schematic.GetCircuit();
     REQUIRE_FALSE(circuit.HasGround());
     // V1 drives A0 and V2 drives A1; V3 holds EN high
     const std::vector<std::string> inputs =
@@ -1406,7 +1406,7 @@ TEST_CASE("The 8-bit counter of two nested 4-bit blocks carries into its high ni
     }
     CHECK(schematic.GetMeasurements().GetBuses().size() == 1);
     // The pins of the block reach flip-flops two levels down, so the plot draws them as logic lanes
-    const std::vector<GUI::LogicNode> logic_nodes = GUI::FindLogicNodes(schematic.BuildCircuit());
+    const std::vector<GUI::LogicNode> logic_nodes = GUI::FindLogicNodes(schematic.GetCircuit());
     for (const std::size_t bit : bits) {
         CHECK(std::ranges::contains(logic_nodes, static_cast<int>(bit), &GUI::LogicNode::Node));
     }
@@ -1418,7 +1418,7 @@ TEST_CASE("The fuse example blows the fast fuse first and the slow-blow one late
     OpenExample("fuse_fast_and_slow_blow.imcsim", schematic);
 
     const Core::TransientRun run =
-        Core::RunTransient(schematic.BuildCircuit(), schematic.GetSimulationSettings().Transient);
+        Core::RunTransient(schematic.GetCircuit(), schematic.GetSimulationSettings().Transient);
     REQUIRE(run.Result.has_value());
     const Core::Transient &transient = *run.Result;
     const std::vector<std::optional<double>> blow_times =
@@ -1453,7 +1453,7 @@ TEST_CASE("The S-parameter example is a T low-pass whose matrix is the closed fo
     const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
     CHECK(settings.Selected == GUI::Analysis::S_PARAMETERS);
 
-    const Core::SParametersRun run = Core::RunSParameters(schematic.BuildCircuit(), settings.SParameters);
+    const Core::SParametersRun run = Core::RunSParameters(schematic.GetCircuit(), settings.SParameters);
     if (!run.Result) {
         FAIL(run.Result.error());
     }
@@ -1490,7 +1490,7 @@ TEST_CASE("The series RLC example plots its impedance, resistive at resonance", 
         return schematic.GetConnectivity().FindNodeOfNet(net);
     });
     REQUIRE(program.has_value());
-    const Core::ACSweepRun run = Core::RunACSweep(schematic.BuildCircuit(), schematic.GetSimulationSettings().ACSweep);
+    const Core::ACSweepRun run = Core::RunACSweep(schematic.GetCircuit(), schematic.GetSimulationSettings().ACSweep);
     REQUIRE(run.Result.has_value());
     const auto impedance = GUI::EvaluateACExpression(*program, *run.Result);
     REQUIRE(impedance.has_value());
@@ -1513,7 +1513,7 @@ TEST_CASE("The behavioral source multiplies the carrier by the message, an ampli
     GUI::Schematic schematic;
     OpenExample("behavioral_am_modulator.imcsim", schematic);
     const Core::TransientRun run =
-        Core::RunTransient(schematic.BuildCircuit(), schematic.GetSimulationSettings().Transient);
+        Core::RunTransient(schematic.GetCircuit(), schematic.GetSimulationSettings().Transient);
     REQUIRE(run.Result.has_value());
     const Core::Transient &transient = *run.Result;
     const std::vector<double> &carrier = transient.NodeVoltages[NodeAt(schematic, {4, 4})];
@@ -1531,7 +1531,7 @@ TEST_CASE("The offset example shows the input offset of each op-amp times the ga
     GUI::Schematic schematic;
     OpenExample("op_amp_input_offset.imcsim", schematic);
     CHECK(schematic.GetSimulationSettings().Selected == GUI::Analysis::OPERATING_POINT);
-    const Core::OperatingPointRun run = Core::RunOperatingPoint(schematic.BuildCircuit());
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(schematic.GetCircuit());
     REQUIRE(run.Result.has_value());
     const double lm358 = run.Result->NodeVoltages[NodeAt(schematic, {20, 8})];
     const double op07 = run.Result->NodeVoltages[NodeAt(schematic, {20, 22})];
@@ -1547,7 +1547,7 @@ TEST_CASE("The Monte Carlo bias example spreads the collector voltage around its
     const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
     CHECK(settings.Selected == GUI::Analysis::OPERATING_POINT);
     REQUIRE(settings.MonteCarlo.Enabled);
-    const Core::Circuit circuit = schematic.BuildCircuit();
+    const Core::Circuit circuit = schematic.GetCircuit();
     CHECK(Core::FindVariedParts(circuit).size() == 4);
     CHECK_FALSE(Core::CheckMonteCarlo(circuit, settings.MonteCarlo));
 
@@ -1577,7 +1577,7 @@ TEST_CASE("The noise example opens on its noise analysis and totals the kT/C noi
     REQUIRE(settings.Selected == GUI::Analysis::NOISE);
     REQUIRE(settings.NoiseOutput.has_value());
 
-    const Core::NoiseRun run = Core::RunNoise(schematic.BuildCircuit(),
+    const Core::NoiseRun run = Core::RunNoise(schematic.GetCircuit(),
                                               {.OutputNode = static_cast<int>(NodeAt(schematic, *settings.NoiseOutput)),
                                                .InputSource = settings.NoiseSource,
                                                .StartFrequency = settings.NoiseRange.StartFrequency,
@@ -1607,7 +1607,7 @@ TEST_CASE("The transfer function example reads a gain of 0.5 and impedances of 2
     REQUIRE(settings.TransferFunctionOutput.has_value());
 
     const Core::TransferFunctionRun run =
-        Core::RunTransferFunction(schematic.BuildCircuit(),
+        Core::RunTransferFunction(schematic.GetCircuit(),
                                   {.OutputNode = static_cast<int>(NodeAt(schematic, *settings.TransferFunctionOutput)),
                                    .InputSource = settings.TransferFunctionSource});
     REQUIRE(run.Result.has_value());
@@ -1626,7 +1626,7 @@ TEST_CASE("The harmonic balance example finds a rectified DC level with harmonic
     REQUIRE(settings.Selected == GUI::Analysis::HARMONIC_BALANCE);
 
     const TestSupport::NodalysInUse nodalys;
-    const Core::HarmonicBalanceRun run = Core::RunHarmonicBalance(schematic.BuildCircuit(), settings.HarmonicBalance);
+    const Core::HarmonicBalanceRun run = Core::RunHarmonicBalance(schematic.GetCircuit(), settings.HarmonicBalance);
     REQUIRE(run.Result.has_value());
     const Core::HarmonicBalance &balance = *run.Result;
     CHECK_THAT(balance.FundamentalFrequency, Catch::Matchers::WithinRel(1e3, 1e-9));
@@ -1649,7 +1649,7 @@ TEST_CASE("The stability example is potentially unstable up to about 290 MHz, wi
     OpenExample("stability_common_emitter.imcsim", schematic);
     const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
     CHECK(settings.Selected == GUI::Analysis::S_PARAMETERS);
-    const Core::SParametersRun run = Core::RunSParameters(schematic.BuildCircuit(), settings.SParameters);
+    const Core::SParametersRun run = Core::RunSParameters(schematic.GetCircuit(), settings.SParameters);
     if (!run.Result) {
         FAIL(run.Result.error());
     }
@@ -1711,7 +1711,7 @@ TEST_CASE("The Sallen-Key sensitivity example ranks the four filter parts at the
                                                    .StopFrequency = settings.ACSensitivityRange.StopFrequency,
                                                    .PointsPerDecade = settings.ACSensitivityRange.PointsPerDecade};
 
-    const Core::ACSensitivityRun run = Core::RunACSensitivity(schematic.BuildCircuit(), run_settings);
+    const Core::ACSensitivityRun run = Core::RunACSensitivity(schematic.GetCircuit(), run_settings);
 
     if (!run.Result) {
         FAIL(run.Result.error());
@@ -1747,4 +1747,69 @@ TEST_CASE("The Sallen-Key sensitivity example ranks the four filter parts at the
         / std::log(sensitivity.Frequencies[corner + 1] / sensitivity.Frequencies[corner - 1]);
     CHECK_THAT(total.real(), Catch::Matchers::WithinRel(2.0 * slope.real(), 0.02));
     CHECK_THAT(total.imag(), Catch::Matchers::WithinRel(2.0 * slope.imag(), 0.02));
+}
+
+TEST_CASE("The transmission line reflections example launches half the step and settles at 1.5 V after one round trip",
+          "[examples]") {
+    const TestSupport::NodalysInUse nodalys;
+    GUI::Schematic schematic;
+    OpenExample("transmission_line_reflections.imcsim", schematic);
+    const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
+    REQUIRE(settings.Selected == GUI::Analysis::TRANSIENT);
+
+    const Core::TransientRun run = Core::RunTransient(schematic.GetCircuit(), settings.Transient);
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const Core::Transient &transient = *run.Result;
+    CHECK(transient.Warnings.empty());
+
+    const std::size_t input = NodeAt(schematic, {9, 4});
+    const std::size_t output = NodeAt(schematic, {15, 4});
+    const auto sample_at = [&](const std::size_t node, const double target_seconds) {
+        const auto found = std::ranges::lower_bound(transient.Times, target_seconds);
+        REQUIRE(found != transient.Times.end());
+        const auto index = static_cast<std::size_t>(found - transient.Times.begin());
+        return transient.NodeVoltages[node][index];
+    };
+
+    // Before Td = 2 ns: matched 50 Ohm source divider gives 1 V at the launch end while the load still reads 0 V
+    CHECK_THAT(sample_at(input, 1.5e-9), Catch::Matchers::WithinAbs(1.0, 0.02));
+    CHECK_THAT(sample_at(output, 1.5e-9), Catch::Matchers::WithinAbs(0.0, 0.02));
+
+    // Between Td and 2 Td: the wave arrives at RL = 150 Ohm (Gamma_L = +0.5 -> 1.5 V), input stays at 1.0 V
+    CHECK_THAT(sample_at(output, 3.5e-9), Catch::Matchers::WithinAbs(1.5, 0.02));
+    CHECK_THAT(sample_at(input, 3.5e-9), Catch::Matchers::WithinAbs(1.0, 0.02));
+
+    // After 2 Td = 4 ns: the +0.5 V reflection reaches the matched source and both ends settle at 1.5 V
+    CHECK_THAT(sample_at(input, 6.0e-9), Catch::Matchers::WithinAbs(1.5, 0.02));
+    CHECK_THAT(sample_at(output, 6.0e-9), Catch::Matchers::WithinAbs(1.5, 0.02));
+}
+
+TEST_CASE("The quarter-wave transformer example matches the 200 Ohm load to 50 Ohm at 250 MHz",
+          "[examples][s_parameters]") {
+    const TestSupport::NodalysInUse nodalys;
+    GUI::Schematic schematic;
+    OpenExample("transmission_line_quarter_wave.imcsim", schematic);
+    const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
+    REQUIRE(settings.Selected == GUI::Analysis::S_PARAMETERS);
+
+    const Core::SParametersRun run = Core::RunSParameters(schematic.GetCircuit(), settings.SParameters);
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const Core::SParameters &spar = *run.Result;
+    CHECK(spar.Warnings.empty());
+    REQUIRE(spar.GetPortCount() == 1);
+    REQUIRE(spar.Frequencies.size() == 100);
+
+    // 10 MHz to 1 GHz in 100 steps puts 10 MHz per step: 250 MHz at index 24, 500 MHz at 49, 750 MHz at 74
+    REQUIRE_THAT(spar.Frequencies[24], Catch::Matchers::WithinRel(250e6, 1e-6));
+    CHECK(std::abs(spar.Get(24, 1, 1)) < 1e-6);
+
+    REQUIRE_THAT(spar.Frequencies[49], Catch::Matchers::WithinRel(500e6, 1e-6));
+    CHECK_THAT(std::abs(spar.Get(49, 1, 1)), Catch::Matchers::WithinAbs(0.6, 1e-4));
+
+    REQUIRE_THAT(spar.Frequencies[74], Catch::Matchers::WithinRel(750e6, 1e-6));
+    CHECK(std::abs(spar.Get(74, 1, 1)) < 1e-6);
 }

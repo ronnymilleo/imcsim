@@ -654,6 +654,9 @@ void Schematic::SetSimulationSettings(const SimulationSettings &settings) {
         return;
     }
     m_SimulationSettings = settings;
+    if (m_Circuit) {
+        m_Circuit->SetSolverOptions(m_SimulationSettings.Solver);
+    }
     m_Modified = true;
     m_History.NoteChange();
 }
@@ -827,19 +830,22 @@ const Connectivity &Schematic::GetConnectivity() {
 }
 
 /**
- * @brief   Builds the circuit topology of the schematic, for the simulator, with the solver options of its settings.
- * @return  The circuit; it points at the components of this schematic, so use it before the next change.
+ * @brief   Returns the circuit topology of the schematic, with the solver options of its settings.
+ * @return  The circuit, built on first use after a change and cached until the next one.
  */
-Core::Circuit Schematic::BuildCircuit() {
-    Core::Circuit circuit = GUI::BuildCircuit(m_Elements, GetConnectivity());
-    for (const auto &definition : m_Blocks.GetBuiltDefinitions()) {
-        circuit.AddSubcircuit(definition);
+const Core::Circuit &Schematic::GetCircuit() {
+    if (!m_Circuit) {
+        Core::Circuit circuit = GUI::BuildCircuit(m_Elements, GetConnectivity());
+        for (const auto &definition : m_Blocks.GetBuiltDefinitions()) {
+            circuit.AddSubcircuit(definition);
+        }
+        for (const Core::LibraryModel &model : m_Blocks.GetLibraryModels()) {
+            circuit.AddLibraryModel(model);
+        }
+        circuit.SetSolverOptions(m_SimulationSettings.Solver);
+        m_Circuit = std::move(circuit);
     }
-    for (const Core::LibraryModel &model : m_Blocks.GetLibraryModels()) {
-        circuit.AddLibraryModel(model);
-    }
-    circuit.SetSolverOptions(m_SimulationSettings.Solver);
-    return circuit;
+    return *m_Circuit;
 }
 
 /**
@@ -864,7 +870,7 @@ std::size_t Schematic::GetDocumentVersion() const {
  * @return  The netlist text, without analysis commands.
  */
 std::string Schematic::BuildSpiceNetlist() {
-    return BuildCircuit().ToSpiceNetlist();
+    return GetCircuit().ToSpiceNetlist();
 }
 
 /**
@@ -876,6 +882,7 @@ Schematic::ListenerSlot::ListenerSlot(ListenerSlot &&) noexcept {
 void Schematic::InvalidateDerivedData() {
     ++m_CircuitVersion;
     m_Connectivity.reset();
+    m_Circuit.reset();
     if (m_Listener.Target != nullptr) {
         m_Listener.Target->OnCircuitChanged();
     }
