@@ -277,7 +277,12 @@ void CircuitCompiler::Lower(const ThyristorSpec &spec) {
     Device *dev = AddDevice(
         std::make_unique<ThyristorDevice>(MapNode(spec.Anode), MapNode(spec.Cathode), MapNode(spec.Gate), spec.Params));
     m_Compiled.ElementsByName[spec.Name] = dev;
-    RegisterTerminalCurrents(spec.Name, dev, {"A", "K", "G"});
+    // A TRIAC names its main terminals MT2 and MT1; an SCR names them anode and cathode
+    if (spec.Params.IsBidirectional) {
+        RegisterTerminalCurrents(spec.Name, dev, {"MT2", "MT1", "G"});
+    } else {
+        RegisterTerminalCurrents(spec.Name, dev, {"A", "K", "G"});
+    }
 }
 
 void CircuitCompiler::Lower(const TransformerSpec &spec) {
