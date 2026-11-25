@@ -35,6 +35,14 @@ TEST_CASE("A command with two chords is named by the one the menu shows", "[shor
         std::ranges::count(GUI::GetEditorShortcuts(), GUI::EditorCommand::REDO, &GUI::EditorShortcut::Command);
     CHECK(redo_chords == 2);
     CHECK(LabelOf(GUI::EditorCommand::REDO) == IMCSIM_SHORTCUT "Y");
+
+    // Delete answers Backspace too (for macOS keyboards), while the menu shows Del
+    const auto delete_chords = std::ranges::count(GUI::GetEditorShortcuts(),
+                                                  GUI::EditorCommand::DELETE_SELECTION,
+                                                  &GUI::EditorShortcut::Command);
+    CHECK(delete_chords == 2);
+    CHECK(LabelOf(GUI::EditorCommand::DELETE_SELECTION) == "Del");
+    CHECK(GUI::GetShortcutChord(GUI::EditorCommand::DELETE_SELECTION) == ImGuiKey_Delete);
 }
 
 TEST_CASE("The keys of a command come from the table, and a command without keys has none", "[shortcuts]") {

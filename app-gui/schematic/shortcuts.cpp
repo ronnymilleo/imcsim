@@ -101,6 +101,11 @@ constexpr std::array SHORTCUTS = {
                    .Chord = ImGuiKey_Delete,
                    .Label = "Del",
                    .Scope = Scope::SELECTING},
+    // On macOS compact keyboards the key labeled Delete sends Backspace
+    EditorShortcut{.Command = EditorCommand::DELETE_SELECTION,
+                   .Chord = ImGuiKey_Backspace,
+                   .Label = nullptr,
+                   .Scope = Scope::SELECTING},
 };
 
 } // namespace
