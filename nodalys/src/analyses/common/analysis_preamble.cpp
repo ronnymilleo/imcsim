@@ -155,6 +155,9 @@ MnaSystem BuildReactiveSystem(const CompiledCircuit &compiled, const std::vector
     MnaSystem reactive = MakeEmptySystemLike(*compiled.System);
     for (const std::unique_ptr<Device> &device : compiled.Devices) {
         device->StampAc(reactive, x_dc);
+        if (const FrequencyDevice *frequency_device = device->AsFrequency()) {
+            reactive.AddFrequencyStamp(frequency_device->MakeStamp());
+        }
     }
     return reactive;
 }

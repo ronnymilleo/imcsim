@@ -223,19 +223,21 @@ std::expected<void, std::string> ReadSource(DeckContext &context, const DeckLine
     }
     const std::string &name = tokens.front();
     const NodeId positive = context.Nodes.Resolve(tokens[1]);
+    const NodeId negative = context.Nodes.Resolve(tokens[2]);
     const SourceWords words = ReadSourceWords(tokens);
     if (words.IsPort) {
         const int number = words.Port.Number.value_or(0);
         context.Builder.AddPort(number > 0 ? number : GetPortNumberFromName(name, 1),
                                 positive,
-                                words.Port.Ohms.value_or(DEFAULT_PORT_OHMS));
+                                words.Port.Ohms.value_or(DEFAULT_PORT_OHMS),
+                                negative);
         return {};
     }
     AddWaveformSource(context.Builder,
                       name,
                       GetElementLetter(name) == 'V',
                       positive,
-                      context.Nodes.Resolve(tokens[2]),
+                      negative,
                       words.Values.Waveform,
                       words.Values.WaveformValues,
                       words.Values.Levels);
@@ -267,7 +269,8 @@ std::expected<void, std::string> ReadPort(DeckContext &context, const DeckLine &
     }
     context.Builder.AddPort(port.Number.value_or(GetPortNumberFromName(tokens.front(), 1)),
                             context.Nodes.Resolve(tokens[1]),
-                            port.Ohms.value_or(DEFAULT_PORT_OHMS));
+                            port.Ohms.value_or(DEFAULT_PORT_OHMS),
+                            context.Nodes.Resolve(tokens[2]));
     return {};
 }
 

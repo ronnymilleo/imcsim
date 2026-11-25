@@ -13,6 +13,7 @@
 
 #include <cstddef>
 #include <expected>
+#include <functional>
 #include <initializer_list>
 #include <map>
 #include <string>
@@ -25,6 +26,9 @@ namespace Nodalys {
 constexpr std::size_t FIRST_NODE_INDEX = 1;
 /// The index of the first word after the two nodes of a two-terminal element, where its value starts.
 constexpr std::size_t TWO_TERMINAL_VALUE_INDEX = 3;
+
+/// Evaluates one option value text (`(key, raw_value)`) into a number or an error message.
+using OptionEvaluator = std::function<std::expected<double, std::string>(std::string_view key, std::string_view text)>;
 
 /**
  * @struct  ElementLine
@@ -53,6 +57,8 @@ struct Arguments {
 };
 
 // Reading
+[[nodiscard]] std::expected<TransmissionLineParameters, std::string>
+ParseTransmissionLineOptions(const Arguments &arguments, const OptionEvaluator &evaluate);
 Arguments SplitArguments(const std::vector<std::string> &tokens, std::size_t first);
 
 // Checks

@@ -12,10 +12,13 @@
 #include "devices/passive/passive_devices.h"
 #include "devices/passive/smooth_logic.h"
 #include "devices/passive/switch_device.h"
+#include "devices/passive/transmission_line_device.h"
 #include "devices/semiconductors/bjt_device.h"
 #include "devices/semiconductors/diode_device.h"
 #include "devices/semiconductors/mosfet_device.h"
 #include "devices/sources/controlled_sources.h"
+#include <cmath>
+#include <format>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -271,6 +274,45 @@ void CircuitCompiler::Lower(const SwitchSpec &spec) {
 
 void CircuitCompiler::Lower(const TransformerSpec &spec) {
     CompileTransformer(*this, spec);
+}
+
+void CircuitCompiler::Lower(const TransmissionLineSpec &spec) {
+    const TransmissionLineParameters &p = spec.Params;
+    if (!std::isfinite(p.ImpedanceOhms) || p.ImpedanceOhms <= 0.0) {
+        m_Errors.push_back(std::format("{}: characteristic impedance Z0 must be positive", spec.Name));
+        return;
+    }
+    if (!std::isfinite(p.DelaySeconds) || p.DelaySeconds <= 0.0) {
+        m_Errors.push_back(std::format("{}: propagation delay Td must be positive", spec.Name));
+        return;
+    }
+    if (!std::isfinite(p.DcResistanceOhms) || p.DcResistanceOhms < 0.0 || !std::isfinite(p.SkinResistanceOhms)
+        || p.SkinResistanceOhms < 0.0 || !std::isfinite(p.DcConductanceSiemens) || p.DcConductanceSiemens < 0.0
+        || !std::isfinite(p.LossTangent) || p.LossTangent < 0.0) {
+        m_Errors.push_back(std::format("{}: transmission line loss parameters must be non-negative", spec.Name));
+        return;
+    }
+    if (!std::isfinite(p.ReferenceFrequencyHz) || p.ReferenceFrequencyHz <= 0.0) {
+        m_Errors.push_back(std::format("{}: reference frequency must be positive", spec.Name));
+        return;
+    }
+    const int up1 = MapNode(spec.Port1Pos);
+    const int un1 = MapNode(spec.Port1Neg);
+    const int up2 = MapNode(spec.Port2Pos);
+    const int un2 = MapNode(spec.Port2Neg);
+    MarkDynamic(up1);
+    MarkDynamic(un1);
+    MarkDynamic(up2);
+    MarkDynamic(un2);
+    const int b1 = AllocateBranch();
+    const int b2 = AllocateBranch();
+    Device *dev = AddDevice(std::make_unique<TransmissionLineDevice>(up1, un1, up2, un2, b1, b2, p));
+    RegisterElementAlias(spec.Name, dev);
+    AddCurrentReadout(spec.Name + ".P1", {{dev, 0}});
+    AddCurrentReadout(spec.Name + ".P2", {{dev, 2}});
+    if (p.IsLossy()) {
+        AddNoiseGroup(spec.Name, {dev});
+    }
 }
 
 void CircuitCompiler::Lower(const VccsSpec &spec) {

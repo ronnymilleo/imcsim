@@ -34,7 +34,7 @@ public:
     CircuitBuilder &SetCircuitNodeCount(int count);
     CircuitBuilder &SetTemperature(double temperature_celsius, double nominal_celsius = 27.0);
     NodeId AddNode();
-    CircuitBuilder &AddPort(int number, NodeId node, double reference_ohms = 50.0);
+    CircuitBuilder &AddPort(int number, NodeId node, double reference_ohms = 50.0, NodeId negative_node = 0);
     CircuitBuilder &AddPort(const CircuitPort &port);
 
     // Passive Linear Elements
@@ -43,6 +43,12 @@ public:
     AddCapacitor(std::string name, NodeId n1, NodeId n2, double capacitance_farads, double initial_voltage = 0.0);
     CircuitBuilder &
     AddInductor(std::string name, NodeId n1, NodeId n2, double inductance_henries, double initial_current = 0.0);
+    CircuitBuilder &AddTransmissionLine(std::string name,
+                                        NodeId p1_pos,
+                                        NodeId p1_neg,
+                                        NodeId p2_pos,
+                                        NodeId p2_neg,
+                                        const TransmissionLineParameters &params = {});
 
     // Independent Sources (Voltage & Current)
     CircuitBuilder &

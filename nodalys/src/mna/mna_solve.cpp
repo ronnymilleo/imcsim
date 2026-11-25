@@ -13,6 +13,21 @@ namespace Nodalys {
 
 namespace {
 
+/// Context forwarded from `ComplexStamper` into a `ComplexDenseMatrix` during AC assembly.
+struct MatrixStamperContext {
+    ComplexDenseMatrix &Target;
+    bool Transpose = false;
+};
+
+void ApplyFrequencyEntry(const int row, const int col, const std::complex<double> value, void *raw_context) {
+    auto &ctx = *static_cast<MatrixStamperContext *>(raw_context);
+    const auto r = static_cast<std::size_t>(ctx.Transpose ? col : row);
+    const auto c = static_cast<std::size_t>(ctx.Transpose ? row : col);
+    if (r < ctx.Target.Rows() && c < ctx.Target.Cols()) {
+        ctx.Target.At(r, c) += value;
+    }
+}
+
 std::vector<double> EquilibrateRealMatrix(DenseMatrix &factors) {
     const std::size_t n = factors.Rows();
     std::vector<double> row_scale(n, 1.0);
@@ -96,15 +111,20 @@ void RefineComplexSolution(const ComplexDenseMatrix &y_orig,
 } // namespace
 
 /**
- * @brief   Assembles the complex AC matrix \f$Y(j\omega) = A_{\text{DC}} + j\omega C_{\text{AC}}\f$ (or its transpose).
- * @param[in] dc_matrix  Real DC conductance/Jacobian matrix.
- * @param[in] ac_matrix  Reactive coefficient matrix.
- * @param[in] omega      Angular frequency \f$\omega = 2\pi f\f$ in rad/s.
- * @param[in] transpose  True to assemble \f$Y(j\omega)^T\f$ instead of \f$Y(j\omega)\f$.
+ * @brief   Assembles the complex AC matrix \f$Y(j\omega) = A_{\text{DC}} + j\omega C_{\text{AC}} +
+ *          \Delta Y_{\text{freq}}(\omega)\f$ (or its transpose).
+ * @param[in] dc_matrix         Real DC conductance/Jacobian matrix.
+ * @param[in] ac_matrix         Reactive coefficient matrix.
+ * @param[in] omega             Angular frequency \f$\omega = 2\pi f\f$ in rad/s.
+ * @param[in] transpose         True to assemble \f$Y(j\omega)^T\f$ instead of \f$Y(j\omega)\f$.
+ * @param[in] frequency_stamps  Distributed/dispersive callbacks contributing frequency-dependent deltas.
  * @return  Assembled complex dense matrix.
  */
-ComplexDenseMatrix
-AssembleAcMatrix(const DenseMatrix &dc_matrix, const DenseMatrix &ac_matrix, const double omega, const bool transpose) {
+ComplexDenseMatrix AssembleAcMatrix(const DenseMatrix &dc_matrix,
+                                    const DenseMatrix &ac_matrix,
+                                    const double omega,
+                                    const bool transpose,
+                                    const std::vector<FrequencyStamp> &frequency_stamps) {
     const std::size_t n = dc_matrix.Rows();
     ComplexDenseMatrix y_orig(n, n);
     for (std::size_t r = 0; r < n; ++r) {
@@ -112,6 +132,13 @@ AssembleAcMatrix(const DenseMatrix &dc_matrix, const DenseMatrix &ac_matrix, con
             const std::size_t src_r = transpose ? c : r;
             const std::size_t src_c = transpose ? r : c;
             y_orig.At(r, c) = std::complex<double>(dc_matrix.At(src_r, src_c), omega * ac_matrix.At(src_r, src_c));
+        }
+    }
+    if (omega > 0.0 && !frequency_stamps.empty()) {
+        MatrixStamperContext ctx{.Target = y_orig, .Transpose = transpose};
+        const ComplexStamper stamper{.Apply = ApplyFrequencyEntry, .Context = &ctx};
+        for (const FrequencyStamp &stamp : frequency_stamps) {
+            stamp.Apply(stamper, omega);
         }
     }
     return y_orig;

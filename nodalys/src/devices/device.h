@@ -23,6 +23,7 @@
 
 namespace Nodalys {
 
+class FrequencyDevice;
 class IndependentSourceDevice;
 class NonlinearDevice;
 class SensitiveDevice;
@@ -33,10 +34,57 @@ class TransientDevice;
  * @brief   Optional role interfaces implemented by a device instance.
  */
 struct DeviceRoles {
+    const FrequencyDevice *Frequency = nullptr;           ///< Distributed/dispersive frequency-domain capability.
     const SensitiveDevice *Sensitive = nullptr;           ///< Analytical DC/AC sensitivity capability.
     IndependentSourceDevice *IndependentSource = nullptr; ///< Independent voltage or current source view.
     const NonlinearDevice *Nonlinear = nullptr;           ///< Newton-Raphson and Harmonic Balance nonlinear capability.
     TransientDevice *Transient = nullptr;                 ///< Stateful time-integration and breakpoint capability.
+};
+
+/**
+ * @class   FrequencyDevice
+ * @brief   Role interface for distributed or dispersive linear devices whose frequency-domain stamp is not a
+ *          first-order polynomial \f$G + j\omega C\f$ (such as lossless and lossy transmission lines).
+ */
+class FrequencyDevice {
+public:
+    /**
+     * @brief   Destroys the frequency device role interface.
+     */
+    virtual ~FrequencyDevice() = default;
+
+    /**
+     * @brief   Reports whether this distributed device has finite-order poles/zeros in a generalized eigenvalue pencil.
+     * @return  False for distributed delay elements, which `.pz` refuses explicitly.
+     */
+    [[nodiscard]] virtual bool SupportsPoleZero() const { return false; }
+
+    /**
+     * @brief   Reports why this device cannot participate in a time-domain transient run, or empty when supported.
+     * @return  Refusal explanation when unsupported in transient, or empty view.
+     */
+    [[nodiscard]] virtual std::string_view TransientUnsupportedReason() const { return {}; }
+
+    /**
+     * @brief   Stamps the complex difference \f$\mathbf{Y}(\omega) - \mathbf{Y}_{\text{DC}}\f$ at angular frequency
+     *          \f$\omega > 0\f$ so that adding it to \f$\mathbf{A}_{\text{DC}} + j\omega \mathbf{C}_{\text{AC}}\f$
+     *          yields the exact system matrix at \f$\omega\f$.
+     * @param[in] stamper  Target receiving `(row, col, delta)` contributions.
+     * @param[in] omega    Angular frequency \f$\omega = 2\pi f > 0\f$ in rad/s.
+     */
+    virtual void StampFrequencyDelta(const ComplexStamper &stamper, double omega) const = 0;
+
+    /**
+     * @brief   Wraps `StampFrequencyDelta()` into a type-erased `FrequencyStamp` for `MnaSystem`.
+     * @return  Bound callback and pointer to this device.
+     */
+    [[nodiscard]] FrequencyStamp MakeStamp() const {
+        return {.Stamp =
+                    [](const void *context, const ComplexStamper &stamper, const double omega) {
+                        static_cast<const FrequencyDevice *>(context)->StampFrequencyDelta(stamper, omega);
+                    },
+                .Context = this};
+    }
 };
 
 /**
@@ -168,6 +216,29 @@ public:
         (void)value;
         return false;
     }
+
+    /**
+     * @brief   Notifies the device that the transient solver accepted a waveform corner or switching discontinuity at
+     *          `time`, allowing delay elements whose delay is resolved by `max_step` to schedule downstream arrival
+     *          breakpoints.
+     * @param[in] time      Simulation time of the accepted corner in seconds.
+     * @param[in] max_step  Active maximum step size of the transient run in seconds.
+     */
+    virtual void NoteCorner(double time, double max_step) {
+        (void)time;
+        (void)max_step;
+    }
+
+    /**
+     * @brief   Returns the largest internal time step this device permits for a run ending at `stop_time`, or infinity
+     *          when unconstrained.
+     * @param[in] stop_time  Configured transient stop time in seconds.
+     * @return  Maximum step size in seconds.
+     */
+    [[nodiscard]] virtual double MaxTimeStep(double stop_time) const {
+        (void)stop_time;
+        return std::numeric_limits<double>::infinity();
+    }
 };
 
 /**
@@ -255,6 +326,12 @@ public:
      * @return  Populated DeviceRoles descriptor with pointers to supported roles.
      */
     [[nodiscard]] virtual DeviceRoles GetRoles() { return {}; }
+
+    /**
+     * @brief   Returns the distributed/dispersive frequency capability when this device implements it.
+     * @return  Pointer to the FrequencyDevice interface, or nullptr.
+     */
+    [[nodiscard]] const FrequencyDevice *AsFrequency() { return GetRoles().Frequency; }
 
     /**
      * @brief   Returns the sensitivity capability when this device supports analytical DC/AC sensitivity.

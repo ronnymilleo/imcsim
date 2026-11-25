@@ -55,6 +55,7 @@ struct StepState {
     /// Backward Euler starts the run and leaves every corner, where the trapezoidal rule would ring.
     bool IsRestart = true;
     double NextCorner = std::numeric_limits<double>::infinity();
+    double NextSourceCorner = std::numeric_limits<double>::infinity();
     std::vector<double> Now;
     std::vector<double> Old;
     std::vector<double> Older;
@@ -71,7 +72,8 @@ struct SteppingOutcome {
 };
 
 /**
- * @brief   Finds the next corner of any source waveform after an instant, so the step never jumps over an edge.
+ * @brief   Finds the next corner of any source or delay waveform after an instant, so the step never jumps over an
+ * edge.
  */
 double FindNextCorner(const CompiledCircuit &compiled, const double time) {
     double corner = std::numeric_limits<double>::infinity();
@@ -81,6 +83,47 @@ double FindNextCorner(const CompiledCircuit &compiled, const double time) {
         }
     }
     return corner;
+}
+
+double FindNextSourceCorner(const CompiledCircuit &compiled, const double time) {
+    double corner = std::numeric_limits<double>::infinity();
+    for (const std::unique_ptr<Device> &device : compiled.Devices) {
+        if (device->AsIndependentSource() != nullptr) {
+            if (const TransientDevice *transient = device->AsTransient()) {
+                corner = std::min(corner, transient->NextBreakpoint(time));
+            }
+        }
+    }
+    return corner;
+}
+
+double FindMaxDeviceStep(const CompiledCircuit &compiled, const double stop_time) {
+    double limit = std::numeric_limits<double>::infinity();
+    for (const std::unique_ptr<Device> &device : compiled.Devices) {
+        if (const TransientDevice *transient = device->AsTransient()) {
+            limit = std::min(limit, transient->MaxTimeStep(stop_time));
+        }
+    }
+    return limit;
+}
+
+void NoteDeviceCorners(CompiledCircuit &compiled, const double time, const double max_step) {
+    for (const std::unique_ptr<Device> &device : compiled.Devices) {
+        if (TransientDevice *transient = device->AsTransient()) {
+            transient->NoteCorner(time, max_step);
+        }
+    }
+}
+
+std::optional<std::string> CheckTransientDevices(const CompiledCircuit &compiled) {
+    for (const std::unique_ptr<Device> &device : compiled.Devices) {
+        if (const FrequencyDevice *freq = device->AsFrequency()) {
+            if (const std::string_view reason = freq->TransientUnsupportedReason(); !reason.empty()) {
+                return std::string(reason);
+            }
+        }
+    }
+    return std::nullopt;
 }
 
 /**
@@ -162,6 +205,9 @@ std::expected<std::vector<double>, std::string> SolveStart(CompiledCircuit &comp
                                                            const double output_step,
                                                            const ConvergenceOptions &options,
                                                            std::vector<DiagnosticMessage> *messages) {
+    if (const std::optional<std::string> unsupported = CheckTransientDevices(compiled)) {
+        return std::unexpected(*unsupported);
+    }
     const TimeContext initial = has_initial_conditions ? TimeContext{.IsTransient = true,
                                                                      .UseInitialConditions = true,
                                                                      .IsTransientStart = true,
@@ -281,7 +327,7 @@ void AcceptStep(CompiledCircuit &compiled,
                 const std::vector<double> &x_new,
                 const double ratio,
                 const bool reaches_corner,
-                const double output_step) {
+                const double max_step) {
     const bool has_switched = std::ranges::any_of(compiled.Devices, [](const std::unique_ptr<Device> &device) {
         const TransientDevice *transient = device->AsTransient();
         return transient != nullptr && transient->HasSwitched();
@@ -302,33 +348,40 @@ void AcceptStep(CompiledCircuit &compiled,
                       * std::clamp(LTE_SAFETY * std::pow(std::max(ratio, MIN_ERROR_RATIO), STEP_ERROR_EXPONENT),
                                    STEP_SHRINK_LIMIT,
                                    STEP_GROW_LIMIT);
-    state.Step = std::clamp(next, MIN_STEP, output_step);
+    state.Step = std::clamp(next, MIN_STEP, max_step);
+    const bool reaches_source_corner = reaches_corner && state.NextCorner >= state.NextSourceCorner;
+    if (reaches_source_corner || has_switched) {
+        NoteDeviceCorners(compiled, state.Time, max_step);
+    }
     // A device whose state decides its corners, such as a fuse about to blow, moves its next one at every point
     state.NextCorner = FindNextCorner(compiled, state.Time);
+    state.NextSourceCorner = FindNextSourceCorner(compiled, state.Time);
     if (reaches_corner || has_switched) {
         ResetAfterDiscontinuity(state);
     }
 }
 
-StepState InitStepState(const CompiledCircuit &compiled,
+StepState InitStepState(CompiledCircuit &compiled,
                         std::vector<double> x_start,
-                        const double output_step,
+                        const double max_step,
                         const double stop_time,
                         TransientCollector &collector) {
     StepState state;
     state.CurrentsNow = ReadCurrentValues(compiled, x_start);
     collector.Append(0.0, x_start, state.CurrentsNow);
-    state.Step = std::min(output_step, stop_time);
+    state.Step = std::min(max_step, stop_time);
     state.Old = x_start;
     state.Older = x_start;
     state.Now = std::move(x_start);
+    NoteDeviceCorners(compiled, 0.0, max_step);
     state.NextCorner = FindNextCorner(compiled, state.Time);
+    state.NextSourceCorner = FindNextSourceCorner(compiled, state.Time);
     return state;
 }
 
 SteppingOutcome RunSteppingLoop(CompiledCircuit &compiled,
                                 const TransientConfig &settings,
-                                const double output_step,
+                                const double max_step,
                                 const ConvergenceOptions &options,
                                 StepState &state,
                                 TransientCollector &collector,
@@ -355,7 +408,7 @@ SteppingOutcome RunSteppingLoop(CompiledCircuit &compiled,
             }
             continue;
         }
-        AcceptStep(compiled, state, collector, x_new, ratio, reaches_corner, output_step);
+        AcceptStep(compiled, state, collector, x_new, ratio, reaches_corner, max_step);
         if (IsChunkDue(publisher, state.Time, collector.PointCount())
             && ServeChunk(compiled, publisher, collector.View(), state.Time, settings.StopTime, messages)) {
             result.IsStopped = true;
@@ -386,24 +439,22 @@ std::expected<TransientResult, std::string> ComputeTransient(CompiledCircuit &co
                                                              const ConvergenceOptions &options,
                                                              std::vector<DiagnosticMessage> *messages) {
     const double output_step = settings.TimeStep > 0.0 ? settings.TimeStep : (settings.StopTime / 1000.0);
+    const double max_step = std::min(output_step, FindMaxDeviceStep(compiled, settings.StopTime));
     TransientCollector collector(compiled, output_step);
     SeedDeviceRandomness(compiled, settings);
-
     std::expected<std::vector<double>, std::string> x_start =
         SolveStart(compiled, has_initial_conditions, output_step, options, messages);
     if (!x_start) {
         return std::unexpected(x_start.error());
     }
     AcceptDeviceStep(compiled, *x_start);
-
-    StepState state = InitStepState(compiled, std::move(*x_start), output_step, settings.StopTime, collector);
+    StepState state = InitStepState(compiled, std::move(*x_start), max_step, settings.StopTime, collector);
     ChunkPublisher publisher{.Monitor = monitor,
                              .LastSend = std::chrono::steady_clock::now(),
                              .ChunkEnd = monitor.ChunkSpan,
                              .Sent = 0};
-
     const SteppingOutcome stepping =
-        RunSteppingLoop(compiled, settings, output_step, options, state, collector, publisher, messages);
+        RunSteppingLoop(compiled, settings, max_step, options, state, collector, publisher, messages);
     const bool is_complete = !stepping.IsStopped && !stepping.Failure;
     if (is_complete) {
         collector.AppendFinalPointIfNeeded(settings.StopTime, state.Now, state.CurrentsNow);

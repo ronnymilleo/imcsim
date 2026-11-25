@@ -230,6 +230,16 @@ struct TransformerSpec {
     double WindingResistance = 0.1;
 };
 
+/// Specification for a uniform two-port TEM transmission line (`T` element).
+struct TransmissionLineSpec {
+    std::string Name;
+    NodeId Port1Pos = 0;
+    NodeId Port1Neg = 0;
+    NodeId Port2Pos = 0;
+    NodeId Port2Neg = 0;
+    TransmissionLineParameters Params;
+};
+
 /// Specification for a linear voltage-controlled current source (`G` element).
 struct VccsSpec {
     std::string Name;
@@ -277,6 +287,7 @@ struct CircuitDescription {
                                      ResistorSpec,
                                      SwitchSpec,
                                      TransformerSpec,
+                                     TransmissionLineSpec,
                                      VccsSpec,
                                      VcvsSpec>;
 

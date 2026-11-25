@@ -7,14 +7,18 @@
 #define NODALYS_MNA_SOLVE_H
 
 #include "linear/dense_matrix.h"
+#include "mna/mna_system.h"
 #include <complex>
 #include <vector>
 
 namespace Nodalys {
 
 // Matrix assembly
-[[nodiscard]] ComplexDenseMatrix
-AssembleAcMatrix(const DenseMatrix &dc_matrix, const DenseMatrix &ac_matrix, double omega, bool transpose = false);
+[[nodiscard]] ComplexDenseMatrix AssembleAcMatrix(const DenseMatrix &dc_matrix,
+                                                  const DenseMatrix &ac_matrix,
+                                                  double omega,
+                                                  bool transpose = false,
+                                                  const std::vector<FrequencyStamp> &frequency_stamps = {});
 
 // Linear system solvers
 [[nodiscard]] bool

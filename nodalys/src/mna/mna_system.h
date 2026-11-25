@@ -41,6 +41,42 @@ class BasicDenseMatrix;
 using DenseMatrix = BasicDenseMatrix<double>;
 
 /**
+ * @struct  ComplexStamper
+ * @brief   Sink receiving complex MNA matrix entries `(row, col, delta)` at angular frequency \f$\omega\f$, ignoring
+ *          negative indices (ground) like `MnaSystem::AddA()`.
+ */
+struct ComplexStamper {
+    using Callback = void (*)(int row, int col, std::complex<double> value, void *context);
+
+    Callback Apply = nullptr;
+    void *Context = nullptr;
+
+    void Add(const int row, const int col, const std::complex<double> value) const {
+        if (row < 0 || col < 0 || Apply == nullptr) {
+            return;
+        }
+        Apply(row, col, value, Context);
+    }
+};
+
+/**
+ * @struct  FrequencyStamp
+ * @brief   Type-erased frequency-dependent matrix delta callback registered on a reactive `MnaSystem`.
+ */
+struct FrequencyStamp {
+    using Callback = void (*)(const void *context, const ComplexStamper &stamper, double omega);
+
+    Callback Stamp = nullptr;
+    const void *Context = nullptr;
+
+    void Apply(const ComplexStamper &stamper, const double omega) const {
+        if (Stamp != nullptr) {
+            Stamp(Context, stamper, omega);
+        }
+    }
+};
+
+/**
  * @struct  TimeContext
  * @brief   Describes the analysis point at which devices are being stamped.
  */
@@ -109,6 +145,8 @@ public:
     void AddMatrixFrom(const MnaSystem &source);
     void AddRhs(int row, double value);
     void AddGminToNodes(double conductance);
+    void AddFrequencyStamp(FrequencyStamp stamp);
+    [[nodiscard]] const std::vector<FrequencyStamp> &FrequencyStamps() const;
     void Clear();
     void ClearRhs();
     bool Solve(std::vector<double> &x) const;
@@ -140,6 +178,7 @@ private:
     std::unique_ptr<Storage> m_Storage;
     std::vector<double> m_Rhs;
     std::vector<bool> m_IsNodeUnknown;
+    std::vector<FrequencyStamp> m_FrequencyStamps;
     int m_NodeUnknowns = 0;
 
     void VisitNonZeros(void (*callback)(int, int, double, const void *), const void *context) const;

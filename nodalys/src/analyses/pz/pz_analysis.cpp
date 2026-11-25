@@ -137,6 +137,13 @@ std::expected<PoleZeroResult, std::string> ComputePoleZero(CompiledCircuit &comp
                                                            const PoleZeroConfig &settings,
                                                            const ConvergenceOptions &options,
                                                            std::vector<DiagnosticMessage> *messages) {
+    for (const std::unique_ptr<Device> &device : compiled.Devices) {
+        if (const FrequencyDevice *freq = device->AsFrequency(); freq != nullptr && !freq->SupportsPoleZero()) {
+            return std::unexpected(
+                "Pole-zero analysis does not support transmission lines: a distributed delay line has infinitely many "
+                "poles and zeros");
+        }
+    }
     const int out_node = settings.OutputNode;
     if (const std::optional<std::string> refusal = CheckOutputNode(compiled, out_node)) {
         return std::unexpected(*refusal);

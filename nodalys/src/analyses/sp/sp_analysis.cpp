@@ -39,7 +39,8 @@ struct DeviceRestoreGuard {
  * @brief   What each port needs to be excited and read, one entry per port in the order of the ports.
  */
 struct PortDrives {
-    std::vector<int> Unknowns; ///< Unknown of the port node, or -1 when the port is on ground.
+    std::vector<int> PosUnknowns; ///< Unknown of the port positive node, or -1 when on ground.
+    std::vector<int> NegUnknowns; ///< Unknown of the port negative node, or -1 when on ground.
     std::vector<double> SqrtConductances;
     /// Norton current source of each port, as the right-hand side that excites it.
     std::vector<std::vector<std::complex<double>>> Excitations;
@@ -88,14 +89,22 @@ std::optional<std::string> CheckPortNodes(const std::vector<CircuitPort> &ports,
         if (port.ReferenceOhms <= 0.0) {
             return std::format("The reference impedance of port {} must be positive", port.Number);
         }
-        if (port.Node == 0) {
+        if (port.Node == 0 && port.NegativeNode == 0) {
             return std::format("Port {} is on ground; an S-parameter port needs a node of its own", port.Number);
         }
-        if (port.Node < 0 || port.Node >= circuit_node_count) {
+        if (port.Node == port.NegativeNode) {
+            return std::format("Port {} has both terminals on node {}; a port needs two distinct terminals",
+                               port.Number,
+                               port.Node);
+        }
+        if (port.Node < 0 || port.Node >= circuit_node_count || port.NegativeNode < 0
+            || port.NegativeNode >= circuit_node_count) {
             return std::format("Port {} is on a node that is not in the circuit", port.Number);
         }
         for (std::size_t second = first + 1; second < ports.size(); ++second) {
-            if (ports[second].Node == port.Node) {
+            const bool same_pair = (ports[second].Node == port.Node && ports[second].NegativeNode == port.NegativeNode)
+                                || (ports[second].Node == port.NegativeNode && ports[second].NegativeNode == port.Node);
+            if (same_pair) {
                 return std::format("Ports {} and {} are on the same node; each port needs a node of its own",
                                    port.Number,
                                    ports[second].Number);
@@ -139,8 +148,9 @@ void AddPortMatrices(SParameterResult &result, const PortMatrix &scattering) {
 DeviceRestoreGuard AddPortTerminations(CompiledCircuit &compiled, const std::vector<CircuitPort> &ports) {
     const std::size_t original_device_count = compiled.Devices.size();
     for (const CircuitPort &port : ports) {
-        const int u = compiled.System->NodeIndex(port.Node);
-        compiled.Devices.push_back(std::make_unique<ResistorDevice>(u, -1, port.ReferenceOhms));
+        const int u_pos = compiled.System->NodeIndex(port.Node);
+        const int u_neg = compiled.System->NodeIndex(port.NegativeNode);
+        compiled.Devices.push_back(std::make_unique<ResistorDevice>(u_pos, u_neg, port.ReferenceOhms));
     }
     return DeviceRestoreGuard{compiled.Devices, original_device_count};
 }
@@ -153,7 +163,8 @@ DeviceRestoreGuard AddPortTerminations(CompiledCircuit &compiled, const std::vec
 PortDrives MakePortDrives(const CompiledCircuit &compiled, const std::vector<CircuitPort> &ports) {
     const std::size_t port_count = ports.size();
     const auto size = static_cast<std::size_t>(compiled.System->GetSize());
-    PortDrives drives{.Unknowns = std::vector<int>(port_count),
+    PortDrives drives{.PosUnknowns = std::vector<int>(port_count),
+                      .NegUnknowns = std::vector<int>(port_count),
                       .SqrtConductances = std::vector<double>(port_count),
                       .Excitations = std::vector<std::vector<std::complex<double>>>(
                           port_count,
@@ -161,10 +172,16 @@ PortDrives MakePortDrives(const CompiledCircuit &compiled, const std::vector<Cir
     for (std::size_t j = 0; j < port_count; ++j) {
         const double gj = 1.0 / ports[j].ReferenceOhms;
         drives.SqrtConductances[j] = std::sqrt(gj);
-        const int uj = compiled.System->NodeIndex(ports[j].Node);
-        drives.Unknowns[j] = uj;
-        if (uj >= 0) {
-            drives.Excitations[j][static_cast<std::size_t>(uj)] =
+        const int u_pos = compiled.System->NodeIndex(ports[j].Node);
+        const int u_neg = compiled.System->NodeIndex(ports[j].NegativeNode);
+        drives.PosUnknowns[j] = u_pos;
+        drives.NegUnknowns[j] = u_neg;
+        if (u_pos >= 0) {
+            drives.Excitations[j][static_cast<std::size_t>(u_pos)] +=
+                std::complex<double>(2.0 * drives.SqrtConductances[j], 0.0);
+        }
+        if (u_neg >= 0) {
+            drives.Excitations[j][static_cast<std::size_t>(u_neg)] -=
                 std::complex<double>(2.0 * drives.SqrtConductances[j], 0.0);
         }
     }
@@ -194,15 +211,19 @@ std::expected<PortMatrix, std::string>
 ScatteringFromSolutions(const PortDrives &drives,
                         const std::vector<std::vector<std::complex<double>>> &solutions,
                         const double frequency) {
-    const std::size_t port_count = drives.Unknowns.size();
+    const std::size_t port_count = drives.PosUnknowns.size();
     PortMatrix scattering;
     scattering.reserve(port_count * port_count);
     for (std::size_t i = 0; i < port_count; ++i) {
-        const int ui = drives.Unknowns[i];
+        const int u_pos = drives.PosUnknowns[i];
+        const int u_neg = drives.NegUnknowns[i];
         const double gi_sqrt = drives.SqrtConductances[i];
         for (std::size_t j = 0; j < port_count; ++j) {
-            const std::complex<double> vi =
-                (ui < 0) ? std::complex<double>(0.0, 0.0) : solutions[j][static_cast<std::size_t>(ui)];
+            const std::complex<double> v_pos =
+                (u_pos < 0) ? std::complex<double>(0.0, 0.0) : solutions[j][static_cast<std::size_t>(u_pos)];
+            const std::complex<double> v_neg =
+                (u_neg < 0) ? std::complex<double>(0.0, 0.0) : solutions[j][static_cast<std::size_t>(u_neg)];
+            const std::complex<double> vi = v_pos - v_neg;
             const double delta_ij = (i == j) ? 1.0 : 0.0;
             const std::complex<double> s_ij = vi * gi_sqrt - delta_ij;
             if (!std::isfinite(s_ij.real()) || !std::isfinite(s_ij.imag())) {

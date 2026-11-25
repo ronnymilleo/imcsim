@@ -56,7 +56,8 @@ MnaSystem::MnaSystem(std::vector<bool> is_node_unknown)
  */
 MnaSystem::MnaSystem(const MnaSystem &other)
     : m_Storage(other.m_Storage ? std::make_unique<Storage>(*other.m_Storage) : nullptr), m_Rhs(other.m_Rhs),
-      m_IsNodeUnknown(other.m_IsNodeUnknown), m_NodeUnknowns(other.m_NodeUnknowns) {
+      m_IsNodeUnknown(other.m_IsNodeUnknown), m_FrequencyStamps(other.m_FrequencyStamps),
+      m_NodeUnknowns(other.m_NodeUnknowns) {
 }
 
 /**
@@ -71,6 +72,7 @@ MnaSystem &MnaSystem::operator=(const MnaSystem &other) {
     m_Storage = other.m_Storage ? std::make_unique<Storage>(*other.m_Storage) : nullptr;
     m_Rhs = other.m_Rhs;
     m_IsNodeUnknown = other.m_IsNodeUnknown;
+    m_FrequencyStamps = other.m_FrequencyStamps;
     m_NodeUnknowns = other.m_NodeUnknowns;
     return *this;
 }
@@ -230,11 +232,30 @@ void MnaSystem::AddGminToNodes(const double conductance) {
 }
 
 /**
+ * @brief   Registers a frequency-dependent matrix delta callback invoked per \f$\omega\f$.
+ * @param[in] stamp  Callback and context for the distributed/dispersive element.
+ */
+void MnaSystem::AddFrequencyStamp(const FrequencyStamp stamp) {
+    if (stamp.Stamp != nullptr) {
+        m_FrequencyStamps.push_back(stamp);
+    }
+}
+
+/**
+ * @brief   Returns the frequency-dependent matrix delta callbacks registered with this reactive system.
+ * @return  Registered frequency stamp callbacks.
+ */
+const std::vector<FrequencyStamp> &MnaSystem::FrequencyStamps() const {
+    return m_FrequencyStamps;
+}
+
+/**
  * @brief   Zeros both \f$A\f$ and \f$\text{rhs}\f$ before stamping a new Newton iteration.
  */
 void MnaSystem::Clear() {
     m_Storage->Matrix.Reset();
     std::ranges::fill(m_Rhs, 0.0);
+    m_FrequencyStamps.clear();
 }
 
 /**
@@ -316,7 +337,9 @@ bool MnaSystem::SolveAcFor(const MnaSystem &reactive,
     if (ac_matrix.Rows() != n || rhs.size() != n) {
         return false;
     }
-    return SolveComplexSystem(AssembleAcMatrix(dc_matrix, ac_matrix, omega), rhs, x_ac);
+    return SolveComplexSystem(AssembleAcMatrix(dc_matrix, ac_matrix, omega, false, reactive.m_FrequencyStamps),
+                              rhs,
+                              x_ac);
 }
 
 /**
@@ -337,7 +360,9 @@ bool MnaSystem::SolveAcMultiple(const MnaSystem &reactive,
     if (ac_matrix.Rows() != n) {
         return false;
     }
-    return SolveComplexSystemMultiple(AssembleAcMatrix(dc_matrix, ac_matrix, omega), rhs_list, solutions);
+    return SolveComplexSystemMultiple(AssembleAcMatrix(dc_matrix, ac_matrix, omega, false, reactive.m_FrequencyStamps),
+                                      rhs_list,
+                                      solutions);
 }
 
 /**
@@ -383,7 +408,9 @@ bool MnaSystem::SolveAcTransposeFor(const MnaSystem &reactive,
     if (ac_matrix.Rows() != n || rhs.size() != n) {
         return false;
     }
-    return SolveComplexSystem(AssembleAcMatrix(dc_matrix, ac_matrix, omega, true), rhs, adjoint);
+    return SolveComplexSystem(AssembleAcMatrix(dc_matrix, ac_matrix, omega, true, reactive.m_FrequencyStamps),
+                              rhs,
+                              adjoint);
 }
 
 /**
