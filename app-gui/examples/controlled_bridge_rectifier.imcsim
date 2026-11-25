@@ -1,0 +1,374 @@
+{
+  "format": "imcsim-schematic",
+  "version": 1,
+  "elements": [
+    {
+      "type": "Thyristor",
+      "rotation": 270,
+      "x": 4,
+      "y": 7,
+      "name": "SCR1"
+    },
+    {
+      "type": "Thyristor",
+      "rotation": 270,
+      "x": 12,
+      "y": 7,
+      "name": "SCR2"
+    },
+    {
+      "type": "Diode",
+      "rotation": 270,
+      "x": 4,
+      "y": 15,
+      "model": "1N4007",
+      "name": "D1"
+    },
+    {
+      "type": "Diode",
+      "rotation": 270,
+      "x": 12,
+      "y": 15,
+      "model": "1N4007",
+      "name": "D2"
+    },
+    {
+      "type": "VoltageSource",
+      "rotation": 180,
+      "x": 8,
+      "y": 11,
+      "source": "AC",
+      "value": 0,
+      "amplitude": 10,
+      "frequency": 50,
+      "offset": 0,
+      "ac_magnitude": 1,
+      "pulse": {
+        "delay": 0,
+        "fall": 1e-06,
+        "high": 5,
+        "low": 0,
+        "period": 0.001,
+        "rise": 1e-06,
+        "width": 0.0005
+      },
+      "name": "Vin1"
+    },
+    {
+      "type": "Resistor",
+      "rotation": 90,
+      "x": 20,
+      "y": 11,
+      "value": 100,
+      "name": "R1"
+    },
+    {
+      "type": "VoltageSource",
+      "rotation": 0,
+      "x": 8,
+      "y": 7,
+      "source": "Pulse",
+      "value": 0,
+      "amplitude": 1,
+      "frequency": 1000,
+      "offset": 0,
+      "ac_magnitude": 1,
+      "pulse": {
+        "delay": 0.0033333,
+        "fall": 1e-06,
+        "high": 5,
+        "low": 0,
+        "period": 0.01,
+        "rise": 1e-06,
+        "width": 0.0005
+      },
+      "name": "Vin2"
+    },
+    {
+      "type": "VoltageSource",
+      "rotation": 0,
+      "x": 16,
+      "y": 7,
+      "source": "Pulse",
+      "value": 0,
+      "amplitude": 1,
+      "frequency": 1000,
+      "offset": 0,
+      "ac_magnitude": 1,
+      "pulse": {
+        "delay": 0.0033333,
+        "fall": 1e-06,
+        "high": 5,
+        "low": 0,
+        "period": 0.01,
+        "rise": 1e-06,
+        "width": 0.0005
+      },
+      "name": "Vin3"
+    },
+    {
+      "type": "Ground",
+      "rotation": 0,
+      "x": 23,
+      "y": 14
+    },
+    {
+      "type": "Resistor",
+      "rotation": 0,
+      "x": 2,
+      "y": 13,
+      "value": 1000000,
+      "name": "R2"
+    }
+  ],
+  "wires": [
+    {
+      "start": [
+        4,
+        9
+      ],
+      "end": [
+        4,
+        13
+      ]
+    },
+    {
+      "start": [
+        12,
+        9
+      ],
+      "end": [
+        12,
+        13
+      ]
+    },
+    {
+      "start": [
+        4,
+        17
+      ],
+      "end": [
+        4,
+        18
+      ]
+    },
+    {
+      "start": [
+        4,
+        18
+      ],
+      "end": [
+        12,
+        18
+      ]
+    },
+    {
+      "start": [
+        12,
+        18
+      ],
+      "end": [
+        12,
+        17
+      ]
+    },
+    {
+      "start": [
+        4,
+        5
+      ],
+      "end": [
+        4,
+        4
+      ]
+    },
+    {
+      "start": [
+        4,
+        4
+      ],
+      "end": [
+        12,
+        4
+      ]
+    },
+    {
+      "start": [
+        12,
+        4
+      ],
+      "end": [
+        12,
+        5
+      ]
+    },
+    {
+      "start": [
+        6,
+        11
+      ],
+      "end": [
+        4,
+        11
+      ]
+    },
+    {
+      "start": [
+        10,
+        11
+      ],
+      "end": [
+        12,
+        11
+      ]
+    },
+    {
+      "start": [
+        12,
+        18
+      ],
+      "end": [
+        20,
+        18
+      ]
+    },
+    {
+      "start": [
+        20,
+        18
+      ],
+      "end": [
+        20,
+        14
+      ]
+    },
+    {
+      "start": [
+        20,
+        14
+      ],
+      "end": [
+        23,
+        14
+      ]
+    },
+    {
+      "start": [
+        12,
+        4
+      ],
+      "end": [
+        20,
+        4
+      ]
+    },
+    {
+      "start": [
+        20,
+        9
+      ],
+      "end": [
+        20,
+        8
+      ]
+    },
+    {
+      "start": [
+        20,
+        8
+      ],
+      "end": [
+        20,
+        4
+      ]
+    },
+    {
+      "start": [
+        20,
+        13
+      ],
+      "end": [
+        20,
+        14
+      ]
+    },
+    {
+      "start": [
+        10,
+        7
+      ],
+      "end": [
+        10,
+        4
+      ]
+    },
+    {
+      "start": [
+        18,
+        7
+      ],
+      "end": [
+        18,
+        4
+      ]
+    },
+    {
+      "start": [
+        0,
+        13
+      ],
+      "end": [
+        0,
+        18
+      ]
+    },
+    {
+      "start": [
+        0,
+        18
+      ],
+      "end": [
+        4,
+        18
+      ]
+    }
+  ],
+  "simulation": {
+    "analysis": "transient",
+    "transient": {
+      "step": 0.0002,
+      "stop": 0.06
+    },
+    "ac_sweep": {
+      "start": 10,
+      "stop": 1000000,
+      "points_per_decade": 20
+    },
+    "dc_sweep": {
+      "step_source": false,
+      "swept": {
+        "source": "",
+        "start": 0,
+        "step": 0.1,
+        "stop": 5
+      },
+      "stepped": {
+        "source": "",
+        "start": 0,
+        "step": 0.1,
+        "stop": 5
+      }
+    }
+  },
+  "measurements": {
+    "voltages": [
+      [
+        4,
+        4
+      ]
+    ],
+    "currents": [
+      "SCR1.A"
+    ]
+  }
+}

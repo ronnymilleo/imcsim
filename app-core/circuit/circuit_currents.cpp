@@ -39,10 +39,10 @@ bool HasBranchCurrent(const ComponentType type) {
 /**
  * @brief   Lists the terminals of a component whose current is measured with a probe.
  * @param[in] component  Any component.
- * @return  The anode of a diode part, the first terminal of a switch or a fuse, every terminal of a transistor or a
- *          potentiometer, the contact and the coil of a relay, the two windings of a transformer, and the first output
- * terminal of a controlled source or the output of an op-amp; nothing for the others, whose currents ngspice reports
- * directly.
+ * @return  The anode of a diode part, the first terminal of a switch or a fuse, every terminal of a transistor, a
+ *          thyristor or a potentiometer, the contact and the coil of a relay, the two windings of a transformer, and
+ *          the first output terminal of a controlled source or the output of an op-amp; nothing for the others, whose
+ *          currents ngspice reports directly.
  */
 std::vector<CurrentProbe> GetCurrentProbes(const Component &component) {
     const ComponentType type = component.GetType();
@@ -71,6 +71,9 @@ std::vector<CurrentProbe> GetCurrentProbes(const Component &component) {
     }
     if (IsMOSFET(component.GetType())) {
         return {{0, "D"}, {1, "G"}, {2, "S"}};
+    }
+    if (component.GetType() == ComponentType::THYRISTOR) {
+        return {{0, "A"}, {1, "K"}, {2, "G"}};
     }
     if (component.GetType() == ComponentType::POTENTIOMETER) {
         return {{0, "A"}, {1, "B"}, {2, "W"}};

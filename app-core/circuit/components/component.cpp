@@ -459,6 +459,14 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .AcceptedValues = ValueRule::NONE,
         .Family = ComponentFamily::LOGIC_DISPLAY,
     },
+    {
+        .Type = ComponentType::THYRISTOR,
+        .TypeName = "Thyristor",
+        .NamePrefix = "SCR",
+        .Unit = "",
+        .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::SWITCHING,
+    },
 });
 
 /**

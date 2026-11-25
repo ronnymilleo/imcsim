@@ -24,6 +24,7 @@
 #include "circuit/components/source.h"
 #include "circuit/components/subcircuit.h"
 #include "circuit/components/switch.h"
+#include "circuit/components/thyristor.h"
 #include "circuit/components/transformer.h"
 #include "circuit/components/transmission_line.h"
 #include "circuit/components/voltage_controlled_switch.h"
@@ -412,6 +413,22 @@ std::string FormatFuse(const Fuse &fuse, const std::vector<int> &nodes, NetlistE
 }
 
 /**
+ * @brief   An instance of the two-transistor subcircuit that latches; see FormatThyristorSubcircuit().
+ */
+std::string FormatThyristor(const Thyristor &thyristor, const std::vector<int> &nodes, NetlistExtras &extras) {
+    const ThyristorParameters &figures = thyristor.GetParameters();
+    AddModelLine(GetThyristorSubcircuitName(), FormatThyristorSubcircuit(), extras.ModelNames, extras.Models);
+    return std::format("X-{} {} {} {} {} RG={} RT={}\n",
+                       thyristor.GetName(),
+                       nodes[0],
+                       nodes[1],
+                       nodes[2],
+                       GetThyristorSubcircuitName(),
+                       FormatSpiceValue(figures.GateResistance),
+                       FormatSpiceValue(figures.OnResistance));
+}
+
+/**
  * @brief   Two inductors, each behind the resistance of its winding, coupled by a K element.
  */
 std::string FormatTransformer(const Transformer &transformer, const std::vector<int> &nodes, NetlistExtras &extras) {
@@ -534,6 +551,8 @@ std::string FormatSwitchingPart(const Component &component, const std::vector<in
         return FormatRelay(static_cast<const Relay &>(component), nodes, extras);
     case ComponentType::FUSE:
         return FormatFuse(static_cast<const Fuse &>(component), nodes, extras);
+    case ComponentType::THYRISTOR:
+        return FormatThyristor(static_cast<const Thyristor &>(component), nodes, extras);
     case ComponentType::V_SWITCH:
     default:
         return FormatVoltageSwitch(static_cast<const VoltageControlledSwitch &>(component), nodes, extras);
@@ -648,7 +667,8 @@ std::string WriteNetlistBody(const Circuit &circuit, const bool add_current_prob
  * gain stage of each ideal op-amp use nodes numbered after GetNodeCount(), so the circuit nodes keep their numbers.
  * Op-amp macromodels are subcircuits, written after the models. A fuse is an instance of a subcircuit written once with
  * the models, and a circuit with a fuse, in a block or not, writes
- *          ".options method=gear" once.
+ *          ".options method=gear" once. A thyristor is an instance of the imcsim_scr two-transistor subcircuit,
+ *          written once with the models too.
  */
 std::string WriteSpiceNetlist(const Circuit &circuit, const std::string_view analysis, const bool add_current_probes) {
     std::string netlist = "* imcsim netlist\n";
@@ -693,7 +713,7 @@ std::vector<std::string> GetElementNames(const Component &component) {
                 std::format("D-{}-N", name),
                 std::format("E-{}", name)};
     }
-    if (type == ComponentType::OP_AMP || type == ComponentType::FUSE) {
+    if (type == ComponentType::OP_AMP || type == ComponentType::FUSE || type == ComponentType::THYRISTOR) {
         return {std::format("X-{}", name)};
     }
     if (type == ComponentType::POTENTIOMETER) {

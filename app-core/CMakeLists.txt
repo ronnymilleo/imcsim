@@ -55,6 +55,7 @@ add_library(imcsim-core-lib
             circuit/components/subcircuit.cpp
             circuit/components/subcircuit_pin.cpp
             circuit/components/switch.cpp
+            circuit/components/thyristor.cpp
             circuit/components/transformer.cpp
             circuit/components/transmission_line.cpp
             circuit/components/vcc.cpp

@@ -226,6 +226,22 @@ Nodalys::FuseParameters ToNodalys(const FuseParameters &parameters) {
 }
 
 /**
+ * @brief   The figures of a thyristor.
+ * @param[in] parameters  Datasheet figures of the thyristor.
+ * @return  The same figures for the Nodalys device, which takes every one of them as a parameter.
+ */
+Nodalys::ThyristorParameters ToNodalys(const ThyristorParameters &parameters) {
+    return {.OnResistance = parameters.OnResistance,
+            .OnThresholdVoltage = parameters.OnThresholdVoltage,
+            .OffResistance = parameters.OffResistance,
+            .HoldingCurrent = parameters.HoldingCurrent,
+            .GateTriggerCurrent = parameters.GateTriggerCurrent,
+            .GateTriggerVoltage = parameters.GateTriggerVoltage,
+            .GateResistance = parameters.GateResistance,
+            .BreakoverVoltage = parameters.BreakoverVoltage};
+}
+
+/**
  * @brief   Combines the characteristic impedance and the delay/loss figures of a transmission line for Nodalys.
  * @param[in] impedance_ohms  Lossless characteristic impedance \f$Z_0\f$ in Ohms.
  * @param[in] parameters      Delay and optional conductor/dielectric loss figures.

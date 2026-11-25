@@ -115,13 +115,15 @@ void ThyristorDevice::Stamp(MnaSystem &sys, const std::vector<double> &x, const 
 }
 
 double ThyristorDevice::TerminalCurrent(const int terminal, const std::vector<double> &x) const {
+    const double gate_current = GateCurrent(x) + GATE_OFF_CONDUCTANCE * BranchVoltage(x, m_Gate, m_Cathode);
     switch (terminal) {
     case 0:
         return AnodeCurrent(x);
     case 1:
-        return -AnodeCurrent(x);
+        // The cathode terminal carries the anode branch and the gate branch, which both leave through it
+        return -(AnodeCurrent(x) + gate_current);
     case 2:
-        return GateCurrent(x) + GATE_OFF_CONDUCTANCE * BranchVoltage(x, m_Gate, m_Cathode);
+        return gate_current;
     default:
         return 0.0;
     }
@@ -133,17 +135,18 @@ std::complex<double> ThyristorDevice::AcTerminalCurrent(const int terminal,
                                                         const double /*omega*/) const {
     const double branch_conductance =
         m_IsConducting ? 1.0 / m_Parameters.OnResistance : 1.0 / m_Parameters.OffResistance;
+    const double gate_conductance = BranchVoltage(x_dc, m_Gate, m_Cathode) > m_Parameters.GateTriggerVoltage
+                                      ? 1.0 / m_Parameters.GateResistance + GATE_OFF_CONDUCTANCE
+                                      : GATE_OFF_CONDUCTANCE;
     switch (terminal) {
     case 0:
         return branch_conductance * AcBranchVoltage(x_ac, m_Anode, m_Cathode);
     case 1:
-        return -branch_conductance * AcBranchVoltage(x_ac, m_Anode, m_Cathode);
-    case 2: {
-        const double gate_conductance = BranchVoltage(x_dc, m_Gate, m_Cathode) > m_Parameters.GateTriggerVoltage
-                                          ? 1.0 / m_Parameters.GateResistance + GATE_OFF_CONDUCTANCE
-                                          : GATE_OFF_CONDUCTANCE;
+        // The cathode terminal carries the anode branch and the gate branch, which both leave through it
+        return -(branch_conductance * AcBranchVoltage(x_ac, m_Anode, m_Cathode)
+                 + gate_conductance * AcBranchVoltage(x_ac, m_Gate, m_Cathode));
+    case 2:
         return gate_conductance * AcBranchVoltage(x_ac, m_Gate, m_Cathode);
-    }
     default:
         return {0.0, 0.0};
     }
