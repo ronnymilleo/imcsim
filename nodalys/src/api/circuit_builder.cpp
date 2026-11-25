@@ -72,23 +72,25 @@ NodeId CircuitBuilder::AddNode() {
 /**
  * @brief   Registers an RF measurement port for S-parameter analysis.
  * @param[in] number          One-based port number.
- * @param[in] node            Circuit node where the port connects (referenced to ground).
+ * @param[in] node            Positive circuit node where the port connects.
  * @param[in] reference_ohms  Port reference impedance in Ohms.
+ * @param[in] negative_node   Reference terminal node of the port (`0` for ground).
  * @return  Reference to this builder for chaining.
  */
-CircuitBuilder &CircuitBuilder::AddPort(const int number, const NodeId node, const double reference_ohms) {
-    m_Impl->Description.TrackNode(node);
-    m_Impl->Description.Ports.push_back({number, node, reference_ohms});
+CircuitBuilder &
+CircuitBuilder::AddPort(const int number, const NodeId node, const double reference_ohms, const NodeId negative_node) {
+    m_Impl->Description.TrackNodes({node, negative_node});
+    m_Impl->Description.Ports.push_back({number, node, reference_ohms, negative_node});
     return *this;
 }
 
 /**
  * @brief   Registers an RF measurement port descriptor for S-parameter analysis.
- * @param[in] port  Port descriptor containing number, node, and reference impedance.
+ * @param[in] port  Port descriptor containing number, terminals, and reference impedance.
  * @return  Reference to this builder for chaining.
  */
 CircuitBuilder &CircuitBuilder::AddPort(const CircuitPort &port) {
-    m_Impl->Description.TrackNode(port.Node);
+    m_Impl->Description.TrackNodes({port.Node, port.NegativeNode});
     m_Impl->Description.Ports.push_back(port);
     return *this;
 }
@@ -155,6 +157,34 @@ CircuitBuilder &CircuitBuilder::AddInductor(std::string name,
         .N2 = n2,
         .Inductance = inductance_henries,
         .InitialCurrent = initial_current,
+    });
+    return *this;
+}
+
+/**
+ * @brief   Adds a uniform two-port TEM transmission line (lossless or dispersive lossy).
+ * @param[in] name    Element designator.
+ * @param[in] p1_pos  Port 1 positive terminal node.
+ * @param[in] p1_neg  Port 1 negative terminal node.
+ * @param[in] p2_pos  Port 2 positive terminal node.
+ * @param[in] p2_neg  Port 2 negative terminal node.
+ * @param[in] params  Characteristic impedance, propagation delay, and optional conductor/dielectric loss parameters.
+ * @return  Reference to this builder for chaining.
+ */
+CircuitBuilder &CircuitBuilder::AddTransmissionLine(std::string name,
+                                                    const NodeId p1_pos,
+                                                    const NodeId p1_neg,
+                                                    const NodeId p2_pos,
+                                                    const NodeId p2_neg,
+                                                    const TransmissionLineParameters &params) {
+    m_Impl->Description.TrackNodes({p1_pos, p1_neg, p2_pos, p2_neg});
+    m_Impl->Description.Elements.push_back(TransmissionLineSpec{
+        .Name = std::move(name),
+        .Port1Pos = p1_pos,
+        .Port1Neg = p1_neg,
+        .Port2Pos = p2_pos,
+        .Port2Neg = p2_neg,
+        .Params = params,
     });
     return *this;
 }

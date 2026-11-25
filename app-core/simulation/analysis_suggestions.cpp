@@ -8,6 +8,7 @@
 #include "circuit/components/clock.h"
 #include "circuit/components/op_amp.h"
 #include "circuit/components/source.h"
+#include "circuit/components/transmission_line.h"
 #include "simulation/check_harmonic_balance.h"
 #include <algorithm>
 #include <array>
@@ -92,6 +93,9 @@ std::vector<double> ListCharacteristicFrequencies(const Circuit &circuit) {
         if (entry.Part->GetType() == ComponentType::OP_AMP) {
             const auto &op_amp = static_cast<const OpAmp &>(*entry.Part);
             frequencies.push_back(op_amp.IsIdeal() ? op_amp.GetIdealBandwidth() : op_amp.GetParameters().GainBandwidth);
+        } else if (entry.Part->GetType() == ComponentType::TRANSMISSION_LINE) {
+            const auto &line = static_cast<const TransmissionLine &>(*entry.Part);
+            frequencies.push_back(line.GetQuarterWaveFrequency());
         }
     }
     return frequencies;

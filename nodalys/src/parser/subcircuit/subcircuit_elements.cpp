@@ -256,6 +256,31 @@ Result AddSwitchLine(const ElementLine &element) {
     return {};
 }
 
+Result AddTransmissionLine(const ElementLine &element) {
+    constexpr std::size_t NODES = 4;
+    if (const Result nodes = CheckNodeCount(element, NODES); !nodes) {
+        return nodes;
+    }
+    const Arguments arguments = SplitArguments(element.Tokens, FIRST_NODE_INDEX + NODES);
+    if (const Result counted = CheckPositionalCount(arguments, 0); !counted) {
+        return counted;
+    }
+    const auto parameters =
+        ParseTransmissionLineOptions(arguments, [&](const std::string_view /*key*/, const std::string_view text) {
+            return element.Scope.Evaluate(text);
+        });
+    if (!parameters) {
+        return std::unexpected(parameters.error());
+    }
+    element.GetBuilder().AddTransmissionLine(element.Name,
+                                             element.ResolveNode(0),
+                                             element.ResolveNode(1),
+                                             element.ResolveNode(2),
+                                             element.ResolveNode(3),
+                                             *parameters);
+    return {};
+}
+
 /**
  * @brief   What an element letter that the engine has no device for stands for, to say it in the message.
  */
@@ -267,8 +292,6 @@ std::string_view DescribeUnsupportedLetter(const char letter) {
         return "a MESFET";
     case 'K':
         return "coupled inductors";
-    case 'T':
-        return "a transmission line";
     case 'O':
         return "a lossy transmission line";
     case 'U':
@@ -303,6 +326,7 @@ const std::map<char, Handler> &GetHandlers() {
         {'Q', AddBjtLine},
         {'M', AddMosfetLine},
         {'S', AddSwitchLine},
+        {'T', AddTransmissionLine},
     };
     return handlers;
 }

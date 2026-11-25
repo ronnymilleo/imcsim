@@ -24,6 +24,7 @@
 #include "circuit/components/source.h"
 #include "circuit/components/switch.h"
 #include "circuit/components/transformer.h"
+#include "circuit/components/transmission_line.h"
 #include "circuit/components/voltage_controlled_switch.h"
 #include <format>
 #include <optional>
@@ -333,6 +334,16 @@ void AddTransformer(Nodalys::CircuitBuilder &builder, const EntryContext &entry)
                            transformer.GetSecondaryInductance(),
                            figures.Coupling,
                            figures.WindingResistance);
+}
+
+void AddTransmissionLine(Nodalys::CircuitBuilder &builder, const EntryContext &entry) {
+    const auto &line = static_cast<const TransmissionLine &>(entry.Part);
+    builder.AddTransmissionLine(entry.Name,
+                                entry.Nodes[0],
+                                entry.Nodes[1],
+                                entry.Nodes[2],
+                                entry.Nodes[3],
+                                ToNodalys(line.GetValue(), line.GetParameters()));
 }
 
 void AddOpAmp(Nodalys::CircuitBuilder &builder, const EntryContext &entry) {

@@ -113,7 +113,8 @@ std::vector<EditorCommand> HandleKeys(const SelectionInput &input) {
     if (enter && input.Shown.GetSelectedElement() != nullptr && !ImGui::IsAnyItemActive()) {
         input.Popover.Open();
     }
-    if (ImGui::IsKeyPressed(ImGuiKey_Delete)) {
+    // On macOS compact keyboards the key labeled Delete sends Backspace
+    if (ImGui::IsKeyPressed(ImGuiKey_Delete) || ImGui::IsKeyPressed(ImGuiKey_Backspace)) {
         commands.push_back(EditorCommand::DELETE_SELECTION);
     }
     if (ImGui::IsKeyPressed(ImGuiKey_Escape) && !input.WasPopupOpenLastFrame) {

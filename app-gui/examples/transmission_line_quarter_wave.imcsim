@@ -1,0 +1,156 @@
+{
+  "elements": [
+    {
+      "net": "P1",
+      "port": {
+        "number": 1,
+        "z0": 50.0
+      },
+      "rotation": 0,
+      "type": "Pin",
+      "x": 5,
+      "y": 4
+    },
+    {
+      "name": "TL1",
+      "parameters": {
+        "dc_conductance": 0.0,
+        "dc_resistance": 0.0,
+        "delay": 1e-09,
+        "loss_tangent": 0.0,
+        "reference_frequency": 1000000000.0,
+        "skin_resistance": 0.0
+      },
+      "rotation": 0,
+      "type": "TransmissionLine",
+      "value": 100.0,
+      "x": 9,
+      "y": 5
+    },
+    {
+      "name": "RL",
+      "rotation": 90,
+      "type": "Resistor",
+      "value": 200.0,
+      "x": 14,
+      "y": 7
+    },
+    {
+      "rotation": 0,
+      "type": "Ground",
+      "x": 11,
+      "y": 10
+    }
+  ],
+  "format": "imcsim-schematic",
+  "measurements": {
+    "currents": [],
+    "voltages": [
+      [
+        5,
+        4
+      ],
+      [
+        11,
+        4
+      ]
+    ]
+  },
+  "simulation": {
+    "analysis": "s_parameters",
+    "s_parameters": {
+      "linear_points": 100,
+      "logarithmic": false,
+      "points_per_decade": 100,
+      "start": 10000000.0,
+      "stop": 1000000000.0
+    },
+    "transient": {
+      "step": 5e-11,
+      "stop": 5e-09
+    }
+  },
+  "version": 1,
+  "wires": [
+    {
+      "end": [
+        7,
+        4
+      ],
+      "start": [
+        5,
+        4
+      ]
+    },
+    {
+      "end": [
+        14,
+        4
+      ],
+      "start": [
+        11,
+        4
+      ]
+    },
+    {
+      "end": [
+        14,
+        5
+      ],
+      "start": [
+        14,
+        4
+      ]
+    },
+    {
+      "end": [
+        7,
+        9
+      ],
+      "start": [
+        7,
+        6
+      ]
+    },
+    {
+      "end": [
+        11,
+        9
+      ],
+      "start": [
+        11,
+        6
+      ]
+    },
+    {
+      "end": [
+        11,
+        9
+      ],
+      "start": [
+        7,
+        9
+      ]
+    },
+    {
+      "end": [
+        14,
+        9
+      ],
+      "start": [
+        11,
+        9
+      ]
+    },
+    {
+      "end": [
+        11,
+        10
+      ],
+      "start": [
+        11,
+        9
+      ]
+    }
+  ]
+}

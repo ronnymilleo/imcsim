@@ -8,6 +8,7 @@
 #include "parser/netlist/netlist_element_devices.h"
 #include "parser/netlist/netlist_element_sources.h"
 #include "parser/subcircuit/subcircuit_lines.h"
+#include "parser/syntax/element_arguments.h"
 #include "parser/syntax/spice_text.h"
 #include "text/spice_number.h"
 
@@ -108,6 +109,42 @@ ElementResult ReadInductor(DeckContext &context, const DeckLine &line) {
 }
 
 /**
+ * @brief   T<name> <p1+> <p1-> <p2+> <p2-> Z0=<ohms> (TD=<sec> | F=<hz> [NL=<wavelengths>])
+ *          [RDC=<ohms>] [RSKIN=<ohms>] [GDC=<siemens>] [TAND=<val>] [FREF=<hz>].
+ */
+ElementResult ReadTransmissionLine(DeckContext &context, const DeckLine &line) {
+    constexpr std::size_t OPTION_START = 5;
+    const std::vector<std::string> &tokens = line.Tokens;
+    if (tokens.size() < OPTION_START) {
+        return std::unexpected(std::format("Malformed transmission line: '{}'", line.Text));
+    }
+    const Arguments args = SplitArguments(tokens, OPTION_START);
+    if (!args.Positional.empty()) {
+        return std::unexpected(
+            std::format("Unexpected argument '{}' on transmission line '{}'", args.Positional.front(), tokens.front()));
+    }
+    const auto params = ParseTransmissionLineOptions(
+        args,
+        [&](const std::string_view key, const std::string_view text) -> std::expected<double, std::string> {
+            const std::optional<double> val = ParseSpiceNumber(text);
+            if (!val) {
+                return std::unexpected(std::format("invalid {} value '{}'", key, text));
+            }
+            return *val;
+        });
+    if (!params) {
+        return std::unexpected(std::format("{}: {}", tokens.front(), params.error()));
+    }
+    context.Builder.AddTransmissionLine(tokens.front(),
+                                        context.Nodes.Resolve(tokens[1]),
+                                        context.Nodes.Resolve(tokens[2]),
+                                        context.Nodes.Resolve(tokens[3]),
+                                        context.Nodes.Resolve(tokens[4]),
+                                        *params);
+    return {};
+}
+
+/**
  * @brief   X lines are placed before the other lines are read, since the directives may name their nodes.
  */
 ElementResult SkipInstance(DeckContext & /*context*/, const DeckLine & /*line*/) {
@@ -164,6 +201,7 @@ const ElementReader *FindElementReader(const DeckLine &line) {
         {'Q', ListThreeNodes, ReadBjt},
         {'M', ListFourNodes, ReadMosfet},
         {'S', ListFourNodes, ReadSwitch},
+        {'T', ListFourNodes, ReadTransmissionLine},
         {'U', ListGateNodes, ReadLogicGate},
         {'X', ListInstanceNodes, SkipInstance},
     });

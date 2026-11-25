@@ -225,4 +225,21 @@ Nodalys::FuseParameters ToNodalys(const FuseParameters &parameters) {
             .BlownResistance = parameters.BlownResistance};
 }
 
+/**
+ * @brief   Combines the characteristic impedance and the delay/loss figures of a transmission line for Nodalys.
+ * @param[in] impedance_ohms  Lossless characteristic impedance \f$Z_0\f$ in Ohms.
+ * @param[in] parameters      Delay and optional conductor/dielectric loss figures.
+ * @return  Equivalent Nodalys transmission line parameters.
+ */
+Nodalys::TransmissionLineParameters ToNodalys(const double impedance_ohms,
+                                              const TransmissionLineParameters &parameters) {
+    return {.ImpedanceOhms = impedance_ohms,
+            .DelaySeconds = parameters.Delay,
+            .DcResistanceOhms = parameters.DcResistance,
+            .SkinResistanceOhms = parameters.SkinResistance,
+            .DcConductanceSiemens = parameters.DcConductance,
+            .LossTangent = parameters.LossTangent,
+            .ReferenceFrequencyHz = parameters.ReferenceFrequency};
+}
+
 } // namespace Core

@@ -47,6 +47,7 @@ add_library(nodalys STATIC
     src/devices/passive/passive_devices.cpp
     src/devices/passive/smooth_logic.cpp
     src/devices/passive/switch_device.cpp
+    src/devices/passive/transmission_line_device.cpp
     src/devices/semiconductors/bjt_device.cpp
     src/devices/semiconductors/diode_device.cpp
     src/devices/semiconductors/mosfet_device.cpp

@@ -17,6 +17,7 @@ using Core::ComponentType;
 constexpr auto RESISTOR = std::to_array({ComponentType::RESISTOR});
 constexpr auto CAPACITOR = std::to_array({ComponentType::CAPACITOR});
 constexpr auto INDUCTOR = std::to_array({ComponentType::INDUCTOR});
+constexpr auto TRANSMISSION_LINE = std::to_array({ComponentType::TRANSMISSION_LINE});
 constexpr auto GROUND = std::to_array({ComponentType::GROUND});
 constexpr auto OP_AMP = std::to_array({ComponentType::OP_AMP});
 
@@ -61,6 +62,7 @@ const auto PASSIVE_SECTION = std::to_array<RailEntry>({
     {.Name = "Resistor", .Parts = RESISTOR},
     {.Name = "Capacitor", .Parts = CAPACITOR},
     {.Name = "Inductor", .Parts = INDUCTOR},
+    {.Name = "Transmission line", .Parts = TRANSMISSION_LINE},
 });
 const auto SOURCE_SECTION = std::to_array<RailEntry>({
     {.Name = "Ground", .Parts = GROUND},

@@ -13,6 +13,7 @@
 #include "circuit/components/relay.h"
 #include "circuit/components/seven_segment.h"
 #include "circuit/components/transformer.h"
+#include "circuit/components/transmission_line.h"
 #include "circuit/components/voltage_controlled_switch.h"
 #include "nlohmann/json.hpp"
 #include "schematic/file_json.h"
@@ -51,6 +52,15 @@ constexpr auto TRANSFORMER_KEYS = std::to_array<ParameterKey<Core::TransformerPa
     {"turns_ratio", &Core::TransformerParameters::TurnsRatio},
     {"coupling", &Core::TransformerParameters::Coupling},
     {"winding_resistance", &Core::TransformerParameters::WindingResistance},
+});
+
+constexpr auto TRANSMISSION_LINE_KEYS = std::to_array<ParameterKey<Core::TransmissionLineParameters>>({
+    {"delay", &Core::TransmissionLineParameters::Delay},
+    {"dc_resistance", &Core::TransmissionLineParameters::DcResistance},
+    {"skin_resistance", &Core::TransmissionLineParameters::SkinResistance},
+    {"dc_conductance", &Core::TransmissionLineParameters::DcConductance},
+    {"loss_tangent", &Core::TransmissionLineParameters::LossTangent},
+    {"reference_frequency", &Core::TransmissionLineParameters::ReferenceFrequency},
 });
 
 constexpr auto LOGIC_KEYS = std::to_array<ParameterKey<Core::LogicParameters>>({
@@ -181,6 +191,7 @@ constexpr auto FIGURE_CODECS = std::to_array<FigureCodec>({
     MakeFigureCodec<Core::ComponentType::RELAY, Core::Relay, RELAY_KEYS>(),
     MakeFigureCodec<Core::ComponentType::FUSE, Core::Fuse, FUSE_KEYS>(),
     MakeFigureCodec<Core::ComponentType::TRANSFORMER, Core::Transformer, TRANSFORMER_KEYS>(),
+    MakeFigureCodec<Core::ComponentType::TRANSMISSION_LINE, Core::TransmissionLine, TRANSMISSION_LINE_KEYS>(),
     {&Core::IsLogicPart, &WriteLogicFigures, &ReadLogicFigures},
     MakeFigureCodec<Core::ComponentType::CLOCK, Core::Clock, CLOCK_KEYS>(),
     MakeFigureCodec<Core::ComponentType::LOGIC_INPUT, Core::LogicInput, LOGIC_INPUT_KEYS>(),

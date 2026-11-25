@@ -380,6 +380,8 @@ TEST_CASE("A line with a value, a node, a model or an option that cannot be read
         "S1 IN OUT IN 0 NOMODEL",
         "S1 IN OUT IN 0 SMOD ON",
         "S1 IN OUT IN",
+        "T1 IN 0 OUT 0 Z0=50",
+        "T1 IN 0 OUT",
     };
     for (const std::string &line : lines) {
         CAPTURE(line);

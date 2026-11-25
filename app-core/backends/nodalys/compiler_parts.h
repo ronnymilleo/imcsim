@@ -27,6 +27,7 @@ AddSemiconductor(Nodalys::CircuitBuilder &builder, const Circuit &top_circuit, c
 [[nodiscard]] std::expected<void, std::string> AddSwitchingPart(Nodalys::CircuitBuilder &builder,
                                                                 const EntryContext &entry);
 void AddTransformer(Nodalys::CircuitBuilder &builder, const EntryContext &entry);
+void AddTransmissionLine(Nodalys::CircuitBuilder &builder, const EntryContext &entry);
 void AddOpAmp(Nodalys::CircuitBuilder &builder, const EntryContext &entry);
 
 } // namespace Core

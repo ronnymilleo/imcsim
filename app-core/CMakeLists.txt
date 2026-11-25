@@ -56,6 +56,7 @@ add_library(imcsim-core-lib
             circuit/components/subcircuit_pin.cpp
             circuit/components/switch.cpp
             circuit/components/transformer.cpp
+            circuit/components/transmission_line.cpp
             circuit/components/vcc.cpp
             circuit/components/voltage_controlled_switch.cpp
             circuit/components/voltage_source.cpp

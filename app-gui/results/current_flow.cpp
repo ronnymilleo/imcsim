@@ -66,7 +66,9 @@ std::optional<double> GetProbedTerminalCurrent(const Core::Component &component,
         }
     }
     const Core::ComponentType type = component.GetType();
-    if ((type != Core::ComponentType::RELAY && type != Core::ComponentType::TRANSFORMER) || terminal % 2 == 0) {
+    if ((type != Core::ComponentType::RELAY && type != Core::ComponentType::TRANSFORMER
+         && type != Core::ComponentType::TRANSMISSION_LINE)
+        || terminal % 2 == 0) {
         return std::nullopt;
     }
     for (std::size_t index = 0; index < names.size(); ++index) {

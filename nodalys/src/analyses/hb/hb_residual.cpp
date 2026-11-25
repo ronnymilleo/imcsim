@@ -18,6 +18,51 @@ namespace {
 /// Weight of a branch current in the norm of the residual, so amperes do not drown the volts.
 constexpr double BRANCH_ROW_WEIGHT = 1e-3;
 
+/// Context passed to `FrequencyDevice::StampFrequencyDelta` when accumulating harmonic `k` into the HB residual.
+struct HbResidualFreqContext {
+    const HbWorkspace &Ws;
+    const std::vector<double> &XHb;
+    HarmonicResidual &Residual;
+    int Harmonic = 1;
+};
+
+/// Context passed to `FrequencyDevice::StampFrequencyDelta` when stamping harmonic `k` into the HB Jacobian.
+struct HbJacobianFreqContext {
+    const HbWorkspace &Ws;
+    DenseMatrix &Jacobian;
+    int Harmonic = 1;
+};
+
+void ApplyHbResidualDelta(const int r, const int col, const std::complex<double> delta, void *raw_context) {
+    auto &ctx = *static_cast<HbResidualFreqContext *>(raw_context);
+    const std::size_t rc = ctx.Ws.Index(r, 2 * ctx.Harmonic - 1);
+    const std::size_t rs = ctx.Ws.Index(r, 2 * ctx.Harmonic);
+    const double xa = ctx.XHb[ctx.Ws.Index(col, 2 * ctx.Harmonic - 1)];
+    const double xb = ctx.XHb[ctx.Ws.Index(col, 2 * ctx.Harmonic)];
+    const double g = delta.real();
+    const double b = delta.imag();
+    const double y_cos = g * xa + b * xb;
+    const double y_sin = -b * xa + g * xb;
+    ctx.Residual.Values[rc] += y_cos;
+    ctx.Residual.Values[rs] += y_sin;
+    ctx.Residual.RowScale[rc] = std::max(ctx.Residual.RowScale[rc], std::abs(g * xa) + std::abs(b * xb));
+    ctx.Residual.RowScale[rs] = std::max(ctx.Residual.RowScale[rs], std::abs(b * xa) + std::abs(g * xb));
+}
+
+void ApplyHbJacobianDelta(const int r, const int col, const std::complex<double> delta, void *raw_context) {
+    auto &ctx = *static_cast<HbJacobianFreqContext *>(raw_context);
+    const std::size_t rc = ctx.Ws.Index(r, 2 * ctx.Harmonic - 1);
+    const std::size_t rs = ctx.Ws.Index(r, 2 * ctx.Harmonic);
+    const std::size_t cc = ctx.Ws.Index(col, 2 * ctx.Harmonic - 1);
+    const std::size_t cs = ctx.Ws.Index(col, 2 * ctx.Harmonic);
+    const double g = delta.real();
+    const double b = delta.imag();
+    ctx.Jacobian.Add(rc, cc, g);
+    ctx.Jacobian.Add(rc, cs, b);
+    ctx.Jacobian.Add(rs, cc, -b);
+    ctx.Jacobian.Add(rs, cs, g);
+}
+
 /**
  * @brief   Adds the linear contribution of one matrix position `(r, col)` to the harmonic residual.
  */
@@ -103,6 +148,17 @@ void AddLinearResidual(const HbWorkspace &ws,
             AddLinearResidualEntry(ws, x_hb, r, col, 0.0, c_val, residual);
         }
     });
+    const auto &freq_stamps = ws.CLin.FrequencyStamps();
+    if (!freq_stamps.empty()) {
+        for (int k = 1; k <= ws.Harmonics; ++k) {
+            HbResidualFreqContext ctx{.Ws = ws, .XHb = x_hb, .Residual = residual, .Harmonic = k};
+            const ComplexStamper stamper{.Apply = ApplyHbResidualDelta, .Context = &ctx};
+            const double kw = static_cast<double>(k) * ws.Omega0;
+            for (const FrequencyStamp &stamp : freq_stamps) {
+                stamp.Apply(stamper, kw);
+            }
+        }
+    }
 }
 
 /**
@@ -141,6 +197,17 @@ void StampLinearJacobian(const HbWorkspace &ws, const double gmin, DenseMatrix &
             jacobian.Add(ws.Index(r, 2 * k), ws.Index(col, 2 * k - 1), -kw_c);
         }
     });
+    const auto &freq_stamps = ws.CLin.FrequencyStamps();
+    if (!freq_stamps.empty()) {
+        for (int k = 1; k <= ws.Harmonics; ++k) {
+            HbJacobianFreqContext ctx{.Ws = ws, .Jacobian = jacobian, .Harmonic = k};
+            const ComplexStamper stamper{.Apply = ApplyHbJacobianDelta, .Context = &ctx};
+            const double kw = static_cast<double>(k) * ws.Omega0;
+            for (const FrequencyStamp &stamp : freq_stamps) {
+                stamp.Apply(stamper, kw);
+            }
+        }
+    }
 }
 
 /**

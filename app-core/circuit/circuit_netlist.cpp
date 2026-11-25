@@ -25,6 +25,7 @@
 #include "circuit/components/subcircuit.h"
 #include "circuit/components/switch.h"
 #include "circuit/components/transformer.h"
+#include "circuit/components/transmission_line.h"
 #include "circuit/components/voltage_controlled_switch.h"
 #include "circuit/library_model.h"
 #include "circuit/netlist_logic.h"
@@ -436,6 +437,37 @@ std::string FormatTransformer(const Transformer &transformer, const std::vector<
 }
 
 /**
+ * @brief   A two-port TEM transmission line card read natively by Nodalys, keeping optional loss parameters omitted
+ *          while lossless so standard SPICE readers recognize the `Z0`/`TD` form.
+ */
+std::string FormatTransmissionLine(const TransmissionLine &line, const std::vector<int> &nodes) {
+    const TransmissionLineParameters &figures = line.GetParameters();
+    std::string text = std::format("{} {} {} {} {} Z0={} TD={}",
+                                   line.GetName(),
+                                   nodes[0],
+                                   nodes[1],
+                                   nodes[2],
+                                   nodes[3],
+                                   FormatSpiceValue(line.GetValue()),
+                                   FormatSpiceValue(figures.Delay));
+    if (figures.DcResistance > 0.0) {
+        text += std::format(" RDC={}", FormatSpiceValue(figures.DcResistance));
+    }
+    if (figures.SkinResistance > 0.0) {
+        text += std::format(" RSKIN={} FREF={}",
+                            FormatSpiceValue(figures.SkinResistance),
+                            FormatSpiceValue(figures.ReferenceFrequency));
+    }
+    if (figures.DcConductance > 0.0) {
+        text += std::format(" GDC={}", FormatSpiceValue(figures.DcConductance));
+    }
+    if (figures.LossTangent > 0.0) {
+        text += std::format(" TAND={}", FormatSpiceValue(figures.LossTangent));
+    }
+    return text + "\n";
+}
+
+/**
  * @brief   Resistors, reactive parts, potentiometers and switches, which write a plain value or a fixed resistance.
  */
 std::string FormatPassivePart(const Component &component, const std::vector<int> &nodes) {
@@ -538,6 +570,8 @@ FormatPart(const Circuit &circuit, const Component &component, const std::vector
         return FormatSwitchingPart(component, nodes, extras);
     case ComponentFamily::TRANSFORMER:
         return FormatTransformer(static_cast<const Transformer &>(component), nodes, extras);
+    case ComponentFamily::TRANSMISSION_LINE:
+        return FormatTransmissionLine(static_cast<const TransmissionLine &>(component), nodes);
     case ComponentFamily::AMPLIFIER:
         return FormatOpAmpPart(static_cast<const OpAmp &>(component), nodes, extras);
     case ComponentFamily::BLOCK:

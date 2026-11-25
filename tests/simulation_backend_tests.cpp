@@ -365,8 +365,9 @@ TEST_CASE("ngspice is the backend until another one is set, and runs every analy
     const Core::BackendCapabilities &capabilities = backend.GetCapabilities();
     CHECK(capabilities.Analyses.size() == 9);
     CHECK_FALSE(capabilities.Analyses.contains(Core::AnalysisKind::HARMONIC_BALANCE));
+    CHECK(capabilities.UnsupportedParts.contains(Core::ComponentType::TRANSMISSION_LINE));
     // Logic parts are refused only when the digital models are missing, whatever the system ngspice has
-    CHECK(capabilities.UnsupportedParts.empty() == Core::AreDigitalModelsAvailable());
+    CHECK(capabilities.UnsupportedParts.contains(Core::ComponentType::NAND) == !Core::AreDigitalModelsAvailable());
     // ngspice cannot recover from a sensitivity analysis of logic parts, with its digital models or without
     CHECK(Core::FindUnsupported(backend, {Core::ComponentType::NAND}, Core::AnalysisKind::SENSITIVITY).has_value());
     CHECK_FALSE(

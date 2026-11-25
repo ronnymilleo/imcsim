@@ -322,6 +322,14 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .Family = ComponentFamily::TRANSFORMER,
     },
     {
+        .Type = ComponentType::TRANSMISSION_LINE,
+        .TypeName = "TransmissionLine",
+        .NamePrefix = "TL",
+        .Unit = "Ohm",
+        .AcceptedValues = ValueRule::POSITIVE,
+        .Family = ComponentFamily::TRANSMISSION_LINE,
+    },
+    {
         .Type = ComponentType::AND,
         .TypeName = "And",
         .NamePrefix = "U",

@@ -63,6 +63,9 @@ std::vector<CurrentProbe> GetCurrentProbes(const Component &component) {
     if (type == ComponentType::TRANSFORMER) {
         return {{0, "P"}, {2, "S"}};
     }
+    if (type == ComponentType::TRANSMISSION_LINE) {
+        return {{0, "P1"}, {2, "P2"}};
+    }
     if (IsBJT(component.GetType())) {
         return {{0, "C"}, {1, "B"}, {2, "E"}};
     }

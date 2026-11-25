@@ -207,6 +207,9 @@ void AssembleLinearAndExcitation(HbWorkspace &ws, const PartitionedCircuit &part
     for (Device *device : partitioned.LinearDevices) {
         device->Stamp(ws.GLin, zero_x, TimeContext{});
         device->StampAc(ws.CLin, zero_x);
+        if (const FrequencyDevice *frequency_device = device->AsFrequency()) {
+            ws.CLin.AddFrequencyStamp(frequency_device->MakeStamp());
+        }
     }
 
     // Sample the independent sources' RHS over one steady-state period [0, T0) and transform to B
