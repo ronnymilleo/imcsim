@@ -113,7 +113,8 @@ A matrix is taken as singular when a pivot of its Gauss-Jordan inversion is belo
 
 ### 1.6 Ports and Sweeps
 
-- **One port** gives $S_{11}$ directly, and its $Z$ and $Y$ are the impedance and admittance of the load against the ground. A circuit with no port is refused.
+- **Ground-referenced and differential ports:** `CircuitPort` carries both `Node` ($n_k^+$) and `NegativeNode` ($n_k^-$, defaulting to ground `0`), exposed through `CircuitBuilder::AddPort(number, node, reference_ohms, negative_node)` and netlist `P<name> n+ n- z0=50` (or `V`/`I` sources with `portnum`). The Norton termination $G_k$ and unit-wave source $I_{s,j} = 2\sqrt{G_j}$ are stamped differentially between $n_k^+$ and $n_k^-$, and $S_{ij} = (V_{n_i^+} - V_{n_i^-})\sqrt{G_i} - \delta_{ij}$. Schematic pin markers in `imcsim` remain ground-referenced (`NegativeNode = 0`).
+- **One port** gives $S_{11}$ directly, and its $Z$ and $Y$ are the impedance and admittance of the load against the port's return node. A circuit with no port is refused.
 - Ports may be listed in any order in the netlist or the circuit; the matrix follows their numbers. The numbers must run from 1 to $N$ with no gap and no repeat: the matrix, the Touchstone file and the Output tab index the ports by number, so a gap would leave a row with no port.
 - A linear sweep of 2 points gives both frequencies (start and stop), and of 1 point only the start.
 - Each wrong setting is reported in words, with the same text as the checks that imcsim runs before any engine (`tests/s_parameters_tests.cpp` keeps the two in step):

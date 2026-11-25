@@ -27,8 +27,8 @@ elements, so the results are those of ngspice with the models below. Some things
   of each element at the DC operating point. imcsim lists the value of resistors, capacitors, inductors, sources and
   supply rails, the gain of controlled sources, the two halves of a potentiometer together (the sum of their normalized
   sensitivities, which is the sensitivity to its total resistance), and for a block its most influential element.
-  Parts that are several elements in the netlist, such as op-amps, fuses, relays and transformers, and parts with no
-  value, such as switches, are not listed. ngspice also reports model parameters of diodes and transistors, but most
+  Parts that are several elements in the netlist, such as op-amps, fuses, relays and transformers, distributed
+  transmission lines, and parts with no value, such as switches, are not listed. ngspice also reports model parameters of diodes and transistors, but most
   read the same meaningless number or nan, so they are left out. Logic parts are refused, since ngspice cannot recover
   from a sensitivity analysis that holds them. The AC form of ngspice's `.sens` is not used: it leaves the small-signal
   conductance of forward-biased diodes and transistors out of it, and gives a wrong current for a resistor, so it is
@@ -103,12 +103,13 @@ in these points:
   the seed of the transient settings repeats the whole run, white and 1/f noise included; the values differ from those
   of ngspice, which draws its own.
 - A block imported from a library, which imcsim keeps as SPICE text, runs on Nodalys as on ngspice: the engine reads
-  its elements (R, C, L, V, I, E, G, H, F, B, D, Q, M, S and nested blocks), `.param` lines, `{expressions}`, `.model`
+  its elements (R, C, L, V, I, E, G, H, F, B, D, Q, M, S, T and nested blocks), `.param` lines, `{expressions}`, `.model`
   cards and nested `.subckt` definitions (see [`nodalys/subcircuit_text.md`](nodalys/subcircuit_text.md)). What it holds
   that Nodalys cannot simulate (a JFET, a `.func`, a model of a type or level it lacks) is refused
   with the line, before the run, and a model parameter its devices do not read is named in a message of the run.
   A MOSFET model of a level other than 1 is refused with the reason, and the harmonic balance also refuses
   voltage-controlled switches and relays.
+- A transmission line (`TL`) is simulated natively on Nodalys only; see Transmission lines below.
 - The transient lands a time point on every corner of a source waveform (each edge of a pulse or clock, each point of
   a piecewise linear source, the delays of the exponential and AM sources) and keeps it in the results, so a pulse
   narrower than the time step still shows; ngspice does the same with its breakpoints.
@@ -260,6 +261,45 @@ ones, move together.
 - There is no core: no saturation, hysteresis, core loss, capacitance between windings or isolation rating. The
   magnetizing current is that of the primary inductance, so a small value draws a large no-load current.
 - A DC source across a primary is only limited by the winding resistance, since an inductor passes DC.
+
+## Transmission lines
+
+A transmission line (`TL1`, `TL2`...) is a two-port distributed line between port 1 (`1+`, `1-` on the left) and port 2
+(`2+`, `2-` on the right), simulated natively by **Nodalys** (`ngspice` refuses the part; switch to Nodalys in
+Edit > Preferences > Simulation). Its main value is the lossless characteristic impedance `Z0` (50 Ohm by default), and
+its properties hold the electrical delay and optional frequency-dependent losses:
+
+| Parameter | Meaning | Default |
+|---|---|---|
+| `Z0` | nominal lossless characteristic impedance | 50 Ohm |
+| `Delay` (`Td`) | one-way propagation delay (`L_tot = Z0 * Td`, `C_tot = Td / Z0`) | 1 ns |
+| `DC R` (`R_DC`) | total series DC loop resistance along the line | 0 Ohm |
+| `Skin R` (`R_skin`) | additional conductor skin-effect resistance at `Ref freq`, scaling as `sqrt(f / f_ref)` | 0 Ohm |
+| `Ref freq` (`f_ref`) | reference frequency for `Skin R` | 1 GHz |
+| `DC G` (`G_DC`) | total shunt DC leakage conductance between the conductors | 0 S |
+| `Loss tangent` (`tan delta`) | dielectric loss tangent, giving `G_diel(f) = 2 * pi * f * C_tot * tan delta` | 0 |
+
+The part editor also shows the lossless quarter-wave frequency `1 / (4 * Td)` (250 MHz at 1 ns) as a read-only line,
+and `Suggest` on an AC sweep extends the stop frequency past it. Currents are reported into the positive pin of each
+port as `TL1.P1` and `TL1.P2` (with the return pins `1-` and `2-` carrying the opposite current of their port).
+
+- **Lossless lines** (`DC R`, `Skin R`, `DC G` and `Loss tangent` all 0) run in every analysis except Pole-Zero: at DC
+  they pass voltage and current straight through (`V1 = V2`, `I1 + I2 = 0`); in AC, S-parameters, AC sensitivity, noise
+  (adding 0 thermal noise) and harmonic balance they follow the exact telegrapher equations without singularities at
+  quarter-, half- or full-wavelength resonances; and in **transient** they propagate waves and reflections exactly by
+  Bergeron's method of characteristics (`V1(t) - Z0 * I1(t) = V2(t - Td) + Z0 * I2(t - Td)`), scheduling arrival
+  breakpoints `Td` after source corners so fast edges are preserved.
+- **Lossy or dispersive lines** (any loss parameter above 0) include conductor skin effect `sqrt(f)` and dielectric loss
+  tangent `f` across **Operating Point, DC Sweep, AC Sweep, Transfer Function, S-Parameters, Noise** (exact passive
+  two-port Bosma thermal noise), **AC Sensitivity** and **Harmonic Balance** (at every harmonic `k * f0`, with nonlinear
+  parts attached). **Transient refuses a lossy line** before the run with a clear message: causal time-domain
+  dispersion requires impulse-response convolution rather than Bergeron's lossless delay equations, so set the four loss
+  fields to 0 for time-domain reflections or use AC, S-parameters or Harmonic Balance for dispersive lines.
+- **Pole-Zero refuses every transmission line**, lossless or lossy, because a distributed delay element has infinitely
+  many poles and zeros rather than a finite rational transfer function.
+- Inside a block kept as SPICE text (or a netlist fed to the `nodalys` CLI), `T` lines are read with `Z0=` (or `ZO=`)
+  and either `TD=` or `F=` with `NL=` (`TD = NL / F`, `NL` defaulting to `0.25`), plus optional `RDC=`, `RSKIN=`,
+  `GDC=`, `TAND=` and `FREF=` (see [`nodalys/transmission_line.md`](nodalys/transmission_line.md)).
 
 ## Logic gates and flip-flops
 

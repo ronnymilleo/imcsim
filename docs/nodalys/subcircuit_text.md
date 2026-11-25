@@ -40,7 +40,7 @@ The compiler of `imcsim` ([`compiler.cpp`](../../app-core/backends/nodalys/compi
 | :--- | :--- |
 | Ports | Each port is the node the instance connects it to. Names are read without regard to case. |
 | Internal nodes | Private to the instance: a name no port maps gets a new node of its own, so two instances never share one. `0` and `gnd` are the ground of the circuit. |
-| Elements | `R`, `C`, `L` (value, `IC=`), `V` and `I` (a DC value, an `AC` magnitude and phase, and any waveform: `PULSE`, `SIN`, `EXP`, `PWL`, `SFFM`, `AM`, `TRNOISE`, `TRRANDOM`), `E` and `G` (gain, or `VALUE={expression}`), `H` and `F` (a gain, from a voltage source of the same block), `B` (`V=` or `I=` with an expression), `D` and `Q` (an area after the model or as `AREA=`, which scales the currents and capacitances up and the resistances down), `M` (`L=`, `W=`), `S` and `X`. |
+| Elements | `R`, `C`, `L` (value, `IC=`), `V` and `I` (a DC value, an `AC` magnitude and phase, and any waveform: `PULSE`, `SIN`, `EXP`, `PWL`, `SFFM`, `AM`, `TRNOISE`, `TRRANDOM`), `E` and `G` (gain, or `VALUE={expression}`), `H` and `F` (a gain, from a voltage source of the same block), `B` (`V=` or `I=` with an expression), `D` and `Q` (an area after the model or as `AREA=`, which scales the currents and capacitances up and the resistances down), `M` (`L=`, `W=`), `S`, `T` (`Z0=`/`ZO=`, `TD=` or `F=`/`NL=`, plus optional `RDC=`, `RSKIN=`, `GDC=`, `TAND=`, `FREF=`) and `X`. |
 | Element names | The name of the instance, a dot, and the name of the element: `X1.R1`, `X1.XLOAD.R2`. Two instances of one block never collide, and the results of `imcsim` still hold the nodes of the circuit only. |
 | Parameters | The values of the instance are the parameters of the block. A `.param` line adds names and may use the ones before it; a value the instance passes wins over a `.param` of the same name. A nested `.subckt` with `params:` takes its defaults, and an X line overrides them with `NAME=VALUE`. |
 | Values | A literal (`4.7k`, `100n`, `1meg`) or an expression of parameters, in braces, quotes or bare: `{RTOP * 3}`, `'GAIN/1Meg'`. The language is that of the behavioral source (`pi`, `e`, `temper`, the functions of [`behavioral_source.md`](./behavioral_source.md)), evaluated once. A value that reads a voltage, a current or `time` is refused. |
@@ -60,7 +60,7 @@ Each refusal names the subcircuit and the line: `Nodalys cannot simulate the sub
 
 | Content | Message says |
 | :--- | :--- |
-| `J`, `Z`, `K`, `T`, `O`, `U`, `W`, `A`, `P` and any other element letter | the letter and what it is |
+| `J`, `Z`, `K`, `O`, `U`, `W`, `A`, `P` and any other element letter | the letter and what it is |
 | A source word that is not `DC`, `AC` or a waveform | the word, and that only DC and AC values and the waveforms are simulated |
 | `POLY`, `TABLE`, `LAPLACE`, `FREQ` forms of `E`, `G`, `H`, `F` | the form |
 | An option such as `TC1=`, `AD=`, `M=` or an initial state `ON` | the option |

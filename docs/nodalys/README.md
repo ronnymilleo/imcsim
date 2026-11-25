@@ -50,6 +50,9 @@
     - Algorithms: an expansion of the text of a `.subckt` into a `CircuitBuilder` with the scopes of SPICE (parameters, `.model` cards, nested subcircuits), private nodes and element names for each instance, values as expressions of parameters, and a refusal that names the line for everything the engine cannot simulate.
     - Benchmarks: the precision rectifier example, whose op-amp is such a block, against `ngspice`.
 
+14. **[Transmission Lines (`TL` / `T` element)](./transmission_line.md)**
+    - Algorithms: voltage-scaled even/odd telegrapher MNA equations free of half-wave singularities, $\sqrt{f}$ skin-effect and $\omega C \tan\delta$ dielectric dispersion across `.ac`, `.sp`, `.noise`, `.sens ... ac`, and `.hb`, Bosma passive two-port thermal noise, and Bergeron characteristic wave propagation with corner breakpoints in `.tran`.
+
 ---
 
 ## Architecture & Modular Layout
@@ -144,6 +147,7 @@
 | Category | Components / Models | `ngspice` | `Nodalys` | Notes |
 | :--- | :--- | :---: | :---: | :--- |
 | **Passives** | Resistor, Capacitor, Inductor | ✅ | ✅ **Ready** | Exact companion models; Norton charge integration with initial conditions (`uic`). |
+| **Transmission Lines** | Lossless & Dispersive Lossy (`TL` / `T`) | Lossless `T` / `LTRA` (no skin/$\tan\delta$ HB) | ✅ **Ready** | Telegrapher model with $\sqrt{f}$ skin effect and $\tan\delta$ dielectric loss in DC/AC/SP/Noise/AC-Sens/HB, plus Bergeron transient for lossless lines ([`transmission_line.md`](./transmission_line.md)). |
 | **Sources** | DC/AC Voltage & Current, Clock, Pulse, Sine, EXP, PWL, SFFM, AM | ✅ | ✅ **Ready** | Waveform generators; the transient lands on the corners of each. |
 | **Noise & Random Sources** | `TRNOISE`, `TRRANDOM` | ✅ | ✅ **Ready** | Held at their DC level outside a transient; in a transient, white, $1/f$ and telegraph noise and the uniform, Gaussian, exponential and Poisson draws from a `std::mt19937_64` seeded by the run seed. The draws are written out in [`random_draws.cpp`](../../nodalys/src/devices/sources/random_draws.cpp) (top 53 bits for the uniform number, Box-Muller, inversion, Knuth), not taken from the standard distributions, so a seed gives the same run on Linux, Windows and macOS up to the last digit of `log` and `cos`. The values differ from those of `ngspice`. |
 | **Behavioral Sources** | `B` element | ✅ | ✅ **Ready** | An expression of node voltages, currents and time with exact derivatives for Newton, the operators and functions of `ngspice`; what `ngspice` reads and `Nodalys` does not (`limit`, the random functions, `hertz`) is refused by name before the run ([`behavioral_source.md`](./behavioral_source.md)). |
@@ -229,6 +233,7 @@ Measured on one development machine with `./out/release/bin/imcsim-tests "[.benc
 | **SPICE-Text Subcircuits** | `.subckt` / `X` | Vendor `.subckt` models kept as SPICE text, with parameters, `{expressions}`, `.model` cards, and nested blocks ([`subcircuit_text.md`](./subcircuit_text.md)). |
 | **Node Initial Conditions** | `.ic`, `.nodeset` | Node `.ic` clamped in transient startup OP ([`transient_analysis.md`](./transient_analysis.md)) and `.nodeset` two-pass pull/release ([`dc_analysis.md`](./dc_analysis.md), 1.7). |
 | **Parallel Monte Carlo, Parameter Steps & Truth Tables** | — | Independent runs dispatched across worker threads via `RunBatch` ([`parallel_runs.h`](../../app-core/simulation/parallel_runs.h)) when `SupportsConcurrentRuns` is true. |
+| **Transmission Lines & Differential Ports** | `T`, `P` | Differential `CircuitPort` (`NegativeNode`), lossless Bergeron `.tran`, and dispersive skin-effect / $\tan\delta$ telegrapher lines in `.ac`, `.sp`, `.noise`, `.sens ... ac`, and `.hb` ([`transmission_line.md`](./transmission_line.md)). |
 
 #### Phase 1 — Remaining Performance Parity
 
