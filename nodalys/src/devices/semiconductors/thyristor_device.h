@@ -33,7 +33,9 @@ namespace Nodalys {
  *          With `ThyristorParameters::IsBidirectional` the device is a TRIAC: the on-state line and the gate junction
  *          mirror about zero, so it conducts and blocks both ways and the gate fires it in all four quadrants, while
  *          the holding current, the breakover voltage, the critical dv/dt and the recovery apply to the magnitudes.
- *          The main current then carries the sign of the main-terminal voltage.
+ *          The main current then carries the sign of the main-terminal voltage: between \f$-V_0\f$ and \f$+V_0\f$
+ *          a conducting TRIAC carries only the off-state current, so its line is continuous and has one solution
+ *          for every current, which keeps Newton off a reversed one when the voltage crosses zero.
  *
  *          Terminal indices: `0 = Anode (MT2)`, `1 = Cathode (MT1)`, `2 = Gate`. The gate is referenced to the
  *          cathode (MT1), through which its current returns.
@@ -69,6 +71,12 @@ private:
         double Voltage = 0.0; ///< Main-terminal voltage at the point, in Volts.
     };
 
+    /// The straight piece of the main branch a voltage falls on, as the current \f$i = G v + I_0\f$ it carries.
+    struct BranchLine {
+        double Conductance = 0.0; ///< Slope G of the piece, in Siemens.
+        double Offset = 0.0;      ///< Current \f$I_0\f$ of the piece at zero volts, in Amperes.
+    };
+
     int m_Anode;
     int m_Cathode;
     int m_Gate;
@@ -88,6 +96,7 @@ private:
     bool m_IsDvDtFired = false;
     bool m_SavedIsDvDtFired = false;
 
+    BranchLine OnStateLine(double voltage) const;
     double MainCurrent(const std::vector<double> &x) const;
     double GateCurrent(const std::vector<double> &x) const;
     double Magnitude(double value) const;

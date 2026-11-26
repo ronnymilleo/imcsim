@@ -44,17 +44,40 @@ ThyristorDevice::ThyristorDevice(const int anode,
 }
 
 /**
+ * @brief   The piece of the on-state line a main-terminal voltage falls on.
+ * @details An SCR follows the datasheet line \f$i = (v - V_0)/R_T\f$ at every voltage; a current it cannot carry
+ *          releases it. A TRIAC mirrors that line about zero, and between the two thresholds, where a real device
+ *          has not yet overcome its junction drop, it carries only the off-state current. The three pieces meet, so
+ *          the line is continuous and rises with the voltage: one voltage for every current, whichever half the
+ *          Newton iteration starts from. Mirroring by the sign of the voltage alone instead left the line, across
+ *          zero, a second solution with a small voltage of one sign and a large current of the other.
+ * @param[in] voltage  Main-terminal voltage, from the anode (MT2) to the cathode (MT1), in Volts.
+ * @return  The conductance and the offset current of the piece.
+ */
+ThyristorDevice::BranchLine ThyristorDevice::OnStateLine(const double voltage) const {
+    const double on_conductance = 1.0 / m_Parameters.OnResistance;
+    const double off_conductance = 1.0 / m_Parameters.OffResistance;
+    const double &threshold = m_Parameters.OnThresholdVoltage;
+    if (!m_Parameters.IsBidirectional) {
+        return {.Conductance = on_conductance, .Offset = -on_conductance * threshold};
+    }
+    if (std::fabs(voltage) <= threshold) {
+        return {.Conductance = off_conductance, .Offset = 0.0};
+    }
+    // Past a threshold the line leaves the off-state current it reached there with the slope 1/RT
+    const double sign = SignOf(voltage);
+    return {.Conductance = on_conductance, .Offset = sign * threshold * (off_conductance - on_conductance)};
+}
+
+/**
  * @brief   The current from the anode (MT2) to the cathode (MT1): the on-state line while latched, the blocking
  *          conductance otherwise.
- * @details A TRIAC mirrors the on-state line about zero, so the threshold it drops carries the sign of the
- *          main-terminal voltage and the current flows either way.
  */
 double ThyristorDevice::MainCurrent(const std::vector<double> &x) const {
     const double voltage = BranchVoltage(x, m_Anode, m_Cathode);
     if (m_IsConducting) {
-        const double threshold = m_Parameters.IsBidirectional ? SignOf(voltage) * m_Parameters.OnThresholdVoltage
-                                                              : m_Parameters.OnThresholdVoltage;
-        return (voltage - threshold) / m_Parameters.OnResistance;
+        const BranchLine line = OnStateLine(voltage);
+        return line.Conductance * voltage + line.Offset;
     }
     return voltage / m_Parameters.OffResistance;
 }
@@ -179,19 +202,15 @@ void ThyristorDevice::UpdateState(const std::vector<double> &x) {
 }
 
 /**
- * @brief   Stamps the anode-cathode branch: the on-state line as a conductance with its threshold source, or the
- *          blocking conductance.
- * @details The threshold source of a TRIAC carries the sign of the main-terminal voltage, so the on-state line
- *          mirrors about zero and drops \f$V_0\f$ whichever way the current flows.
+ * @brief   Stamps the anode-cathode branch: the piece of the on-state line the iterate falls on, as a conductance
+ *          with its offset current, or the blocking conductance.
  */
 void ThyristorDevice::StampBranch(MnaSystem &sys, const std::vector<double> &x) const {
     if (m_IsConducting) {
-        const double conductance = 1.0 / m_Parameters.OnResistance;
-        StampConductance(sys, m_Anode, m_Cathode, conductance);
-        // The on-state line I = (V - V0) / RT is the conductance 1/RT less a constant V0/RT, which a source from
-        // cathode to anode supplies; a TRIAC signs that source with the main-terminal voltage
-        const double sign = m_Parameters.IsBidirectional ? SignOf(BranchVoltage(x, m_Anode, m_Cathode)) : 1.0;
-        StampCurrentSource(sys, m_Cathode, m_Anode, sign * conductance * m_Parameters.OnThresholdVoltage);
+        const BranchLine line = OnStateLine(BranchVoltage(x, m_Anode, m_Cathode));
+        StampConductance(sys, m_Anode, m_Cathode, line.Conductance);
+        // A source from cathode to anode takes its current away from the branch, so minus the offset adds it
+        StampCurrentSource(sys, m_Cathode, m_Anode, -line.Offset);
     } else {
         StampConductance(sys, m_Anode, m_Cathode, 1.0 / m_Parameters.OffResistance);
     }
