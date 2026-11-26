@@ -245,6 +245,19 @@ Nodalys::ThyristorParameters ToNodalys(const ThyristorParameters &parameters) {
 }
 
 /**
+ * @brief   The figures of a DIAC.
+ * @param[in] parameters  Datasheet figures of the DIAC.
+ * @return  The same figures for the Nodalys device.
+ */
+Nodalys::DiacParameters ToNodalys(const DiacParameters &parameters) {
+    return {.BreakoverVoltage = parameters.BreakoverVoltage,
+            .OnThresholdVoltage = parameters.OnThresholdVoltage,
+            .OnResistance = parameters.OnResistance,
+            .OffResistance = parameters.OffResistance,
+            .HoldingCurrent = parameters.HoldingCurrent};
+}
+
+/**
  * @brief   Combines the characteristic impedance and the delay/loss figures of a transmission line for Nodalys.
  * @param[in] impedance_ohms  Lossless characteristic impedance \f$Z_0\f$ in Ohms.
  * @param[in] parameters      Delay and optional conductor/dielectric loss figures.

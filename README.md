@@ -90,7 +90,7 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
 - Potentiometers, with the wiper set in the properties, and switches and push buttons that are open or closed,
   voltage-controlled switches and relays whose coil current sets when the contact closes, fuses that blow by their
   I2t and cool between overloads, thyristors (SCRs) and TRIACs that fire on gate current, latch on and release below
-  their holding current, transformers of two coupled inductors with a turns ratio, and transmission lines, lossless or
+  their holding current, DIACs that break over and trigger them, transformers of two coupled inductors with a turns ratio, and transmission lines, lossless or
   lossy, on the Nodalys engine
 - Piecewise linear sources whose points are typed in or imported from a CSV table or a WAV recording
 - Logic gates (AND, OR, NAND, NOR, XOR and XNOR with 2 to 8 inputs, NOT and a buffer) and D, JK, T and SR
@@ -128,7 +128,7 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   characteristics, a current mirror, common-emitter and class AB amplifiers, the stability of a common-emitter stage,
   the Monte Carlo spread of a bias point, an astable multivibrator started by an initial voltage, a bistable whose state
   a nodeset picks, op-amp amplifiers and their input offsets, an integrator, a Schmitt trigger and a Sallen-Key filter
-  with the part that sets its corner, an ideal transformer made of controlled sources, switching circuits, thyristor ones (a half-wave controlled rectifier, one with an inductive load and a freewheeling diode, a controlled bridge, and a TRIAC light dimmer), transmission lines (reflections on a mismatched line and a quarter-wave transformer), digital ones
+  with the part that sets its corner, an ideal transformer made of controlled sources, switching circuits, thyristor ones (a half-wave controlled rectifier, one with an inductive load and a freewheeling diode, a controlled bridge, a TRIAC light dimmer and one triggered by a DIAC), transmission lines (reflections on a mismatched line and a quarter-wave transformer), digital ones
   (gates, a truth table of the basic gates, half and full adders, an SR latch, a ripple counter, a decoder with logic
   outputs and a decade counter on a 7-segment display), and blocks: one RC filter used twice, an 8-bit counter of two
   4-bit blocks, and a precision rectifier from a vendor's op-amp and diode models
@@ -159,7 +159,7 @@ it can change at any time. The ideas below are tracked as tasks in the project's
 roughly in the order they are likely to come.
 
 - **Digital**: Verilog modules placed as parts and simulated together with the analog circuit
-- **Sources, parts and models**: power semiconductors (IGBT, GTO, DIAC and thyristor rating warnings), a calculator
+- **Sources, parts and models**: power semiconductors (IGBT, GTO and thyristor rating warnings), a calculator
   from the geometry of a line to its electrical figures, and a MOSFET body diode and higher-level MOSFET models
 - **Analyses**: loop gain and stability margins (`.stb`) on Nodalys, measurements (`.meas`) on result traces, and the
   noise figure of a two-port

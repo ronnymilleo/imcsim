@@ -80,6 +80,11 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   referenced to the cathode (MT1), since the gate current returns through it; a TRIAC fires in all four gate
   quadrants. The Switching examples drive them: a half-wave controlled rectifier, one with an inductive load and a
   freewheeling diode, a controlled bridge, and a TRIAC light dimmer (see docs/models.md).
+- **DIACs**: a DIAC, in the same group, is the gate-less trigger diode of a dimmer, MT2 on terminal 1 and MT1 on
+  terminal 2. Its properties set the breakover voltage (VBO), the on-state line it snaps back to (V0 and RT), the
+  blocking resistance and the holding current, and the label under the symbol shows VBO. It breaks over either way at
+  VBO and holds until its current falls below IH. Only Nodalys simulates it: ngspice refuses a circuit with one, with
+  the reason. The DIAC-triggered TRIAC dimmer of the Switching examples shows it.
 - **Transmission lines**: a transmission line has its own button among the passive parts of the part rail, a coaxial symbol with two
   ports: port 1 on the left (terminal 1 the center conductor, terminal 2 the shield) and port 2 on the right
   (terminals 3 and 4). Its value is the characteristic impedance Z0, and its properties set the delay and the losses
@@ -430,6 +435,7 @@ Every part with more than one terminal numbers them in the order the SPICE netli
 | Diode, Zener diode, LED | anode | cathode | |
 | Thyristor (SCR) | anode | cathode | gate |
 | TRIAC | MT2 | MT1 | gate |
+| DIAC | MT2 | MT1 | |
 | Transmission line (TL) | port 1 center, upper left | port 1 shield, lower left | port 2 center, upper right (4: port 2 shield) |
 | Voltage source | positive (+) | negative (-) | |
 | Current source | tail of its arrow | head of its arrow | |
@@ -472,6 +478,7 @@ imcsim reports currents as ngspice computes them:
   voltage-controlled switch reports the current into its first contact terminal, like a two-terminal part.
 - **Thyristors** report one current per terminal, `I(SCR1.A)`, `I(SCR1.K)` and `I(SCR1.G)` for an SCR and
   `I(TR1.MT2)`, `I(TR1.MT1)` and `I(TR1.G)` for a TRIAC, each positive into its terminal. The three add up to zero.
+- **DIACs** report one current like a two-terminal part, `I(DIAC1)`, positive from MT2 to MT1.
 - **Transmission lines** report `I(TL1.P1)` into the center of port 1 and `I(TL1.P2)` into the center of port 2,
   each positive into its terminal; the shield of each port carries the same current back.
 - **Transformers** report `I(T1.P)` into the primary + and `I(T1.S)` into the secondary +, each positive into its

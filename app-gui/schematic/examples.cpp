@@ -481,6 +481,21 @@ constexpr auto EXAMPLES = std::to_array<Example>({
         .FileName = "triac_dimmer.imcsim",
     },
     {
+        .Title = "DIAC-triggered TRIAC dimmer",
+        .Group = "Switching",
+        .Description =
+            "The classic light dimmer: a 120 V, 60 Hz line feeds a 100 Ohm lamp, and a TRIAC from the lamp to ground "
+            "switches it. R2 and C1 across the TRIAC time the firing: C1 charges through R2 behind the line, and when "
+            "V(C1) reaches the 32 V breakover of the DIAC, the DIAC snaps back to about 27 V and dumps a short pulse "
+            "of the charge into the gate, which fires the TRIAC; the DIAC releases as soon as its current falls "
+            "below 1 mA. Both parts conduct both ways, so the same happens on the negative half-cycle. Run the "
+            "transient: V(C1) ramps to the breakover and drops by the snapback at each firing, the TRIAC voltage "
+            "collapses there, and the lamp current follows the line from that angle to the next zero crossing. "
+            "Raise R2 to dim the lamp: C1 charges slower and reaches the breakover later in each half-cycle. It "
+            "runs on Nodalys: ngspice refuses the DIAC, and its TRIAC subcircuit does not block at mains voltage.",
+        .FileName = "diac_triac_dimmer.imcsim",
+    },
+    {
         .Title = "Relay driver",
         .Group = "Switching",
         .Description =

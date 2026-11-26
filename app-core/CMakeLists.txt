@@ -35,6 +35,7 @@ add_library(imcsim-core-lib
             circuit/components/component.cpp
             circuit/components/controlled_source.cpp
             circuit/components/current_source.cpp
+            circuit/components/diac.cpp
             circuit/components/diode.cpp
             circuit/components/fuse.cpp
             circuit/components/ground.cpp

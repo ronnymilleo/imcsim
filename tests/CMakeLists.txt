@@ -40,6 +40,7 @@ add_executable(imcsim-tests
             current_flow_tests.cpp
             cursor_widgets_tests.cpp
             default_backend.cpp
+            diac_tests.cpp
             displayed_state_tests.cpp
             dock_layout_tests.cpp
             editor_command_tests.cpp

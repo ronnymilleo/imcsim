@@ -8,6 +8,7 @@
 
 #include "base/value_field.h"
 #include "circuit/components/component.h"
+#include "circuit/components/diac.h"
 #include "circuit/components/fuse.h"
 #include "circuit/components/relay.h"
 #include "circuit/components/switch.h"
@@ -35,6 +36,8 @@ struct ElectromechanicalFields {
     std::array<ValueField, 4> Fuse;
     /// One per member of Core::ThyristorParameters.
     std::array<ValueField, 10> Thyristor;
+    /// One per member of Core::DiacParameters.
+    std::array<ValueField, 5> Diac;
     /// One per member of Core::TransformerParameters.
     std::array<ValueField, 3> Transformer;
     /// One per member of Core::TransmissionLineParameters.
@@ -52,6 +55,7 @@ void DrawControlledSwitch(Core::VoltageControlledSwitch &controlled,
 void DrawRelay(Core::Relay &relay, ElectromechanicalFields &fields, Schematic &schematic);
 void DrawFuse(Core::Fuse &fuse, ElectromechanicalFields &fields, Schematic &schematic);
 void DrawThyristor(Core::Thyristor &thyristor, ElectromechanicalFields &fields, Schematic &schematic);
+void DrawDiac(Core::Diac &diac, ElectromechanicalFields &fields, Schematic &schematic);
 void DrawTransformer(Core::Transformer &transformer, ElectromechanicalFields &fields, Schematic &schematic);
 void DrawTransmissionLine(Core::TransmissionLine &line, ElectromechanicalFields &fields, Schematic &schematic);
 

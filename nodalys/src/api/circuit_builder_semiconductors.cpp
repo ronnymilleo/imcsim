@@ -7,6 +7,7 @@
 
 #include "api/circuit_builder_impl.h"
 #include "compiler/circuit_description.h"
+#include <limits>
 #include <utility>
 
 namespace Nodalys {
@@ -111,6 +112,37 @@ CircuitBuilder &CircuitBuilder::AddThyristor(std::string name,
         .Cathode = cathode,
         .Gate = gate,
         .Params = params,
+    });
+    return *this;
+}
+
+/**
+ * @brief   Adds a DIAC, a gate-less trigger diode that breaks over either way and holds until its current falls.
+ * @details The device is the latching core of the TRIAC with its gate tied to MT1, so the gate never fires it: only
+ *          the breakover does, on the magnitude of the voltage. It reports one current, into MT2, as a two-terminal
+ *          part does.
+ * @param[in] name    Element designator.
+ * @param[in] mt2     Main terminal 2 node, the one the current is reported into.
+ * @param[in] mt1     Main terminal 1 node.
+ * @param[in] params  Breakover, on-state and holding figures.
+ * @return  Reference to this builder for chaining.
+ */
+CircuitBuilder &
+CircuitBuilder::AddDiac(std::string name, const NodeId mt2, const NodeId mt1, const DiacParameters &params) {
+    m_Impl->Description.TrackNodes({mt2, mt1});
+    m_Impl->Description.Elements.push_back(ThyristorSpec{
+        .Name = std::move(name),
+        .Anode = mt2,
+        .Cathode = mt1,
+        .Gate = mt1,
+        .Params = {.OnResistance = params.OnResistance,
+                   .OnThresholdVoltage = params.OnThresholdVoltage,
+                   .OffResistance = params.OffResistance,
+                   .HoldingCurrent = params.HoldingCurrent,
+                   .GateTriggerCurrent = std::numeric_limits<double>::infinity(),
+                   .BreakoverVoltage = params.BreakoverVoltage,
+                   .IsBidirectional = true},
+        .HasGate = false,
     });
     return *this;
 }

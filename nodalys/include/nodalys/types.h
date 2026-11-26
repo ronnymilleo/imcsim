@@ -328,6 +328,28 @@ struct ThyristorParameters {
 };
 
 /**
+ * @struct  DiacParameters
+ * @brief   Breakover figures of a DIAC, the gate-less bidirectional trigger diode, as a datasheet gives them.
+ * @details A DIAC blocks either way until the magnitude of its voltage reaches the breakover voltage \f$V_{BO}\f$,
+ *          then snaps back onto the on-state line \f$V = V_0 + R_T I\f$, mirrored about zero, and releases when the
+ *          magnitude of its current falls below \f$I_H\f$. The snapback a datasheet gives as \f$\Delta V\f$ is
+ *          \f$V_{BO} - V_0\f$, read at the current where the slope resistance is negligible.
+ */
+struct DiacParameters {
+    double BreakoverVoltage = 32.0;   ///< \f$V_{BO}\f$: voltage magnitude that fires the device, in Volts.
+    double OnThresholdVoltage = 27.0; ///< Threshold \f$V_0\f$ of the on-state line, in Volts.
+    double OnResistance = 10.0;       ///< Slope resistance \f$R_T\f$ of the on-state line, in Ohms.
+    double OffResistance = 1e9;       ///< Blocking resistance below the breakover, in Ohms.
+    double HoldingCurrent = 1e-3;     ///< \f$I_H\f$: current magnitude below which the device releases, in Amperes.
+
+    /**
+     * @brief   Compares two DiacParameters values for equality.
+     * @return  True when all fields match.
+     */
+    bool operator==(const DiacParameters &) const = default;
+};
+
+/**
  * @struct  TransmissionLineParameters
  * @brief   Electrical parameters of a uniform two-port TEM transmission line (lossless or dispersive lossy).
  * @details The lossless backbone is set by `ImpedanceOhms` (\f$Z_0 > 0\f$) and `DelaySeconds` (\f$T_d > 0\f$), giving

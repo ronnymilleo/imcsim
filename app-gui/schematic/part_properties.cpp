@@ -17,6 +17,27 @@
 
 namespace GUI {
 
+namespace {
+
+/// The switches that follow a voltage, the thyristors, a clock and a logic input, which have only their parameters.
+constexpr auto PARAMETER_ONLY_TYPES = std::to_array({Core::ComponentType::V_SWITCH,
+                                                     Core::ComponentType::RELAY,
+                                                     Core::ComponentType::FUSE,
+                                                     Core::ComponentType::THYRISTOR,
+                                                     Core::ComponentType::TRIAC,
+                                                     Core::ComponentType::DIAC,
+                                                     Core::ComponentType::CLOCK,
+                                                     Core::ComponentType::LOGIC_INPUT});
+
+/**
+ * @brief   Whether the part is set by its parameters alone: the types above, the logic parts and the logic displays.
+ */
+bool HasParametersOnly(const Core::ComponentType type) {
+    return std::ranges::contains(PARAMETER_ONLY_TYPES, type) || Core::IsLogicPart(type) || Core::IsLogicDisplay(type);
+}
+
+} // namespace
+
 /**
  * @brief   Parts with something to edit: a value, a model, a name, a state or parameters; ground has nothing.
  */
@@ -32,6 +53,7 @@ bool HasPropertyFields(const Core::Component &component) {
                                                        Core::ComponentType::FUSE,
                                                        Core::ComponentType::THYRISTOR,
                                                        Core::ComponentType::TRIAC,
+                                                       Core::ComponentType::DIAC,
                                                        Core::ComponentType::CLOCK,
                                                        Core::ComponentType::LOGIC_INPUT,
                                                        Core::ComponentType::LOGIC_OUTPUT,
@@ -67,15 +89,7 @@ bool ShowsValueFields(const Core::Component &component) {
         const auto &op_amp = static_cast<const Core::OpAmp &>(component);
         return op_amp.IsCustom() || op_amp.IsIdeal();
     }
-    // The switches that follow a voltage, the thyristor, the logic parts, a clock and the logic inputs and outputs
-    // have only their parameters
-    if (type == Core::ComponentType::V_SWITCH || type == Core::ComponentType::RELAY || type == Core::ComponentType::FUSE
-        || type == Core::ComponentType::THYRISTOR || type == Core::ComponentType::TRIAC || Core::IsLogicPart(type)
-        || type == Core::ComponentType::CLOCK || type == Core::ComponentType::LOGIC_INPUT
-        || Core::IsLogicDisplay(type)) {
-        return true;
-    }
-    return component.HasValue();
+    return HasParametersOnly(type) || component.HasValue();
 }
 
 /**
