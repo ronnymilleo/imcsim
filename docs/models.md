@@ -260,6 +260,12 @@ and terminal 3 the gate. The part has no value; you set the figures a datasheet 
   current returns through the cathode, so the gate drive is referenced to the cathode.
 - **Off resistance** (1 GOhm) and **forward breakover** (`VBO`, 0 = disabled): the voltage that fires it without a
   gate, which a correctly driven thyristor never reaches.
+- **Critical `dv/dt`** (0 = disabled, in V/s): a rate of rise of the anode voltage faster than this fires a blocking
+  device without a gate, as the displacement current through the junction capacitance fires a real one.
+- **Turn-off time** (`tq`, 0 = disabled): after the latch releases, the device recovers for this long; a forward
+  voltage re-applied inside the window fires it again, which is the commutation failure of a forced-commutated
+  circuit. A voltage already applied when the device releases does not re-fire it, so the natural commutation of a
+  rectifier still lands.
 
 Nodalys simulates it as one device whose state is a latch, so every figure is a parameter and the commutation is
 landed on exactly. ngspice runs the `imcsim_scr` subcircuit, a PNP and an NPN with the collector of each into the
@@ -268,7 +274,9 @@ real device. Two diodes of a vanishing drop keep the pair's base current from le
 of a reverse-biased thyristor from finding a path through it to the anode, as the junctions of a real device block.
 `RG` and `RT` are parameters of the instance; the holding current, the trigger current and the on-state threshold
 emerge from the transistors, close to the figures of Nodalys. There is no breakover on ngspice: the pair blocks
-whatever forward voltage the circuit puts on it.
+whatever forward voltage the circuit puts on it. Neither the critical `dv/dt` nor the turn-off time reach it: the
+fixed junction capacitances of the pair soften the switching but fire nothing, and it recovers its blocking as soon
+as the current releases.
 
 - **The engines agree on the rectification**: the half-wave controlled rectifier of the example, fired at 60 degrees
   into 100 Ohm, averages the same 2.2 V on both, its anode current matches within 1 %, and the bridge example
@@ -279,8 +287,13 @@ whatever forward voltage the circuit puts on it.
   by the gain through a blocked thyristor, such as its input-referred noise, which mean nothing on either engine.
 - **The latching current is not modeled separately** from the holding current: the gate sustains conduction whatever
   the anode current, and the latch holds above `IH` once it is gone.
-- There is no `dv/dt` triggering, no turn-off time `tq` (the device blocks again as soon as the current releases), no
-  reverse recovery and no temperature dependence of the holding current.
+- **The `dv/dt` firing and the `tq` recovery are Nodalys-only**, as the breakover is. Nodalys reads the rate of rise
+  from the last accepted time point to the step being solved, and a device that fires on it stays fired for the rest
+  of that step, as the displacement current drives it while the voltage moves. The recovery re-fires on a voltage
+  that rises back past the on-state threshold, so a voltage already present at the release does not re-fire it;
+  while the window runs the device has not regained its blocking, and the holding-current release waits for it to
+  close. There is no reverse recovery, no re-applied-voltage rating, and no temperature dependence of the holding
+  current.
 - Every run starts blocking, and the circuit fires it. In the small-signal analyses the state is frozen at the
   operating point; a harmonic balance and a pole-zero are refused with the reason, as they are for the hysteretic
   switch, since the roots through a blocking state are numerically meaningless.
@@ -306,9 +319,11 @@ Nodalys, and there is no breakover on ngspice.
   half-cycles to the same peaks on both engines. A circuit with a TRIAC runs on the Gear integration, as one with a
   thyristor or a fuse does. The blocking-state noise differs as it does for the SCR, and is bounded in the
   cross-validation test.
-- The same limits as the SCR apply: no separate latching current, no `dv/dt` triggering, no turn-off time `tq`, no
-  reverse recovery and no temperature dependence. Every run starts blocking, and a harmonic balance and a pole-zero
-  are refused with the reason.
+- The same figures as the SCR set it, and the critical `dv/dt` and the turn-off time apply to the magnitudes: a
+  fast voltage change of either sign fires a blocking TRIAC, and a voltage of either sign re-applied inside the
+  recovery window re-fires it, on Nodalys only as for the SCR. The other limits also apply: no separate latching
+  current, no reverse recovery and no temperature dependence. Every run starts blocking, and a harmonic balance and
+  a pole-zero are refused with the reason.
 
 ## Transformers
 A transformer is two inductors coupled by a SPICE `K` element: `L-T1p` and `L-T1s`, each behind a resistor for its

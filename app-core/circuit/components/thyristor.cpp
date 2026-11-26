@@ -49,13 +49,15 @@ void Thyristor::SetParameters(const ThyristorParameters &parameters) {
  * @brief   Checks whether a set of thyristor parameters can be simulated.
  * @param[in] parameters  Candidate parameters.
  * @return  True when every resistance is positive, the on-state line lies inside the blocking one and every current
- *          and voltage is non-negative, with a breakover of zero meaning disabled.
+ *          and voltage is non-negative, with a breakover, a critical dv/dt and a turn-off time of zero meaning
+ *          disabled.
  */
 bool Thyristor::IsValidParameters(const ThyristorParameters &parameters) {
     return parameters.OnResistance > 0.0 && parameters.OnResistance < parameters.OffResistance
         && parameters.OnThresholdVoltage >= 0.0 && parameters.HoldingCurrent > 0.0
         && parameters.GateTriggerCurrent > 0.0 && parameters.GateTriggerVoltage >= 0.0
-        && parameters.GateResistance > 0.0 && parameters.BreakoverVoltage >= 0.0;
+        && parameters.GateResistance > 0.0 && parameters.BreakoverVoltage >= 0.0 && parameters.CriticalDvDt >= 0.0
+        && parameters.TurnOffTime >= 0.0;
 }
 
 const char *GetThyristorSubcircuitName() {

@@ -75,37 +75,106 @@ double ThyristorDevice::GateCurrent(const std::vector<double> &x) const {
 }
 
 /**
- * @brief   Fires the latch on gate current or breakover, and releases it below the holding current.
- * @details While the gate keeps drawing at least the trigger current it sustains conduction whatever the main
- *          current; with the gate removed the latch holds only while the main current stays above the holding
- *          current. The latch itself is the hysteresis: once released, only a new gate pulse or breakover fires again.
- *          A TRIAC fires on gate current of either polarity and on breakover of either sign, and releases when the
- *          magnitude of the main current falls below the holding current.
+ * @brief   Reads a figure the way the device does: on the magnitude for a TRIAC, on the signed value for an SCR.
+ * @param[in] value  Voltage, current or slope to read.
+ * @return  The absolute value for a TRIAC, the value itself for an SCR.
  */
-void ThyristorDevice::UpdateState(const std::vector<double> &x) {
+double ThyristorDevice::Magnitude(const double value) const {
+    return m_Parameters.IsBidirectional ? std::fabs(value) : value;
+}
+
+/**
+ * @brief   The rate at which the main-terminal voltage rises from the last accepted point to the current iterate.
+ * @param[in] voltage  Main-terminal voltage of the iterate, in Volts.
+ * @return  The slope in Volts per second, or zero when no time has passed since the accepted point, as in a
+ *          operating point or before the first step.
+ */
+double ThyristorDevice::VoltageSlope(const double voltage) const {
+    const double elapsed = m_StampTime - m_Accepted.Time;
+    return elapsed > 0.0 ? (voltage - m_Accepted.Voltage) / elapsed : 0.0;
+}
+
+/**
+ * @brief   Reports whether the gate of the iterate sustains conduction.
+ * @param[in] x  Current Newton iterate.
+ * @return  True when the gate draws at least the trigger current, of either polarity for a TRIAC.
+ */
+bool ThyristorDevice::IsGateOn(const std::vector<double> &x) const {
+    return Magnitude(GateCurrent(x)) >= m_Parameters.GateTriggerCurrent;
+}
+
+/**
+ * @brief   Reports whether the main-terminal voltage of the iterate moves faster than the critical dv/dt.
+ * @param[in] vak  Main-terminal voltage of the iterate, in Volts.
+ * @return  True when the slope from the last accepted point reaches the critical rate, of either sign for a
+ *          TRIAC; false when the figure is disabled.
+ */
+bool ThyristorDevice::IsPastCriticalDvDt(const double vak) const {
+    return m_Parameters.CriticalDvDt > 0.0 && Magnitude(VoltageSlope(vak)) >= m_Parameters.CriticalDvDt;
+}
+
+/**
+ * @brief   Decides whether a blocking device fires at the iterate.
+ * @param[in] x              Current Newton iterate.
+ * @param[in] is_recovering  Whether the turn-off recovery window is running.
+ * @return  True on gate current, which an SCR only takes with a forward voltage, on breakover, on the dv/dt
+ *          latch of the step, or on a voltage re-applied while recovering.
+ */
+bool ThyristorDevice::ShouldFire(const std::vector<double> &x, const bool is_recovering) const {
     const ThyristorParameters &p = m_Parameters;
     const double vak = BranchVoltage(x, m_Anode, m_Cathode);
-    const double gate = GateCurrent(x);
-    if (p.IsBidirectional) {
-        if (!m_IsConducting) {
-            const bool is_gate_fired = std::fabs(gate) >= p.GateTriggerCurrent;
-            const bool is_breakover = p.BreakoverVoltage > 0.0 && std::fabs(vak) >= p.BreakoverVoltage;
-            if (is_gate_fired || is_breakover) {
-                m_IsConducting = true;
-            }
-        } else if (std::fabs(gate) < p.GateTriggerCurrent && std::fabs(MainCurrent(x)) < p.HoldingCurrent) {
+    const double blocking = Magnitude(vak);
+    const bool is_gate_fired = IsGateOn(x) && (p.IsBidirectional || vak > 0.0);
+    const bool is_breakover = p.BreakoverVoltage > 0.0 && blocking >= p.BreakoverVoltage;
+    const bool is_refired =
+        is_recovering && blocking > p.OnThresholdVoltage && Magnitude(m_Accepted.Voltage) <= p.OnThresholdVoltage;
+    return is_gate_fired || is_breakover || m_IsDvDtFired || is_refired;
+}
+
+/**
+ * @brief   Decides whether a conducting device releases at the iterate.
+ * @param[in] x              Current Newton iterate.
+ * @param[in] is_recovering  Whether the turn-off recovery window is running, which suspends the release.
+ * @return  True when the gate is gone, the main current is below the holding current, the recovery window has
+ *          closed and the dv/dt latch of the step is not sustaining conduction.
+ */
+bool ThyristorDevice::ShouldRelease(const std::vector<double> &x, const bool is_recovering) const {
+    const bool is_held = Magnitude(MainCurrent(x)) >= m_Parameters.HoldingCurrent;
+    return !IsGateOn(x) && !is_held && !is_recovering && !m_IsDvDtFired;
+}
+
+/**
+ * @brief   Fires the latch on gate current, breakover, a fast voltage rise or a re-applied voltage during the
+ *          recovery, and releases it below the holding current.
+ * @details The latch itself is the hysteresis: once released, only a new gate pulse, breakover, a rise faster
+ *          than the critical dv/dt or the recovery window fires again.
+ *
+ *          A rise faster than the critical dv/dt, read from the last accepted point to the iterate, latches for
+ *          the rest of the step: it fires a blocking device and sustains conduction like a gate drive does, so
+ *          the device cannot toggle within the step that carries the edge, and the Newton solve settles.
+ *
+ *          A release opens the recovery window for the turn-off time. While it runs, a blocking device re-fires
+ *          when the main-terminal voltage rises back past the on-state threshold from at or below it at the last
+ *          accepted point, which is the commutation failure of a forced-commutated circuit; a voltage already
+ *          above the threshold when the device releases does not re-fire it, so the natural commutation of a
+ *          rectifier still lands. While the window runs the device has not regained its blocking, so the
+ *          holding-current release is suspended until it closes.
+ * @param[in] x  Current Newton iterate.
+ */
+void ThyristorDevice::UpdateState(const std::vector<double> &x) {
+    const bool is_recovering = m_StampTime < m_RecoveryEnds;
+    if (m_IsStep && IsPastCriticalDvDt(BranchVoltage(x, m_Anode, m_Cathode))) {
+        m_IsDvDtFired = true;
+    }
+    if (m_IsConducting) {
+        if (ShouldRelease(x, is_recovering)) {
             m_IsConducting = false;
+            m_RecoveryEnds = m_StampTime + m_Parameters.TurnOffTime;
         }
         return;
     }
-    if (!m_IsConducting) {
-        const bool is_gate_fired = vak > 0.0 && gate >= p.GateTriggerCurrent;
-        const bool is_breakover = p.BreakoverVoltage > 0.0 && vak >= p.BreakoverVoltage;
-        if (is_gate_fired || is_breakover) {
-            m_IsConducting = true;
-        }
-    } else if (gate < p.GateTriggerCurrent && MainCurrent(x) < p.HoldingCurrent) {
-        m_IsConducting = false;
+    if (ShouldFire(x, is_recovering)) {
+        m_IsConducting = true;
     }
 }
 
@@ -145,12 +214,16 @@ void ThyristorDevice::StampGate(MnaSystem &sys, const std::vector<double> &x) co
 /**
  * @brief   Decides the state at the iterate and stamps the branch and the gate.
  * @details The state is worked out here, from the solution the Newton iteration stamps at, so the converged one,
- *          which it stamps last, is the one AcceptStep() keeps.
+ *          which it stamps last, is the one AcceptStep() keeps. A new time point clears the dv/dt latch, which
+ *          holds only for the step whose voltage edge fired it.
  * @param[in,out] sys   MNA system to stamp into.
  * @param[in]     x     Current Newton iterate.
  * @param[in]     time  Analysis time context.
  */
 void ThyristorDevice::Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) {
+    if (time.Time != m_StampTime) {
+        m_IsDvDtFired = false;
+    }
     m_IsStep = time.IsTransient && !time.UseInitialConditions;
     m_StampTime = time.Time;
     UpdateState(x);
@@ -199,14 +272,18 @@ std::complex<double> ThyristorDevice::AcTerminalCurrent(const int terminal,
 }
 
 /**
- * @brief   Keeps the state of the step that converged and moves the main-current history on.
+ * @brief   Keeps the state of the step that converged and moves the main-branch history on.
  * @details The first call after an operating point or an initial point has no step behind it: the history starts at
- *          the current of that point, so the commutation prediction waits for a second transient point.
+ *          the current and voltage of that point, so the commutation prediction waits for a second transient point.
  * @param[in] x  Converged solution vector of the accepted time point.
  */
 void ThyristorDevice::AcceptStep(const std::vector<double> &x) {
     m_SavedIsConducting = m_IsConducting;
-    const AcceptedPoint point{.Time = m_StampTime, .Current = MainCurrent(x)};
+    m_SavedRecoveryEnds = m_RecoveryEnds;
+    m_SavedIsDvDtFired = m_IsDvDtFired;
+    const AcceptedPoint point{.Time = m_StampTime,
+                              .Current = MainCurrent(x),
+                              .Voltage = BranchVoltage(x, m_Anode, m_Cathode)};
     if (m_IsStep) {
         m_Previous = m_Accepted;
         m_Accepted = point;
@@ -220,6 +297,8 @@ void ThyristorDevice::AcceptStep(const std::vector<double> &x) {
 
 void ThyristorDevice::RejectStep() {
     m_IsConducting = m_SavedIsConducting;
+    m_RecoveryEnds = m_SavedRecoveryEnds;
+    m_IsDvDtFired = m_SavedIsDvDtFired;
 }
 
 bool ThyristorDevice::HasSwitched() const {

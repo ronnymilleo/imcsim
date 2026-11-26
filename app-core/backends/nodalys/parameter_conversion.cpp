@@ -239,6 +239,8 @@ Nodalys::ThyristorParameters ToNodalys(const ThyristorParameters &parameters) {
             .GateTriggerVoltage = parameters.GateTriggerVoltage,
             .GateResistance = parameters.GateResistance,
             .BreakoverVoltage = parameters.BreakoverVoltage,
+            .CriticalDvDt = parameters.CriticalDvDt,
+            .TurnOffTime = parameters.TurnOffTime,
             .IsBidirectional = parameters.IsBidirectional};
 }
 

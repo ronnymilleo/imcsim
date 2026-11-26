@@ -18,9 +18,10 @@ namespace Core {
  * @brief   Datasheet figures of a thyristor (SCR) or TRIAC, in SI units.
  * @details The on-state is the datasheet line \f$V_{TM} = V_0 + R_T I_T\f$. Nodalys takes every figure as a parameter;
  *          the ngspice subcircuit follows the gate and slope resistances exactly, while its holding and trigger
- *          currents and its on-state threshold emerge from the two-transistor pair, close to these defaults.
- *          `IsBidirectional` is set by the part, not by the editor: a TRIAC conducts both ways and fires in all four
- *          gate quadrants, an SCR one way only.
+ *          currents and its on-state threshold emerge from the two-transistor pair, close to these defaults. The
+ *          breakover, the critical dv/dt and the turn-off time run on Nodalys only; the ngspice pair has none of
+ *          them. `IsBidirectional` is set by the part, not by the editor: a TRIAC conducts both ways and fires in
+ *          all four gate quadrants, an SCR one way only.
  */
 struct ThyristorParameters {
     double OnResistance = 0.01;       ///< Slope resistance \f$R_T\f$ of the on-state line, in Ohms.
@@ -31,6 +32,12 @@ struct ThyristorParameters {
     double GateTriggerVoltage = 0.8;  ///< \f$V_{GT}\f$: gate junction threshold, in Volts.
     double GateResistance = 100.0;    ///< \f$R_G\f$: series gate resistance, in Ohms.
     double BreakoverVoltage = 0.0;    ///< \f$V_{BO}\f$: breakover voltage; zero disables it, in Volts.
+    /// Critical \f$dv/dt\f$: a faster rise of the main-terminal voltage fires a blocking device; zero disables it,
+    /// in Volts per second (Nodalys only).
+    double CriticalDvDt = 0.0;
+    /// \f$t_q\f$: recovery time after a release, during which a re-applied forward voltage re-fires the device;
+    /// zero disables it, in seconds (Nodalys only).
+    double TurnOffTime = 0.0;
     /// True for a TRIAC, which conducts both ways; the part sets it from its type and the editor leaves it alone.
     bool IsBidirectional = false;
 
