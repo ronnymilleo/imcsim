@@ -496,6 +496,21 @@ constexpr auto EXAMPLES = std::to_array<Example>({
         .FileName = "diac_triac_dimmer.imcsim",
     },
     {
+        .Title = "GTO chopper",
+        .Group = "Switching",
+        .Description =
+            "A GTO chops a 100 V DC supply into a 10 Ohm load at 1 kHz, which a plain thyristor cannot do: it would "
+            "latch on and never let go while the load keeps its current far above the holding current. Two pulse "
+            "sources in series drive the gate, referenced to the cathode: Vin3 gives +5 V for 20 us at 0.1 ms of each "
+            "millisecond, which fires the GTO and latches it on, and Vin2 gives -15 V for 20 us at 0.5 ms, which "
+            "pulls the gate current past the 2 A turn-off current IGQ and releases it while the 9.9 A of the load "
+            "still flows. Run the transient: the load voltage is a 100 V square wave of 40% duty, and GTO1.A "
+            "drops from 9.9 A to nothing at each turn-off, with the full supply across the device. Raise IGQ above "
+            "the 14 A that the pulse draws, or lower the pulse, and the GTO stays on. It runs on Nodalys: ngspice "
+            "refuses the GTO, whose gate turn-off it has no model for.",
+        .FileName = "gto_chopper.imcsim",
+    },
+    {
         .Title = "Relay driver",
         .Group = "Switching",
         .Description =

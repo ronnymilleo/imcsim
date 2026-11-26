@@ -4,6 +4,7 @@
  */
 
 #include "analysis/analysis_inputs.h"
+#include "backends/ngspice/ngspice_backend.h"
 #include "backends/ngspice/ngspice_library.h"
 #include "backends/nodalys/nodalys_backend.h"
 #include "circuit/components/potentiometer.h"
@@ -1308,6 +1309,32 @@ TEST_CASE("The precision rectifier passes the positive half of the sine without 
     // The capacitance of the diode lets a few tens of millivolts of the edge through when the op-amp output drops to
     // its negative limit; without the loop the output would not reach the peak by about the diode drop instead
     CHECK(lowest > -0.05);
+}
+
+TEST_CASE("The GTO chopper switches its load on at the firing pulse and off at the turn-off pulse", "[examples][gto]") {
+    GUI::Schematic schematic;
+    OpenExample("gto_chopper.imcsim", schematic);
+    Core::NodalysBackend nodalys;
+    const Core::TransientRun run =
+        nodalys.RunTransient(schematic.GetCircuit(), schematic.GetSimulationSettings().Transient, std::nullopt, {});
+    REQUIRE(run.Result.has_value());
+    const Core::Transient &transient = *run.Result;
+    const std::vector<double> &load = transient.NodeVoltages[NodeAt(schematic, {17, 9})];
+    const auto at = [&](const double time) {
+        const auto point = std::ranges::lower_bound(transient.Times, time);
+        REQUIRE(point != transient.Times.end());
+        return load[static_cast<std::size_t>(point - transient.Times.begin())];
+    };
+    // In the second period the GTO is off before the firing pulse at 1.1 ms, on after it, and off again after the
+    // turn-off pulse at 1.5 ms, with the 100 V supply still across it
+    CHECK_THAT(at(1.05e-3), Catch::Matchers::WithinAbs(0.0, 1e-3));
+    CHECK_THAT(at(1.3e-3), Catch::Matchers::WithinAbs(99.2, 0.5));
+    CHECK_THAT(at(1.8e-3), Catch::Matchers::WithinAbs(0.0, 1e-3));
+    // ngspice refuses the part, with the name of the engine that runs it
+    const auto refusal =
+        Core::FindUnsupported(Core::NgspiceBackend{}, schematic.GetCircuit(), Core::AnalysisKind::TRANSIENT);
+    REQUIRE(refusal.has_value());
+    CHECK(refusal->contains("Nodalys"));
 }
 
 TEST_CASE("The decoder example varies A0 and A1 only, and each row raises the output they select",
