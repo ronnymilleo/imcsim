@@ -1,0 +1,212 @@
+{
+  "format": "imcsim-schematic",
+  "version": 1,
+  "elements": [
+    {
+      "type": "VoltageSource",
+      "rotation": 90,
+      "x": 5,
+      "y": 11,
+      "source": "AC",
+      "value": 0,
+      "amplitude": 170,
+      "frequency": 60,
+      "offset": 0,
+      "ac_magnitude": 1,
+      "pulse": {
+        "delay": 0,
+        "fall": 0.000001,
+        "high": 5,
+        "low": 0,
+        "period": 0.001,
+        "rise": 0.000001,
+        "width": 0.0005
+      },
+      "name": "Vin1"
+    },
+    {
+      "type": "Triac",
+      "rotation": 0,
+      "x": 11,
+      "y": 9,
+      "name": "TR1"
+    },
+    {
+      "type": "Resistor",
+      "rotation": 90,
+      "x": 17,
+      "y": 11,
+      "value": 100,
+      "name": "R1"
+    },
+    {
+      "type": "Resistor",
+      "rotation": 90,
+      "x": 7,
+      "y": 11,
+      "value": 47000,
+      "name": "R2"
+    },
+    {
+      "type": "Capacitor",
+      "rotation": 90,
+      "x": 7,
+      "y": 15,
+      "value": 1E-7,
+      "name": "C1"
+    },
+    {
+      "type": "Diac",
+      "rotation": 0,
+      "x": 9,
+      "y": 13,
+      "name": "DIAC1"
+    },
+    {
+      "type": "Ground",
+      "rotation": 0,
+      "x": 5,
+      "y": 15
+    },
+    {
+      "type": "Ground",
+      "rotation": 0,
+      "x": 17,
+      "y": 15
+    }
+  ],
+  "wires": [
+    {
+      "start": [
+        5,
+        9
+      ],
+      "end": [
+        7,
+        9
+      ]
+    },
+    {
+      "start": [
+        7,
+        9
+      ],
+      "end": [
+        9,
+        9
+      ]
+    },
+    {
+      "start": [
+        13,
+        9
+      ],
+      "end": [
+        15,
+        9
+      ]
+    },
+    {
+      "start": [
+        15,
+        9
+      ],
+      "end": [
+        17,
+        9
+      ]
+    },
+    {
+      "start": [
+        11,
+        11
+      ],
+      "end": [
+        11,
+        13
+      ]
+    },
+    {
+      "start": [
+        7,
+        17
+      ],
+      "end": [
+        15,
+        17
+      ]
+    },
+    {
+      "start": [
+        15,
+        17
+      ],
+      "end": [
+        15,
+        9
+      ]
+    },
+    {
+      "start": [
+        5,
+        13
+      ],
+      "end": [
+        5,
+        15
+      ]
+    },
+    {
+      "start": [
+        17,
+        13
+      ],
+      "end": [
+        17,
+        15
+      ]
+    }
+  ],
+  "simulation": {
+    "analysis": "transient",
+    "transient": {
+      "step": 0.00001,
+      "stop": 0.05
+    },
+    "ac_sweep": {
+      "start": 10,
+      "stop": 1000000,
+      "points_per_decade": 20
+    },
+    "dc_sweep": {
+      "step_source": false,
+      "swept": {
+        "source": "",
+        "start": 0,
+        "step": 0.1,
+        "stop": 5
+      },
+      "stepped": {
+        "source": "",
+        "start": 0,
+        "step": 0.1,
+        "stop": 5
+      }
+    }
+  },
+  "measurements": {
+    "voltages": [
+      [
+        7,
+        13
+      ],
+      [
+        7,
+        17
+      ]
+    ],
+    "currents": [
+      "TR1.MT2"
+    ]
+  }
+}
