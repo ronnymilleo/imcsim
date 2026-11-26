@@ -457,3 +457,23 @@ TEST_CASE("A TRIAC re-fires on a voltage re-applied within the turn-off time, th
     // threshold and the device re-fires without a gate
     CHECK_THAT(LoadVoltageAt(refired, 1.25e-3), WithinAbs(-9.099, 0.01));
 }
+
+TEST_CASE("A conducting TRIAC follows its main-terminal voltage across zero onto the other half of its line",
+          "[nodalys][thyristor]") {
+    // The gate stays on, so the TRIAC conducts throughout while the supply swings from +10 V to -10 V in 1 us at
+    // 0.5 ms. Newton starts the step after the swing from the positive on-state, where a line mirrored by the sign
+    // of the voltage also has a solution with a small positive voltage and the current reversed
+    const Nodalys::PulseParameters gate{.Low = 5.0, .High = 5.0, .Delay = 0.0, .Width = 1.0, .Period = 10.0};
+    const Nodalys::PulseParameters supply{.Low = 10.0,
+                                          .High = -10.0,
+                                          .Delay = 0.5e-3,
+                                          .RiseTime = 1e-6,
+                                          .FallTime = 1e-6,
+                                          .Width = 1.0,
+                                          .Period = 10.0};
+    const Nodalys::TransientResult result = RunTransient(BuildCommutatedLoop(TRIAC, supply, 100.0, gate), 1e-3, 1e-5);
+    // The on-state line from each supply: (10 - 0.9) * 100 / 100.01 one way, the same negative the other
+    CHECK_THAT(LoadVoltageAt(result, 0.4e-3), WithinAbs(9.099, 0.01));
+    CHECK_THAT(LoadVoltageAt(result, 0.6e-3), WithinAbs(-9.099, 0.01));
+    CHECK_THAT(LoadVoltageAt(result, 0.95e-3), WithinAbs(-9.099, 0.01));
+}

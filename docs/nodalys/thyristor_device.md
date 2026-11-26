@@ -31,6 +31,12 @@ $$v_{AK} = V_0 + R_T\, i_A \quad\Longleftrightarrow\quad i_A = \frac{v_{AK} - V_
 
 stamped as the conductance $1/R_T$ between anode and cathode with an equivalent current source $V_0/R_T$ from cathode to anode. The off-state is the conductance $1/R_{off}$. Both are linear at each Newton iterate, so the branch cannot fail to converge; only the discrete state changes.
 
+A TRIAC mirrors the line about zero, and between the two thresholds, where a real device has not yet overcome its junction drop, a conducting one carries only the off-state current:
+
+$$i = \begin{cases} (v - V_0)/R_T + V_0/R_{off} & v > V_0 \\ v / R_{off} & |v| \le V_0 \\ (v + V_0)/R_T - V_0/R_{off} & v < -V_0 \end{cases}$$
+
+The three pieces meet, so the line is continuous and rises with the voltage: one voltage for every current. A line mirrored by the sign of the voltage alone, $i = (v - \operatorname{sign}(v)\,V_0)/R_T$, jumps at zero and has a second solution there, a small voltage of one sign with a large current of the other, which Newton kept when the supply swung across zero while the gate held the device on.
+
 The gate-cathode junction draws
 
 $$i_G = \begin{cases} (v_{GK} - V_{GT})/R_G & v_{GK} > V_{GT} \\ 0 & v_{GK} \le V_{GT} \end{cases}$$
@@ -62,7 +68,7 @@ The two-transistor model is physical: its holding and trigger currents emerge fr
 
 ## 3. Verification
 
-`nodalys/tests/devices/thyristor_device_tests.cpp`: blocking forward voltage until the gate fires, latching after the gate pulse ends, release below the holding current, reverse blocking with gate current, forward breakover with and without the supply past it, the on-state line $V_0 + R_T I$, the gate junction current, and the half-wave controlled rectifier. The second-order effects have tests of their own: a $10\ \mathrm{V}$ rise in $1\ \mu\mathrm{s}$ fires a device set to a critical $dv/dt$ of $0.5\ \mathrm{V}/\mu\mathrm{s}$ with the gate silent, the same rise spread over $1\ \mathrm{ms}$ does not, and a fall never fires an SCR while a TRIAC fires on a rise and on a fall alike; a supply that collapses and returns inside the $t_q$ window re-fires the device without a gate, and one that returns past the window finds it blocking, for an SCR and for a TRIAC the negative way.
+`nodalys/tests/devices/thyristor_device_tests.cpp`: blocking forward voltage until the gate fires, latching after the gate pulse ends, release below the holding current, reverse blocking with gate current, forward breakover with and without the supply past it, the on-state line $V_0 + R_T I$, the gate junction current, and the half-wave controlled rectifier. A TRIAC held on by its gate while the supply swings from $+10\ \mathrm{V}$ to $-10\ \mathrm{V}$ follows its voltage onto the negative half of the line, not the reversed solution of a sign-mirrored line. The second-order effects have tests of their own: a $10\ \mathrm{V}$ rise in $1\ \mu\mathrm{s}$ fires a device set to a critical $dv/dt$ of $0.5\ \mathrm{V}/\mu\mathrm{s}$ with the gate silent, the same rise spread over $1\ \mathrm{ms}$ does not, and a fall never fires an SCR while a TRIAC fires on a rise and on a fall alike; a supply that collapses and returns inside the $t_q$ window re-fires the device without a gate, and one that returns past the window finds it blocking, for an SCR and for a TRIAC the negative way.
 
 The rectifier average is checked against its closed form over a steady-state period:
 
