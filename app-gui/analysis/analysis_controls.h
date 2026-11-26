@@ -113,6 +113,8 @@ private:
 
     // Last runs
     RunReport m_Report;
+    /// Version of the document the last runs were about.
+    std::size_t m_ReportDocumentVersion = 0;
 
     // Runs of one analysis
     void StartRun(Analysis analysis, Core::Job job);
