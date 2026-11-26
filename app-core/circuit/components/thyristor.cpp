@@ -161,7 +161,7 @@ std::string FormatGtoSubcircuit() {
 }
 
 /**
- * @brief   Writes the subcircuit that ngspice runs for a TRIAC.
+ * @brief   Writes the subcircuit that the Netlist window shows for a TRIAC.
  * @return  The ".subckt" block, newline included.
  * @details Two SCR pairs of the imcsim_scr kind sit anti-parallel between MT2 and MT1, each with its own vanishing
  *          anode diode so it conducts one way only: the pair P latches when MT2 is positive, the pair N when MT1 is.
@@ -182,8 +182,9 @@ std::string FormatGtoSubcircuit() {
  *          Nodalys. The stage steers with transistor gain, so at the firing instant it draws more gate current than
  *          the single junction of Nodalys, which the cross-validation test bounds. As in imcsim_scr, the collector
  *          junctions have no capacitance, so a rising off-state voltage does not fire a pair.
- * @note    There is no breakover and no dv/dt firing: the pairs block whatever voltage the circuit puts on them,
- *          however fast it rises, as a TRIAC driven correctly does. Nodalys models both.
+ * @note    imcsim does not run it: the ngspice backend refuses a TRIAC, which Nodalys simulates as one latching
+ *          device with breakover, dv/dt firing and turn-off time, so the subcircuit is only in the netlist the Netlist
+ *          window shows and exports. It ran on ngspice until the TRIAC became a Nodalys part, with the behavior above.
  */
 std::string FormatTriacSubcircuit() {
     return ".subckt imcsim_triac mt2 mt1 g params: RG=100 RT=0.01\n"

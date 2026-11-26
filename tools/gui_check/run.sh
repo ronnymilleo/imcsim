@@ -50,9 +50,10 @@
 #   Stepped parameter      fixtures/parameter_step_rc_low_pass (R1 of the RC low-pass over a list)
 #   Stepped source         bjt_output_characteristics (DC sweep of V1, stepping I1)
 #   Monte Carlo            monte_carlo_rc_low_pass (AC sweep), monte_carlo_bias_point (operating point)
-#   Thyristors             controlled_rectifier_half_wave (an SCR) and triac_dimmer (a TRIAC), transients on both
-#                          engines, whose subcircuits on ngspice differ from the native device of Nodalys; the
-#                          harmonic balance of the SCR, which Nodalys disables with the reason
+#   Thyristors             controlled_rectifier_half_wave (an SCR), a transient on both engines, whose subcircuit
+#                          on ngspice differs from the native device of Nodalys; the harmonic balance of the SCR,
+#                          which Nodalys disables with the reason
+#   TRIAC                  triac_dimmer (transient): Nodalys runs it, ngspice refuses the TRIAC with the reason
 #   Transmission lines     transmission_line_reflections (transient) and transmission_line_quarter_wave
 #                          (S-parameters): Nodalys runs both, ngspice refuses the part with the reason
 #   DIAC                   diac_triac_dimmer (transient): Nodalys runs it, ngspice refuses the DIAC with the reason
@@ -538,7 +539,7 @@ check_live_potentiometer() {
 # The parts that only one engine simulates, or that one engine simulates its own way
 check_parts() {
     check_circuit_run transient_thyristor controlled_rectifier_half_wave Spectrum
-    check_circuit_run transient_triac triac_dimmer Spectrum
+    check_nodalys_only transient_triac triac_dimmer Spectrum 'TRIACs'
     check_nodalys_only transmission_line_transient transmission_line_reflections Spectrum 'Transmission lines'
     check_nodalys_only transmission_line_s_parameters transmission_line_quarter_wave Smith 'Transmission lines'
     check_nodalys_only transient_diac diac_triac_dimmer Spectrum 'DIACs'

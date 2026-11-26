@@ -36,8 +36,8 @@ struct DiacParameters {
  * @brief   A two-terminal DIAC, with MT2 on terminal 1 and MT1 on terminal 2.
  * @details The part has no value; its figures are set one by one. Every run starts blocking. Nodalys simulates it as
  *          the latching device of the TRIAC with its gate tied to MT1, fired by breakover only. ngspice refuses it:
- *          the netlist writes it as the imcsim_diac subcircuit, which the Netlist window shows and exports, but the
- *          TRIAC that a DIAC triggers does not block at mains voltage on ngspice.
+ *          the netlist writes it as the imcsim_diac subcircuit, which the Netlist window shows and exports, as ngspice
+ *          refuses the TRIAC that a DIAC triggers.
  */
 class Diac : public Component {
 public:

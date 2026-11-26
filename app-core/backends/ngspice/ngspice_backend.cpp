@@ -361,6 +361,8 @@ const BackendCapabilities &NgspiceBackend::GetCapabilities() const {
                                   "to Nodalys"},
                                  {ComponentType::DIAC,
                                   "DIACs are simulated natively by Nodalys; switch the simulator backend to Nodalys"},
+                                 {ComponentType::TRIAC,
+                                  "TRIACs are simulated natively by Nodalys; switch the simulator backend to Nodalys"},
                                  {ComponentType::GTO,
                                   "GTOs are simulated natively by Nodalys; switch the simulator backend to Nodalys"}},
             .UnsupportedPartsByAnalysis = {},

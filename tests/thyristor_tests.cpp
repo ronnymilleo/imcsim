@@ -1,9 +1,10 @@
 /**
  * @file    thyristor_tests.cpp
- * @brief   Tests for the thyristor (SCR) and TRIAC: their figures, their netlists, and the controlled rectifier and
- *          light dimmer they drive on ngspice and on Nodalys, and the warnings of a run past their ratings.
+ * @brief   Tests for the thyristor (SCR) and TRIAC: their figures, their netlists, the controlled rectifier they drive
+ *          on ngspice and on Nodalys and the light dimmer on Nodalys, and the warnings of a run past their ratings.
  */
 
+#include "backends/ngspice/ngspice_backend.h"
 #include "circuit/circuit.h"
 #include "circuit/circuit_currents.h"
 #include "circuit/components/ground.h"
@@ -11,6 +12,7 @@
 #include "circuit/components/thyristor.h"
 #include "circuit/components/voltage_source.h"
 #include "nodalys_in_use.h"
+#include "simulation/simulation_backend.h"
 #include "simulation/simulator.h"
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
@@ -18,6 +20,7 @@
 #include <cmath>
 #include <memory>
 #include <numbers>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -358,42 +361,45 @@ TEST_CASE("A TRIAC writes one instance of its anti-parallel subcircuit, however 
     CHECK(netlist.contains(".ends imcsim_triac\n"));
 }
 
-TEST_CASE("A TRIAC dimmer chops both half-cycles on both engines", "[thyristor][simulator]") {
+TEST_CASE("A TRIAC dimmer chops both half-cycles on Nodalys", "[thyristor][simulator]") {
     Dimmer dimmer(LOAD_OHMS);
-
-    Core::TransientRun ngspice_run;
-    const Core::Transient &ngspice_transient = RunRectifier(dimmer.Circuit, ngspice_run);
+    const TestSupport::NodalysInUse nodalys;
+    Core::TransientRun run;
+    const Core::Transient &transient = RunRectifier(dimmer.Circuit, run);
     // Before the first firing the load is dark; at the peaks of the second period it follows the sine both ways
-    CHECK(LoadVoltageAt(ngspice_transient, 1e-3) < 0.1);
-    CHECK(LoadVoltageAt(ngspice_transient, 25e-3) > 8.0);
-    CHECK(LoadVoltageAt(ngspice_transient, 35e-3) < -8.0);
-    INFO("ngspice: positive peak " << LoadVoltageAt(ngspice_transient, 25e-3) << " V, negative peak "
-                                   << LoadVoltageAt(ngspice_transient, 35e-3) << " V");
-
-    TestSupport::NodalysInUse nodalys;
-    Core::TransientRun nodalys_run;
-    const Core::Transient &nodalys_transient = RunRectifier(dimmer.Circuit, nodalys_run);
-    CHECK(LoadVoltageAt(nodalys_transient, 1e-3) < 0.1);
-    CHECK(LoadVoltageAt(nodalys_transient, 25e-3) > 8.0);
-    CHECK(LoadVoltageAt(nodalys_transient, 35e-3) < -8.0);
-    INFO("Nodalys: positive peak " << LoadVoltageAt(nodalys_transient, 25e-3) << " V, negative peak "
-                                   << LoadVoltageAt(nodalys_transient, 35e-3) << " V");
-    // The anti-parallel pair of the subcircuit and the bidirectional device of Nodalys agree on the peaks
-    CHECK_THAT(LoadVoltageAt(nodalys_transient, 25e-3), WithinAbs(LoadVoltageAt(ngspice_transient, 25e-3), 0.1));
-    CHECK_THAT(LoadVoltageAt(nodalys_transient, 35e-3), WithinAbs(LoadVoltageAt(ngspice_transient, 35e-3), 0.1));
+    INFO("positive peak " << LoadVoltageAt(transient, 25e-3) << " V, negative peak " << LoadVoltageAt(transient, 35e-3)
+                          << " V");
+    CHECK(LoadVoltageAt(transient, 1e-3) < 0.1);
+    CHECK(LoadVoltageAt(transient, 25e-3) > 8.0);
+    CHECK(LoadVoltageAt(transient, 35e-3) < -8.0);
 }
 
-TEST_CASE("A TRIAC or a thyristor left idle on the mains blocks both half-cycles on both engines",
+TEST_CASE("ngspice refuses a TRIAC with the reason, and Nodalys runs it", "[thyristor][simulation_backend]") {
+    const Core::NgspiceBackend ngspice;
+    const std::optional<std::string> refusal =
+        Core::FindUnsupported(ngspice, {Core::ComponentType::TRIAC}, Core::AnalysisKind::TRANSIENT);
+    REQUIRE(refusal.has_value());
+    CHECK(refusal->contains("Nodalys"));
+    // The SCR stays on both engines
+    CHECK_FALSE(
+        Core::FindUnsupported(ngspice, {Core::ComponentType::THYRISTOR}, Core::AnalysisKind::TRANSIENT).has_value());
+
+    const TestSupport::NodalysInUse nodalys;
+    CHECK_FALSE(Core::FindUnsupported(Core::GetBackend(), {Core::ComponentType::TRIAC}, Core::AnalysisKind::TRANSIENT)
+                    .has_value());
+}
+
+TEST_CASE("A thyristor left idle on the mains blocks both half-cycles on both engines, and a TRIAC on Nodalys",
           "[thyristor][simulator]") {
-    // The ngspice subcircuits once fired by themselves here: through the sensors of the TRIAC's gate stage and
-    // through the displacement current of the collector junctions, which the steep mains sine drove into the bases
-    for (const Core::ComponentType type : {Core::ComponentType::TRIAC, Core::ComponentType::THYRISTOR}) {
-        const IdleOnMains idle(type);
-        INFO((type == Core::ComponentType::TRIAC ? "TRIAC" : "thyristor"));
-        CHECK(PeakIdleCurrent(idle.Circuit) < IDLE_CURRENT_LIMIT);
-        const TestSupport::NodalysInUse nodalys;
-        CHECK(PeakIdleCurrent(idle.Circuit) < IDLE_CURRENT_LIMIT);
-    }
+    // The ngspice subcircuit once fired by itself here, through the displacement current of the collector junctions,
+    // which the steep mains sine drove into the bases
+    const IdleOnMains thyristor(Core::ComponentType::THYRISTOR);
+    CHECK(PeakIdleCurrent(thyristor.Circuit) < IDLE_CURRENT_LIMIT);
+
+    const TestSupport::NodalysInUse nodalys;
+    CHECK(PeakIdleCurrent(thyristor.Circuit) < IDLE_CURRENT_LIMIT);
+    const IdleOnMains triac(Core::ComponentType::TRIAC);
+    CHECK(PeakIdleCurrent(triac.Circuit) < IDLE_CURRENT_LIMIT);
 }
 
 TEST_CASE("A thyristor past its voltage, current, surge or I2t rating is reported on both engines",
@@ -435,6 +441,7 @@ TEST_CASE("A thyristor past its voltage, current, surge or I2t rating is reporte
 
 TEST_CASE("A TRIAC is judged on its RMS current, since its average is near zero", "[thyristor][simulator][ratings]") {
     // The chopped sine through 100 Ohm averages near zero but has about 63 mA RMS
+    const TestSupport::NodalysInUse nodalys;
     Dimmer dimmer(LOAD_OHMS);
     dimmer.Part.SetParameters({.MaxOnStateCurrent = 0.1});
     Core::TransientRun within;
