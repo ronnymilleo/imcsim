@@ -13,6 +13,7 @@
 #include "circuit/components/diac.h"
 #include "circuit/components/diode.h"
 #include "circuit/components/fuse.h"
+#include "circuit/components/igbt.h"
 #include "circuit/components/mosfet.h"
 #include "circuit/components/source.h"
 #include "circuit/components/thyristor.h"
@@ -25,6 +26,7 @@ namespace Core {
 // Semiconductors
 Nodalys::DiodeParameters ToNodalys(const DiodeParameters &parameters);
 Nodalys::BjtParameters ToNodalys(const BJTParameters &parameters);
+Nodalys::IgbtParameters ToNodalys(const IGBTParameters &parameters);
 Nodalys::MosfetParameters ToNodalys(const MOSFETParameters &parameters);
 
 // Waveforms

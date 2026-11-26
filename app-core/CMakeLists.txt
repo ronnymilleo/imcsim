@@ -39,6 +39,7 @@ add_library(imcsim-core-lib
             circuit/components/diac.cpp
             circuit/components/diode.cpp
             circuit/components/fuse.cpp
+            circuit/components/igbt.cpp
             circuit/components/ground.cpp
             circuit/components/inductor.cpp
             circuit/components/initial_voltage.cpp

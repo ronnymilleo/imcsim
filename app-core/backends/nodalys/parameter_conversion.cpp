@@ -5,7 +5,38 @@
 
 #include "backends/nodalys/parameter_conversion.h"
 
+#include <cmath>
+
 namespace Core {
+
+namespace {
+
+/// Emission coefficient of the co-packaged diode of an IGBT, that of a fast power diode.
+constexpr double CO_PACKAGED_DIODE_EMISSION = 1.5;
+/// Share of the forward voltage of the co-packaged diode at the rated current that its series resistance drops.
+constexpr double CO_PACKAGED_DIODE_RESISTIVE_SHARE = 0.3;
+/// Thermal voltage kT/q at 27 degrees Celsius, in Volts.
+constexpr double THERMAL_VOLTAGE = 0.025865;
+/// Breakdown voltage of the co-packaged diode, far beyond any rating, as neither it nor the IGBT models avalanche.
+constexpr double CO_PACKAGED_DIODE_BREAKDOWN = 1e6;
+
+/**
+ * @brief   The diode of an IGBT package, from its forward voltage at the rated collector current.
+ * @details A share of the drop is the series resistance and the rest the junction, whose saturation current follows
+ *          from the Shockley equation at that current.
+ */
+Nodalys::DiodeParameters ToCoPackagedDiode(const IGBTParameters &parameters) {
+    const double rated_current = parameters.MaxCollectorCurrent;
+    const double resistive_drop = CO_PACKAGED_DIODE_RESISTIVE_SHARE * parameters.DiodeForwardVoltage;
+    const double junction_drop = parameters.DiodeForwardVoltage - resistive_drop;
+    return {.SaturationCurrent =
+                rated_current * std::exp(-junction_drop / (CO_PACKAGED_DIODE_EMISSION * THERMAL_VOLTAGE)),
+            .EmissionCoefficient = CO_PACKAGED_DIODE_EMISSION,
+            .SeriesResistance = resistive_drop / rated_current,
+            .BreakdownVoltage = CO_PACKAGED_DIODE_BREAKDOWN};
+}
+
+} // namespace
 
 /**
  * @brief   The SPICE diode model of a diode part, without its ratings, which only imcsim checks.
@@ -43,6 +74,28 @@ Nodalys::BjtParameters ToNodalys(const BJTParameters &parameters) {
             .EmitterCapacitance = parameters.EmitterCapacitance,
             .CollectorCapacitance = parameters.CollectorCapacitance,
             .TransitTime = parameters.TransitTime};
+}
+
+/**
+ * @brief   The figures of an IGBT, without its ratings, with its co-packaged diode when it has one.
+ * @param[in] parameters  Datasheet figures of the part.
+ * @return  The same figures for the Nodalys IGBT.
+ */
+Nodalys::IgbtParameters ToNodalys(const IGBTParameters &parameters) {
+    Nodalys::IgbtParameters figures{.GateThresholdVoltage = parameters.GateThresholdVoltage,
+                                    .Transconductance = parameters.Transconductance,
+                                    .TransconductanceCurrent = parameters.TransconductanceCurrent,
+                                    .OnThresholdVoltage = parameters.OnThresholdVoltage,
+                                    .OnResistance = parameters.OnResistance,
+                                    .InputCapacitance = parameters.InputCapacitance,
+                                    .OutputCapacitance = parameters.OutputCapacitance,
+                                    .ReverseTransferCapacitance = parameters.ReverseTransferCapacitance,
+                                    .TailFraction = parameters.TailFraction,
+                                    .TailTimeConstant = parameters.TailTimeConstant};
+    if (parameters.DiodeForwardVoltage > 0.0) {
+        figures.AntiParallelDiode = ToCoPackagedDiode(parameters);
+    }
+    return figures;
 }
 
 /**

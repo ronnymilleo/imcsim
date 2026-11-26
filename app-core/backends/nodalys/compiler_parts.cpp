@@ -17,6 +17,7 @@
 #include "circuit/components/diac.h"
 #include "circuit/components/diode.h"
 #include "circuit/components/fuse.h"
+#include "circuit/components/igbt.h"
 #include "circuit/components/logic_input.h"
 #include "circuit/components/mosfet.h"
 #include "circuit/components/op_amp.h"
@@ -121,6 +122,47 @@ void AddRelayPart(Nodalys::CircuitBuilder &builder, const EntryContext &entry) {
                      figures.CoilResistance,
                      figures.CoilInductance,
                      ToNodalys(relay.GetContactParameters()));
+}
+
+/**
+ * @brief   Adds a diode, LED or Zener with the parameters of its model, a library one included.
+ */
+std::expected<void, std::string>
+AddDiodePart(Nodalys::CircuitBuilder &builder, const Circuit &top_circuit, const EntryContext &entry) {
+    const auto diode = ResolveParameters(top_circuit, static_cast<const Diode &>(entry.Part));
+    if (!diode) {
+        return std::unexpected(diode.error());
+    }
+    builder.AddDiode(entry.Name, entry.Nodes[0], entry.Nodes[1], ToNodalys(*diode));
+    return {};
+}
+
+/**
+ * @brief   Adds an NPN or PNP transistor with the parameters of its model, a library one included.
+ */
+std::expected<void, std::string>
+AddBJTPart(Nodalys::CircuitBuilder &builder, const Circuit &top_circuit, const EntryContext &entry) {
+    const auto bjt = ResolveParameters(top_circuit, static_cast<const BJT &>(entry.Part));
+    if (!bjt) {
+        return std::unexpected(bjt.error());
+    }
+    const std::vector<int> &nodes = entry.Nodes;
+    builder.AddBjt(entry.Name, nodes[0], nodes[1], nodes[2], entry.Type != ComponentType::PNP, ToNodalys(*bjt));
+    return {};
+}
+
+/**
+ * @brief   Adds an N- or P-channel MOSFET with the parameters of its model, a library one included.
+ */
+std::expected<void, std::string>
+AddMOSFETPart(Nodalys::CircuitBuilder &builder, const Circuit &top_circuit, const EntryContext &entry) {
+    const auto mosfet = ResolveParameters(top_circuit, static_cast<const MOSFET &>(entry.Part));
+    if (!mosfet) {
+        return std::unexpected(mosfet.error());
+    }
+    const std::vector<int> &nodes = entry.Nodes;
+    builder.AddMosfet(entry.Name, nodes[0], nodes[1], nodes[2], entry.Type != ComponentType::PMOS, ToNodalys(*mosfet));
+    return {};
 }
 
 } // namespace
@@ -275,33 +317,21 @@ AddSemiconductor(Nodalys::CircuitBuilder &builder, const Circuit &top_circuit, c
     switch (entry.Type) {
     case ComponentType::DIODE:
     case ComponentType::ZENER_DIODE:
-    case ComponentType::LED: {
-        const auto diode = ResolveParameters(top_circuit, static_cast<const Diode &>(part));
-        if (!diode) {
-            return std::unexpected(diode.error());
-        }
-        builder.AddDiode(entry.Name, nodes[0], nodes[1], ToNodalys(*diode));
-        return {};
-    }
+    case ComponentType::LED:
+        return AddDiodePart(builder, top_circuit, entry);
     case ComponentType::NPN:
-    case ComponentType::PNP: {
-        const auto bjt = ResolveParameters(top_circuit, static_cast<const BJT &>(part));
-        if (!bjt) {
-            return std::unexpected(bjt.error());
-        }
-        builder.AddBjt(entry.Name, nodes[0], nodes[1], nodes[2], entry.Type != ComponentType::PNP, ToNodalys(*bjt));
-        return {};
-    }
+    case ComponentType::PNP:
+        return AddBJTPart(builder, top_circuit, entry);
     case ComponentType::NMOS:
-    case ComponentType::PMOS: {
-        const auto mosfet = ResolveParameters(top_circuit, static_cast<const MOSFET &>(part));
-        if (!mosfet) {
-            return std::unexpected(mosfet.error());
-        }
-        builder
-            .AddMosfet(entry.Name, nodes[0], nodes[1], nodes[2], entry.Type != ComponentType::PMOS, ToNodalys(*mosfet));
+    case ComponentType::PMOS:
+        return AddMOSFETPart(builder, top_circuit, entry);
+    case ComponentType::IGBT:
+        builder.AddIgbt(entry.Name,
+                        nodes[0],
+                        nodes[1],
+                        nodes[2],
+                        ToNodalys(static_cast<const IGBT &>(part).GetParameters()));
         return {};
-    }
     default:
         return std::unexpected(NoDeviceMessage(entry));
     }

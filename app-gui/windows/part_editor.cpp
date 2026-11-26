@@ -224,7 +224,7 @@ void PartEditor::DrawValuedPart(Core::Component &component) {
 }
 
 /**
- * @brief   Diodes, transistors and op-amps, which a model sets; false for the other parts.
+ * @brief   Diodes, transistors, IGBTs and op-amps, which a model sets; false for the other parts.
  */
 bool PartEditor::DrawModeledPart(Core::Component &component) {
     const Core::ComponentType type = component.GetType();
@@ -234,6 +234,8 @@ bool PartEditor::DrawModeledPart(Core::Component &component) {
         DrawBJT(static_cast<Core::BJT &>(component), m_Models, *m_Schematic);
     } else if (Core::IsMOSFET(type)) {
         DrawMOSFET(static_cast<Core::MOSFET &>(component), m_Models, *m_Schematic);
+    } else if (Core::IsIGBT(type)) {
+        DrawIGBT(static_cast<Core::IGBT &>(component), m_Models, *m_Schematic);
     } else if (type == Core::ComponentType::OP_AMP) {
         DrawOpAmp(static_cast<Core::OpAmp &>(component), m_Models, m_Value, *m_Schematic);
     } else {

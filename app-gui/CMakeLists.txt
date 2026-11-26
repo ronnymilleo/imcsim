@@ -161,6 +161,7 @@ add_library(imcsim-gui-lib
             ui_elements/ui_element.cpp
             ui_elements/ui_flip_flop.cpp
             ui_elements/ui_fuse.cpp
+            ui_elements/ui_igbt.cpp
             ui_elements/ui_gate.cpp
             ui_elements/ui_ground.cpp
             ui_elements/ui_inductor.cpp

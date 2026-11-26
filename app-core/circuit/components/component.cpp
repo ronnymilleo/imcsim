@@ -491,6 +491,14 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .AcceptedValues = ValueRule::NONE,
         .Family = ComponentFamily::SWITCHING,
     },
+    {
+        .Type = ComponentType::IGBT,
+        .TypeName = "IGBT",
+        .NamePrefix = "Q",
+        .Unit = "",
+        .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::SEMICONDUCTOR,
+    },
 });
 
 /**

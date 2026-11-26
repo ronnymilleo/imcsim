@@ -18,6 +18,7 @@
 #include "ui_elements/ui_fuse.h"
 #include "ui_elements/ui_gate.h"
 #include "ui_elements/ui_ground.h"
+#include "ui_elements/ui_igbt.h"
 #include "ui_elements/ui_inductor.h"
 #include "ui_elements/ui_initial_voltage.h"
 #include "ui_elements/ui_logic_input.h"
@@ -70,6 +71,7 @@ constexpr auto PARTS = std::to_array<PartInfo>({
     {Core::ComponentType::PNP, "PNP transistor"},
     {Core::ComponentType::NMOS, "N-channel MOSFET"},
     {Core::ComponentType::PMOS, "P-channel MOSFET"},
+    {Core::ComponentType::IGBT, "IGBT"},
     {Core::ComponentType::VCVS, "VCVS (E)"},
     {Core::ComponentType::VCCS, "VCCS (G)"},
     {Core::ComponentType::CCCS, "CCCS (F)"},
@@ -147,6 +149,8 @@ CreateElement(const Core::ComponentType type, const GridPoint position, const Ro
     case Core::ComponentType::NMOS:
     case Core::ComponentType::PMOS:
         return std::make_unique<UIMOSFET>(type, position, rotation);
+    case Core::ComponentType::IGBT:
+        return std::make_unique<UIIGBT>(position, rotation);
     case Core::ComponentType::VCVS:
     case Core::ComponentType::VCCS:
     case Core::ComponentType::CCCS:

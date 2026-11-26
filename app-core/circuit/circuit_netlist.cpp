@@ -16,6 +16,7 @@
 #include "circuit/components/diac.h"
 #include "circuit/components/diode.h"
 #include "circuit/components/fuse.h"
+#include "circuit/components/igbt.h"
 #include "circuit/components/logic_input.h"
 #include "circuit/components/logic_part.h"
 #include "circuit/components/mosfet.h"
@@ -138,7 +139,32 @@ std::string FormatComponentValue(const Component &component) {
 }
 
 /**
- * @brief   The line of a diode or a transistor, with the line of its model added to models the first time it comes up.
+ * @brief   An instance of the subcircuit the Netlist window shows for an IGBT; see FormatIGBTSubcircuit().
+ * @details Its parameters are the channel and the capacitances of its datasheet figures, split as the datasheet gives
+ *          them: \f$C_{gc} = C_{res}\f$, \f$C_{ge} = C_{ies} - C_{res}\f$ and \f$C_{ce} = C_{oes} - C_{res}\f$.
+ */
+std::string FormatIGBT(const IGBT &igbt,
+                       const std::vector<int> &nodes,
+                       std::vector<std::string> &model_names,
+                       std::string &models) {
+    const IGBTParameters &figures = igbt.GetParameters();
+    AddModelLine(GetIGBTSubcircuitName(), FormatIGBTSubcircuit(), model_names, models);
+    return std::format("X-{} {} {} {} {} VTO={} KP={} CGC={} CGE={} CCE={}\n",
+                       igbt.GetName(),
+                       nodes[0],
+                       nodes[1],
+                       nodes[2],
+                       GetIGBTSubcircuitName(),
+                       FormatSpiceValue(figures.GateThresholdVoltage),
+                       FormatSpiceValue(GetChannelGain(figures)),
+                       FormatSpiceValue(figures.ReverseTransferCapacitance),
+                       FormatSpiceValue(figures.InputCapacitance - figures.ReverseTransferCapacitance),
+                       FormatSpiceValue(figures.OutputCapacitance - figures.ReverseTransferCapacitance));
+}
+
+/**
+ * @brief   The line of a diode, a transistor or an IGBT, with the line of its model added to models the first time it
+ * comes up.
  * @details A library model is written once, with the other library models, after the parts. The body of a MOSFET is
  *          tied to its source, past its probe, so the source current includes it; a library model brings its own
  *          channel size.
@@ -163,6 +189,9 @@ std::string FormatModeledPart(const Component &component,
             AddModelLine(model_name, FormatBJTModel(type, model_name, bjt.GetParameters()), model_names, models);
         }
         return std::format("{} {} {} {} {}\n", bjt.GetName(), nodes[0], nodes[1], nodes[2], model_name);
+    }
+    if (IsIGBT(type)) {
+        return FormatIGBT(static_cast<const IGBT &>(component), nodes, model_names, models);
     }
     const auto &mosfet = static_cast<const MOSFET &>(component);
     const std::string model_name = mosfet.GetSpiceModelName();
@@ -745,9 +774,9 @@ std::string WriteSpiceNetlist(const Circuit &circuit, const std::string_view ana
  * @param[in] component  Any component.
  * @return  The component name for a part that is one element, such as "R1" or "Q1"; the elements of a part written
  *          as several, such as "R-RV1a" and "R-RV1b" for a potentiometer or "X-U1" for an op-amp macromodel, whose
- *          own elements ngspice names after it ("q.x-u1.q1"), "X-FU1" for a fuse subcircuit, and the model, bridges and
- * resistors of a logic part; nothing for ground, net labels, initial voltages, logic displays and subcircuit pin
- * markers.
+ *          own elements ngspice names after it ("q.x-u1.q1"), "X-FU1" for a fuse subcircuit, "X-Q1" for the shown
+ *          subcircuit of an IGBT, and the model, bridges and resistors of a logic part; nothing for ground, net labels,
+ *          initial voltages, logic displays and subcircuit pin markers.
  */
 std::vector<std::string> GetElementNames(const Component &component) {
     const std::string &name = component.GetName();
@@ -766,8 +795,8 @@ std::vector<std::string> GetElementNames(const Component &component) {
                 std::format("D-{}-N", name),
                 std::format("E-{}", name)};
     }
-    if (type == ComponentType::OP_AMP || type == ComponentType::FUSE || IsThyristor(type)
-        || type == ComponentType::DIAC) {
+    if (type == ComponentType::OP_AMP || type == ComponentType::FUSE || IsThyristor(type) || type == ComponentType::DIAC
+        || IsIGBT(type)) {
         return {std::format("X-{}", name)};
     }
     if (type == ComponentType::POTENTIOMETER) {

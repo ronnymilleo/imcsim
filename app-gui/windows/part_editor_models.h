@@ -10,6 +10,7 @@
 #include "circuit/components/bjt.h"
 #include "circuit/components/component.h"
 #include "circuit/components/diode.h"
+#include "circuit/components/igbt.h"
 #include "circuit/components/mosfet.h"
 #include "circuit/components/op_amp.h"
 #include "schematic/schematic.h"
@@ -26,6 +27,7 @@ struct ModelFields {
     std::array<ValueField, 11> Diode;
     std::array<ValueField, 16> BJT;
     std::array<ValueField, 13> MOSFET;
+    std::array<ValueField, 15> IGBT;
     std::array<ValueField, 12> OpAmp;
 };
 
@@ -36,6 +38,7 @@ void LoadModelFields(ModelFields &fields, const Core::Component &component, Valu
 void DrawDiode(Core::Diode &diode, ModelFields &fields, Schematic &schematic);
 void DrawBJT(Core::BJT &bjt, ModelFields &fields, Schematic &schematic);
 void DrawMOSFET(Core::MOSFET &mosfet, ModelFields &fields, Schematic &schematic);
+void DrawIGBT(Core::IGBT &igbt, ModelFields &fields, Schematic &schematic);
 void DrawOpAmp(Core::OpAmp &op_amp, ModelFields &fields, ValueField &main_value, Schematic &schematic);
 
 } // namespace GUI

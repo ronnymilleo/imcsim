@@ -7,6 +7,7 @@
 
 #include "circuit/components/bjt.h"
 #include "circuit/components/diode.h"
+#include "circuit/components/igbt.h"
 #include "circuit/components/mosfet.h"
 #include "circuit/components/op_amp.h"
 #include "nlohmann/json.hpp"
@@ -71,6 +72,24 @@ constexpr auto MOSFET_KEYS = std::to_array<ParameterKey<Core::MOSFETParameters>>
     {"pmax", &Core::MOSFETParameters::MaxPower},
 });
 
+constexpr auto IGBT_KEYS = std::to_array<ParameterKey<Core::IGBTParameters>>({
+    {"vge_th", &Core::IGBTParameters::GateThresholdVoltage},
+    {"gfs", &Core::IGBTParameters::Transconductance},
+    {"gfs_current", &Core::IGBTParameters::TransconductanceCurrent},
+    {"v0", &Core::IGBTParameters::OnThresholdVoltage},
+    {"rce", &Core::IGBTParameters::OnResistance},
+    {"cies", &Core::IGBTParameters::InputCapacitance},
+    {"coes", &Core::IGBTParameters::OutputCapacitance},
+    {"cres", &Core::IGBTParameters::ReverseTransferCapacitance},
+    {"tail_share", &Core::IGBTParameters::TailFraction},
+    {"tail_tau", &Core::IGBTParameters::TailTimeConstant},
+    {"diode_vf", &Core::IGBTParameters::DiodeForwardVoltage},
+    {"vcesmax", &Core::IGBTParameters::MaxCollectorEmitterVoltage},
+    {"vgesmax", &Core::IGBTParameters::MaxGateEmitterVoltage},
+    {"icmax", &Core::IGBTParameters::MaxCollectorCurrent},
+    {"pmax", &Core::IGBTParameters::MaxPower},
+});
+
 constexpr auto OP_AMP_KEYS = std::to_array<ParameterKey<Core::OpAmpParameters>>({
     {"avol_db", &Core::OpAmpParameters::OpenLoopGainDecibels},
     {"gbw", &Core::OpAmpParameters::GainBandwidth},
@@ -116,6 +135,7 @@ constexpr auto DIODE_MODELS =
 constexpr auto BJT_MODELS = MakeModelCodec<Core::BJT>(BJT_KEYS, Core::CUSTOM_BJT_MODEL_NAME, &Core::FindBJTModel);
 constexpr auto MOSFET_MODELS =
     MakeModelCodec<Core::MOSFET>(MOSFET_KEYS, Core::CUSTOM_MOSFET_MODEL_NAME, &Core::FindMOSFETModel);
+constexpr auto IGBT_MODELS = MakeModelCodec<Core::IGBT>(IGBT_KEYS, Core::CUSTOM_IGBT_MODEL_NAME, &Core::FindIGBTModel);
 constexpr auto OP_AMP_MODELS =
     MakeModelCodec<Core::OpAmp>(OP_AMP_KEYS, Core::CUSTOM_OP_AMP_MODEL_NAME, &Core::FindOpAmpModel);
 
@@ -280,6 +300,7 @@ constexpr auto MODEL_CODECS = std::to_array<ModelFieldCodec>({
     {&Core::IsDiode, &WriteModel<DIODE_MODELS>, &ReadModel<DIODE_MODELS>},
     {&Core::IsBJT, &WriteModel<BJT_MODELS>, &ReadModel<BJT_MODELS>},
     {&Core::IsMOSFET, &WriteModel<MOSFET_MODELS>, &ReadModel<MOSFET_MODELS>},
+    {&Core::IsIGBT, &WriteModel<IGBT_MODELS>, &ReadModel<IGBT_MODELS>},
     {&IsOpAmp, &WriteOpAmpModel, &ReadOpAmpModel},
 });
 

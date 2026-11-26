@@ -8,6 +8,7 @@
 #include "circuit/circuit_currents.h"
 #include "circuit/components/bjt.h"
 #include "circuit/components/diode.h"
+#include "circuit/components/igbt.h"
 #include "circuit/components/mosfet.h"
 #include "circuit/components/thyristor.h"
 #include "simulation/fuse_state.h"
@@ -25,10 +26,10 @@ namespace {
 constexpr double I2T_WINDOW_SECONDS = 10e-3;
 
 /**
- * @brief   True for the parts other than diodes that carry datasheet ratings.
+ * @brief   True for the parts other than diodes that carry datasheet ratings: transistors, IGBTs and thyristors.
  */
 bool IsRatedSwitch(const ComponentType type) {
-    return IsBJT(type) || IsMOSFET(type) || IsThyristor(type);
+    return IsBJT(type) || IsMOSFET(type) || IsIGBT(type) || IsThyristor(type);
 }
 
 /**
@@ -249,6 +250,34 @@ BJTRatingWarnings(const BJT &bjt, const std::vector<double> &times, const Termin
 }
 
 /**
+ * @brief   Checks an IGBT on its peak VCE, VGE and IC and its average power.
+ * @details The collector current includes the co-packaged diode, so a diode carrying a freewheeling current counts
+ *          against IC as the package does.
+ */
+std::vector<std::string>
+IGBTRatingWarnings(const IGBT &igbt, const std::vector<double> &times, const TerminalWaveforms &terminals) {
+    std::vector<std::string> warnings;
+    const IGBTParameters &ratings = igbt.GetParameters();
+    const std::string label = DescribeRatedPart(igbt, igbt.GetModelName());
+    const std::vector<std::vector<double>> &voltages = terminals.Voltages;
+    AddRatingWarning(label,
+                     "VCE",
+                     PeakVoltageBetween(voltages[0], voltages[2]),
+                     ratings.MaxCollectorEmitterVoltage,
+                     "V",
+                     warnings);
+    AddRatingWarning(label,
+                     "VGE",
+                     PeakVoltageBetween(voltages[1], voltages[2]),
+                     ratings.MaxGateEmitterVoltage,
+                     "V",
+                     warnings);
+    AddRatingWarning(label, "IC", PeakMagnitude(terminals.Currents[0]), ratings.MaxCollectorCurrent, "A", warnings);
+    AddRatingWarning(label, "power", AveragePower(times, terminals), ratings.MaxPower, "W", warnings);
+    return warnings;
+}
+
+/**
  * @brief   Checks a MOSFET on its peak VDS, VGS and ID and its average power.
  */
 std::vector<std::string>
@@ -332,6 +361,9 @@ RatingWarnings(const Component &part, const std::vector<double> &times, const Te
     }
     if (IsMOSFET(type)) {
         return MOSFETRatingWarnings(static_cast<const MOSFET &>(part), times, terminals);
+    }
+    if (IsIGBT(type)) {
+        return IGBTRatingWarnings(static_cast<const IGBT &>(part), times, terminals);
     }
     if (IsThyristor(type)) {
         return ThyristorRatingWarnings(static_cast<const Thyristor &>(part), times, terminals);
