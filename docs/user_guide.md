@@ -211,9 +211,11 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   warnings, or failed, followed by the reason, which then takes the whole line), then the keys of the current mode, shortened at a word
   when the window is narrow, and the grid position of the cursor on the right. Click the result for the
   errors, the warnings and the ngspice output. Among the warnings are the safe operating area ones: a diode, LED,
-  Zener, transistor or MOSFET that a run pushes past its ratings (diode average forward current and power, and the VCE, IC,
-  VDS, VGS, ID and power of transistors) is named with the value and the rating. Ratings are fields of a part's
-  properties (IF max, the average forward current, P max, ...) and are only checked for ready and custom models, not for library ones.
+  Zener, transistor, MOSFET, thyristor or TRIAC that a run pushes past its ratings (diode average forward current and power,
+  the VCE, IC, VDS, VGS, ID and power of transistors, and the VDRM, on-state current, ITSM and I2t of thyristors) is named
+  with the value and the rating. Ratings are fields of a part's properties (IF max, the average forward current, P max,
+  ...) and are only checked for ready and custom models, not for library ones; a thyristor's ratings start at 0, which
+  leaves each unchecked until you set it.
 - **Menus**: File (files, import of schematics and of SPICE libraries, examples and the schematic export), Edit (undo,
   redo, changes to the selection, blocks and Preferences) and View (fit, wire colors, live effects, theme, and the windows). On macOS the shortcuts use Cmd where
   this guide says Ctrl: Cmd+S saves, Cmd+Z undoes.
