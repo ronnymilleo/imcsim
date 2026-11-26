@@ -418,49 +418,42 @@ std::string FormatFuse(const Fuse &fuse, const std::vector<int> &nodes, NetlistE
 }
 
 /**
- * @brief   An instance of the two-transistor subcircuit that latches; see FormatThyristorSubcircuit().
+ * @struct  ThyristorSubcircuit
+ * @brief   The name and the text of the subcircuit a kind of thyristor is written as.
+ */
+struct ThyristorSubcircuit {
+    const char *Name;
+    std::string Text;
+};
+
+/**
+ * @brief   Picks the subcircuit of a kind of thyristor: the two-transistor pair of an SCR, the anti-parallel pairs of a
+ *          TRIAC, or the pair with a turn-off path of a GTO.
+ */
+ThyristorSubcircuit GetThyristorSubcircuit(const ComponentType type) {
+    if (type == ComponentType::TRIAC) {
+        return {.Name = GetTriacSubcircuitName(), .Text = FormatTriacSubcircuit()};
+    }
+    if (type == ComponentType::GTO) {
+        return {.Name = GetGtoSubcircuitName(), .Text = FormatGtoSubcircuit()};
+    }
+    return {.Name = GetThyristorSubcircuitName(), .Text = FormatThyristorSubcircuit()};
+}
+
+/**
+ * @brief   An instance of the subcircuit of an SCR, a TRIAC or a GTO, which takes the gate and slope resistances; see
+ *          FormatThyristorSubcircuit(), FormatTriacSubcircuit() and FormatGtoSubcircuit().
  */
 std::string FormatThyristor(const Thyristor &thyristor, const std::vector<int> &nodes, NetlistExtras &extras) {
     const ThyristorParameters &figures = thyristor.GetParameters();
-    AddModelLine(GetThyristorSubcircuitName(), FormatThyristorSubcircuit(), extras.ModelNames, extras.Models);
+    const ThyristorSubcircuit subcircuit = GetThyristorSubcircuit(thyristor.GetType());
+    AddModelLine(subcircuit.Name, subcircuit.Text, extras.ModelNames, extras.Models);
     return std::format("X-{} {} {} {} {} RG={} RT={}\n",
                        thyristor.GetName(),
                        nodes[0],
                        nodes[1],
                        nodes[2],
-                       GetThyristorSubcircuitName(),
-                       FormatSpiceValue(figures.GateResistance),
-                       FormatSpiceValue(figures.OnResistance));
-}
-
-/**
- * @brief   An instance of the anti-parallel subcircuit that latches both ways; see FormatTriacSubcircuit().
- */
-std::string FormatTriac(const Thyristor &triac, const std::vector<int> &nodes, NetlistExtras &extras) {
-    const ThyristorParameters &figures = triac.GetParameters();
-    AddModelLine(GetTriacSubcircuitName(), FormatTriacSubcircuit(), extras.ModelNames, extras.Models);
-    return std::format("X-{} {} {} {} {} RG={} RT={}\n",
-                       triac.GetName(),
-                       nodes[0],
-                       nodes[1],
-                       nodes[2],
-                       GetTriacSubcircuitName(),
-                       FormatSpiceValue(figures.GateResistance),
-                       FormatSpiceValue(figures.OnResistance));
-}
-
-/**
- * @brief   An instance of the subcircuit that a negative gate turns off; see FormatGtoSubcircuit().
- */
-std::string FormatGto(const Thyristor &gto, const std::vector<int> &nodes, NetlistExtras &extras) {
-    const ThyristorParameters &figures = gto.GetParameters();
-    AddModelLine(GetGtoSubcircuitName(), FormatGtoSubcircuit(), extras.ModelNames, extras.Models);
-    return std::format("X-{} {} {} {} {} RG={} RT={}\n",
-                       gto.GetName(),
-                       nodes[0],
-                       nodes[1],
-                       nodes[2],
-                       GetGtoSubcircuitName(),
+                       subcircuit.Name,
                        FormatSpiceValue(figures.GateResistance),
                        FormatSpiceValue(figures.OnResistance));
 }
@@ -606,12 +599,10 @@ std::string FormatSwitchingPart(const Component &component, const std::vector<in
         return FormatRelay(static_cast<const Relay &>(component), nodes, extras);
     case ComponentType::FUSE:
         return FormatFuse(static_cast<const Fuse &>(component), nodes, extras);
-    case ComponentType::GTO:
-        return FormatGto(static_cast<const Thyristor &>(component), nodes, extras);
     case ComponentType::THYRISTOR:
-        return FormatThyristor(static_cast<const Thyristor &>(component), nodes, extras);
     case ComponentType::TRIAC:
-        return FormatTriac(static_cast<const Thyristor &>(component), nodes, extras);
+    case ComponentType::GTO:
+        return FormatThyristor(static_cast<const Thyristor &>(component), nodes, extras);
     case ComponentType::DIAC:
         return FormatDiac(static_cast<const Diac &>(component), nodes, extras);
     case ComponentType::V_SWITCH:
@@ -775,8 +766,8 @@ std::vector<std::string> GetElementNames(const Component &component) {
                 std::format("D-{}-N", name),
                 std::format("E-{}", name)};
     }
-    if (type == ComponentType::OP_AMP || type == ComponentType::FUSE || type == ComponentType::THYRISTOR
-        || type == ComponentType::TRIAC || type == ComponentType::GTO || type == ComponentType::DIAC) {
+    if (type == ComponentType::OP_AMP || type == ComponentType::FUSE || IsThyristor(type)
+        || type == ComponentType::DIAC) {
         return {std::format("X-{}", name)};
     }
     if (type == ComponentType::POTENTIOMETER) {
