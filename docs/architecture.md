@@ -37,7 +37,7 @@ flowchart TD
     app_core_simulation[simulation]
     app_core_backends[backends]
     app_core_backends -->|82| app_core_circuit
-    app_core_backends -->|52| app_core_simulation
+    app_core_backends -->|53| app_core_simulation
     app_core_backends -->|5| app_core_spice
     app_core_circuit -->|13| app_core_spice
     app_core_simulation -->|86| app_core_circuit
@@ -92,12 +92,12 @@ flowchart TD
     app_gui_schematic -->|70| app_gui_ui_elements
     app_gui_ui_elements -->|7| app_gui_base
     app_gui_ui_elements -->|2| app_gui_canvas
-    app_gui_windows -->|13| app_gui_analysis
+    app_gui_windows -->|15| app_gui_analysis
     app_gui_windows -->|66| app_gui_base
     app_gui_windows -->|4| app_gui_canvas
     app_gui_windows -->|4| app_gui_overlays
     app_gui_windows -->|71| app_gui_plots
-    app_gui_windows -->|50| app_gui_results
+    app_gui_windows -->|53| app_gui_results
     app_gui_windows -->|137| app_gui_schematic
     app_gui_windows -->|3| app_gui_ui_elements
 ```
