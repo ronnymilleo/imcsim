@@ -475,6 +475,14 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .AcceptedValues = ValueRule::NONE,
         .Family = ComponentFamily::SWITCHING,
     },
+    {
+        .Type = ComponentType::DIAC,
+        .TypeName = "Diac",
+        .NamePrefix = "DIAC",
+        .Unit = "",
+        .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::SWITCHING,
+    },
 });
 
 /**

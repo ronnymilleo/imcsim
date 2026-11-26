@@ -32,6 +32,7 @@ bool HasPropertyFields(const Core::Component &component) {
                                                        Core::ComponentType::FUSE,
                                                        Core::ComponentType::THYRISTOR,
                                                        Core::ComponentType::TRIAC,
+                                                       Core::ComponentType::DIAC,
                                                        Core::ComponentType::CLOCK,
                                                        Core::ComponentType::LOGIC_INPUT,
                                                        Core::ComponentType::LOGIC_OUTPUT,
@@ -67,12 +68,12 @@ bool ShowsValueFields(const Core::Component &component) {
         const auto &op_amp = static_cast<const Core::OpAmp &>(component);
         return op_amp.IsCustom() || op_amp.IsIdeal();
     }
-    // The switches that follow a voltage, the thyristor, the logic parts, a clock and the logic inputs and outputs
+    // The switches that follow a voltage, the thyristors, the logic parts, a clock and the logic inputs and outputs
     // have only their parameters
     if (type == Core::ComponentType::V_SWITCH || type == Core::ComponentType::RELAY || type == Core::ComponentType::FUSE
-        || type == Core::ComponentType::THYRISTOR || type == Core::ComponentType::TRIAC || Core::IsLogicPart(type)
-        || type == Core::ComponentType::CLOCK || type == Core::ComponentType::LOGIC_INPUT
-        || Core::IsLogicDisplay(type)) {
+        || type == Core::ComponentType::THYRISTOR || type == Core::ComponentType::TRIAC
+        || type == Core::ComponentType::DIAC || Core::IsLogicPart(type) || type == Core::ComponentType::CLOCK
+        || type == Core::ComponentType::LOGIC_INPUT || Core::IsLogicDisplay(type)) {
         return true;
     }
     return component.HasValue();

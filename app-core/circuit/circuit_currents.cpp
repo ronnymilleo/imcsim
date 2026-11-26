@@ -39,15 +39,16 @@ bool HasBranchCurrent(const ComponentType type) {
 /**
  * @brief   Lists the terminals of a component whose current is measured with a probe.
  * @param[in] component  Any component.
- * @return  The anode of a diode part, the first terminal of a switch or a fuse, every terminal of a transistor, a
- *          thyristor or a potentiometer, the contact and the coil of a relay, the two windings of a transformer, and
- *          the first output terminal of a controlled source or the output of an op-amp; nothing for the others, whose
- *          currents ngspice reports directly.
+ * @return  The anode of a diode part, the first terminal of a switch, a fuse or a DIAC, every terminal of a transistor,
+ * a thyristor or a potentiometer, the contact and the coil of a relay, the two windings of a transformer, and the first
+ * output terminal of a controlled source or the output of an op-amp; nothing for the others, whose currents ngspice
+ * reports directly.
  */
 std::vector<CurrentProbe> GetCurrentProbes(const Component &component) {
     const ComponentType type = component.GetType();
     if (IsDiode(type) || IsControlledSource(type) || IsBehavioralSource(type) || IsSwitch(type)
-        || type == ComponentType::V_SWITCH || type == ComponentType::FUSE || type == ComponentType::OP_AMP) {
+        || type == ComponentType::V_SWITCH || type == ComponentType::FUSE || type == ComponentType::DIAC
+        || type == ComponentType::OP_AMP) {
         return {{0, ""}};
     }
     if (IsLogicGate(type)) {

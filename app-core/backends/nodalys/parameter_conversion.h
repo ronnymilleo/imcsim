@@ -10,6 +10,7 @@
 
 #include "circuit/components/bjt.h"
 #include "circuit/components/clock.h"
+#include "circuit/components/diac.h"
 #include "circuit/components/diode.h"
 #include "circuit/components/fuse.h"
 #include "circuit/components/mosfet.h"
@@ -45,6 +46,7 @@ Nodalys::FuseParameters ToNodalys(const FuseParameters &parameters);
 
 // Thyristors
 Nodalys::ThyristorParameters ToNodalys(const ThyristorParameters &parameters);
+Nodalys::DiacParameters ToNodalys(const DiacParameters &parameters);
 
 // Transmission lines
 Nodalys::TransmissionLineParameters ToNodalys(double impedance_ohms, const TransmissionLineParameters &parameters);

@@ -13,6 +13,7 @@
 #include "circuit/components/clock.h"
 #include "circuit/components/component.h"
 #include "circuit/components/controlled_source.h"
+#include "circuit/components/diac.h"
 #include "circuit/components/diode.h"
 #include "circuit/components/fuse.h"
 #include "circuit/components/logic_input.h"
@@ -449,6 +450,24 @@ std::string FormatTriac(const Thyristor &triac, const std::vector<int> &nodes, N
 }
 
 /**
+ * @brief   An instance of the subcircuit that breaks over either way and holds; see FormatDiacSubcircuit().
+ */
+std::string FormatDiac(const Diac &diac, const std::vector<int> &nodes, NetlistExtras &extras) {
+    const DiacParameters &figures = diac.GetParameters();
+    AddModelLine(GetDiacSubcircuitName(), FormatDiacSubcircuit(), extras.ModelNames, extras.Models);
+    return std::format("X-{} {} {} {} VBO={} V0={} RT={} IH={} ROFF={}\n",
+                       diac.GetName(),
+                       nodes[0],
+                       nodes[1],
+                       GetDiacSubcircuitName(),
+                       FormatSpiceValue(figures.BreakoverVoltage),
+                       FormatSpiceValue(figures.OnThresholdVoltage),
+                       FormatSpiceValue(figures.OnResistance),
+                       FormatSpiceValue(figures.HoldingCurrent),
+                       FormatSpiceValue(figures.OffResistance));
+}
+
+/**
  * @brief   Two inductors, each behind the resistance of its winding, coupled by a K element.
  */
 std::string FormatTransformer(const Transformer &transformer, const std::vector<int> &nodes, NetlistExtras &extras) {
@@ -575,6 +594,8 @@ std::string FormatSwitchingPart(const Component &component, const std::vector<in
         return FormatThyristor(static_cast<const Thyristor &>(component), nodes, extras);
     case ComponentType::TRIAC:
         return FormatTriac(static_cast<const Thyristor &>(component), nodes, extras);
+    case ComponentType::DIAC:
+        return FormatDiac(static_cast<const Diac &>(component), nodes, extras);
     case ComponentType::V_SWITCH:
     default:
         return FormatVoltageSwitch(static_cast<const VoltageControlledSwitch &>(component), nodes, extras);
@@ -737,7 +758,7 @@ std::vector<std::string> GetElementNames(const Component &component) {
                 std::format("E-{}", name)};
     }
     if (type == ComponentType::OP_AMP || type == ComponentType::FUSE || type == ComponentType::THYRISTOR
-        || type == ComponentType::TRIAC) {
+        || type == ComponentType::TRIAC || type == ComponentType::DIAC) {
         return {std::format("X-{}", name)};
     }
     if (type == ComponentType::POTENTIOMETER) {

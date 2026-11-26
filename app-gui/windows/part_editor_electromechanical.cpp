@@ -49,6 +49,14 @@ constexpr auto THYRISTOR_FIELDS = std::to_array<ParameterField<Core::ThyristorPa
     {"tq", &Core::ThyristorParameters::TurnOffTime, "s"},
 });
 
+constexpr auto DIAC_FIELDS = std::to_array<ParameterField<Core::DiacParameters>>({
+    {"VBO", &Core::DiacParameters::BreakoverVoltage, "V"},
+    {"V0", &Core::DiacParameters::OnThresholdVoltage, "V"},
+    {"RT", &Core::DiacParameters::OnResistance, "Ohm"},
+    {"Off R", &Core::DiacParameters::OffResistance, "Ohm"},
+    {"IH", &Core::DiacParameters::HoldingCurrent, "A"},
+});
+
 constexpr auto TRANSFORMER_FIELDS = std::to_array<ParameterField<Core::TransformerParameters>>({
     {"Turns ratio", &Core::TransformerParameters::TurnsRatio, ":1"},
     {"Coupling", &Core::TransformerParameters::Coupling, ""},
@@ -83,6 +91,8 @@ void LoadElectromechanicalFields(ElectromechanicalFields &fields, const Core::Co
         LoadParameterFields(THYRISTOR_FIELDS,
                             fields.Thyristor,
                             static_cast<const Core::Thyristor &>(component).GetParameters());
+    } else if (type == Core::ComponentType::DIAC) {
+        LoadParameterFields(DIAC_FIELDS, fields.Diac, static_cast<const Core::Diac &>(component).GetParameters());
     } else if (type == Core::ComponentType::TRANSFORMER) {
         LoadParameterFields(TRANSFORMER_FIELDS,
                             fields.Transformer,
@@ -196,6 +206,23 @@ void DrawThyristor(Core::Thyristor &thyristor, ElectromechanicalFields &fields, 
     ImGui::TextDisabled("On Nodalys every figure is a parameter; on ngspice only RG and RT are, and IH, IGT and V0"
                         " follow from the transistor pair");
     ImGui::TextDisabled("VBO, dv/dt firing and the turn-off time tq run on Nodalys only; 0 disables each");
+}
+
+/**
+ * @brief   The DIAC breaks over at VBO either way, snaps back to the on-state line from V0 and releases below IH.
+ */
+void DrawDiac(Core::Diac &diac, ElectromechanicalFields &fields, Schematic &schematic) {
+    Core::DiacParameters parameters = diac.GetParameters();
+    const auto is_valid = [](const Core::DiacParameters &candidate) {
+        return Core::Diac::IsValidParameters(candidate);
+    };
+    if (DrawParameterFields(DIAC_FIELDS, fields.Diac, "", is_valid, parameters)) {
+        diac.SetParameters(parameters);
+        schematic.MarkModified();
+    }
+    ImGui::TextDisabled("Breaks over at VBO either way and snaps back by %sV; releases below IH",
+                        Core::FormatValue(parameters.BreakoverVoltage - parameters.OnThresholdVoltage).c_str());
+    ImGui::TextDisabled("V0 plus RT times IH must stay below VBO");
 }
 
 /**

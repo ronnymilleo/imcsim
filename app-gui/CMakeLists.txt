@@ -156,6 +156,7 @@ add_library(imcsim-gui-lib
             ui_elements/ui_controlled_switch.cpp
             ui_elements/ui_current_source.cpp
             ui_elements/ui_dependent_source.cpp
+            ui_elements/ui_diac.cpp
             ui_elements/ui_diode.cpp
             ui_elements/ui_element.cpp
             ui_elements/ui_flip_flop.cpp
