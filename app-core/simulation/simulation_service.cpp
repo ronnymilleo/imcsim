@@ -39,6 +39,7 @@ bool SimulationService::Submit(Job job) {
         }
         m_Job = std::move(job);
         m_Control.Reset();
+        m_Control.SetSpeedMultiplier(m_SpeedMultiplier);
         m_State = State::QUEUED;
         if (!m_Worker.joinable()) {
             m_Worker = std::thread(&SimulationService::Work, this);
@@ -142,6 +143,16 @@ void SimulationService::Resume() {
 }
 
 /**
+ * @brief   Sets the live simulation speed multiplier for the current and subsequent runs.
+ * @param[in] multiplier  Speed multiplier, clamped strictly above zero.
+ */
+void SimulationService::SetSpeedMultiplier(const double multiplier) {
+    const std::lock_guard lock(m_Mutex);
+    m_SpeedMultiplier = ClampSpeedMultiplier(multiplier);
+    m_Control.SetSpeedMultiplier(m_SpeedMultiplier);
+}
+
+/**
  * @brief   Tells whether a job is queued, running, or done and not yet polled.
  * @return  True until Poll() takes the result or Cancel() drops it.
  */
@@ -166,6 +177,15 @@ bool SimulationService::IsCancelling() const {
 bool SimulationService::IsPaused() const {
     const std::lock_guard lock(m_Mutex);
     return (m_State == State::QUEUED || m_State == State::RUNNING) && m_Control.IsPaused();
+}
+
+/**
+ * @brief   Returns the live simulation speed multiplier.
+ * @return  Positive speed multiplier, 1.0 by default.
+ */
+double SimulationService::GetSpeedMultiplier() const {
+    const std::lock_guard lock(m_Mutex);
+    return m_SpeedMultiplier;
 }
 
 /**

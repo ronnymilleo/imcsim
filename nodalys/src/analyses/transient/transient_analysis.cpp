@@ -475,7 +475,7 @@ std::expected<TransientResult, std::string> ComputeTransient(CompiledCircuit &co
     StepState state = InitStepState(compiled, std::move(*x_start), max_step, settings.StopTime, collector);
     ChunkPublisher publisher{.Monitor = monitor,
                              .LastSend = std::chrono::steady_clock::now(),
-                             .ChunkEnd = monitor.ChunkSpan,
+                             .ChunkEnd = ResolveChunkSpan(monitor),
                              .Sent = 0};
     const SteppingOutcome stepping =
         RunSteppingLoop(compiled, settings, max_step, options, state, collector, publisher, messages);

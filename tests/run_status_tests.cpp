@@ -38,8 +38,16 @@ TEST_CASE("A run in progress tells its share done, or that it is stopping", "[ru
 TEST_CASE("A live run tells how far it has got, running or paused", "[run_status]") {
     CHECK(GUI::FormatLiveProgress(false, std::nullopt) == "Transient live");
     CHECK(GUI::FormatLiveProgress(true, Core::Transient{}) == "Transient paused");
-    CHECK(GUI::FormatLiveProgress(false, MakeTransient(13)) == "Transient live at 12ms");
-    CHECK(GUI::FormatLiveProgress(true, MakeTransient(13)) == "Transient paused at 12ms");
+    CHECK(GUI::FormatLiveProgress(false, MakeTransient(13)) == "Transient live at 12.00ms");
+    CHECK(GUI::FormatLiveProgress(true, MakeTransient(13)) == "Transient paused at 12.00ms");
+}
+
+TEST_CASE("Live time formatting keeps fixed decimals per engineering decade", "[run_status]") {
+    CHECK(GUI::FormatLiveTime(0.0) == "0s");
+    CHECK(GUI::FormatLiveTime(1.234e-3) == "1.234ms");
+    CHECK(GUI::FormatLiveTime(12.3e-3) == "12.30ms");
+    CHECK(GUI::FormatLiveTime(123.4e-3) == "123.4ms");
+    CHECK(GUI::FormatLiveTime(1.5) == "1.500s");
 }
 
 TEST_CASE("The cost of a run is the steps and the time of a transient, and the time of any other analysis",

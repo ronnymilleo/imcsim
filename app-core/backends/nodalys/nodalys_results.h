@@ -7,10 +7,10 @@
 #define IMCSIM_NODALYS_RESULTS_H
 
 #include "circuit/circuit.h"
+#include "simulation/live_pace.h"
 #include "simulation/run_control.h"
 #include "simulation/simulation_backend.h"
 #include "simulation/simulation_results.h"
-#include <chrono>
 #include <expected>
 #include <nodalys/analyses.h>
 #include <nodalys/results.h>
@@ -20,7 +20,7 @@ namespace Core {
 
 // Monitor bridging
 [[nodiscard]] Nodalys::RunMonitor
-ToNodalysMonitor(const RunMonitor &monitor, std::chrono::steady_clock::time_point &live_start, const Circuit &circuit);
+ToNodalysMonitor(const RunMonitor &monitor, LivePacer &live_pacer, const Circuit &circuit);
 
 // Result conversion
 [[nodiscard]] OperatingPoint ToOperatingPoint(const Circuit &circuit, Nodalys::OperatingPointResult result);

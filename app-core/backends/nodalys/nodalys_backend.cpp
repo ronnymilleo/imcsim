@@ -13,7 +13,6 @@
 #include "circuit/components/subcircuit.h"
 #include "circuit/components/transmission_line.h"
 #include "simulation/sensitivity.h"
-#include <chrono>
 #include <format>
 #include <nodalys/nodalys.h>
 #include <utility>
@@ -210,8 +209,8 @@ TransientRun NodalysBackend::RunTransient(const Circuit &circuit,
                                           .Method = ToNodalysMethod(circuit),
                                           .Seed = settings.Seed};
     const bool has_initial_conditions = circuit.HasInitialConditions();
-    auto live_start = std::chrono::steady_clock::now();
-    const Nodalys::RunMonitor nodalys_monitor = ToNodalysMonitor(monitor, live_start, circuit);
+    LivePacer live_pacer;
+    const Nodalys::RunMonitor nodalys_monitor = ToNodalysMonitor(monitor, live_pacer, circuit);
     return RunOnNodalys<TransientRun>(
         circuit,
         [&, options = ToConvergenceOptions(circuit)](const Nodalys::Circuit &compiled,

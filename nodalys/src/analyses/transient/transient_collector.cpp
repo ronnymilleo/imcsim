@@ -153,6 +153,15 @@ void TransientCollector::AppendFinalPointIfNeeded(const double stop_time,
 }
 
 /**
+ * @brief   Returns the chunk span in simulated seconds for the next chunk, preferring NextChunkSpan when provided.
+ * @param[in] monitor  Run monitor configuration.
+ * @return  Chunk span in simulated seconds, or 0 when chunks are not bounded by simulated span.
+ */
+double ResolveChunkSpan(const RunMonitor &monitor) {
+    return monitor.NextChunkSpan ? monitor.NextChunkSpan() : monitor.ChunkSpan;
+}
+
+/**
  * @brief   Reports progress and streams any unsent output points to the RunMonitor.
  * @param[in]     result     Accumulated transient result.
  * @param[in,out] publisher  Chunk streaming state.
@@ -180,8 +189,9 @@ void PublishChunk(const TransientResult &result, ChunkPublisher &publisher, cons
  * @return  True when a chunk should be published now.
  */
 bool IsChunkDue(const ChunkPublisher &publisher, const double time, const std::size_t point_count) {
-    const bool spans_chunk = publisher.Monitor.ChunkSpan > 0.0 && time >= publisher.ChunkEnd;
-    return spans_chunk || std::chrono::steady_clock::now() - publisher.LastSend > CHUNK_INTERVAL
+    const bool is_span_due =
+        (publisher.Monitor.ChunkSpan > 0.0 || publisher.Monitor.NextChunkSpan != nullptr) && time >= publisher.ChunkEnd;
+    return is_span_due || std::chrono::steady_clock::now() - publisher.LastSend > CHUNK_INTERVAL
         || point_count - publisher.Sent > CHUNK_POINT_LIMIT;
 }
 
@@ -210,7 +220,7 @@ bool ServeChunk(CompiledCircuit &compiled,
     }
     ApplyLiveChanges(compiled, monitor, messages);
     publisher.LastSend = std::chrono::steady_clock::now();
-    publisher.ChunkEnd = time + monitor.ChunkSpan;
+    publisher.ChunkEnd = time + ResolveChunkSpan(monitor);
     return false;
 }
 

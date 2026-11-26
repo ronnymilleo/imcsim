@@ -118,7 +118,7 @@ constexpr double COMPLETE_SHARE = 1.0 - 1e-9;
  */
 double GetFirstChunkDuration(const TransientSettings &settings, const RunMonitor &monitor) {
     if (monitor.LivePace > 0.0) {
-        return monitor.LivePace * LIVE_CHUNK_SECONDS;
+        return GetLiveChunkDuration(monitor.LivePace, monitor.Control);
     }
     if (monitor.FixedChunkSeconds > 0.0) {
         return monitor.FixedChunkSeconds;
@@ -252,11 +252,13 @@ std::optional<std::string> RunInChunks(const Circuit &circuit,
     double reached = 0.0;
     std::size_t sent = 0;
     bool is_started = false;
-    // When the clock the live run keeps pace with started, moved later by the time spent paused
-    auto start = std::chrono::steady_clock::now();
+    LivePacer pacer;
     while (true) {
-        if (is_live && monitor.Control != nullptr) {
-            ApplyLiveChanges(*monitor.Control);
+        if (is_live) {
+            if (monitor.Control != nullptr) {
+                ApplyLiveChanges(*monitor.Control);
+            }
+            duration = GetLiveChunkDuration(pace, monitor.Control);
         }
         const auto begin = std::chrono::steady_clock::now();
         RunChunk(reached + duration, settings.StopTime, is_started);
@@ -281,7 +283,7 @@ std::optional<std::string> RunInChunks(const Circuit &circuit,
         }
         if (!is_live) {
             duration = GetNextChunkDuration(monitor, duration, wall.count(), settings.TimeStep);
-        } else if (!KeepLivePace(start, reached, pace, monitor.Control)) {
+        } else if (!KeepLivePace(pacer, reached, pace, monitor.Control)) {
             return std::nullopt;
         }
     }

@@ -58,8 +58,8 @@ EditorWindow::EditorWindow(Schematic &schematic,
                    [this](std::string file_name, Core::SpiceLibrary library) {
                        m_SpiceImport.Open(std::move(file_name), std::move(library));
                    }}),
-      m_Toolbar(controls, settings_panel, schematic), m_PartPicker(preferences), m_PartRail(preferences),
-      m_Overlays(glow_renderer, playback, preferences),
+      m_Toolbar(controls, settings_panel, schematic, results, playback), m_PartPicker(preferences),
+      m_PartRail(preferences), m_Overlays(glow_renderer, playback, preferences),
       m_Navigator(schematic, {.Mode = m_Mode, .Part = part_editor, .Overlays = m_Overlays, .View = m_View}) {
 }
 

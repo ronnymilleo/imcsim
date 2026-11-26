@@ -14,31 +14,14 @@ namespace {
 
 /// A live run that is ahead of the clock waits in slices this long, so a stop waits little.
 constexpr std::chrono::duration<double> PACE_WAIT_SLICE{0.01};
-/// A live run further behind the clock than one chunk drops the delay instead of making it up; smaller delays, such as
-/// the oversleep of a wait, are made up, so they do not add up over a long run.
-constexpr std::chrono::duration<double> LIVE_CATCH_UP_LIMIT{LIVE_CHUNK_SECONDS};
 
 bool IsCancelled(const RunControl *control) {
     return control != nullptr && control->IsCancelled();
 }
 
 /**
- * @brief   Waits until the clock catches up with the simulated time a live run has reached, unless the run is asked to
- *          stop.
- */
-void WaitForClock(const std::chrono::steady_clock::time_point due, const RunControl *control) {
-    while (!IsCancelled(control)) {
-        const std::chrono::duration<double> left = due - std::chrono::steady_clock::now();
-        if (left <= std::chrono::duration<double>::zero()) {
-            return;
-        }
-        std::this_thread::sleep_for(std::min(left, PACE_WAIT_SLICE));
-    }
-}
-
-/**
  * @brief   Holds a paused live run until it is resumed or asked to stop, and returns how long it held, by which the
- *          clock the run keeps pace with moves on.
+ *          due clock moves on.
  */
 std::chrono::steady_clock::duration WaitWhilePaused(const RunControl *control) {
     const auto start = std::chrono::steady_clock::now();
@@ -48,31 +31,82 @@ std::chrono::steady_clock::duration WaitWhilePaused(const RunControl *control) {
     return std::chrono::steady_clock::now() - start;
 }
 
+/**
+ * @brief   Waits until the clock catches up with the pacer's due time, shifting it when paused and returning early on
+ *          cancel.
+ */
+void WaitForClock(LivePacer &pacer, const RunControl *control) {
+    while (!IsCancelled(control)) {
+        if (control != nullptr && control->IsPaused()) {
+            pacer.Due += WaitWhilePaused(control);
+            continue;
+        }
+        const std::chrono::duration<double> left = pacer.Due - std::chrono::steady_clock::now();
+        if (left <= std::chrono::duration<double>::zero()) {
+            return;
+        }
+        std::this_thread::sleep_for(std::min(left, PACE_WAIT_SLICE));
+    }
+}
+
 } // namespace
 
 /**
- * @brief   Keeps a live run at its pace once it reached a simulated time: waits for the clock, then holds while it is
- *          paused, moving the start of its clock by the time paused so it never catches up.
- * @details A run that fell more than a chunk behind, because the circuit was slow for a while, moves the start by its
- *          delay too, so it goes on at its pace instead of hurrying to make the delay up once the circuit gets easy.
- * @param[in,out] start    When the clock of the run started, moved later by the time paused and the delays dropped.
+ * @brief   Computes the simulated time span of one live chunk scaled by the current speed multiplier.
+ * @param[in] pace     Base simulated seconds per wall-clock second.
+ * @param[in] control  Run control providing the speed multiplier, or null for 1x.
+ * @return  Chunk duration in simulated seconds.
+ */
+double GetLiveChunkDuration(const double pace, const RunControl *control) {
+    const double speed = control != nullptr ? control->GetSpeedMultiplier() : 1.0;
+    return pace * ClampSpeedMultiplier(speed) * LIVE_CHUNK_SECONDS;
+}
+
+/**
+ * @brief   Advances the pacer's wall-clock target by the simulated time covered since the last chunk at the given
+ * speed.
+ * @param[in,out] pacer             Incremental pacer state updated in place.
+ * @param[in]     reached           Simulated time reached at the end of the chunk, in seconds.
+ * @param[in]     pace              Base simulated seconds per wall-clock second, above 0.
+ * @param[in]     speed_multiplier  Speed multiplier for this chunk, clamped strictly above 0.
+ */
+void AdvanceLivePace(LivePacer &pacer, const double reached, const double pace, const double speed_multiplier) {
+    const double delta_sim = std::max(0.0, reached - pacer.LastReached);
+    pacer.LastReached = std::max(pacer.LastReached, reached);
+    const double effective_pace = pace * ClampSpeedMultiplier(speed_multiplier);
+    if (effective_pace <= 0.0 || delta_sim <= 0.0) {
+        return;
+    }
+    pacer.Due += std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+        std::chrono::duration<double>(delta_sim / effective_pace));
+}
+
+/**
+ * @brief   Drops accumulated wall-clock delay beyond LIVE_CATCH_UP_LIMIT so the run does not rush to catch up.
+ * @param[in,out] pacer  Incremental pacer state whose due time shifts forward when behind.
+ * @param[in]     now    Current wall-clock time.
+ */
+void DropLiveDelay(LivePacer &pacer, const std::chrono::steady_clock::time_point now) {
+    if (const auto late = now - pacer.Due; late > LIVE_CATCH_UP_LIMIT) {
+        pacer.Due += late;
+    }
+}
+
+/**
+ * @brief   Keeps a live run at its current speed once it reached a simulated time: advances the incremental target,
+ * waits for the clock, drops excessive lateness and holds while paused.
+ * @param[in,out] pacer    Incremental pacer state tracking the due clock and last reached simulated time.
  * @param[in]     reached  Simulated time the run has reached, in seconds.
- * @param[in]     pace     Simulated seconds the run covers per second of the clock, above 0.
- * @param[in]     control  Where to look for a stop request and the pause, or null.
+ * @param[in]     pace     Base simulated seconds the run covers per second of the clock, above 0.
+ * @param[in]     control  Where to look for speed multiplier, stop request and pause, or null.
  * @return  True when the run goes on, false when it was asked to stop.
  */
-bool KeepLivePace(std::chrono::steady_clock::time_point &start,
-                  const double reached,
-                  const double pace,
-                  const RunControl *control) {
-    const auto due = start
-                   + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
-                         std::chrono::duration<double>(reached / pace));
-    WaitForClock(due, control);
-    if (const auto late = std::chrono::steady_clock::now() - due; late > LIVE_CATCH_UP_LIMIT) {
-        start += late;
-    }
-    start += WaitWhilePaused(control);
+bool KeepLivePace(LivePacer &pacer, const double reached, const double pace, const RunControl *control) {
+    const double speed = control != nullptr ? control->GetSpeedMultiplier() : 1.0;
+    AdvanceLivePace(pacer, reached, pace, speed);
+    WaitForClock(pacer, control);
+    DropLiveDelay(pacer, std::chrono::steady_clock::now());
+    pacer.Due += WaitWhilePaused(control);
     return !IsCancelled(control);
 }
 

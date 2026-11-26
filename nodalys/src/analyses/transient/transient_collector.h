@@ -82,6 +82,7 @@ private:
 };
 
 // Chunk streaming and live changes
+[[nodiscard]] double ResolveChunkSpan(const RunMonitor &monitor);
 void PublishChunk(const TransientResult &result, ChunkPublisher &publisher, double progress);
 [[nodiscard]] bool IsChunkDue(const ChunkPublisher &publisher, double time, std::size_t point_count);
 [[nodiscard]] bool ServeChunk(CompiledCircuit &compiled,

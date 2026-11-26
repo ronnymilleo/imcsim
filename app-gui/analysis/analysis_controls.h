@@ -78,6 +78,8 @@ public:
     void ContinueLive();
     void DiscardLive();
     bool IsLiveResult() const;
+    void SetSpeedMultiplier(double multiplier);
+    double GetSpeedMultiplier() const;
 
     // Last run
     std::optional<Analysis> GetLastRun() const;

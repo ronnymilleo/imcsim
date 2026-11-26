@@ -9,6 +9,7 @@
 #include "base/theme.h"
 #include "schematic/shortcuts.h"
 #include "spice/spice_value.h"
+#include "windows/speed_selector.h"
 #include "windows/tool_icons.h"
 #include <algorithm>
 #include <format>
@@ -29,6 +30,8 @@ constexpr float GROUP_GAP = 0.6f;
 constexpr float SEARCH_MAX_WIDTH = 18.0f;
 /// Narrowest the part search gets, in font sizes.
 constexpr float SEARCH_MIN_WIDTH = 8.0f;
+/// Widest live time readout text, reserved so controls to its right never shift as digits change.
+constexpr const char *WIDEST_LIVE_TIME_READOUT = "t = 888.8ms";
 
 /**
  * @brief   A thin upright line between two groups of buttons, centered in the gap.
@@ -84,11 +87,33 @@ float LiveButtonWidth() {
 }
 
 /**
- * @brief   The analysis button, Live and Run, pinned to the right end of the bar.
+ * @brief   Fixed width reserved for the live simulated time readout in the monospace font.
  */
-float GetRunControlsWidth() {
+float LiveTimeReadoutWidth() {
+    ImGui::PushFont(GetMonospaceFont(), 0.0f);
+    const float width = ImGui::CalcTextSize(WIDEST_LIVE_TIME_READOUT).x;
+    ImGui::PopFont();
+    return width;
+}
+
+/**
+ * @brief   The analysis button, Live and Run, plus optional live speed and time readout, pinned to the right end of the
+ *          bar.
+ */
+float GetRunControlsWidth(const bool has_time, const bool has_speed) {
     const float spacing = ImGui::GetFontSize() * BUTTON_SPACING;
-    return AnalysisButtonWidth() + LiveButtonWidth() + GetToolButtonSide() + spacing * 2.0f;
+    float width = AnalysisButtonWidth() + LiveButtonWidth() + GetToolButtonSide() + spacing * 2.0f;
+    if (has_speed) {
+        width += GetSpeedSelectorWidth() + spacing;
+    }
+    if (has_time) {
+        width += LiveTimeReadoutWidth() + spacing;
+    }
+    return width;
+}
+
+bool ShouldShowSpeedSelector(const AnalysisControls &controls) {
+    return controls.IsLive() || (controls.IsLiveModeOn() && !controls.FindLiveObstacle());
 }
 
 /**
@@ -237,16 +262,23 @@ std::string DescribeRunAction(const AnalysisControls &controls, const Analysis s
  * @param[in] controls        Runs of the analyses, for the Run button; they must outlive the toolbar.
  * @param[in] settings_panel  Analysis picker and settings, for the popover beside Run; it must outlive the toolbar.
  * @param[in] root_schematic  The document, whose settings name the analysis to run; it must outlive the toolbar.
+ * @param[in] results         Results of the document, read for the live time readout; they must outlive the toolbar.
+ * @param[in] playback        Shared playback state whose speed stays in sync with live runs; it must outlive the
+ *                            toolbar.
  */
 EditorToolbar::EditorToolbar(AnalysisControls &controls,
                              AnalysisSettingsPanel &settings_panel,
-                             const Schematic &root_schematic)
-    : m_Controls(controls), m_SettingsPanel(settings_panel), m_RootSchematic(root_schematic) {
+                             const Schematic &root_schematic,
+                             const ResultStore &results,
+                             TransientPlayback &playback)
+    : m_Controls(controls), m_SettingsPanel(settings_panel), m_RootSchematic(root_schematic), m_Results(results),
+      m_Playback(playback) {
 }
 
 /**
  * @brief   Draws the bar on one row that never wraps: the tools and the history on the left, the part search after
- * them, and the analysis, Live and Run at the right end, where Run stays whatever the width of the window.
+ *          them, and the live readout/speed, analysis, Live and Run at the right end, where Run stays whatever the
+ *          width of the window.
  * @param[in]     mode              The mode of the editor, whose tool shows as the one in use.
  * @param[in]     schematic         The schematic being edited, for the state of Undo and Redo.
  * @param[in]     is_editing_block  Whether a block is open, which disables the run controls.
@@ -259,8 +291,10 @@ ToolbarRequest EditorToolbar::Draw(const EditorMode &mode,
                                    const bool is_editing_block,
                                    PartPicker &search,
                                    const std::vector<const SavedSubcircuit *> &blocks) {
+    const bool has_time = m_Controls.IsLive();
+    const bool has_speed = ShouldShowSpeedSelector(m_Controls);
     const float row_right = ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvail().x;
-    const float run_left = row_right - GetRunControlsWidth();
+    const float run_left = row_right - GetRunControlsWidth(has_time, has_speed);
     ToolbarRequest request = {.Mode = DrawToolButtons(mode), .Command = std::nullopt};
     DrawGroupSeparator();
     request.Command = DrawHistoryButtons(schematic);
@@ -274,8 +308,8 @@ ToolbarRequest EditorToolbar::Draw(const EditorMode &mode,
 }
 
 /**
- * @brief   The analysis button, Live and Run, from where the room before them ends or, when the bar is short of room,
- *          right after the part search.
+ * @brief   The live time readout and speed selector (when active), analysis button, Live and Run, from where the room
+ *          before them ends or, when the bar is short of room, right after the part search.
  * @param[in] run_left          Where they start when the bar has room, so Run ends at the right end.
  * @param[in] row_top           Top of the row of the bar, in window coordinates.
  * @param[in] is_editing_block  Whether a block is open, which disables them.
@@ -286,12 +320,45 @@ void EditorToolbar::DrawRunControls(const float run_left, const float row_top, c
     ImGui::SetCursorScreenPos({std::max(run_left, ImGui::GetCursorScreenPos().x + ImGui::GetFontSize() * GROUP_GAP),
                                ImGui::GetWindowPos().y + row_top});
     ImGui::BeginDisabled(is_editing_block);
+    if (m_Controls.IsLive()) {
+        DrawLiveTimeReadout();
+        ImGui::SameLine(0.0f, spacing);
+    }
+    if (ShouldShowSpeedSelector(m_Controls)) {
+        ImGui::SetCursorPosY(row_top + (GetToolButtonSide() - ImGui::GetFrameHeight()) / 2.0f);
+        if (DrawSpeedSelector("##live_speed", m_Playback.Speed, "Live simulation speed")) {
+            m_Controls.SetSpeedMultiplier(m_Playback.Speed);
+        }
+        ImGui::SameLine(0.0f, spacing);
+        ImGui::SetCursorPosY(row_top);
+    }
     DrawAnalysisButton();
     ImGui::SameLine(0.0f, spacing);
     DrawLiveToggle();
     ImGui::SameLine(0.0f, spacing);
     DrawRunButton();
     ImGui::EndDisabled();
+}
+
+/**
+ * @brief   Draws the current simulated time of an active or paused live run in a fixed-width monospace box.
+ */
+void EditorToolbar::DrawLiveTimeReadout() const {
+    const float side = GetToolButtonSide();
+    const auto &transient = m_Results.GetTransient();
+    const std::string text = transient && !transient->Times.empty()
+                               ? std::format("t = {}", FormatLiveTime(transient->Times.back()))
+                               : "t = --";
+    ImGui::PushFont(GetMonospaceFont(), 0.0f);
+    const float width = std::max(LiveTimeReadoutWidth(), ImGui::CalcTextSize(text.c_str()).x);
+    const float text_height = ImGui::GetTextLineHeight();
+    const ImVec2 pos = ImGui::GetCursorScreenPos();
+    ImGui::Dummy({width, side});
+    ImGui::SetItemTooltip("Current simulated time of the live run");
+    ImGui::GetWindowDrawList()->AddText({pos.x, pos.y + (side - text_height) / 2.0f},
+                                        ImGui::GetColorU32(ImGuiCol_Text),
+                                        text.c_str());
+    ImGui::PopFont();
 }
 
 /**

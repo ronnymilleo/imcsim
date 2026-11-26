@@ -29,7 +29,7 @@ void DrawCursorToggle(PlotCursors &cursors, float right_edge);
 void DrawCursorCheckbox(PlotCursors &cursors);
 
 // Playback
-void DrawPlaybackBar(TransientPlayback &playback, double from, double to);
+bool DrawPlaybackBar(TransientPlayback &playback, double from, double to);
 
 } // namespace GUI
 

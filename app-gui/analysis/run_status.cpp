@@ -30,7 +30,16 @@ std::string FormatRunProgress(const std::string_view analysis_name, const bool i
 }
 
 /**
- * @brief   "Transient live at 12.5ms", or paused: a live run has no end to count toward, so it tells how far it has
+ * @brief   Formats a simulated instant with fixed decimals per engineering decade so live readouts do not jitter.
+ * @param[in] seconds  Simulated time in seconds.
+ * @return  Formatted time with unit, such as "12.34ms".
+ */
+std::string FormatLiveTime(const double seconds) {
+    return std::format("{}s", Core::FormatMeasurement(seconds));
+}
+
+/**
+ * @brief   "Transient live at 12.50ms", or paused: a live run has no end to count toward, so it tells how far it has
  *          got.
  */
 std::string FormatLiveProgress(const bool is_paused, const std::optional<Core::Transient> &transient) {
@@ -38,7 +47,7 @@ std::string FormatLiveProgress(const bool is_paused, const std::optional<Core::T
     if (!transient || transient->Times.empty()) {
         return std::format("Transient {}", state);
     }
-    return std::format("Transient {} at {}s", state, Core::FormatValue(transient->Times.back()));
+    return std::format("Transient {} at {}", state, FormatLiveTime(transient->Times.back()));
 }
 
 /**
