@@ -25,6 +25,7 @@ constexpr auto PARAMETER_ONLY_TYPES = std::to_array({Core::ComponentType::V_SWIT
                                                      Core::ComponentType::FUSE,
                                                      Core::ComponentType::THYRISTOR,
                                                      Core::ComponentType::TRIAC,
+                                                     Core::ComponentType::GTO,
                                                      Core::ComponentType::DIAC,
                                                      Core::ComponentType::CLOCK,
                                                      Core::ComponentType::LOGIC_INPUT});
@@ -53,6 +54,7 @@ bool HasPropertyFields(const Core::Component &component) {
                                                        Core::ComponentType::FUSE,
                                                        Core::ComponentType::THYRISTOR,
                                                        Core::ComponentType::TRIAC,
+                                                       Core::ComponentType::GTO,
                                                        Core::ComponentType::DIAC,
                                                        Core::ComponentType::CLOCK,
                                                        Core::ComponentType::LOGIC_INPUT,

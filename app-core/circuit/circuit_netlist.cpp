@@ -450,6 +450,22 @@ std::string FormatTriac(const Thyristor &triac, const std::vector<int> &nodes, N
 }
 
 /**
+ * @brief   An instance of the subcircuit that a negative gate turns off; see FormatGtoSubcircuit().
+ */
+std::string FormatGto(const Thyristor &gto, const std::vector<int> &nodes, NetlistExtras &extras) {
+    const ThyristorParameters &figures = gto.GetParameters();
+    AddModelLine(GetGtoSubcircuitName(), FormatGtoSubcircuit(), extras.ModelNames, extras.Models);
+    return std::format("X-{} {} {} {} {} RG={} RT={}\n",
+                       gto.GetName(),
+                       nodes[0],
+                       nodes[1],
+                       nodes[2],
+                       GetGtoSubcircuitName(),
+                       FormatSpiceValue(figures.GateResistance),
+                       FormatSpiceValue(figures.OnResistance));
+}
+
+/**
  * @brief   An instance of the subcircuit that breaks over either way and holds; see FormatDiacSubcircuit().
  */
 std::string FormatDiac(const Diac &diac, const std::vector<int> &nodes, NetlistExtras &extras) {
@@ -590,6 +606,8 @@ std::string FormatSwitchingPart(const Component &component, const std::vector<in
         return FormatRelay(static_cast<const Relay &>(component), nodes, extras);
     case ComponentType::FUSE:
         return FormatFuse(static_cast<const Fuse &>(component), nodes, extras);
+    case ComponentType::GTO:
+        return FormatGto(static_cast<const Thyristor &>(component), nodes, extras);
     case ComponentType::THYRISTOR:
         return FormatThyristor(static_cast<const Thyristor &>(component), nodes, extras);
     case ComponentType::TRIAC:
@@ -758,7 +776,7 @@ std::vector<std::string> GetElementNames(const Component &component) {
                 std::format("E-{}", name)};
     }
     if (type == ComponentType::OP_AMP || type == ComponentType::FUSE || type == ComponentType::THYRISTOR
-        || type == ComponentType::TRIAC || type == ComponentType::DIAC) {
+        || type == ComponentType::TRIAC || type == ComponentType::GTO || type == ComponentType::DIAC) {
         return {std::format("X-{}", name)};
     }
     if (type == ComponentType::POTENTIOMETER) {

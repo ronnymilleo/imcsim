@@ -37,6 +37,7 @@ TEST_CASE("FindParts ignores case, spaces and punctuation", "[element_factory]")
     CHECK(GUI::FindParts("thyristor") == std::vector{ComponentType::THYRISTOR});
     CHECK(GUI::FindParts("scr") == std::vector{ComponentType::THYRISTOR});
     CHECK(GUI::FindParts("triac") == std::vector{ComponentType::TRIAC});
+    CHECK(GUI::FindParts("gto") == std::vector{ComponentType::GTO});
     CHECK(GUI::FindParts("diac") == std::vector{ComponentType::DIAC});
     CHECK(GUI::FindParts("transmission line") == std::vector{ComponentType::TRANSMISSION_LINE});
     CHECK(GUI::FindParts("controlled switch") == std::vector{ComponentType::V_SWITCH});
@@ -59,11 +60,12 @@ TEST_CASE("FindParts ignores case, spaces and punctuation", "[element_factory]")
     }
     SECTION("an empty query lists every part") {
         const std::vector<ComponentType> all = GUI::FindParts("");
-        CHECK(all.size() == 52);
+        CHECK(all.size() == 53);
         CHECK(std::ranges::contains(all, ComponentType::RESISTOR));
         CHECK(std::ranges::contains(all, ComponentType::TRANSMISSION_LINE));
         CHECK(std::ranges::contains(all, ComponentType::THYRISTOR));
         CHECK(std::ranges::contains(all, ComponentType::TRIAC));
+        CHECK(std::ranges::contains(all, ComponentType::GTO));
         CHECK(std::ranges::contains(all, ComponentType::DIAC));
         CHECK(std::ranges::contains(all, ComponentType::CLOCK));
         CHECK(std::ranges::contains(all, ComponentType::LOGIC_INPUT));

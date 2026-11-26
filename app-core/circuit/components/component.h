@@ -72,11 +72,12 @@ enum class ComponentType {
     THYRISTOR,
     TRIAC,
     DIAC,
+    GTO,
 };
 
 /// Last enumerator of ComponentType, which the table of traits in component.cpp is checked against: a new type goes
 /// before it, or this moves to the new type.
-constexpr ComponentType LAST_COMPONENT_TYPE = ComponentType::DIAC;
+constexpr ComponentType LAST_COMPONENT_TYPE = ComponentType::GTO;
 
 /**
  * @enum    ComponentFamily

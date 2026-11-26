@@ -24,10 +24,6 @@ namespace {
 /// Span a datasheet I2t for fusing is given over: one half-cycle of 50 Hz mains, in seconds.
 constexpr double I2T_WINDOW_SECONDS = 10e-3;
 
-bool IsThyristor(const ComponentType type) {
-    return type == ComponentType::THYRISTOR || type == ComponentType::TRIAC;
-}
-
 /**
  * @brief   True for the parts other than diodes that carry datasheet ratings.
  */
@@ -279,9 +275,9 @@ MOSFETRatingWarnings(const MOSFET &mosfet, const std::vector<double> &times, con
 }
 
 /**
- * @brief   Checks a thyristor (SCR) or TRIAC on the ratings it sets: the peak off-state voltage, the on-state current
- *          (the average forward current of an SCR, the RMS current of a TRIAC), the peak surge current and the I2t
- *          over a mains half-cycle, all read from the main current, the one into the anode or MT2.
+ * @brief   Checks a thyristor (SCR), TRIAC or GTO on the ratings it sets: the peak off-state voltage, the on-state
+ *          current (the average forward current of an SCR or a GTO, the RMS current of a TRIAC), the peak surge current
+ *          and the I2t over a mains half-cycle, all read from the main current, the one into the anode or MT2.
  * @details The part has no model name, so the warning names it alone. An SCR's one voltage rating stands for both
  *          VDRM and VRRM, which datasheets mostly give equal, and is checked on the peak either way.
  */

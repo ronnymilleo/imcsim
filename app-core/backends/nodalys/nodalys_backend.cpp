@@ -176,6 +176,8 @@ NodalysBackend::NodalysBackend() {
         "Nodalys harmonic balance does not support the latching thyristor";
     m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::HARMONIC_BALANCE][ComponentType::TRIAC] =
         "Nodalys harmonic balance does not support the latching TRIAC";
+    m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::HARMONIC_BALANCE][ComponentType::GTO] =
+        "Nodalys harmonic balance does not support the latching GTO";
     m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::HARMONIC_BALANCE][ComponentType::DIAC] =
         "Nodalys harmonic balance does not support the latching DIAC";
     m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::POLE_ZERO][ComponentType::THYRISTOR] =
@@ -183,6 +185,9 @@ NodalysBackend::NodalysBackend() {
         "the circuit last drove, so its frozen state has no roots the solver can place";
     m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::POLE_ZERO][ComponentType::TRIAC] =
         "Pole-zero analysis is small-signal, and a TRIAC blocks nearly open or conducts as a switch, whichever "
+        "the circuit last drove, so its frozen state has no roots the solver can place";
+    m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::POLE_ZERO][ComponentType::GTO] =
+        "Pole-zero analysis is small-signal, and a GTO blocks nearly open or conducts as a switch, whichever "
         "the circuit last drove, so its frozen state has no roots the solver can place";
     m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::POLE_ZERO][ComponentType::DIAC] =
         "Pole-zero analysis is small-signal, and a DIAC blocks nearly open or conducts as a switch, whichever "

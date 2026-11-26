@@ -226,7 +226,7 @@ Nodalys::FuseParameters ToNodalys(const FuseParameters &parameters) {
 }
 
 /**
- * @brief   The figures of a thyristor (SCR) or TRIAC.
+ * @brief   The figures of a thyristor (SCR), TRIAC or GTO.
  * @param[in] parameters  Datasheet figures of the thyristor, with the direction the part type fixes.
  * @return  The same figures for the Nodalys device, which takes every one of them as a parameter.
  */
@@ -241,6 +241,7 @@ Nodalys::ThyristorParameters ToNodalys(const ThyristorParameters &parameters) {
             .BreakoverVoltage = parameters.BreakoverVoltage,
             .CriticalDvDt = parameters.CriticalDvDt,
             .TurnOffTime = parameters.TurnOffTime,
+            .GateTurnOffCurrent = parameters.GateTurnOffCurrent,
             .IsBidirectional = parameters.IsBidirectional};
 }
 

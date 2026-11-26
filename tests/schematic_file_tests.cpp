@@ -1082,6 +1082,37 @@ TEST_CASE("A TRIAC keeps its ratings, and a file without them leaves them unchec
     CHECK(old_part.GetParameters().MaxI2t == 0.0);
 }
 
+TEST_CASE("A GTO keeps its type and its gate turn-off current, and an SCR saved without one has none",
+          "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::GTO, {6, 6}, GUI::Rotation::R0));
+    auto &gto = static_cast<Core::Thyristor &>(elements.back()->GetComponent());
+    gto.SetName("GTO1");
+    gto.SetParameters({.GateResistance = 2.0, .GateTurnOffCurrent = 4.5});
+    elements.push_back(GUI::CreateElement(Core::ComponentType::THYRISTOR, {12, 6}, GUI::Rotation::R0));
+    static_cast<Core::Thyristor &>(elements.back()->GetComponent()).SetName("SCR1");
+
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 2);
+    const auto &copy = static_cast<const Core::Thyristor &>(loaded.Elements[0]->GetComponent());
+    CHECK(copy.GetType() == Core::ComponentType::GTO);
+    CHECK(copy.GetName() == "GTO1");
+    CHECK(copy.GetParameters() == gto.GetParameters());
+    CHECK(copy.GetParameters().GateTurnOffCurrent == 4.5);
+    const auto &scr = static_cast<const Core::Thyristor &>(loaded.Elements[1]->GetComponent());
+    CHECK(scr.GetType() == Core::ComponentType::THYRISTOR);
+    CHECK(scr.GetParameters().GateTurnOffCurrent == 0.0);
+
+    // A file that gives an SCR a turn-off current is read, and the part keeps none
+    const GUI::LoadedSchematic stray = LoadOrFail(Document(
+        R"({"type": "Thyristor", "x": 1, "y": 1, "rotation": 0, "name": "SCR1", "parameters": {"gate_turn_off_current": 2.0}})",
+        ""));
+    REQUIRE(stray.Elements.size() == 1);
+    CHECK(static_cast<const Core::Thyristor &>(stray.Elements[0]->GetComponent()).GetParameters().GateTurnOffCurrent
+          == 0.0);
+}
+
 TEST_CASE("A transformer keeps its primary inductance and its figures", "[schematic_file]") {
     std::vector<std::unique_ptr<GUI::UIElement>> elements;
     elements.push_back(GUI::CreateElement(Core::ComponentType::TRANSFORMER, {5, 5}, GUI::Rotation::R180));

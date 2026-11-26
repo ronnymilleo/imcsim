@@ -37,6 +37,8 @@ struct ElectromechanicalFields {
     std::array<ValueField, 4> Fuse;
     /// One per member of Core::ThyristorParameters.
     std::array<ValueField, 14> Thyristor;
+    /// One per member of Core::ThyristorParameters that only a GTO has.
+    std::array<ValueField, 1> GateTurnOff;
     /// One per member of Core::DiacParameters.
     std::array<ValueField, 5> Diac;
     /// One per member of Core::TransformerParameters.

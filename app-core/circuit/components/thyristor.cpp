@@ -1,6 +1,7 @@
 /**
  * @file    thyristor.cpp
- * @brief   A thyristor (SCR) or TRIAC that fires on gate current, latches on, and releases below its holding current.
+ * @brief   A thyristor (SCR), TRIAC or GTO that fires on gate current, latches on, and releases below its holding
+ *          current, or on a negative gate current for a GTO.
  */
 
 #include "circuit/components/thyristor.h"
@@ -13,11 +14,17 @@ namespace Core {
 /**
  * @brief   Creates a thyristor that fires at 1 mA of gate current, holds on above 5 mA of main current and drops
  *          0.8 V plus 10 mOhm on the on-state line.
- * @param[in] type  THYRISTOR for a one-way SCR, TRIAC for a bidirectional one; any other type is refused by the
- *                  caller, which only places these two.
+ * @param[in] type  THYRISTOR for a one-way SCR, TRIAC for a bidirectional one, GTO for a one-way one that a negative
+ *                  gate current turns off, with the gate figures of a power device; any other type is refused by the
+ *                  caller, which only places these three.
  */
 Thyristor::Thyristor(const ComponentType type) : Component(type, 0.0) {
     m_Parameters.IsBidirectional = type == ComponentType::TRIAC;
+    if (type == ComponentType::GTO) {
+        m_Parameters.GateTriggerCurrent = DEFAULT_GTO_TRIGGER_CURRENT;
+        m_Parameters.GateResistance = DEFAULT_GTO_GATE_RESISTANCE;
+        m_Parameters.GateTurnOffCurrent = DEFAULT_GTO_TURN_OFF_CURRENT;
+    }
 }
 
 /**
@@ -37,28 +44,42 @@ const ThyristorParameters &Thyristor::GetParameters() const {
 }
 
 /**
- * @brief   Sets the parameters of the thyristor, keeping the direction the part type fixes.
+ * @brief   Sets the parameters of the thyristor, keeping the direction and the turn-off current the part type fixes.
+ * @details Only a GTO has a gate turn-off current: the other types get zero, so a stray value never turns one off.
  * @param[in] parameters  New parameters; check them with IsValidParameters() first.
  */
 void Thyristor::SetParameters(const ThyristorParameters &parameters) {
     m_Parameters = parameters;
     m_Parameters.IsBidirectional = GetType() == ComponentType::TRIAC;
+    if (GetType() != ComponentType::GTO) {
+        m_Parameters.GateTurnOffCurrent = 0.0;
+    }
 }
 
 /**
  * @brief   Checks whether a set of thyristor parameters can be simulated.
  * @param[in] parameters  Candidate parameters.
  * @return  True when every resistance is positive, the on-state line lies inside the blocking one and every current
- *          and voltage is non-negative, with a breakover, a critical dv/dt, a turn-off time and each rating of zero
- *          meaning disabled.
+ *          and voltage is non-negative, with a breakover, a critical dv/dt, a turn-off time, a gate turn-off current
+ *          and each rating of zero meaning disabled.
  */
 bool Thyristor::IsValidParameters(const ThyristorParameters &parameters) {
     return parameters.OnResistance > 0.0 && parameters.OnResistance < parameters.OffResistance
         && parameters.OnThresholdVoltage >= 0.0 && parameters.HoldingCurrent > 0.0
         && parameters.GateTriggerCurrent > 0.0 && parameters.GateTriggerVoltage >= 0.0
         && parameters.GateResistance > 0.0 && parameters.BreakoverVoltage >= 0.0 && parameters.CriticalDvDt >= 0.0
-        && parameters.TurnOffTime >= 0.0 && parameters.MaxRepetitivePeakVoltage >= 0.0
-        && parameters.MaxOnStateCurrent >= 0.0 && parameters.MaxSurgeCurrent >= 0.0 && parameters.MaxI2t >= 0.0;
+        && parameters.TurnOffTime >= 0.0 && parameters.GateTurnOffCurrent >= 0.0
+        && parameters.MaxRepetitivePeakVoltage >= 0.0 && parameters.MaxOnStateCurrent >= 0.0
+        && parameters.MaxSurgeCurrent >= 0.0 && parameters.MaxI2t >= 0.0;
+}
+
+/**
+ * @brief   Tells whether a component type is a Thyristor part: an SCR, a TRIAC or a GTO.
+ * @param[in] type  Any component type.
+ * @return  True for THYRISTOR, TRIAC and GTO, which the Thyristor class serves; false for the DIAC, which has its own.
+ */
+bool IsThyristor(const ComponentType type) {
+    return type == ComponentType::THYRISTOR || type == ComponentType::TRIAC || type == ComponentType::GTO;
 }
 
 const char *GetThyristorSubcircuitName() {
@@ -103,6 +124,40 @@ std::string FormatThyristorSubcircuit() {
 
 const char *GetTriacSubcircuitName() {
     return "imcsim_triac";
+}
+
+const char *GetGtoSubcircuitName() {
+    return "imcsim_gto";
+}
+
+/**
+ * @brief   Writes the subcircuit that the Netlist window shows for a GTO.
+ * @return  The ".subckt" block, newline included.
+ * @details The two-transistor pair of imcsim_scr, whose gate fires it through a vanishing diode, with a second path
+ *          for the turn-off: a negative gate pulls the base current of the NPN out through a reversed diode and the
+ *          gate resistance, which starves the regeneration the way the negative gate of a real GTO does. `RG` and `RT`
+ *          are parameters of the instance.
+ * @note    imcsim does not run it: the ngspice backend refuses a GTO, whose gate turn-off current, dv/dt firing and
+ *          turn-off time run on Nodalys only, so the subcircuit is only in the netlist the Netlist window shows and
+ *          exports, and no simulation has checked it.
+ */
+std::string FormatGtoSubcircuit() {
+    return ".subckt imcsim_gto a k g params: RG=1 RT=0.01\n"
+           "Dt a nrt IMCSIM_GTO_DT\n"
+           "Rt nrt na {RT}\n"
+           "Q1 n2 n1 na IMCSIM_GTO_QP\n"
+           "Q2 n1 n2 k IMCSIM_GTO_QN\n"
+           "Dg g ng IMCSIM_GTO_DG\n"
+           "Rg ng n2 {RG}\n"
+           "Dq nq g IMCSIM_GTO_DG\n"
+           "Rq n2 nq {RG}\n"
+           "R1 n1 na 100k\n"
+           "R2 n2 k 100k\n"
+           ".model IMCSIM_GTO_QP PNP(IS=1e-14 BF=100 CJE=20p)\n"
+           ".model IMCSIM_GTO_QN NPN(IS=1e-14 BF=100 CJE=20p)\n"
+           ".model IMCSIM_GTO_DG D(IS=1e-12 N=0.001)\n"
+           ".model IMCSIM_GTO_DT D(IS=1e-12 N=0.001)\n"
+           ".ends imcsim_gto\n";
 }
 
 /**

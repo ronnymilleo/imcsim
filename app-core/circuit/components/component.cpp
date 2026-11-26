@@ -483,6 +483,14 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .AcceptedValues = ValueRule::NONE,
         .Family = ComponentFamily::SWITCHING,
     },
+    {
+        .Type = ComponentType::GTO,
+        .TypeName = "Gto",
+        .NamePrefix = "GTO",
+        .Unit = "",
+        .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::SWITCHING,
+    },
 });
 
 /**
