@@ -199,6 +199,15 @@ struct RelaySpec {
     SwitchParameters ContactParams;
 };
 
+/// Specification for an IGBT, with its capacitances and its optional co-packaged diode.
+struct IgbtSpec {
+    std::string Name;
+    NodeId Collector = 0;
+    NodeId Gate = 0;
+    NodeId Emitter = 0;
+    IgbtParameters Params;
+};
+
 /// Specification for a linear resistor (`R` element).
 struct ResistorSpec {
     std::string Name;
@@ -215,6 +224,17 @@ struct SwitchSpec {
     NodeId CtrlPos = 0;
     NodeId CtrlNeg = 0;
     SwitchParameters Params;
+};
+
+/// Specification for a latching thyristor (SCR), TRIAC or DIAC.
+struct ThyristorSpec {
+    std::string Name;
+    NodeId Anode = 0;
+    NodeId Cathode = 0;
+    NodeId Gate = 0;
+    ThyristorParameters Params;
+    /// False for a DIAC, whose gate is its MT1 and which reports one current, as a two-terminal part does.
+    bool HasGate = true;
 };
 
 /// Specification for a two-winding magnetically coupled transformer macromodel.
@@ -276,6 +296,7 @@ struct CircuitDescription {
                                      DiodeSpec,
                                      FuseSpec,
                                      IdealOpAmpSpec,
+                                     IgbtSpec,
                                      IndependentSourceSpec,
                                      InductorSpec,
                                      InitialVoltageSpec,
@@ -286,6 +307,7 @@ struct CircuitDescription {
                                      RelaySpec,
                                      ResistorSpec,
                                      SwitchSpec,
+                                     ThyristorSpec,
                                      TransformerSpec,
                                      TransmissionLineSpec,
                                      VccsSpec,

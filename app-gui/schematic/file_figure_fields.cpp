@@ -6,12 +6,14 @@
 #include "schematic/file_figure_fields.h"
 
 #include "circuit/components/clock.h"
+#include "circuit/components/diac.h"
 #include "circuit/components/fuse.h"
 #include "circuit/components/logic_input.h"
 #include "circuit/components/logic_output.h"
 #include "circuit/components/logic_part.h"
 #include "circuit/components/relay.h"
 #include "circuit/components/seven_segment.h"
+#include "circuit/components/thyristor.h"
 #include "circuit/components/transformer.h"
 #include "circuit/components/transmission_line.h"
 #include "circuit/components/voltage_controlled_switch.h"
@@ -38,6 +40,32 @@ constexpr auto FUSE_KEYS = std::to_array<ParameterKey<Core::FuseParameters>>({
     {"melting_i2t", &Core::FuseParameters::MeltingI2t},
     {"cold_resistance", &Core::FuseParameters::ColdResistance},
     {"blown_resistance", &Core::FuseParameters::BlownResistance},
+});
+
+constexpr auto THYRISTOR_KEYS = std::to_array<ParameterKey<Core::ThyristorParameters>>({
+    {"on_threshold", &Core::ThyristorParameters::OnThresholdVoltage},
+    {"on_resistance", &Core::ThyristorParameters::OnResistance},
+    {"off_resistance", &Core::ThyristorParameters::OffResistance},
+    {"holding_current", &Core::ThyristorParameters::HoldingCurrent},
+    {"gate_trigger_current", &Core::ThyristorParameters::GateTriggerCurrent},
+    {"gate_trigger_voltage", &Core::ThyristorParameters::GateTriggerVoltage},
+    {"gate_resistance", &Core::ThyristorParameters::GateResistance},
+    {"breakover", &Core::ThyristorParameters::BreakoverVoltage},
+    {"critical_dvdt", &Core::ThyristorParameters::CriticalDvDt},
+    {"turn_off_time", &Core::ThyristorParameters::TurnOffTime},
+    {"gate_turn_off_current", &Core::ThyristorParameters::GateTurnOffCurrent},
+    {"vdrm", &Core::ThyristorParameters::MaxRepetitivePeakVoltage},
+    {"it_max", &Core::ThyristorParameters::MaxOnStateCurrent},
+    {"itsm", &Core::ThyristorParameters::MaxSurgeCurrent},
+    {"i2t", &Core::ThyristorParameters::MaxI2t},
+});
+
+constexpr auto DIAC_KEYS = std::to_array<ParameterKey<Core::DiacParameters>>({
+    {"breakover", &Core::DiacParameters::BreakoverVoltage},
+    {"on_threshold", &Core::DiacParameters::OnThresholdVoltage},
+    {"on_resistance", &Core::DiacParameters::OnResistance},
+    {"off_resistance", &Core::DiacParameters::OffResistance},
+    {"holding_current", &Core::DiacParameters::HoldingCurrent},
 });
 
 constexpr auto RELAY_KEYS = std::to_array<ParameterKey<Core::RelayParameters>>({
@@ -190,6 +218,10 @@ constexpr auto FIGURE_CODECS = std::to_array<FigureCodec>({
     MakeFigureCodec<Core::ComponentType::V_SWITCH, Core::VoltageControlledSwitch, SWITCH_KEYS>(),
     MakeFigureCodec<Core::ComponentType::RELAY, Core::Relay, RELAY_KEYS>(),
     MakeFigureCodec<Core::ComponentType::FUSE, Core::Fuse, FUSE_KEYS>(),
+    MakeFigureCodec<Core::ComponentType::THYRISTOR, Core::Thyristor, THYRISTOR_KEYS>(),
+    MakeFigureCodec<Core::ComponentType::TRIAC, Core::Thyristor, THYRISTOR_KEYS>(),
+    MakeFigureCodec<Core::ComponentType::GTO, Core::Thyristor, THYRISTOR_KEYS>(),
+    MakeFigureCodec<Core::ComponentType::DIAC, Core::Diac, DIAC_KEYS>(),
     MakeFigureCodec<Core::ComponentType::TRANSFORMER, Core::Transformer, TRANSFORMER_KEYS>(),
     MakeFigureCodec<Core::ComponentType::TRANSMISSION_LINE, Core::TransmissionLine, TRANSMISSION_LINE_KEYS>(),
     {&Core::IsLogicPart, &WriteLogicFigures, &ReadLogicFigures},

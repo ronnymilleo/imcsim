@@ -12,11 +12,13 @@
 #include "ui_elements/ui_controlled_source.h"
 #include "ui_elements/ui_controlled_switch.h"
 #include "ui_elements/ui_current_source.h"
+#include "ui_elements/ui_diac.h"
 #include "ui_elements/ui_diode.h"
 #include "ui_elements/ui_flip_flop.h"
 #include "ui_elements/ui_fuse.h"
 #include "ui_elements/ui_gate.h"
 #include "ui_elements/ui_ground.h"
+#include "ui_elements/ui_igbt.h"
 #include "ui_elements/ui_inductor.h"
 #include "ui_elements/ui_initial_voltage.h"
 #include "ui_elements/ui_logic_input.h"
@@ -31,6 +33,7 @@
 #include "ui_elements/ui_subcircuit.h"
 #include "ui_elements/ui_subcircuit_pin.h"
 #include "ui_elements/ui_switch.h"
+#include "ui_elements/ui_thyristor.h"
 #include "ui_elements/ui_transformer.h"
 #include "ui_elements/ui_transmission_line.h"
 #include "ui_elements/ui_vcc.h"
@@ -68,6 +71,7 @@ constexpr auto PARTS = std::to_array<PartInfo>({
     {Core::ComponentType::PNP, "PNP transistor"},
     {Core::ComponentType::NMOS, "N-channel MOSFET"},
     {Core::ComponentType::PMOS, "P-channel MOSFET"},
+    {Core::ComponentType::IGBT, "IGBT"},
     {Core::ComponentType::VCVS, "VCVS (E)"},
     {Core::ComponentType::VCCS, "VCCS (G)"},
     {Core::ComponentType::CCCS, "CCCS (F)"},
@@ -85,6 +89,10 @@ constexpr auto PARTS = std::to_array<PartInfo>({
     {Core::ComponentType::V_SWITCH, "Voltage-controlled switch"},
     {Core::ComponentType::RELAY, "Relay"},
     {Core::ComponentType::FUSE, "Fuse"},
+    {Core::ComponentType::THYRISTOR, "Thyristor (SCR)"},
+    {Core::ComponentType::TRIAC, "TRIAC"},
+    {Core::ComponentType::GTO, "GTO"},
+    {Core::ComponentType::DIAC, "DIAC"},
     {Core::ComponentType::TRANSFORMER, "Transformer"},
     {Core::ComponentType::TRANSMISSION_LINE, "Transmission line"},
     {Core::ComponentType::AND, "AND gate"},
@@ -141,6 +149,8 @@ CreateElement(const Core::ComponentType type, const GridPoint position, const Ro
     case Core::ComponentType::NMOS:
     case Core::ComponentType::PMOS:
         return std::make_unique<UIMOSFET>(type, position, rotation);
+    case Core::ComponentType::IGBT:
+        return std::make_unique<UIIGBT>(position, rotation);
     case Core::ComponentType::VCVS:
     case Core::ComponentType::VCCS:
     case Core::ComponentType::CCCS:
@@ -171,6 +181,12 @@ CreateElement(const Core::ComponentType type, const GridPoint position, const Ro
         return std::make_unique<UIControlledSwitch>(type, position, rotation);
     case Core::ComponentType::FUSE:
         return std::make_unique<UIFuse>(position, rotation);
+    case Core::ComponentType::THYRISTOR:
+    case Core::ComponentType::TRIAC:
+    case Core::ComponentType::GTO:
+        return std::make_unique<UIThyristor>(type, position, rotation);
+    case Core::ComponentType::DIAC:
+        return std::make_unique<UIDiac>(position, rotation);
     case Core::ComponentType::TRANSFORMER:
         return std::make_unique<UITransformer>(position, rotation);
     case Core::ComponentType::TRANSMISSION_LINE:

@@ -30,8 +30,8 @@ constexpr auto SUPPLIES = std::to_array({ComponentType::VCC,
                                          ComponentType::NODESET,
                                          ComponentType::PIN});
 constexpr auto DIODES = std::to_array({ComponentType::DIODE, ComponentType::ZENER_DIODE, ComponentType::LED});
-constexpr auto TRANSISTORS =
-    std::to_array({ComponentType::NPN, ComponentType::PNP, ComponentType::NMOS, ComponentType::PMOS});
+constexpr auto TRANSISTORS = std::to_array(
+    {ComponentType::NPN, ComponentType::PNP, ComponentType::NMOS, ComponentType::PMOS, ComponentType::IGBT});
 constexpr auto CONTROLLED = std::to_array({ComponentType::VCVS,
                                            ComponentType::VCCS,
                                            ComponentType::CCCS,
@@ -43,7 +43,11 @@ constexpr auto SWITCHES = std::to_array({ComponentType::SWITCH,
                                          ComponentType::PUSH_BUTTON,
                                          ComponentType::V_SWITCH,
                                          ComponentType::RELAY,
-                                         ComponentType::FUSE});
+                                         ComponentType::FUSE,
+                                         ComponentType::THYRISTOR,
+                                         ComponentType::TRIAC,
+                                         ComponentType::GTO,
+                                         ComponentType::DIAC});
 constexpr auto LOGIC_IO =
     std::to_array({ComponentType::LOGIC_INPUT, ComponentType::LOGIC_OUTPUT, ComponentType::SEVEN_SEGMENT});
 constexpr auto GATES = std::to_array({ComponentType::AND,

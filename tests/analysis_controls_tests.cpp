@@ -1151,6 +1151,34 @@ TEST_CASE("The S-parameter analysis runs the example on the worker, and refuses 
     CHECK(results.GetOperatingPoint().has_value());
 }
 
+TEST_CASE("Opening another schematic forgets the failure of the last run, while an edit keeps it",
+          "[analysis_controls]") {
+    GUI::Schematic schematic;
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
+    OpenRCFilter(schematic);
+    GUI::AnalysisControls controls(schematic, results);
+    GUI::SimulationSettings settings = schematic.GetSimulationSettings();
+    settings.Selected = GUI::Analysis::TRANSIENT;
+    settings.Transient.StopTime = -1.0;
+    schematic.SetSimulationSettings(settings);
+    RunAndWait(controls);
+    REQUIRE(controls.GetOutcome(GUI::Analysis::TRANSIENT) == GUI::RunOutcome::FAILED);
+
+    // Rerunning on an edit needs to know the analysis failed, so an edit leaves the error
+    schematic.MarkModified();
+    controls.Update();
+    CHECK(controls.GetError(GUI::Analysis::TRANSIENT).has_value());
+
+    const std::size_t finished = controls.GetFinishedRunCount();
+    OpenExample(schematic, "s_parameters_lc_low_pass.imcsim");
+    controls.Update();
+    CHECK_FALSE(controls.GetError(GUI::Analysis::TRANSIENT).has_value());
+    CHECK(controls.GetOutcome(GUI::Analysis::TRANSIENT) == GUI::RunOutcome::NONE);
+    CHECK_FALSE(controls.GetLastRun().has_value());
+    CHECK(controls.GetFinishedRunCount() == finished);
+}
+
 TEST_CASE("Harmonic balance runs on Nodalys through AnalysisControls and fails cleanly on ngspice",
           "[analysis_controls][hb]") {
     struct BackendRestorer {

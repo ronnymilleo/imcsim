@@ -25,10 +25,12 @@ add_executable(nodalys-tests
     devices/behavioral_device_tests.cpp
     devices/bjt_device_tests.cpp
     devices/fuse_device_tests.cpp
+    devices/igbt_device_tests.cpp
     devices/mosfet_device_tests.cpp
     devices/random_draws_tests.cpp
     devices/smooth_logic_tests.cpp
     devices/thermal_tests.cpp
+    devices/thyristor_device_tests.cpp
     devices/transient_noise_tests.cpp
     devices/transmission_line_tests.cpp
     devices/waveforms_tests.cpp

@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cstddef>
+#include <latch>
 #include <thread>
 #include <vector>
 
@@ -71,7 +72,13 @@ void RunConcurrentBatch(const std::size_t count,
     std::atomic<std::size_t> finished_count = progress_offset;
     std::atomic<bool> should_stop = false;
 
+    // Every worker waits until the whole team is running before taking items, so the calling thread cannot drain a
+    // short batch before the threads it spawned have started (which on a loaded machine left the batch on one thread)
+    std::latch team_ready(static_cast<std::ptrdiff_t>(thread_count));
+
     const auto worker = [&]() {
+        team_ready.count_down();
+        team_ready.wait();
         while (!should_stop.load(std::memory_order_relaxed)) {
             if (control != nullptr && control->IsCancelled()) {
                 return;

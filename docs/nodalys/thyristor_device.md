@@ -1,0 +1,102 @@
+# Thyristor Device
+
+The thyristor (SCR) of `imcsim`, with its TRIAC, DIAC and GTO variants, is a latching switch: it blocks forward voltage until a gate pulse fires it, then stays on with the gate removed until its anode current falls below the holding current. `Nodalys` models it as one native device, [`ThyristorDevice`](../../nodalys/src/devices/semiconductors/thyristor_device.cpp), built with `CircuitBuilder::AddThyristor(name, anode, cathode, gate, ThyristorParameters)`. The `ngspice` companion model is a two-transistor regenerative pair written as the subcircuit `imcsim_scr`, which ships with the schematic part (see the Thyristors section of [`docs/models.md`](../models.md)).
+
+---
+
+## 1. Model
+
+### 1.1 The latch
+
+The state is a single flag, conducting or blocking. With $v_{AK}$ the anode-cathode voltage and $i_G$ the gate current:
+
+- **Firing.** A blocking device starts conducting when $v_{AK} > 0$ and $i_G \ge I_{GT}$, or when $v_{AK} \ge V_{BO}$ (forward breakover, disabled when $V_{BO} = 0$), or when the anode voltage rises faster than the critical $dv/dt$ (disabled at 0), or when a forward voltage is re-applied inside the turn-off recovery window.
+- **Holding.** A conducting device keeps conducting while the gate draws at least $I_{GT}$, whatever the anode current; with the gate removed it holds only while $i_A \ge I_H$.
+- **Release.** Below $I_H$ with the gate removed, the latch opens. It cannot close again on its own: only a new gate pulse, breakover, a fast voltage rise or the recovery window fires it, so the latch itself is the hysteresis and the device does not chatter at the threshold.
+
+The latching current $I_L$ is not a separate parameter: the gate sustains conduction until the anode current reaches $I_H$, which plays the role of both.
+
+A GTO adds one transition: a conducting device whose gate current is negative with $-i_G \ge I_{GQ}$ releases at once, whatever the anode current (see 1.6).
+
+### 1.2 The second-order effects
+
+Two datasheet figures refine the plain latch; both are optional and disabled at zero, and a TRIAC reads them on the magnitude of the main-terminal voltage.
+
+- **Critical $dv/dt$.** A real device fires spuriously when the displacement current through its junction capacitance drives the regenerative pair: a rate of rise of the blocking voltage faster than the critical figure turns it on without a gate. The device reads the slope from the last accepted time point to the Newton iterate, $\dot v = (v_{AK} - v_{accepted}) / (t - t_{accepted})$, and fires when $\dot v \ge (dv/dt)_{crit}$ — on a fall too, for a TRIAC. The detection latches for the rest of the step: once fired this way, the device does not release again until the next time point, so the step that carries the edge converges instead of toggling between the two states.
+- **Turn-off time $t_q$.** After a release the device recovers for $t_q$: while that window runs it has not regained its blocking, a forward voltage re-applied inside it fires it again (the commutation failure of a forced-commutated circuit), and the holding-current release is suspended until it closes. The re-fire reads a *rising* voltage: it fires when $v_{AK}$ crosses back above the on-state threshold $V_0$ from at or below it at the last accepted point. The voltage of an accepted on-state is always past $V_0$, so the release itself never re-fires on its own iterate, and the natural commutation of a rectifier — where the voltage stays up while the current falls — still lands.
+
+### 1.3 The branches
+
+The on-state is the datasheet line
+
+$$v_{AK} = V_0 + R_T\, i_A \quad\Longleftrightarrow\quad i_A = \frac{v_{AK} - V_0}{R_T}$$
+
+stamped as the conductance $1/R_T$ between anode and cathode with an equivalent current source $V_0/R_T$ from cathode to anode. The off-state is the conductance $1/R_{off}$. Both are linear at each Newton iterate, so the branch cannot fail to converge; only the discrete state changes.
+
+A TRIAC mirrors the line about zero, and between the two thresholds, where a real device has not yet overcome its junction drop, a conducting one carries only the off-state current:
+
+$$i = \begin{cases} (v - V_0)/R_T + V_0/R_{off} & v > V_0 \\ v / R_{off} & |v| \le V_0 \\ (v + V_0)/R_T - V_0/R_{off} & v < -V_0 \end{cases}$$
+
+The three pieces meet, so the line is continuous and rises with the voltage: one voltage for every current. A line mirrored by the sign of the voltage alone, $i = (v - \operatorname{sign}(v)\,V_0)/R_T$, jumps at zero and has a second solution there, a small voltage of one sign with a large current of the other, which Newton kept when the supply swung across zero while the gate held the device on.
+
+The gate-cathode junction draws
+
+$$i_G = \begin{cases} (v_{GK} - V_{GT})/R_G & v_{GK} > V_{GT} \\ 0 & v_{GK} \le V_{GT} \end{cases}$$
+
+with a small leakage conductance always tying the gate to the cathode, so a gate left undriven never floats the matrix. The gate current returns through the cathode, as it does in a real device, so a gate drive must be referenced to the cathode.
+
+### 1.4 How it maps to the `ngspice` subcircuit
+
+| `imcsim_scr` (`ngspice`) | `ThyristorDevice` (`Nodalys`) |
+| :--- | :--- |
+| PNP + NPN regenerative pair, collector of each into the base of the other | The flag `IsConducting`, fired by gate current or breakover |
+| Gate resistor into the base of the NPN; holding current set by the base-emitter shunts and the betas | $I_{GT}$, $I_H$, $V_0$, $R_T$ taken as parameters |
+| Latch emerges from the loop gain reaching unity | The latch is explicit, so it cannot fail to converge |
+
+The two-transistor model is physical: its holding and trigger currents emerge from the transistor parameters, so they match the figures of `Nodalys` only approximately. `Nodalys` takes them as parameters and hits them exactly. The subcircuit has no breakover, no critical $dv/dt$ and no turn-off time: its fixed junction capacitances soften the switching but fire nothing, and it recovers its blocking as soon as the current releases.
+
+### 1.5 The DIAC
+
+A DIAC is the same device with no gate: `CircuitBuilder::AddDiac(name, mt2, mt1, DiacParameters)` builds a bidirectional `ThyristorDevice` with its gate tied to MT1 and an infinite trigger current, so only the breakover fires it. `DiacParameters` gives the breakover voltage, the on-state line it snaps back to ($V_0$, $R_T$), the blocking resistance and the holding current; the datasheet snapback is $V_{BO} - V_0$. It reports one current, into MT2, as a two-terminal element does. A circuit whose DIAC drives a capacitor has no operating point, since the DIAC fires and releases around it, so such a transient starts from a supply stepped up from zero.
+
+### 1.6 The GTO
+
+A positive `ThyristorParameters::GateTurnOffCurrent` $I_{GQ}$ makes the device a GTO; zero, the default, leaves an SCR or a TRIAC. It is a one-way device like the SCR, so the main branch, the firing and the holding current are the SCR's, but its gate junction mirrors about zero as the TRIAC's does, so a negative gate voltage below $-V_{GT}$ draws $i_G = (v_{GK} + V_{GT})/R_G < 0$. The device is told apart by that parameter alone, since the figure is only meaningful when it is positive and a separate flag would have to agree with it; the part of `imcsim` sets it from the component type (the `GTO` type starts at 2 A, an SCR or a TRIAC is forced to 0).
+
+The gate reads two ways. Firing and holding use the signed current as the SCR does, so a negative gate never fires or holds the device. The turn-off reads $-i_G \ge I_{GQ}$ in the release test, ahead of the holding-current test and independent of the recovery window, so the pulse acts however large the anode current. After it the device blocks, and while the gate keeps pulling it stays off, since the negative current cannot fire it. A turn-off time $t_q$, when set, opens the recovery window as for any release.
+
+`NextBreakpoint()` also predicts this transition: the accepted points keep the gate current beside the main current, and the turn-off drive $-i_G$, extrapolated to $I_{GQ}$ like the main current to $I_H$, gives the instant a slow gate edge reaches the turn-off current. The earlier of the two predictions is returned. A pulse source reports its own corners, so a fast edge is landed on by them, and the prediction serves a ramp that crosses the threshold between corners.
+
+---
+
+## 2. Integration
+
+- **The state** is decided in `Stamp()` from the current Newton iterate and kept between the firing and the release, so the converged iterate, which stamps last, is the one `AcceptStep()` keeps. A rejected step restores the accepted state, the recovery window and the $dv/dt$ latch with it. A new time point clears the $dv/dt$ latch, which holds only for the step whose voltage edge fired it.
+- **The accepted history** keeps the time, the main current and the main-terminal voltage of each accepted point: the current feeds the commutation prediction, and the voltage is what the $dv/dt$ slope and the recovery re-fire read.
+- **Landing on the commutation.** While conducting, `NextBreakpoint()` extrapolates the anode current of the last two accepted points to the holding current and returns that instant, so the transient lands a time point on the natural commutation instead of stepping over it. When the current changes, the prediction is wrong and the transient asks again after the next point, so it closes in on the zero, as the fuse closes in on its blow.
+- **`HasSwitched()`** is true for the step that fires or releases the latch, so the step that follows restarts with Backward Euler, which damps the stiff modes a switching branch excites. A step that switches the latch is not rejected for good by the truncation error estimate: a release that is due at the start of a step happens however short the step is, and the estimate reads the bend it makes as an error, so the transient accepts such a step once it is below a millionth of the largest step (see `transient_analysis.md`).
+- **The small-signal analyses** see the conductance of the state at the operating point ($1/R_T$ or $1/R_{off}$); the threshold $V_0$ is a DC source and contributes nothing to AC. **Harmonic balance refuses the device**, as it does the hysteretic switch, because a latch has no smooth periodic steady state.
+- **No noise.** The model is a switch, so it adds no noise contribution, as the switch and the fuse.
+
+---
+
+## 3. Verification
+
+`nodalys/tests/devices/thyristor_device_tests.cpp`: a DIAC relaxation oscillator swinging between the breakover and the release, and a DIAC-triggered TRIAC dimmer at 120 V that fires at the same delay in both half-cycles; blocking forward voltage until the gate fires, latching after the gate pulse ends, release below the holding current, reverse blocking with gate current, forward breakover with and without the supply past it, the on-state line $V_0 + R_T I$, the gate junction current, and the half-wave controlled rectifier. A GTO fired by a positive pulse and turned off by a negative one while a $9\ \mathrm{A}$ load current flows drops to the blocking leakage and stays off after the pulse; a negative pulse below $I_{GQ}$ leaves it on; a negative gate never fires it, and an SCR ignores one; its gate junction conducts both ways; and a slow gate ramp turns it off at the instant the drive reaches $I_{GQ}$ (within $10\ \mu\mathrm{s}$). A TRIAC held on by its gate while the supply swings from $+10\ \mathrm{V}$ to $-10\ \mathrm{V}$ follows its voltage onto the negative half of the line, not the reversed solution of a sign-mirrored line. The second-order effects have tests of their own: a $10\ \mathrm{V}$ rise in $1\ \mu\mathrm{s}$ fires a device set to a critical $dv/dt$ of $0.5\ \mathrm{V}/\mu\mathrm{s}$ with the gate silent, the same rise spread over $1\ \mathrm{ms}$ does not, and a fall never fires an SCR while a TRIAC fires on a rise and on a fall alike; a supply that collapses and returns inside the $t_q$ window re-fires the device without a gate, and one that returns past the window finds it blocking, for an SCR and for a TRIAC the negative way.
+
+The rectifier average is checked against its closed form over a steady-state period:
+
+$$\langle v_{load}\rangle = \frac{V_m (1 + \cos\alpha)}{2\pi}$$
+
+for firing angles of 60 and 90 degrees (within 0.05 V), and the turn-off is checked to land on the holding-current crossing $\bigl(\pi - \arcsin(I_H R / V_m)\bigr)/\omega$ (within 0.1 ms), which the predicted breakpoint must hit rather than a step late.
+
+---
+
+## 4. Limits
+
+- The GTO turns off instantly: there is no storage time, no tail current and no turn-off loss, and $I_{GQ}$ is a fixed figure, not the usual fraction of the anode current that the datasheet gives, so a very large anode current is turned off by the same pulse.
+- The latching current $I_L$ is not modeled separately from $I_H$; the gate sustains conduction until the anode current reaches $I_H$.
+- The $dv/dt$ firing reads the slope between accepted time points, so an edge shorter than a step fires on the average slope the step sees, and the detection is transient-only: an operating point has no rate of rise.
+- The $t_q$ recovery re-fires on the voltage crossing back above $V_0$; there is no charge behind it, no reverse-recovery current, and no re-applied-voltage rating below which the re-fire would not happen. The temperature dependence of the holding current is not modeled either.
+- There is no junction capacitance or charge, so the device adds no dynamic state and no noise; the $dv/dt$ firing is a detection on the voltage history, not a stamped capacitance.
+- The state is not kept between runs: every transient starts blocking, and fires when the circuit makes it.

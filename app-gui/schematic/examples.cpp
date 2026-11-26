@@ -421,6 +421,109 @@ constexpr auto EXAMPLES = std::to_array<Example>({
         .FileName = "buck_converter.imcsim",
     },
     {
+        .Title = "Controlled rectifier (half-wave)",
+        .Group = "Switching",
+        .Description =
+            "A thyristor rectifies a 10 V, 50 Hz sine into a 100 Ohm load: a 5 V gate pulse of half a millisecond, "
+            "referenced to the cathode, fires it at 60 degrees of every positive half-cycle, and it latches on "
+            "after the pulse ends, until the anode current falls below the 5 mA holding current near the zero "
+            "crossing. Run the transient: the load follows the sine from 60 degrees on, and its mean over a period "
+            "is about 2.2 V, where a plain diode would give about 3 V. Both engines run it: Nodalys takes every "
+            "figure as a parameter of its latching device, while ngspice runs the two-transistor pair of the "
+            "imcsim_scr subcircuit. Change the delay of Vin2 to move the firing angle: 90 degrees halves the "
+            "mean, and a delay past the zero crossing leaves the load dark. The step is 0.2 ms, fifty points a "
+            "period, and the solver lands on the commutation instant itself.",
+        .FileName = "controlled_rectifier_half_wave.imcsim",
+    },
+    {
+        .Title = "Controlled rectifier with an inductive load",
+        .Group = "Switching",
+        .Description =
+            "The same thyristor and gate pulse drive a load of 50 Ohm and 0.2 H. The inductor stretches the "
+            "current past the zero of the sine, and the 1N4007 across the load carries it while the thyristor "
+            "is off: run the transient and watch the anode current of SCR1 stop at the zero crossing while the "
+            "load current keeps rippling through D1, waiting for the next gate pulse at 60 degrees. The load "
+            "voltage sits at about minus a diode drop for most of the freewheeling, and its mean is about "
+            "2 V over a period. The gate pulse is referenced to the cathode, as a real gate drive is, "
+            "because the gate current returns through it.",
+        .FileName = "controlled_rectifier_inductive_load.imcsim",
+    },
+    {
+        .Title = "Controlled bridge rectifier",
+        .Group = "Switching",
+        .Description =
+            "Two thyristors over a bridge of diodes rectify both half-cycles: SCR1 and SCR2 fire together at 60 "
+            "degrees, each on the half-cycle its anode sits positive, and D1 and D2 return the current, so the "
+            "100 Ohm load sees a full-wave chopped sine of about 3.8 V mean, nearly twice the half-wave one. The "
+            "two gate pulses are referenced to the common cathode rail, where both cathodes meet, and run at the "
+            "10 ms of the half-cycle, so each thyristor gets one on its turn; the load side is grounded through "
+            "that rail. R2, 1 MOhm from the transformer side to ground, gives the floating source "
+            "the DC reference a simulation of a floating bridge needs, carrying 10 uA at the peak. Both engines "
+            "run it, and both land on each natural commutation; the step is 0.2 ms. Change the delay of both "
+            "gate pulses to move the firing angle, and the mean follows the cosine of it.",
+        .FileName = "controlled_bridge_rectifier.imcsim",
+    },
+    {
+        .Title = "TRIAC light dimmer",
+        .Group = "Switching",
+        .Description =
+            "A TRIAC chops both half-cycles of a 10 V, 50 Hz sine into a 100 Ohm lamp, the way a light dimmer does: a "
+            "5 V gate pulse of half a millisecond, referenced to MT1, fires it at 60 degrees of every half-cycle, "
+            "positive and negative alike, and it latches on after the pulse ends until the main current falls below "
+            "the 5 mA holding current near each zero crossing. Run the transient: the load follows the sine from 60 "
+            "degrees on in both directions, so it sees a full-wave chopped sine whose RMS is about 6.3 V, where the "
+            "whole sine would give 7.1 V; the mean over a period is zero, since the two half-cycles mirror each "
+            "other. It runs on Nodalys, which takes every figure as a parameter of its bidirectional latching device; "
+            "ngspice refuses the TRIAC. Change the delay of Vin2 to move the firing angle: a later "
+            "pulse dims the lamp, and a delay past the peak leaves it dark. The step is 0.2 ms, and the solver lands "
+            "on each commutation instant itself.",
+        .FileName = "triac_dimmer.imcsim",
+    },
+    {
+        .Title = "DIAC-triggered TRIAC dimmer",
+        .Group = "Switching",
+        .Description =
+            "The classic light dimmer: a 120 V, 60 Hz line feeds a 100 Ohm lamp, and a TRIAC from the lamp to ground "
+            "switches it. R2 and C1 across the TRIAC time the firing: C1 charges through R2 behind the line, and when "
+            "V(C1) reaches the 32 V breakover of the DIAC, the DIAC snaps back to about 27 V and dumps a short pulse "
+            "of the charge into the gate, which fires the TRIAC; the DIAC releases as soon as its current falls "
+            "below 1 mA. Both parts conduct both ways, so the same happens on the negative half-cycle. Run the "
+            "transient: V(C1) ramps to the breakover and drops by the snapback at each firing, the TRIAC voltage "
+            "collapses there, and the lamp current follows the line from that angle to the next zero crossing. "
+            "Raise R2 to dim the lamp: C1 charges slower and reaches the breakover later in each half-cycle. It "
+            "runs on Nodalys: ngspice refuses the DIAC and the TRIAC.",
+        .FileName = "diac_triac_dimmer.imcsim",
+    },
+    {
+        .Title = "GTO chopper",
+        .Group = "Switching",
+        .Description =
+            "A GTO chops a 100 V DC supply into a 10 Ohm load at 1 kHz, which a plain thyristor cannot do: it would "
+            "latch on and never let go while the load keeps its current far above the holding current. Two pulse "
+            "sources in series drive the gate, referenced to the cathode: Vin3 gives +5 V for 20 us at 0.1 ms of each "
+            "millisecond, which fires the GTO and latches it on, and Vin2 gives -15 V for 20 us at 0.5 ms, which "
+            "pulls the gate current past the 2 A turn-off current IGQ and releases it while the 9.9 A of the load "
+            "still flows. Run the transient: the load voltage is a 100 V square wave of 40% duty, and GTO1.A "
+            "drops from 9.9 A to nothing at each turn-off, with the full supply across the device. Raise IGQ above "
+            "the 14 A that the pulse draws, or lower the pulse, and the GTO stays on. It runs on Nodalys: ngspice "
+            "refuses the GTO, whose gate turn-off it has no model for.",
+        .FileName = "gto_chopper.imcsim",
+    },
+    {
+        .Title = "IGBT chopper with an inductive load",
+        .Group = "Switching",
+        .Description =
+            "An IGBT switches a 200 V supply into a 1 mH, 10 Ohm load at 10 kHz, half of each period, through a 10 "
+            "Ohm gate resistor, and D1 lets the load current freewheel while it is off. Run the transient: the "
+            "load current climbs toward its 10 A mean while Q1 conducts and flows through D1 while it is off, and the "
+            "collector sits on the on-state line, about 1 V, then jumps to the supply. Zoom in on a turn-off: as the "
+            "gate falls through its threshold, the collector rises at the Miller plateau, and Q1.C does not stop at "
+            "once but keeps a tail of 15 % of the current it carried, decaying with 150 ns, which is where an IGBT "
+            "loses its switching energy. Pick the 1200V 40A model for a longer tail. It runs on Nodalys: ngspice "
+            "refuses the IGBT.",
+        .FileName = "igbt_chopper.imcsim",
+    },
+    {
         .Title = "Relay driver",
         .Group = "Switching",
         .Description =

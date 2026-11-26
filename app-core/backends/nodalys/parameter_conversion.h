@@ -10,10 +10,13 @@
 
 #include "circuit/components/bjt.h"
 #include "circuit/components/clock.h"
+#include "circuit/components/diac.h"
 #include "circuit/components/diode.h"
 #include "circuit/components/fuse.h"
+#include "circuit/components/igbt.h"
 #include "circuit/components/mosfet.h"
 #include "circuit/components/source.h"
+#include "circuit/components/thyristor.h"
 #include "circuit/components/transmission_line.h"
 #include "circuit/components/voltage_controlled_switch.h"
 #include <nodalys/types.h>
@@ -23,6 +26,7 @@ namespace Core {
 // Semiconductors
 Nodalys::DiodeParameters ToNodalys(const DiodeParameters &parameters);
 Nodalys::BjtParameters ToNodalys(const BJTParameters &parameters);
+Nodalys::IgbtParameters ToNodalys(const IGBTParameters &parameters);
 Nodalys::MosfetParameters ToNodalys(const MOSFETParameters &parameters);
 
 // Waveforms
@@ -41,6 +45,10 @@ Nodalys::SwitchParameters ToNodalys(const SwitchParameters &parameters);
 
 // Fuses
 Nodalys::FuseParameters ToNodalys(const FuseParameters &parameters);
+
+// Thyristors
+Nodalys::ThyristorParameters ToNodalys(const ThyristorParameters &parameters);
+Nodalys::DiacParameters ToNodalys(const DiacParameters &parameters);
 
 // Transmission lines
 Nodalys::TransmissionLineParameters ToNodalys(double impedance_ohms, const TransmissionLineParameters &parameters);

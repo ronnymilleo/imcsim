@@ -14,8 +14,10 @@
 #include "circuit/components/bjt.h"
 #include "circuit/components/clock.h"
 #include "circuit/components/controlled_source.h"
+#include "circuit/components/diac.h"
 #include "circuit/components/diode.h"
 #include "circuit/components/fuse.h"
+#include "circuit/components/igbt.h"
 #include "circuit/components/logic_input.h"
 #include "circuit/components/mosfet.h"
 #include "circuit/components/op_amp.h"
@@ -23,6 +25,7 @@
 #include "circuit/components/relay.h"
 #include "circuit/components/source.h"
 #include "circuit/components/switch.h"
+#include "circuit/components/thyristor.h"
 #include "circuit/components/transformer.h"
 #include "circuit/components/transmission_line.h"
 #include "circuit/components/voltage_controlled_switch.h"
@@ -103,6 +106,63 @@ void AddSource(Nodalys::CircuitBuilder &builder, const EntryContext &entry) {
     default:
         return AddWaveform(builder, entry, ac, ToNodalys(s.GetRandom()), &B::AddVrandom, &B::AddIrandom);
     }
+}
+
+/**
+ * @brief   Adds a relay: its contact switches between the first two terminals, driven by its coil on the last two.
+ */
+void AddRelayPart(Nodalys::CircuitBuilder &builder, const EntryContext &entry) {
+    const auto &relay = static_cast<const Relay &>(entry.Part);
+    const RelayParameters &figures = relay.GetParameters();
+    builder.AddRelay(entry.Name,
+                     entry.Nodes[2],
+                     entry.Nodes[3],
+                     entry.Nodes[0],
+                     entry.Nodes[1],
+                     figures.CoilResistance,
+                     figures.CoilInductance,
+                     ToNodalys(relay.GetContactParameters()));
+}
+
+/**
+ * @brief   Adds a diode, LED or Zener with the parameters of its model, a library one included.
+ */
+std::expected<void, std::string>
+AddDiodePart(Nodalys::CircuitBuilder &builder, const Circuit &top_circuit, const EntryContext &entry) {
+    const auto diode = ResolveParameters(top_circuit, static_cast<const Diode &>(entry.Part));
+    if (!diode) {
+        return std::unexpected(diode.error());
+    }
+    builder.AddDiode(entry.Name, entry.Nodes[0], entry.Nodes[1], ToNodalys(*diode));
+    return {};
+}
+
+/**
+ * @brief   Adds an NPN or PNP transistor with the parameters of its model, a library one included.
+ */
+std::expected<void, std::string>
+AddBJTPart(Nodalys::CircuitBuilder &builder, const Circuit &top_circuit, const EntryContext &entry) {
+    const auto bjt = ResolveParameters(top_circuit, static_cast<const BJT &>(entry.Part));
+    if (!bjt) {
+        return std::unexpected(bjt.error());
+    }
+    const std::vector<int> &nodes = entry.Nodes;
+    builder.AddBjt(entry.Name, nodes[0], nodes[1], nodes[2], entry.Type != ComponentType::PNP, ToNodalys(*bjt));
+    return {};
+}
+
+/**
+ * @brief   Adds an N- or P-channel MOSFET with the parameters of its model, a library one included.
+ */
+std::expected<void, std::string>
+AddMOSFETPart(Nodalys::CircuitBuilder &builder, const Circuit &top_circuit, const EntryContext &entry) {
+    const auto mosfet = ResolveParameters(top_circuit, static_cast<const MOSFET &>(entry.Part));
+    if (!mosfet) {
+        return std::unexpected(mosfet.error());
+    }
+    const std::vector<int> &nodes = entry.Nodes;
+    builder.AddMosfet(entry.Name, nodes[0], nodes[1], nodes[2], entry.Type != ComponentType::PMOS, ToNodalys(*mosfet));
+    return {};
 }
 
 } // namespace
@@ -257,33 +317,21 @@ AddSemiconductor(Nodalys::CircuitBuilder &builder, const Circuit &top_circuit, c
     switch (entry.Type) {
     case ComponentType::DIODE:
     case ComponentType::ZENER_DIODE:
-    case ComponentType::LED: {
-        const auto diode = ResolveParameters(top_circuit, static_cast<const Diode &>(part));
-        if (!diode) {
-            return std::unexpected(diode.error());
-        }
-        builder.AddDiode(entry.Name, nodes[0], nodes[1], ToNodalys(*diode));
-        return {};
-    }
+    case ComponentType::LED:
+        return AddDiodePart(builder, top_circuit, entry);
     case ComponentType::NPN:
-    case ComponentType::PNP: {
-        const auto bjt = ResolveParameters(top_circuit, static_cast<const BJT &>(part));
-        if (!bjt) {
-            return std::unexpected(bjt.error());
-        }
-        builder.AddBjt(entry.Name, nodes[0], nodes[1], nodes[2], entry.Type != ComponentType::PNP, ToNodalys(*bjt));
-        return {};
-    }
+    case ComponentType::PNP:
+        return AddBJTPart(builder, top_circuit, entry);
     case ComponentType::NMOS:
-    case ComponentType::PMOS: {
-        const auto mosfet = ResolveParameters(top_circuit, static_cast<const MOSFET &>(part));
-        if (!mosfet) {
-            return std::unexpected(mosfet.error());
-        }
-        builder
-            .AddMosfet(entry.Name, nodes[0], nodes[1], nodes[2], entry.Type != ComponentType::PMOS, ToNodalys(*mosfet));
+    case ComponentType::PMOS:
+        return AddMOSFETPart(builder, top_circuit, entry);
+    case ComponentType::IGBT:
+        builder.AddIgbt(entry.Name,
+                        nodes[0],
+                        nodes[1],
+                        nodes[2],
+                        ToNodalys(static_cast<const IGBT &>(part).GetParameters()));
         return {};
-    }
     default:
         return std::unexpected(NoDeviceMessage(entry));
     }
@@ -304,19 +352,21 @@ std::expected<void, std::string> AddSwitchingPart(Nodalys::CircuitBuilder &build
     case ComponentType::FUSE:
         builder.AddFuse(entry.Name, nodes[0], nodes[1], ToNodalys(static_cast<const Fuse &>(part).GetParameters()));
         return {};
-    case ComponentType::RELAY: {
-        const auto &relay = static_cast<const Relay &>(part);
-        const RelayParameters &figures = relay.GetParameters();
-        builder.AddRelay(entry.Name,
-                         nodes[2],
-                         nodes[3],
-                         nodes[0],
-                         nodes[1],
-                         figures.CoilResistance,
-                         figures.CoilInductance,
-                         ToNodalys(relay.GetContactParameters()));
+    case ComponentType::THYRISTOR:
+    case ComponentType::TRIAC:
+    case ComponentType::GTO:
+        builder.AddThyristor(entry.Name,
+                             nodes[0],
+                             nodes[1],
+                             nodes[2],
+                             ToNodalys(static_cast<const Thyristor &>(part).GetParameters()));
         return {};
-    }
+    case ComponentType::DIAC:
+        builder.AddDiac(entry.Name, nodes[0], nodes[1], ToNodalys(static_cast<const Diac &>(part).GetParameters()));
+        return {};
+    case ComponentType::RELAY:
+        AddRelayPart(builder, entry);
+        return {};
     default:
         return std::unexpected(NoDeviceMessage(entry));
     }

@@ -72,6 +72,48 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   the run: the branch loses its current at that instant, the symbol breaks with a gap, and the Output window warns when
   it blew. A fuse inside a block is simulated, but its blow is not drawn or warned about. Every run starts with a whole fuse, and an operating point, a DC sweep and an AC sweep always see it closed.
   The Protection example compares a fast and a slow-blow fuse (see docs/models.md).
+- **IGBTs**: an IGBT is in the Transistors group of the part rail, with the collector on terminal 1, the gate on
+  terminal 2 and the emitter on terminal 3, drawn as a bipolar transistor with an insulated gate plate. Its properties
+  pick a ready model (600V 30A or 1200V 40A, both with a co-packaged diode) or set the figures of a datasheet: the gate
+  threshold, the transconductance, the on-state line V0 + RCE IC, the three capacitances, the share and time constant
+  of the tail current that flows on after a turn-off, the forward voltage of the diode (0 leaves it out) and the
+  ratings. Only Nodalys simulates it: ngspice refuses a circuit with one, with the reason. The IGBT chopper of the
+  Switching examples shows the Miller plateau and the tail (see docs/models.md).
+- **Thyristors**: a thyristor (SCR) and a TRIAC are in the Switches and fuses group of the part rail. The SCR has anode
+  on terminal 1, cathode on terminal 2, gate on terminal 3; the TRIAC has MT2 on terminal 1, MT1 on terminal 2, gate
+  on terminal 3, and conducts both ways. Their properties set the on-state line (V0 and RT), the holding and trigger
+  currents, the gate resistance and the breakover voltage. They block until the gate is fired and latch on until
+  the current falls below the holding current, and the label above the symbol shows the name and IH, clear of the
+  gate lead. The gate drive must be referenced to the cathode (MT1), since the gate current returns through it; a
+  TRIAC fires in all four gate quadrants. Only Nodalys simulates the TRIAC; ngspice refuses it with the reason, and runs
+  the SCR. The Switching examples drive them: a half-wave controlled rectifier, one with an inductive load and a
+  freewheeling diode, a controlled bridge, and a TRIAC light dimmer (see docs/models.md).
+- **GTOs**: a GTO (gate turn-off thyristor), in the same group, has the SCR's terminals, anode on terminal 1, cathode on
+  terminal 2 and gate on terminal 3, and two arrowheads on its gate lead. It fires and latches like an SCR, and a
+  negative gate current of at least IGQ, which its properties set, turns it off while the anode current still
+  flows. Its gate figures start as those of a power device (IGT 0.1 A, RG 1 Ohm, IGQ 2 A). Only Nodalys simulates
+  it: ngspice refuses a circuit with one, with the reason. The GTO chopper of the Switching examples shows it
+  (see docs/models.md).
+- **DIACs**: a DIAC, in the same group, is the gate-less trigger diode of a dimmer, MT2 on terminal 1 and MT1 on
+  terminal 2. Its properties set the breakover voltage (VBO), the on-state line it snaps back to (V0 and RT), the
+  blocking resistance and the holding current, and the label under the symbol shows VBO. It breaks over either way at
+  VBO and holds until its current falls below IH. Only Nodalys simulates it: ngspice refuses a circuit with one, with
+  the reason. The DIAC-triggered TRIAC dimmer of the Switching examples shows it.
+- **Transmission lines**: a transmission line has its own button among the passive parts of the part rail, a coaxial symbol with two
+  ports: port 1 on the left (terminal 1 the center conductor, terminal 2 the shield) and port 2 on the right
+  (terminals 3 and 4). Its value is the characteristic impedance Z0, and its properties set the delay and the losses
+  (DC R, Skin R at Ref freq, DC G and Loss tangent); the label under it shows Z0 and the delay, and the properties show
+  the quarter-wave frequency. **From geometry...** in its properties works Z0 and every parameter out from a real
+  line: pick a microstrip, a stripline or a coax, type its dimensions in meters with a scale suffix ("1.6m" is
+  1.6 mm), the permittivity and loss tangent of the dielectric, the conductivity of the copper and the length, read
+  the figures as you type, and Apply sets them on the part. Only Nodalys simulates it: ngspice refuses a circuit with
+  one, with the reason. A line
+  with all losses at 0 runs in every analysis but pole-zero, a lossy one in all but the transient and pole-zero. The
+  Transmission lines examples show reflections on a mismatched line and a quarter-wave transformer (see docs/models.md).
+- **PWL sources**: a source with the PWL waveform takes its points as text, or from a file: **Import CSV...** reads a
+  table of time and value columns and **Import WAV...** a recording, scaled so its full scale is the **WAV peak**
+  field. The points are saved in the schematic, so the file is not needed afterwards; a table of more than 64 points
+  shows as a summary with **Reset points** instead of the text (see docs/models.md for what the files may hold).
 - **Transformers**: the value of a transformer is its primary inductance, and its properties set the turns ratio, the
   coupling and the resistance of the windings. The secondary needs a path to ground, such as the bridge of the
   Transformers examples.
@@ -183,9 +225,11 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   warnings, or failed, followed by the reason, which then takes the whole line), then the keys of the current mode, shortened at a word
   when the window is narrow, and the grid position of the cursor on the right. Click the result for the
   errors, the warnings and the ngspice output. Among the warnings are the safe operating area ones: a diode, LED,
-  Zener, transistor or MOSFET that a run pushes past its ratings (diode average forward current and power, and the VCE, IC,
-  VDS, VGS, ID and power of transistors) is named with the value and the rating. Ratings are fields of a part's
-  properties (IF max, the average forward current, P max, ...) and are only checked for ready and custom models, not for library ones.
+  Zener, transistor, MOSFET, IGBT, thyristor or TRIAC that a run pushes past its ratings (diode average forward current and power,
+  the VCE, IC, VDS, VGS, ID and power of transistors, and the VDRM, on-state current, ITSM and I2t of thyristors) is named
+  with the value and the rating. Ratings are fields of a part's properties (IF max, the average forward current, P max,
+  ...) and are only checked for ready and custom models, not for library ones; a thyristor's ratings start at 0, which
+  leaves each unchecked until you set it.
 - **Menus**: File (files, import of schematics and of SPICE libraries, examples and the schematic export), Edit (undo,
   redo, changes to the selection, blocks and Preferences) and View (fit, wire colors, live effects, theme, and the windows). On macOS the shortcuts use Cmd where
   this guide says Ctrl: Cmd+S saves, Cmd+Z undoes.
@@ -409,10 +453,16 @@ Every part with more than one terminal numbers them in the order the SPICE netli
 | Relay (K) | contact, top | contact, bottom | coil + (4: coil -) |
 | Transformer (T) | primary +, upper left | primary -, lower left | secondary + (4: secondary -), on the right |
 | Diode, Zener diode, LED | anode | cathode | |
+| Thyristor (SCR) | anode | cathode | gate |
+| TRIAC | MT2 | MT1 | gate |
+| GTO | anode | cathode | gate |
+| DIAC | MT2 | MT1 | |
+| Transmission line (TL) | port 1 center, upper left | port 1 shield, lower left | port 2 center, upper right (4: port 2 shield) |
 | Voltage source | positive (+) | negative (-) | |
 | Current source | tail of its arrow | head of its arrow | |
 | NPN or PNP transistor | collector | base | emitter |
 | N- or P-channel MOSFET | drain | gate | source |
+| IGBT | collector | gate | emitter |
 | VCVS or VCCS (E, G) | output, top of the diamond | output, bottom | control + (4: control -) |
 | CCCS or CCVS (F, H) | output, top of the diamond | output, bottom | |
 | Behavioral source (B) | +, top of the diamond | -, bottom | |
@@ -440,7 +490,8 @@ imcsim reports currents as ngspice computes them:
   current leaves it through its positive terminal, so it reports a **negative** current. A 5 V supply feeding
   2.5 mA into a circuit reports -2.5 mA.
 - **Transistors** report one current per terminal, `I(Q1.C)`, `I(Q1.B)` and `I(Q1.E)`, each positive into its
-  terminal. The three always add up to zero.
+  terminal. The three always add up to zero. An IGBT reports `I(Q1.C)`, `I(Q1.G)` and `I(Q1.E)` the same way; the
+  collector current includes its co-packaged diode, which carries it backward.
 - **Potentiometers** report one current per terminal, `I(RV1.A)` for the first end, `I(RV1.B)` for the second and
   `I(RV1.W)` for the wiper, each positive into its terminal. The three always add up to zero.
 - **Switches and push buttons** report one current like a two-terminal part, positive from terminal 1 to terminal 2;
@@ -448,6 +499,12 @@ imcsim reports currents as ngspice computes them:
 - **Fuses** report one current like a switch, positive from terminal 1 to terminal 2; a blown one carries nanoamperes.
 - **Relays** report two currents, `I(K1.S)` into the first contact terminal and `I(K1.C)` into the coil +. A
   voltage-controlled switch reports the current into its first contact terminal, like a two-terminal part.
+- **Thyristors** report one current per terminal, `I(SCR1.A)`, `I(SCR1.K)` and `I(SCR1.G)` for an SCR and
+  `I(TR1.MT2)`, `I(TR1.MT1)` and `I(TR1.G)` for a TRIAC and `I(GTO1.A)`, `I(GTO1.K)` and `I(GTO1.G)` for a GTO,
+  each positive into its terminal. The three add up to zero.
+- **DIACs** report one current like a two-terminal part, `I(DIAC1)`, positive from MT2 to MT1.
+- **Transmission lines** report `I(TL1.P1)` into the center of port 1 and `I(TL1.P2)` into the center of port 2,
+  each positive into its terminal; the shield of each port carries the same current back.
 - **Transformers** report `I(T1.P)` into the primary + and `I(T1.S)` into the secondary +, each positive into its
   terminal. With a load on the secondary the two have opposite signs, in the ratio of the turns.
 - **Controlled and behavioral sources** report the current of their output like a two-terminal part; the control pins

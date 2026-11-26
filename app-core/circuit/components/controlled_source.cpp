@@ -67,6 +67,9 @@ double DefaultGain(const ComponentType type) {
     case ComponentType::JK_FLIP_FLOP:
     case ComponentType::T_FLIP_FLOP:
     case ComponentType::SR_FLIP_FLOP:
+    case ComponentType::SUBCIRCUIT:
+    case ComponentType::CLOCK:
+    case ComponentType::LOGIC_INPUT:
         break;
     }
     return 1.0;

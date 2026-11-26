@@ -4,6 +4,7 @@
  */
 
 #include "analysis/analysis_inputs.h"
+#include "backends/ngspice/ngspice_backend.h"
 #include "backends/ngspice/ngspice_library.h"
 #include "backends/nodalys/nodalys_backend.h"
 #include "circuit/components/potentiometer.h"
@@ -1308,6 +1309,68 @@ TEST_CASE("The precision rectifier passes the positive half of the sine without 
     // The capacitance of the diode lets a few tens of millivolts of the edge through when the op-amp output drops to
     // its negative limit; without the loop the output would not reach the peak by about the diode drop instead
     CHECK(lowest > -0.05);
+}
+
+TEST_CASE("The GTO chopper switches its load on at the firing pulse and off at the turn-off pulse", "[examples][gto]") {
+    GUI::Schematic schematic;
+    OpenExample("gto_chopper.imcsim", schematic);
+    Core::NodalysBackend nodalys;
+    const Core::TransientRun run =
+        nodalys.RunTransient(schematic.GetCircuit(), schematic.GetSimulationSettings().Transient, std::nullopt, {});
+    REQUIRE(run.Result.has_value());
+    const Core::Transient &transient = *run.Result;
+    const std::vector<double> &load = transient.NodeVoltages[NodeAt(schematic, {17, 9})];
+    const auto at = [&](const double time) {
+        const auto point = std::ranges::lower_bound(transient.Times, time);
+        REQUIRE(point != transient.Times.end());
+        return load[static_cast<std::size_t>(point - transient.Times.begin())];
+    };
+    // In the second period the GTO is off before the firing pulse at 1.1 ms, on after it, and off again after the
+    // turn-off pulse at 1.5 ms, with the 100 V supply still across it
+    CHECK_THAT(at(1.05e-3), Catch::Matchers::WithinAbs(0.0, 1e-3));
+    CHECK_THAT(at(1.3e-3), Catch::Matchers::WithinAbs(99.2, 0.5));
+    CHECK_THAT(at(1.8e-3), Catch::Matchers::WithinAbs(0.0, 1e-3));
+    // ngspice refuses the part, with the name of the engine that runs it
+    const auto refusal =
+        Core::FindUnsupported(Core::NgspiceBackend{}, schematic.GetCircuit(), Core::AnalysisKind::TRANSIENT);
+    REQUIRE(refusal.has_value());
+    CHECK(refusal->contains("Nodalys"));
+}
+
+TEST_CASE("The IGBT chopper switches its inductive load and leaves a tail at each turn-off", "[examples][igbt]") {
+    GUI::Schematic schematic;
+    OpenExample("igbt_chopper.imcsim", schematic);
+    Core::NodalysBackend nodalys;
+    const Core::TransientRun run =
+        nodalys.RunTransient(schematic.GetCircuit(), schematic.GetSimulationSettings().Transient, std::nullopt, {});
+    REQUIRE(run.Result.has_value());
+    CAPTURE(run.Result->Warnings);
+    CHECK(run.Result->Warnings.empty());
+    const Core::Transient &transient = *run.Result;
+    const std::vector<double> &collector = transient.NodeVoltages[NodeAt(schematic, {17, 19})];
+    const auto collector_current = std::ranges::find(transient.Currents, "Q1.C", &Core::ComponentTrace::Name)->Values;
+    const auto index_at = [&](const double time) {
+        const auto point = std::ranges::lower_bound(transient.Times, time);
+        REQUIRE(point != transient.Times.end());
+        return static_cast<std::size_t>(point - transient.Times.begin());
+    };
+    // In the fifth period Q1 conducts until 450 us, near its on-state line, and blocks the supply plus the diode
+    // drop after
+    CHECK(collector[index_at(440e-6)] < 2.0);
+    CHECK(collector[index_at(470e-6)] > 200.0);
+    // Just after the gate has fallen the collector still carries its tail, which has died out 2 us later
+    const double carried = collector_current[index_at(449e-6)];
+    const double tail = collector_current[index_at(450.2e-6)];
+    const double later = collector_current[index_at(452e-6)];
+    INFO("carried " << carried << " A, tail " << tail << " A, later " << later << " A");
+    CHECK(carried > 5.0);
+    CHECK(tail > 0.02 * carried);
+    CHECK(tail < 0.15 * carried);
+    CHECK(std::abs(later) < 0.01 * carried);
+    const auto refusal =
+        Core::FindUnsupported(Core::NgspiceBackend{}, schematic.GetCircuit(), Core::AnalysisKind::TRANSIENT);
+    REQUIRE(refusal.has_value());
+    CHECK(refusal->contains("IGBT"));
 }
 
 TEST_CASE("The decoder example varies A0 and A1 only, and each row raises the output they select",

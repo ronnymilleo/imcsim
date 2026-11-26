@@ -156,10 +156,12 @@ add_library(imcsim-gui-lib
             ui_elements/ui_controlled_switch.cpp
             ui_elements/ui_current_source.cpp
             ui_elements/ui_dependent_source.cpp
+            ui_elements/ui_diac.cpp
             ui_elements/ui_diode.cpp
             ui_elements/ui_element.cpp
             ui_elements/ui_flip_flop.cpp
             ui_elements/ui_fuse.cpp
+            ui_elements/ui_igbt.cpp
             ui_elements/ui_gate.cpp
             ui_elements/ui_ground.cpp
             ui_elements/ui_inductor.cpp
@@ -179,6 +181,7 @@ add_library(imcsim-gui-lib
             ui_elements/ui_subcircuit.cpp
             ui_elements/ui_subcircuit_pin.cpp
             ui_elements/ui_switch.cpp
+            ui_elements/ui_thyristor.cpp
             ui_elements/ui_transformer.cpp
             ui_elements/ui_transistor.cpp
             ui_elements/ui_transmission_line.cpp
@@ -197,6 +200,7 @@ add_library(imcsim-gui-lib
             windows/editor_status_bar.cpp
             windows/editor_toolbar.cpp
             windows/editor_window.cpp
+            windows/line_geometry_calculator.cpp
             windows/live_input_handler.cpp
             windows/mode_input.cpp
             windows/netlist_window.cpp

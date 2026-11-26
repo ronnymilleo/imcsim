@@ -22,6 +22,7 @@ add_library(imcsim-core-lib
             backends/nodalys/model_parser.cpp
             backends/nodalys/nodalys_backend.cpp
             backends/nodalys/nodalys_results.cpp
+            backends/nodalys/nodalys_unsupported_parts.cpp
             backends/nodalys/parameter_conversion.cpp
             backends/nodalys/spice_block_check.cpp
             circuit/behavioral_expression.cpp
@@ -35,8 +36,10 @@ add_library(imcsim-core-lib
             circuit/components/component.cpp
             circuit/components/controlled_source.cpp
             circuit/components/current_source.cpp
+            circuit/components/diac.cpp
             circuit/components/diode.cpp
             circuit/components/fuse.cpp
+            circuit/components/igbt.cpp
             circuit/components/ground.cpp
             circuit/components/inductor.cpp
             circuit/components/initial_voltage.cpp
@@ -55,12 +58,14 @@ add_library(imcsim-core-lib
             circuit/components/subcircuit.cpp
             circuit/components/subcircuit_pin.cpp
             circuit/components/switch.cpp
+            circuit/components/thyristor.cpp
             circuit/components/transformer.cpp
             circuit/components/transmission_line.cpp
             circuit/components/vcc.cpp
             circuit/components/voltage_controlled_switch.cpp
             circuit/components/voltage_source.cpp
             circuit/library_model.cpp
+            circuit/line_geometry.cpp
             circuit/netlist_logic.cpp
             circuit/netlist_sources.cpp
             circuit/netlist_subcircuits.cpp

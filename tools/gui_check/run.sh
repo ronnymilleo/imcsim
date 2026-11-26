@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
 # Drives a real imcsim through the paths a refactoring can break without any test noticing, once on each simulation
 # engine: every analysis on a circuit made for it and its Output tab, the runs that repeat (a stepped parameter, a
-# stepped source, Monte Carlo), what an engine refuses and says so, results dropped by an edit, undo and redo, a block
-# opened and left, and a live run with a switch flipped and a potentiometer turned.
+# stepped source, Monte Carlo), the parts that need one engine or a control of their own (thyristors, transmission
+# lines, a PWL source imported from a file), what an engine refuses and says so, results dropped by an edit, undo and
+# redo, a block opened and left, and a live run with a switch flipped and a potentiometer turned.
 #
 # It shares the machinery of the docs images (tools/docs_images/lib.sh, whose README lists what must be installed):
 # an isolated instance on a Hyprland workspace, driven through gui-helper, with text found on screen by OCR. Leave
 # the keyboard and mouse alone while it runs.
 #
 #   tools/gui_check/run.sh                 every section, on every engine
-#   tools/gui_check/run.sh edit block      only some sections: preferences, analyses, repeated, refusals, edit,
-#                                          block, live
+#   tools/gui_check/run.sh edit block      only some sections: preferences, analyses, repeated, parts, refusals,
+#                                          edit, block, live
 #   GUI_CHECK_ENGINES=nodalys tools/gui_check/run.sh live    only one engine: ngspice, nodalys or both (the default)
 #   GUI_CHECK_KEEP_OPEN=1 tools/gui_check/run.sh   leave the last instance open at the end, to look at it
 #   IMCSIM_BIN=/path/to/imcsim tools/gui_check/run.sh        a copy of the binary, so a rebuild cannot change it midway
@@ -25,8 +26,8 @@
 # named by engine and numbered in order, such as nodalys_03_transient.png, and those are to be looked at before a
 # change is called good.
 #
-# The circuit of each analysis (examples/ unless noted; fixtures/ holds the stepped parameter and the live
-# potentiometer, which no example saves):
+# The circuit of each analysis (examples/ unless noted; fixtures/ holds the stepped parameter, the live potentiometer
+# and the PWL source with the table it imports, which no example saves):
 #
 #   Operating point        voltage_divider
 #   Transient              led_driver, decade_counter (logic parts), noise_through_rc_low_pass (random source),
@@ -49,6 +50,18 @@
 #   Stepped parameter      fixtures/parameter_step_rc_low_pass (R1 of the RC low-pass over a list)
 #   Stepped source         bjt_output_characteristics (DC sweep of V1, stepping I1)
 #   Monte Carlo            monte_carlo_rc_low_pass (AC sweep), monte_carlo_bias_point (operating point)
+#   Thyristors             controlled_rectifier_half_wave (an SCR), a transient on both engines, whose subcircuit
+#                          on ngspice differs from the native device of Nodalys; the harmonic balance of the SCR,
+#                          which Nodalys disables with the reason
+#   TRIAC                  triac_dimmer (transient): Nodalys runs it, ngspice refuses the TRIAC with the reason
+#   Transmission lines     transmission_line_reflections (transient) and transmission_line_quarter_wave
+#                          (S-parameters): Nodalys runs both, ngspice refuses the part with the reason
+#   DIAC                   diac_triac_dimmer (transient): Nodalys runs it, ngspice refuses the DIAC or the TRIAC
+#                          with the reason
+#   GTO                    gto_chopper (transient): Nodalys runs it, ngspice refuses the GTO with the reason
+#   IGBT                   igbt_chopper (transient): Nodalys runs it, ngspice refuses the IGBT with the reason
+#   PWL import             fixtures/pwl_import_rc_low_pass, whose source takes fixtures/pwl_sine_100_points.csv
+#                          through Import CSV... in its properties, shown then as a summary of its points
 #   Live run               switches_and_or (a switch flipped), fixtures/potentiometer_live (the LED dimmer, with a
 #                          probe, whose potentiometer is turned with the wheel)
 
@@ -64,6 +77,7 @@ ENGINES=${GUI_CHECK_ENGINES:-"ngspice nodalys"}
 RUN_FIRST_LOOK=1.5
 RUN_TIMEOUT=45
 MONTE_CARLO_TIMEOUT=90
+IMPORT_TIMEOUT=10
 LIVE_PAUSE=3
 # Wheel notches that turn the potentiometer, and the wiper step each one makes, in percent
 WIPER_NOTCHES=3
@@ -377,6 +391,10 @@ check_refusals() {
         open_circuit harmonic_balance_rectifier
         check_refusal harmonic_balance_disabled Harmonic 'does not run'
     fi
+    if [[ "$ENGINE" == nodalys ]]; then
+        open_circuit controlled_rectifier_half_wave
+        check_refusal thyristor_harmonic_balance_disabled Harmonic 'thyristor'
+    fi
     # Logic gates have no sensitivity analysis with either engine
     open_circuit logic_truth_table
     check_refusal sensitivity_disabled Sensitivity 'logic'
@@ -520,17 +538,79 @@ check_live_potentiometer() {
     fi
 }
 
+# The parts that only one engine simulates, or that one engine simulates its own way
+check_parts() {
+    check_circuit_run transient_thyristor controlled_rectifier_half_wave Spectrum
+    check_nodalys_only transient_triac triac_dimmer Spectrum 'TRIACs'
+    check_nodalys_only transmission_line_transient transmission_line_reflections Spectrum 'Transmission lines'
+    check_nodalys_only transmission_line_s_parameters transmission_line_quarter_wave Smith 'Transmission lines'
+    # The dimmer holds a DIAC and a TRIAC, which ngspice both refuses, so the refusal may name either one
+    check_nodalys_only transient_diac diac_triac_dimmer Spectrum '(DI|TRI)ACs'
+    check_nodalys_only transient_gto gto_chopper Spectrum 'GTOs'
+    check_nodalys_only transient_igbt igbt_chopper Spectrum 'IGBTs'
+    check_pwl_import
+}
+
+# Nodalys runs a circuit with a part only it simulates, and ngspice refuses it naming the part: NAME, CIRCUIT, WORD,
+# then the REASON the refusal must give
+check_nodalys_only() {
+    local name=$1 circuit=$2 word=$3 reason=$4
+    open_circuit "$circuit"
+    run_and_wait
+    if [[ "$ENGINE" == ngspice ]]; then
+        check_step "${name}_refused" '' failed "$reason"
+    else
+        check_step "$name" "$word" "done"
+    fi
+}
+
+# Opens the properties of the PWL source, imports a table of 100 points, which the properties then show as a summary
+# instead of the text, and runs the transient on them
+check_pwl_import() {
+    open_circuit pwl_import_rc_low_pass
+    # The bottom wire runs from (4, 10) to (14, 10); the source Vin1 stands at (4, 7)
+    docs_calibrate_on_wire 4 14 10
+    # shellcheck disable=SC2046
+    ui_double_click $(docs_grid_point 4 7)
+    sleep "$MEDIUM_PAUSE"
+    # The dialog of the properties comes up later than that of File > Open, so the answer stays until the summary of
+    # the imported points shows, or the wait is over
+    echo "$GUI_CHECK_FIXTURES/pwl_sine_100_points.csv" >"$DOCS_DIALOG_ANSWER"
+    # The first click after the double click on the canvas only moves the focus, so it goes on the plain text of the
+    # properties, where it does nothing else
+    ui_click_text Voltage "$DOCS_SIDE_X" "$COMMAND_BAR_BOTTOM" "$DOCS_WIDTH" "$DOCS_HEIGHT"
+    sleep "$SHORT_PAUSE"
+    click_import_csv
+    local waited=0
+    while ! docs_find_text 100 "$DOCS_SIDE_X" "$COMMAND_BAR_BOTTOM" "$DOCS_WIDTH" "$DOCS_HEIGHT" >/dev/null &&
+        [[ $waited -lt $IMPORT_TIMEOUT ]]; do
+        sleep 1
+        waited=$((waited + 1))
+    done
+    : >"$DOCS_DIALOG_ANSWER"
+    check_step pwl_imported '100'
+    ui_key Escape
+    run_and_wait
+    check_step pwl_import_transient Spectrum "done"
+}
+
+# Text on a button reads badly, so the first of the two Import buttons, CSV before WAV, is found by its first word in
+# the properties on the right
+click_import_csv() {
+    ui_click_text Import "$DOCS_SIDE_X" "$COMMAND_BAR_BOTTOM" "$DOCS_WIDTH" "$DOCS_HEIGHT"
+}
+
 # =============================================================================
 # Main
 # =============================================================================
 
 # The sections to run, all of them unless some are named on the command line
 SECTIONS=("$@")
-[[ ${#SECTIONS[@]} -gt 0 ]] || SECTIONS=(preferences analyses repeated refusals edit block live)
+[[ ${#SECTIONS[@]} -gt 0 ]] || SECTIONS=(preferences analyses repeated parts refusals edit block live)
 for section in "${SECTIONS[@]}"; do
     case "$section" in
-        preferences | analyses | repeated | refusals | edit | block | live) ;;
-        *) docs_fail "unknown section: $section (preferences, analyses, repeated, refusals, edit, block, live)" ;;
+        preferences | analyses | repeated | parts | refusals | edit | block | live) ;;
+        *) docs_fail "unknown section: $section (preferences, analyses, repeated, parts, refusals, edit, block, live)" ;;
     esac
 done
 
@@ -561,6 +641,7 @@ for engine in $ENGINES; do
             preferences) check_preferences ;;
             analyses) check_analyses ;;
             repeated) check_repeated ;;
+            parts) check_parts ;;
             refusals) check_refusals ;;
             edit) check_edit_drops_results ;;
             block) check_block ;;

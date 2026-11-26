@@ -61,9 +61,13 @@ jobs:
           cmake --build build
 
       # The install rules lay out the folder: the program, ngspice.dll, the notices and the licenses
+      # The tag name reaches the shell through the environment, never through ${{ }} inside the script, so a name
+      # with PowerShell metacharacters cannot expand into code
       - name: Build the zip
+        env:
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          $Name = "imcsim-$('${{ github.ref_name }}'.TrimStart('v'))-windows-x64"
+          $Name = "imcsim-$($env:REF_NAME.TrimStart('v'))-windows-x64"
           cmake --install build --prefix "out/zip/$Name"
           Compress-Archive "out/zip/$Name" "out/zip/$Name.zip"
 

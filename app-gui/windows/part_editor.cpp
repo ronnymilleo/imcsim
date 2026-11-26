@@ -208,7 +208,10 @@ void PartEditor::DrawValuedPart(Core::Component &component) {
     if (type == Core::ComponentType::TRANSFORMER) {
         DrawTransformer(static_cast<Core::Transformer &>(component), m_Electromechanical, *m_Schematic);
     } else if (type == Core::ComponentType::TRANSMISSION_LINE) {
-        DrawTransmissionLine(static_cast<Core::TransmissionLine &>(component), m_Electromechanical, *m_Schematic);
+        DrawTransmissionLine(static_cast<Core::TransmissionLine &>(component),
+                             m_Electromechanical,
+                             m_Value,
+                             *m_Schematic);
     } else if (type == Core::ComponentType::INITIAL_VOLTAGE) {
         ImGui::TextDisabled("The node starts a transient at this voltage; other analyses ignore it");
     } else if (type == Core::ComponentType::NODESET) {
@@ -221,7 +224,7 @@ void PartEditor::DrawValuedPart(Core::Component &component) {
 }
 
 /**
- * @brief   Diodes, transistors and op-amps, which a model sets; false for the other parts.
+ * @brief   Diodes, transistors, IGBTs and op-amps, which a model sets; false for the other parts.
  */
 bool PartEditor::DrawModeledPart(Core::Component &component) {
     const Core::ComponentType type = component.GetType();
@@ -231,6 +234,8 @@ bool PartEditor::DrawModeledPart(Core::Component &component) {
         DrawBJT(static_cast<Core::BJT &>(component), m_Models, *m_Schematic);
     } else if (Core::IsMOSFET(type)) {
         DrawMOSFET(static_cast<Core::MOSFET &>(component), m_Models, *m_Schematic);
+    } else if (Core::IsIGBT(type)) {
+        DrawIGBT(static_cast<Core::IGBT &>(component), m_Models, *m_Schematic);
     } else if (type == Core::ComponentType::OP_AMP) {
         DrawOpAmp(static_cast<Core::OpAmp &>(component), m_Models, m_Value, *m_Schematic);
     } else {
@@ -255,6 +260,10 @@ bool PartEditor::DrawSettingPart(Core::Component &component) {
         DrawRelay(static_cast<Core::Relay &>(component), m_Electromechanical, *m_Schematic);
     } else if (type == Core::ComponentType::FUSE) {
         DrawFuse(static_cast<Core::Fuse &>(component), m_Electromechanical, *m_Schematic);
+    } else if (Core::IsThyristor(type)) {
+        DrawThyristor(static_cast<Core::Thyristor &>(component), m_Electromechanical, *m_Schematic);
+    } else if (type == Core::ComponentType::DIAC) {
+        DrawDiac(static_cast<Core::Diac &>(component), m_Electromechanical, *m_Schematic);
     } else if (Core::IsLogicPart(type)) {
         DrawLogicPart(static_cast<Core::LogicPart &>(component), m_Logic, *m_Schematic);
     } else if (type == Core::ComponentType::CLOCK) {

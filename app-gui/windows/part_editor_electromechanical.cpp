@@ -36,6 +36,36 @@ constexpr auto FUSE_FIELDS = std::to_array<ParameterField<Core::FuseParameters>>
     {"Blown R", &Core::FuseParameters::BlownResistance, "Ohm"},
 });
 
+constexpr auto THYRISTOR_FIELDS = std::to_array<ParameterField<Core::ThyristorParameters>>({
+    {"V0", &Core::ThyristorParameters::OnThresholdVoltage, "V"},
+    {"RT", &Core::ThyristorParameters::OnResistance, "Ohm"},
+    {"Off R", &Core::ThyristorParameters::OffResistance, "Ohm"},
+    {"IH", &Core::ThyristorParameters::HoldingCurrent, "A"},
+    {"IGT", &Core::ThyristorParameters::GateTriggerCurrent, "A"},
+    {"VGT", &Core::ThyristorParameters::GateTriggerVoltage, "V"},
+    {"RG", &Core::ThyristorParameters::GateResistance, "Ohm"},
+    {"VBO", &Core::ThyristorParameters::BreakoverVoltage, "V"},
+    {"dv/dt", &Core::ThyristorParameters::CriticalDvDt, "V/s"},
+    {"tq", &Core::ThyristorParameters::TurnOffTime, "s"},
+    {"VDRM", &Core::ThyristorParameters::MaxRepetitivePeakVoltage, "V"},
+    {"IT max", &Core::ThyristorParameters::MaxOnStateCurrent, "A"},
+    {"ITSM", &Core::ThyristorParameters::MaxSurgeCurrent, "A"},
+    {"I2t", &Core::ThyristorParameters::MaxI2t, "A2s"},
+});
+
+/// The extra figure of a GTO, drawn below the thyristor ones.
+constexpr auto GATE_TURN_OFF_FIELDS = std::to_array<ParameterField<Core::ThyristorParameters>>({
+    {"IGQ", &Core::ThyristorParameters::GateTurnOffCurrent, "A"},
+});
+
+constexpr auto DIAC_FIELDS = std::to_array<ParameterField<Core::DiacParameters>>({
+    {"VBO", &Core::DiacParameters::BreakoverVoltage, "V"},
+    {"V0", &Core::DiacParameters::OnThresholdVoltage, "V"},
+    {"RT", &Core::DiacParameters::OnResistance, "Ohm"},
+    {"Off R", &Core::DiacParameters::OffResistance, "Ohm"},
+    {"IH", &Core::DiacParameters::HoldingCurrent, "A"},
+});
+
 constexpr auto TRANSFORMER_FIELDS = std::to_array<ParameterField<Core::TransformerParameters>>({
     {"Turns ratio", &Core::TransformerParameters::TurnsRatio, ":1"},
     {"Coupling", &Core::TransformerParameters::Coupling, ""},
@@ -66,6 +96,12 @@ void LoadElectromechanicalFields(ElectromechanicalFields &fields, const Core::Co
         LoadParameterFields(RELAY_FIELDS, fields.Relay, static_cast<const Core::Relay &>(component).GetParameters());
     } else if (type == Core::ComponentType::FUSE) {
         LoadParameterFields(FUSE_FIELDS, fields.Fuse, static_cast<const Core::Fuse &>(component).GetParameters());
+    } else if (Core::IsThyristor(type)) {
+        const Core::ThyristorParameters &parameters = static_cast<const Core::Thyristor &>(component).GetParameters();
+        LoadParameterFields(THYRISTOR_FIELDS, fields.Thyristor, parameters);
+        LoadParameterFields(GATE_TURN_OFF_FIELDS, fields.GateTurnOff, parameters);
+    } else if (type == Core::ComponentType::DIAC) {
+        LoadParameterFields(DIAC_FIELDS, fields.Diac, static_cast<const Core::Diac &>(component).GetParameters());
     } else if (type == Core::ComponentType::TRANSFORMER) {
         LoadParameterFields(TRANSFORMER_FIELDS,
                             fields.Transformer,
@@ -158,6 +194,60 @@ void DrawFuse(Core::Fuse &fuse, ElectromechanicalFields &fields, Schematic &sche
 }
 
 /**
+ * @brief   The thyristor fires at the gate trigger current, latches on, and releases below the holding current; a
+ *          TRIAC does so both ways, firing in all four gate quadrants, and a GTO also turns off on a negative gate
+ *          current of IGQ.
+ */
+void DrawThyristor(Core::Thyristor &thyristor, ElectromechanicalFields &fields, Schematic &schematic) {
+    Core::ThyristorParameters parameters = thyristor.GetParameters();
+    const bool is_gto = thyristor.GetType() == Core::ComponentType::GTO;
+    const auto is_valid = [](const Core::ThyristorParameters &candidate) {
+        return Core::Thyristor::IsValidParameters(candidate);
+    };
+    bool is_changed = DrawParameterFields(THYRISTOR_FIELDS, fields.Thyristor, "", is_valid, parameters);
+    if (is_gto) {
+        is_changed =
+            DrawParameterFields(GATE_TURN_OFF_FIELDS, fields.GateTurnOff, "", is_valid, parameters) || is_changed;
+    }
+    if (is_changed) {
+        thyristor.SetParameters(parameters);
+        schematic.MarkModified();
+    }
+    const bool is_triac = thyristor.GetType() == Core::ComponentType::TRIAC;
+    ImGui::TextDisabled("Fires at IGT, latches on, and releases when the %s current falls below IH",
+                        is_triac ? "main" : "anode");
+    if (is_gto) {
+        ImGui::TextDisabled("A negative gate current of at least IGQ turns it off while the anode current flows; "
+                            "Nodalys only, and 0 disables it");
+    }
+    if (is_triac) {
+        ImGui::TextDisabled("Conducts both ways and fires in all four gate quadrants; the gate is referenced to MT1");
+    }
+    ImGui::TextDisabled("On Nodalys every figure is a parameter; on ngspice only RG and RT are, and IH, IGT and V0"
+                        " follow from the transistor pair");
+    ImGui::TextDisabled("VBO, dv/dt firing and the turn-off time tq run on Nodalys only; 0 disables each");
+    ImGui::TextDisabled("VDRM, IT max (%s), ITSM and I2t are ratings the run is checked against; 0 skips each",
+                        is_triac ? "the RMS current" : "the average forward current");
+}
+
+/**
+ * @brief   The DIAC breaks over at VBO either way, snaps back to the on-state line from V0 and releases below IH.
+ */
+void DrawDiac(Core::Diac &diac, ElectromechanicalFields &fields, Schematic &schematic) {
+    Core::DiacParameters parameters = diac.GetParameters();
+    const auto is_valid = [](const Core::DiacParameters &candidate) {
+        return Core::Diac::IsValidParameters(candidate);
+    };
+    if (DrawParameterFields(DIAC_FIELDS, fields.Diac, "", is_valid, parameters)) {
+        diac.SetParameters(parameters);
+        schematic.MarkModified();
+    }
+    ImGui::TextDisabled("Breaks over at VBO either way and snaps back by %sV; releases below IH",
+                        Core::FormatValue(parameters.BreakoverVoltage - parameters.OnThresholdVoltage).c_str());
+    ImGui::TextDisabled("V0 plus RT times IH must stay below VBO");
+}
+
+/**
  * @brief   The value is the primary inductance; the secondary's follows from the turns ratio.
  */
 void DrawTransformer(Core::Transformer &transformer, ElectromechanicalFields &fields, Schematic &schematic) {
@@ -175,9 +265,17 @@ void DrawTransformer(Core::Transformer &transformer, ElectromechanicalFields &fi
 
 /**
  * @brief   The value is the characteristic impedance Z0; zero losses run in transient (Bergeron) and frequency domain,
- *          while skin/dielectric losses run in frequency-domain and Harmonic Balance analyses.
+ *          while skin/dielectric losses run in frequency-domain and Harmonic Balance analyses. The geometry calculator
+ *          sets Z0 and every parameter at once from a real line.
+ * @param[in,out] line       Line being edited.
+ * @param[in,out] fields     Texts of its parameters and the calculator.
+ * @param[in,out] impedance  Field of the value, reloaded when the calculator sets Z0.
+ * @param[in,out] schematic  Marked modified on a change.
  */
-void DrawTransmissionLine(Core::TransmissionLine &line, ElectromechanicalFields &fields, Schematic &schematic) {
+void DrawTransmissionLine(Core::TransmissionLine &line,
+                          ElectromechanicalFields &fields,
+                          ValueField &impedance,
+                          Schematic &schematic) {
     Core::TransmissionLineParameters parameters = line.GetParameters();
     const auto is_valid = [](const Core::TransmissionLineParameters &candidate) {
         return Core::TransmissionLine::IsValidParameters(candidate);
@@ -192,6 +290,16 @@ void DrawTransmissionLine(Core::TransmissionLine &line, ElectromechanicalFields 
         ImGui::TextDisabled("Lossy/dispersive: runs in DC, AC, S-parameters, noise and HB (not transient)");
     } else {
         ImGui::TextDisabled("Lossless (0 losses): runs in transient (Bergeron) and all frequency analyses");
+    }
+    if (ImGui::Button("From geometry...")) {
+        OpenLineGeometryCalculator(fields.LineGeometry);
+    }
+    if (const std::optional<Core::LineElectrical> figures = DrawLineGeometryCalculator(fields.LineGeometry)) {
+        line.SetValue(figures->CharacteristicImpedance);
+        line.SetParameters(figures->Parameters);
+        impedance.Load(figures->CharacteristicImpedance);
+        LoadParameterFields(TRANSMISSION_LINE_FIELDS, fields.TransmissionLine, figures->Parameters);
+        schematic.MarkModified();
     }
 }
 

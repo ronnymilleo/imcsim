@@ -8,6 +8,7 @@
 
 #include "nodalys/waveform_types.h"
 #include <cstddef>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -228,6 +229,42 @@ struct FuseParameters {
 };
 
 /**
+ * @struct  IgbtParameters
+ * @brief   Datasheet figures of an N-channel IGBT, the MOS-gated bipolar switch of power converters.
+ * @details The collector current is the smaller of two limits, blended smoothly so Newton and the harmonic balance see
+ * a continuous slope: the channel, which saturates at \f$K/2\,(V_{GE} - V_{GE(th)})^2\f$ with
+ *          \f$K = g_{fs}^2 / (2 I_{gfs})\f$ from the transconductance at its test current, and the on-state line
+ *          \f$V_{CE(sat)} = V_0 + R_{CE} I_C\f$ of the conducting bipolar part. The capacitances are those of the
+ *          datasheet, constant: \f$C_{res}\f$ from gate to collector, which makes the Miller plateau,
+ *          \f$C_{ies} - C_{res}\f$ from gate to emitter and \f$C_{oes} - C_{res}\f$ from collector to emitter. When the
+ *          channel current falls in a transient, the charge stored in the drift region keeps a tail current flowing:
+ *          a fraction of the current that fell, decaying with its time constant. The device blocks reverse voltage
+ *          with its off-state leakage only, without breakdown; `AntiParallelDiode` adds the diode many IGBTs carry in
+ *          the same package, from emitter to collector.
+ */
+struct IgbtParameters {
+    double GateThresholdVoltage = 5.5;     ///< \f$V_{GE(th)}\f$: gate voltage the channel opens at, in Volts.
+    double Transconductance = 10.0;        ///< \f$g_{fs}\f$ at the test current, in Siemens.
+    double TransconductanceCurrent = 20.0; ///< \f$I_{gfs}\f$: collector current \f$g_{fs}\f$ is given at, in Amperes.
+    double OnThresholdVoltage = 0.8;       ///< \f$V_0\f$ of the on-state line, in Volts.
+    double OnResistance = 0.04;            ///< \f$R_{CE}\f$: slope resistance of the on-state line, in Ohms.
+    double OffResistance = 1e9;            ///< Collector-emitter leakage resistance of the off-state, in Ohms.
+    double InputCapacitance = 1.5e-9;      ///< \f$C_{ies}\f$, in Farads.
+    double OutputCapacitance = 100e-12;    ///< \f$C_{oes}\f$, in Farads.
+    double ReverseTransferCapacitance = 30e-12; ///< \f$C_{res}\f$, the Miller capacitance, in Farads.
+    double TailFraction = 0.2;                  ///< Share of the falling current the tail starts at, from 0 to 1.
+    double TailTimeConstant = 200e-9;           ///< Time constant the tail decays with, in seconds.
+    /// The diode from emitter to collector of a co-packaged IGBT, or none.
+    std::optional<DiodeParameters> AntiParallelDiode;
+
+    /**
+     * @brief   Compares two IgbtParameters values for equality.
+     * @return  True when all fields match.
+     */
+    bool operator==(const IgbtParameters &) const = default;
+};
+
+/**
  * @struct  MosfetParameters
  * @brief   Level-1 Shichman-Hodges MOSFET parameters.
  */
@@ -287,6 +324,71 @@ struct SwitchParameters {
      * @return  True when all fields match.
      */
     bool operator==(const SwitchParameters &) const = default;
+};
+
+/**
+ * @struct  ThyristorParameters
+ * @brief   Latching switch parameters of a thyristor (SCR) or a TRIAC, as a datasheet gives them.
+ * @details The on-state is the datasheet line \f$V_{TM} = V_0 + R_T I_T\f$; the gate fires the device when its current
+ *          reaches \f$I_{GT}\f$, and the latch releases when the main current falls below \f$I_H\f$ with the gate
+ *          removed. The latching current \f$I_L\f$ is not modeled separately: the gate sustains conduction until the
+ *          main current reaches the holding current. The second-order figures are optional: `CriticalDvDt` fires a
+ *          blocking device on a faster rise of the main-terminal voltage, as the displacement current through the
+ *          junction capacitance does, and `TurnOffTime` keeps it re-firable on a re-applied forward voltage for that
+ *          long after a release. With `IsBidirectional` the device is a TRIAC: it conducts and blocks both ways, the
+ *          gate fires it in all four quadrants, and the holding, breakover, dv/dt and recovery figures apply to the
+ *          magnitude of the main current and voltage. A positive `GateTurnOffCurrent` makes it a GTO, a one-way device
+ *          whose gate junction conducts both ways: a negative gate current of at least \f$I_{GQ}\f$ releases the latch
+ *          while the main current still flows.
+ */
+struct ThyristorParameters {
+    double OnResistance = 0.01;       ///< Slope resistance \f$R_T\f$ of the on-state line, in Ohms.
+    double OnThresholdVoltage = 0.9;  ///< Threshold \f$V_0\f$ of the on-state line, in Volts.
+    double OffResistance = 1e9;       ///< Blocking resistance of the off-state, in Ohms.
+    double HoldingCurrent = 5e-3;     ///< \f$I_H\f$: main current below which the latch releases, in Amperes.
+    double GateTriggerCurrent = 1e-3; ///< \f$I_{GT}\f$: gate current that fires the device, in Amperes.
+    double GateTriggerVoltage = 0.7;  ///< \f$V_{GT}\f$: gate junction threshold, in Volts.
+    double GateResistance = 100.0;    ///< \f$R_G\f$: series gate resistance, in Ohms.
+    double BreakoverVoltage = 0.0;    ///< \f$V_{BO}\f$: breakover voltage; zero disables it, in Volts.
+    /// Critical \f$dv/dt\f$: a faster rise of the main-terminal voltage fires a blocking device; zero disables it,
+    /// in Volts per second.
+    double CriticalDvDt = 0.0;
+    /// \f$t_q\f$: recovery time after a release, during which a re-applied forward voltage re-fires the device;
+    /// zero disables it, in seconds.
+    double TurnOffTime = 0.0;
+    /// \f$I_{GQ}\f$: magnitude of the negative gate current that releases a conducting GTO whatever its main
+    /// current; zero leaves the device an SCR or a TRIAC, which only the holding current releases, in Amperes.
+    double GateTurnOffCurrent = 0.0;
+    /// True for a TRIAC, which conducts both ways and fires in all four gate quadrants; false for a one-way SCR.
+    bool IsBidirectional = false;
+
+    /**
+     * @brief   Compares two ThyristorParameters values for equality.
+     * @return  True when all fields match.
+     */
+    bool operator==(const ThyristorParameters &) const = default;
+};
+
+/**
+ * @struct  DiacParameters
+ * @brief   Breakover figures of a DIAC, the gate-less bidirectional trigger diode, as a datasheet gives them.
+ * @details A DIAC blocks either way until the magnitude of its voltage reaches the breakover voltage \f$V_{BO}\f$,
+ *          then snaps back onto the on-state line \f$V = V_0 + R_T I\f$, mirrored about zero, and releases when the
+ *          magnitude of its current falls below \f$I_H\f$. The snapback a datasheet gives as \f$\Delta V\f$ is
+ *          \f$V_{BO} - V_0\f$, read at the current where the slope resistance is negligible.
+ */
+struct DiacParameters {
+    double BreakoverVoltage = 32.0;   ///< \f$V_{BO}\f$: voltage magnitude that fires the device, in Volts.
+    double OnThresholdVoltage = 27.0; ///< Threshold \f$V_0\f$ of the on-state line, in Volts.
+    double OnResistance = 10.0;       ///< Slope resistance \f$R_T\f$ of the on-state line, in Ohms.
+    double OffResistance = 1e9;       ///< Blocking resistance below the breakover, in Ohms.
+    double HoldingCurrent = 1e-3;     ///< \f$I_H\f$: current magnitude below which the device releases, in Amperes.
+
+    /**
+     * @brief   Compares two DiacParameters values for equality.
+     * @return  True when all fields match.
+     */
+    bool operator==(const DiacParameters &) const = default;
 };
 
 /**

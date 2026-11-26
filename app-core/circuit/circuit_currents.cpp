@@ -8,12 +8,10 @@
 #include "circuit/circuit.h"
 #include "circuit/circuit_netlist.h"
 #include "circuit/components/behavioral_source.h"
-#include "circuit/components/bjt.h"
 #include "circuit/components/component.h"
 #include "circuit/components/controlled_source.h"
 #include "circuit/components/diode.h"
 #include "circuit/components/logic_part.h"
-#include "circuit/components/mosfet.h"
 #include "circuit/components/switch.h"
 #include <algorithm>
 #include <array>
@@ -25,6 +23,38 @@
 #include <vector>
 
 namespace Core {
+
+namespace {
+
+/// Most terminals a part probes, which a transistor, a thyristor and a potentiometer have.
+constexpr std::size_t MAX_FIXED_PROBES = 3;
+
+/**
+ * @struct  FixedProbes
+ * @brief   The probed terminals of a kind of part whose probes do not depend on its settings.
+ */
+struct FixedProbes {
+    ComponentType Type;
+    std::array<CurrentProbe, MAX_FIXED_PROBES> Probes;
+    std::size_t Count; ///< How many entries of Probes the kind uses.
+};
+
+constexpr auto FIXED_PROBES = std::to_array<FixedProbes>({
+    {.Type = ComponentType::RELAY, .Probes = {{{0, "S"}, {2, "C"}}}, .Count = 2},
+    {.Type = ComponentType::TRANSFORMER, .Probes = {{{0, "P"}, {2, "S"}}}, .Count = 2},
+    {.Type = ComponentType::TRANSMISSION_LINE, .Probes = {{{0, "P1"}, {2, "P2"}}}, .Count = 2},
+    {.Type = ComponentType::NPN, .Probes = {{{0, "C"}, {1, "B"}, {2, "E"}}}, .Count = 3},
+    {.Type = ComponentType::PNP, .Probes = {{{0, "C"}, {1, "B"}, {2, "E"}}}, .Count = 3},
+    {.Type = ComponentType::NMOS, .Probes = {{{0, "D"}, {1, "G"}, {2, "S"}}}, .Count = 3},
+    {.Type = ComponentType::PMOS, .Probes = {{{0, "D"}, {1, "G"}, {2, "S"}}}, .Count = 3},
+    {.Type = ComponentType::IGBT, .Probes = {{{0, "C"}, {1, "G"}, {2, "E"}}}, .Count = 3},
+    {.Type = ComponentType::THYRISTOR, .Probes = {{{0, "A"}, {1, "K"}, {2, "G"}}}, .Count = 3},
+    {.Type = ComponentType::GTO, .Probes = {{{0, "A"}, {1, "K"}, {2, "G"}}}, .Count = 3},
+    {.Type = ComponentType::TRIAC, .Probes = {{{0, "MT2"}, {1, "MT1"}, {2, "G"}}}, .Count = 3},
+    {.Type = ComponentType::POTENTIOMETER, .Probes = {{{0, "A"}, {1, "B"}, {2, "W"}}}, .Count = 3},
+});
+
+} // namespace
 
 /**
  * @brief   Supplies and voltage sources carry their own branch current, which a CCCS or CCVS can follow directly.
@@ -39,15 +69,16 @@ bool HasBranchCurrent(const ComponentType type) {
 /**
  * @brief   Lists the terminals of a component whose current is measured with a probe.
  * @param[in] component  Any component.
- * @return  The anode of a diode part, the first terminal of a switch or a fuse, every terminal of a transistor or a
- *          potentiometer, the contact and the coil of a relay, the two windings of a transformer, and the first output
- * terminal of a controlled source or the output of an op-amp; nothing for the others, whose currents ngspice reports
- * directly.
+ * @return  The anode of a diode part, the first terminal of a switch, a fuse or a DIAC, every terminal of a transistor,
+ *          an IGBT, a thyristor, a GTO or a potentiometer, the contact and the coil of a relay, the two windings of a
+ *          transformer, and the first output terminal of a controlled source or the output of an op-amp; nothing for
+ *          the others, whose currents ngspice reports directly.
  */
 std::vector<CurrentProbe> GetCurrentProbes(const Component &component) {
     const ComponentType type = component.GetType();
     if (IsDiode(type) || IsControlledSource(type) || IsBehavioralSource(type) || IsSwitch(type)
-        || type == ComponentType::V_SWITCH || type == ComponentType::FUSE || type == ComponentType::OP_AMP) {
+        || type == ComponentType::V_SWITCH || type == ComponentType::FUSE || type == ComponentType::DIAC
+        || type == ComponentType::OP_AMP) {
         return {{0, ""}};
     }
     if (IsLogicGate(type)) {
@@ -57,23 +88,9 @@ std::vector<CurrentProbe> GetCurrentProbes(const Component &component) {
         const auto outputs = static_cast<int>(GetLogicInputLabels(type).size());
         return {{outputs, "Q"}, {outputs + 1, "QN"}};
     }
-    if (type == ComponentType::RELAY) {
-        return {{0, "S"}, {2, "C"}};
-    }
-    if (type == ComponentType::TRANSFORMER) {
-        return {{0, "P"}, {2, "S"}};
-    }
-    if (type == ComponentType::TRANSMISSION_LINE) {
-        return {{0, "P1"}, {2, "P2"}};
-    }
-    if (IsBJT(component.GetType())) {
-        return {{0, "C"}, {1, "B"}, {2, "E"}};
-    }
-    if (IsMOSFET(component.GetType())) {
-        return {{0, "D"}, {1, "G"}, {2, "S"}};
-    }
-    if (component.GetType() == ComponentType::POTENTIOMETER) {
-        return {{0, "A"}, {1, "B"}, {2, "W"}};
+    const auto fixed = std::ranges::find(FIXED_PROBES, type, &FixedProbes::Type);
+    if (fixed != FIXED_PROBES.end()) {
+        return {fixed->Probes.begin(), fixed->Probes.begin() + static_cast<std::ptrdiff_t>(fixed->Count)};
     }
     return {};
 }

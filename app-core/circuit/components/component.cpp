@@ -459,6 +459,46 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .AcceptedValues = ValueRule::NONE,
         .Family = ComponentFamily::LOGIC_DISPLAY,
     },
+    {
+        .Type = ComponentType::THYRISTOR,
+        .TypeName = "Thyristor",
+        .NamePrefix = "SCR",
+        .Unit = "",
+        .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::SWITCHING,
+    },
+    {
+        .Type = ComponentType::TRIAC,
+        .TypeName = "Triac",
+        .NamePrefix = "TR",
+        .Unit = "",
+        .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::SWITCHING,
+    },
+    {
+        .Type = ComponentType::DIAC,
+        .TypeName = "Diac",
+        .NamePrefix = "DIAC",
+        .Unit = "",
+        .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::SWITCHING,
+    },
+    {
+        .Type = ComponentType::GTO,
+        .TypeName = "Gto",
+        .NamePrefix = "GTO",
+        .Unit = "",
+        .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::SWITCHING,
+    },
+    {
+        .Type = ComponentType::IGBT,
+        .TypeName = "IGBT",
+        .NamePrefix = "Q",
+        .Unit = "",
+        .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::SEMICONDUCTOR,
+    },
 });
 
 /**

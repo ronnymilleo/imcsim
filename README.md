@@ -21,7 +21,8 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   and Random sources for the transient: white, 1/f and telegraph noise, or values drawn from a distribution and held
   for each step
 - Diodes, Zener diodes, LEDs, NPN and PNP bipolar transistors, and N- and P-channel MOSFETs, each with ready models,
-  custom SPICE parameters or a vendor's `.model` imported from a library
+  custom SPICE parameters or a vendor's `.model` imported from a library; IGBTs from datasheet figures, with the tail
+  current of their turn-off, on the Nodalys engine
 - Blocks: part of a schematic grouped into a reusable part with named pins on any edge and parameters each instance
   can set, edited in place, with its wires routed around it; blocks inside blocks, entered level by level; and a
   vendor's subcircuits, such as op-amp models, imported from a SPICE library as blocks kept as text, following its
@@ -89,7 +90,10 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   wires in place
 - Potentiometers, with the wiper set in the properties, and switches and push buttons that are open or closed,
   voltage-controlled switches and relays whose coil current sets when the contact closes, fuses that blow by their
-  I2t and cool between overloads, and transformers of two coupled inductors with a turns ratio
+  I2t and cool between overloads, thyristors (SCRs), TRIACs and GTOs (which a negative gate current also turns off) that fire on gate current, latch on and release below
+  their holding current, DIACs that break over and trigger them, transformers of two coupled inductors with a turns ratio, and transmission lines, lossless or
+  lossy, on the Nodalys engine
+- Piecewise linear sources whose points are typed in or imported from a CSV table or a WAV recording
 - Logic gates (AND, OR, NAND, NOR, XOR and XNOR with 2 to 8 inputs, NOT and a buffer) and D, JK, T and SR
   flip-flops, driven by a Clock source (frequency, duty cycle, logic level and start delay, written as a pulse so there
   are no rise or fall times to set) and a Logic input that drives a net high or low, and simulated with the digital
@@ -119,13 +123,13 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   a configurable window of points keeps long runs responsive
 - Live transients paced by the clock: flip switches, hold push buttons, change logic inputs and turn potentiometers on
   the schematic while the run continues, then pause, continue or discard the session
-- 52 example circuits sorted by topic, each with its analyses and measurements set up: dividers, RC and RLC filters, the
+- 55 example circuits sorted by topic, each with its analyses and measurements set up: dividers, RC and RLC filters, the
   noise of an RC low-pass, the gain and impedances of an attenuator, an amplitude modulator from a behavioral source,
   diode curves, a Zener regulator and a rectifier with its harmonic balance, BJT and MOSFET switches and
   characteristics, a current mirror, common-emitter and class AB amplifiers, the stability of a common-emitter stage,
   the Monte Carlo spread of a bias point, an astable multivibrator started by an initial voltage, a bistable whose state
   a nodeset picks, op-amp amplifiers and their input offsets, an integrator, a Schmitt trigger and a Sallen-Key filter
-  with the part that sets its corner, an ideal transformer made of controlled sources, switching circuits, digital ones
+  with the part that sets its corner, an ideal transformer made of controlled sources, switching circuits, thyristor ones (a half-wave controlled rectifier, one with an inductive load and a freewheeling diode, a controlled bridge, a TRIAC light dimmer and one triggered by a DIAC, a GTO chopper), an IGBT chopper with an inductive load, transmission lines (reflections on a mismatched line and a quarter-wave transformer), digital ones
   (gates, a truth table of the basic gates, half and full adders, an SR latch, a ripple counter, a decoder with logic
   outputs and a decade counter on a 7-segment display), and blocks: one RC filter used twice, an 8-bit counter of two
   4-bit blocks, and a precision rectifier from a vendor's op-amp and diode models
@@ -156,9 +160,8 @@ it can change at any time. The ideas below are tracked as tasks in the project's
 roughly in the order they are likely to come.
 
 - **Digital**: Verilog modules placed as parts and simulated together with the analog circuit
-- **Sources, parts and models**: XSPICE analog blocks (transfer functions, limiters, integrators), transmission lines,
-  a circuit driven from a WAV or CSV file, PWL points read from a CSV file, and a MOSFET body diode and higher-level
-  MOSFET models
+- **Sources, parts and models**: power semiconductors (IGBT, GTO and thyristor rating warnings), a calculator
+  from the geometry of a line to its electrical figures, and a MOSFET body diode and higher-level MOSFET models
 - **Analyses**: loop gain and stability margins (`.stb`) on Nodalys, measurements (`.meas`) on result traces, and the
   noise figure of a two-port
 

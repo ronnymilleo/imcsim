@@ -47,6 +47,16 @@ void RunReport::Clear(const Analysis analysis) {
 }
 
 /**
+ * @brief   Forgets every run and which one ran last, as when another schematic is opened, whose circuit those runs
+ *          were not about.
+ * @note    The count of finished runs stays, so it never goes back to a value already seen.
+ */
+void RunReport::Reset() {
+    m_Statuses = {};
+    m_LastRun.reset();
+}
+
+/**
  * @brief   Returns what the last run of an analysis left besides its result.
  * @param[in] analysis  Analysis to read.
  * @return  Its status, empty before its first run.

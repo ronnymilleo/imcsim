@@ -41,6 +41,9 @@ constexpr double MIN_ERROR_RATIO = 1e-3;
 constexpr double STEP_ERROR_EXPONENT = -1.0 / 3.0;
 /// How many times the voltage tolerance the local truncation error may be.
 constexpr double TRUNCATION_TOLERANCE_FACTOR = 7.0;
+/// Share of the largest step below which a step that switches a device is accepted whatever its error estimate: the
+/// estimate then measures the jump in slope at the switch, which no smaller step removes.
+constexpr double SWITCH_RESOLUTION_SHARE = 1e-6;
 
 /**
  * @struct  StepState
@@ -234,6 +237,30 @@ void AcceptDeviceStep(CompiledCircuit &compiled, const std::vector<double> &x) {
     }
 }
 
+/**
+ * @brief   Tells whether a device changed its discrete state, such as a switch or a latch, in the step just solved.
+ */
+bool HasDeviceSwitched(const CompiledCircuit &compiled) {
+    return std::ranges::any_of(compiled.Devices, [](const std::unique_ptr<Device> &device) {
+        const TransientDevice *transient = device->AsTransient();
+        return transient != nullptr && transient->HasSwitched();
+    });
+}
+
+/**
+ * @brief   Decides whether the error estimate of a solved step rejects it.
+ * @details A device that switches inside the step bends the waveforms there, which the estimate, built from the
+ *          points before the switch, reads as an error that no shorter step removes. Such a step is accepted once it
+ *          is shorter than a tiny share of the largest step, and the history restarts after it, as after a corner.
+ * @return  True when the step must be retried shorter.
+ */
+bool IsRejectedByError(const double ratio, const double step, const double max_step, const bool has_switched) {
+    if (ratio <= LTE_REJECT_FACTOR) {
+        return false;
+    }
+    return !has_switched || step > SWITCH_RESOLUTION_SHARE * max_step;
+}
+
 void RejectDeviceStep(CompiledCircuit &compiled) {
     for (const std::unique_ptr<Device> &device : compiled.Devices) {
         if (TransientDevice *transient = device->AsTransient()) {
@@ -328,10 +355,7 @@ void AcceptStep(CompiledCircuit &compiled,
                 const double ratio,
                 const bool reaches_corner,
                 const double max_step) {
-    const bool has_switched = std::ranges::any_of(compiled.Devices, [](const std::unique_ptr<Device> &device) {
-        const TransientDevice *transient = device->AsTransient();
-        return transient != nullptr && transient->HasSwitched();
-    });
+    const bool has_switched = HasDeviceSwitched(compiled);
     AcceptDeviceStep(compiled, x_new);
     std::vector<double> currents_new = ReadCurrentValues(compiled, x_new);
     collector.AppendSegment({.Time = state.Time, .X = state.Now, .Currents = state.CurrentsNow},
@@ -401,7 +425,7 @@ SteppingOutcome RunSteppingLoop(CompiledCircuit &compiled,
             continue;
         }
         const double ratio = EstimateTruncationRatio(compiled, state, x_new, settings.Method, options);
-        if (ratio > LTE_REJECT_FACTOR) {
+        if (IsRejectedByError(ratio, state.Step, max_step, HasDeviceSwitched(compiled))) {
             result.Failure = RetryAfterRejection(compiled, state, ratio);
             if (result.Failure) {
                 break;

@@ -53,6 +53,14 @@
 14. **[Transmission Lines (`TL` / `T` element)](./transmission_line.md)**
     - Algorithms: voltage-scaled even/odd telegrapher MNA equations free of half-wave singularities, $\sqrt{f}$ skin-effect and $\omega C \tan\delta$ dielectric dispersion across `.ac`, `.sp`, `.noise`, `.sens ... ac`, and `.hb`, Bosma passive two-port thermal noise, and Bergeron characteristic wave propagation with corner breakpoints in `.tran`.
 
+15. **[Thyristor Device (SCR)](./thyristor_device.md)**
+    - Algorithms: a latching switch fired by gate current or forward breakover and held on by its anode current, the on-state datasheet line $V_0 + R_T I$ stamped as a conductance with a threshold source, and the natural commutation predicted as a transient breakpoint.
+    - Benchmarks: the half-wave controlled rectifier average against $V_m(1+\cos\alpha)/(2\pi)$ and the turn-off against the holding-current crossing.
+
+16. **[IGBT Device](./igbt_device.md)**
+    - Algorithms: the smooth minimum of the saturated channel $K/2\,v_{ov}^2$ and the on-state line $V_0 + R_{CE} I_C$, the constant capacitances of the datasheet around it, a tail current as a first-order lag on the conduction, and Newton limiting of the collector at the knee (`DEVlimvds` and `pnjlim` style).
+    - Verification: the on-state line, the Miller plateau, the tail charge $\alpha I \tau$ and the convergence of the operating point across supplies, loads and gate drives.
+
 ---
 
 ## Architecture & Modular Layout
@@ -154,6 +162,7 @@
 | **Fuses** | `imcsim_fuse` subcircuit | ✅ | ✅ **Ready** | Native device with a thermal state and a latch, with the blow time of `ngspice` within 3 % ([`fuse_device.md`](./fuse_device.md)). |
 | **Controlled Sources** | VCVS, VCCS, CCCS, CCVS | ✅ | ✅ **Ready** | Stamped into linear MNA system; zero-voltage current probes handled natively. |
 | **Semiconductors** | Diode, Zener, LED, BJT (NPN/PNP), MOSFET (NMOS/PMOS) | ✅ | ✅ **Ready** | Shockley diode, Gummel-Poon BJT, Shichman-Hodges Level-1 MOSFET with charge depletion/diffusion. |
+| **IGBT** | N-channel IGBT, optional co-packaged diode | ❌ | ✅ **Ready** | Native device from datasheet figures: channel and on-state line, constant capacitances, turn-off tail ([`igbt_device.md`](./igbt_device.md)). |
 | **Macromodels** | Ideal Op-Amp, Boyle Op-Amp (LTC AN48) | ✅ | ✅ **Ready** | Real datasheet-level macromodel with CMRR, slew rate, finite gain-bandwidth, and output clamp. |
 | **Continuous Logic ($C^\infty$)** | NOT, BUFFER, AND, NAND, OR, NOR, XOR, XNOR, Schmitt Trigger | ✅ (`digital.cm`) | ✅ **Ready** | Hyperbolic tangent smooth macromodels with inertial delay RC filtering and Thevenin output stages. |
 | **Sequential Logic** | D Flip-Flop, SR Latch, SR Flip-Flop, T Flip-Flop, JK Flip-Flop | ✅ (`digital.cm`) | ✅ **Ready** | Cross-coupled multi-stage implementations with Newton-Raphson voltage change damping; the D flip-flop is the classic 7474 six-gate form, whose active-high asynchronous set and reset (`CircuitBuilder::AddDFlipFlop()`) override the clock. |

@@ -69,11 +69,16 @@ enum class ComponentType {
     LOGIC_INPUT,
     LOGIC_OUTPUT,
     SEVEN_SEGMENT,
+    THYRISTOR,
+    TRIAC,
+    DIAC,
+    GTO,
+    IGBT,
 };
 
 /// Last enumerator of ComponentType, which the table of traits in component.cpp is checked against: a new type goes
 /// before it, or this moves to the new type.
-constexpr ComponentType LAST_COMPONENT_TYPE = ComponentType::SEVEN_SEGMENT;
+constexpr ComponentType LAST_COMPONENT_TYPE = ComponentType::IGBT;
 
 /**
  * @enum    ComponentFamily

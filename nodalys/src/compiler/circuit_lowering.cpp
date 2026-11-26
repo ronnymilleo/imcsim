@@ -6,6 +6,7 @@
 #include "compiler/circuit_compiler.h"
 
 #include "compiler/macromodels/electromechanical_macromodels.h"
+#include "compiler/macromodels/igbt_macromodel.h"
 #include "compiler/macromodels/logic_macromodels.h"
 #include "compiler/macromodels/opamp_macromodels.h"
 #include "devices/passive/fuse_device.h"
@@ -16,10 +17,13 @@
 #include "devices/semiconductors/bjt_device.h"
 #include "devices/semiconductors/diode_device.h"
 #include "devices/semiconductors/mosfet_device.h"
+#include "devices/semiconductors/thyristor_device.h"
 #include "devices/sources/controlled_sources.h"
 #include <cmath>
 #include <format>
 #include <memory>
+#include <optional>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -48,6 +52,36 @@ BjtParameters ScaleByArea(BjtParameters parameters, const double area) {
     parameters.CollectorResistance /= area;
     parameters.EmitterResistance /= area;
     return parameters;
+}
+
+bool IsFinitePositive(const double value) {
+    return std::isfinite(value) && value > 0.0;
+}
+
+bool IsFiniteNonNegative(const double value) {
+    return std::isfinite(value) && value >= 0.0;
+}
+
+/**
+ * @brief   Checks the figures of a transmission line before it is built.
+ * @param[in] p  Figures of the line.
+ * @return  What is wrong, or nothing when the line can be simulated.
+ */
+std::optional<std::string> CheckTransmissionLine(const TransmissionLineParameters &p) {
+    if (!IsFinitePositive(p.ImpedanceOhms)) {
+        return "characteristic impedance Z0 must be positive";
+    }
+    if (!IsFinitePositive(p.DelaySeconds)) {
+        return "propagation delay Td must be positive";
+    }
+    if (!IsFiniteNonNegative(p.DcResistanceOhms) || !IsFiniteNonNegative(p.SkinResistanceOhms)
+        || !IsFiniteNonNegative(p.DcConductanceSiemens) || !IsFiniteNonNegative(p.LossTangent)) {
+        return "transmission line loss parameters must be non-negative";
+    }
+    if (!IsFinitePositive(p.ReferenceFrequencyHz)) {
+        return "reference frequency must be positive";
+    }
+    return std::nullopt;
 }
 
 } // namespace
@@ -170,6 +204,14 @@ void CircuitCompiler::Lower(const IdealOpAmpSpec &spec) {
     CompileIdealOpAmp(*this, spec);
 }
 
+void CircuitCompiler::Lower(const IgbtSpec &spec) {
+    if (const std::optional<std::string> problem = CheckIgbt(spec)) {
+        m_Errors.push_back(*problem);
+        return;
+    }
+    CompileIgbt(*this, spec);
+}
+
 void CircuitCompiler::Lower(IndependentSourceSpec &spec) {
     const int u_pos = MapNode(spec.Pos);
     const int u_neg = MapNode(spec.Neg);
@@ -272,28 +314,31 @@ void CircuitCompiler::Lower(const SwitchSpec &spec) {
     RegisterElement(spec.Name, dev);
 }
 
+void CircuitCompiler::Lower(const ThyristorSpec &spec) {
+    Device *dev = AddDevice(
+        std::make_unique<ThyristorDevice>(MapNode(spec.Anode), MapNode(spec.Cathode), MapNode(spec.Gate), spec.Params));
+    // A DIAC is a two-terminal part, read as one current; a TRIAC names its main terminals MT2 and MT1, and an SCR
+    // names them anode and cathode
+    if (!spec.HasGate) {
+        RegisterElement(spec.Name, dev);
+        return;
+    }
+    m_Compiled.ElementsByName[spec.Name] = dev;
+    if (spec.Params.IsBidirectional) {
+        RegisterTerminalCurrents(spec.Name, dev, {"MT2", "MT1", "G"});
+    } else {
+        RegisterTerminalCurrents(spec.Name, dev, {"A", "K", "G"});
+    }
+}
+
 void CircuitCompiler::Lower(const TransformerSpec &spec) {
     CompileTransformer(*this, spec);
 }
 
 void CircuitCompiler::Lower(const TransmissionLineSpec &spec) {
     const TransmissionLineParameters &p = spec.Params;
-    if (!std::isfinite(p.ImpedanceOhms) || p.ImpedanceOhms <= 0.0) {
-        m_Errors.push_back(std::format("{}: characteristic impedance Z0 must be positive", spec.Name));
-        return;
-    }
-    if (!std::isfinite(p.DelaySeconds) || p.DelaySeconds <= 0.0) {
-        m_Errors.push_back(std::format("{}: propagation delay Td must be positive", spec.Name));
-        return;
-    }
-    if (!std::isfinite(p.DcResistanceOhms) || p.DcResistanceOhms < 0.0 || !std::isfinite(p.SkinResistanceOhms)
-        || p.SkinResistanceOhms < 0.0 || !std::isfinite(p.DcConductanceSiemens) || p.DcConductanceSiemens < 0.0
-        || !std::isfinite(p.LossTangent) || p.LossTangent < 0.0) {
-        m_Errors.push_back(std::format("{}: transmission line loss parameters must be non-negative", spec.Name));
-        return;
-    }
-    if (!std::isfinite(p.ReferenceFrequencyHz) || p.ReferenceFrequencyHz <= 0.0) {
-        m_Errors.push_back(std::format("{}: reference frequency must be positive", spec.Name));
+    if (const std::optional<std::string> problem = CheckTransmissionLine(p)) {
+        m_Errors.push_back(std::format("{}: {}", spec.Name, *problem));
         return;
     }
     const int up1 = MapNode(spec.Port1Pos);

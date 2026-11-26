@@ -239,17 +239,149 @@ blows when the heat reaches 1.015, a margin above the 1 that the rated current s
   or sigmoid: the heat follows the equation above exactly, the fuse opens when it reaches 1.015, and the resistance
   goes from cold to blown over a ten-thousandth of `tau`. Its blow time matches the closed form, and ngspice sits within
   3% of it, up to 1.7% earlier close to the threshold, where the sigmoid of its latch starts to open the fuse a little
-  before 1.015. A circuit with a fuse runs with the Gear integration on both. Nodalys writes no rating warnings, so the
-  "blew at" text of the Output window is not added to its results; the schematic and its flash read the blow from the
-  results and show it.
+  before 1.015. A circuit with a fuse runs with the Gear integration on both. The "blew at" warning is read from the
+  results, so both engines give it, and the schematic and its flash read the blow from the results the same way.
 - A fuse is a model of the thermal state, not of the arc: there is no breaking capacity, arc voltage or voltage rating,
   no temperature dependence of the cold resistance, and the part carries a current through its probe like a switch.
   In a noise analysis the model adds none.
 - The blown state is read from the voltage across the fuse and its current, so a fuse inside a block is simulated, but
   its blow is not shown on the schematic or warned about; the fuses of the main schematic are.
 
-## Transformers
+## Thyristors
 
+A thyristor (SCR) is a latching switch: it blocks forward voltage until gate current fires it, then stays on with the
+gate removed until the anode current falls below the holding current. Terminal 1 is the anode, terminal 2 the cathode
+and terminal 3 the gate. The part has no value; you set the figures a datasheet gives.
+
+- **On-state line** `VTM = V0 + RT*IT` (**V0** 0.8 V, **RT** 10 mOhm): what it drops while conducting.
+- **Holding current** (`IH`, 5 mA): below it, with the gate off, the latch releases.
+- **Gate trigger** (**IGT** 1 mA behind **VGT** 0.8 V and **RG** 100 Ohm): the gate current that fires it. The gate
+  current returns through the cathode, so the gate drive is referenced to the cathode.
+- **Off resistance** (1 GOhm) and **forward breakover** (`VBO`, 0 = disabled): the voltage that fires it without a
+  gate, which a correctly driven thyristor never reaches.
+- **Critical `dv/dt`** (0 = disabled, in V/s): a rate of rise of the anode voltage faster than this fires a blocking
+  device without a gate, as the displacement current through the junction capacitance fires a real one.
+- **Turn-off time** (`tq`, 0 = disabled): after the latch releases, the device recovers for this long; a forward
+  voltage re-applied inside the window fires it again, which is the commutation failure of a forced-commutated
+  circuit. A voltage already applied when the device releases does not re-fire it, so the natural commutation of a
+  rectifier still lands.
+- **Ratings** (0 = not checked, the default): the repetitive peak off-state voltage `VDRM`, taken as `VRRM` too and
+  checked on the peak either way; the on-state current **IT max**, the average forward current `IT(AV)`; the
+  non-repetitive surge `ITSM`, checked on the peak of the anode current; and the `I2t` for fusing, checked on the
+  largest integral of the squared anode current over any 10 ms of the run (one half-cycle of 50 Hz mains, which a
+  datasheet gives it over; a run shorter than that is judged whole, and an operating point has none). No engine
+  reads them: imcsim checks the results of an operating point or a transient against them, on both engines, and
+  warns "SCR1 exceeds its IT(AV) rating: 12A against 8A". The surge rating is a single-event limit, so a circuit
+  that only reaches it once at start-up still earns the warning.
+
+Nodalys simulates it as one device whose state is a latch, so every figure is a parameter and the commutation is
+landed on exactly. ngspice runs the `imcsim_scr` subcircuit, a PNP and an NPN with the collector of each into the
+base of the other: the pair regenerates once the gate drives the base of the NPN, which is the PNPN structure of the
+real device. Two diodes of a vanishing drop keep the pair's base current from leaking out of the gate, and the drive
+of a reverse-biased thyristor from finding a path through it to the anode, as the junctions of a real device block.
+`RG` and `RT` are parameters of the instance; the holding current, the trigger current and the on-state threshold
+emerge from the transistors, close to the figures of Nodalys. There is no breakover on ngspice: the pair blocks
+whatever forward voltage the circuit puts on it. Neither the critical `dv/dt` nor the turn-off time reach it: the
+emitter junctions of the pair have a fixed capacitance that softens the switching, the collector junctions have
+none, so a fast-rising anode voltage fires nothing, and it recovers its blocking as soon as the current releases.
+
+- **The engines agree on the rectification**: the half-wave controlled rectifier of the example, fired at 60 degrees
+  into 100 Ohm, averages the same 2.2 V on both, its anode current matches within 1 %, and the bridge example
+  matches to 0.3 %. A circuit with a thyristor runs on the Gear integration, as one with a fuse does: the
+  trapezoidal rule rings for ever on an inductor whose current the release of the latch cuts. The difference that
+  remains is listed and bounded in the cross-validation test: the figures that divide by the gain through a blocked
+  thyristor, such as its input-referred noise, mean nothing on either engine.
+- **The latching current is not modeled separately** from the holding current: the gate sustains conduction whatever
+  the anode current, and the latch holds above `IH` once it is gone.
+- **The `dv/dt` firing and the `tq` recovery are Nodalys-only**, as the breakover is. Nodalys reads the rate of rise
+  from the last accepted time point to the step being solved, and a device that fires on it stays fired for the rest
+  of that step, as the displacement current drives it while the voltage moves. The recovery re-fires on a voltage
+  that rises back past the on-state threshold, so a voltage already present at the release does not re-fire it;
+  while the window runs the device has not regained its blocking, and the holding-current release waits for it to
+  close. There is no reverse recovery, no re-applied-voltage rating, and no temperature dependence of the holding
+  current.
+- Every run starts blocking, and the circuit fires it. In the small-signal analyses the state is frozen at the
+  operating point; a harmonic balance and a pole-zero are refused with the reason, as they are for the hysteretic
+  switch, since the roots through a blocking state are numerically meaningless.
+
+### TRIACs
+
+A TRIAC is a thyristor that conducts both ways: terminal 1 is MT2, terminal 2 MT1 and terminal 3 the gate, and the
+same figures as the SCR set it. It blocks voltage of either sign until the gate fires it, then latches on until the
+magnitude of the main current falls below the holding current, whichever way the current flows. The gate fires it in
+all four quadrants (MT2 positive or negative, gate positive or negative relative to MT1), and the gate drive is
+referenced to MT1, through which the gate current returns. The breakover voltage, when set, applies to either sign.
+
+Nodalys simulates it as the same latching device with a bidirectional flag, so the on-state line and the gate junction
+mirror about zero and every figure is a parameter. Between -V0 and +V0 a conducting TRIAC carries only its off-state
+current, as a real one does before its junction drop is overcome, so a main current that crosses zero passes through
+that gap and the device follows the voltage onto the other half of its line. **ngspice refuses the TRIAC**, with the
+reason, as it does the DIAC and the GTO. The Netlist window and the export still write a TRIAC as an instance of the
+`imcsim_triac` subcircuit: two SCR pairs of the `imcsim_scr` kind anti-parallel between MT2 and MT1 and a gate stage
+referenced to MT1 that fires them in all four quadrants. It ran on ngspice until the TRIAC became a Nodalys part, and
+it has no breakover, dv/dt firing or turn-off time.
+
+- **The light dimmer** of the example, fired at 60 degrees into 100 Ohm, chops both half-cycles to the same peaks. A
+  circuit with a TRIAC runs on the Gear integration, as one with a thyristor or a fuse does.
+- The same figures as the SCR set it, and the critical `dv/dt` and the turn-off time apply to the magnitudes: a
+  fast voltage change of either sign fires a blocking TRIAC, and a voltage of either sign re-applied inside the
+  recovery window re-fires it. The other limits also apply: no separate latching
+  current, no reverse recovery and no temperature dependence. Every run starts blocking, and a harmonic balance and
+  a pole-zero are refused with the reason.
+- **Ratings** are those of the SCR, but the on-state current **IT max** is `IT(RMS)`, the time-weighted RMS of the MT2
+  current over the run, since a current that flows both ways averages near zero; `VDRM`, `ITSM` and `I2t` read the
+  magnitude, whichever way it flows.
+
+### GTOs
+
+A GTO (gate turn-off thyristor) is an SCR that the gate can also turn off: terminal 1 is the anode, terminal 2 the
+cathode and terminal 3 the gate, and the same figures as the SCR set it, plus **IGQ**, the negative gate current that
+turns it off. It fires on a gate current of at least IGT with a forward voltage and latches on, as the SCR does, but a
+conducting GTO whose gate draws a negative current of magnitude IGQ or more releases at once, whatever its anode
+current, where an SCR waits for the current to fall below IH. That is what makes a chopper or a forced-commutated
+converter out of it: a firing pulse switches the load on, a turn-off pulse switches it off with the supply still driving
+it. A negative gate never fires it, and one below IGQ leaves it on. The gate drive is referenced to the cathode, which
+the gate current returns through, and the gate junction conducts both ways, with the same threshold VGT and resistance RG
+either way, so the turn-off current is $(|v_G| - V_{GT}) / R_G$: choose the pulse and RG to draw more than IGQ. A new GTO
+starts with figures of a power device, IGT of 0.1 A, RG of 1 Ohm and IGQ of 2 A, a fifth of the 10 A it switches. IGQ
+is a GTO figure only: the SCR and the TRIAC have none, and a GTO with IGQ at 0 has no gate turn-off, so it
+runs as an SCR with the gate of a power device.
+
+Nodalys simulates it as the SCR's latching device with a positive gate turn-off current, which mirrors the gate
+junction about zero and adds the release on the negative gate current; the next turn-off is predicted from the gate
+current as the commutation is from the main one, so the transient lands on it. The turn-off time tq, when set, opens
+the same recovery window after a gate turn-off. **ngspice refuses the GTO**, with the reason: its two-transistor pair
+has no turn-off to model, and a subcircuit of one has not been tuned. The Netlist window and the export still show a
+GTO as an instance of an `imcsim_gto` subcircuit, the SCR's pair with a path that pulls the base of the NPN out through
+a negative gate, which no run checks. A harmonic balance and a pole-zero are refused as for the SCR.
+
+- **The GTO chopper** of the Switching examples switches 9.9 A of a 100 V supply into 10 Ohm at 1 kHz with two 20 us
+  gate pulses, +5 V to fire and -15 V to turn off, which draw 4.2 A and 14.2 A through the 1 Ohm gate.
+- The limits are those of the SCR. The turn-off here is instantaneous: there is no storage time, no tail current and
+  no turn-off snubber loss, and the on-state line is not slowed by the gate. **Ratings** are those of the SCR.
+
+### DIACs
+
+A DIAC is the trigger diode of a light dimmer: two terminals, MT2 (terminal 1) and MT1 (terminal 2), and no gate. It
+blocks either way until the magnitude of its voltage reaches the breakover voltage `VBO`, then snaps back onto the
+on-state line `V0 + RT * I`, mirrored about zero, and holds until the magnitude of its current falls below the holding
+current `IH`. The datasheet snapback `dV` is `VBO - V0`. The defaults are those of a DB3: 32 V breakover, a 5 V
+snapback (`V0` = 27 V), `RT` = 10 Ohm, 1 mA holding and 1 GOhm blocking. The figures must keep the release,
+`V0 + RT * IH`, below the breakover, so the device snaps back when it fires.
+
+Nodalys simulates it as the latching device of the TRIAC with its gate tied to MT1, so only the breakover fires it,
+and it reports one current, into MT2, as a two-terminal part does. **ngspice refuses it**: the netlist writes it as the
+`imcsim_diac` subcircuit (a switch with hysteresis on the magnitude of the voltage that turns the on-state line on and
+off), which the Netlist window shows and exports, but the TRIAC that a DIAC triggers does not block at mains voltage on
+ngspice. A harmonic balance and a pole-zero are refused as for the TRIAC.
+
+- **The DIAC-triggered TRIAC dimmer** of the Switching examples runs on a 120 V, 60 Hz line: R2 and C1 across the
+  TRIAC delay the voltage the DIAC sees, the DIAC breaks over at 32 V and dumps a pulse of the capacitor's charge into
+  the gate, and the TRIAC fires at the same angle of both half-cycles, about 2.7 ms after each zero crossing.
+- An oscillator built on a DIAC has no operating point, since the DIAC fires and releases around it: start its supply
+  from 0 V, with a pulse or a ramp, as the examples do.
+
+## Transformers
 A transformer is two inductors coupled by a SPICE `K` element: `L-T1p` and `L-T1s`, each behind a resistor for its
 winding (`R-T1p`, `R-T1s`). Its value is the primary inductance; the secondary's is that divided by the square of the
 turns ratio, primary turns over secondary turns, so a 100 mH primary at 2:1 has a 25 mH secondary. The other figures are
@@ -280,7 +412,19 @@ its properties hold the electrical delay and optional frequency-dependent losses
 | `Loss tangent` (`tan delta`) | dielectric loss tangent, giving `G_diel(f) = 2 * pi * f * C_tot * tan delta` | 0 |
 
 The part editor also shows the lossless quarter-wave frequency `1 / (4 * Td)` (250 MHz at 1 ns) as a read-only line,
-and `Suggest` on an AC sweep extends the stop frequency past it. Currents are reported into the positive pin of each
+and `Suggest` on an AC sweep extends the stop frequency past it. **From geometry...** works the value and parameters out
+from a physical line with closed-form formulas, within a few percent in the usual ranges:
+
+| Cross-section | Z0 and effective permittivity | Conductor resistance per meter |
+|---|---|---|
+| Microstrip | Hammerstad and Jensen, the width widened by the copper thickness (Wheeler) | `2 Rs / W`, trace and plane (Pozar) |
+| Stripline (centered) | Cohn's formula as Pozar gives it, thin strip; `eeff = er` | `Rs / W`, both faces and both planes |
+| Coax | `eta0 ln(D/d) / (2 pi sqrt(er))`; `eeff = er` | `Rs (1/a + 1/b) / (2 pi)` |
+
+The delay is `length * sqrt(eeff) / c`, the skin resistance is given at `Ref freq` from the surface resistance
+`Rs = sqrt(pi f mu0 / sigma)`, the DC resistance counts the trace (the inner conductor of a coax) only, and the loss
+tangent of a microstrip is scaled by its filling factor `er (eeff - 1) / (eeff (er - 1))`, since part of its field runs
+in air. Rough copper, copper thinner than the skin depth and coupled (differential) lines are not modeled. Currents are reported into the positive pin of each
 port as `TL1.P1` and `TL1.P2` (with the return pins `1-` and `2-` carrying the opposite current of their port).
 
 - **Lossless lines** (`DC R`, `Skin R`, `DC G` and `Loss tangent` all 0) run in every analysis except Pole-Zero: at DC
@@ -411,7 +555,14 @@ between). It loads nothing and needs no Ground. A **7-segment display** is the s
 - The piecewise linear `PWL(t1 v1 t2 v2 ...)` holds v1 before t1, joins the points with straight lines and holds the
   last value after the last point. It defaults to `0 0, 1m 5, 2m 0` (1 mA instead of 5 for a current source). The
   points are edited as one text of "time value" pairs in the part editor; at least two are needed, times are not
-  negative and strictly increase.
+  negative and strictly increase. **Import CSV...** reads them from a table of two columns, time then value, split by
+  commas, semicolons, tabs or spaces, with SPICE scale suffixes allowed, one header row, empty lines and `#` or `//`
+  comments skipped. **Import WAV...** reads an uncompressed WAV file (PCM of 8, 16, 24 or 32 bits, or float of 32 or
+  64 bits) as one point per sample from 0 s, the channels averaged to mono and full scale set to the **WAV peak**
+  field. The points are stored in the schematic, so the file is not needed again; a table of more than 64 points
+  shows as a summary (count, span and range) with **Reset points** in place of the text. Both engines run the
+  imported points as any PWL; Nodalys finds the segment of each time by bisection, so a recording of a million
+  samples costs little per step.
 - The noise source `TRNOISE(na nt alpha namp rtsam capt emt)` is `DC offset` plus transient noise: Gaussian white
   noise of rms na with a new sample every nt (the output is a straight line between samples, so its rms over time is
   sqrt(2/3) of na and its density is na times sqrt(2 nt) per root hertz, flat up to 1 / (2 nt)), 1/f noise of
@@ -633,6 +784,42 @@ Ready models: 2N7000, BS170 and IRF540N (N-channel), BS250 and IRF9540N (P-chann
 - Not modeled: subthreshold conduction, velocity saturation and other short-channel effects, the nonlinear gate
   capacitances of power MOSFETs, and temperature. Level 1 is fine for switching and biasing studies, rough for
   precise analog work.
+
+## IGBTs
+
+An IGBT is the MOS-gated bipolar switch of power converters: terminal 1 is the collector, terminal 2 the gate and
+terminal 3 the emitter. Its model takes the figures a datasheet gives:
+
+| Figure | Meaning |
+|---|---|
+| VGE(th) | gate voltage the channel opens at |
+| gfs, gfs at IC | transconductance and the collector current it is given at; the channel carries K/2 (VGE - VGE(th))² with K = gfs² / (2 IC) |
+| V0, RCE | the on-state line VCE(sat) = V0 + RCE × IC of the conducting part |
+| Cies, Coes, Cres | input, output and reverse transfer capacitances, constant |
+| Tail share, tail tau | the tail current of a turn-off: a share of the current that fell, decaying with tau |
+| Diode VF | forward voltage of the co-packaged diode at the rated current; 0 leaves the diode out |
+| VCES, VGES, IC max, P max | ratings, checked after each simulation |
+
+Ready models: 600V 30A and 1200V 40A, typical figures of two classes of trench IGBT with a co-packaged diode rather
+than of one part number (the 1200 V one has the longer tail).
+
+**Only Nodalys simulates the IGBT**; ngspice refuses it with the reason. The Netlist window and the export write it as
+an instance of an `imcsim_igbt` subcircuit, the classic picture of an N-channel MOSFET driving the base of a PNP, which
+no run checks. Nodalys runs it as one device whose current is the smaller of the channel and the on-state line, blended
+smoothly so every analysis can linearize it, with the three capacitances around it and the diode from emitter to
+collector ([`nodalys/igbt_device.md`](nodalys/igbt_device.md)):
+
+- **Switching**: the gate-collector capacitance Cres makes the Miller plateau, where the gate holds while the collector
+  swings, so a gate resistor sets the switching speed. At turn-off the collector current does not stop with the
+  channel: a tail of its share of the current flows on and decays with tau, which is where an IGBT loses its switching
+  energy.
+- **The IGBT chopper** of the Switching examples switches 200 V into a 1 mH, 10 Ohm load at 10 kHz with a freewheeling
+  diode, and shows the tail at each turn-off.
+- **Ratings**: VCE and VGE are checked at their peak, IC at its peak (the co-packaged diode counts, as the package
+  carries it), and power on its average over the run.
+- Not modeled: capacitances that fall with the collector voltage, a tail that depends on the voltage or the
+  temperature, avalanche, latch-up, short-circuit withstand and temperature. The reverse blocking is the leakage alone,
+  without breakdown. Every analysis takes it, the harmonic balance and the pole-zero included, since it has no latch.
 
 ## Op-amps
 

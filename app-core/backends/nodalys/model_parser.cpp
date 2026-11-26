@@ -20,8 +20,38 @@ namespace Core {
 
 namespace {
 
+bool IsSeparator(const char character) {
+    return std::isspace(static_cast<unsigned char>(character)) != 0 || character == '+';
+}
+
+bool IsKeyCharacter(const char character) {
+    return std::isalnum(static_cast<unsigned char>(character)) != 0 || character == '_';
+}
+
+/**
+ * @brief   Whether a character belongs to a value: anything up to the next space or the closing parenthesis.
+ */
+bool IsValueCharacter(const char character) {
+    return std::isspace(static_cast<unsigned char>(character)) == 0 && character != ')';
+}
+
+/**
+ * @brief   Moves past the characters of the text that a predicate accepts.
+ * @param[in] text       Text to scan.
+ * @param[in] position   Where to start.
+ * @param[in] is_inside  Predicate of the characters to move past.
+ * @return  The position of the first character it does not accept, or the end of the text.
+ */
+std::size_t SkipWhile(const std::string &text, std::size_t position, bool (*is_inside)(char)) {
+    while (position < text.size() && is_inside(text[position])) {
+        ++position;
+    }
+    return position;
+}
+
 /**
  * @brief   Splits the parameter list of a ".model" statement into upper-case keys and their value text.
+ * @details A token that is not a KEY=VALUE pair is skipped.
  * @param[in] text  Whole model statement, continuation lines included.
  * @return  Key to value text, such as "IS" → "2.52n"; empty when the statement has no parameter list.
  */
@@ -33,31 +63,15 @@ std::map<std::string, std::string> ParameterList(const std::string &text) {
     }
     std::size_t position = open + 1;
     while (position < text.size() && text[position] != ')') {
-        while (position < text.size()
-               && (std::isspace(static_cast<unsigned char>(text[position])) != 0 || text[position] == '+')) {
-            ++position;
+        const std::size_t key_start = SkipWhile(text, position, IsSeparator);
+        const std::size_t key_end = SkipWhile(text, key_start, IsKeyCharacter);
+        const bool is_pair = key_end > key_start && key_end < text.size() && text[key_end] == '=';
+        const std::size_t value_start = is_pair ? key_end + 1 : key_end;
+        position = SkipWhile(text, value_start, IsValueCharacter);
+        if (is_pair) {
+            values[ToUpper(text.substr(key_start, key_end - key_start))] =
+                text.substr(value_start, position - value_start);
         }
-        const std::size_t key_start = position;
-        while (position < text.size()
-               && (std::isalnum(static_cast<unsigned char>(text[position])) != 0 || text[position] == '_')) {
-            ++position;
-        }
-        const std::string key = text.substr(key_start, position - key_start);
-        if (key.empty() || position >= text.size() || text[position] != '=') {
-            // Not a KEY=VALUE pair; skip whatever token this is
-            while (position < text.size() && std::isspace(static_cast<unsigned char>(text[position])) == 0
-                   && text[position] != ')') {
-                ++position;
-            }
-            continue;
-        }
-        ++position;
-        const std::size_t value_start = position;
-        while (position < text.size() && std::isspace(static_cast<unsigned char>(text[position])) == 0
-               && text[position] != ')') {
-            ++position;
-        }
-        values[ToUpper(key)] = text.substr(value_start, position - value_start);
     }
     return values;
 }

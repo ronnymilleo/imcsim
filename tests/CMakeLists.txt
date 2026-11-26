@@ -40,6 +40,7 @@ add_executable(imcsim-tests
             current_flow_tests.cpp
             cursor_widgets_tests.cpp
             default_backend.cpp
+            diac_tests.cpp
             displayed_state_tests.cpp
             dock_layout_tests.cpp
             editor_command_tests.cpp
@@ -53,6 +54,8 @@ add_executable(imcsim-tests
             fuse_tests.cpp
             glow_falloff_tests.cpp
             group_editing_tests.cpp
+            gto_tests.cpp
+            igbt_tests.cpp
             harmonic_balance_samples_tests.cpp
             harmonic_balance_view_tests.cpp
             heat_glow_tests.cpp
@@ -60,6 +63,7 @@ add_executable(imcsim-tests
             hovered_value_tests.cpp
             initial_voltages_tests.cpp
             led_glow_tests.cpp
+            line_geometry_tests.cpp
             live_change_tests.cpp
             live_current_tests.cpp
             live_input_tests.cpp
@@ -156,6 +160,7 @@ add_executable(imcsim-tests
             trace_math_tests.cpp
             trace_statistics_tests.cpp
             transmission_line_tests.cpp
+            thyristor_tests.cpp
             two_port_metrics_tests.cpp
             transient_chunks_tests.cpp
             transient_tab_tests.cpp

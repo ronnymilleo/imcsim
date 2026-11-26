@@ -13,8 +13,10 @@
 #include "circuit/components/clock.h"
 #include "circuit/components/component.h"
 #include "circuit/components/controlled_source.h"
+#include "circuit/components/diac.h"
 #include "circuit/components/diode.h"
 #include "circuit/components/fuse.h"
+#include "circuit/components/igbt.h"
 #include "circuit/components/logic_input.h"
 #include "circuit/components/logic_part.h"
 #include "circuit/components/mosfet.h"
@@ -24,6 +26,7 @@
 #include "circuit/components/source.h"
 #include "circuit/components/subcircuit.h"
 #include "circuit/components/switch.h"
+#include "circuit/components/thyristor.h"
 #include "circuit/components/transformer.h"
 #include "circuit/components/transmission_line.h"
 #include "circuit/components/voltage_controlled_switch.h"
@@ -136,7 +139,32 @@ std::string FormatComponentValue(const Component &component) {
 }
 
 /**
- * @brief   The line of a diode or a transistor, with the line of its model added to models the first time it comes up.
+ * @brief   An instance of the subcircuit the Netlist window shows for an IGBT; see FormatIGBTSubcircuit().
+ * @details Its parameters are the channel and the capacitances of its datasheet figures, split as the datasheet gives
+ *          them: \f$C_{gc} = C_{res}\f$, \f$C_{ge} = C_{ies} - C_{res}\f$ and \f$C_{ce} = C_{oes} - C_{res}\f$.
+ */
+std::string FormatIGBT(const IGBT &igbt,
+                       const std::vector<int> &nodes,
+                       std::vector<std::string> &model_names,
+                       std::string &models) {
+    const IGBTParameters &figures = igbt.GetParameters();
+    AddModelLine(GetIGBTSubcircuitName(), FormatIGBTSubcircuit(), model_names, models);
+    return std::format("X-{} {} {} {} {} VTO={} KP={} CGC={} CGE={} CCE={}\n",
+                       igbt.GetName(),
+                       nodes[0],
+                       nodes[1],
+                       nodes[2],
+                       GetIGBTSubcircuitName(),
+                       FormatSpiceValue(figures.GateThresholdVoltage),
+                       FormatSpiceValue(GetChannelGain(figures)),
+                       FormatSpiceValue(figures.ReverseTransferCapacitance),
+                       FormatSpiceValue(figures.InputCapacitance - figures.ReverseTransferCapacitance),
+                       FormatSpiceValue(figures.OutputCapacitance - figures.ReverseTransferCapacitance));
+}
+
+/**
+ * @brief   The line of a diode, a transistor or an IGBT, with the line of its model added to models the first time it
+ * comes up.
  * @details A library model is written once, with the other library models, after the parts. The body of a MOSFET is
  *          tied to its source, past its probe, so the source current includes it; a library model brings its own
  *          channel size.
@@ -161,6 +189,9 @@ std::string FormatModeledPart(const Component &component,
             AddModelLine(model_name, FormatBJTModel(type, model_name, bjt.GetParameters()), model_names, models);
         }
         return std::format("{} {} {} {} {}\n", bjt.GetName(), nodes[0], nodes[1], nodes[2], model_name);
+    }
+    if (IsIGBT(type)) {
+        return FormatIGBT(static_cast<const IGBT &>(component), nodes, model_names, models);
     }
     const auto &mosfet = static_cast<const MOSFET &>(component);
     const std::string model_name = mosfet.GetSpiceModelName();
@@ -201,6 +232,10 @@ struct NetlistExtras {
     std::string Models;
     int NextExtraNode = 0;
 };
+
+/// The netlist option a circuit with a fuse or a thyristor writes: the Gear integration, since the trapezoidal rule
+/// rings for ever on an inductor whose current an opened fuse or a released thyristor cuts.
+constexpr std::string_view GEAR_INTEGRATION_OPTION = ".options method=gear\n";
 
 /**
  * @brief   A capacitor's initial condition is a voltage and an inductor's a current; ngspice reads both as IC= and
@@ -256,8 +291,8 @@ std::string FormatSolverOptions(const Circuit &circuit) {
     add("tnom", options.NominalTemperatureCelsius, DEFAULT_NOMINAL_TEMPERATURE_CELSIUS);
     if (options.Method != IntegrationMethod::DEFAULT) {
         line += options.Method == IntegrationMethod::GEAR ? " method=gear" : " method=trap";
-    } else if (circuit.HasFuse()) {
-        return std::string(FUSE_INTEGRATION_OPTION) + (line.empty() ? "" : ".options" + line + "\n");
+    } else if (circuit.HasFuse() || circuit.HasThyristor()) {
+        return std::string(GEAR_INTEGRATION_OPTION) + (line.empty() ? "" : ".options" + line + "\n");
     }
     return line.empty() ? std::string() : ".options" + line + "\n";
 }
@@ -412,6 +447,65 @@ std::string FormatFuse(const Fuse &fuse, const std::vector<int> &nodes, NetlistE
 }
 
 /**
+ * @struct  ThyristorSubcircuit
+ * @brief   The name and the text of the subcircuit a kind of thyristor is written as.
+ */
+struct ThyristorSubcircuit {
+    const char *Name;
+    std::string Text;
+};
+
+/**
+ * @brief   Picks the subcircuit of a kind of thyristor: the two-transistor pair of an SCR, the anti-parallel pairs of a
+ *          TRIAC, or the pair with a turn-off path of a GTO.
+ */
+ThyristorSubcircuit GetThyristorSubcircuit(const ComponentType type) {
+    if (type == ComponentType::TRIAC) {
+        return {.Name = GetTriacSubcircuitName(), .Text = FormatTriacSubcircuit()};
+    }
+    if (type == ComponentType::GTO) {
+        return {.Name = GetGtoSubcircuitName(), .Text = FormatGtoSubcircuit()};
+    }
+    return {.Name = GetThyristorSubcircuitName(), .Text = FormatThyristorSubcircuit()};
+}
+
+/**
+ * @brief   An instance of the subcircuit of an SCR, a TRIAC or a GTO, which takes the gate and slope resistances; see
+ *          FormatThyristorSubcircuit(), FormatTriacSubcircuit() and FormatGtoSubcircuit().
+ */
+std::string FormatThyristor(const Thyristor &thyristor, const std::vector<int> &nodes, NetlistExtras &extras) {
+    const ThyristorParameters &figures = thyristor.GetParameters();
+    const ThyristorSubcircuit subcircuit = GetThyristorSubcircuit(thyristor.GetType());
+    AddModelLine(subcircuit.Name, subcircuit.Text, extras.ModelNames, extras.Models);
+    return std::format("X-{} {} {} {} {} RG={} RT={}\n",
+                       thyristor.GetName(),
+                       nodes[0],
+                       nodes[1],
+                       nodes[2],
+                       subcircuit.Name,
+                       FormatSpiceValue(figures.GateResistance),
+                       FormatSpiceValue(figures.OnResistance));
+}
+
+/**
+ * @brief   An instance of the subcircuit that breaks over either way and holds; see FormatDiacSubcircuit().
+ */
+std::string FormatDiac(const Diac &diac, const std::vector<int> &nodes, NetlistExtras &extras) {
+    const DiacParameters &figures = diac.GetParameters();
+    AddModelLine(GetDiacSubcircuitName(), FormatDiacSubcircuit(), extras.ModelNames, extras.Models);
+    return std::format("X-{} {} {} {} VBO={} V0={} RT={} IH={} ROFF={}\n",
+                       diac.GetName(),
+                       nodes[0],
+                       nodes[1],
+                       GetDiacSubcircuitName(),
+                       FormatSpiceValue(figures.BreakoverVoltage),
+                       FormatSpiceValue(figures.OnThresholdVoltage),
+                       FormatSpiceValue(figures.OnResistance),
+                       FormatSpiceValue(figures.HoldingCurrent),
+                       FormatSpiceValue(figures.OffResistance));
+}
+
+/**
  * @brief   Two inductors, each behind the resistance of its winding, coupled by a K element.
  */
 std::string FormatTransformer(const Transformer &transformer, const std::vector<int> &nodes, NetlistExtras &extras) {
@@ -534,6 +628,12 @@ std::string FormatSwitchingPart(const Component &component, const std::vector<in
         return FormatRelay(static_cast<const Relay &>(component), nodes, extras);
     case ComponentType::FUSE:
         return FormatFuse(static_cast<const Fuse &>(component), nodes, extras);
+    case ComponentType::THYRISTOR:
+    case ComponentType::TRIAC:
+    case ComponentType::GTO:
+        return FormatThyristor(static_cast<const Thyristor &>(component), nodes, extras);
+    case ComponentType::DIAC:
+        return FormatDiac(static_cast<const Diac &>(component), nodes, extras);
     case ComponentType::V_SWITCH:
     default:
         return FormatVoltageSwitch(static_cast<const VoltageControlledSwitch &>(component), nodes, extras);
@@ -647,8 +747,10 @@ std::string WriteNetlistBody(const Circuit &circuit, const bool add_current_prob
  * changed are one ".options" line with reltol, abstol, vntol, tnom and method. Probes and the
  * gain stage of each ideal op-amp use nodes numbered after GetNodeCount(), so the circuit nodes keep their numbers.
  * Op-amp macromodels are subcircuits, written after the models. A fuse is an instance of a subcircuit written once with
- * the models, and a circuit with a fuse, in a block or not, writes
- *          ".options method=gear" once.
+ * the models, and a circuit with a fuse or a thyristor, in a block or not, writes
+ *          ".options method=gear" once: the trapezoidal rule rings for ever on an inductor whose current an opened
+ *          fuse or a released thyristor cuts. A thyristor is an instance of the imcsim_scr two-transistor subcircuit,
+ *          written once with the models too.
  */
 std::string WriteSpiceNetlist(const Circuit &circuit, const std::string_view analysis, const bool add_current_probes) {
     std::string netlist = "* imcsim netlist\n";
@@ -672,9 +774,9 @@ std::string WriteSpiceNetlist(const Circuit &circuit, const std::string_view ana
  * @param[in] component  Any component.
  * @return  The component name for a part that is one element, such as "R1" or "Q1"; the elements of a part written
  *          as several, such as "R-RV1a" and "R-RV1b" for a potentiometer or "X-U1" for an op-amp macromodel, whose
- *          own elements ngspice names after it ("q.x-u1.q1"), "X-FU1" for a fuse subcircuit, and the model, bridges and
- * resistors of a logic part; nothing for ground, net labels, initial voltages, logic displays and subcircuit pin
- * markers.
+ *          own elements ngspice names after it ("q.x-u1.q1"), "X-FU1" for a fuse subcircuit, "X-Q1" for the shown
+ *          subcircuit of an IGBT, and the model, bridges and resistors of a logic part; nothing for ground, net labels,
+ *          initial voltages, logic displays and subcircuit pin markers.
  */
 std::vector<std::string> GetElementNames(const Component &component) {
     const std::string &name = component.GetName();
@@ -693,7 +795,8 @@ std::vector<std::string> GetElementNames(const Component &component) {
                 std::format("D-{}-N", name),
                 std::format("E-{}", name)};
     }
-    if (type == ComponentType::OP_AMP || type == ComponentType::FUSE) {
+    if (type == ComponentType::OP_AMP || type == ComponentType::FUSE || IsThyristor(type) || type == ComponentType::DIAC
+        || IsIGBT(type)) {
         return {std::format("X-{}", name)};
     }
     if (type == ComponentType::POTENTIOMETER) {

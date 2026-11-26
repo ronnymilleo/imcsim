@@ -52,18 +52,20 @@ struct CombinationOutcome {
 };
 
 /**
- * @brief   What stops a run before it reaches the backend: the circuit, the settings the analysis takes, and a part or
- *          an analysis the backend does not run.
+ * @brief   What stops a run before it reaches the backend: the circuit, a part or an analysis the backend does not run,
+ *          and the settings the analysis takes.
+ * @details What the backend refuses comes before the settings, since no change to the settings would make it run: a
+ *          port count that ngspice needs means nothing for a circuit whose part it cannot simulate.
  */
 std::optional<std::string>
 FindProblem(const Circuit &circuit, const std::optional<std::string> &settings_error, const AnalysisKind kind) {
     if (const std::optional<std::string> error = CheckCircuit(circuit)) {
         return error;
     }
-    if (settings_error) {
-        return settings_error;
+    if (const std::optional<std::string> reason = FindUnsupported(GetBackend(), circuit, kind)) {
+        return reason;
     }
-    return FindUnsupported(GetBackend(), circuit, kind);
+    return settings_error;
 }
 
 /**

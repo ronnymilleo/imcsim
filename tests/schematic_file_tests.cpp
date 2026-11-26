@@ -9,6 +9,7 @@
 #include "circuit/components/controlled_source.h"
 #include "circuit/components/current_source.h"
 #include "circuit/components/diode.h"
+#include "circuit/components/igbt.h"
 #include "circuit/components/logic_input.h"
 #include "circuit/components/logic_part.h"
 #include "circuit/components/mosfet.h"
@@ -18,6 +19,7 @@
 #include "circuit/components/relay.h"
 #include "circuit/components/subcircuit_pin.h"
 #include "circuit/components/switch.h"
+#include "circuit/components/thyristor.h"
 #include "circuit/components/transformer.h"
 #include "circuit/components/voltage_controlled_switch.h"
 #include "circuit/components/voltage_source.h"
@@ -385,6 +387,32 @@ TEST_CASE("A custom diode from an older file takes its ratings from the default 
     const Core::DiodeParameters &defaults = Core::GetDiodeModels(Core::ComponentType::DIODE).front().Parameters;
     CHECK(diode.GetParameters().MaxForwardCurrent == defaults.MaxForwardCurrent);
     CHECK(diode.GetParameters().MaxPower == defaults.MaxPower);
+}
+
+TEST_CASE("An IGBT keeps its model or its custom figures", "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::IGBT, {0, 0}, GUI::Rotation::R0));
+    auto &ready = static_cast<Core::IGBT &>(elements.back()->GetComponent());
+    ready.SetName("Q1");
+    ready.SetModel(*Core::FindIGBTModel(Core::ComponentType::IGBT, "1200V 40A"));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::IGBT, {6, 0}, GUI::Rotation::R0));
+    auto &custom = static_cast<Core::IGBT &>(elements.back()->GetComponent());
+    custom.SetName("Q2");
+    Core::IGBTParameters figures = custom.GetParameters();
+    figures.TailTimeConstant = 400e-9;
+    figures.DiodeForwardVoltage = 0.0;
+    custom.SetCustomParameters(figures);
+
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 2);
+    const auto &ready_copy = static_cast<const Core::IGBT &>(loaded.Elements[0]->GetComponent());
+    CHECK(std::string_view(ready_copy.GetModelName()) == "1200V 40A");
+    const auto &custom_copy = static_cast<const Core::IGBT &>(loaded.Elements[1]->GetComponent());
+    CHECK(custom_copy.IsCustom());
+    CHECK(custom_copy.GetParameters().TailTimeConstant == 400e-9);
+    CHECK(custom_copy.GetParameters().DiodeForwardVoltage == 0.0);
+    CHECK(custom_copy.GetParameters().OnResistance == figures.OnResistance);
 }
 
 TEST_CASE("Transistors keep their model or custom parameters", "[schematic_file]") {
@@ -1054,6 +1082,62 @@ TEST_CASE("A relay keeps its coil and contact figures", "[schematic_file]") {
     const GUI::LoadedSchematic skipped = LoadOrFail(Document(inverted, ""));
     CHECK(skipped.Elements.empty());
     CHECK(skipped.Warnings.size() == 1);
+}
+
+TEST_CASE("A TRIAC keeps its ratings, and a file without them leaves them unchecked", "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::TRIAC, {6, 6}, GUI::Rotation::R0));
+    auto &triac = static_cast<Core::Thyristor &>(elements.back()->GetComponent());
+    triac.SetName("TR1");
+    triac.SetParameters(
+        {.MaxRepetitivePeakVoltage = 600.0, .MaxOnStateCurrent = 8.0, .MaxSurgeCurrent = 80.0, .MaxI2t = 32.0});
+
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 1);
+    const auto &copy = static_cast<const Core::Thyristor &>(loaded.Elements[0]->GetComponent());
+    CHECK(copy.GetParameters() == triac.GetParameters());
+
+    // Files written before the ratings existed load with none set
+    const GUI::LoadedSchematic older = LoadOrFail(Document(
+        R"({"type": "Triac", "x": 1, "y": 1, "rotation": 0, "name": "TR1", "parameters": {"holding_current": 0.01}})",
+        ""));
+    REQUIRE(older.Elements.size() == 1);
+    const auto &old_part = static_cast<const Core::Thyristor &>(older.Elements[0]->GetComponent());
+    CHECK(old_part.GetParameters().HoldingCurrent == 0.01);
+    CHECK(old_part.GetParameters().MaxRepetitivePeakVoltage == 0.0);
+    CHECK(old_part.GetParameters().MaxI2t == 0.0);
+}
+
+TEST_CASE("A GTO keeps its type and its gate turn-off current, and an SCR saved without one has none",
+          "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::GTO, {6, 6}, GUI::Rotation::R0));
+    auto &gto = static_cast<Core::Thyristor &>(elements.back()->GetComponent());
+    gto.SetName("GTO1");
+    gto.SetParameters({.GateResistance = 2.0, .GateTurnOffCurrent = 4.5});
+    elements.push_back(GUI::CreateElement(Core::ComponentType::THYRISTOR, {12, 6}, GUI::Rotation::R0));
+    static_cast<Core::Thyristor &>(elements.back()->GetComponent()).SetName("SCR1");
+
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 2);
+    const auto &copy = static_cast<const Core::Thyristor &>(loaded.Elements[0]->GetComponent());
+    CHECK(copy.GetType() == Core::ComponentType::GTO);
+    CHECK(copy.GetName() == "GTO1");
+    CHECK(copy.GetParameters() == gto.GetParameters());
+    CHECK(copy.GetParameters().GateTurnOffCurrent == 4.5);
+    const auto &scr = static_cast<const Core::Thyristor &>(loaded.Elements[1]->GetComponent());
+    CHECK(scr.GetType() == Core::ComponentType::THYRISTOR);
+    CHECK(scr.GetParameters().GateTurnOffCurrent == 0.0);
+
+    // A file that gives an SCR a turn-off current is read, and the part keeps none
+    const GUI::LoadedSchematic stray = LoadOrFail(Document(
+        R"({"type": "Thyristor", "x": 1, "y": 1, "rotation": 0, "name": "SCR1", "parameters": {"gate_turn_off_current": 2.0}})",
+        ""));
+    REQUIRE(stray.Elements.size() == 1);
+    CHECK(static_cast<const Core::Thyristor &>(stray.Elements[0]->GetComponent()).GetParameters().GateTurnOffCurrent
+          == 0.0);
 }
 
 TEST_CASE("A transformer keeps its primary inductance and its figures", "[schematic_file]") {
