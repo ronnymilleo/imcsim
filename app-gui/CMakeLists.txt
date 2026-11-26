@@ -199,6 +199,7 @@ add_library(imcsim-gui-lib
             windows/editor_status_bar.cpp
             windows/editor_toolbar.cpp
             windows/editor_window.cpp
+            windows/line_geometry_calculator.cpp
             windows/live_input_handler.cpp
             windows/mode_input.cpp
             windows/netlist_window.cpp

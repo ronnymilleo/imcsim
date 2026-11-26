@@ -243,9 +243,17 @@ void DrawTransformer(Core::Transformer &transformer, ElectromechanicalFields &fi
 
 /**
  * @brief   The value is the characteristic impedance Z0; zero losses run in transient (Bergeron) and frequency domain,
- *          while skin/dielectric losses run in frequency-domain and Harmonic Balance analyses.
+ *          while skin/dielectric losses run in frequency-domain and Harmonic Balance analyses. The geometry calculator
+ *          sets Z0 and every parameter at once from a real line.
+ * @param[in,out] line       Line being edited.
+ * @param[in,out] fields     Texts of its parameters and the calculator.
+ * @param[in,out] impedance  Field of the value, reloaded when the calculator sets Z0.
+ * @param[in,out] schematic  Marked modified on a change.
  */
-void DrawTransmissionLine(Core::TransmissionLine &line, ElectromechanicalFields &fields, Schematic &schematic) {
+void DrawTransmissionLine(Core::TransmissionLine &line,
+                          ElectromechanicalFields &fields,
+                          ValueField &impedance,
+                          Schematic &schematic) {
     Core::TransmissionLineParameters parameters = line.GetParameters();
     const auto is_valid = [](const Core::TransmissionLineParameters &candidate) {
         return Core::TransmissionLine::IsValidParameters(candidate);
@@ -260,6 +268,16 @@ void DrawTransmissionLine(Core::TransmissionLine &line, ElectromechanicalFields 
         ImGui::TextDisabled("Lossy/dispersive: runs in DC, AC, S-parameters, noise and HB (not transient)");
     } else {
         ImGui::TextDisabled("Lossless (0 losses): runs in transient (Bergeron) and all frequency analyses");
+    }
+    if (ImGui::Button("From geometry...")) {
+        OpenLineGeometryCalculator(fields.LineGeometry);
+    }
+    if (const std::optional<Core::LineElectrical> figures = DrawLineGeometryCalculator(fields.LineGeometry)) {
+        line.SetValue(figures->CharacteristicImpedance);
+        line.SetParameters(figures->Parameters);
+        impedance.Load(figures->CharacteristicImpedance);
+        LoadParameterFields(TRANSMISSION_LINE_FIELDS, fields.TransmissionLine, figures->Parameters);
+        schematic.MarkModified();
     }
 }
 
