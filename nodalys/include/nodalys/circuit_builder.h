@@ -171,6 +171,8 @@ public:
                            const BjtParameters &params,
                            double area = 1.0);
     CircuitBuilder &
+    AddIgbt(std::string name, NodeId collector, NodeId gate, NodeId emitter, const IgbtParameters &params);
+    CircuitBuilder &
     AddMosfet(std::string name, NodeId drain, NodeId gate, NodeId source, bool is_nmos, const MosfetParameters &params);
     CircuitBuilder &
     AddThyristor(std::string name, NodeId anode, NodeId cathode, NodeId gate, const ThyristorParameters &params);

@@ -8,6 +8,7 @@
 
 #include "nodalys/waveform_types.h"
 #include <cstddef>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -225,6 +226,42 @@ struct FuseParameters {
      * @return  True when all fields match.
      */
     bool operator==(const FuseParameters &) const = default;
+};
+
+/**
+ * @struct  IgbtParameters
+ * @brief   Datasheet figures of an N-channel IGBT, the MOS-gated bipolar switch of power converters.
+ * @details The collector current is the smaller of two limits, blended smoothly so Newton and the harmonic balance see
+ * a continuous slope: the channel, which saturates at \f$K/2\,(V_{GE} - V_{GE(th)})^2\f$ with
+ *          \f$K = g_{fs}^2 / (2 I_{gfs})\f$ from the transconductance at its test current, and the on-state line
+ *          \f$V_{CE(sat)} = V_0 + R_{CE} I_C\f$ of the conducting bipolar part. The capacitances are those of the
+ *          datasheet, constant: \f$C_{res}\f$ from gate to collector, which makes the Miller plateau,
+ *          \f$C_{ies} - C_{res}\f$ from gate to emitter and \f$C_{oes} - C_{res}\f$ from collector to emitter. When the
+ *          channel current falls in a transient, the charge stored in the drift region keeps a tail current flowing:
+ *          a fraction of the current that fell, decaying with its time constant. The device blocks reverse voltage
+ *          with its off-state leakage only, without breakdown; `AntiParallelDiode` adds the diode many IGBTs carry in
+ *          the same package, from emitter to collector.
+ */
+struct IgbtParameters {
+    double GateThresholdVoltage = 5.5;     ///< \f$V_{GE(th)}\f$: gate voltage the channel opens at, in Volts.
+    double Transconductance = 10.0;        ///< \f$g_{fs}\f$ at the test current, in Siemens.
+    double TransconductanceCurrent = 20.0; ///< \f$I_{gfs}\f$: collector current \f$g_{fs}\f$ is given at, in Amperes.
+    double OnThresholdVoltage = 0.8;       ///< \f$V_0\f$ of the on-state line, in Volts.
+    double OnResistance = 0.04;            ///< \f$R_{CE}\f$: slope resistance of the on-state line, in Ohms.
+    double OffResistance = 1e9;            ///< Collector-emitter leakage resistance of the off-state, in Ohms.
+    double InputCapacitance = 1.5e-9;      ///< \f$C_{ies}\f$, in Farads.
+    double OutputCapacitance = 100e-12;    ///< \f$C_{oes}\f$, in Farads.
+    double ReverseTransferCapacitance = 30e-12; ///< \f$C_{res}\f$, the Miller capacitance, in Farads.
+    double TailFraction = 0.2;                  ///< Share of the falling current the tail starts at, from 0 to 1.
+    double TailTimeConstant = 200e-9;           ///< Time constant the tail decays with, in seconds.
+    /// The diode from emitter to collector of a co-packaged IGBT, or none.
+    std::optional<DiodeParameters> AntiParallelDiode;
+
+    /**
+     * @brief   Compares two IgbtParameters values for equality.
+     * @return  True when all fields match.
+     */
+    bool operator==(const IgbtParameters &) const = default;
 };
 
 /**

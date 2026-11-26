@@ -25,6 +25,7 @@ add_executable(nodalys-tests
     devices/behavioral_device_tests.cpp
     devices/bjt_device_tests.cpp
     devices/fuse_device_tests.cpp
+    devices/igbt_device_tests.cpp
     devices/mosfet_device_tests.cpp
     devices/random_draws_tests.cpp
     devices/smooth_logic_tests.cpp
