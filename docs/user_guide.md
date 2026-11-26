@@ -80,6 +80,17 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   referenced to the cathode (MT1), since the gate current returns through it; a TRIAC fires in all four gate
   quadrants. The Switching examples drive them: a half-wave controlled rectifier, one with an inductive load and a
   freewheeling diode, a controlled bridge, and a TRIAC light dimmer (see docs/models.md).
+- **Transmission lines**: a transmission line has its own button among the passive parts of the part rail, a coaxial symbol with two
+  ports: port 1 on the left (terminal 1 the center conductor, terminal 2 the shield) and port 2 on the right
+  (terminals 3 and 4). Its value is the characteristic impedance Z0, and its properties set the delay and the losses
+  (DC R, Skin R at Ref freq, DC G and Loss tangent); the label under it shows Z0 and the delay, and the properties show
+  the quarter-wave frequency. Only Nodalys simulates it: ngspice refuses a circuit with one, with the reason. A line
+  with all losses at 0 runs in every analysis but pole-zero, a lossy one in all but the transient and pole-zero. The
+  Transmission lines examples show reflections on a mismatched line and a quarter-wave transformer (see docs/models.md).
+- **PWL sources**: a source with the PWL waveform takes its points as text, or from a file: **Import CSV...** reads a
+  table of time and value columns and **Import WAV...** a recording, scaled so its full scale is the **WAV peak**
+  field. The points are saved in the schematic, so the file is not needed afterwards; a table of more than 64 points
+  shows as a summary with **Reset points** instead of the text (see docs/models.md for what the files may hold).
 - **Transformers**: the value of a transformer is its primary inductance, and its properties set the turns ratio, the
   coupling and the resistance of the windings. The secondary needs a path to ground, such as the bridge of the
   Transformers examples.
@@ -417,6 +428,9 @@ Every part with more than one terminal numbers them in the order the SPICE netli
 | Relay (K) | contact, top | contact, bottom | coil + (4: coil -) |
 | Transformer (T) | primary +, upper left | primary -, lower left | secondary + (4: secondary -), on the right |
 | Diode, Zener diode, LED | anode | cathode | |
+| Thyristor (SCR) | anode | cathode | gate |
+| TRIAC | MT2 | MT1 | gate |
+| Transmission line (TL) | port 1 center, upper left | port 1 shield, lower left | port 2 center, upper right (4: port 2 shield) |
 | Voltage source | positive (+) | negative (-) | |
 | Current source | tail of its arrow | head of its arrow | |
 | NPN or PNP transistor | collector | base | emitter |
@@ -456,6 +470,10 @@ imcsim reports currents as ngspice computes them:
 - **Fuses** report one current like a switch, positive from terminal 1 to terminal 2; a blown one carries nanoamperes.
 - **Relays** report two currents, `I(K1.S)` into the first contact terminal and `I(K1.C)` into the coil +. A
   voltage-controlled switch reports the current into its first contact terminal, like a two-terminal part.
+- **Thyristors** report one current per terminal, `I(SCR1.A)`, `I(SCR1.K)` and `I(SCR1.G)` for an SCR and
+  `I(TR1.MT2)`, `I(TR1.MT1)` and `I(TR1.G)` for a TRIAC, each positive into its terminal. The three add up to zero.
+- **Transmission lines** report `I(TL1.P1)` into the center of port 1 and `I(TL1.P2)` into the center of port 2,
+  each positive into its terminal; the shield of each port carries the same current back.
 - **Transformers** report `I(T1.P)` into the primary + and `I(T1.S)` into the secondary +, each positive into its
   terminal. With a load on the secondary the two have opposite signs, in the ratio of the turns.
 - **Controlled and behavioral sources** report the current of their output like a two-terminal part; the control pins
