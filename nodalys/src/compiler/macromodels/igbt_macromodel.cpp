@@ -12,11 +12,26 @@
 #include <cmath>
 #include <format>
 #include <memory>
+#include <optional>
+#include <string>
+#include <utility>
 #include <vector>
 
 namespace Nodalys {
 
 namespace {
+
+/**
+ * @struct  IgbtParts
+ * @brief   The devices an IGBT is built of; a capacitor of zero and a missing diode are null.
+ */
+struct IgbtParts {
+    Device *Igbt = nullptr;
+    Device *GateCollector = nullptr;
+    Device *GateEmitter = nullptr;
+    Device *CollectorEmitter = nullptr;
+    Device *Diode = nullptr;
+};
 
 /**
  * @brief   Tells whether a figure is a finite number above zero.
@@ -39,12 +54,55 @@ Device *AddCapacitance(CircuitCompiler &compiler, const int node_a, const int no
 }
 
 /**
+ * @brief   Adds the co-packaged diode from the emitter to the collector, or nothing when the IGBT has none.
+ * @return  The diode, or null when none was added.
+ */
+Device *
+AddDiode(CircuitCompiler &compiler, const int anode, const int cathode, const std::optional<DiodeParameters> &figures) {
+    if (!figures.has_value()) {
+        return nullptr;
+    }
+    const int internal = figures->SeriesResistance > 0.0 ? compiler.AllocateInternalNode() : -1;
+    if (figures->JunctionCapacitance > 0.0 || figures->TransitTime > 0.0) {
+        compiler.MarkDynamic(anode);
+        compiler.MarkDynamic(internal >= 0 ? internal : cathode);
+    }
+    return compiler.AddDevice(std::make_unique<DiodeDevice>(anode, cathode, internal, *figures));
+}
+
+/**
  * @brief   Adds a device terminal to a current readout, when the device exists.
  */
 void AddContribution(std::vector<CurrentContribution> &readout, Device *device, const int terminal) {
     if (device != nullptr) {
         readout.push_back({.Element = device, .Terminal = terminal});
     }
+}
+
+/**
+ * @brief   Reports the currents into the collector, gate and emitter of an IGBT, each the sum of its devices on that
+ *          terminal, and groups them for the noise.
+ */
+void AddReadouts(CircuitCompiler &compiler, const std::string &name, const IgbtParts &parts) {
+    std::vector<CurrentContribution> into_collector{{.Element = parts.Igbt, .Terminal = 0}};
+    AddContribution(into_collector, parts.GateCollector, 0);
+    AddContribution(into_collector, parts.CollectorEmitter, 0);
+    AddContribution(into_collector, parts.Diode, 1);
+    std::vector<CurrentContribution> into_gate{{.Element = parts.Igbt, .Terminal = 1}};
+    AddContribution(into_gate, parts.GateCollector, 1);
+    AddContribution(into_gate, parts.GateEmitter, 0);
+    std::vector<CurrentContribution> into_emitter{{.Element = parts.Igbt, .Terminal = 2}};
+    AddContribution(into_emitter, parts.GateEmitter, 1);
+    AddContribution(into_emitter, parts.CollectorEmitter, 1);
+    AddContribution(into_emitter, parts.Diode, 0);
+    compiler.AddCurrentReadout(name + ".C", std::move(into_collector));
+    compiler.AddCurrentReadout(name + ".G", std::move(into_gate));
+    compiler.AddCurrentReadout(name + ".E", std::move(into_emitter));
+    std::vector<const Device *> noisy{parts.Igbt};
+    if (parts.Diode != nullptr) {
+        noisy.push_back(parts.Diode);
+    }
+    compiler.AddNoiseGroup(name, std::move(noisy));
 }
 
 } // namespace
@@ -92,42 +150,16 @@ void CompileIgbt(CircuitCompiler &compiler, const IgbtSpec &spec) {
     const int collector = compiler.MapNode(spec.Collector);
     const int gate = compiler.MapNode(spec.Gate);
     const int emitter = compiler.MapNode(spec.Emitter);
-    Device *igbt = compiler.AddDevice(std::make_unique<IgbtDevice>(collector, gate, emitter, p));
-    Device *gate_collector = AddCapacitance(compiler, collector, gate, p.ReverseTransferCapacitance);
-    Device *gate_emitter = AddCapacitance(compiler, gate, emitter, p.InputCapacitance - p.ReverseTransferCapacitance);
-    Device *collector_emitter =
-        AddCapacitance(compiler, collector, emitter, p.OutputCapacitance - p.ReverseTransferCapacitance);
-    Device *diode = nullptr;
-    if (p.AntiParallelDiode.has_value()) {
-        const DiodeParameters &figures = *p.AntiParallelDiode;
-        const int internal = figures.SeriesResistance > 0.0 ? compiler.AllocateInternalNode() : -1;
-        if (figures.JunctionCapacitance > 0.0 || figures.TransitTime > 0.0) {
-            compiler.MarkDynamic(emitter);
-            compiler.MarkDynamic(internal >= 0 ? internal : collector);
-        }
-        diode = compiler.AddDevice(std::make_unique<DiodeDevice>(emitter, collector, internal, figures));
-    }
-    compiler.RegisterElementAlias(spec.Name, igbt);
-
-    std::vector<CurrentContribution> into_collector{{.Element = igbt, .Terminal = 0}};
-    AddContribution(into_collector, gate_collector, 0);
-    AddContribution(into_collector, collector_emitter, 0);
-    AddContribution(into_collector, diode, 1);
-    std::vector<CurrentContribution> into_gate{{.Element = igbt, .Terminal = 1}};
-    AddContribution(into_gate, gate_collector, 1);
-    AddContribution(into_gate, gate_emitter, 0);
-    std::vector<CurrentContribution> into_emitter{{.Element = igbt, .Terminal = 2}};
-    AddContribution(into_emitter, gate_emitter, 1);
-    AddContribution(into_emitter, collector_emitter, 1);
-    AddContribution(into_emitter, diode, 0);
-    compiler.AddCurrentReadout(spec.Name + ".C", std::move(into_collector));
-    compiler.AddCurrentReadout(spec.Name + ".G", std::move(into_gate));
-    compiler.AddCurrentReadout(spec.Name + ".E", std::move(into_emitter));
-    std::vector<const Device *> noisy{igbt};
-    if (diode != nullptr) {
-        noisy.push_back(diode);
-    }
-    compiler.AddNoiseGroup(spec.Name, std::move(noisy));
+    const IgbtParts parts{
+        .Igbt = compiler.AddDevice(std::make_unique<IgbtDevice>(collector, gate, emitter, p)),
+        .GateCollector = AddCapacitance(compiler, collector, gate, p.ReverseTransferCapacitance),
+        .GateEmitter = AddCapacitance(compiler, gate, emitter, p.InputCapacitance - p.ReverseTransferCapacitance),
+        .CollectorEmitter =
+            AddCapacitance(compiler, collector, emitter, p.OutputCapacitance - p.ReverseTransferCapacitance),
+        .Diode = AddDiode(compiler, emitter, collector, p.AntiParallelDiode),
+    };
+    compiler.RegisterElementAlias(spec.Name, parts.Igbt);
+    AddReadouts(compiler, spec.Name, parts);
 }
 
 } // namespace Nodalys

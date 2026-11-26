@@ -16,7 +16,7 @@ namespace Nodalys {
 class CircuitCompiler;
 
 // IGBT
-std::optional<std::string> CheckIgbt(const IgbtSpec &spec);
+[[nodiscard]] std::optional<std::string> CheckIgbt(const IgbtSpec &spec);
 void CompileIgbt(CircuitCompiler &compiler, const IgbtSpec &spec);
 
 } // namespace Nodalys
