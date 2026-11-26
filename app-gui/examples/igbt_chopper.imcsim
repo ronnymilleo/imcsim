@@ -1,0 +1,229 @@
+{
+  "format": "imcsim-schematic",
+  "version": 1,
+  "elements": [
+    {
+      "type": "VCC",
+      "rotation": 0,
+      "x": 17,
+      "y": 7,
+      "value": 200,
+      "name": "V1"
+    },
+    {
+      "type": "Inductor",
+      "rotation": 90,
+      "x": 17,
+      "y": 11,
+      "value": 0.001,
+      "name": "L1"
+    },
+    {
+      "type": "Resistor",
+      "rotation": 90,
+      "x": 17,
+      "y": 17,
+      "value": 10,
+      "name": "R1"
+    },
+    {
+      "type": "Diode",
+      "rotation": 270,
+      "x": 21,
+      "y": 13,
+      "model": "Custom",
+      "parameters": {
+        "is": 1e-09,
+        "n": 1.5,
+        "rs": 0,
+        "bv": 1000,
+        "cjo": 0,
+        "tt": 0,
+        "ifmax": 30,
+        "pmax": 100
+      },
+      "name": "D1"
+    },
+    {
+      "type": "IGBT",
+      "rotation": 0,
+      "x": 16,
+      "y": 21,
+      "model": "600V 30A",
+      "name": "Q1"
+    },
+    {
+      "type": "Resistor",
+      "rotation": 0,
+      "x": 12,
+      "y": 21,
+      "value": 10,
+      "name": "R2"
+    },
+    {
+      "type": "VoltageSource",
+      "rotation": 90,
+      "x": 8,
+      "y": 23,
+      "source": "Pulse",
+      "value": 0,
+      "amplitude": 1,
+      "frequency": 1000,
+      "offset": 0,
+      "ac_magnitude": 1,
+      "pulse": {
+        "delay": 0,
+        "fall": 5e-08,
+        "high": 15,
+        "low": 0,
+        "period": 0.0001,
+        "rise": 5e-08,
+        "width": 5e-05
+      },
+      "name": "Vin1"
+    },
+    {
+      "type": "Ground",
+      "rotation": 0,
+      "x": 17,
+      "y": 25
+    },
+    {
+      "type": "Ground",
+      "rotation": 0,
+      "x": 8,
+      "y": 27
+    }
+  ],
+  "wires": [
+    {
+      "start": [
+        17,
+        7
+      ],
+      "end": [
+        17,
+        9
+      ]
+    },
+    {
+      "start": [
+        17,
+        9
+      ],
+      "end": [
+        21,
+        9
+      ]
+    },
+    {
+      "start": [
+        21,
+        9
+      ],
+      "end": [
+        21,
+        11
+      ]
+    },
+    {
+      "start": [
+        17,
+        13
+      ],
+      "end": [
+        17,
+        15
+      ]
+    },
+    {
+      "start": [
+        17,
+        19
+      ],
+      "end": [
+        21,
+        19
+      ]
+    },
+    {
+      "start": [
+        21,
+        19
+      ],
+      "end": [
+        21,
+        15
+      ]
+    },
+    {
+      "start": [
+        17,
+        23
+      ],
+      "end": [
+        17,
+        25
+      ]
+    },
+    {
+      "start": [
+        8,
+        21
+      ],
+      "end": [
+        10,
+        21
+      ]
+    },
+    {
+      "start": [
+        8,
+        25
+      ],
+      "end": [
+        8,
+        27
+      ]
+    }
+  ],
+  "simulation": {
+    "analysis": "transient",
+    "transient": {
+      "step": 2e-07,
+      "stop": 0.0005
+    },
+    "ac_sweep": {
+      "start": 10,
+      "stop": 1000000,
+      "points_per_decade": 20
+    },
+    "dc_sweep": {
+      "step_source": false,
+      "swept": {
+        "source": "",
+        "start": 0,
+        "step": 0.1,
+        "stop": 5
+      },
+      "stepped": {
+        "source": "",
+        "start": 0,
+        "step": 0.1,
+        "stop": 5
+      }
+    }
+  },
+  "measurements": {
+    "voltages": [
+      [
+        17,
+        19
+      ]
+    ],
+    "currents": [
+      "D1",
+      "Q1.C"
+    ]
+  }
+}

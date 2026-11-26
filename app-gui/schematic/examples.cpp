@@ -510,6 +510,20 @@ constexpr auto EXAMPLES = std::to_array<Example>({
         .FileName = "gto_chopper.imcsim",
     },
     {
+        .Title = "IGBT chopper with an inductive load",
+        .Group = "Switching",
+        .Description =
+            "An IGBT switches a 200 V supply into a 1 mH, 10 Ohm load at 10 kHz, half of each period, through a 10 "
+            "Ohm gate resistor, and D1 lets the load current freewheel while it is off. Run the transient: the "
+            "load current climbs toward its 10 A mean while Q1 conducts and flows through D1 while it is off, and the "
+            "collector sits on the on-state line, about 1 V, then jumps to the supply. Zoom in on a turn-off: as the "
+            "gate falls through its threshold, the collector rises at the Miller plateau, and Q1.C does not stop at "
+            "once but keeps a tail of 15 % of the current it carried, decaying with 150 ns, which is where an IGBT "
+            "loses its switching energy. Pick the 1200V 40A model for a longer tail. It runs on Nodalys: ngspice "
+            "refuses the IGBT.",
+        .FileName = "igbt_chopper.imcsim",
+    },
+    {
         .Title = "Relay driver",
         .Group = "Switching",
         .Description =
