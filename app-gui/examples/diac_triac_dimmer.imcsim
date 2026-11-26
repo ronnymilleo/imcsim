@@ -5,8 +5,8 @@
     {
       "type": "VoltageSource",
       "rotation": 90,
-      "x": 5,
-      "y": 11,
+      "x": 3,
+      "y": 12,
       "source": "AC",
       "value": 0,
       "amplitude": 170,
@@ -25,145 +25,161 @@
       "name": "Vin1"
     },
     {
-      "type": "Triac",
+      "type": "Ground",
       "rotation": 0,
-      "x": 11,
-      "y": 9,
-      "name": "TR1"
+      "x": 3,
+      "y": 16
     },
     {
       "type": "Resistor",
-      "rotation": 90,
-      "x": 17,
-      "y": 11,
+      "rotation": 0,
+      "x": 7,
+      "y": 10,
       "value": 100,
       "name": "R1"
     },
     {
+      "type": "Triac",
+      "rotation": 90,
+      "x": 18,
+      "y": 12,
+      "name": "TR1"
+    },
+    {
+      "type": "Ground",
+      "rotation": 0,
+      "x": 18,
+      "y": 16
+    },
+    {
       "type": "Resistor",
       "rotation": 90,
-      "x": 7,
-      "y": 11,
+      "x": 9,
+      "y": 12,
       "value": 47000,
       "name": "R2"
     },
     {
+      "type": "Diac",
+      "rotation": 0,
+      "x": 13,
+      "y": 16,
+      "name": "DIAC1"
+    },
+    {
       "type": "Capacitor",
       "rotation": 90,
-      "x": 7,
-      "y": 15,
+      "x": 9,
+      "y": 20,
       "value": 1E-7,
       "name": "C1"
     },
     {
-      "type": "Diac",
+      "type": "Ground",
       "rotation": 0,
       "x": 9,
-      "y": 13,
-      "name": "DIAC1"
-    },
-    {
-      "type": "Ground",
-      "rotation": 0,
-      "x": 5,
-      "y": 15
-    },
-    {
-      "type": "Ground",
-      "rotation": 0,
-      "x": 17,
-      "y": 15
+      "y": 24
     }
   ],
   "wires": [
     {
       "start": [
-        5,
-        9
+        3,
+        10
       ],
       "end": [
-        7,
-        9
+        5,
+        10
       ]
     },
     {
       "start": [
-        7,
-        9
+        3,
+        14
+      ],
+      "end": [
+        3,
+        16
+      ]
+    },
+    {
+      "start": [
+        9,
+        10
+      ],
+      "end": [
+        18,
+        10
+      ]
+    },
+    {
+      "start": [
+        18,
+        14
+      ],
+      "end": [
+        18,
+        16
+      ]
+    },
+    {
+      "start": [
+        9,
+        14
       ],
       "end": [
         9,
-        9
+        16
       ]
     },
     {
       "start": [
-        13,
-        9
+        9,
+        16
       ],
       "end": [
-        15,
-        9
+        9,
+        18
       ]
     },
     {
       "start": [
-        15,
-        9
-      ],
-      "end": [
-        17,
-        9
-      ]
-    },
-    {
-      "start": [
-        11,
-        11
+        9,
+        16
       ],
       "end": [
         11,
-        13
-      ]
-    },
-    {
-      "start": [
-        7,
-        17
-      ],
-      "end": [
-        15,
-        17
+        16
       ]
     },
     {
       "start": [
         15,
-        17
+        16
       ],
       "end": [
-        15,
-        9
+        16,
+        16
       ]
     },
     {
       "start": [
-        5,
-        13
+        16,
+        16
       ],
       "end": [
-        5,
-        15
+        16,
+        12
       ]
     },
     {
       "start": [
-        17,
-        13
+        9,
+        22
       ],
       "end": [
-        17,
-        15
+        9,
+        24
       ]
     }
   ],
@@ -197,12 +213,12 @@
   "measurements": {
     "voltages": [
       [
-        7,
-        13
+        9,
+        10
       ],
       [
-        7,
-        17
+        9,
+        14
       ]
     ],
     "currents": [
