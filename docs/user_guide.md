@@ -78,7 +78,8 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   currents, the gate resistance and the breakover voltage. They block until the gate is fired and latch on until
   the current falls below the holding current, and the label above the symbol shows the name and IH, clear of the
   gate lead. The gate drive must be referenced to the cathode (MT1), since the gate current returns through it; a
-  TRIAC fires in all four gate quadrants. The Switching examples drive them: a half-wave controlled rectifier, one with an inductive load and a
+  TRIAC fires in all four gate quadrants. Only Nodalys simulates the TRIAC; ngspice refuses it with the reason, and runs
+  the SCR. The Switching examples drive them: a half-wave controlled rectifier, one with an inductive load and a
   freewheeling diode, a controlled bridge, and a TRIAC light dimmer (see docs/models.md).
 - **GTOs**: a GTO (gate turn-off thyristor), in the same group, has the SCR's terminals, anode on terminal 1, cathode on
   terminal 2 and gate on terminal 3, and two arrowheads on its gate lead. It fires and latches like an SCR, and a

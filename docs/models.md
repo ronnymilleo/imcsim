@@ -315,23 +315,17 @@ referenced to MT1, through which the gate current returns. The breakover voltage
 Nodalys simulates it as the same latching device with a bidirectional flag, so the on-state line and the gate junction
 mirror about zero and every figure is a parameter. Between -V0 and +V0 a conducting TRIAC carries only its off-state
 current, as a real one does before its junction drop is overcome, so a main current that crosses zero passes through
-that gap and the device follows the voltage onto the other half of its line. ngspice runs the `imcsim_triac` subcircuit: two SCR pairs of the
-`imcsim_scr` kind sit anti-parallel between MT2 and MT1, each with its own vanishing anode diode so it conducts one way
-only, and a gate stage referenced to MT1 routes gate current of either polarity to whichever pair is forward-biased.
-The sensors of that stage sit across the gate resistors to MT1, so they conduct only while the gate draws current and
-the device blocks with the gate open or tied to MT1, whatever MT2 does: the sensors and the pair that conducts toward
-MT2 reach it through vanishing diodes, so MT2 of the other sign cannot drive the gate stage, and an idle TRIAC on
-230 V mains blocks both half-cycles. `RG` and `RT` are parameters of the instance;
-the holding and trigger currents and the on-state threshold emerge from the transistors, close to the figures of
-Nodalys, and there is no breakover on ngspice.
+that gap and the device follows the voltage onto the other half of its line. **ngspice refuses the TRIAC**, with the
+reason, as it does the DIAC and the GTO. The Netlist window and the export still write a TRIAC as an instance of the
+`imcsim_triac` subcircuit: two SCR pairs of the `imcsim_scr` kind anti-parallel between MT2 and MT1 and a gate stage
+referenced to MT1 that fires them in all four quadrants. It ran on ngspice until the TRIAC became a Nodalys part, and
+it has no breakover, dv/dt firing or turn-off time.
 
-- **The engines agree on the dimming**: the light dimmer of the example, fired at 60 degrees into 100 Ohm, chops both
-  half-cycles to the same peaks on both engines. A circuit with a TRIAC runs on the Gear integration, as one with a
-  thyristor or a fuse does. The input-referred noise differs as it does for the SCR, and is bounded in the
-  cross-validation test.
+- **The light dimmer** of the example, fired at 60 degrees into 100 Ohm, chops both half-cycles to the same peaks. A
+  circuit with a TRIAC runs on the Gear integration, as one with a thyristor or a fuse does.
 - The same figures as the SCR set it, and the critical `dv/dt` and the turn-off time apply to the magnitudes: a
   fast voltage change of either sign fires a blocking TRIAC, and a voltage of either sign re-applied inside the
-  recovery window re-fires it, on Nodalys only as for the SCR. The other limits also apply: no separate latching
+  recovery window re-fires it. The other limits also apply: no separate latching
   current, no reverse recovery and no temperature dependence. Every run starts blocking, and a harmonic balance and
   a pole-zero are refused with the reason.
 - **Ratings** are those of the SCR, but the on-state current **IT max** is `IT(RMS)`, the time-weighted RMS of the MT2
