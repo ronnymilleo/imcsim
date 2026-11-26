@@ -291,21 +291,25 @@ struct SwitchParameters {
 
 /**
  * @struct  ThyristorParameters
- * @brief   Latching switch parameters of a thyristor (SCR), as a datasheet gives them.
+ * @brief   Latching switch parameters of a thyristor (SCR) or a TRIAC, as a datasheet gives them.
  * @details The on-state is the datasheet line \f$V_{TM} = V_0 + R_T I_T\f$; the gate fires the device when its current
- *          reaches \f$I_{GT}\f$, and the latch releases when the anode current falls below \f$I_H\f$ with the gate
+ *          reaches \f$I_{GT}\f$, and the latch releases when the main current falls below \f$I_H\f$ with the gate
  *          removed. The latching current \f$I_L\f$ is not modeled separately: the gate sustains conduction until the
- *          anode current reaches the holding current.
+ *          main current reaches the holding current. With `IsBidirectional` the device is a TRIAC: it conducts and
+ *          blocks both ways, the gate fires it in all four quadrants, and the holding and breakover figures apply to
+ *          the magnitude of the main current and voltage.
  */
 struct ThyristorParameters {
     double OnResistance = 0.01;       ///< Slope resistance \f$R_T\f$ of the on-state line, in Ohms.
     double OnThresholdVoltage = 0.9;  ///< Threshold \f$V_0\f$ of the on-state line, in Volts.
     double OffResistance = 1e9;       ///< Blocking resistance of the off-state, in Ohms.
-    double HoldingCurrent = 5e-3;     ///< \f$I_H\f$: anode current below which the latch releases, in Amperes.
+    double HoldingCurrent = 5e-3;     ///< \f$I_H\f$: main current below which the latch releases, in Amperes.
     double GateTriggerCurrent = 1e-3; ///< \f$I_{GT}\f$: gate current that fires the device, in Amperes.
-    double GateTriggerVoltage = 0.7;  ///< \f$V_{GT}\f$: gate-cathode junction threshold, in Volts.
+    double GateTriggerVoltage = 0.7;  ///< \f$V_{GT}\f$: gate junction threshold, in Volts.
     double GateResistance = 100.0;    ///< \f$R_G\f$: series gate resistance, in Ohms.
-    double BreakoverVoltage = 0.0;    ///< \f$V_{BO}\f$: forward breakover voltage; zero disables it, in Volts.
+    double BreakoverVoltage = 0.0;    ///< \f$V_{BO}\f$: breakover voltage; zero disables it, in Volts.
+    /// True for a TRIAC, which conducts both ways and fires in all four gate quadrants; false for a one-way SCR.
+    bool IsBidirectional = false;
 
     /**
      * @brief   Compares two ThyristorParameters values for equality.

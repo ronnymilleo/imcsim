@@ -285,6 +285,31 @@ whatever forward voltage the circuit puts on it.
   operating point; a harmonic balance and a pole-zero are refused with the reason, as they are for the hysteretic
   switch, since the roots through a blocking state are numerically meaningless.
 
+### TRIACs
+
+A TRIAC is a thyristor that conducts both ways: terminal 1 is MT2, terminal 2 MT1 and terminal 3 the gate, and the
+same figures as the SCR set it. It blocks voltage of either sign until the gate fires it, then latches on until the
+magnitude of the main current falls below the holding current, whichever way the current flows. The gate fires it in
+all four quadrants (MT2 positive or negative, gate positive or negative relative to MT1), and the gate drive is
+referenced to MT1, through which the gate current returns. The breakover voltage, when set, applies to either sign.
+
+Nodalys simulates it as the same latching device with a bidirectional flag, so the on-state line and the gate junction
+mirror about zero and every figure is a parameter. ngspice runs the `imcsim_triac` subcircuit: two SCR pairs of the
+`imcsim_scr` kind sit anti-parallel between MT2 and MT1, each with its own vanishing anode diode so it conducts one way
+only, and a gate stage referenced to MT1 routes gate current of either polarity to whichever pair is forward-biased.
+The sensors of that stage sit across the gate resistors to MT1, so they conduct only while the gate draws current and
+the device blocks with the gate open or tied to MT1, whatever MT2 does. `RG` and `RT` are parameters of the instance;
+the holding and trigger currents and the on-state threshold emerge from the transistors, close to the figures of
+Nodalys, and there is no breakover on ngspice.
+
+- **The engines agree on the dimming**: the light dimmer of the example, fired at 60 degrees into 100 Ohm, chops both
+  half-cycles to the same peaks on both engines. A circuit with a TRIAC runs on the Gear integration, as one with a
+  thyristor or a fuse does. The blocking-state noise differs as it does for the SCR, and is bounded in the
+  cross-validation test.
+- The same limits as the SCR apply: no separate latching current, no `dv/dt` triggering, no turn-off time `tq`, no
+  reverse recovery and no temperature dependence. Every run starts blocking, and a harmonic balance and a pole-zero
+  are refused with the reason.
+
 ## Transformers
 A transformer is two inductors coupled by a SPICE `K` element: `L-T1p` and `L-T1s`, each behind a resistor for its
 winding (`R-T1p`, `R-T1s`). Its value is the primary inductance; the secondary's is that divided by the square of the

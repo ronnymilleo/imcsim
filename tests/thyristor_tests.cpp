@@ -1,7 +1,7 @@
 /**
  * @file    thyristor_tests.cpp
- * @brief   Tests for the thyristor: its figures, its netlist, and the controlled rectifier it drives on ngspice and
- *          on Nodalys.
+ * @brief   Tests for the thyristor (SCR) and TRIAC: their figures, their netlists, and the controlled rectifier and
+ *          light dimmer they drive on ngspice and on Nodalys.
  */
 
 #include "circuit/circuit.h"
@@ -114,6 +114,40 @@ const Core::Transient &RunRectifier(const Core::Circuit &circuit, Core::Transien
     return *run.Result;
 }
 
+/// A light dimmer: a 50 Hz sine feeding the TRIAC into a load, with a gate pulse train referenced to MT1 firing at
+/// 60 degrees of every half-cycle, so the load sees a full-wave chopped sine.
+struct Dimmer {
+    Core::VoltageSource Supply;
+    Core::Thyristor Part;
+    Core::Resistor Load;
+    Core::VoltageSource Gate;
+    Core::Ground Reference;
+    Core::Circuit Circuit;
+
+    explicit Dimmer(const double load_ohms) : Part(Core::ComponentType::TRIAC) {
+        Supply.SetName("Vin1");
+        Supply.SetSourceType(Core::VoltageSource::SourceType::AC);
+        Supply.SetAC({.Amplitude = AMPLITUDE, .Frequency = FREQUENCY});
+        Part.SetName("TR1");
+        Load.SetName("R1");
+        Load.SetValue(load_ohms);
+        Gate.SetName("Vgate1");
+        Gate.SetSourceType(Core::VoltageSource::SourceType::PULSE);
+        Gate.SetPulse({.Low = 0.0,
+                       .High = 5.0,
+                       .Delay = GATE_DELAY,
+                       .RiseTime = 1e-6,
+                       .FallTime = 1e-6,
+                       .Width = 0.5e-3,
+                       .Period = PERIOD / 2.0});
+        Circuit.Add(Supply, {1, 0});
+        Circuit.Add(Part, {1, 2, 3});
+        Circuit.Add(Load, {2, 0});
+        Circuit.Add(Gate, {3, 2});
+        Circuit.Add(Reference, {0});
+    }
+};
+
 } // namespace
 
 TEST_CASE("A thyristor starts with the datasheet figures, and clones keep them", "[thyristor]") {
@@ -184,4 +218,71 @@ TEST_CASE("A half-wave controlled rectifier fires, latches and commutates on bot
     CHECK_THAT(MeanLoadVoltage(nodalys_transient), WithinAbs(expected, 0.1));
     // The pair of the subcircuit and the latching device of Nodalys agree on the rectification
     CHECK_THAT(MeanLoadVoltage(nodalys_transient), WithinAbs(MeanLoadVoltage(ngspice_transient), 0.05));
+}
+
+TEST_CASE("A TRIAC starts with the datasheet figures, and clones keep them", "[thyristor]") {
+    Core::Thyristor part(Core::ComponentType::TRIAC);
+    CHECK(part.GetType() == Core::ComponentType::TRIAC);
+    CHECK(part.GetParameters().IsBidirectional);
+    CHECK(part.GetParameters() == Core::ThyristorParameters{.IsBidirectional = true});
+    // The editor cannot turn a TRIAC into an SCR: the part type fixes the direction
+    part.SetParameters({.OnThresholdVoltage = 1.1, .HoldingCurrent = 10e-3});
+    CHECK(part.GetParameters().IsBidirectional);
+    const std::unique_ptr<Core::Component> copy = part.Clone();
+    CHECK(copy->GetType() == Core::ComponentType::TRIAC);
+    CHECK(static_cast<const Core::Thyristor &>(*copy).GetParameters().OnThresholdVoltage == 1.1);
+    CHECK(static_cast<const Core::Thyristor &>(*copy).GetParameters().IsBidirectional);
+
+    Core::Thyristor scr;
+    CHECK_FALSE(scr.GetParameters().IsBidirectional);
+    scr.SetParameters({.IsBidirectional = true});
+    CHECK_FALSE(scr.GetParameters().IsBidirectional);
+}
+
+TEST_CASE("A TRIAC reports the currents of MT2, MT1 and gate", "[thyristor]") {
+    Core::Thyristor part(Core::ComponentType::TRIAC);
+    part.SetName("TR1");
+    const std::vector<std::string> names = Core::GetCurrentNames(part);
+    REQUIRE(names.size() == 3);
+    CHECK(names[0] == "TR1.MT2");
+    CHECK(names[1] == "TR1.MT1");
+    CHECK(names[2] == "TR1.G");
+}
+
+TEST_CASE("A TRIAC writes one instance of its anti-parallel subcircuit, however many there are", "[thyristor]") {
+    Dimmer dimmer(LOAD_OHMS);
+    Core::Thyristor second(Core::ComponentType::TRIAC);
+    second.SetName("TR2");
+    dimmer.Circuit.Add(second, {4, 5, 6});
+
+    const std::string netlist = dimmer.Circuit.ToSpiceNetlist();
+    CHECK(netlist.contains("X-TR1 1 2 3 imcsim_triac RG=100 RT=10m\n"));
+    CHECK(netlist.contains("X-TR2 4 5 6 imcsim_triac RG=100 RT=10m\n"));
+    CHECK(netlist.find(".subckt imcsim_triac") == netlist.rfind(".subckt imcsim_triac"));
+    CHECK(netlist.contains(".ends imcsim_triac\n"));
+}
+
+TEST_CASE("A TRIAC dimmer chops both half-cycles on both engines", "[thyristor][simulator]") {
+    Dimmer dimmer(LOAD_OHMS);
+
+    Core::TransientRun ngspice_run;
+    const Core::Transient &ngspice_transient = RunRectifier(dimmer.Circuit, ngspice_run);
+    // Before the first firing the load is dark; at the peaks of the second period it follows the sine both ways
+    CHECK(LoadVoltageAt(ngspice_transient, 1e-3) < 0.1);
+    CHECK(LoadVoltageAt(ngspice_transient, 25e-3) > 8.0);
+    CHECK(LoadVoltageAt(ngspice_transient, 35e-3) < -8.0);
+    INFO("ngspice: positive peak " << LoadVoltageAt(ngspice_transient, 25e-3) << " V, negative peak "
+                                   << LoadVoltageAt(ngspice_transient, 35e-3) << " V");
+
+    TestSupport::NodalysInUse nodalys;
+    Core::TransientRun nodalys_run;
+    const Core::Transient &nodalys_transient = RunRectifier(dimmer.Circuit, nodalys_run);
+    CHECK(LoadVoltageAt(nodalys_transient, 1e-3) < 0.1);
+    CHECK(LoadVoltageAt(nodalys_transient, 25e-3) > 8.0);
+    CHECK(LoadVoltageAt(nodalys_transient, 35e-3) < -8.0);
+    INFO("Nodalys: positive peak " << LoadVoltageAt(nodalys_transient, 25e-3) << " V, negative peak "
+                                   << LoadVoltageAt(nodalys_transient, 35e-3) << " V");
+    // The anti-parallel pair of the subcircuit and the bidirectional device of Nodalys agree on the peaks
+    CHECK_THAT(LoadVoltageAt(nodalys_transient, 25e-3), WithinAbs(LoadVoltageAt(ngspice_transient, 25e-3), 0.1));
+    CHECK_THAT(LoadVoltageAt(nodalys_transient, 35e-3), WithinAbs(LoadVoltageAt(ngspice_transient, 35e-3), 0.1));
 }

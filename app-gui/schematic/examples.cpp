@@ -464,6 +464,23 @@ constexpr auto EXAMPLES = std::to_array<Example>({
         .FileName = "controlled_bridge_rectifier.imcsim",
     },
     {
+        .Title = "TRIAC light dimmer",
+        .Group = "Switching",
+        .Description =
+            "A TRIAC chops both half-cycles of a 10 V, 50 Hz sine into a 100 Ohm lamp, the way a light dimmer does: a "
+            "5 V gate pulse of half a millisecond, referenced to MT1, fires it at 60 degrees of every half-cycle, "
+            "positive and negative alike, and it latches on after the pulse ends until the main current falls below "
+            "the 5 mA holding current near each zero crossing. Run the transient: the load follows the sine from 60 "
+            "degrees on in both directions, so it sees a full-wave chopped sine whose RMS is about 6.3 V, where the "
+            "whole sine would give 7.1 V; the mean over a period is zero, since the two half-cycles mirror each "
+            "other. Both engines run it: Nodalys takes every figure as a parameter of its bidirectional latching "
+            "device, while ngspice runs the imcsim_triac subcircuit, two anti-parallel transistor pairs with a gate "
+            "stage that fires in all four quadrants. Change the delay of Vin2 to move the firing angle: a later "
+            "pulse dims the lamp, and a delay past the peak leaves it dark. The step is 0.2 ms, and the solver lands "
+            "on each commutation instant itself.",
+        .FileName = "triac_dimmer.imcsim",
+    },
+    {
         .Title = "Relay driver",
         .Group = "Switching",
         .Description =

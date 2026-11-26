@@ -298,9 +298,14 @@ bool Circuit::HasFuse() const {
                                [](const Component *part) { return part->GetType() == ComponentType::FUSE; });
 }
 
+/**
+ * @brief   Tells whether the circuit has a thyristor (SCR) or a TRIAC.
+ * @return  True when it, or a subcircuit one of its instances uses, contains one, which needs the Gear integration.
+ */
 bool Circuit::HasThyristor() const {
-    return std::ranges::any_of(CollectParts(*this),
-                               [](const Component *part) { return part->GetType() == ComponentType::THYRISTOR; });
+    return std::ranges::any_of(CollectParts(*this), [](const Component *part) {
+        return part->GetType() == ComponentType::THYRISTOR || part->GetType() == ComponentType::TRIAC;
+    });
 }
 
 /**

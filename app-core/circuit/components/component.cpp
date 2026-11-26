@@ -467,6 +467,14 @@ constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({
         .AcceptedValues = ValueRule::NONE,
         .Family = ComponentFamily::SWITCHING,
     },
+    {
+        .Type = ComponentType::TRIAC,
+        .TypeName = "Triac",
+        .NamePrefix = "TR",
+        .Unit = "",
+        .AcceptedValues = ValueRule::NONE,
+        .Family = ComponentFamily::SWITCHING,
+    },
 });
 
 /**

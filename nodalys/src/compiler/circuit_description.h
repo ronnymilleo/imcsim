@@ -217,7 +217,7 @@ struct SwitchSpec {
     SwitchParameters Params;
 };
 
-/// Specification for a latching thyristor (SCR).
+/// Specification for a latching thyristor (SCR) or TRIAC.
 struct ThyristorSpec {
     std::string Name;
     NodeId Anode = 0;

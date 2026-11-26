@@ -433,6 +433,22 @@ std::string FormatThyristor(const Thyristor &thyristor, const std::vector<int> &
 }
 
 /**
+ * @brief   An instance of the anti-parallel subcircuit that latches both ways; see FormatTriacSubcircuit().
+ */
+std::string FormatTriac(const Thyristor &triac, const std::vector<int> &nodes, NetlistExtras &extras) {
+    const ThyristorParameters &figures = triac.GetParameters();
+    AddModelLine(GetTriacSubcircuitName(), FormatTriacSubcircuit(), extras.ModelNames, extras.Models);
+    return std::format("X-{} {} {} {} {} RG={} RT={}\n",
+                       triac.GetName(),
+                       nodes[0],
+                       nodes[1],
+                       nodes[2],
+                       GetTriacSubcircuitName(),
+                       FormatSpiceValue(figures.GateResistance),
+                       FormatSpiceValue(figures.OnResistance));
+}
+
+/**
  * @brief   Two inductors, each behind the resistance of its winding, coupled by a K element.
  */
 std::string FormatTransformer(const Transformer &transformer, const std::vector<int> &nodes, NetlistExtras &extras) {
@@ -557,6 +573,8 @@ std::string FormatSwitchingPart(const Component &component, const std::vector<in
         return FormatFuse(static_cast<const Fuse &>(component), nodes, extras);
     case ComponentType::THYRISTOR:
         return FormatThyristor(static_cast<const Thyristor &>(component), nodes, extras);
+    case ComponentType::TRIAC:
+        return FormatTriac(static_cast<const Thyristor &>(component), nodes, extras);
     case ComponentType::V_SWITCH:
     default:
         return FormatVoltageSwitch(static_cast<const VoltageControlledSwitch &>(component), nodes, extras);
@@ -718,7 +736,8 @@ std::vector<std::string> GetElementNames(const Component &component) {
                 std::format("D-{}-N", name),
                 std::format("E-{}", name)};
     }
-    if (type == ComponentType::OP_AMP || type == ComponentType::FUSE || type == ComponentType::THYRISTOR) {
+    if (type == ComponentType::OP_AMP || type == ComponentType::FUSE || type == ComponentType::THYRISTOR
+        || type == ComponentType::TRIAC) {
         return {std::format("X-{}", name)};
     }
     if (type == ComponentType::POTENTIOMETER) {

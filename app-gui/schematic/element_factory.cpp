@@ -87,6 +87,7 @@ constexpr auto PARTS = std::to_array<PartInfo>({
     {Core::ComponentType::RELAY, "Relay"},
     {Core::ComponentType::FUSE, "Fuse"},
     {Core::ComponentType::THYRISTOR, "Thyristor (SCR)"},
+    {Core::ComponentType::TRIAC, "TRIAC"},
     {Core::ComponentType::TRANSFORMER, "Transformer"},
     {Core::ComponentType::TRANSMISSION_LINE, "Transmission line"},
     {Core::ComponentType::AND, "AND gate"},
@@ -174,7 +175,8 @@ CreateElement(const Core::ComponentType type, const GridPoint position, const Ro
     case Core::ComponentType::FUSE:
         return std::make_unique<UIFuse>(position, rotation);
     case Core::ComponentType::THYRISTOR:
-        return std::make_unique<UIThyristor>(position, rotation);
+    case Core::ComponentType::TRIAC:
+        return std::make_unique<UIThyristor>(type, position, rotation);
     case Core::ComponentType::TRANSFORMER:
         return std::make_unique<UITransformer>(position, rotation);
     case Core::ComponentType::TRANSMISSION_LINE:

@@ -91,12 +91,12 @@ CircuitBuilder &CircuitBuilder::AddMosfet(std::string name,
 }
 
 /**
- * @brief   Adds a latching thyristor (SCR) fired by gate current and held on by its anode current.
+ * @brief   Adds a latching thyristor (SCR) or TRIAC fired by gate current and held on by its main current.
  * @param[in] name     Element designator.
- * @param[in] anode    Anode node.
- * @param[in] cathode  Cathode node.
+ * @param[in] anode    Anode (MT2) node.
+ * @param[in] cathode  Cathode (MT1) node.
  * @param[in] gate     Gate node.
- * @param[in] params   Thyristor model parameters.
+ * @param[in] params   Thyristor model parameters; `IsBidirectional` makes it a TRIAC.
  * @return  Reference to this builder for chaining.
  */
 CircuitBuilder &CircuitBuilder::AddThyristor(std::string name,

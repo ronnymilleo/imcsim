@@ -77,7 +77,7 @@ void LoadElectromechanicalFields(ElectromechanicalFields &fields, const Core::Co
         LoadParameterFields(RELAY_FIELDS, fields.Relay, static_cast<const Core::Relay &>(component).GetParameters());
     } else if (type == Core::ComponentType::FUSE) {
         LoadParameterFields(FUSE_FIELDS, fields.Fuse, static_cast<const Core::Fuse &>(component).GetParameters());
-    } else if (type == Core::ComponentType::THYRISTOR) {
+    } else if (type == Core::ComponentType::THYRISTOR || type == Core::ComponentType::TRIAC) {
         LoadParameterFields(THYRISTOR_FIELDS,
                             fields.Thyristor,
                             static_cast<const Core::Thyristor &>(component).GetParameters());
@@ -173,7 +173,8 @@ void DrawFuse(Core::Fuse &fuse, ElectromechanicalFields &fields, Schematic &sche
 }
 
 /**
- * @brief   The thyristor fires at the gate trigger current, latches on, and releases below the holding current.
+ * @brief   The thyristor fires at the gate trigger current, latches on, and releases below the holding current; a
+ *          TRIAC does so both ways, firing in all four gate quadrants.
  */
 void DrawThyristor(Core::Thyristor &thyristor, ElectromechanicalFields &fields, Schematic &schematic) {
     Core::ThyristorParameters parameters = thyristor.GetParameters();
@@ -184,7 +185,12 @@ void DrawThyristor(Core::Thyristor &thyristor, ElectromechanicalFields &fields, 
         thyristor.SetParameters(parameters);
         schematic.MarkModified();
     }
-    ImGui::TextDisabled("Fires at IGT, latches on, and releases when the anode current falls below IH");
+    const bool is_triac = thyristor.GetType() == Core::ComponentType::TRIAC;
+    ImGui::TextDisabled("Fires at IGT, latches on, and releases when the %s current falls below IH",
+                        is_triac ? "main" : "anode");
+    if (is_triac) {
+        ImGui::TextDisabled("Conducts both ways and fires in all four gate quadrants; the gate is referenced to MT1");
+    }
     ImGui::TextDisabled("On Nodalys every figure is a parameter; on ngspice only RG and RT are, and IH, IGT and V0"
                         " follow from the transistor pair");
 }

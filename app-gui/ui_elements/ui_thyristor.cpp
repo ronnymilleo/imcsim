@@ -1,6 +1,6 @@
 /**
  * @file    ui_thyristor.cpp
- * @brief   Schematic symbol of a thyristor (SCR).
+ * @brief   Schematic symbol of a thyristor (SCR) or a TRIAC.
  */
 
 #include "ui_elements/ui_thyristor.h"
@@ -20,6 +20,9 @@ constexpr float BODY_HALF_HEIGHT = 0.6f;
 /// Where the gate lead leaves the cathode bar, and the terminal it reaches below the symbol.
 constexpr float GATE_LEAD_X = BODY_HALF_LENGTH;
 constexpr float GATE_LEAD_Y = BODY_HALF_HEIGHT;
+/// A TRIAC draws two anti-parallel triangles, their tips this far off the axis and their bases this tall.
+constexpr float TRIAC_TIP_OFFSET = 0.25f;
+constexpr float TRIAC_BASE_HALF_HEIGHT = 0.35f;
 /// Labels sit just outside the symbol.
 constexpr float LABEL_OFFSET = 1.0f;
 
@@ -27,16 +30,17 @@ constexpr float LABEL_OFFSET = 1.0f;
 
 /**
  * @brief   Creates a thyristor part placed on the grid, together with its simulation component.
+ * @param[in] type      Core::ComponentType::THYRISTOR for an SCR, TRIAC for a bidirectional one.
  * @param[in] position  Grid position in world units.
  * @param[in] rotation  Orientation on the grid.
  */
-UIThyristor::UIThyristor(const GridPoint position, const Rotation rotation)
-    : UIElement(std::make_unique<Core::Thyristor>(), position, rotation) {
+UIThyristor::UIThyristor(const Core::ComponentType type, const GridPoint position, const Rotation rotation)
+    : UIElement(std::make_unique<Core::Thyristor>(type), position, rotation) {
 }
 
 /**
- * @brief   The anode and cathode leads run along the axis; the gate lead runs from the cathode bar down to its
- *          terminal.
+ * @brief   The anode (MT2) and cathode (MT1) leads run along the axis; the gate lead runs from the cathode bar down to
+ *          its terminal.
  */
 void UIThyristor::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     canvas.AddLine(LocalToScreen(view, -2, 0), LocalToScreen(view, -1, 0), color, LINE_THICKNESS);
@@ -50,11 +54,26 @@ void UIThyristor::DrawSymbol(SchematicCanvas &canvas,
                              SymbolStyle /*style*/) const {
     canvas.AddLine(LocalToScreen(view, -1, 0), LocalToScreen(view, -BODY_HALF_LENGTH, 0), color, LINE_THICKNESS);
     canvas.AddLine(LocalToScreen(view, BODY_HALF_LENGTH, 0), LocalToScreen(view, 1, 0), color, LINE_THICKNESS);
-    canvas.AddTriangle(LocalToScreen(view, -BODY_HALF_LENGTH, -BODY_HALF_HEIGHT),
-                       LocalToScreen(view, -BODY_HALF_LENGTH, BODY_HALF_HEIGHT),
-                       LocalToScreen(view, BODY_HALF_LENGTH, 0),
-                       color,
-                       LINE_THICKNESS);
+    if (GetComponent().GetType() == Core::ComponentType::TRIAC) {
+        // Two anti-parallel triangles, one each way, sharing the MT1 bar: the upper conducts MT2 to MT1, the lower
+        // MT1 to MT2
+        canvas.AddTriangle(LocalToScreen(view, -BODY_HALF_LENGTH, -TRIAC_TIP_OFFSET - TRIAC_BASE_HALF_HEIGHT),
+                           LocalToScreen(view, -BODY_HALF_LENGTH, -TRIAC_TIP_OFFSET + TRIAC_BASE_HALF_HEIGHT),
+                           LocalToScreen(view, BODY_HALF_LENGTH, -TRIAC_TIP_OFFSET),
+                           color,
+                           LINE_THICKNESS);
+        canvas.AddTriangle(LocalToScreen(view, BODY_HALF_LENGTH, TRIAC_TIP_OFFSET - TRIAC_BASE_HALF_HEIGHT),
+                           LocalToScreen(view, BODY_HALF_LENGTH, TRIAC_TIP_OFFSET + TRIAC_BASE_HALF_HEIGHT),
+                           LocalToScreen(view, -BODY_HALF_LENGTH, TRIAC_TIP_OFFSET),
+                           color,
+                           LINE_THICKNESS);
+    } else {
+        canvas.AddTriangle(LocalToScreen(view, -BODY_HALF_LENGTH, -BODY_HALF_HEIGHT),
+                           LocalToScreen(view, -BODY_HALF_LENGTH, BODY_HALF_HEIGHT),
+                           LocalToScreen(view, BODY_HALF_LENGTH, 0),
+                           color,
+                           LINE_THICKNESS);
+    }
     canvas.AddLine(LocalToScreen(view, BODY_HALF_LENGTH, -BODY_HALF_HEIGHT),
                    LocalToScreen(view, BODY_HALF_LENGTH, BODY_HALF_HEIGHT),
                    color,
@@ -80,7 +99,7 @@ void UIThyristor::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view,
 
 /**
  * @brief   Returns the terminals in component order, in local grid units before rotation.
- * @return  Anode at (-2, 0), cathode at (2, 0) and gate at (0, 2).
+ * @return  Anode (MT2) at (-2, 0), cathode (MT1) at (2, 0) and gate at (0, 2).
  */
 std::vector<GridPoint> UIThyristor::GetLocalTerminals() const {
     return {{-2, 0}, {2, 0}, {0, 2}};

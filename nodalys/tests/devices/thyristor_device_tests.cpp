@@ -1,7 +1,7 @@
 /**
  * @file    thyristor_device_tests.cpp
- * @brief   Tests of the thyristor of Nodalys: the gate firing, the latch, the holding current, the blocking states
- *          and the controlled rectifier against its closed form.
+ * @brief   Tests of the thyristor (SCR) and TRIAC of Nodalys: the gate firing, the latch, the holding current, the
+ *          blocking states, the four quadrants of the TRIAC and the controlled rectifier against its closed form.
  */
 
 #include <catch2/catch_test_macros.hpp>
@@ -27,6 +27,12 @@ constexpr Nodalys::ThyristorParameters SCR = {.OnResistance = 0.01,
                                               .GateTriggerVoltage = 0.7,
                                               .GateResistance = 100.0,
                                               .BreakoverVoltage = 0.0};
+/// The same figures as a TRIAC, which conducts both ways and fires in all four gate quadrants.
+constexpr Nodalys::ThyristorParameters TRIAC = [] {
+    Nodalys::ThyristorParameters params = SCR;
+    params.IsBidirectional = true;
+    return params;
+}();
 /// Node of the supply, of the load and of the gate drive.
 constexpr int SUPPLY = 1;
 constexpr int LOAD = 2;
@@ -239,4 +245,84 @@ TEST_CASE("Harmonic balance refuses a thyristor", "[nodalys][thyristor]") {
     REQUIRE(circuit.has_value());
     const auto result = Nodalys::ComputeHarmonicBalance(*circuit, {.FundamentalFrequency = 50.0, .Harmonics = 4});
     CHECK_FALSE(result.has_value());
+}
+
+TEST_CASE("A TRIAC blocks both polarities until the gate fires it", "[nodalys][thyristor]") {
+    // Without a gate the 10 V supply sits across the blocking device, whichever way it points
+    const Nodalys::OperatingPointResult forward = RunOperatingPoint(BuildScrLoop(TRIAC, 10.0, 100.0, 0.0));
+    CHECK_THAT(forward.NodeVoltages[LOAD], WithinAbs(0.0, 1e-3));
+    const Nodalys::OperatingPointResult reverse = RunOperatingPoint(BuildScrLoop(TRIAC, -10.0, 100.0, 0.0));
+    CHECK_THAT(reverse.NodeVoltages[LOAD], WithinAbs(0.0, 1e-3));
+}
+
+TEST_CASE("A TRIAC fires in all four gate quadrants", "[nodalys][thyristor]") {
+    // MT2 positive or negative, gate positive or negative relative to MT1: each pair fires the latch
+    const Nodalys::OperatingPointResult q1 = RunOperatingPoint(BuildScrLoop(TRIAC, 10.0, 100.0, 5.0));
+    CHECK_THAT(q1.NodeVoltages[LOAD], WithinAbs(9.099, 0.01));
+    const Nodalys::OperatingPointResult q2 = RunOperatingPoint(BuildScrLoop(TRIAC, 10.0, 100.0, -5.0));
+    CHECK_THAT(q2.NodeVoltages[LOAD], WithinAbs(9.099, 0.01));
+    const Nodalys::OperatingPointResult q3 = RunOperatingPoint(BuildScrLoop(TRIAC, -10.0, 100.0, -5.0));
+    CHECK_THAT(q3.NodeVoltages[LOAD], WithinAbs(-9.099, 0.01));
+    const Nodalys::OperatingPointResult q4 = RunOperatingPoint(BuildScrLoop(TRIAC, -10.0, 100.0, 5.0));
+    CHECK_THAT(q4.NodeVoltages[LOAD], WithinAbs(-9.099, 0.01));
+}
+
+TEST_CASE("A TRIAC latches on after the gate pulse ends, either way", "[nodalys][thyristor]") {
+    // The pulse ends at 1.2 ms; the 91 mA main current is far above the 5 mA holding current, both ways
+    const Nodalys::PulseParameters pulse{.High = 5.0, .Delay = 1e-3, .Width = 0.2e-3, .Period = 1.0};
+    const Nodalys::TransientResult forward = RunTransient(BuildPulsedScrLoop(TRIAC, 10.0, 100.0, pulse), 2e-3, 1e-5);
+    CHECK_THAT(LoadVoltageAt(forward, 1.5e-3), WithinAbs(9.099, 0.01));
+    const Nodalys::TransientResult reverse = RunTransient(BuildPulsedScrLoop(TRIAC, -10.0, 100.0, pulse), 2e-3, 1e-5);
+    CHECK_THAT(LoadVoltageAt(reverse, 1.5e-3), WithinAbs(-9.099, 0.01));
+}
+
+TEST_CASE("A TRIAC releases below the holding current in either direction", "[nodalys][thyristor]") {
+    // A 10 kOhm load carries only 0.91 mA, below the 5 mA holding current: the latch releases once the pulse ends
+    const Nodalys::PulseParameters pulse{.High = 5.0, .Delay = 1e-3, .Width = 0.2e-3, .Period = 1.0};
+    const Nodalys::TransientResult forward = RunTransient(BuildPulsedScrLoop(TRIAC, 10.0, 10e3, pulse), 2e-3, 1e-5);
+    CHECK_THAT(LoadVoltageAt(forward, 1.1e-3), WithinAbs(9.099, 0.01));
+    CHECK_THAT(LoadVoltageAt(forward, 1.5e-3), WithinAbs(0.0, 0.1));
+    const Nodalys::TransientResult reverse = RunTransient(BuildPulsedScrLoop(TRIAC, -10.0, 10e3, pulse), 2e-3, 1e-5);
+    CHECK_THAT(LoadVoltageAt(reverse, 1.1e-3), WithinAbs(-9.099, 0.01));
+    CHECK_THAT(LoadVoltageAt(reverse, 1.5e-3), WithinAbs(0.0, 0.1));
+}
+
+TEST_CASE("Breakover fires a TRIAC without a gate, both ways", "[nodalys][thyristor]") {
+    Nodalys::ThyristorParameters breakover = TRIAC;
+    breakover.BreakoverVoltage = 5.0;
+    // 10 V is past the 5 V breakover either way; 3 V is not
+    const Nodalys::OperatingPointResult forward = RunOperatingPoint(BuildScrLoop(breakover, 10.0, 100.0, 0.0));
+    CHECK_THAT(forward.NodeVoltages[LOAD], WithinAbs(9.099, 0.01));
+    const Nodalys::OperatingPointResult reverse = RunOperatingPoint(BuildScrLoop(breakover, -10.0, 100.0, 0.0));
+    CHECK_THAT(reverse.NodeVoltages[LOAD], WithinAbs(-9.099, 0.01));
+    const Nodalys::OperatingPointResult blocked = RunOperatingPoint(BuildScrLoop(breakover, 3.0, 100.0, 0.0));
+    CHECK_THAT(blocked.NodeVoltages[LOAD], WithinAbs(0.0, 1e-3));
+}
+
+TEST_CASE("A TRIAC dimmer conducts both half-cycles and commutates at the holding current", "[nodalys][thyristor]") {
+    // An ideal on-state (no V0); a gate pulse train referenced to MT1 fires at 60 degrees of every half-cycle, so the
+    // load follows the sine from 60 degrees on, positive and negative alike
+    Nodalys::ThyristorParameters ideal = TRIAC;
+    ideal.OnThresholdVoltage = 0.0;
+    const double amplitude = 10.0;
+    const double frequency = 50.0;
+    const double period = 1.0 / frequency;
+    const Nodalys::PulseParameters pulse{.High = 5.0,
+                                         .Delay = period / 6.0,
+                                         .RiseTime = 1e-6,
+                                         .FallTime = 1e-6,
+                                         .Width = 0.5e-3,
+                                         .Period = period / 2.0};
+    Nodalys::CircuitBuilder builder;
+    builder.AddVsine("V1", SUPPLY, 0, {.Amplitude = amplitude, .Frequency = frequency});
+    builder.AddThyristor("TR1", SUPPLY, LOAD, GATE, ideal);
+    builder.AddResistor("R1", LOAD, 0, 100.0);
+    builder.AddVpulse("Vg", GATE, LOAD, pulse);
+    auto circuit = builder.Build();
+    REQUIRE(circuit.has_value());
+    const Nodalys::TransientResult result = RunTransient(*circuit, 2.0 * period, 20e-6);
+    // Before the first firing the load is dark; at the peaks of the second period it follows the sine both ways
+    CHECK_THAT(LoadVoltageAt(result, 1e-3), WithinAbs(0.0, 1e-3));
+    CHECK_THAT(LoadVoltageAt(result, period + period / 4.0), WithinAbs(amplitude, 0.05));
+    CHECK_THAT(LoadVoltageAt(result, period + 3.0 * period / 4.0), WithinAbs(-amplitude, 0.05));
 }

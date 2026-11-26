@@ -1,6 +1,6 @@
 /**
  * @file    thyristor.cpp
- * @brief   A thyristor (SCR) that fires on gate current, latches on, and releases below its holding current.
+ * @brief   A thyristor (SCR) or TRIAC that fires on gate current, latches on, and releases below its holding current.
  */
 
 #include "circuit/components/thyristor.h"
@@ -11,10 +11,13 @@
 namespace Core {
 
 /**
- * @brief   Creates a thyristor that fires at 1 mA of gate current, holds on above 5 mA of anode current and drops
- *          0.9 V plus 10 mOhm on the on-state line.
+ * @brief   Creates a thyristor that fires at 1 mA of gate current, holds on above 5 mA of main current and drops
+ *          0.8 V plus 10 mOhm on the on-state line.
+ * @param[in] type  THYRISTOR for a one-way SCR, TRIAC for a bidirectional one; any other type is refused by the
+ *                  caller, which only places these two.
  */
-Thyristor::Thyristor() : Component(ComponentType::THYRISTOR, 0.0) {
+Thyristor::Thyristor(const ComponentType type) : Component(type, 0.0) {
+    m_Parameters.IsBidirectional = type == ComponentType::TRIAC;
 }
 
 /**
@@ -34,11 +37,12 @@ const ThyristorParameters &Thyristor::GetParameters() const {
 }
 
 /**
- * @brief   Sets the parameters of the thyristor.
+ * @brief   Sets the parameters of the thyristor, keeping the direction the part type fixes.
  * @param[in] parameters  New parameters; check them with IsValidParameters() first.
  */
 void Thyristor::SetParameters(const ThyristorParameters &parameters) {
     m_Parameters = parameters;
+    m_Parameters.IsBidirectional = GetType() == ComponentType::TRIAC;
 }
 
 /**
@@ -59,7 +63,7 @@ const char *GetThyristorSubcircuitName() {
 }
 
 /**
- * @brief   Writes the two-transistor subcircuit that ngspice runs for a thyristor.
+ * @brief   Writes the two-transistor subcircuit that ngspice runs for a thyristor (SCR).
  * @return  The ".subckt" block, newline included.
  * @details A PNP and an NPN with the collector of each into the base of the other: the pair is the PNPN structure,
  *          and it latches by regeneration once the gate drives the base of the NPN, releasing when the anode current
@@ -90,6 +94,69 @@ std::string FormatThyristorSubcircuit() {
            ".model IMCSIM_SCR_DG D(IS=1e-12 N=0.001)\n"
            ".model IMCSIM_SCR_DT D(IS=1e-12 N=0.001)\n"
            ".ends imcsim_scr\n";
+}
+
+const char *GetTriacSubcircuitName() {
+    return "imcsim_triac";
+}
+
+/**
+ * @brief   Writes the subcircuit that ngspice runs for a TRIAC.
+ * @return  The ".subckt" block, newline included.
+ * @details Two SCR pairs of the imcsim_scr kind sit anti-parallel between MT2 and MT1, each with its own vanishing
+ *          anode diode so it conducts one way only: the pair P latches when MT2 is positive, the pair N when MT1 is.
+ *          A gate stage referenced to MT1 routes gate current of either polarity to whichever pair is forward-biased,
+ *          so the device fires in all four quadrants. A positive gate drives the NPN base of P directly through a
+ *          vanishing diode, and a PNP sensor turns on a switched path into the NPN base of N for the fourth quadrant;
+ *          a negative gate pulls the PNP base of N directly, and an NPN sensor switches a pull from the PNP base of P
+ *          for the second quadrant. Each sensor reads the gate against MT1 through a base resistor, and a bleed holds
+ *          its input at MT1, so a sensor conducts only while the gate actually draws current and the device blocks
+ *          with the gate open or tied to MT1, whatever MT2 does. The diodes keep the latched base current from leaking
+ *          back out of the gate. `RG` and `RT` are parameters of the instance, RG setting the steering paths; the
+ *          holding and trigger currents and the on-state threshold emerge from the transistors, close to the figures of
+ *          Nodalys. The stage steers with transistor gain, so at the firing instant it draws more gate current than
+ *          the single junction of Nodalys, which the cross-validation test bounds.
+ * @note    There is no breakover: the pairs block whatever voltage the circuit puts on them, as a TRIAC driven
+ *          correctly does.
+ */
+std::string FormatTriacSubcircuit() {
+    return ".subckt imcsim_triac mt2 mt1 g params: RG=100 RT=0.01\n"
+           "Dtp mt2 nrtp IMCSIM_TRIAC_DT\n"
+           "Rtp nrtp nap {RT}\n"
+           "Q1p n2p n1p nap IMCSIM_TRIAC_QP\n"
+           "Q2p n1p n2p mt1 IMCSIM_TRIAC_QN\n"
+           "R1p n1p nap 100k\n"
+           "R2p n2p mt1 100k\n"
+           "Dtn mt1 nrtn IMCSIM_TRIAC_DT\n"
+           "Rtn nrtn nan {RT}\n"
+           "Q1n n2n n1n nan IMCSIM_TRIAC_QP\n"
+           "Q2n n1n n2n mt2 IMCSIM_TRIAC_QN\n"
+           "R1n n1n nan 100k\n"
+           "R2n n2n mt2 100k\n"
+           "Dgp g pg IMCSIM_TRIAC_DG\n"
+           "Rsp pg mt1 1k\n"
+           "Qsp cp nbp pg IMCSIM_TRIAC_QP\n"
+           "Rbp nbp mt1 1k\n"
+           "Dp pg np2p IMCSIM_TRIAC_DG\n"
+           "Rp np2p n2p {RG}\n"
+           "Dpn cp np2n IMCSIM_TRIAC_DG\n"
+           "Rpn np2n n2n {RG}\n"
+           "Rcp cp mt2 100k\n"
+           "Dgn ng g IMCSIM_TRIAC_DG\n"
+           "Rsn mt1 ng 1k\n"
+           "Qsn cn nbn ng IMCSIM_TRIAC_QN\n"
+           "Rbn nbn mt1 1k\n"
+           "Dn n1n nn1n IMCSIM_TRIAC_DG\n"
+           "Rn nn1n ng {RG}\n"
+           "Dnp n1p nn1p IMCSIM_TRIAC_DG\n"
+           "Rnp nn1p cn {RG}\n"
+           "Rcn cn mt2 100k\n"
+           "Rlk g mt1 1G\n"
+           ".model IMCSIM_TRIAC_QP PNP(IS=1e-14 BF=100 CJE=20p CJC=20p)\n"
+           ".model IMCSIM_TRIAC_QN NPN(IS=1e-14 BF=100 CJE=20p CJC=20p)\n"
+           ".model IMCSIM_TRIAC_DG D(IS=1e-12 N=0.001)\n"
+           ".model IMCSIM_TRIAC_DT D(IS=1e-12 N=0.001)\n"
+           ".ends imcsim_triac\n";
 }
 
 } // namespace Core

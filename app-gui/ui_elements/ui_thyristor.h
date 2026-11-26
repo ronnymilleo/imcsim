@@ -1,6 +1,6 @@
 /**
  * @file    ui_thyristor.h
- * @brief   Schematic symbol of a thyristor (SCR).
+ * @brief   Schematic symbol of a thyristor (SCR) or a TRIAC.
  */
 
 #ifndef IMCSIM_UI_THYRISTOR_H
@@ -12,14 +12,15 @@ namespace GUI {
 
 /**
  * @class   UIThyristor
- * @brief   The diode symbol of a thyristor, anode to cathode left to right, with the gate lead leaving the cathode
- *          bar for its third terminal below.
- * @details The anode is terminal 1 at (-2, 0), the cathode terminal 2 at (2, 0) and the gate terminal 3 at (0, 2).
- *          The name is drawn above the symbol and the holding current below it.
+ * @brief   The diode symbol of a thyristor, anode (MT2) to cathode (MT1) left to right, with the gate lead leaving the
+ *          cathode bar for its third terminal below.
+ * @details One class serves the SCR and the TRIAC: a TRIAC draws two anti-parallel triangles, one each way, sharing
+ *          the MT1 bar. The anode (MT2) is terminal 1 at (-2, 0), the cathode (MT1) terminal 2 at (2, 0) and the gate
+ *          terminal 3 at (0, 2). The name is drawn above the symbol and the holding current below it.
  */
 class UIThyristor : public UIElement {
 public:
-    UIThyristor(GridPoint position, Rotation rotation);
+    UIThyristor(Core::ComponentType type, GridPoint position, Rotation rotation);
     ~UIThyristor() override = default;
 
 protected:
