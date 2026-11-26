@@ -208,7 +208,10 @@ void PartEditor::DrawValuedPart(Core::Component &component) {
     if (type == Core::ComponentType::TRANSFORMER) {
         DrawTransformer(static_cast<Core::Transformer &>(component), m_Electromechanical, *m_Schematic);
     } else if (type == Core::ComponentType::TRANSMISSION_LINE) {
-        DrawTransmissionLine(static_cast<Core::TransmissionLine &>(component), m_Electromechanical, *m_Schematic);
+        DrawTransmissionLine(static_cast<Core::TransmissionLine &>(component),
+                             m_Electromechanical,
+                             m_Value,
+                             *m_Schematic);
     } else if (type == Core::ComponentType::INITIAL_VOLTAGE) {
         ImGui::TextDisabled("The node starts a transient at this voltage; other analyses ignore it");
     } else if (type == Core::ComponentType::NODESET) {

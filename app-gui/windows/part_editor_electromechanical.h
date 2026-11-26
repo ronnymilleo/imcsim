@@ -17,6 +17,7 @@
 #include "circuit/components/transmission_line.h"
 #include "circuit/components/voltage_controlled_switch.h"
 #include "schematic/schematic.h"
+#include "windows/line_geometry_calculator.h"
 #include <array>
 
 namespace GUI {
@@ -42,6 +43,8 @@ struct ElectromechanicalFields {
     std::array<ValueField, 3> Transformer;
     /// One per member of Core::TransmissionLineParameters.
     std::array<ValueField, 6> TransmissionLine;
+    /// The geometry the figures of a line can be worked out from.
+    LineGeometryCalculator LineGeometry;
 };
 
 // Loading
@@ -57,7 +60,10 @@ void DrawFuse(Core::Fuse &fuse, ElectromechanicalFields &fields, Schematic &sche
 void DrawThyristor(Core::Thyristor &thyristor, ElectromechanicalFields &fields, Schematic &schematic);
 void DrawDiac(Core::Diac &diac, ElectromechanicalFields &fields, Schematic &schematic);
 void DrawTransformer(Core::Transformer &transformer, ElectromechanicalFields &fields, Schematic &schematic);
-void DrawTransmissionLine(Core::TransmissionLine &line, ElectromechanicalFields &fields, Schematic &schematic);
+void DrawTransmissionLine(Core::TransmissionLine &line,
+                          ElectromechanicalFields &fields,
+                          ValueField &impedance,
+                          Schematic &schematic);
 
 } // namespace GUI
 
