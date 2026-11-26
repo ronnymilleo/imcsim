@@ -47,11 +47,13 @@ public:
     void SendChanges(const std::vector<LiveChange> &changes);
     void Pause();
     void Resume();
+    void SetSpeedMultiplier(double multiplier);
 
     // State
     bool IsBusy() const;
     bool IsCancelling() const;
     bool IsPaused() const;
+    double GetSpeedMultiplier() const;
     double GetProgress() const;
 
 private:
@@ -66,6 +68,7 @@ private:
     std::condition_variable m_Wake;
     State m_State = State::IDLE;
     bool m_IsQuitting = false;
+    double m_SpeedMultiplier = 1.0;
     Job m_Job;
     Delivery m_Delivery;
     RunControl m_Control;

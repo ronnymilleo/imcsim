@@ -58,6 +58,9 @@ struct RunMonitor {
     std::function<void(const TransientResult &chunk)> PostTransientChunk = nullptr;
     /// Simulated seconds after which a chunk ends, besides the clock interval; 0 ends chunks by the clock only.
     double ChunkSpan = 0.0;
+    /// Returns the simulated seconds for the next chunk when chunk length changes during a run, or empty to use
+    /// ChunkSpan.
+    std::function<double()> NextChunkSpan = nullptr;
     /// Called after each chunk with the simulated time reached; it may block, to pace a live run or hold it while
     /// paused, and returns false to stop the run.
     std::function<bool(double time)> AfterChunk = nullptr;

@@ -67,6 +67,7 @@ add_executable(imcsim-tests
             live_change_tests.cpp
             live_current_tests.cpp
             live_input_tests.cpp
+            live_pace_tests.cpp
             live_run_plan_tests.cpp
             logarithmic_level_tests.cpp
             logic_bus_definition_tests.cpp

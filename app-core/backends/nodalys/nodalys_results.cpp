@@ -79,12 +79,11 @@ std::string DescribeConstantTransfer(const PoleZeroSettings &settings, const int
 /**
  * @brief   Bridges an imcsim RunMonitor to a Nodalys::RunMonitor with live pacing, chunk streaming, and switch aliases.
  * @param[in]     monitor     Caller monitor callbacks and control handle.
- * @param[in,out] live_start  Wall-clock start time adjusted by pauses.
+ * @param[in,out] live_pacer  Incremental wall-clock pacer state.
  * @param[in]     circuit     Simulated circuit for top-level node count and switch element names.
  * @return  Configured Nodalys::RunMonitor.
  */
-Nodalys::RunMonitor
-ToNodalysMonitor(const RunMonitor &monitor, std::chrono::steady_clock::time_point &live_start, const Circuit &circuit) {
+Nodalys::RunMonitor ToNodalysMonitor(const RunMonitor &monitor, LivePacer &live_pacer, const Circuit &circuit) {
     const int node_count = circuit.GetNodeCount();
     Nodalys::RunMonitor nodalys_monitor;
     if (monitor.Control != nullptr) {
@@ -106,9 +105,12 @@ ToNodalysMonitor(const RunMonitor &monitor, std::chrono::steady_clock::time_poin
         };
     }
     if (monitor.LivePace > 0.0) {
-        nodalys_monitor.ChunkSpan = monitor.LivePace * LIVE_CHUNK_SECONDS;
-        nodalys_monitor.AfterChunk = [&monitor, &live_start](const double time) {
-            return KeepLivePace(live_start, time, monitor.LivePace, monitor.Control);
+        nodalys_monitor.ChunkSpan = GetLiveChunkDuration(monitor.LivePace, monitor.Control);
+        nodalys_monitor.NextChunkSpan = [&monitor]() {
+            return GetLiveChunkDuration(monitor.LivePace, monitor.Control);
+        };
+        nodalys_monitor.AfterChunk = [&monitor, &live_pacer](const double time) {
+            return KeepLivePace(live_pacer, time, monitor.LivePace, monitor.Control);
         };
     }
     if (monitor.OnChunk) {

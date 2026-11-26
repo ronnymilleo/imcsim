@@ -6,6 +6,8 @@
 
 #include "simulation/run_control.h"
 
+#include <algorithm>
+#include <cmath>
 #include <utility>
 
 namespace Core {
@@ -62,6 +64,22 @@ void RunControl::Resume() {
  */
 bool RunControl::IsPaused() const {
     return m_IsPaused;
+}
+
+/**
+ * @brief   Sets the live simulation speed multiplier, clamped strictly above zero.
+ * @param[in] multiplier  Speed multiplier (1.0 is normal live speed).
+ */
+void RunControl::SetSpeedMultiplier(const double multiplier) {
+    m_SpeedMultiplier = ClampSpeedMultiplier(multiplier);
+}
+
+/**
+ * @brief   Returns the live simulation speed multiplier.
+ * @return  Positive speed multiplier, 1.0 by default.
+ */
+double RunControl::GetSpeedMultiplier() const {
+    return m_SpeedMultiplier;
 }
 
 /**
@@ -125,10 +143,23 @@ void RunControl::Reset() {
     m_IsCancelled = false;
     m_IsDiscarded = false;
     m_IsPaused = false;
+    m_SpeedMultiplier = 1.0;
     m_Progress = 0.0;
     const std::lock_guard lock(m_MailboxMutex);
     m_Posted.clear();
     m_Changes.clear();
+}
+
+/**
+ * @brief   Clamps a live speed multiplier to a finite value at least MIN_SPEED_MULTIPLIER.
+ * @param[in] multiplier  Requested speed multiplier.
+ * @return  Clamped multiplier, or 1.0 when non-finite.
+ */
+double ClampSpeedMultiplier(const double multiplier) {
+    if (!std::isfinite(multiplier)) {
+        return 1.0;
+    }
+    return std::max(multiplier, MIN_SPEED_MULTIPLIER);
 }
 
 } // namespace Core
