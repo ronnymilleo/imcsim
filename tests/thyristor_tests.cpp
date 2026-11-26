@@ -164,6 +164,13 @@ TEST_CASE("A thyristor starts with the datasheet figures, and clones keep them",
     CHECK_FALSE(Core::Thyristor::IsValidParameters({.HoldingCurrent = 0.0}));
     CHECK_FALSE(Core::Thyristor::IsValidParameters({.GateTriggerCurrent = 0.0}));
     CHECK_FALSE(Core::Thyristor::IsValidParameters({.GateResistance = 0.0}));
+    CHECK_FALSE(Core::Thyristor::IsValidParameters({.CriticalDvDt = -1.0}));
+    CHECK_FALSE(Core::Thyristor::IsValidParameters({.TurnOffTime = -1.0}));
+    // The dv/dt and turn-off figures are kept like the rest, and zero disables each
+    part.SetParameters({.CriticalDvDt = 2e6, .TurnOffTime = 60e-6});
+    CHECK(part.GetParameters().CriticalDvDt == 2e6);
+    CHECK(part.GetParameters().TurnOffTime == 60e-6);
+    CHECK(Core::Thyristor::IsValidParameters(part.GetParameters()));
 }
 
 TEST_CASE("A thyristor reports the currents of its anode, cathode and gate", "[thyristor]") {

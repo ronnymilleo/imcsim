@@ -102,3 +102,31 @@ TEST_CASE("A waveform reaches Nodalys as it is, and an AC source starts at phase
     CHECK(Core::ToNodalys(contact)
           == Nodalys::SwitchParameters{.Threshold = 1.0, .Hysteresis = 0.2, .OnResistance = 0.5, .OffResistance = 1e6});
 }
+
+TEST_CASE("Every thyristor figure reaches Nodalys, including the dv/dt and turn-off figures",
+          "[parameter_conversion]") {
+    // Values unlike the defaults, so a figure left out or swapped with another shows
+    const Core::ThyristorParameters thyristor{.OnResistance = 0.02,
+                                              .OnThresholdVoltage = 1.1,
+                                              .OffResistance = 1e8,
+                                              .HoldingCurrent = 8e-3,
+                                              .GateTriggerCurrent = 2e-3,
+                                              .GateTriggerVoltage = 0.9,
+                                              .GateResistance = 50.0,
+                                              .BreakoverVoltage = 400.0,
+                                              .CriticalDvDt = 2e6,
+                                              .TurnOffTime = 60e-6,
+                                              .IsBidirectional = true};
+    CHECK(Core::ToNodalys(thyristor)
+          == Nodalys::ThyristorParameters{.OnResistance = 0.02,
+                                          .OnThresholdVoltage = 1.1,
+                                          .OffResistance = 1e8,
+                                          .HoldingCurrent = 8e-3,
+                                          .GateTriggerCurrent = 2e-3,
+                                          .GateTriggerVoltage = 0.9,
+                                          .GateResistance = 50.0,
+                                          .BreakoverVoltage = 400.0,
+                                          .CriticalDvDt = 2e6,
+                                          .TurnOffTime = 60e-6,
+                                          .IsBidirectional = true});
+}

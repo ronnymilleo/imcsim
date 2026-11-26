@@ -50,6 +50,8 @@ constexpr auto THYRISTOR_KEYS = std::to_array<ParameterKey<Core::ThyristorParame
     {"gate_trigger_voltage", &Core::ThyristorParameters::GateTriggerVoltage},
     {"gate_resistance", &Core::ThyristorParameters::GateResistance},
     {"breakover", &Core::ThyristorParameters::BreakoverVoltage},
+    {"critical_dvdt", &Core::ThyristorParameters::CriticalDvDt},
+    {"turn_off_time", &Core::ThyristorParameters::TurnOffTime},
 });
 
 constexpr auto RELAY_KEYS = std::to_array<ParameterKey<Core::RelayParameters>>({
