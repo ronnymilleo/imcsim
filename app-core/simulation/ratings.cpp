@@ -9,15 +9,31 @@
 #include "circuit/components/bjt.h"
 #include "circuit/components/diode.h"
 #include "circuit/components/mosfet.h"
+#include "circuit/components/thyristor.h"
 #include "simulation/fuse_state.h"
 #include "spice/spice_value.h"
 #include <algorithm>
+#include <cmath>
 #include <format>
 #include <iterator>
 
 namespace Core {
 
 namespace {
+
+/// Span a datasheet I2t for fusing is given over: one half-cycle of 50 Hz mains, in seconds.
+constexpr double I2T_WINDOW_SECONDS = 10e-3;
+
+bool IsThyristor(const ComponentType type) {
+    return type == ComponentType::THYRISTOR || type == ComponentType::TRIAC;
+}
+
+/**
+ * @brief   True for the parts other than diodes that carry datasheet ratings.
+ */
+bool IsRatedSwitch(const ComponentType type) {
+    return IsBJT(type) || IsMOSFET(type) || IsThyristor(type);
+}
 
 /**
  * @brief   Zeners work in breakdown, but other diodes only reach it when the circuit exceeds their rating, which
@@ -121,19 +137,70 @@ double AveragePower(const std::vector<double> &times, const TerminalWaveforms &t
     return energy / (times.back() - times.front());
 }
 
-void AddRatingWarning(const Component &part,
-                      const char *model_name,
+/**
+ * @brief   Root mean square of a waveform over the run, time-weighted; a single point, as in .op, is its own RMS.
+ * @details TRIAC datasheets rate the on-state current as IT(RMS), since a current that flows both ways averages near
+ *          zero.
+ */
+double RootMeanSquare(const std::vector<double> &times, const std::vector<double> &values) {
+    if (times.size() < 2) {
+        return values.empty() ? 0.0 : std::abs(values.front());
+    }
+    double integral = 0.0;
+    for (std::size_t index = 1; index < times.size(); ++index) {
+        integral += (values[index] * values[index] + values[index - 1] * values[index - 1]) / 2.0
+                  * (times[index] - times[index - 1]);
+    }
+    return std::sqrt(integral / (times.back() - times.front()));
+}
+
+/**
+ * @brief   Largest integral of the squared current over any span of the run no longer than the window.
+ * @details A datasheet gives the I2t for fusing over one half-cycle of the mains, so a long run of a steady current is
+ *          judged on the heat of one window, not of the whole run. A run shorter than the window is judged whole, and
+ *          a single point, as in .op, has no I2t.
+ */
+double HighestI2t(const std::vector<double> &times, const std::vector<double> &currents, const double window_seconds) {
+    // The integral from the start to each point, so the integral over a span is a difference
+    std::vector<double> cumulative(times.size(), 0.0);
+    for (std::size_t index = 1; index < times.size(); ++index) {
+        cumulative[index] = cumulative[index - 1]
+                          + (currents[index] * currents[index] + currents[index - 1] * currents[index - 1]) / 2.0
+                                * (times[index] - times[index - 1]);
+    }
+    double highest = 0.0;
+    std::size_t first = 0;
+    for (std::size_t last = 1; last < times.size(); ++last) {
+        while (times[last] - times[first] > window_seconds) {
+            ++first;
+        }
+        highest = std::max(highest, cumulative[last] - cumulative[first]);
+    }
+    return highest;
+}
+
+/**
+ * @brief   Names a part in a rating warning, with its model when it has one, such as "D1 (1N4148)".
+ */
+std::string DescribeRatedPart(const Component &part, const char *model_name) {
+    return std::format("{} ({})", part.GetName(), model_name);
+}
+
+/**
+ * @brief   Adds a warning when a value exceeds its rating; a rating of zero is one the part leaves unset, and is not
+ *          checked.
+ */
+void AddRatingWarning(const std::string_view part_label,
                       const std::string_view quantity,
                       const double value,
                       const double rating,
                       const std::string_view unit,
                       std::vector<std::string> &warnings) {
-    if (value <= rating) {
+    if (rating <= 0.0 || value <= rating) {
         return;
     }
-    warnings.push_back(std::format("{} ({}) exceeds its {} rating: {}{} against {}{}",
-                                   part.GetName(),
-                                   model_name,
+    warnings.push_back(std::format("{} exceeds its {} rating: {}{} against {}{}",
+                                   part_label,
                                    quantity,
                                    FormatValue(value),
                                    unit,
@@ -142,84 +209,138 @@ void AddRatingWarning(const Component &part,
 }
 
 /**
- * @brief   Checks a diode or a transistor against its datasheet ratings, which ngspice knows nothing about.
+ * @brief   Checks a diode on the average of its forward current and of its power.
+ * @details The forward current is the one into the anode, so a Zener in reverse breakdown is judged on power alone.
+ */
+std::vector<std::string>
+DiodeRatingWarnings(const Diode &diode, const std::vector<double> &times, const TerminalWaveforms &terminals) {
+    std::vector<std::string> warnings;
+    const DiodeParameters &ratings = diode.GetParameters();
+    const std::string label = DescribeRatedPart(diode, diode.GetModelName());
+    AddRatingWarning(label,
+                     "average forward current",
+                     AverageForwardCurrent(times, terminals.Currents[0]),
+                     ratings.MaxForwardCurrent,
+                     "A",
+                     warnings);
+    AddRatingWarning(label,
+                     "power",
+                     AveragePower(times, AcrossAnodeAndCathode(terminals)),
+                     ratings.MaxPower,
+                     "W",
+                     warnings);
+    return warnings;
+}
+
+/**
+ * @brief   Checks a BJT on its peak VCE and IC and its average power.
+ */
+std::vector<std::string>
+BJTRatingWarnings(const BJT &bjt, const std::vector<double> &times, const TerminalWaveforms &terminals) {
+    std::vector<std::string> warnings;
+    const BJTParameters &ratings = bjt.GetParameters();
+    const std::string label = DescribeRatedPart(bjt, bjt.GetModelName());
+    const std::vector<std::vector<double>> &voltages = terminals.Voltages;
+    AddRatingWarning(label,
+                     "VCE",
+                     PeakVoltageBetween(voltages[0], voltages[2]),
+                     ratings.MaxCollectorEmitterVoltage,
+                     "V",
+                     warnings);
+    AddRatingWarning(label, "IC", PeakMagnitude(terminals.Currents[0]), ratings.MaxCollectorCurrent, "A", warnings);
+    AddRatingWarning(label, "power", AveragePower(times, terminals), ratings.MaxPower, "W", warnings);
+    return warnings;
+}
+
+/**
+ * @brief   Checks a MOSFET on its peak VDS, VGS and ID and its average power.
+ */
+std::vector<std::string>
+MOSFETRatingWarnings(const MOSFET &mosfet, const std::vector<double> &times, const TerminalWaveforms &terminals) {
+    std::vector<std::string> warnings;
+    const MOSFETParameters &ratings = mosfet.GetParameters();
+    const std::string label = DescribeRatedPart(mosfet, mosfet.GetModelName());
+    const std::vector<std::vector<double>> &voltages = terminals.Voltages;
+    AddRatingWarning(label,
+                     "VDS",
+                     PeakVoltageBetween(voltages[0], voltages[2]),
+                     ratings.MaxDrainSourceVoltage,
+                     "V",
+                     warnings);
+    AddRatingWarning(label,
+                     "VGS",
+                     PeakVoltageBetween(voltages[1], voltages[2]),
+                     ratings.MaxGateSourceVoltage,
+                     "V",
+                     warnings);
+    AddRatingWarning(label, "ID", PeakMagnitude(terminals.Currents[0]), ratings.MaxDrainCurrent, "A", warnings);
+    AddRatingWarning(label, "power", AveragePower(times, terminals), ratings.MaxPower, "W", warnings);
+    return warnings;
+}
+
+/**
+ * @brief   Checks a thyristor (SCR) or TRIAC on the ratings it sets: the peak off-state voltage, the on-state current
+ *          (the average forward current of an SCR, the RMS current of a TRIAC), the peak surge current and the I2t
+ *          over a mains half-cycle, all read from the main current, the one into the anode or MT2.
+ * @details The part has no model name, so the warning names it alone. An SCR's one voltage rating stands for both
+ *          VDRM and VRRM, which datasheets mostly give equal, and is checked on the peak either way.
+ */
+std::vector<std::string> ThyristorRatingWarnings(const Thyristor &thyristor,
+                                                 const std::vector<double> &times,
+                                                 const TerminalWaveforms &terminals) {
+    std::vector<std::string> warnings;
+    const ThyristorParameters &ratings = thyristor.GetParameters();
+    const std::string &label = thyristor.GetName();
+    const std::vector<double> &main_current = terminals.Currents[0];
+    const bool is_triac = ratings.IsBidirectional;
+    AddRatingWarning(label,
+                     is_triac ? "VDRM" : "VDRM/VRRM",
+                     PeakVoltageBetween(terminals.Voltages[0], terminals.Voltages[1]),
+                     ratings.MaxRepetitivePeakVoltage,
+                     "V",
+                     warnings);
+    AddRatingWarning(label,
+                     is_triac ? "IT(RMS)" : "IT(AV)",
+                     is_triac ? RootMeanSquare(times, main_current) : AverageForwardCurrent(times, main_current),
+                     ratings.MaxOnStateCurrent,
+                     "A",
+                     warnings);
+    AddRatingWarning(label, "ITSM", PeakMagnitude(main_current), ratings.MaxSurgeCurrent, "A", warnings);
+    AddRatingWarning(label,
+                     "I2t",
+                     HighestI2t(times, main_current, I2T_WINDOW_SECONDS),
+                     ratings.MaxI2t,
+                     "A2s",
+                     warnings);
+    return warnings;
+}
+
+/**
+ * @brief   Checks a diode, a transistor or a thyristor against its datasheet ratings, which ngspice knows nothing
+ *          about.
  * @details Voltages and the currents of transistors are checked at their peak, and power and the forward current of
  *          a diode on average.
  */
 std::vector<std::string>
 RatingWarnings(const Component &part, const std::vector<double> &times, const TerminalWaveforms &terminals) {
-    std::vector<std::string> warnings;
     // A library model carries no datasheet ratings, only the parameters ngspice reads
     if (part.HasLibraryModel()) {
-        return warnings;
+        return {};
     }
-    const std::vector<std::vector<double>> &voltages = terminals.Voltages;
-    if (IsDiode(part.GetType())) {
-        const auto &diode = static_cast<const Diode &>(part);
-        const DiodeParameters &ratings = diode.GetParameters();
-        const char *model = diode.GetModelName();
-        // The forward current is the one into the anode, so a Zener in reverse breakdown is judged on power alone
-        AddRatingWarning(part,
-                         model,
-                         "average forward current",
-                         AverageForwardCurrent(times, terminals.Currents[0]),
-                         ratings.MaxForwardCurrent,
-                         "A",
-                         warnings);
-        AddRatingWarning(part,
-                         model,
-                         "power",
-                         AveragePower(times, AcrossAnodeAndCathode(terminals)),
-                         ratings.MaxPower,
-                         "W",
-                         warnings);
-    } else if (IsBJT(part.GetType())) {
-        const auto &bjt = static_cast<const BJT &>(part);
-        const BJTParameters &ratings = bjt.GetParameters();
-        const char *model = bjt.GetModelName();
-        AddRatingWarning(part,
-                         model,
-                         "VCE",
-                         PeakVoltageBetween(voltages[0], voltages[2]),
-                         ratings.MaxCollectorEmitterVoltage,
-                         "V",
-                         warnings);
-        AddRatingWarning(part,
-                         model,
-                         "IC",
-                         PeakMagnitude(terminals.Currents[0]),
-                         ratings.MaxCollectorCurrent,
-                         "A",
-                         warnings);
-        AddRatingWarning(part, model, "power", AveragePower(times, terminals), ratings.MaxPower, "W", warnings);
-    } else if (IsMOSFET(part.GetType())) {
-        const auto &mosfet = static_cast<const MOSFET &>(part);
-        const MOSFETParameters &ratings = mosfet.GetParameters();
-        const char *model = mosfet.GetModelName();
-        AddRatingWarning(part,
-                         model,
-                         "VDS",
-                         PeakVoltageBetween(voltages[0], voltages[2]),
-                         ratings.MaxDrainSourceVoltage,
-                         "V",
-                         warnings);
-        AddRatingWarning(part,
-                         model,
-                         "VGS",
-                         PeakVoltageBetween(voltages[1], voltages[2]),
-                         ratings.MaxGateSourceVoltage,
-                         "V",
-                         warnings);
-        AddRatingWarning(part,
-                         model,
-                         "ID",
-                         PeakMagnitude(terminals.Currents[0]),
-                         ratings.MaxDrainCurrent,
-                         "A",
-                         warnings);
-        AddRatingWarning(part, model, "power", AveragePower(times, terminals), ratings.MaxPower, "W", warnings);
+    const ComponentType type = part.GetType();
+    if (IsDiode(type)) {
+        return DiodeRatingWarnings(static_cast<const Diode &>(part), times, terminals);
     }
-    return warnings;
+    if (IsBJT(type)) {
+        return BJTRatingWarnings(static_cast<const BJT &>(part), times, terminals);
+    }
+    if (IsMOSFET(type)) {
+        return MOSFETRatingWarnings(static_cast<const MOSFET &>(part), times, terminals);
+    }
+    if (IsThyristor(type)) {
+        return ThyristorRatingWarnings(static_cast<const Thyristor &>(part), times, terminals);
+    }
+    return {};
 }
 
 /**
@@ -256,7 +377,8 @@ TerminalWaveforms TransientTerminals(const CircuitEntry &entry, const Transient 
 
 /**
  * @brief   Adds the warnings an operating point earns: diodes in reverse breakdown or past their forward current or
- *          power ratings, and transistors past their voltage, current or power ratings.
+ *          power ratings, transistors past their voltage, current or power ratings, and thyristors past the voltage,
+ *          on-state current or surge current they are rated for.
  * @param[in] circuit  Circuit the result is of.
  * @param[in,out] result  Operating point to add the warnings to; its currents must include every probed current of
  *                        the circuit.
@@ -275,7 +397,7 @@ void AddRatingWarnings(const Circuit &circuit, OperatingPoint &result) {
         }
     }
     for (const CircuitEntry &entry : circuit.GetEntries()) {
-        if (IsBJT(entry.Part->GetType()) || IsMOSFET(entry.Part->GetType())) {
+        if (IsRatedSwitch(entry.Part->GetType())) {
             std::ranges::move(RatingWarnings(*entry.Part, {0.0}, OperatingPointTerminals(entry, result)),
                               std::back_inserter(result.Warnings));
         }
@@ -283,8 +405,9 @@ void AddRatingWarnings(const Circuit &circuit, OperatingPoint &result) {
 }
 
 /**
- * @brief   Adds the warnings a transient earns, with voltages and transistor currents checked at their peak, and power
- * and diode forward current on average, and the time each fuse blew.
+ * @brief   Adds the warnings a transient earns, with voltages and transistor and surge currents checked at their peak,
+ *          power and the forward current of diodes and SCRs on average, the current of a TRIAC as its RMS, the I2t of
+ *          a thyristor over the worst mains half-cycle, and the time each fuse blew.
  * @param[in] circuit  Circuit the result is of.
  * @param[in,out] result  Transient to add the warnings to; its currents must include every probed current of the
  *                        circuit.
@@ -307,7 +430,7 @@ void AddRatingWarnings(const Circuit &circuit, Transient &result) {
         }
     }
     for (const CircuitEntry &entry : circuit.GetEntries()) {
-        if (IsBJT(entry.Part->GetType()) || IsMOSFET(entry.Part->GetType())) {
+        if (IsRatedSwitch(entry.Part->GetType())) {
             std::ranges::move(RatingWarnings(*entry.Part, result.Times, TransientTerminals(entry, result)),
                               std::back_inserter(result.Warnings));
         }

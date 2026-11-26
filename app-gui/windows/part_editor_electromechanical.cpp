@@ -47,6 +47,10 @@ constexpr auto THYRISTOR_FIELDS = std::to_array<ParameterField<Core::ThyristorPa
     {"VBO", &Core::ThyristorParameters::BreakoverVoltage, "V"},
     {"dv/dt", &Core::ThyristorParameters::CriticalDvDt, "V/s"},
     {"tq", &Core::ThyristorParameters::TurnOffTime, "s"},
+    {"VDRM", &Core::ThyristorParameters::MaxRepetitivePeakVoltage, "V"},
+    {"IT max", &Core::ThyristorParameters::MaxOnStateCurrent, "A"},
+    {"ITSM", &Core::ThyristorParameters::MaxSurgeCurrent, "A"},
+    {"I2t", &Core::ThyristorParameters::MaxI2t, "A2s"},
 });
 
 constexpr auto DIAC_FIELDS = std::to_array<ParameterField<Core::DiacParameters>>({
@@ -206,6 +210,8 @@ void DrawThyristor(Core::Thyristor &thyristor, ElectromechanicalFields &fields, 
     ImGui::TextDisabled("On Nodalys every figure is a parameter; on ngspice only RG and RT are, and IH, IGT and V0"
                         " follow from the transistor pair");
     ImGui::TextDisabled("VBO, dv/dt firing and the turn-off time tq run on Nodalys only; 0 disables each");
+    ImGui::TextDisabled("VDRM, IT max (%s), ITSM and I2t are ratings the run is checked against; 0 skips each",
+                        is_triac ? "the RMS current" : "the average forward current");
 }
 
 /**

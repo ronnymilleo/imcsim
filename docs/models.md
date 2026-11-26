@@ -239,9 +239,8 @@ blows when the heat reaches 1.015, a margin above the 1 that the rated current s
   or sigmoid: the heat follows the equation above exactly, the fuse opens when it reaches 1.015, and the resistance
   goes from cold to blown over a ten-thousandth of `tau`. Its blow time matches the closed form, and ngspice sits within
   3% of it, up to 1.7% earlier close to the threshold, where the sigmoid of its latch starts to open the fuse a little
-  before 1.015. A circuit with a fuse runs with the Gear integration on both. Nodalys writes no rating warnings, so the
-  "blew at" text of the Output window is not added to its results; the schematic and its flash read the blow from the
-  results and show it.
+  before 1.015. A circuit with a fuse runs with the Gear integration on both. The "blew at" warning is read from the
+  results, so both engines give it, and the schematic and its flash read the blow from the results the same way.
 - A fuse is a model of the thermal state, not of the arc: there is no breaking capacity, arc voltage or voltage rating,
   no temperature dependence of the cold resistance, and the part carries a current through its probe like a switch.
   In a noise analysis the model adds none.
@@ -266,6 +265,14 @@ and terminal 3 the gate. The part has no value; you set the figures a datasheet 
   voltage re-applied inside the window fires it again, which is the commutation failure of a forced-commutated
   circuit. A voltage already applied when the device releases does not re-fire it, so the natural commutation of a
   rectifier still lands.
+- **Ratings** (0 = not checked, the default): the repetitive peak off-state voltage `VDRM`, taken as `VRRM` too and
+  checked on the peak either way; the on-state current **IT max**, the average forward current `IT(AV)`; the
+  non-repetitive surge `ITSM`, checked on the peak of the anode current; and the `I2t` for fusing, checked on the
+  largest integral of the squared anode current over any 10 ms of the run (one half-cycle of 50 Hz mains, which a
+  datasheet gives it over; a run shorter than that is judged whole, and an operating point has none). No engine
+  reads them: imcsim checks the results of an operating point or a transient against them, on both engines, and
+  warns "SCR1 exceeds its IT(AV) rating: 12A against 8A". The surge rating is a single-event limit, so a circuit
+  that only reaches it once at start-up still earns the warning.
 
 Nodalys simulates it as one device whose state is a latch, so every figure is a parameter and the commutation is
 landed on exactly. ngspice runs the `imcsim_scr` subcircuit, a PNP and an NPN with the collector of each into the
@@ -327,6 +334,9 @@ Nodalys, and there is no breakover on ngspice.
   recovery window re-fires it, on Nodalys only as for the SCR. The other limits also apply: no separate latching
   current, no reverse recovery and no temperature dependence. Every run starts blocking, and a harmonic balance and
   a pole-zero are refused with the reason.
+- **Ratings** are those of the SCR, but the on-state current **IT max** is `IT(RMS)`, the time-weighted RMS of the MT2
+  current over the run, since a current that flows both ways averages near zero; `VDRM`, `ITSM` and `I2t` read the
+  magnitude, whichever way it flows.
 
 ### DIACs
 
