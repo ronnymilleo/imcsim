@@ -61,6 +61,7 @@ add_executable(imcsim-tests
             hovered_value_tests.cpp
             initial_voltages_tests.cpp
             led_glow_tests.cpp
+            line_geometry_tests.cpp
             live_change_tests.cpp
             live_current_tests.cpp
             live_input_tests.cpp

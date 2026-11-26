@@ -63,6 +63,7 @@ add_library(imcsim-core-lib
             circuit/components/voltage_controlled_switch.cpp
             circuit/components/voltage_source.cpp
             circuit/library_model.cpp
+            circuit/line_geometry.cpp
             circuit/netlist_logic.cpp
             circuit/netlist_sources.cpp
             circuit/netlist_subcircuits.cpp
