@@ -75,6 +75,15 @@ double ThyristorDevice::GateCurrent(const std::vector<double> &x) const {
 }
 
 /**
+ * @brief   Reads a figure the way the device does: on the magnitude for a TRIAC, on the signed value for an SCR.
+ * @param[in] value  Voltage, current or slope to read.
+ * @return  The absolute value for a TRIAC, the value itself for an SCR.
+ */
+double ThyristorDevice::Magnitude(const double value) const {
+    return m_Parameters.IsBidirectional ? std::fabs(value) : value;
+}
+
+/**
  * @brief   The rate at which the main-terminal voltage rises from the last accepted point to the current iterate.
  * @param[in] voltage  Main-terminal voltage of the iterate, in Volts.
  * @return  The slope in Volts per second, or zero when no time has passed since the accepted point, as in a
@@ -86,12 +95,59 @@ double ThyristorDevice::VoltageSlope(const double voltage) const {
 }
 
 /**
+ * @brief   Reports whether the gate of the iterate sustains conduction.
+ * @param[in] x  Current Newton iterate.
+ * @return  True when the gate draws at least the trigger current, of either polarity for a TRIAC.
+ */
+bool ThyristorDevice::IsGateOn(const std::vector<double> &x) const {
+    return Magnitude(GateCurrent(x)) >= m_Parameters.GateTriggerCurrent;
+}
+
+/**
+ * @brief   Reports whether the main-terminal voltage of the iterate moves faster than the critical dv/dt.
+ * @param[in] vak  Main-terminal voltage of the iterate, in Volts.
+ * @return  True when the slope from the last accepted point reaches the critical rate, of either sign for a
+ *          TRIAC; false when the figure is disabled.
+ */
+bool ThyristorDevice::IsPastCriticalDvDt(const double vak) const {
+    return m_Parameters.CriticalDvDt > 0.0 && Magnitude(VoltageSlope(vak)) >= m_Parameters.CriticalDvDt;
+}
+
+/**
+ * @brief   Decides whether a blocking device fires at the iterate.
+ * @param[in] x              Current Newton iterate.
+ * @param[in] is_recovering  Whether the turn-off recovery window is running.
+ * @return  True on gate current, which an SCR only takes with a forward voltage, on breakover, on the dv/dt
+ *          latch of the step, or on a voltage re-applied while recovering.
+ */
+bool ThyristorDevice::ShouldFire(const std::vector<double> &x, const bool is_recovering) const {
+    const ThyristorParameters &p = m_Parameters;
+    const double vak = BranchVoltage(x, m_Anode, m_Cathode);
+    const double blocking = Magnitude(vak);
+    const bool is_gate_fired = IsGateOn(x) && (p.IsBidirectional || vak > 0.0);
+    const bool is_breakover = p.BreakoverVoltage > 0.0 && blocking >= p.BreakoverVoltage;
+    const bool is_refired =
+        is_recovering && blocking > p.OnThresholdVoltage && Magnitude(m_Accepted.Voltage) <= p.OnThresholdVoltage;
+    return is_gate_fired || is_breakover || m_IsDvDtFired || is_refired;
+}
+
+/**
+ * @brief   Decides whether a conducting device releases at the iterate.
+ * @param[in] x              Current Newton iterate.
+ * @param[in] is_recovering  Whether the turn-off recovery window is running, which suspends the release.
+ * @return  True when the gate is gone, the main current is below the holding current, the recovery window has
+ *          closed and the dv/dt latch of the step is not sustaining conduction.
+ */
+bool ThyristorDevice::ShouldRelease(const std::vector<double> &x, const bool is_recovering) const {
+    const bool is_held = Magnitude(MainCurrent(x)) >= m_Parameters.HoldingCurrent;
+    return !IsGateOn(x) && !is_held && !is_recovering && !m_IsDvDtFired;
+}
+
+/**
  * @brief   Fires the latch on gate current, breakover, a fast voltage rise or a re-applied voltage during the
  *          recovery, and releases it below the holding current.
- * @details While the gate keeps drawing at least the trigger current it sustains conduction whatever the main
- *          current; with the gate removed the latch holds only while the main current stays above the holding
- *          current. The latch itself is the hysteresis: once released, only a new gate pulse, breakover, a rise
- *          faster than the critical dv/dt or the recovery window fires again.
+ * @details The latch itself is the hysteresis: once released, only a new gate pulse, breakover, a rise faster
+ *          than the critical dv/dt or the recovery window fires again.
  *
  *          A rise faster than the critical dv/dt, read from the last accepted point to the iterate, latches for
  *          the rest of the step: it fires a blocking device and sustains conduction like a gate drive does, so
@@ -103,40 +159,21 @@ double ThyristorDevice::VoltageSlope(const double voltage) const {
  *          above the threshold when the device releases does not re-fire it, so the natural commutation of a
  *          rectifier still lands. While the window runs the device has not regained its blocking, so the
  *          holding-current release is suspended until it closes.
- *
- *          A TRIAC fires on gate current of either polarity, on breakover, on a rise and on a re-applied voltage
- *          of either sign, all read on the magnitudes, and releases when the magnitude of the main current falls
- *          below the holding current.
+ * @param[in] x  Current Newton iterate.
  */
 void ThyristorDevice::UpdateState(const std::vector<double> &x) {
-    const ThyristorParameters &p = m_Parameters;
-    const double vak = BranchVoltage(x, m_Anode, m_Cathode);
-    const double gate = GateCurrent(x);
-    // The figures a TRIAC reads on the magnitude, and an SCR on the signed value
-    const double blocking = p.IsBidirectional ? std::fabs(vak) : vak;
-    const bool is_gate_on = p.IsBidirectional ? std::fabs(gate) >= p.GateTriggerCurrent : gate >= p.GateTriggerCurrent;
     const bool is_recovering = m_StampTime < m_RecoveryEnds;
-    const double slope = VoltageSlope(vak);
-    const bool is_past_critical = p.IsBidirectional ? std::fabs(slope) >= p.CriticalDvDt : slope >= p.CriticalDvDt;
-    if (m_IsStep && p.CriticalDvDt > 0.0 && is_past_critical) {
+    if (m_IsStep && IsPastCriticalDvDt(BranchVoltage(x, m_Anode, m_Cathode))) {
         m_IsDvDtFired = true;
     }
     if (m_IsConducting) {
-        const double main_current = MainCurrent(x);
-        const bool is_held =
-            p.IsBidirectional ? std::fabs(main_current) >= p.HoldingCurrent : main_current >= p.HoldingCurrent;
-        if (!is_gate_on && !is_held && !is_recovering && !m_IsDvDtFired) {
+        if (ShouldRelease(x, is_recovering)) {
             m_IsConducting = false;
-            m_RecoveryEnds = m_StampTime + p.TurnOffTime;
+            m_RecoveryEnds = m_StampTime + m_Parameters.TurnOffTime;
         }
         return;
     }
-    const bool is_gate_fired = p.IsBidirectional ? is_gate_on : vak > 0.0 && is_gate_on;
-    const bool is_breakover = p.BreakoverVoltage > 0.0 && blocking >= p.BreakoverVoltage;
-    const double accepted_blocking = p.IsBidirectional ? std::fabs(m_Accepted.Voltage) : m_Accepted.Voltage;
-    const bool is_refired =
-        is_recovering && blocking > p.OnThresholdVoltage && accepted_blocking <= p.OnThresholdVoltage;
-    if (is_gate_fired || is_breakover || m_IsDvDtFired || is_refired) {
+    if (ShouldFire(x, is_recovering)) {
         m_IsConducting = true;
     }
 }

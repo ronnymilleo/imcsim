@@ -90,7 +90,12 @@ private:
 
     double MainCurrent(const std::vector<double> &x) const;
     double GateCurrent(const std::vector<double> &x) const;
+    double Magnitude(double value) const;
     double VoltageSlope(double voltage) const;
+    bool IsGateOn(const std::vector<double> &x) const;
+    bool IsPastCriticalDvDt(double vak) const;
+    bool ShouldFire(const std::vector<double> &x, bool is_recovering) const;
+    bool ShouldRelease(const std::vector<double> &x, bool is_recovering) const;
     void UpdateState(const std::vector<double> &x);
     void StampBranch(MnaSystem &sys, const std::vector<double> &x) const;
     void StampGate(MnaSystem &sys, const std::vector<double> &x) const;
