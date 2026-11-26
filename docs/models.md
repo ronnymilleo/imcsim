@@ -327,6 +327,27 @@ Nodalys, and there is no breakover on ngspice.
   current, no reverse recovery and no temperature dependence. Every run starts blocking, and a harmonic balance and
   a pole-zero are refused with the reason.
 
+### DIACs
+
+A DIAC is the trigger diode of a light dimmer: two terminals, MT2 (terminal 1) and MT1 (terminal 2), and no gate. It
+blocks either way until the magnitude of its voltage reaches the breakover voltage `VBO`, then snaps back onto the
+on-state line `V0 + RT * I`, mirrored about zero, and holds until the magnitude of its current falls below the holding
+current `IH`. The datasheet snapback `dV` is `VBO - V0`. The defaults are those of a DB3: 32 V breakover, a 5 V
+snapback (`V0` = 27 V), `RT` = 10 Ohm, 1 mA holding and 1 GOhm blocking. The figures must keep the release,
+`V0 + RT * IH`, below the breakover, so the device snaps back when it fires.
+
+Nodalys simulates it as the latching device of the TRIAC with its gate tied to MT1, so only the breakover fires it,
+and it reports one current, into MT2, as a two-terminal part does. **ngspice refuses it**: the netlist writes it as the
+`imcsim_diac` subcircuit (a switch with hysteresis on the magnitude of the voltage that turns the on-state line on and
+off), which the Netlist window shows and exports, but the TRIAC that a DIAC triggers does not block at mains voltage on
+ngspice. A harmonic balance and a pole-zero are refused as for the TRIAC.
+
+- **The DIAC-triggered TRIAC dimmer** of the Switching examples runs on a 120 V, 60 Hz line: R2 and C1 across the
+  TRIAC delay the voltage the DIAC sees, the DIAC breaks over at 32 V and dumps a pulse of the capacitor's charge into
+  the gate, and the TRIAC fires at the same angle of both half-cycles, about 2.7 ms after each zero crossing.
+- An oscillator built on a DIAC has no operating point, since the DIAC fires and releases around it: start its supply
+  from 0 V, with a pulse or a ramp, as the examples do.
+
 ## Transformers
 A transformer is two inductors coupled by a SPICE `K` element: `L-T1p` and `L-T1s`, each behind a resistor for its
 winding (`R-T1p`, `R-T1s`). Its value is the primary inductance; the secondary's is that divided by the square of the
