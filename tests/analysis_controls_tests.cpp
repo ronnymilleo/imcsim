@@ -1282,3 +1282,27 @@ TEST_CASE(
     CHECK(results.GetSensitivity().has_value());
     CHECK_FALSE(results.GetACSensitivity().has_value());
 }
+
+TEST_CASE("AnalysisControls exposes and clamps the live speed multiplier across runs", "[analysis_controls][live]") {
+    GUI::Schematic schematic;
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
+    OpenRCFilter(schematic);
+    SelectLiveTransient(schematic);
+    GUI::AnalysisControls controls(schematic, results);
+
+    CHECK(controls.GetSpeedMultiplier() == 1.0);
+    controls.SetSpeedMultiplier(0.0);
+    CHECK(controls.GetSpeedMultiplier() > 0.0);
+    controls.SetSpeedMultiplier(2.0);
+    CHECK(controls.GetSpeedMultiplier() == 2.0);
+
+    controls.SetLiveMode(true);
+    controls.RunSelected();
+    REQUIRE(UpdateUntil(controls, [&] { return ReachedTime(results) > 0.0; }));
+    controls.SetSpeedMultiplier(5.0);
+    CHECK(controls.GetSpeedMultiplier() == 5.0);
+    controls.DiscardLive();
+    REQUIRE(UpdateUntil(controls, [&] { return !controls.GetRunningAnalysis(); }));
+    CHECK(controls.GetSpeedMultiplier() == 5.0);
+}

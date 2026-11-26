@@ -9,6 +9,8 @@
 #include "analysis/analysis_controls.h"
 #include "analysis/analysis_settings_panel.h"
 #include "circuit/components/component.h"
+#include "results/playback.h"
+#include "results/result_store.h"
 #include "schematic/editor_command.h"
 #include "schematic/editor_mode.h"
 #include "schematic/schematic.h"
@@ -37,7 +39,11 @@ struct ToolbarRequest {
  */
 class EditorToolbar {
 public:
-    EditorToolbar(AnalysisControls &controls, AnalysisSettingsPanel &settings_panel, const Schematic &root_schematic);
+    EditorToolbar(AnalysisControls &controls,
+                  AnalysisSettingsPanel &settings_panel,
+                  const Schematic &root_schematic,
+                  const ResultStore &results,
+                  TransientPlayback &playback);
 
     ToolbarRequest Draw(const EditorMode &mode,
                         const Schematic &schematic,
@@ -50,9 +56,14 @@ private:
     AnalysisSettingsPanel &m_SettingsPanel;
     /// The document, whose simulation settings name the analysis Run starts.
     const Schematic &m_RootSchematic;
+    /// Results of the document, read for the live run time readout.
+    const ResultStore &m_Results;
+    /// Shared playback speed kept in sync with the live simulation controls.
+    TransientPlayback &m_Playback;
 
     // Simulation
     void DrawRunControls(float run_left, float row_top, bool is_editing_block);
+    void DrawLiveTimeReadout() const;
     void DrawRunButton();
     void DrawAnalysisButton();
     void DrawLiveToggle();

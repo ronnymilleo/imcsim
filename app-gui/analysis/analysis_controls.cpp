@@ -279,6 +279,22 @@ bool AnalysisControls::IsLiveResult() const {
 }
 
 /**
+ * @brief   Sets the speed multiplier for the current live run and future live runs.
+ * @param[in] multiplier  Speed multiplier, clamped strictly above zero.
+ */
+void AnalysisControls::SetSpeedMultiplier(const double multiplier) {
+    m_Service.SetSpeedMultiplier(multiplier);
+}
+
+/**
+ * @brief   Returns the current live speed multiplier.
+ * @return  Positive speed multiplier, 1.0 by default.
+ */
+double AnalysisControls::GetSpeedMultiplier() const {
+    return m_Service.GetSpeedMultiplier();
+}
+
+/**
  * @brief   Returns the analysis that ran last.
  * @return  The analysis, or no value before the first run.
  */

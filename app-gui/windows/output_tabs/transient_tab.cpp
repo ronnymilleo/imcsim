@@ -5,6 +5,7 @@
 
 #include "windows/output_tabs/transient_tab.h"
 
+#include "analysis/run_status.h"
 #include "base/node_colors.h"
 #include "base/theme.h"
 #include "imgui_internal.h"
@@ -19,6 +20,7 @@
 #include "windows/output_tabs/plot_widgets.h"
 #include "windows/output_tabs/statistics_widgets.h"
 #include "windows/output_tabs/step_widgets.h"
+#include "windows/speed_selector.h"
 #include <algorithm>
 #include <array>
 #include <expected>
@@ -111,8 +113,8 @@ void TransientTab::Draw(const FrameResults &frame) {
                 DrawPlots(shown, frame.TransientMath, frame.StepWindows, layout);
             }
             ImGui::EndChild();
-            if (has_playback) {
-                DrawPlaybackBar(m_Playback, shown.Times.front(), shown.Times.back());
+            if (has_playback && DrawPlaybackBar(m_Playback, shown.Times.front(), shown.Times.back())) {
+                m_Controls.SetSpeedMultiplier(m_Playback.Speed);
             }
         },
         [&] { DrawStatistics(*frame.TransientWindow, frame.TransientMath, layout); });
@@ -217,13 +219,17 @@ void TransientTab::DrawLiveRunControls(const Core::Transient &transient) {
     if (ImGui::Button("Discard")) {
         m_Controls.DiscardLive();
     }
+    ImGui::SameLine();
+    if (DrawSpeedSelector("##live_tab_speed", m_Playback.Speed, "Live simulation speed")) {
+        m_Controls.SetSpeedMultiplier(m_Playback.Speed);
+    }
     ImGui::EndDisabled();
     ImGui::SameLine();
-    ImGui::TextDisabled("%s",
-                        std::format("{}, simulated up to {}s",
-                                    is_paused ? "Live, paused" : "Live",
-                                    Core::FormatValue(transient.Times.back()))
-                            .c_str());
+    ImGui::TextDisabled("%s", is_paused ? "Live, paused, simulated up to " : "Live, simulated up to ");
+    ImGui::SameLine(0.0f, 0.0f);
+    ImGui::PushFont(GetMonospaceFont(), 0.0f);
+    ImGui::TextDisabled("%s", FormatLiveTime(transient.Times.back()).c_str());
+    ImGui::PopFont();
 }
 
 /**

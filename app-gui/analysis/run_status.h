@@ -44,6 +44,7 @@ struct RunStatusLine {
 
 // Texts
 std::string FormatRunProgress(std::string_view analysis_name, bool is_stopping, double progress);
+std::string FormatLiveTime(double seconds);
 std::string FormatLiveProgress(bool is_paused, const std::optional<Core::Transient> &transient);
 std::string
 DescribeRunCost(std::optional<double> seconds, Analysis analysis, const std::optional<Core::Transient> &transient);

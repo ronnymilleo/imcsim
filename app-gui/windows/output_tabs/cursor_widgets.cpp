@@ -6,12 +6,14 @@
 
 #include "windows/output_tabs/cursor_widgets.h"
 
+#include "analysis/run_status.h"
 #include "base/theme.h"
 #include "plots/plot_helpers.h"
 #include "results/logic_trace.h"
 #include "results/trace_statistics.h"
 #include "schematic/probing.h"
 #include "spice/spice_value.h"
+#include "windows/speed_selector.h"
 #include <algorithm>
 #include <cmath>
 #include <format>
@@ -175,14 +177,15 @@ void DrawCursorCheckbox(PlotCursors &cursors) {
 }
 
 /**
- * @brief   Draws the playback of the transient under its plot: play, loop, a slider over the window of points the plot
- *          shows and the instant, which the schematic and the playhead of the plot follow.
- * @param[in,out] playback  The instant shown and whether it plays.
+ * @brief   Draws the playback of the transient under its plot: play, loop, speed selector, a slider over the window of
+ *          points the plot shows and the instant, which the schematic and the playhead of the plot follow.
+ * @param[in,out] playback  The instant shown, whether it plays, and the playback speed.
  * @param[in]     from      Start of the window, in seconds.
  * @param[in]     to        End of the window, in seconds.
+ * @return  True in the frame the user picked a new speed preset.
  * @note    Moving the slider stops the playback, so it holds where the user put it.
  */
-void DrawPlaybackBar(TransientPlayback &playback, const double from, const double to) {
+bool DrawPlaybackBar(TransientPlayback &playback, const double from, const double to) {
     const ImGuiStyle &style = ImGui::GetStyle();
     // Play and Pause share the width of the wider label, so the row does not shift when they swap
     const float play_width =
@@ -197,7 +200,9 @@ void DrawPlaybackBar(TransientPlayback &playback, const double from, const doubl
     ImGui::SameLine();
     ImGui::Checkbox("Loop", &playback.Loop);
     ImGui::SameLine();
-    const std::string readout = std::format("t = {}s / {}s", Core::FormatValue(playback.Time), Core::FormatValue(to));
+    const bool speed_changed = DrawSpeedSelector("##playback_speed", playback.Speed, "Playback and live speed");
+    ImGui::SameLine();
+    const std::string readout = std::format("t = {} / {}s", FormatLiveTime(playback.Time), Core::FormatValue(to));
     const float readout_width =
         std::max(ImGui::CalcTextSize(readout.c_str()).x, ImGui::CalcTextSize(WIDEST_TIME_READOUT).x)
         + style.ItemSpacing.x;
@@ -210,6 +215,7 @@ void DrawPlaybackBar(TransientPlayback &playback, const double from, const doubl
     ImGui::SetItemTooltip("Instant of the transient shown on the schematic and by the playhead of the plot");
     ImGui::SameLine();
     ImGui::TextUnformatted(readout.c_str());
+    return speed_changed;
 }
 
 } // namespace GUI
