@@ -22,10 +22,18 @@ namespace Nodalys {
  *          a conductance \f$1/R_T\f$ with an equivalent current source; the off-state is \f$1/R_{off}\f$. The gate
  *          draws \f$(V_{G} - V_{GT})/R_G\f$ above its threshold and fires the device at \f$I_{GT}\f$.
  *
+ *          Two second-order effects are optional. A blocking device whose main-terminal voltage rises faster than
+ *          `ThyristorParameters::CriticalDvDt` fires without a gate, as the displacement current through the junction
+ *          capacitance fires a real one; the slope is read from the last accepted time point to the iterate. After a
+ *          release, the device recovers for `ThyristorParameters::TurnOffTime`: while that window runs, a forward
+ *          voltage that rises back past the on-state threshold re-fires it, which is the commutation failure of a
+ *          forced-commutated circuit; a voltage already above the threshold when the device releases does not, so
+ *          the natural commutation of a rectifier still lands.
+ *
  *          With `ThyristorParameters::IsBidirectional` the device is a TRIAC: the on-state line and the gate junction
  *          mirror about zero, so it conducts and blocks both ways and the gate fires it in all four quadrants, while
- *          the holding current and the breakover voltage apply to the magnitudes. The main current then carries the
- *          sign of the main-terminal voltage.
+ *          the holding current, the breakover voltage, the critical dv/dt and the recovery apply to the magnitudes.
+ *          The main current then carries the sign of the main-terminal voltage.
  *
  *          Terminal indices: `0 = Anode (MT2)`, `1 = Cathode (MT1)`, `2 = Gate`. The gate is referenced to the
  *          cathode (MT1), through which its current returns.
@@ -53,10 +61,12 @@ public:
     [[nodiscard]] std::unique_ptr<Device> Clone() const override;
 
 private:
-    /// One accepted time point of the main current, which the commutation prediction extrapolates from.
+    /// One accepted time point of the main branch: the current the commutation prediction extrapolates from, and
+    /// the voltage the dv/dt firing and the recovery re-fire read.
     struct AcceptedPoint {
         double Time = 0.0;    ///< Instant of the point, in seconds.
         double Current = 0.0; ///< Main current at the point, in Amperes.
+        double Voltage = 0.0; ///< Main-terminal voltage at the point, in Volts.
     };
 
     int m_Anode;
@@ -70,10 +80,17 @@ private:
     double m_StampTime = 0.0; ///< Instant of the step being stamped, which AcceptStep() records.
     AcceptedPoint m_Accepted;
     AcceptedPoint m_Previous;
-    bool m_HasHistory = false; ///< True once two transient points are behind, which the prediction needs.
+    bool m_HasHistory = false;   ///< True once two transient points are behind, which the prediction needs.
+    double m_RecoveryEnds = 0.0; ///< End of the turn-off recovery window; the step time below it can re-fire.
+    double m_SavedRecoveryEnds = 0.0;
+    /// True while the voltage slope of the step has reached the critical dv/dt; it then fires and sustains
+    /// conduction for the rest of the step, as the displacement current does while the voltage keeps moving.
+    bool m_IsDvDtFired = false;
+    bool m_SavedIsDvDtFired = false;
 
     double MainCurrent(const std::vector<double> &x) const;
     double GateCurrent(const std::vector<double> &x) const;
+    double VoltageSlope(double voltage) const;
     void UpdateState(const std::vector<double> &x);
     void StampBranch(MnaSystem &sys, const std::vector<double> &x) const;
     void StampGate(MnaSystem &sys, const std::vector<double> &x) const;

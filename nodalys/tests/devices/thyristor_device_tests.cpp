@@ -1,7 +1,8 @@
 /**
  * @file    thyristor_device_tests.cpp
  * @brief   Tests of the thyristor (SCR) and TRIAC of Nodalys: the gate firing, the latch, the holding current, the
- *          blocking states, the four quadrants of the TRIAC and the controlled rectifier against its closed form.
+ *          blocking states, the dv/dt firing, the turn-off recovery, the four quadrants of the TRIAC and the
+ *          controlled rectifier against its closed form.
  */
 
 #include <catch2/catch_test_macros.hpp>
@@ -37,6 +38,8 @@ constexpr Nodalys::ThyristorParameters TRIAC = [] {
 constexpr int SUPPLY = 1;
 constexpr int LOAD = 2;
 constexpr int GATE = 3;
+/// Node between the two sources of the TRIAC that reads a fast voltage fall.
+constexpr int BIAS = 4;
 
 /// A supply on node 1 feeding the thyristor to node 2, where a load goes to ground, and a gate drive on node 3.
 Nodalys::Circuit BuildScrLoop(const Nodalys::ThyristorParameters &params,
@@ -68,13 +71,31 @@ Nodalys::Circuit BuildPulsedScrLoop(const Nodalys::ThyristorParameters &params,
     return std::move(*circuit);
 }
 
+/// The same loop with a pulsed supply, which the dv/dt firing and the turn-off recovery read; a gate pulse of
+/// High = 0 leaves the gate silent.
+Nodalys::Circuit BuildCommutatedLoop(const Nodalys::ThyristorParameters &params,
+                                     const Nodalys::PulseParameters &supply_pulse,
+                                     const double load_ohms,
+                                     const Nodalys::PulseParameters &gate_pulse) {
+    Nodalys::CircuitBuilder builder;
+    builder.AddVpulse("V1", SUPPLY, 0, supply_pulse);
+    builder.AddThyristor("SCR1", SUPPLY, LOAD, GATE, params);
+    builder.AddResistor("R1", LOAD, 0, load_ohms);
+    builder.AddVpulse("Vg", GATE, LOAD, gate_pulse);
+    auto circuit = builder.Build();
+    REQUIRE(circuit.has_value());
+    return std::move(*circuit);
+}
+
 Nodalys::TransientResult RunTransient(const Nodalys::Circuit &circuit, const double stop_time, const double time_step) {
     const Nodalys::TransientConfig config{.StopTime = stop_time,
                                           .TimeStep = time_step,
                                           .MaxStep = time_step,
                                           .Method = Nodalys::IntegrationMethod::GEAR2};
     auto result = Nodalys::ComputeTransient(circuit, config);
-    REQUIRE(result.has_value());
+    if (!result.has_value()) {
+        FAIL("transient failed: " << result.error());
+    }
     return std::move(*result);
 }
 
@@ -235,6 +256,58 @@ TEST_CASE("The transient lands on the commutation instant of a controlled rectif
     CHECK_THAT(turn_off, WithinAbs(expected, 1e-4));
 }
 
+TEST_CASE("A thyristor fires on an anode voltage rise faster than its critical dv/dt", "[nodalys][thyristor]") {
+    Nodalys::ThyristorParameters sensitive = SCR;
+    sensitive.CriticalDvDt = 5e5;
+    // The gate stays silent throughout; only the rate of rise of the supply can fire the device
+    const Nodalys::PulseParameters silent_gate{.High = 0.0, .Delay = 0.0, .Width = 1.0, .Period = 10.0};
+    // 10 V in 1 us is 1e7 V/s, far past the critical rate
+    const Nodalys::PulseParameters fast{.High = 10.0,
+                                        .Delay = 0.5e-3,
+                                        .RiseTime = 1e-6,
+                                        .FallTime = 1e-6,
+                                        .Width = 1e-3,
+                                        .Period = 10.0};
+    const Nodalys::TransientResult fired =
+        RunTransient(BuildCommutatedLoop(sensitive, fast, 100.0, silent_gate), 2e-3, 1e-5);
+    CHECK_THAT(LoadVoltageAt(fired, 0.6e-3), WithinAbs(9.099, 0.01));
+    // The pulse falls at 1.5 ms: the latch releases, and an SCR never fires on a fall
+    CHECK_THAT(LoadVoltageAt(fired, 1.6e-3), WithinAbs(0.0, 0.05));
+    // The same 10 V spread over 1 ms is 1e4 V/s, below the critical rate: the device keeps blocking
+    Nodalys::PulseParameters slow = fast;
+    slow.RiseTime = 1e-3;
+    const Nodalys::TransientResult blocked =
+        RunTransient(BuildCommutatedLoop(sensitive, slow, 100.0, silent_gate), 2e-3, 1e-5);
+    CHECK_THAT(LoadVoltageAt(blocked, 1.2e-3), WithinAbs(0.0, 0.05));
+}
+
+TEST_CASE("Forward voltage re-applied within the turn-off time re-fires a thyristor", "[nodalys][thyristor]") {
+    Nodalys::ThyristorParameters slow_turn_off = SCR;
+    slow_turn_off.TurnOffTime = 0.5e-3;
+    // The gate fires the device at 0.3 ms; the supply collapses at 0.8 ms and releases the latch, which then
+    // recovers until 1.3 ms
+    const Nodalys::PulseParameters gate{.High = 5.0, .Delay = 0.3e-3, .Width = 0.2e-3, .Period = 10.0};
+    const Nodalys::PulseParameters supply{.High = 10.0,
+                                          .Delay = 0.2e-3,
+                                          .RiseTime = 1e-6,
+                                          .FallTime = 1e-6,
+                                          .Width = 0.6e-3,
+                                          .Period = 1.0e-3};
+    const Nodalys::TransientResult refired =
+        RunTransient(BuildCommutatedLoop(slow_turn_off, supply, 100.0, gate), 2e-3, 1e-5);
+    CHECK_THAT(LoadVoltageAt(refired, 0.5e-3), WithinAbs(9.099, 0.01));
+    CHECK_THAT(LoadVoltageAt(refired, 1.0e-3), WithinAbs(0.0, 0.05));
+    // The supply returns at 1.2 ms, inside the window: the device re-fires without a gate
+    CHECK_THAT(LoadVoltageAt(refired, 1.25e-3), WithinAbs(9.099, 0.01));
+    // The same circuit with the supply returning at 2.2 ms, past the window: the device blocks again
+    Nodalys::PulseParameters late = supply;
+    late.Period = 2.0e-3;
+    const Nodalys::TransientResult blocked =
+        RunTransient(BuildCommutatedLoop(slow_turn_off, late, 100.0, gate), 3e-3, 1e-5);
+    CHECK_THAT(LoadVoltageAt(blocked, 1.0e-3), WithinAbs(0.0, 0.05));
+    CHECK_THAT(LoadVoltageAt(blocked, 2.25e-3), WithinAbs(0.0, 0.05));
+}
+
 TEST_CASE("Harmonic balance refuses a thyristor", "[nodalys][thyristor]") {
     Nodalys::CircuitBuilder builder;
     builder.AddVsine("V1", SUPPLY, 0, {.Amplitude = 10.0, .Frequency = 50.0});
@@ -325,4 +398,62 @@ TEST_CASE("A TRIAC dimmer conducts both half-cycles and commutates at the holdin
     CHECK_THAT(LoadVoltageAt(result, 1e-3), WithinAbs(0.0, 1e-3));
     CHECK_THAT(LoadVoltageAt(result, period + period / 4.0), WithinAbs(amplitude, 0.05));
     CHECK_THAT(LoadVoltageAt(result, period + 3.0 * period / 4.0), WithinAbs(-amplitude, 0.05));
+}
+
+TEST_CASE("A TRIAC fires on a fast main-terminal voltage rise and on a fast fall", "[nodalys][thyristor]") {
+    Nodalys::ThyristorParameters sensitive = TRIAC;
+    sensitive.CriticalDvDt = 5e5;
+    const Nodalys::PulseParameters silent_gate{.High = 0.0, .Delay = 0.0, .Width = 1.0, .Period = 10.0};
+    // The rise: 10 V in 1 us across a blocking TRIAC fires it the positive way
+    const Nodalys::PulseParameters fast{.High = 10.0,
+                                        .Delay = 0.5e-3,
+                                        .RiseTime = 1e-6,
+                                        .FallTime = 1e-6,
+                                        .Width = 1e-3,
+                                        .Period = 10.0};
+    const Nodalys::TransientResult risen =
+        RunTransient(BuildCommutatedLoop(sensitive, fast, 100.0, silent_gate), 1e-3, 1e-5);
+    CHECK_THAT(LoadVoltageAt(risen, 0.6e-3), WithinAbs(9.099, 0.01));
+    // The fall: a +10 V bias holds the TRIAC blocking; a fast -5 V pulse at 0.5 ms takes the supply to +5 V,
+    // a fall of 5e6 V/s across the device, which fires it while the voltage stays positive
+    const Nodalys::PulseParameters step_down{.High = -5.0,
+                                             .Delay = 0.5e-3,
+                                             .RiseTime = 1e-6,
+                                             .FallTime = 1e-6,
+                                             .Width = 1e-3,
+                                             .Period = 10.0};
+    Nodalys::CircuitBuilder builder;
+    builder.AddVdc("Vbias", SUPPLY, BIAS, 10.0);
+    builder.AddVpulse("Vstep", BIAS, 0, step_down);
+    builder.AddThyristor("TR1", SUPPLY, LOAD, GATE, sensitive);
+    builder.AddResistor("R1", LOAD, 0, 100.0);
+    builder.AddVdc("Vg", GATE, LOAD, 0.0);
+    auto circuit = builder.Build();
+    REQUIRE(circuit.has_value());
+    const Nodalys::TransientResult fallen = RunTransient(*circuit, 1e-3, 1e-5);
+    CHECK_THAT(LoadVoltageAt(fallen, 0.4e-3), WithinAbs(0.0, 1e-3));
+    // The fired device drops the on-state line from the +5 V supply: (5 - 0.9) * 100 / 100.01
+    CHECK_THAT(LoadVoltageAt(fallen, 0.6e-3), WithinAbs(4.0996, 0.01));
+}
+
+TEST_CASE("A TRIAC re-fires on a voltage re-applied within the turn-off time, the negative way",
+          "[nodalys][thyristor]") {
+    Nodalys::ThyristorParameters slow_turn_off = TRIAC;
+    slow_turn_off.TurnOffTime = 0.5e-3;
+    // A 300 Ohm load: it holds 30 mA while the supply is up, and the mirrored on-state line drops to 3 mA, below
+    // the holding current, once the supply collapses, which releases the latch at 0.8 ms; the window runs to 1.3 ms
+    const Nodalys::PulseParameters gate{.High = 5.0, .Delay = 0.3e-3, .Width = 0.2e-3, .Period = 10.0};
+    const Nodalys::PulseParameters supply{.High = -10.0,
+                                          .Delay = 0.2e-3,
+                                          .RiseTime = 1e-6,
+                                          .FallTime = 1e-6,
+                                          .Width = 0.6e-3,
+                                          .Period = 1.0e-3};
+    const Nodalys::TransientResult refired =
+        RunTransient(BuildCommutatedLoop(slow_turn_off, supply, 300.0, gate), 2e-3, 1e-5);
+    CHECK_THAT(LoadVoltageAt(refired, 0.5e-3), WithinAbs(-9.099, 0.01));
+    CHECK_THAT(LoadVoltageAt(refired, 1.0e-3), WithinAbs(0.0, 0.05));
+    // The supply returns at 1.2 ms, inside the window: the magnitude of the voltage rises back past the on-state
+    // threshold and the device re-fires without a gate
+    CHECK_THAT(LoadVoltageAt(refired, 1.25e-3), WithinAbs(-9.099, 0.01));
 }

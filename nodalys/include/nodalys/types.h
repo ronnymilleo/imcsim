@@ -295,9 +295,12 @@ struct SwitchParameters {
  * @details The on-state is the datasheet line \f$V_{TM} = V_0 + R_T I_T\f$; the gate fires the device when its current
  *          reaches \f$I_{GT}\f$, and the latch releases when the main current falls below \f$I_H\f$ with the gate
  *          removed. The latching current \f$I_L\f$ is not modeled separately: the gate sustains conduction until the
- *          main current reaches the holding current. With `IsBidirectional` the device is a TRIAC: it conducts and
- *          blocks both ways, the gate fires it in all four quadrants, and the holding and breakover figures apply to
- *          the magnitude of the main current and voltage.
+ *          main current reaches the holding current. The second-order figures are optional: `CriticalDvDt` fires a
+ *          blocking device on a faster rise of the main-terminal voltage, as the displacement current through the
+ *          junction capacitance does, and `TurnOffTime` keeps it re-firable on a re-applied forward voltage for that
+ *          long after a release. With `IsBidirectional` the device is a TRIAC: it conducts and blocks both ways, the
+ *          gate fires it in all four quadrants, and the holding, breakover, dv/dt and recovery figures apply to the
+ *          magnitude of the main current and voltage.
  */
 struct ThyristorParameters {
     double OnResistance = 0.01;       ///< Slope resistance \f$R_T\f$ of the on-state line, in Ohms.
@@ -308,6 +311,12 @@ struct ThyristorParameters {
     double GateTriggerVoltage = 0.7;  ///< \f$V_{GT}\f$: gate junction threshold, in Volts.
     double GateResistance = 100.0;    ///< \f$R_G\f$: series gate resistance, in Ohms.
     double BreakoverVoltage = 0.0;    ///< \f$V_{BO}\f$: breakover voltage; zero disables it, in Volts.
+    /// Critical \f$dv/dt\f$: a faster rise of the main-terminal voltage fires a blocking device; zero disables it,
+    /// in Volts per second.
+    double CriticalDvDt = 0.0;
+    /// \f$t_q\f$: recovery time after a release, during which a re-applied forward voltage re-fires the device;
+    /// zero disables it, in seconds.
+    double TurnOffTime = 0.0;
     /// True for a TRIAC, which conducts both ways and fires in all four gate quadrants; false for a one-way SCR.
     bool IsBidirectional = false;
 
