@@ -18,9 +18,9 @@ namespace Core {
  * @struct  ThyristorParameters
  * @brief   Datasheet figures of a thyristor (SCR), TRIAC or GTO, in SI units.
  * @details The on-state is the datasheet line \f$V_{TM} = V_0 + R_T I_T\f$. Nodalys takes every figure as a parameter;
- *          the ngspice subcircuit follows the gate and slope resistances exactly, while its holding and trigger
- *          currents and its on-state threshold emerge from the two-transistor pair, close to these defaults. The
- *          breakover, the critical dv/dt and the turn-off time run on Nodalys only; the ngspice pair has none of them.
+ *          the ngspice subcircuit of an SCR follows the gate and slope resistances exactly, while its holding and
+ *          trigger currents and its on-state threshold emerge from the two-transistor pair, close to these defaults.
+ * The breakover, the critical dv/dt and the turn-off time run on Nodalys only; the ngspice pair has none of them.
  *          `IsBidirectional` is set by the part, not by the editor: a TRIAC conducts both ways and fires in all four
  *          gate quadrants, an SCR one way only. `GateTurnOffCurrent` is set for a GTO only, whose negative gate current
  *          of at least that size releases it whatever its main current; the part zeroes it for the other types.
@@ -73,11 +73,10 @@ constexpr double DEFAULT_GTO_GATE_RESISTANCE = 1.0;
  * @brief   A three-terminal thyristor: an SCR or a GTO with anode on terminal 1, cathode on terminal 2 and gate on
  *          terminal 3, or a TRIAC with MT2 on terminal 1, MT1 on terminal 2 and gate on terminal 3.
  * @details The same class serves the three, the component type telling which; a TRIAC sets `IsBidirectional` and a GTO
- *          a `GateTurnOffCurrent`, with the gate figures of a power device. ngspice refuses a GTO: only Nodalys runs
- *          its turn-off, and the subcircuit imcsim_gto is in the netlist the Netlist window shows only. The part has no
- *          value; its parameters are set one by one. Every run starts blocking, and the circuit fires it. Nodalys
- *          simulates it as one latching device; ngspice runs the imcsim_scr two-transistor subcircuit for an SCR and
- *          the imcsim_triac subcircuit, two anti-parallel pairs with a four-quadrant gate stage, for a TRIAC. The gate
+ *          a `GateTurnOffCurrent`, with the gate figures of a power device. The part has no value; its parameters are
+ *          set one by one. Every run starts blocking, and the circuit fires it. Nodalys simulates each as one latching
+ *          device; ngspice runs the imcsim_scr two-transistor subcircuit for an SCR and refuses a TRIAC and a GTO,
+ *          whose subcircuits imcsim_triac and imcsim_gto are only in the netlist the Netlist window shows. The gate
  *          drive must be referenced to the cathode (MT1), as the gate current returns through it.
  */
 class Thyristor : public Component {

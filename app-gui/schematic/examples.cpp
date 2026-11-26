@@ -473,9 +473,8 @@ constexpr auto EXAMPLES = std::to_array<Example>({
             "the 5 mA holding current near each zero crossing. Run the transient: the load follows the sine from 60 "
             "degrees on in both directions, so it sees a full-wave chopped sine whose RMS is about 6.3 V, where the "
             "whole sine would give 7.1 V; the mean over a period is zero, since the two half-cycles mirror each "
-            "other. Both engines run it: Nodalys takes every figure as a parameter of its bidirectional latching "
-            "device, while ngspice runs the imcsim_triac subcircuit, two anti-parallel transistor pairs with a gate "
-            "stage that fires in all four quadrants. Change the delay of Vin2 to move the firing angle: a later "
+            "other. It runs on Nodalys, which takes every figure as a parameter of its bidirectional latching device; "
+            "ngspice refuses the TRIAC. Change the delay of Vin2 to move the firing angle: a later "
             "pulse dims the lamp, and a delay past the peak leaves it dark. The step is 0.2 ms, and the solver lands "
             "on each commutation instant itself.",
         .FileName = "triac_dimmer.imcsim",
@@ -492,7 +491,7 @@ constexpr auto EXAMPLES = std::to_array<Example>({
             "transient: V(C1) ramps to the breakover and drops by the snapback at each firing, the TRIAC voltage "
             "collapses there, and the lamp current follows the line from that angle to the next zero crossing. "
             "Raise R2 to dim the lamp: C1 charges slower and reaches the breakover later in each half-cycle. It "
-            "runs on Nodalys: ngspice refuses the DIAC, and its TRIAC subcircuit does not block at mains voltage.",
+            "runs on Nodalys: ngspice refuses the DIAC and the TRIAC.",
         .FileName = "diac_triac_dimmer.imcsim",
     },
     {
