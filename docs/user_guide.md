@@ -76,9 +76,9 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   on terminal 1, cathode on terminal 2, gate on terminal 3; the TRIAC has MT2 on terminal 1, MT1 on terminal 2, gate
   on terminal 3, and conducts both ways. Their properties set the on-state line (V0 and RT), the holding and trigger
   currents, the gate resistance and the breakover voltage. They block until the gate is fired and latch on until
-  the current falls below the holding current, and the label under the symbol shows IH. The gate drive must be
-  referenced to the cathode (MT1), since the gate current returns through it; a TRIAC fires in all four gate
-  quadrants. The Switching examples drive them: a half-wave controlled rectifier, one with an inductive load and a
+  the current falls below the holding current, and the label above the symbol shows the name and IH, clear of the
+  gate lead. The gate drive must be referenced to the cathode (MT1), since the gate current returns through it; a
+  TRIAC fires in all four gate quadrants. The Switching examples drive them: a half-wave controlled rectifier, one with an inductive load and a
   freewheeling diode, a controlled bridge, and a TRIAC light dimmer (see docs/models.md).
 - **Transmission lines**: a transmission line has its own button among the passive parts of the part rail, a coaxial symbol with two
   ports: port 1 on the left (terminal 1 the center conductor, terminal 2 the shield) and port 2 on the right
