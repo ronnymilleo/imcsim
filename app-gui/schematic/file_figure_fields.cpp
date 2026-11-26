@@ -53,6 +53,10 @@ constexpr auto THYRISTOR_KEYS = std::to_array<ParameterKey<Core::ThyristorParame
     {"breakover", &Core::ThyristorParameters::BreakoverVoltage},
     {"critical_dvdt", &Core::ThyristorParameters::CriticalDvDt},
     {"turn_off_time", &Core::ThyristorParameters::TurnOffTime},
+    {"vdrm", &Core::ThyristorParameters::MaxRepetitivePeakVoltage},
+    {"it_max", &Core::ThyristorParameters::MaxOnStateCurrent},
+    {"itsm", &Core::ThyristorParameters::MaxSurgeCurrent},
+    {"i2t", &Core::ThyristorParameters::MaxI2t},
 });
 
 constexpr auto DIAC_KEYS = std::to_array<ParameterKey<Core::DiacParameters>>({

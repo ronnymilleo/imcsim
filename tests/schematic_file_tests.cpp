@@ -18,6 +18,7 @@
 #include "circuit/components/relay.h"
 #include "circuit/components/subcircuit_pin.h"
 #include "circuit/components/switch.h"
+#include "circuit/components/thyristor.h"
 #include "circuit/components/transformer.h"
 #include "circuit/components/voltage_controlled_switch.h"
 #include "circuit/components/voltage_source.h"
@@ -1054,6 +1055,31 @@ TEST_CASE("A relay keeps its coil and contact figures", "[schematic_file]") {
     const GUI::LoadedSchematic skipped = LoadOrFail(Document(inverted, ""));
     CHECK(skipped.Elements.empty());
     CHECK(skipped.Warnings.size() == 1);
+}
+
+TEST_CASE("A TRIAC keeps its ratings, and a file without them leaves them unchecked", "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::TRIAC, {6, 6}, GUI::Rotation::R0));
+    auto &triac = static_cast<Core::Thyristor &>(elements.back()->GetComponent());
+    triac.SetName("TR1");
+    triac.SetParameters(
+        {.MaxRepetitivePeakVoltage = 600.0, .MaxOnStateCurrent = 8.0, .MaxSurgeCurrent = 80.0, .MaxI2t = 32.0});
+
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 1);
+    const auto &copy = static_cast<const Core::Thyristor &>(loaded.Elements[0]->GetComponent());
+    CHECK(copy.GetParameters() == triac.GetParameters());
+
+    // Files written before the ratings existed load with none set
+    const GUI::LoadedSchematic older = LoadOrFail(Document(
+        R"({"type": "Triac", "x": 1, "y": 1, "rotation": 0, "name": "TR1", "parameters": {"holding_current": 0.01}})",
+        ""));
+    REQUIRE(older.Elements.size() == 1);
+    const auto &old_part = static_cast<const Core::Thyristor &>(older.Elements[0]->GetComponent());
+    CHECK(old_part.GetParameters().HoldingCurrent == 0.01);
+    CHECK(old_part.GetParameters().MaxRepetitivePeakVoltage == 0.0);
+    CHECK(old_part.GetParameters().MaxI2t == 0.0);
 }
 
 TEST_CASE("A transformer keeps its primary inductance and its figures", "[schematic_file]") {

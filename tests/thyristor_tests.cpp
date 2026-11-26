@@ -1,7 +1,7 @@
 /**
  * @file    thyristor_tests.cpp
  * @brief   Tests for the thyristor (SCR) and TRIAC: their figures, their netlists, and the controlled rectifier and
- *          light dimmer they drive on ngspice and on Nodalys.
+ *          light dimmer they drive on ngspice and on Nodalys, and the warnings of a run past their ratings.
  */
 
 #include "circuit/circuit.h"
@@ -19,6 +19,7 @@
 #include <memory>
 #include <numbers>
 #include <string>
+#include <string_view>
 #include <vector>
 
 using Catch::Matchers::WithinAbs;
@@ -195,6 +196,47 @@ struct Dimmer {
     }
 };
 
+/// The ratings a run of the rectifier or the dimmer stays well within, so none of them warns.
+constexpr Core::ThyristorParameters GENEROUS_RATINGS = {.MaxRepetitivePeakVoltage = 50.0,
+                                                        .MaxOnStateCurrent = 1.0,
+                                                        .MaxSurgeCurrent = 1.0,
+                                                        .MaxI2t = 1.0};
+
+/// A thyristor latched on by a steady gate drive, carrying a direct current through a load from the first instant.
+struct LatchedOnDC {
+    Core::VoltageSource Supply;
+    Core::Resistor Load;
+    Core::Thyristor Part;
+    Core::VoltageSource Gate;
+    Core::Ground Reference;
+    Core::Circuit Circuit;
+
+    explicit LatchedOnDC(const double load_ohms) {
+        Supply.SetName("Vin1");
+        Supply.SetValue(AMPLITUDE);
+        Load.SetName("R1");
+        Load.SetValue(load_ohms);
+        Part.SetName("SCR1");
+        Gate.SetName("Vgate1");
+        Gate.SetValue(5.0);
+        Circuit.Add(Supply, {1, 0});
+        Circuit.Add(Load, {1, 2});
+        Circuit.Add(Part, {2, 0, 3});
+        Circuit.Add(Gate, {3, 0});
+        Circuit.Add(Reference, {0});
+    }
+};
+
+/// True when some warning starts with the text, so a test can check one rating at a time.
+bool HasWarning(const std::vector<std::string> &warnings, const std::string_view start) {
+    return std::ranges::any_of(warnings, [&](const std::string &warning) { return warning.starts_with(start); });
+}
+
+/// True when some warning says a part exceeds a rating.
+bool HasRatingWarning(const std::vector<std::string> &warnings) {
+    return std::ranges::any_of(warnings, [](const std::string &warning) { return warning.contains("exceeds its"); });
+}
+
 } // namespace
 
 TEST_CASE("A thyristor starts with the datasheet figures, and clones keep them", "[thyristor]") {
@@ -352,4 +394,94 @@ TEST_CASE("A TRIAC or a thyristor left idle on the mains blocks both half-cycles
         const TestSupport::NodalysInUse nodalys;
         CHECK(PeakIdleCurrent(idle.Circuit) < IDLE_CURRENT_LIMIT);
     }
+}
+
+TEST_CASE("A thyristor past its voltage, current, surge or I2t rating is reported on both engines",
+          "[thyristor][simulator][ratings]") {
+    HalfWaveRectifier rectifier(LOAD_OHMS);
+    // The rectifier blocks a 10 V peak, averages about 22 mA forward and peaks near 92 mA; a half-cycle of conduction
+    // from 60 degrees heats it by about 34 uA2s
+    const Core::ThyristorParameters tight = {.MaxRepetitivePeakVoltage = 5.0,
+                                             .MaxOnStateCurrent = 10e-3,
+                                             .MaxSurgeCurrent = 50e-3,
+                                             .MaxI2t = 10e-6};
+    const auto check_engine = [&] {
+        rectifier.Part.SetParameters({});
+        Core::TransientRun unrated;
+        // A part that sets no rating is not checked
+        CHECK_FALSE(HasRatingWarning(RunRectifier(rectifier.Circuit, unrated).Warnings));
+
+        rectifier.Part.SetParameters(GENEROUS_RATINGS);
+        Core::TransientRun within;
+        CHECK_FALSE(HasRatingWarning(RunRectifier(rectifier.Circuit, within).Warnings));
+
+        rectifier.Part.SetParameters(tight);
+        Core::TransientRun past;
+        const std::vector<std::string> &warnings = RunRectifier(rectifier.Circuit, past).Warnings;
+        CAPTURE(warnings);
+        CHECK(HasWarning(warnings, "SCR1 exceeds its VDRM/VRRM rating: "));
+        CHECK(HasWarning(warnings, "SCR1 exceeds its IT(AV) rating: "));
+        CHECK(HasWarning(warnings, "SCR1 exceeds its ITSM rating: "));
+        CHECK(HasWarning(warnings, "SCR1 exceeds its I2t rating: "));
+    };
+    SECTION("ngspice") {
+        check_engine();
+    }
+    SECTION("Nodalys") {
+        TestSupport::NodalysInUse nodalys;
+        check_engine();
+    }
+}
+
+TEST_CASE("A TRIAC is judged on its RMS current, since its average is near zero", "[thyristor][simulator][ratings]") {
+    // The chopped sine through 100 Ohm averages near zero but has about 63 mA RMS
+    Dimmer dimmer(LOAD_OHMS);
+    dimmer.Part.SetParameters({.MaxOnStateCurrent = 0.1});
+    Core::TransientRun within;
+    CHECK_FALSE(HasRatingWarning(RunRectifier(dimmer.Circuit, within).Warnings));
+
+    dimmer.Part.SetParameters({.MaxOnStateCurrent = 30e-3});
+    Core::TransientRun past;
+    const std::vector<std::string> &warnings = RunRectifier(dimmer.Circuit, past).Warnings;
+    CAPTURE(warnings);
+    CHECK(HasWarning(warnings, "TR1 exceeds its IT(RMS) rating: "));
+}
+
+TEST_CASE("A thyristor is judged on the I2t of the worst half-cycle, not of the whole run",
+          "[thyristor][simulator][ratings]") {
+    // About 0.92 A for 40 ms: 8.5 mA2s over a 10 ms half-cycle, four times that over the whole run
+    LatchedOnDC latched(10.0);
+    const Core::TransientSettings settings = {.StopTime = 40e-3, .TimeStep = 0.1e-3};
+    latched.Part.SetParameters({.MaxI2t = 15e-3});
+    const Core::TransientRun within = Core::RunTransient(latched.Circuit, settings);
+    REQUIRE(within.Result.has_value());
+    CAPTURE(within.Result->Warnings);
+    CHECK_FALSE(HasRatingWarning(within.Result->Warnings));
+
+    latched.Part.SetParameters({.MaxI2t = 5e-3});
+    const Core::TransientRun past = Core::RunTransient(latched.Circuit, settings);
+    REQUIRE(past.Result.has_value());
+    CAPTURE(past.Result->Warnings);
+    CHECK(HasWarning(past.Result->Warnings, "SCR1 exceeds its I2t rating: "));
+}
+
+TEST_CASE("An operating point checks the voltage and current of a thyristor, but has no I2t",
+          "[thyristor][simulator][ratings]") {
+    LatchedOnDC latched(10.0);
+    // On, it drops about 0.8 V and carries about 0.92 A; a single point has no span to heat it over
+    latched.Part.SetParameters({.MaxRepetitivePeakVoltage = 0.5, .MaxOnStateCurrent = 0.5, .MaxI2t = 1e-9});
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(latched.Circuit);
+    REQUIRE(run.Result.has_value());
+    CAPTURE(run.Result->Warnings);
+    CHECK(HasWarning(run.Result->Warnings, "SCR1 exceeds its VDRM/VRRM rating: "));
+    CHECK(HasWarning(run.Result->Warnings, "SCR1 exceeds its IT(AV) rating: "));
+    CHECK_FALSE(HasWarning(run.Result->Warnings, "SCR1 exceeds its I2t rating"));
+}
+
+TEST_CASE("A thyristor refuses negative ratings", "[thyristor][ratings]") {
+    CHECK(Core::Thyristor::IsValidParameters(GENEROUS_RATINGS));
+    CHECK_FALSE(Core::Thyristor::IsValidParameters({.MaxRepetitivePeakVoltage = -1.0}));
+    CHECK_FALSE(Core::Thyristor::IsValidParameters({.MaxOnStateCurrent = -1.0}));
+    CHECK_FALSE(Core::Thyristor::IsValidParameters({.MaxSurgeCurrent = -1.0}));
+    CHECK_FALSE(Core::Thyristor::IsValidParameters({.MaxI2t = -1.0}));
 }

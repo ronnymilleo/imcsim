@@ -36,7 +36,7 @@ struct ElectromechanicalFields {
     /// One per member of Core::FuseParameters.
     std::array<ValueField, 4> Fuse;
     /// One per member of Core::ThyristorParameters.
-    std::array<ValueField, 10> Thyristor;
+    std::array<ValueField, 14> Thyristor;
     /// One per member of Core::DiacParameters.
     std::array<ValueField, 5> Diac;
     /// One per member of Core::TransformerParameters.

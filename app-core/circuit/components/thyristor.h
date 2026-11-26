@@ -38,6 +38,17 @@ struct ThyristorParameters {
     /// \f$t_q\f$: recovery time after a release, during which a re-applied forward voltage re-fires the device;
     /// zero disables it, in seconds (Nodalys only).
     double TurnOffTime = 0.0;
+
+    // Datasheet ratings, which no engine reads and the results are checked against; zero leaves each unchecked
+    /// \f$V_{DRM}\f$: repetitive peak off-state voltage, taken as \f$V_{RRM}\f$ too, in Volts.
+    double MaxRepetitivePeakVoltage = 0.0;
+    /// On-state current: \f$I_{T(AV)}\f$, the average forward current of an SCR, or \f$I_{T(RMS)}\f$ of a TRIAC, whose
+    /// average is near zero, in Amperes.
+    double MaxOnStateCurrent = 0.0;
+    double MaxSurgeCurrent = 0.0; ///< \f$I_{TSM}\f$: non-repetitive peak surge current, in Amperes.
+    /// \f$I^2t\f$ for fusing, over the 10 ms of a 50 Hz half-cycle, in square Amperes times seconds.
+    double MaxI2t = 0.0;
+
     /// True for a TRIAC, which conducts both ways; the part sets it from its type and the editor leaves it alone.
     bool IsBidirectional = false;
 
