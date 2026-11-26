@@ -1,12 +1,13 @@
 /**
  * @file    thyristor_device.cpp
- * @brief   Thyristor (SCR) and TRIAC of Nodalys: a latching switch fired by gate current and held on by its main
+ * @brief   Thyristor (SCR), TRIAC and GTO of Nodalys: a latching switch fired by gate current and held on by its main
  *          current.
  */
 
 #include "devices/semiconductors/thyristor_device.h"
 
 #include "devices/stamp_helpers.h"
+#include <algorithm>
 #include <cmath>
 #include <limits>
 
@@ -70,6 +71,14 @@ ThyristorDevice::BranchLine ThyristorDevice::OnStateLine(const double voltage) c
 }
 
 /**
+ * @brief   Reports whether the gate junction conducts both ways.
+ * @return  True for a TRIAC, whose gate fires it either way, and for a GTO, whose negative gate current turns it off.
+ */
+bool ThyristorDevice::IsGateMirrored() const {
+    return m_Parameters.IsBidirectional || m_Parameters.GateTurnOffCurrent > 0.0;
+}
+
+/**
  * @brief   The current from the anode (MT2) to the cathode (MT1): the on-state line while latched, the blocking
  *          conductance otherwise.
  */
@@ -84,13 +93,14 @@ double ThyristorDevice::MainCurrent(const std::vector<double> &x) const {
 
 /**
  * @brief   The current into the gate from the cathode (MT1): the junction line above its threshold, zero below it.
- * @details A TRIAC draws gate current of either polarity, so its junction mirrors about zero and the current keeps
- *          the sign of the gate voltage; the latch fires on the magnitude in all four quadrants.
+ * @details A TRIAC or a GTO draws gate current of either polarity, so its junction mirrors about zero and the
+ *          current keeps the sign of the gate voltage; a TRIAC fires on the magnitude in all four quadrants, a GTO
+ *          fires on the positive current and releases on the negative one.
  */
 double ThyristorDevice::GateCurrent(const std::vector<double> &x) const {
     const double voltage = BranchVoltage(x, m_Gate, m_Cathode);
     const double &threshold = m_Parameters.GateTriggerVoltage;
-    if (m_Parameters.IsBidirectional) {
+    if (IsGateMirrored()) {
         return std::fabs(voltage) > threshold ? (voltage - SignOf(voltage) * threshold) / m_Parameters.GateResistance
                                               : 0.0;
     }
@@ -155,13 +165,28 @@ bool ThyristorDevice::ShouldFire(const std::vector<double> &x, const bool is_rec
 }
 
 /**
+ * @brief   Reports whether the gate of a GTO pulls enough current out to turn it off.
+ * @param[in] x  Current Newton iterate.
+ * @return  True when the gate current is negative with a magnitude of at least the gate turn-off current; false for
+ *          any device without one.
+ */
+bool ThyristorDevice::IsGateTurnOff(const std::vector<double> &x) const {
+    return m_Parameters.GateTurnOffCurrent > 0.0 && -GateCurrent(x) >= m_Parameters.GateTurnOffCurrent;
+}
+
+/**
  * @brief   Decides whether a conducting device releases at the iterate.
  * @param[in] x              Current Newton iterate.
- * @param[in] is_recovering  Whether the turn-off recovery window is running, which suspends the release.
- * @return  True when the gate is gone, the main current is below the holding current, the recovery window has
- *          closed and the dv/dt latch of the step is not sustaining conduction.
+ * @param[in] is_recovering  Whether the turn-off recovery window is running, which suspends the release by the
+ *                           holding current.
+ * @return  True when a GTO gate pulls its turn-off current, whatever the main current, or when the gate is gone,
+ *          the main current is below the holding current, the recovery window has closed and the dv/dt latch of the
+ *          step is not sustaining conduction.
  */
 bool ThyristorDevice::ShouldRelease(const std::vector<double> &x, const bool is_recovering) const {
+    if (IsGateTurnOff(x)) {
+        return true;
+    }
     const bool is_held = Magnitude(MainCurrent(x)) >= m_Parameters.HoldingCurrent;
     return !IsGateOn(x) && !is_held && !is_recovering && !m_IsDvDtFired;
 }
@@ -181,7 +206,8 @@ bool ThyristorDevice::ShouldRelease(const std::vector<double> &x, const bool is_
  *          accepted point, which is the commutation failure of a forced-commutated circuit; a voltage already
  *          above the threshold when the device releases does not re-fire it, so the natural commutation of a
  *          rectifier still lands. While the window runs the device has not regained its blocking, so the
- *          holding-current release is suspended until it closes.
+ *          holding-current release is suspended until it closes. A GTO turned off by its gate opens the same
+ *          window, and stays off while the gate keeps pulling, since a negative gate never fires it.
  * @param[in] x  Current Newton iterate.
  */
 void ThyristorDevice::UpdateState(const std::vector<double> &x) {
@@ -219,11 +245,11 @@ void ThyristorDevice::StampBranch(MnaSystem &sys, const std::vector<double> &x) 
 void ThyristorDevice::StampGate(MnaSystem &sys, const std::vector<double> &x) const {
     const double voltage = BranchVoltage(x, m_Gate, m_Cathode);
     const double &threshold = m_Parameters.GateTriggerVoltage;
-    const bool is_above = m_Parameters.IsBidirectional ? std::fabs(voltage) > threshold : voltage > threshold;
+    const bool is_above = IsGateMirrored() ? std::fabs(voltage) > threshold : voltage > threshold;
     if (is_above) {
         const double conductance = 1.0 / m_Parameters.GateResistance + GATE_OFF_CONDUCTANCE;
         StampConductance(sys, m_Gate, m_Cathode, conductance);
-        const double sign = m_Parameters.IsBidirectional ? SignOf(voltage) : 1.0;
+        const double sign = IsGateMirrored() ? SignOf(voltage) : 1.0;
         StampCurrentSource(sys, m_Cathode, m_Gate, sign * threshold / m_Parameters.GateResistance);
     } else {
         StampConductance(sys, m_Gate, m_Cathode, GATE_OFF_CONDUCTANCE);
@@ -272,8 +298,8 @@ std::complex<double> ThyristorDevice::AcTerminalCurrent(const int terminal,
     const double branch_conductance =
         m_IsConducting ? 1.0 / m_Parameters.OnResistance : 1.0 / m_Parameters.OffResistance;
     const double gate_voltage = BranchVoltage(x_dc, m_Gate, m_Cathode);
-    const bool gate_above = m_Parameters.IsBidirectional ? std::fabs(gate_voltage) > m_Parameters.GateTriggerVoltage
-                                                         : gate_voltage > m_Parameters.GateTriggerVoltage;
+    const bool gate_above = IsGateMirrored() ? std::fabs(gate_voltage) > m_Parameters.GateTriggerVoltage
+                                             : gate_voltage > m_Parameters.GateTriggerVoltage;
     const double gate_conductance =
         gate_above ? 1.0 / m_Parameters.GateResistance + GATE_OFF_CONDUCTANCE : GATE_OFF_CONDUCTANCE;
     switch (terminal) {
@@ -302,7 +328,8 @@ void ThyristorDevice::AcceptStep(const std::vector<double> &x) {
     m_SavedIsDvDtFired = m_IsDvDtFired;
     const AcceptedPoint point{.Time = m_StampTime,
                               .Current = MainCurrent(x),
-                              .Voltage = BranchVoltage(x, m_Anode, m_Cathode)};
+                              .Voltage = BranchVoltage(x, m_Anode, m_Cathode),
+                              .GateCurrent = GateCurrent(x)};
     if (m_IsStep) {
         m_Previous = m_Accepted;
         m_Accepted = point;
@@ -325,38 +352,67 @@ bool ThyristorDevice::HasSwitched() const {
 }
 
 /**
- * @brief   Predicts the instant the main current falls to the holding current, so the transient lands on it.
+ * @brief   Predicts the instant the main current falls to the holding current.
  * @details While conducting, the last two accepted points give the slope of the main current; extrapolated to the
  *          holding current, it predicts the commutation. When the current changes, the prediction is wrong and the
  *          transient asks again at the next point, so it closes in on the zero, as the fuse closes in on its blow.
  *          A TRIAC commutates on the magnitude, whichever way the current flows, so the prediction follows the
  *          magnitude toward the holding current.
+ * @return  The predicted instant, or infinity when the current is not falling toward it.
+ */
+double ThyristorDevice::PredictHoldingCurrentCrossing() const {
+    constexpr double NONE = std::numeric_limits<double>::infinity();
+    const double elapsed = m_Accepted.Time - m_Previous.Time;
+    if (elapsed <= 0.0) {
+        return NONE;
+    }
+    const double slope = (m_Accepted.Current - m_Previous.Current) / elapsed;
+    if (m_Parameters.IsBidirectional) {
+        const double magnitude = std::fabs(m_Accepted.Current);
+        const double magnitude_slope = m_Accepted.Current >= 0.0 ? slope : -slope;
+        if (magnitude_slope >= 0.0 || magnitude <= m_Parameters.HoldingCurrent) {
+            return NONE;
+        }
+        return m_Accepted.Time + (m_Parameters.HoldingCurrent - magnitude) / magnitude_slope;
+    }
+    if (slope >= 0.0 || m_Accepted.Current <= m_Parameters.HoldingCurrent) {
+        return NONE;
+    }
+    return m_Accepted.Time + (m_Parameters.HoldingCurrent - m_Accepted.Current) / slope;
+}
+
+/**
+ * @brief   Predicts the instant the gate of a GTO pulls its turn-off current.
+ * @details The turn-off drive is the negative of the gate current; the last two accepted points give its slope, and
+ *          extrapolating it to the gate turn-off current predicts the release, which the gate edge makes in a ramp.
+ * @return  The predicted instant, or infinity for a device without a turn-off current or a drive that is not rising
+ *          toward it.
+ */
+double ThyristorDevice::PredictGateTurnOffCrossing() const {
+    constexpr double NONE = std::numeric_limits<double>::infinity();
+    const double elapsed = m_Accepted.Time - m_Previous.Time;
+    if (m_Parameters.GateTurnOffCurrent <= 0.0 || elapsed <= 0.0) {
+        return NONE;
+    }
+    const double drive = -m_Accepted.GateCurrent;
+    const double drive_slope = -(m_Accepted.GateCurrent - m_Previous.GateCurrent) / elapsed;
+    if (drive_slope <= 0.0 || drive >= m_Parameters.GateTurnOffCurrent) {
+        return NONE;
+    }
+    return m_Accepted.Time + (m_Parameters.GateTurnOffCurrent - drive) / drive_slope;
+}
+
+/**
+ * @brief   Predicts the next instant the latch releases, so the transient lands on it.
+ * @details The earlier of the holding-current crossing and, for a GTO, the gate turn-off crossing.
  * @param[in] time  Instant already reached in seconds.
- * @return  Next predicted commutation instant, or infinity when none is pending.
+ * @return  Next predicted release instant, or infinity when none is pending.
  */
 double ThyristorDevice::NextBreakpoint(const double time) const {
     if (!m_IsConducting || !m_HasHistory) {
         return std::numeric_limits<double>::infinity();
     }
-    const double elapsed = m_Accepted.Time - m_Previous.Time;
-    if (elapsed <= 0.0) {
-        return std::numeric_limits<double>::infinity();
-    }
-    const double slope = (m_Accepted.Current - m_Previous.Current) / elapsed;
-    double crossing = 0.0;
-    if (m_Parameters.IsBidirectional) {
-        const double magnitude = std::fabs(m_Accepted.Current);
-        const double magnitude_slope = m_Accepted.Current >= 0.0 ? slope : -slope;
-        if (magnitude_slope >= 0.0 || magnitude <= m_Parameters.HoldingCurrent) {
-            return std::numeric_limits<double>::infinity();
-        }
-        crossing = m_Accepted.Time + (m_Parameters.HoldingCurrent - magnitude) / magnitude_slope;
-    } else {
-        if (slope >= 0.0 || m_Accepted.Current <= m_Parameters.HoldingCurrent) {
-            return std::numeric_limits<double>::infinity();
-        }
-        crossing = m_Accepted.Time + (m_Parameters.HoldingCurrent - m_Accepted.Current) / slope;
-    }
+    const double crossing = std::min(PredictHoldingCurrentCrossing(), PredictGateTurnOffCrossing());
     return crossing - time >= MIN_BREAKPOINT_GAP ? crossing : std::numeric_limits<double>::infinity();
 }
 

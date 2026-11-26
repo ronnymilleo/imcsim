@@ -89,7 +89,7 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   wires in place
 - Potentiometers, with the wiper set in the properties, and switches and push buttons that are open or closed,
   voltage-controlled switches and relays whose coil current sets when the contact closes, fuses that blow by their
-  I2t and cool between overloads, thyristors (SCRs) and TRIACs that fire on gate current, latch on and release below
+  I2t and cool between overloads, thyristors (SCRs), TRIACs and GTOs (which a negative gate current also turns off) that fire on gate current, latch on and release below
   their holding current, DIACs that break over and trigger them, transformers of two coupled inductors with a turns ratio, and transmission lines, lossless or
   lossy, on the Nodalys engine
 - Piecewise linear sources whose points are typed in or imported from a CSV table or a WAV recording

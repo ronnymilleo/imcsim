@@ -300,7 +300,9 @@ struct SwitchParameters {
  *          junction capacitance does, and `TurnOffTime` keeps it re-firable on a re-applied forward voltage for that
  *          long after a release. With `IsBidirectional` the device is a TRIAC: it conducts and blocks both ways, the
  *          gate fires it in all four quadrants, and the holding, breakover, dv/dt and recovery figures apply to the
- *          magnitude of the main current and voltage.
+ *          magnitude of the main current and voltage. A positive `GateTurnOffCurrent` makes it a GTO, a one-way device
+ *          whose gate junction conducts both ways: a negative gate current of at least \f$I_{GQ}\f$ releases the latch
+ *          while the main current still flows.
  */
 struct ThyristorParameters {
     double OnResistance = 0.01;       ///< Slope resistance \f$R_T\f$ of the on-state line, in Ohms.
@@ -317,6 +319,9 @@ struct ThyristorParameters {
     /// \f$t_q\f$: recovery time after a release, during which a re-applied forward voltage re-fires the device;
     /// zero disables it, in seconds.
     double TurnOffTime = 0.0;
+    /// \f$I_{GQ}\f$: magnitude of the negative gate current that releases a conducting GTO whatever its main
+    /// current; zero leaves the device an SCR or a TRIAC, which only the holding current releases, in Amperes.
+    double GateTurnOffCurrent = 0.0;
     /// True for a TRIAC, which conducts both ways and fires in all four gate quadrants; false for a one-way SCR.
     bool IsBidirectional = false;
 

@@ -1,8 +1,8 @@
 /**
  * @file    thyristor_device_tests.cpp
- * @brief   Tests of the thyristor (SCR) and TRIAC of Nodalys: the gate firing, the latch, the holding current, the
- *          blocking states, the dv/dt firing, the turn-off recovery, the four quadrants of the TRIAC and the
- *          controlled rectifier against its closed form.
+ * @brief   Tests of the thyristor (SCR), TRIAC and GTO of Nodalys: the gate firing, the latch, the holding current, the
+ *          blocking states, the dv/dt firing, the turn-off recovery, the four quadrants of the TRIAC, the gate
+ *          turn-off of the GTO and the controlled rectifier against its closed form.
  */
 
 #include <catch2/catch_test_macros.hpp>
@@ -32,6 +32,14 @@ constexpr Nodalys::ThyristorParameters SCR = {.OnResistance = 0.01,
 constexpr Nodalys::ThyristorParameters TRIAC = [] {
     Nodalys::ThyristorParameters params = SCR;
     params.IsBidirectional = true;
+    return params;
+}();
+/// A GTO: the SCR with a low gate resistance and a 0.5 A gate turn-off current, which a negative gate drive of
+/// 10 Ohm pulls at 5.7 V.
+constexpr Nodalys::ThyristorParameters GTO = [] {
+    Nodalys::ThyristorParameters params = SCR;
+    params.GateResistance = 10.0;
+    params.GateTurnOffCurrent = 0.5;
     return params;
 }();
 /// Node of the supply, of the load and of the gate drive.
@@ -131,6 +139,34 @@ double MeanLoadVoltageOverPeriod(const Nodalys::TransientResult &result, const d
     }
     REQUIRE(count > 0);
     return sum / static_cast<double>(count);
+}
+
+/// A DC supply feeding a thyristor into a load, with the gate driven by a piecewise linear source from the cathode.
+Nodalys::Circuit BuildGateDrivenLoop(const Nodalys::ThyristorParameters &params,
+                                     const double supply_volts,
+                                     const double load_ohms,
+                                     const Nodalys::PwlParameters &gate_drive) {
+    Nodalys::CircuitBuilder builder;
+    builder.AddVdc("V1", SUPPLY, 0, supply_volts);
+    builder.AddThyristor("GTO1", SUPPLY, LOAD, GATE, params);
+    builder.AddResistor("R1", LOAD, 0, load_ohms);
+    builder.AddVpwl("Vg", GATE, LOAD, gate_drive);
+    auto circuit = builder.Build();
+    REQUIRE(circuit.has_value());
+    return std::move(*circuit);
+}
+
+/// A gate that fires at 1 ms with a short positive pulse and, when a turn-off level is given, pulls it from 2 ms.
+Nodalys::PwlParameters FireThenTurnOffDrive(const double turn_off_volts) {
+    return {.Points = {{0.0, 0.0},
+                       {1e-3, 0.0},
+                       {1.01e-3, 5.0},
+                       {1.2e-3, 5.0},
+                       {1.21e-3, 0.0},
+                       {2e-3, 0.0},
+                       {2.01e-3, turn_off_volts},
+                       {2.2e-3, turn_off_volts},
+                       {2.21e-3, 0.0}}};
 }
 
 } // namespace
@@ -549,4 +585,65 @@ TEST_CASE("A DIAC fires a TRIAC at the same angle of each half-cycle of a light 
     CHECK(positive > 1e-3);
     CHECK(positive < HALF_PERIOD - 1e-3);
     CHECK_THAT(negative, WithinAbs(positive, 0.2e-3));
+}
+
+TEST_CASE("A negative gate pulse turns a GTO off while its anode current still flows", "[nodalys][thyristor][gto]") {
+    // A 100 V supply into 10 Ohm carries 9 A, far above the 5 mA holding current; the gate fires it at 1 ms, is
+    // released, and pulls -15 V at 2 ms, which draws (15 - 0.7) / 10 = 1.43 A, above the 0.5 A turn-off current
+    const Nodalys::TransientResult result =
+        RunTransient(BuildGateDrivenLoop(GTO, 100.0, 10.0, FireThenTurnOffDrive(-15.0)), 3e-3, 1e-5);
+    CHECK_THAT(LoadVoltageAt(result, 0.5e-3), WithinAbs(0.0, 1e-3));
+    CHECK_THAT(LoadVoltageAt(result, 1.5e-3), WithinAbs(100.0 - 0.9 - 0.01 * 9.1, 0.2));
+    CHECK_THAT(LoadVoltageAt(result, 1.99e-3), WithinAbs(100.0 - 0.9 - 0.01 * 9.1, 0.2));
+    // Off during the pulse and for good after it: the supply still pushes 100 V across the blocking GTO
+    CHECK_THAT(LoadVoltageAt(result, 2.1e-3), WithinAbs(0.0, 0.1));
+    CHECK_THAT(LoadVoltageAt(result, 2.9e-3), WithinAbs(0.0, 0.1));
+}
+
+TEST_CASE("A negative gate current below the turn-off current leaves a GTO on", "[nodalys][thyristor][gto]") {
+    // -3 V draws (3 - 0.7) / 10 = 0.23 A, under the 0.5 A turn-off current
+    const Nodalys::TransientResult result =
+        RunTransient(BuildGateDrivenLoop(GTO, 100.0, 10.0, FireThenTurnOffDrive(-3.0)), 3e-3, 1e-5);
+    CHECK_THAT(LoadVoltageAt(result, 2.1e-3), WithinAbs(100.0 - 0.9 - 0.01 * 9.1, 0.2));
+    CHECK_THAT(LoadVoltageAt(result, 2.9e-3), WithinAbs(100.0 - 0.9 - 0.01 * 9.1, 0.2));
+}
+
+TEST_CASE("A negative gate never fires a GTO, and an SCR ignores a negative gate", "[nodalys][thyristor][gto]") {
+    const Nodalys::PwlParameters negative{.Points = {{0.0, 0.0}, {1e-3, -15.0}, {2e-3, -15.0}}};
+    const Nodalys::TransientResult gto = RunTransient(BuildGateDrivenLoop(GTO, 100.0, 10.0, negative), 2e-3, 1e-5);
+    CHECK_THAT(LoadVoltageAt(gto, 1.5e-3), WithinAbs(0.0, 0.1));
+    // The SCR has no turn-off current, so a conducting one rides through the same negative gate
+    const Nodalys::PwlParameters fire_then_negative{
+        .Points = {{0.0, 0.0}, {1e-3, 0.0}, {1.01e-3, 5.0}, {1.2e-3, 5.0}, {1.21e-3, -15.0}, {3e-3, -15.0}}};
+    const Nodalys::TransientResult scr =
+        RunTransient(BuildGateDrivenLoop(SCR, 100.0, 10.0, fire_then_negative), 3e-3, 1e-5);
+    CHECK_THAT(LoadVoltageAt(scr, 2.9e-3), WithinAbs(100.0 - 0.9 - 0.01 * 9.1, 0.2));
+}
+
+TEST_CASE("The transient lands on the instant a slow gate edge reaches the GTO turn-off current",
+          "[nodalys][thyristor][gto]") {
+    // The gate ramps from 0 to -15 V over 1 ms from 2 ms; the drive reaches 0.5 A at 0.7 V + 5 V = -5.7 V, that is
+    // at 2 ms + 5.7 / 15 ms = 2.38 ms
+    const Nodalys::PwlParameters drive{
+        .Points = {{0.0, 0.0}, {1e-3, 0.0}, {1.01e-3, 5.0}, {1.2e-3, 5.0}, {1.21e-3, 0.0}, {2e-3, 0.0}, {3e-3, -15.0}}};
+    const Nodalys::TransientResult result = RunTransient(BuildGateDrivenLoop(GTO, 100.0, 10.0, drive), 3e-3, 5e-5);
+    const std::vector<double> &load = result.NodeVoltages[LOAD];
+    // The first point after the ramp starts where the load has lost its voltage is the turn-off
+    double turn_off = 0.0;
+    for (std::size_t i = 0; i < result.Times.size(); ++i) {
+        if (result.Times[i] > 2e-3 && load[i] < 1.0) {
+            turn_off = result.Times[i];
+            break;
+        }
+    }
+    REQUIRE(turn_off > 0.0);
+    CHECK_THAT(turn_off, WithinAbs(2.38e-3, 1e-5));
+}
+
+TEST_CASE("A GTO gate draws current both ways", "[nodalys][thyristor][gto]") {
+    // -5 V across the junction, mirrored about zero: -(5 - 0.7) / 10
+    const Nodalys::OperatingPointResult result = RunOperatingPoint(BuildScrLoop(GTO, 0.0, 100.0, -5.0));
+    const auto gate = std::ranges::find(result.Currents, "SCR1.G", &Nodalys::ComponentCurrent::Name);
+    REQUIRE(gate != result.Currents.end());
+    CHECK_THAT(gate->Current, WithinAbs(-0.43, 1e-6));
 }

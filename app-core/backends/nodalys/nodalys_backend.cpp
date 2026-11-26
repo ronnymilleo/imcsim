@@ -7,8 +7,8 @@
 
 #include "backends/nodalys/compiler.h"
 #include "backends/nodalys/nodalys_results.h"
+#include "backends/nodalys/nodalys_unsupported_parts.h"
 #include "circuit/components/behavioral_source.h"
-#include "circuit/components/logic_part.h"
 #include "circuit/components/source.h"
 #include "circuit/components/subcircuit.h"
 #include "circuit/components/transmission_line.h"
@@ -155,40 +155,7 @@ NodalysBackend::NodalysBackend() {
     m_Capabilities.Analyses = NODALYS_ANALYSES;
     m_Capabilities.SupportsConcurrentRuns = true;
     m_Capabilities.FindPartProblem = FindPartProblem;
-    for (int index = 0; index <= static_cast<int>(LAST_COMPONENT_TYPE); ++index) {
-        const auto type = static_cast<ComponentType>(index);
-        if (IsLogicPart(type)) {
-            m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::SENSITIVITY][type] =
-                "Nodalys cannot run a sensitivity analysis on logic gates and flip-flops";
-            m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::AC_SENSITIVITY][type] =
-                "Nodalys cannot run an AC sensitivity analysis on logic gates and flip-flops";
-            m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::POLE_ZERO][type] =
-                "Pole-zero analysis is small-signal, and digital parts have no small-signal model";
-            m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::S_PARAMETERS][type] =
-                "S-parameters are small-signal, and digital parts have no small-signal RF model";
-        }
-    }
-    m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::HARMONIC_BALANCE][ComponentType::V_SWITCH] =
-        "Nodalys harmonic balance does not support hysteretic switches";
-    m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::HARMONIC_BALANCE][ComponentType::RELAY] =
-        "Nodalys harmonic balance does not support hysteretic relays";
-    m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::HARMONIC_BALANCE][ComponentType::THYRISTOR] =
-        "Nodalys harmonic balance does not support the latching thyristor";
-    m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::HARMONIC_BALANCE][ComponentType::TRIAC] =
-        "Nodalys harmonic balance does not support the latching TRIAC";
-    m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::HARMONIC_BALANCE][ComponentType::DIAC] =
-        "Nodalys harmonic balance does not support the latching DIAC";
-    m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::POLE_ZERO][ComponentType::THYRISTOR] =
-        "Pole-zero analysis is small-signal, and a thyristor blocks nearly open or conducts as a switch, whichever "
-        "the circuit last drove, so its frozen state has no roots the solver can place";
-    m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::POLE_ZERO][ComponentType::TRIAC] =
-        "Pole-zero analysis is small-signal, and a TRIAC blocks nearly open or conducts as a switch, whichever "
-        "the circuit last drove, so its frozen state has no roots the solver can place";
-    m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::POLE_ZERO][ComponentType::DIAC] =
-        "Pole-zero analysis is small-signal, and a DIAC blocks nearly open or conducts as a switch, whichever "
-        "the circuit last drove, so its frozen state has no roots the solver can place";
-    m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::POLE_ZERO][ComponentType::TRANSMISSION_LINE] =
-        "Pole-zero analysis does not support transmission lines, which have infinitely many poles and zeros";
+    AddNodalysUnsupportedParts(m_Capabilities);
 }
 
 /**

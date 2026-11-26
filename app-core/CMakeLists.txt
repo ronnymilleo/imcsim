@@ -22,6 +22,7 @@ add_library(imcsim-core-lib
             backends/nodalys/model_parser.cpp
             backends/nodalys/nodalys_backend.cpp
             backends/nodalys/nodalys_results.cpp
+            backends/nodalys/nodalys_unsupported_parts.cpp
             backends/nodalys/parameter_conversion.cpp
             backends/nodalys/spice_block_check.cpp
             circuit/behavioral_expression.cpp

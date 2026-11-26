@@ -1,6 +1,6 @@
 /**
  * @file    thyristor_device.h
- * @brief   Thyristor (SCR) and TRIAC of Nodalys: a latching switch fired by gate current and held on by its main
+ * @brief   Thyristor (SCR), TRIAC and GTO of Nodalys: a latching switch fired by gate current and held on by its main
  *          current.
  */
 
@@ -14,8 +14,8 @@ namespace Nodalys {
 
 /**
  * @class   ThyristorDevice
- * @brief   A thyristor (SCR) or TRIAC between its two main terminals and the gate: it blocks until a gate pulse fires
- *          it, then latches on until the main current falls below the holding current with the gate removed.
+ * @brief   A thyristor (SCR), TRIAC or GTO between its two main terminals and the gate: it blocks until a gate pulse
+ *          fires it, then latches on until the main current falls below the holding current with the gate removed.
  * @details The state follows the iterate of the current Newton solve and keeps itself between the firing and the
  *          release, so the latch provides the hysteresis: once released, the device fires again only on a new gate
  *          pulse or on breakover. The on-state is the datasheet line \f$V_{TM} = V_0 + R_T I_T\f$, stamped as
@@ -36,6 +36,12 @@ namespace Nodalys {
  *          The main current then carries the sign of the main-terminal voltage: between \f$-V_0\f$ and \f$+V_0\f$
  *          a conducting TRIAC carries only the off-state current, so its line is continuous and has one solution
  *          for every current, which keeps Newton off a reversed one when the voltage crosses zero.
+ *
+ *          With `ThyristorParameters::GateTurnOffCurrent` above zero the device is a GTO: a one-way main branch like
+ *          the SCR's, with a gate junction that mirrors about zero as the TRIAC's does. A conducting GTO whose gate
+ *          draws a negative current of magnitude at least \f$I_{GQ}\f$ releases whatever its main current, which
+ *          the holding current alone cannot do; a negative gate never fires it. The prediction of the next breakpoint
+ *          follows the gate current toward \f$-I_{GQ}\f$ as it follows the main current toward \f$I_H\f$.
  *
  *          Terminal indices: `0 = Anode (MT2)`, `1 = Cathode (MT1)`, `2 = Gate`. The gate is referenced to the
  *          cathode (MT1), through which its current returns.
@@ -66,9 +72,10 @@ private:
     /// One accepted time point of the main branch: the current the commutation prediction extrapolates from, and
     /// the voltage the dv/dt firing and the recovery re-fire read.
     struct AcceptedPoint {
-        double Time = 0.0;    ///< Instant of the point, in seconds.
-        double Current = 0.0; ///< Main current at the point, in Amperes.
-        double Voltage = 0.0; ///< Main-terminal voltage at the point, in Volts.
+        double Time = 0.0;        ///< Instant of the point, in seconds.
+        double Current = 0.0;     ///< Main current at the point, in Amperes.
+        double Voltage = 0.0;     ///< Main-terminal voltage at the point, in Volts.
+        double GateCurrent = 0.0; ///< Gate current at the point, in Amperes; the GTO turn-off prediction reads it.
     };
 
     /// The straight piece of the main branch a voltage falls on, as the current \f$i = G v + I_0\f$ it carries.
@@ -97,6 +104,10 @@ private:
     bool m_SavedIsDvDtFired = false;
 
     BranchLine OnStateLine(double voltage) const;
+    bool IsGateMirrored() const;
+    bool IsGateTurnOff(const std::vector<double> &x) const;
+    double PredictHoldingCurrentCrossing() const;
+    double PredictGateTurnOffCrossing() const;
     double MainCurrent(const std::vector<double> &x) const;
     double GateCurrent(const std::vector<double> &x) const;
     double Magnitude(double value) const;

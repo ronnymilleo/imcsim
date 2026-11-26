@@ -80,6 +80,12 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   gate lead. The gate drive must be referenced to the cathode (MT1), since the gate current returns through it; a
   TRIAC fires in all four gate quadrants. The Switching examples drive them: a half-wave controlled rectifier, one with an inductive load and a
   freewheeling diode, a controlled bridge, and a TRIAC light dimmer (see docs/models.md).
+- **GTOs**: a GTO (gate turn-off thyristor), in the same group, has the SCR's terminals, anode on terminal 1, cathode on
+  terminal 2 and gate on terminal 3, and two arrowheads on its gate lead. It fires and latches like an SCR, and a
+  negative gate current of at least IGQ, which its properties set, turns it off while the anode current still
+  flows. Its gate figures start as those of a power device (IGT 0.1 A, RG 1 Ohm, IGQ 2 A). Only Nodalys simulates
+  it: ngspice refuses a circuit with one, with the reason. The GTO chopper of the Switching examples shows it
+  (see docs/models.md).
 - **DIACs**: a DIAC, in the same group, is the gate-less trigger diode of a dimmer, MT2 on terminal 1 and MT1 on
   terminal 2. Its properties set the breakover voltage (VBO), the on-state line it snaps back to (V0 and RT), the
   blocking resistance and the holding current, and the label under the symbol shows VBO. It breaks over either way at
@@ -441,6 +447,7 @@ Every part with more than one terminal numbers them in the order the SPICE netli
 | Diode, Zener diode, LED | anode | cathode | |
 | Thyristor (SCR) | anode | cathode | gate |
 | TRIAC | MT2 | MT1 | gate |
+| GTO | anode | cathode | gate |
 | DIAC | MT2 | MT1 | |
 | Transmission line (TL) | port 1 center, upper left | port 1 shield, lower left | port 2 center, upper right (4: port 2 shield) |
 | Voltage source | positive (+) | negative (-) | |
@@ -483,7 +490,8 @@ imcsim reports currents as ngspice computes them:
 - **Relays** report two currents, `I(K1.S)` into the first contact terminal and `I(K1.C)` into the coil +. A
   voltage-controlled switch reports the current into its first contact terminal, like a two-terminal part.
 - **Thyristors** report one current per terminal, `I(SCR1.A)`, `I(SCR1.K)` and `I(SCR1.G)` for an SCR and
-  `I(TR1.MT2)`, `I(TR1.MT1)` and `I(TR1.G)` for a TRIAC, each positive into its terminal. The three add up to zero.
+  `I(TR1.MT2)`, `I(TR1.MT1)` and `I(TR1.G)` for a TRIAC and `I(GTO1.A)`, `I(GTO1.K)` and `I(GTO1.G)` for a GTO,
+  each positive into its terminal. The three add up to zero.
 - **DIACs** report one current like a two-terminal part, `I(DIAC1)`, positive from MT2 to MT1.
 - **Transmission lines** report `I(TL1.P1)` into the center of port 1 and `I(TL1.P2)` into the center of port 2,
   each positive into its terminal; the shield of each port carries the same current back.

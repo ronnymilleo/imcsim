@@ -338,6 +338,34 @@ Nodalys, and there is no breakover on ngspice.
   current over the run, since a current that flows both ways averages near zero; `VDRM`, `ITSM` and `I2t` read the
   magnitude, whichever way it flows.
 
+### GTOs
+
+A GTO (gate turn-off thyristor) is an SCR that the gate can also turn off: terminal 1 is the anode, terminal 2 the
+cathode and terminal 3 the gate, and the same figures as the SCR set it, plus **IGQ**, the negative gate current that
+turns it off. It fires on a gate current of at least IGT with a forward voltage and latches on, as the SCR does, but a
+conducting GTO whose gate draws a negative current of magnitude IGQ or more releases at once, whatever its anode
+current, where an SCR waits for the current to fall below IH. That is what makes a chopper or a forced-commutated
+converter out of it: a firing pulse switches the load on, a turn-off pulse switches it off with the supply still driving
+it. A negative gate never fires it, and one below IGQ leaves it on. The gate drive is referenced to the cathode, which
+the gate current returns through, and the gate junction conducts both ways, with the same threshold VGT and resistance RG
+either way, so the turn-off current is $(|v_G| - V_{GT}) / R_G$: choose the pulse and RG to draw more than IGQ. A new GTO
+starts with figures of a power device, IGT of 0.1 A, RG of 1 Ohm and IGQ of 2 A, a fifth of the 10 A it switches. IGQ
+is a GTO figure only: the SCR and the TRIAC have none, and a GTO with IGQ at 0 has no gate turn-off, so it
+runs as an SCR with the gate of a power device.
+
+Nodalys simulates it as the SCR's latching device with a positive gate turn-off current, which mirrors the gate
+junction about zero and adds the release on the negative gate current; the next turn-off is predicted from the gate
+current as the commutation is from the main one, so the transient lands on it. The turn-off time tq, when set, opens
+the same recovery window after a gate turn-off. **ngspice refuses the GTO**, with the reason: its two-transistor pair
+has no turn-off to model, and a subcircuit of one has not been tuned. The Netlist window and the export still show a
+GTO as an instance of an `imcsim_gto` subcircuit, the SCR's pair with a path that pulls the base of the NPN out through
+a negative gate, which no run checks. A harmonic balance and a pole-zero are refused as for the SCR.
+
+- **The GTO chopper** of the Switching examples switches 9.9 A of a 100 V supply into 10 Ohm at 1 kHz with two 20 us
+  gate pulses, +5 V to fire and -15 V to turn off, which draw 4.2 A and 14.2 A through the 1 Ohm gate.
+- The limits are those of the SCR. The turn-off here is instantaneous: there is no storage time, no tail current and
+  no turn-off snubber loss, and the on-state line is not slowed by the gate. **Ratings** are those of the SCR.
+
 ### DIACs
 
 A DIAC is the trigger diode of a light dimmer: two terminals, MT2 (terminal 1) and MT1 (terminal 2), and no gate. It

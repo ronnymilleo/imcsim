@@ -324,6 +324,7 @@ std::expected<void, std::string> AddSwitchingPart(Nodalys::CircuitBuilder &build
         return {};
     case ComponentType::THYRISTOR:
     case ComponentType::TRIAC:
+    case ComponentType::GTO:
         builder.AddThyristor(entry.Name,
                              nodes[0],
                              nodes[1],

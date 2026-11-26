@@ -53,6 +53,11 @@ constexpr auto THYRISTOR_FIELDS = std::to_array<ParameterField<Core::ThyristorPa
     {"I2t", &Core::ThyristorParameters::MaxI2t, "A2s"},
 });
 
+/// The extra figure of a GTO, drawn below the thyristor ones.
+constexpr auto GATE_TURN_OFF_FIELDS = std::to_array<ParameterField<Core::ThyristorParameters>>({
+    {"IGQ", &Core::ThyristorParameters::GateTurnOffCurrent, "A"},
+});
+
 constexpr auto DIAC_FIELDS = std::to_array<ParameterField<Core::DiacParameters>>({
     {"VBO", &Core::DiacParameters::BreakoverVoltage, "V"},
     {"V0", &Core::DiacParameters::OnThresholdVoltage, "V"},
@@ -91,10 +96,10 @@ void LoadElectromechanicalFields(ElectromechanicalFields &fields, const Core::Co
         LoadParameterFields(RELAY_FIELDS, fields.Relay, static_cast<const Core::Relay &>(component).GetParameters());
     } else if (type == Core::ComponentType::FUSE) {
         LoadParameterFields(FUSE_FIELDS, fields.Fuse, static_cast<const Core::Fuse &>(component).GetParameters());
-    } else if (type == Core::ComponentType::THYRISTOR || type == Core::ComponentType::TRIAC) {
-        LoadParameterFields(THYRISTOR_FIELDS,
-                            fields.Thyristor,
-                            static_cast<const Core::Thyristor &>(component).GetParameters());
+    } else if (Core::IsThyristor(type)) {
+        const Core::ThyristorParameters &parameters = static_cast<const Core::Thyristor &>(component).GetParameters();
+        LoadParameterFields(THYRISTOR_FIELDS, fields.Thyristor, parameters);
+        LoadParameterFields(GATE_TURN_OFF_FIELDS, fields.GateTurnOff, parameters);
     } else if (type == Core::ComponentType::DIAC) {
         LoadParameterFields(DIAC_FIELDS, fields.Diac, static_cast<const Core::Diac &>(component).GetParameters());
     } else if (type == Core::ComponentType::TRANSFORMER) {
@@ -190,20 +195,31 @@ void DrawFuse(Core::Fuse &fuse, ElectromechanicalFields &fields, Schematic &sche
 
 /**
  * @brief   The thyristor fires at the gate trigger current, latches on, and releases below the holding current; a
- *          TRIAC does so both ways, firing in all four gate quadrants.
+ *          TRIAC does so both ways, firing in all four gate quadrants, and a GTO also turns off on a negative gate
+ *          current of IGQ.
  */
 void DrawThyristor(Core::Thyristor &thyristor, ElectromechanicalFields &fields, Schematic &schematic) {
     Core::ThyristorParameters parameters = thyristor.GetParameters();
+    const bool is_gto = thyristor.GetType() == Core::ComponentType::GTO;
     const auto is_valid = [](const Core::ThyristorParameters &candidate) {
         return Core::Thyristor::IsValidParameters(candidate);
     };
-    if (DrawParameterFields(THYRISTOR_FIELDS, fields.Thyristor, "", is_valid, parameters)) {
+    bool is_changed = DrawParameterFields(THYRISTOR_FIELDS, fields.Thyristor, "", is_valid, parameters);
+    if (is_gto) {
+        is_changed =
+            DrawParameterFields(GATE_TURN_OFF_FIELDS, fields.GateTurnOff, "", is_valid, parameters) || is_changed;
+    }
+    if (is_changed) {
         thyristor.SetParameters(parameters);
         schematic.MarkModified();
     }
     const bool is_triac = thyristor.GetType() == Core::ComponentType::TRIAC;
     ImGui::TextDisabled("Fires at IGT, latches on, and releases when the %s current falls below IH",
                         is_triac ? "main" : "anode");
+    if (is_gto) {
+        ImGui::TextDisabled("A negative gate current of at least IGQ turns it off while the anode current flows; "
+                            "Nodalys only, and 0 disables it");
+    }
     if (is_triac) {
         ImGui::TextDisabled("Conducts both ways and fires in all four gate quadrants; the gate is referenced to MT1");
     }
