@@ -21,7 +21,8 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   and Random sources for the transient: white, 1/f and telegraph noise, or values drawn from a distribution and held
   for each step
 - Diodes, Zener diodes, LEDs, NPN and PNP bipolar transistors, and N- and P-channel MOSFETs, each with ready models,
-  custom SPICE parameters or a vendor's `.model` imported from a library
+  custom SPICE parameters or a vendor's `.model` imported from a library; IGBTs from datasheet figures, with the tail
+  current of their turn-off, on the Nodalys engine
 - Blocks: part of a schematic grouped into a reusable part with named pins on any edge and parameters each instance
   can set, edited in place, with its wires routed around it; blocks inside blocks, entered level by level; and a
   vendor's subcircuits, such as op-amp models, imported from a SPICE library as blocks kept as text, following its
@@ -128,7 +129,7 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   characteristics, a current mirror, common-emitter and class AB amplifiers, the stability of a common-emitter stage,
   the Monte Carlo spread of a bias point, an astable multivibrator started by an initial voltage, a bistable whose state
   a nodeset picks, op-amp amplifiers and their input offsets, an integrator, a Schmitt trigger and a Sallen-Key filter
-  with the part that sets its corner, an ideal transformer made of controlled sources, switching circuits, thyristor ones (a half-wave controlled rectifier, one with an inductive load and a freewheeling diode, a controlled bridge, a TRIAC light dimmer and one triggered by a DIAC), transmission lines (reflections on a mismatched line and a quarter-wave transformer), digital ones
+  with the part that sets its corner, an ideal transformer made of controlled sources, switching circuits, thyristor ones (a half-wave controlled rectifier, one with an inductive load and a freewheeling diode, a controlled bridge, a TRIAC light dimmer and one triggered by a DIAC, a GTO chopper), an IGBT chopper with an inductive load, transmission lines (reflections on a mismatched line and a quarter-wave transformer), digital ones
   (gates, a truth table of the basic gates, half and full adders, an SR latch, a ripple counter, a decoder with logic
   outputs and a decade counter on a 7-segment display), and blocks: one RC filter used twice, an 8-bit counter of two
   4-bit blocks, and a precision rectifier from a vendor's op-amp and diode models

@@ -9,6 +9,7 @@
 #include "circuit/components/controlled_source.h"
 #include "circuit/components/current_source.h"
 #include "circuit/components/diode.h"
+#include "circuit/components/igbt.h"
 #include "circuit/components/logic_input.h"
 #include "circuit/components/logic_part.h"
 #include "circuit/components/mosfet.h"
@@ -386,6 +387,32 @@ TEST_CASE("A custom diode from an older file takes its ratings from the default 
     const Core::DiodeParameters &defaults = Core::GetDiodeModels(Core::ComponentType::DIODE).front().Parameters;
     CHECK(diode.GetParameters().MaxForwardCurrent == defaults.MaxForwardCurrent);
     CHECK(diode.GetParameters().MaxPower == defaults.MaxPower);
+}
+
+TEST_CASE("An IGBT keeps its model or its custom figures", "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::IGBT, {0, 0}, GUI::Rotation::R0));
+    auto &ready = static_cast<Core::IGBT &>(elements.back()->GetComponent());
+    ready.SetName("Q1");
+    ready.SetModel(*Core::FindIGBTModel(Core::ComponentType::IGBT, "1200V 40A"));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::IGBT, {6, 0}, GUI::Rotation::R0));
+    auto &custom = static_cast<Core::IGBT &>(elements.back()->GetComponent());
+    custom.SetName("Q2");
+    Core::IGBTParameters figures = custom.GetParameters();
+    figures.TailTimeConstant = 400e-9;
+    figures.DiodeForwardVoltage = 0.0;
+    custom.SetCustomParameters(figures);
+
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 2);
+    const auto &ready_copy = static_cast<const Core::IGBT &>(loaded.Elements[0]->GetComponent());
+    CHECK(std::string_view(ready_copy.GetModelName()) == "1200V 40A");
+    const auto &custom_copy = static_cast<const Core::IGBT &>(loaded.Elements[1]->GetComponent());
+    CHECK(custom_copy.IsCustom());
+    CHECK(custom_copy.GetParameters().TailTimeConstant == 400e-9);
+    CHECK(custom_copy.GetParameters().DiodeForwardVoltage == 0.0);
+    CHECK(custom_copy.GetParameters().OnResistance == figures.OnResistance);
 }
 
 TEST_CASE("Transistors keep their model or custom parameters", "[schematic_file]") {

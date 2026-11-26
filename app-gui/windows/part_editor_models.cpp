@@ -73,6 +73,24 @@ constexpr auto MOSFET_FIELDS = std::to_array<ParameterField<Core::MOSFETParamete
     {"P max", &Core::MOSFETParameters::MaxPower, "W"},
 });
 
+constexpr auto IGBT_FIELDS = std::to_array<ParameterField<Core::IGBTParameters>>({
+    {"VGE(th)", &Core::IGBTParameters::GateThresholdVoltage, "V"},
+    {"gfs", &Core::IGBTParameters::Transconductance, "S"},
+    {"gfs at IC", &Core::IGBTParameters::TransconductanceCurrent, "A"},
+    {"V0", &Core::IGBTParameters::OnThresholdVoltage, "V"},
+    {"RCE", &Core::IGBTParameters::OnResistance, "Ohm"},
+    {"Cies", &Core::IGBTParameters::InputCapacitance, "F"},
+    {"Coes", &Core::IGBTParameters::OutputCapacitance, "F"},
+    {"Cres", &Core::IGBTParameters::ReverseTransferCapacitance, "F"},
+    {"Tail share", &Core::IGBTParameters::TailFraction, ""},
+    {"Tail tau", &Core::IGBTParameters::TailTimeConstant, "s"},
+    {"Diode VF", &Core::IGBTParameters::DiodeForwardVoltage, "V"},
+    {"VCES", &Core::IGBTParameters::MaxCollectorEmitterVoltage, "V"},
+    {"VGES", &Core::IGBTParameters::MaxGateEmitterVoltage, "V"},
+    {"IC max", &Core::IGBTParameters::MaxCollectorCurrent, "A"},
+    {"P max", &Core::IGBTParameters::MaxPower, "W"},
+});
+
 /// Datasheet specifications, from which the macromodel is built.
 constexpr auto OP_AMP_FIELDS = std::to_array<ParameterField<Core::OpAmpParameters>>({
     {"Avol", &Core::OpAmpParameters::OpenLoopGainDecibels, "dB"},
@@ -183,7 +201,7 @@ void DrawOpAmpInputStage(Core::OpAmp &op_amp, Schematic &schematic) {
 } // namespace
 
 /**
- * @brief   The custom parameters of diodes, transistors and op-amps, and the bandwidth of the ideal op-amp.
+ * @brief   The custom parameters of diodes, transistors, IGBTs and op-amps, and the bandwidth of the ideal op-amp.
  */
 void LoadModelFields(ModelFields &fields, const Core::Component &component, ValueField &main_value) {
     const Core::ComponentType type = component.GetType();
@@ -193,6 +211,8 @@ void LoadModelFields(ModelFields &fields, const Core::Component &component, Valu
         LoadParameterFields(BJT_FIELDS, fields.BJT, static_cast<const Core::BJT &>(component).GetParameters());
     } else if (Core::IsMOSFET(type)) {
         LoadParameterFields(MOSFET_FIELDS, fields.MOSFET, static_cast<const Core::MOSFET &>(component).GetParameters());
+    } else if (Core::IsIGBT(type)) {
+        LoadParameterFields(IGBT_FIELDS, fields.IGBT, static_cast<const Core::IGBT &>(component).GetParameters());
     } else if (type == Core::ComponentType::OP_AMP) {
         const auto &op_amp = static_cast<const Core::OpAmp &>(component);
         LoadParameterFields(OP_AMP_FIELDS, fields.OpAmp, op_amp.GetParameters());
@@ -245,6 +265,22 @@ void DrawMOSFET(Core::MOSFET &mosfet, ModelFields &fields, Schematic &schematic)
         ImGui::TextDisabled("Level 1: ID = KP/2 W/L (VGS - VTO)^2; VTO is negative for PMOS");
         ImGui::TextDisabled("The max ratings are checked after each simulation");
     }
+}
+
+/**
+ * @brief   An IGBT runs on Nodalys only; when custom, the fields are the figures of its datasheet.
+ */
+void DrawIGBT(Core::IGBT &igbt, ModelFields &fields, Schematic &schematic) {
+    if (DrawModelChoice(igbt, Core::GetIGBTModels(), Core::CUSTOM_IGBT_MODEL_NAME, IGBT_FIELDS, fields.IGBT)) {
+        schematic.MarkModified();
+    }
+    if (igbt.IsCustom()) {
+        ImGui::TextDisabled("IC is the smaller of the channel, from VGE(th) and gfs, and the line V0 + RCE IC");
+        ImGui::TextDisabled("The tail starts at its share of the current cut and decays with tau; a diode VF of 0 "
+                            "leaves the diode out");
+        ImGui::TextDisabled("VCES, VGES, IC max and P max are checked after each simulation");
+    }
+    ImGui::TextDisabled("Nodalys simulates the IGBT; ngspice refuses it");
 }
 
 /**

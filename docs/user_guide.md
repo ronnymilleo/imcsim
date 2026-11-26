@@ -72,6 +72,13 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   the run: the branch loses its current at that instant, the symbol breaks with a gap, and the Output window warns when
   it blew. A fuse inside a block is simulated, but its blow is not drawn or warned about. Every run starts with a whole fuse, and an operating point, a DC sweep and an AC sweep always see it closed.
   The Protection example compares a fast and a slow-blow fuse (see docs/models.md).
+- **IGBTs**: an IGBT is in the Transistors group of the part rail, with the collector on terminal 1, the gate on
+  terminal 2 and the emitter on terminal 3, drawn as a bipolar transistor with an insulated gate plate. Its properties
+  pick a ready model (600V 30A or 1200V 40A, both with a co-packaged diode) or set the figures of a datasheet: the gate
+  threshold, the transconductance, the on-state line V0 + RCE IC, the three capacitances, the share and time constant
+  of the tail current that flows on after a turn-off, the forward voltage of the diode (0 leaves it out) and the
+  ratings. Only Nodalys simulates it: ngspice refuses a circuit with one, with the reason. The IGBT chopper of the
+  Switching examples shows the Miller plateau and the tail (see docs/models.md).
 - **Thyristors**: a thyristor (SCR) and a TRIAC are in the Switches and fuses group of the part rail. The SCR has anode
   on terminal 1, cathode on terminal 2, gate on terminal 3; the TRIAC has MT2 on terminal 1, MT1 on terminal 2, gate
   on terminal 3, and conducts both ways. Their properties set the on-state line (V0 and RT), the holding and trigger
@@ -218,7 +225,7 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   warnings, or failed, followed by the reason, which then takes the whole line), then the keys of the current mode, shortened at a word
   when the window is narrow, and the grid position of the cursor on the right. Click the result for the
   errors, the warnings and the ngspice output. Among the warnings are the safe operating area ones: a diode, LED,
-  Zener, transistor, MOSFET, thyristor or TRIAC that a run pushes past its ratings (diode average forward current and power,
+  Zener, transistor, MOSFET, IGBT, thyristor or TRIAC that a run pushes past its ratings (diode average forward current and power,
   the VCE, IC, VDS, VGS, ID and power of transistors, and the VDRM, on-state current, ITSM and I2t of thyristors) is named
   with the value and the rating. Ratings are fields of a part's properties (IF max, the average forward current, P max,
   ...) and are only checked for ready and custom models, not for library ones; a thyristor's ratings start at 0, which
@@ -455,6 +462,7 @@ Every part with more than one terminal numbers them in the order the SPICE netli
 | Current source | tail of its arrow | head of its arrow | |
 | NPN or PNP transistor | collector | base | emitter |
 | N- or P-channel MOSFET | drain | gate | source |
+| IGBT | collector | gate | emitter |
 | VCVS or VCCS (E, G) | output, top of the diamond | output, bottom | control + (4: control -) |
 | CCCS or CCVS (F, H) | output, top of the diamond | output, bottom | |
 | Behavioral source (B) | +, top of the diamond | -, bottom | |
@@ -482,7 +490,8 @@ imcsim reports currents as ngspice computes them:
   current leaves it through its positive terminal, so it reports a **negative** current. A 5 V supply feeding
   2.5 mA into a circuit reports -2.5 mA.
 - **Transistors** report one current per terminal, `I(Q1.C)`, `I(Q1.B)` and `I(Q1.E)`, each positive into its
-  terminal. The three always add up to zero.
+  terminal. The three always add up to zero. An IGBT reports `I(Q1.C)`, `I(Q1.G)` and `I(Q1.E)` the same way; the
+  collector current includes its co-packaged diode, which carries it backward.
 - **Potentiometers** report one current per terminal, `I(RV1.A)` for the first end, `I(RV1.B)` for the second and
   `I(RV1.W)` for the wiper, each positive into its terminal. The three always add up to zero.
 - **Switches and push buttons** report one current like a two-terminal part, positive from terminal 1 to terminal 2;

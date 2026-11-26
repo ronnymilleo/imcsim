@@ -6,6 +6,7 @@
 #include "compiler/circuit_compiler.h"
 
 #include "compiler/macromodels/electromechanical_macromodels.h"
+#include "compiler/macromodels/igbt_macromodel.h"
 #include "compiler/macromodels/logic_macromodels.h"
 #include "compiler/macromodels/opamp_macromodels.h"
 #include "devices/passive/fuse_device.h"
@@ -21,6 +22,8 @@
 #include <cmath>
 #include <format>
 #include <memory>
+#include <optional>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -169,6 +172,14 @@ void CircuitCompiler::Lower(const FuseSpec &spec) {
 
 void CircuitCompiler::Lower(const IdealOpAmpSpec &spec) {
     CompileIdealOpAmp(*this, spec);
+}
+
+void CircuitCompiler::Lower(const IgbtSpec &spec) {
+    if (const std::optional<std::string> problem = CheckIgbt(spec)) {
+        m_Errors.push_back(*problem);
+        return;
+    }
+    CompileIgbt(*this, spec);
 }
 
 void CircuitCompiler::Lower(IndependentSourceSpec &spec) {

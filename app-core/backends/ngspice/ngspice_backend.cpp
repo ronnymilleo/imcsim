@@ -364,7 +364,9 @@ const BackendCapabilities &NgspiceBackend::GetCapabilities() const {
                                  {ComponentType::TRIAC,
                                   "TRIACs are simulated natively by Nodalys; switch the simulator backend to Nodalys"},
                                  {ComponentType::GTO,
-                                  "GTOs are simulated natively by Nodalys; switch the simulator backend to Nodalys"}},
+                                  "GTOs are simulated natively by Nodalys; switch the simulator backend to Nodalys"},
+                                 {ComponentType::IGBT,
+                                  "IGBTs are simulated natively by Nodalys; switch the simulator backend to Nodalys"}},
             .UnsupportedPartsByAnalysis = {},
             .UnsupportedWithNodesets = {{AnalysisKind::TRANSFER_FUNCTION,
                                          "ngspice crashes in a transfer function when the circuit has a nodeset, and "

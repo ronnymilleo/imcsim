@@ -785,6 +785,42 @@ Ready models: 2N7000, BS170 and IRF540N (N-channel), BS250 and IRF9540N (P-chann
   capacitances of power MOSFETs, and temperature. Level 1 is fine for switching and biasing studies, rough for
   precise analog work.
 
+## IGBTs
+
+An IGBT is the MOS-gated bipolar switch of power converters: terminal 1 is the collector, terminal 2 the gate and
+terminal 3 the emitter. Its model takes the figures a datasheet gives:
+
+| Figure | Meaning |
+|---|---|
+| VGE(th) | gate voltage the channel opens at |
+| gfs, gfs at IC | transconductance and the collector current it is given at; the channel carries K/2 (VGE - VGE(th))² with K = gfs² / (2 IC) |
+| V0, RCE | the on-state line VCE(sat) = V0 + RCE × IC of the conducting part |
+| Cies, Coes, Cres | input, output and reverse transfer capacitances, constant |
+| Tail share, tail tau | the tail current of a turn-off: a share of the current that fell, decaying with tau |
+| Diode VF | forward voltage of the co-packaged diode at the rated current; 0 leaves the diode out |
+| VCES, VGES, IC max, P max | ratings, checked after each simulation |
+
+Ready models: 600V 30A and 1200V 40A, typical figures of two classes of trench IGBT with a co-packaged diode rather
+than of one part number (the 1200 V one has the longer tail).
+
+**Only Nodalys simulates the IGBT**; ngspice refuses it with the reason. The Netlist window and the export write it as
+an instance of an `imcsim_igbt` subcircuit, the classic picture of an N-channel MOSFET driving the base of a PNP, which
+no run checks. Nodalys runs it as one device whose current is the smaller of the channel and the on-state line, blended
+smoothly so every analysis can linearize it, with the three capacitances around it and the diode from emitter to
+collector ([`nodalys/igbt_device.md`](nodalys/igbt_device.md)):
+
+- **Switching**: the gate-collector capacitance Cres makes the Miller plateau, where the gate holds while the collector
+  swings, so a gate resistor sets the switching speed. At turn-off the collector current does not stop with the
+  channel: a tail of its share of the current flows on and decays with tau, which is where an IGBT loses its switching
+  energy.
+- **The IGBT chopper** of the Switching examples switches 200 V into a 1 mH, 10 Ohm load at 10 kHz with a freewheeling
+  diode, and shows the tail at each turn-off.
+- **Ratings**: VCE and VGE are checked at their peak, IC at its peak (the co-packaged diode counts, as the package
+  carries it), and power on its average over the run.
+- Not modeled: capacitances that fall with the collector voltage, a tail that depends on the voltage or the
+  temperature, avalanche, latch-up, short-circuit withstand and temperature. The reverse blocking is the leakage alone,
+  without breakdown. Every analysis takes it, the harmonic balance and the pole-zero included, since it has no latch.
+
 ## Op-amps
 
 Terminals: output, non-inverting input (+), inverting input (-), V+ and V-. An op-amp is either ideal or a Boyle

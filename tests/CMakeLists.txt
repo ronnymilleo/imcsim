@@ -55,6 +55,7 @@ add_executable(imcsim-tests
             glow_falloff_tests.cpp
             group_editing_tests.cpp
             gto_tests.cpp
+            igbt_tests.cpp
             harmonic_balance_samples_tests.cpp
             harmonic_balance_view_tests.cpp
             heat_glow_tests.cpp

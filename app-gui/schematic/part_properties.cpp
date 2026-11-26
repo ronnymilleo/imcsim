@@ -7,6 +7,7 @@
 
 #include "circuit/components/bjt.h"
 #include "circuit/components/diode.h"
+#include "circuit/components/igbt.h"
 #include "circuit/components/logic_part.h"
 #include "circuit/components/mosfet.h"
 #include "circuit/components/op_amp.h"
@@ -66,10 +67,11 @@ bool HasPropertyFields(const Core::Component &component) {
 }
 
 /**
- * @brief   Whether a model sets the part: diodes, transistors and op-amps.
+ * @brief   Whether a model sets the part: diodes, transistors, IGBTs and op-amps.
  */
 bool HasModelChoice(const Core::ComponentType type) {
-    return Core::IsDiode(type) || Core::IsBJT(type) || Core::IsMOSFET(type) || type == Core::ComponentType::OP_AMP;
+    return Core::IsDiode(type) || Core::IsBJT(type) || Core::IsMOSFET(type) || Core::IsIGBT(type)
+        || type == Core::ComponentType::OP_AMP;
 }
 
 /**
@@ -85,6 +87,9 @@ bool ShowsValueFields(const Core::Component &component) {
     }
     if (Core::IsMOSFET(type)) {
         return static_cast<const Core::MOSFET &>(component).IsCustom();
+    }
+    if (Core::IsIGBT(type)) {
+        return static_cast<const Core::IGBT &>(component).IsCustom();
     }
     // The ideal op-amp has its gain-bandwidth product to edit
     if (type == Core::ComponentType::OP_AMP) {

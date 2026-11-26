@@ -94,6 +94,7 @@ private:
     void Lower(const DiodeSpec &spec);
     void Lower(const FuseSpec &spec);
     void Lower(const IdealOpAmpSpec &spec);
+    void Lower(const IgbtSpec &spec);
     void Lower(IndependentSourceSpec &spec);
     void Lower(const InductorSpec &spec);
     void Lower(const InitialVoltageSpec &spec);

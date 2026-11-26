@@ -64,6 +64,34 @@ CircuitBuilder &CircuitBuilder::AddBjt(std::string name,
 }
 
 /**
+ * @brief   Adds an N-channel IGBT, with the capacitances of its datasheet and, when its figures give one, the diode
+ *          from emitter to collector that many IGBTs carry in the same package.
+ * @details It reports the currents into its collector, gate and emitter as `name.C`, `name.G` and `name.E`, each
+ *          summing the conduction, the capacitors and the diode on that terminal.
+ * @param[in] name       Element designator.
+ * @param[in] collector  Collector node.
+ * @param[in] gate       Gate node.
+ * @param[in] emitter    Emitter node.
+ * @param[in] params     Datasheet figures.
+ * @return  Reference to this builder for chaining.
+ */
+CircuitBuilder &CircuitBuilder::AddIgbt(std::string name,
+                                        const NodeId collector,
+                                        const NodeId gate,
+                                        const NodeId emitter,
+                                        const IgbtParameters &params) {
+    m_Impl->Description.TrackNodes({collector, gate, emitter});
+    m_Impl->Description.Elements.push_back(IgbtSpec{
+        .Name = std::move(name),
+        .Collector = collector,
+        .Gate = gate,
+        .Emitter = emitter,
+        .Params = params,
+    });
+    return *this;
+}
+
+/**
  * @brief   Adds an NMOS or PMOS field-effect transistor using the SPICE level-1 Shichman-Hodges model.
  * @param[in] name     Element designator.
  * @param[in] drain    Drain node.

@@ -199,6 +199,15 @@ struct RelaySpec {
     SwitchParameters ContactParams;
 };
 
+/// Specification for an IGBT, with its capacitances and its optional co-packaged diode.
+struct IgbtSpec {
+    std::string Name;
+    NodeId Collector = 0;
+    NodeId Gate = 0;
+    NodeId Emitter = 0;
+    IgbtParameters Params;
+};
+
 /// Specification for a linear resistor (`R` element).
 struct ResistorSpec {
     std::string Name;
@@ -287,6 +296,7 @@ struct CircuitDescription {
                                      DiodeSpec,
                                      FuseSpec,
                                      IdealOpAmpSpec,
+                                     IgbtSpec,
                                      IndependentSourceSpec,
                                      InductorSpec,
                                      InitialVoltageSpec,
