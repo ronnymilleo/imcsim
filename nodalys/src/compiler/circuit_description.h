@@ -217,13 +217,15 @@ struct SwitchSpec {
     SwitchParameters Params;
 };
 
-/// Specification for a latching thyristor (SCR) or TRIAC.
+/// Specification for a latching thyristor (SCR), TRIAC or DIAC.
 struct ThyristorSpec {
     std::string Name;
     NodeId Anode = 0;
     NodeId Cathode = 0;
     NodeId Gate = 0;
     ThyristorParameters Params;
+    /// False for a DIAC, whose gate is its MT1 and which reports one current, as a two-terminal part does.
+    bool HasGate = true;
 };
 
 /// Specification for a two-winding magnetically coupled transformer macromodel.
