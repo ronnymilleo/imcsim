@@ -239,9 +239,8 @@ blows when the heat reaches 1.015, a margin above the 1 that the rated current s
   or sigmoid: the heat follows the equation above exactly, the fuse opens when it reaches 1.015, and the resistance
   goes from cold to blown over a ten-thousandth of `tau`. Its blow time matches the closed form, and ngspice sits within
   3% of it, up to 1.7% earlier close to the threshold, where the sigmoid of its latch starts to open the fuse a little
-  before 1.015. A circuit with a fuse runs with the Gear integration on both. Nodalys writes no rating warnings, so the
-  "blew at" text of the Output window is not added to its results; the schematic and its flash read the blow from the
-  results and show it.
+  before 1.015. A circuit with a fuse runs with the Gear integration on both. The "blew at" warning is read from the
+  results, so both engines give it, and the schematic and its flash read the blow from the results the same way.
 - A fuse is a model of the thermal state, not of the arc: there is no breaking capacity, arc voltage or voltage rating,
   no temperature dependence of the cold resistance, and the part carries a current through its probe like a switch.
   In a noise analysis the model adds none.
