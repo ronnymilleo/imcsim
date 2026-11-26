@@ -55,6 +55,7 @@
 #                          harmonic balance of the SCR, which Nodalys disables with the reason
 #   Transmission lines     transmission_line_reflections (transient) and transmission_line_quarter_wave
 #                          (S-parameters): Nodalys runs both, ngspice refuses the part with the reason
+#   DIAC                   diac_triac_dimmer (transient): Nodalys runs it, ngspice refuses the DIAC with the reason
 #   PWL import             fixtures/pwl_import_rc_low_pass, whose source takes fixtures/pwl_sine_100_points.csv
 #                          through Import CSV... in its properties, shown then as a summary of its points
 #   Live run               switches_and_or (a switch flipped), fixtures/potentiometer_live (the LED dimmer, with a
@@ -537,18 +538,20 @@ check_live_potentiometer() {
 check_parts() {
     check_circuit_run transient_thyristor controlled_rectifier_half_wave Spectrum
     check_circuit_run transient_triac triac_dimmer Spectrum
-    check_transmission_line transmission_line_transient transmission_line_reflections Spectrum
-    check_transmission_line transmission_line_s_parameters transmission_line_quarter_wave Smith
+    check_nodalys_only transmission_line_transient transmission_line_reflections Spectrum 'Transmission lines'
+    check_nodalys_only transmission_line_s_parameters transmission_line_quarter_wave Smith 'Transmission lines'
+    check_nodalys_only transient_diac diac_triac_dimmer Spectrum 'DIACs'
     check_pwl_import
 }
 
-# Nodalys runs a circuit with a transmission line and ngspice refuses it, naming Nodalys: NAME, CIRCUIT, WORD
-check_transmission_line() {
-    local name=$1 circuit=$2 word=$3
+# Nodalys runs a circuit with a part only it simulates, and ngspice refuses it naming the part: NAME, CIRCUIT, WORD,
+# then the REASON the refusal must give
+check_nodalys_only() {
+    local name=$1 circuit=$2 word=$3 reason=$4
     open_circuit "$circuit"
     run_and_wait
     if [[ "$ENGINE" == ngspice ]]; then
-        check_step "${name}_refused" '' failed 'Transmission lines'
+        check_step "${name}_refused" '' failed "$reason"
     else
         check_step "$name" "$word" "done"
     fi

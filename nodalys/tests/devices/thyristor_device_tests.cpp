@@ -477,3 +477,76 @@ TEST_CASE("A conducting TRIAC follows its main-terminal voltage across zero onto
     CHECK_THAT(LoadVoltageAt(result, 0.6e-3), WithinAbs(-9.099, 0.01));
     CHECK_THAT(LoadVoltageAt(result, 0.95e-3), WithinAbs(-9.099, 0.01));
 }
+
+TEST_CASE("A DIAC breaks over at its breakover voltage, snaps back and releases below its holding current",
+          "[nodalys][thyristor][diac]") {
+    // A relaxation oscillator: 50 V charges 100 nF through 100 kOhm, and the DIAC across the capacitor discharges it
+    // into 100 Ohm each time its voltage reaches the 32 V breakover. The DIAC snaps back to the 27 V on-state line,
+    // the capacitor falls until the current drops below 1 mA, and the ramp starts again. The supply steps up from
+    // 0 V, since the oscillator has no operating point to start from
+    constexpr int OSCILLATOR_SUPPLY = 1;
+    constexpr int OSCILLATOR_CAPACITOR = 2;
+    constexpr int OSCILLATOR_DISCHARGE = 3;
+    const Nodalys::PulseParameters step{.Low = 0.0, .High = 50.0, .Delay = 0.0, .Width = 1.0, .Period = 10.0};
+    Nodalys::CircuitBuilder builder;
+    builder.AddVpulse("V1", OSCILLATOR_SUPPLY, 0, step);
+    builder.AddResistor("R1", OSCILLATOR_SUPPLY, OSCILLATOR_CAPACITOR, 100e3);
+    builder.AddCapacitor("C1", OSCILLATOR_CAPACITOR, 0, 100e-9);
+    builder.AddDiac("DIAC1", OSCILLATOR_CAPACITOR, OSCILLATOR_DISCHARGE, Nodalys::DiacParameters{});
+    builder.AddResistor("R2", OSCILLATOR_DISCHARGE, 0, 100.0);
+    auto circuit = builder.Build();
+    REQUIRE(circuit.has_value());
+    const Nodalys::TransientResult result = RunTransient(*circuit, 20e-3, 1e-6);
+    const std::vector<double> &voltages = result.NodeVoltages[OSCILLATOR_CAPACITOR];
+    // The capacitor never charges past the breakover, and each discharge stops near the on-state threshold plus
+    // the drop of the holding current across both resistances
+    const auto [lowest, highest] = std::ranges::minmax(
+        std::vector<double>(voltages.begin() + static_cast<std::ptrdiff_t>(voltages.size() / 2), voltages.end()));
+    CHECK_THAT(highest, WithinAbs(32.0, 0.1));
+    CHECK_THAT(lowest, WithinAbs(27.0, 0.2));
+    // It fires more than once: the discharge resistor sees a pulse at each breakover
+    const std::vector<double> &current = CurrentTrace(result, "DIAC1");
+    int pulses = 0;
+    for (std::size_t i = 1; i < current.size(); ++i) {
+        if (current[i] > 10e-3 && current[i - 1] <= 10e-3) {
+            ++pulses;
+        }
+    }
+    CHECK(pulses >= 3);
+}
+
+TEST_CASE("A DIAC fires a TRIAC at the same angle of each half-cycle of a light dimmer", "[nodalys][thyristor][diac]") {
+    // A 170 V, 60 Hz line feeds a 100 Ohm lamp through a TRIAC; R2 and C1 across the TRIAC time the firing, and the
+    // DIAC from C1 to the gate fires it when C1 reaches the 32 V breakover
+    constexpr int DIMMER_LINE = 1;
+    constexpr int DIMMER_LAMP = 2;
+    constexpr int DIMMER_TIMING = 3;
+    constexpr int DIMMER_GATE = 4;
+    Nodalys::CircuitBuilder builder;
+    builder.AddVsine("V1", DIMMER_LINE, 0, {.Amplitude = 170.0, .Frequency = 60.0});
+    builder.AddThyristor("TR1", DIMMER_LINE, DIMMER_LAMP, DIMMER_GATE, TRIAC);
+    builder.AddResistor("R1", DIMMER_LAMP, 0, 100.0);
+    builder.AddResistor("R2", DIMMER_LINE, DIMMER_TIMING, 47e3);
+    builder.AddCapacitor("C1", DIMMER_TIMING, DIMMER_LAMP, 100e-9);
+    builder.AddDiac("DIAC1", DIMMER_TIMING, DIMMER_GATE, Nodalys::DiacParameters{});
+    auto circuit = builder.Build();
+    REQUIRE(circuit.has_value());
+    const Nodalys::TransientResult result = RunTransient(*circuit, 50e-3, 10e-6);
+    // The firing delay from the start of a half-cycle: the first point where the lamp takes the line, past 10 V
+    const auto firing_delay = [&result](const double start, const double sign) {
+        for (std::size_t i = 0; i < result.Times.size(); ++i) {
+            if (result.Times[i] >= start && sign * result.NodeVoltages[DIMMER_LAMP][i] > 10.0) {
+                return result.Times[i] - start;
+            }
+        }
+        FAIL("the TRIAC never fired after t = " << start);
+        return 0.0;
+    };
+    constexpr double HALF_PERIOD = 1.0 / 120.0;
+    // In the second period both half-cycles fire at the same delay, well inside the half-cycle
+    const double positive = firing_delay(2.0 * HALF_PERIOD, 1.0);
+    const double negative = firing_delay(3.0 * HALF_PERIOD, -1.0);
+    CHECK(positive > 1e-3);
+    CHECK(positive < HALF_PERIOD - 1e-3);
+    CHECK_THAT(negative, WithinAbs(positive, 0.2e-3));
+}

@@ -12,6 +12,7 @@
 #include "ui_elements/ui_controlled_source.h"
 #include "ui_elements/ui_controlled_switch.h"
 #include "ui_elements/ui_current_source.h"
+#include "ui_elements/ui_diac.h"
 #include "ui_elements/ui_diode.h"
 #include "ui_elements/ui_flip_flop.h"
 #include "ui_elements/ui_fuse.h"
@@ -88,6 +89,7 @@ constexpr auto PARTS = std::to_array<PartInfo>({
     {Core::ComponentType::FUSE, "Fuse"},
     {Core::ComponentType::THYRISTOR, "Thyristor (SCR)"},
     {Core::ComponentType::TRIAC, "TRIAC"},
+    {Core::ComponentType::DIAC, "DIAC"},
     {Core::ComponentType::TRANSFORMER, "Transformer"},
     {Core::ComponentType::TRANSMISSION_LINE, "Transmission line"},
     {Core::ComponentType::AND, "AND gate"},
@@ -177,6 +179,8 @@ CreateElement(const Core::ComponentType type, const GridPoint position, const Ro
     case Core::ComponentType::THYRISTOR:
     case Core::ComponentType::TRIAC:
         return std::make_unique<UIThyristor>(type, position, rotation);
+    case Core::ComponentType::DIAC:
+        return std::make_unique<UIDiac>(position, rotation);
     case Core::ComponentType::TRANSFORMER:
         return std::make_unique<UITransformer>(position, rotation);
     case Core::ComponentType::TRANSMISSION_LINE:

@@ -6,6 +6,7 @@
 #include "schematic/file_figure_fields.h"
 
 #include "circuit/components/clock.h"
+#include "circuit/components/diac.h"
 #include "circuit/components/fuse.h"
 #include "circuit/components/logic_input.h"
 #include "circuit/components/logic_output.h"
@@ -52,6 +53,14 @@ constexpr auto THYRISTOR_KEYS = std::to_array<ParameterKey<Core::ThyristorParame
     {"breakover", &Core::ThyristorParameters::BreakoverVoltage},
     {"critical_dvdt", &Core::ThyristorParameters::CriticalDvDt},
     {"turn_off_time", &Core::ThyristorParameters::TurnOffTime},
+});
+
+constexpr auto DIAC_KEYS = std::to_array<ParameterKey<Core::DiacParameters>>({
+    {"breakover", &Core::DiacParameters::BreakoverVoltage},
+    {"on_threshold", &Core::DiacParameters::OnThresholdVoltage},
+    {"on_resistance", &Core::DiacParameters::OnResistance},
+    {"off_resistance", &Core::DiacParameters::OffResistance},
+    {"holding_current", &Core::DiacParameters::HoldingCurrent},
 });
 
 constexpr auto RELAY_KEYS = std::to_array<ParameterKey<Core::RelayParameters>>({
@@ -206,6 +215,7 @@ constexpr auto FIGURE_CODECS = std::to_array<FigureCodec>({
     MakeFigureCodec<Core::ComponentType::FUSE, Core::Fuse, FUSE_KEYS>(),
     MakeFigureCodec<Core::ComponentType::THYRISTOR, Core::Thyristor, THYRISTOR_KEYS>(),
     MakeFigureCodec<Core::ComponentType::TRIAC, Core::Thyristor, THYRISTOR_KEYS>(),
+    MakeFigureCodec<Core::ComponentType::DIAC, Core::Diac, DIAC_KEYS>(),
     MakeFigureCodec<Core::ComponentType::TRANSFORMER, Core::Transformer, TRANSFORMER_KEYS>(),
     MakeFigureCodec<Core::ComponentType::TRANSMISSION_LINE, Core::TransmissionLine, TRANSMISSION_LINE_KEYS>(),
     {&Core::IsLogicPart, &WriteLogicFigures, &ReadLogicFigures},

@@ -276,8 +276,13 @@ void CircuitCompiler::Lower(const SwitchSpec &spec) {
 void CircuitCompiler::Lower(const ThyristorSpec &spec) {
     Device *dev = AddDevice(
         std::make_unique<ThyristorDevice>(MapNode(spec.Anode), MapNode(spec.Cathode), MapNode(spec.Gate), spec.Params));
+    // A DIAC is a two-terminal part, read as one current; a TRIAC names its main terminals MT2 and MT1, and an SCR
+    // names them anode and cathode
+    if (!spec.HasGate) {
+        RegisterElement(spec.Name, dev);
+        return;
+    }
     m_Compiled.ElementsByName[spec.Name] = dev;
-    // A TRIAC names its main terminals MT2 and MT1; an SCR names them anode and cathode
     if (spec.Params.IsBidirectional) {
         RegisterTerminalCurrents(spec.Name, dev, {"MT2", "MT1", "G"});
     } else {

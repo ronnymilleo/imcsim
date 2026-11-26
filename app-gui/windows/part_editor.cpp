@@ -257,6 +257,8 @@ bool PartEditor::DrawSettingPart(Core::Component &component) {
         DrawFuse(static_cast<Core::Fuse &>(component), m_Electromechanical, *m_Schematic);
     } else if (type == Core::ComponentType::THYRISTOR || type == Core::ComponentType::TRIAC) {
         DrawThyristor(static_cast<Core::Thyristor &>(component), m_Electromechanical, *m_Schematic);
+    } else if (type == Core::ComponentType::DIAC) {
+        DrawDiac(static_cast<Core::Diac &>(component), m_Electromechanical, *m_Schematic);
     } else if (Core::IsLogicPart(type)) {
         DrawLogicPart(static_cast<Core::LogicPart &>(component), m_Logic, *m_Schematic);
     } else if (type == Core::ComponentType::CLOCK) {

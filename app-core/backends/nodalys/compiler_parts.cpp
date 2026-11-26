@@ -14,6 +14,7 @@
 #include "circuit/components/bjt.h"
 #include "circuit/components/clock.h"
 #include "circuit/components/controlled_source.h"
+#include "circuit/components/diac.h"
 #include "circuit/components/diode.h"
 #include "circuit/components/fuse.h"
 #include "circuit/components/logic_input.h"
@@ -104,6 +105,22 @@ void AddSource(Nodalys::CircuitBuilder &builder, const EntryContext &entry) {
     default:
         return AddWaveform(builder, entry, ac, ToNodalys(s.GetRandom()), &B::AddVrandom, &B::AddIrandom);
     }
+}
+
+/**
+ * @brief   Adds a relay: its contact switches between the first two terminals, driven by its coil on the last two.
+ */
+void AddRelayPart(Nodalys::CircuitBuilder &builder, const EntryContext &entry) {
+    const auto &relay = static_cast<const Relay &>(entry.Part);
+    const RelayParameters &figures = relay.GetParameters();
+    builder.AddRelay(entry.Name,
+                     entry.Nodes[2],
+                     entry.Nodes[3],
+                     entry.Nodes[0],
+                     entry.Nodes[1],
+                     figures.CoilResistance,
+                     figures.CoilInductance,
+                     ToNodalys(relay.GetContactParameters()));
 }
 
 } // namespace
@@ -313,19 +330,12 @@ std::expected<void, std::string> AddSwitchingPart(Nodalys::CircuitBuilder &build
                              nodes[2],
                              ToNodalys(static_cast<const Thyristor &>(part).GetParameters()));
         return {};
-    case ComponentType::RELAY: {
-        const auto &relay = static_cast<const Relay &>(part);
-        const RelayParameters &figures = relay.GetParameters();
-        builder.AddRelay(entry.Name,
-                         nodes[2],
-                         nodes[3],
-                         nodes[0],
-                         nodes[1],
-                         figures.CoilResistance,
-                         figures.CoilInductance,
-                         ToNodalys(relay.GetContactParameters()));
+    case ComponentType::DIAC:
+        builder.AddDiac(entry.Name, nodes[0], nodes[1], ToNodalys(static_cast<const Diac &>(part).GetParameters()));
         return {};
-    }
+    case ComponentType::RELAY:
+        AddRelayPart(builder, entry);
+        return {};
     default:
         return std::unexpected(NoDeviceMessage(entry));
     }

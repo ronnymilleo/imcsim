@@ -45,7 +45,8 @@ constexpr auto SWITCHES = std::to_array({ComponentType::SWITCH,
                                          ComponentType::RELAY,
                                          ComponentType::FUSE,
                                          ComponentType::THYRISTOR,
-                                         ComponentType::TRIAC});
+                                         ComponentType::TRIAC,
+                                         ComponentType::DIAC});
 constexpr auto LOGIC_IO =
     std::to_array({ComponentType::LOGIC_INPUT, ComponentType::LOGIC_OUTPUT, ComponentType::SEVEN_SEGMENT});
 constexpr auto GATES = std::to_array({ComponentType::AND,
