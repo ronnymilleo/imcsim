@@ -43,16 +43,16 @@ float GetSpeedSelectorWidth() {
 bool DrawSpeedSelector(const char *id, double &speed, const char *tooltip) {
     const std::string preview = FormatPlaybackSpeed(speed);
     ImGui::SetNextItemWidth(GetSpeedSelectorWidth());
-    bool changed = false;
+    bool has_changed = false;
     if (ImGui::BeginCombo(id, preview.c_str())) {
         for (const double preset : PLAYBACK_SPEED_PRESETS) {
             const std::string label = FormatPlaybackSpeed(preset);
-            const bool selected = std::abs(speed - preset) < SPEED_MATCH_TOLERANCE;
-            if (ImGui::Selectable(label.c_str(), selected)) {
+            const bool is_selected = std::abs(speed - preset) < SPEED_MATCH_TOLERANCE;
+            if (ImGui::Selectable(label.c_str(), is_selected)) {
                 speed = preset;
-                changed = true;
+                has_changed = true;
             }
-            if (selected) {
+            if (is_selected) {
                 ImGui::SetItemDefaultFocus();
             }
         }
@@ -61,7 +61,7 @@ bool DrawSpeedSelector(const char *id, double &speed, const char *tooltip) {
     if (tooltip != nullptr) {
         ImGui::SetItemTooltip("%s", tooltip);
     }
-    return changed;
+    return has_changed;
 }
 
 } // namespace GUI

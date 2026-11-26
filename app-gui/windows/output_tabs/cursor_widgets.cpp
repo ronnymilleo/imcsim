@@ -200,7 +200,7 @@ bool DrawPlaybackBar(TransientPlayback &playback, const double from, const doubl
     ImGui::SameLine();
     ImGui::Checkbox("Loop", &playback.Loop);
     ImGui::SameLine();
-    const bool speed_changed = DrawSpeedSelector("##playback_speed", playback.Speed, "Playback and live speed");
+    const bool has_speed_changed = DrawSpeedSelector("##playback_speed", playback.Speed, "Playback and live speed");
     ImGui::SameLine();
     const std::string readout = std::format("t = {} / {}s", FormatLiveTime(playback.Time), Core::FormatValue(to));
     const float readout_width =
@@ -215,7 +215,7 @@ bool DrawPlaybackBar(TransientPlayback &playback, const double from, const doubl
     ImGui::SetItemTooltip("Instant of the transient shown on the schematic and by the playhead of the plot");
     ImGui::SameLine();
     ImGui::TextUnformatted(readout.c_str());
-    return speed_changed;
+    return has_speed_changed;
 }
 
 } // namespace GUI

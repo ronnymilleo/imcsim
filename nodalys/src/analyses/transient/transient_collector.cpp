@@ -189,8 +189,9 @@ void PublishChunk(const TransientResult &result, ChunkPublisher &publisher, cons
  * @return  True when a chunk should be published now.
  */
 bool IsChunkDue(const ChunkPublisher &publisher, const double time, const std::size_t point_count) {
-    const bool spans_chunk = ResolveChunkSpan(publisher.Monitor) > 0.0 && time >= publisher.ChunkEnd;
-    return spans_chunk || std::chrono::steady_clock::now() - publisher.LastSend > CHUNK_INTERVAL
+    const bool is_span_due =
+        (publisher.Monitor.ChunkSpan > 0.0 || publisher.Monitor.NextChunkSpan != nullptr) && time >= publisher.ChunkEnd;
+    return is_span_due || std::chrono::steady_clock::now() - publisher.LastSend > CHUNK_INTERVAL
         || point_count - publisher.Sent > CHUNK_POINT_LIMIT;
 }
 

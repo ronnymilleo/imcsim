@@ -100,13 +100,13 @@ float LiveTimeReadoutWidth() {
  * @brief   The analysis button, Live and Run, plus optional live speed and time readout, pinned to the right end of the
  *          bar.
  */
-float GetRunControlsWidth(const bool show_time, const bool show_speed) {
+float GetRunControlsWidth(const bool has_time, const bool has_speed) {
     const float spacing = ImGui::GetFontSize() * BUTTON_SPACING;
     float width = AnalysisButtonWidth() + LiveButtonWidth() + GetToolButtonSide() + spacing * 2.0f;
-    if (show_speed) {
+    if (has_speed) {
         width += GetSpeedSelectorWidth() + spacing;
     }
-    if (show_time) {
+    if (has_time) {
         width += LiveTimeReadoutWidth() + spacing;
     }
     return width;
@@ -291,10 +291,10 @@ ToolbarRequest EditorToolbar::Draw(const EditorMode &mode,
                                    const bool is_editing_block,
                                    PartPicker &search,
                                    const std::vector<const SavedSubcircuit *> &blocks) {
-    const bool show_time = m_Controls.IsLive();
-    const bool show_speed = ShouldShowSpeedSelector(m_Controls);
+    const bool has_time = m_Controls.IsLive();
+    const bool has_speed = ShouldShowSpeedSelector(m_Controls);
     const float row_right = ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvail().x;
-    const float run_left = row_right - GetRunControlsWidth(show_time, show_speed);
+    const float run_left = row_right - GetRunControlsWidth(has_time, has_speed);
     ToolbarRequest request = {.Mode = DrawToolButtons(mode), .Command = std::nullopt};
     DrawGroupSeparator();
     request.Command = DrawHistoryButtons(schematic);
