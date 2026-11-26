@@ -380,7 +380,19 @@ its properties hold the electrical delay and optional frequency-dependent losses
 | `Loss tangent` (`tan delta`) | dielectric loss tangent, giving `G_diel(f) = 2 * pi * f * C_tot * tan delta` | 0 |
 
 The part editor also shows the lossless quarter-wave frequency `1 / (4 * Td)` (250 MHz at 1 ns) as a read-only line,
-and `Suggest` on an AC sweep extends the stop frequency past it. Currents are reported into the positive pin of each
+and `Suggest` on an AC sweep extends the stop frequency past it. **From geometry...** works the value and parameters out
+from a physical line with closed-form formulas, within a few percent in the usual ranges:
+
+| Cross-section | Z0 and effective permittivity | Conductor resistance per meter |
+|---|---|---|
+| Microstrip | Hammerstad and Jensen, the width widened by the copper thickness (Wheeler) | `2 Rs / W`, trace and plane (Pozar) |
+| Stripline (centered) | Cohn's formula as Pozar gives it, thin strip; `eeff = er` | `Rs / W`, both faces and both planes |
+| Coax | `eta0 ln(D/d) / (2 pi sqrt(er))`; `eeff = er` | `Rs (1/a + 1/b) / (2 pi)` |
+
+The delay is `length * sqrt(eeff) / c`, the skin resistance is given at `Ref freq` from the surface resistance
+`Rs = sqrt(pi f mu0 / sigma)`, the DC resistance counts the trace (the inner conductor of a coax) only, and the loss
+tangent of a microstrip is scaled by its filling factor `er (eeff - 1) / (eeff (er - 1))`, since part of its field runs
+in air. Rough copper, copper thinner than the skin depth and coupled (differential) lines are not modeled. Currents are reported into the positive pin of each
 port as `TL1.P1` and `TL1.P2` (with the return pins `1-` and `2-` carrying the opposite current of their port).
 
 - **Lossless lines** (`DC R`, `Skin R`, `DC G` and `Loss tangent` all 0) run in every analysis except Pole-Zero: at DC

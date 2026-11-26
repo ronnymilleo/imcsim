@@ -89,7 +89,11 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   ports: port 1 on the left (terminal 1 the center conductor, terminal 2 the shield) and port 2 on the right
   (terminals 3 and 4). Its value is the characteristic impedance Z0, and its properties set the delay and the losses
   (DC R, Skin R at Ref freq, DC G and Loss tangent); the label under it shows Z0 and the delay, and the properties show
-  the quarter-wave frequency. Only Nodalys simulates it: ngspice refuses a circuit with one, with the reason. A line
+  the quarter-wave frequency. **From geometry...** in its properties works Z0 and every parameter out from a real
+  line: pick a microstrip, a stripline or a coax, type its dimensions in meters with a scale suffix ("1.6m" is
+  1.6 mm), the permittivity and loss tangent of the dielectric, the conductivity of the copper and the length, read
+  the figures as you type, and Apply sets them on the part. Only Nodalys simulates it: ngspice refuses a circuit with
+  one, with the reason. A line
   with all losses at 0 runs in every analysis but pole-zero, a lossy one in all but the transient and pole-zero. The
   Transmission lines examples show reflections on a mismatched line and a quarter-wave transformer (see docs/models.md).
 - **PWL sources**: a source with the PWL waveform takes its points as text, or from a file: **Import CSV...** reads a
