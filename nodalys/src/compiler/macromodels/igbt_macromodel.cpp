@@ -40,6 +40,29 @@ bool IsPositive(const double value) {
     return std::isfinite(value) && value > 0.0;
 }
 
+bool IsChannelValid(const IgbtParameters &p) {
+    return std::isfinite(p.GateThresholdVoltage) && IsPositive(p.Transconductance)
+        && IsPositive(p.TransconductanceCurrent);
+}
+
+bool IsOnStateLineValid(const IgbtParameters &p) {
+    return std::isfinite(p.OnThresholdVoltage) && p.OnThresholdVoltage >= 0.0 && IsPositive(p.OnResistance)
+        && std::isfinite(p.OffResistance) && p.OffResistance > p.OnResistance;
+}
+
+/**
+ * @brief   Whether the datasheet capacitances split into the three capacitors, none of them negative.
+ */
+bool AreCapacitancesValid(const IgbtParameters &p) {
+    return p.ReverseTransferCapacitance >= 0.0 && std::isfinite(p.InputCapacitance)
+        && std::isfinite(p.OutputCapacitance) && p.InputCapacitance >= p.ReverseTransferCapacitance
+        && p.OutputCapacitance >= p.ReverseTransferCapacitance;
+}
+
+bool IsTailValid(const IgbtParameters &p) {
+    return p.TailFraction >= 0.0 && p.TailFraction <= 1.0 && IsPositive(p.TailTimeConstant);
+}
+
 /**
  * @brief   Adds a capacitor between two unknowns, or nothing when the capacitance is zero.
  * @return  The capacitor, or null when none was added.
@@ -114,23 +137,19 @@ void AddReadouts(CircuitCompiler &compiler, const std::string &name, const IgbtP
  */
 std::optional<std::string> CheckIgbt(const IgbtSpec &spec) {
     const IgbtParameters &p = spec.Params;
-    if (!std::isfinite(p.GateThresholdVoltage) || !IsPositive(p.Transconductance)
-        || !IsPositive(p.TransconductanceCurrent)) {
+    if (!IsChannelValid(p)) {
         return std::format("{}: the gate threshold must be finite, and the transconductance and its test current "
                            "positive",
                            spec.Name);
     }
-    if (!std::isfinite(p.OnThresholdVoltage) || p.OnThresholdVoltage < 0.0 || !IsPositive(p.OnResistance)
-        || !(p.OffResistance > p.OnResistance) || !std::isfinite(p.OffResistance)) {
+    if (!IsOnStateLineValid(p)) {
         return std::format("{}: the on-state line needs V0 >= 0 and RCE > 0, below the off-state resistance",
                            spec.Name);
     }
-    if (!(p.ReverseTransferCapacitance >= 0.0) || !(p.InputCapacitance >= p.ReverseTransferCapacitance)
-        || !(p.OutputCapacitance >= p.ReverseTransferCapacitance) || !std::isfinite(p.InputCapacitance)
-        || !std::isfinite(p.OutputCapacitance)) {
+    if (!AreCapacitancesValid(p)) {
         return std::format("{}: Cies and Coes must each be at least Cres, which is not negative", spec.Name);
     }
-    if (!(p.TailFraction >= 0.0 && p.TailFraction <= 1.0) || !IsPositive(p.TailTimeConstant)) {
+    if (!IsTailValid(p)) {
         return std::format("{}: the tail fraction must be from 0 to 1 and its time constant positive", spec.Name);
     }
     return std::nullopt;

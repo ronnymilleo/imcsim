@@ -54,6 +54,36 @@ BjtParameters ScaleByArea(BjtParameters parameters, const double area) {
     return parameters;
 }
 
+bool IsFinitePositive(const double value) {
+    return std::isfinite(value) && value > 0.0;
+}
+
+bool IsFiniteNonNegative(const double value) {
+    return std::isfinite(value) && value >= 0.0;
+}
+
+/**
+ * @brief   Checks the figures of a transmission line before it is built.
+ * @param[in] p  Figures of the line.
+ * @return  What is wrong, or nothing when the line can be simulated.
+ */
+std::optional<std::string> CheckTransmissionLine(const TransmissionLineParameters &p) {
+    if (!IsFinitePositive(p.ImpedanceOhms)) {
+        return "characteristic impedance Z0 must be positive";
+    }
+    if (!IsFinitePositive(p.DelaySeconds)) {
+        return "propagation delay Td must be positive";
+    }
+    if (!IsFiniteNonNegative(p.DcResistanceOhms) || !IsFiniteNonNegative(p.SkinResistanceOhms)
+        || !IsFiniteNonNegative(p.DcConductanceSiemens) || !IsFiniteNonNegative(p.LossTangent)) {
+        return "transmission line loss parameters must be non-negative";
+    }
+    if (!IsFinitePositive(p.ReferenceFrequencyHz)) {
+        return "reference frequency must be positive";
+    }
+    return std::nullopt;
+}
+
 } // namespace
 
 void CircuitCompiler::Lower(BehavioralSpec &spec) {
@@ -307,22 +337,8 @@ void CircuitCompiler::Lower(const TransformerSpec &spec) {
 
 void CircuitCompiler::Lower(const TransmissionLineSpec &spec) {
     const TransmissionLineParameters &p = spec.Params;
-    if (!std::isfinite(p.ImpedanceOhms) || p.ImpedanceOhms <= 0.0) {
-        m_Errors.push_back(std::format("{}: characteristic impedance Z0 must be positive", spec.Name));
-        return;
-    }
-    if (!std::isfinite(p.DelaySeconds) || p.DelaySeconds <= 0.0) {
-        m_Errors.push_back(std::format("{}: propagation delay Td must be positive", spec.Name));
-        return;
-    }
-    if (!std::isfinite(p.DcResistanceOhms) || p.DcResistanceOhms < 0.0 || !std::isfinite(p.SkinResistanceOhms)
-        || p.SkinResistanceOhms < 0.0 || !std::isfinite(p.DcConductanceSiemens) || p.DcConductanceSiemens < 0.0
-        || !std::isfinite(p.LossTangent) || p.LossTangent < 0.0) {
-        m_Errors.push_back(std::format("{}: transmission line loss parameters must be non-negative", spec.Name));
-        return;
-    }
-    if (!std::isfinite(p.ReferenceFrequencyHz) || p.ReferenceFrequencyHz <= 0.0) {
-        m_Errors.push_back(std::format("{}: reference frequency must be positive", spec.Name));
+    if (const std::optional<std::string> problem = CheckTransmissionLine(p)) {
+        m_Errors.push_back(std::format("{}: {}", spec.Name, *problem));
         return;
     }
     const int up1 = MapNode(spec.Port1Pos);
