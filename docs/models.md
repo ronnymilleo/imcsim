@@ -307,7 +307,9 @@ all four quadrants (MT2 positive or negative, gate positive or negative relative
 referenced to MT1, through which the gate current returns. The breakover voltage, when set, applies to either sign.
 
 Nodalys simulates it as the same latching device with a bidirectional flag, so the on-state line and the gate junction
-mirror about zero and every figure is a parameter. ngspice runs the `imcsim_triac` subcircuit: two SCR pairs of the
+mirror about zero and every figure is a parameter. Between -V0 and +V0 a conducting TRIAC carries only its off-state
+current, as a real one does before its junction drop is overcome, so a main current that crosses zero passes through
+that gap and the device follows the voltage onto the other half of its line. ngspice runs the `imcsim_triac` subcircuit: two SCR pairs of the
 `imcsim_scr` kind sit anti-parallel between MT2 and MT1, each with its own vanishing anode diode so it conducts one way
 only, and a gate stage referenced to MT1 routes gate current of either polarity to whichever pair is forward-biased.
 The sensors of that stage sit across the gate resistors to MT1, so they conduct only while the gate draws current and
