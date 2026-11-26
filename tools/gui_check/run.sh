@@ -56,7 +56,8 @@
 #   TRIAC                  triac_dimmer (transient): Nodalys runs it, ngspice refuses the TRIAC with the reason
 #   Transmission lines     transmission_line_reflections (transient) and transmission_line_quarter_wave
 #                          (S-parameters): Nodalys runs both, ngspice refuses the part with the reason
-#   DIAC                   diac_triac_dimmer (transient): Nodalys runs it, ngspice refuses the DIAC with the reason
+#   DIAC                   diac_triac_dimmer (transient): Nodalys runs it, ngspice refuses the DIAC or the TRIAC
+#                          with the reason
 #   GTO                    gto_chopper (transient): Nodalys runs it, ngspice refuses the GTO with the reason
 #   PWL import             fixtures/pwl_import_rc_low_pass, whose source takes fixtures/pwl_sine_100_points.csv
 #                          through Import CSV... in its properties, shown then as a summary of its points
@@ -542,7 +543,8 @@ check_parts() {
     check_nodalys_only transient_triac triac_dimmer Spectrum 'TRIACs'
     check_nodalys_only transmission_line_transient transmission_line_reflections Spectrum 'Transmission lines'
     check_nodalys_only transmission_line_s_parameters transmission_line_quarter_wave Smith 'Transmission lines'
-    check_nodalys_only transient_diac diac_triac_dimmer Spectrum 'DIACs'
+    # The dimmer holds a DIAC and a TRIAC, which ngspice both refuses, so the refusal may name either one
+    check_nodalys_only transient_diac diac_triac_dimmer Spectrum '(DI|TRI)ACs'
     check_nodalys_only transient_gto gto_chopper Spectrum 'GTOs'
     check_pwl_import
 }
