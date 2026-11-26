@@ -489,7 +489,14 @@ between). It loads nothing and needs no Ground. A **7-segment display** is the s
 - The piecewise linear `PWL(t1 v1 t2 v2 ...)` holds v1 before t1, joins the points with straight lines and holds the
   last value after the last point. It defaults to `0 0, 1m 5, 2m 0` (1 mA instead of 5 for a current source). The
   points are edited as one text of "time value" pairs in the part editor; at least two are needed, times are not
-  negative and strictly increase.
+  negative and strictly increase. **Import CSV...** reads them from a table of two columns, time then value, split by
+  commas, semicolons, tabs or spaces, with SPICE scale suffixes allowed, one header row, empty lines and `#` or `//`
+  comments skipped. **Import WAV...** reads an uncompressed WAV file (PCM of 8, 16, 24 or 32 bits, or float of 32 or
+  64 bits) as one point per sample from 0 s, the channels averaged to mono and full scale set to the **WAV peak**
+  field. The points are stored in the schematic, so the file is not needed again; a table of more than 64 points
+  shows as a summary (count, span and range) with **Reset points** in place of the text. Both engines run the
+  imported points as any PWL; Nodalys finds the segment of each time by bisection, so a recording of a million
+  samples costs little per step.
 - The noise source `TRNOISE(na nt alpha namp rtsam capt emt)` is `DC offset` plus transient noise: Gaussian white
   noise of rms na with a new sample every nt (the output is a straight line between samples, so its rms over time is
   sqrt(2/3) of na and its density is na times sqrt(2 nt) per root hertz, flat up to 1 / (2 nt)), 1/f noise of
