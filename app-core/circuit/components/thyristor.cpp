@@ -76,10 +76,12 @@ const char *GetThyristorSubcircuitName() {
  *          cannot find a path through the pair and out of its anode, which the junctions of a real device block.
  *          The gate resistance and the slope resistance of the on-state line are parameters of the instance; the
  *          holding and trigger currents and the on-state threshold emerge from the transistors and their
- *          base-emitter shunts, close to the figures of Nodalys, which takes them as parameters. The junction
- *          capacitances soften the switching, so the pair converges.
- * @note    There is no forward breakover: the pair blocks whatever forward voltage the circuit puts on it, as a
- *          thyristor driven correctly does.
+ *          base-emitter shunts, close to the figures of Nodalys, which takes them as parameters. The emitter
+ *          junction capacitances soften the switching, so the pair converges. The collector junctions have none: a
+ *          rising off-state voltage would push its displacement current into the bases, and with the 100k shunts the
+ *          pair would fire at a fraction of a volt per microsecond, as a 325 V mains sine does.
+ * @note    There is no forward breakover and no dv/dt firing: the pair blocks whatever forward voltage the circuit
+ *          puts on it, however fast it rises, as a thyristor driven correctly does. Nodalys models both.
  */
 std::string FormatThyristorSubcircuit() {
     return ".subckt imcsim_scr a k g params: RG=100 RT=0.01\n"
@@ -91,8 +93,8 @@ std::string FormatThyristorSubcircuit() {
            "Rg ng n2 {RG}\n"
            "R1 n1 na 100k\n"
            "R2 n2 k 100k\n"
-           ".model IMCSIM_SCR_QP PNP(IS=1e-14 BF=100 CJE=20p CJC=20p)\n"
-           ".model IMCSIM_SCR_QN NPN(IS=1e-14 BF=100 CJE=20p CJC=20p)\n"
+           ".model IMCSIM_SCR_QP PNP(IS=1e-14 BF=100 CJE=20p)\n"
+           ".model IMCSIM_SCR_QN NPN(IS=1e-14 BF=100 CJE=20p)\n"
            ".model IMCSIM_SCR_DG D(IS=1e-12 N=0.001)\n"
            ".model IMCSIM_SCR_DT D(IS=1e-12 N=0.001)\n"
            ".ends imcsim_scr\n";
@@ -107,19 +109,25 @@ const char *GetTriacSubcircuitName() {
  * @return  The ".subckt" block, newline included.
  * @details Two SCR pairs of the imcsim_scr kind sit anti-parallel between MT2 and MT1, each with its own vanishing
  *          anode diode so it conducts one way only: the pair P latches when MT2 is positive, the pair N when MT1 is.
+ *          The pair N also has one at its cathode, MT2, so while MT2 is positive the collector junction of its NPN
+ *          cannot carry current from MT2 into the gate stage, which would fire the pair P.
  *          A gate stage referenced to MT1 routes gate current of either polarity to whichever pair is forward-biased,
  *          so the device fires in all four quadrants. A positive gate drives the NPN base of P directly through a
  *          vanishing diode, and a PNP sensor turns on a switched path into the NPN base of N for the fourth quadrant;
  *          a negative gate pulls the PNP base of N directly, and an NPN sensor switches a pull from the PNP base of P
  *          for the second quadrant. Each sensor reads the gate against MT1 through a base resistor, and a bleed holds
  *          its input at MT1, so a sensor conducts only while the gate actually draws current and the device blocks
- *          with the gate open or tied to MT1, whatever MT2 does. The diodes keep the latched base current from leaking
+ *          with the gate open or tied to MT1, whatever MT2 does. The collector of each sensor is pulled toward MT2
+ *          through a diode, only in the quadrant where it steers: without it, MT2 of the other polarity would bias
+ *          the sensor's collector junction forward and drive the gate stage by itself, firing the device at mains
+ *          voltage. The diodes keep the latched base current from leaking
  *          back out of the gate. `RG` and `RT` are parameters of the instance, RG setting the steering paths; the
  *          holding and trigger currents and the on-state threshold emerge from the transistors, close to the figures of
  *          Nodalys. The stage steers with transistor gain, so at the firing instant it draws more gate current than
- *          the single junction of Nodalys, which the cross-validation test bounds.
- * @note    There is no breakover: the pairs block whatever voltage the circuit puts on them, as a TRIAC driven
- *          correctly does.
+ *          the single junction of Nodalys, which the cross-validation test bounds. As in imcsim_scr, the collector
+ *          junctions have no capacitance, so a rising off-state voltage does not fire a pair.
+ * @note    There is no breakover and no dv/dt firing: the pairs block whatever voltage the circuit puts on them,
+ *          however fast it rises, as a TRIAC driven correctly does. Nodalys models both.
  */
 std::string FormatTriacSubcircuit() {
     return ".subckt imcsim_triac mt2 mt1 g params: RG=100 RT=0.01\n"
@@ -132,9 +140,10 @@ std::string FormatTriacSubcircuit() {
            "Dtn mt1 nrtn IMCSIM_TRIAC_DT\n"
            "Rtn nrtn nan {RT}\n"
            "Q1n n2n n1n nan IMCSIM_TRIAC_QP\n"
-           "Q2n n1n n2n mt2 IMCSIM_TRIAC_QN\n"
+           "Q2n n1n n2n nkn IMCSIM_TRIAC_QN\n"
            "R1n n1n nan 100k\n"
-           "R2n n2n mt2 100k\n"
+           "R2n n2n nkn 100k\n"
+           "Dkn nkn mt2 IMCSIM_TRIAC_DT\n"
            "Dgp g pg IMCSIM_TRIAC_DG\n"
            "Rsp pg mt1 1k\n"
            "Qsp cp nbp pg IMCSIM_TRIAC_QP\n"
@@ -143,7 +152,8 @@ std::string FormatTriacSubcircuit() {
            "Rp np2p n2p {RG}\n"
            "Dpn cp np2n IMCSIM_TRIAC_DG\n"
            "Rpn np2n n2n {RG}\n"
-           "Rcp cp mt2 100k\n"
+           "Rcp cp ncp 100k\n"
+           "Dcp ncp mt2 IMCSIM_TRIAC_DG\n"
            "Dgn ng g IMCSIM_TRIAC_DG\n"
            "Rsn mt1 ng 1k\n"
            "Qsn cn nbn ng IMCSIM_TRIAC_QN\n"
@@ -152,10 +162,11 @@ std::string FormatTriacSubcircuit() {
            "Rn nn1n ng {RG}\n"
            "Dnp n1p nn1p IMCSIM_TRIAC_DG\n"
            "Rnp nn1p cn {RG}\n"
-           "Rcn cn mt2 100k\n"
+           "Rcn cn ncn 100k\n"
+           "Dcn mt2 ncn IMCSIM_TRIAC_DG\n"
            "Rlk g mt1 1G\n"
-           ".model IMCSIM_TRIAC_QP PNP(IS=1e-14 BF=100 CJE=20p CJC=20p)\n"
-           ".model IMCSIM_TRIAC_QN NPN(IS=1e-14 BF=100 CJE=20p CJC=20p)\n"
+           ".model IMCSIM_TRIAC_QP PNP(IS=1e-14 BF=100 CJE=20p)\n"
+           ".model IMCSIM_TRIAC_QN NPN(IS=1e-14 BF=100 CJE=20p)\n"
            ".model IMCSIM_TRIAC_DG D(IS=1e-12 N=0.001)\n"
            ".model IMCSIM_TRIAC_DT D(IS=1e-12 N=0.001)\n"
            ".ends imcsim_triac\n";

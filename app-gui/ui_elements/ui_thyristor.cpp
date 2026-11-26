@@ -81,19 +81,20 @@ void UIThyristor::DrawSymbol(SchematicCanvas &canvas,
 }
 
 /**
- * @brief   Draws the thyristor name above the symbol and its holding current below, in local orientation.
+ * @brief   Draws the thyristor name and its holding current above the symbol, in local orientation.
+ * @details Both sit on the side away from the gate, as one label like the name and value of a two-terminal part, so
+ *          neither covers the gate lead or a wire that goes on from its terminal.
  * @param[in,out] canvas Where it is drawn: the editor window or an exported image.
  * @param[in] view       Transform of the current frame.
  * @param[in] color      Text color.
  */
 void UIThyristor::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const auto &thyristor = static_cast<const Core::Thyristor &>(GetComponent());
-    DrawLabel(canvas, view, {0.0f, -LABEL_OFFSET}, {0.0f, -1.0f}, thyristor.GetName(), color);
     DrawLabel(canvas,
               view,
-              {0.0f, LABEL_OFFSET},
-              {0.0f, 1.0f},
-              std::format("IH {}", Core::FormatValue(thyristor.GetParameters().HoldingCurrent)),
+              {0.0f, -LABEL_OFFSET},
+              {0.0f, -1.0f},
+              std::format("{} IH {}", thyristor.GetName(), Core::FormatValue(thyristor.GetParameters().HoldingCurrent)),
               color);
 }
 

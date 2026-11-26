@@ -114,6 +114,53 @@ const Core::Transient &RunRectifier(const Core::Circuit &circuit, Core::Transien
     return *run.Result;
 }
 
+/// The peak of a 230 V mains sine, which a part on the line must block in both directions.
+constexpr double MAINS_PEAK = 325.0;
+/// The faster mains frequency, whose sine rises the steeper through zero.
+constexpr double MAINS_FREQUENCY = 60.0;
+/// The largest load current an idle part may let through: its leakage stays at microamperes.
+constexpr double IDLE_CURRENT_LIMIT = 1e-3;
+
+/// A thyristor or TRIAC left idle on the mains: the sine feeds it through a load, its gate tied to the cathode or MT1
+/// through a resistor, so nothing should fire it.
+struct IdleOnMains {
+    Core::VoltageSource Supply;
+    Core::Resistor Load;
+    Core::Thyristor Part;
+    Core::Resistor GateTie;
+    Core::Ground Reference;
+    Core::Circuit Circuit;
+
+    explicit IdleOnMains(const Core::ComponentType type) : Part(type) {
+        Supply.SetName("Vin1");
+        Supply.SetSourceType(Core::VoltageSource::SourceType::AC);
+        Supply.SetAC({.Amplitude = MAINS_PEAK, .Frequency = MAINS_FREQUENCY});
+        Load.SetName("R1");
+        Load.SetValue(LOAD_OHMS);
+        Part.SetName("TR1");
+        GateTie.SetName("R2");
+        GateTie.SetValue(1e3);
+        Circuit.Add(Supply, {1, 0});
+        Circuit.Add(Load, {1, 2});
+        Circuit.Add(Part, {2, 0, 3});
+        Circuit.Add(GateTie, {3, 0});
+        Circuit.Add(Reference, {0});
+    }
+};
+
+/// The largest load current over two mains periods on the backend in use.
+double PeakIdleCurrent(const Core::Circuit &circuit) {
+    const Core::TransientRun run =
+        Core::RunTransient(circuit, {.StopTime = 2.0 / MAINS_FREQUENCY, .TimeStep = 1.0 / MAINS_FREQUENCY / 200.0});
+    REQUIRE(run.Result.has_value());
+    const Core::Transient &transient = *run.Result;
+    double peak = 0.0;
+    for (std::size_t i = 0; i < transient.Times.size(); ++i) {
+        peak = std::max(peak, std::abs(transient.NodeVoltages[1][i] - transient.NodeVoltages[2][i]) / LOAD_OHMS);
+    }
+    return peak;
+}
+
 /// A light dimmer: a 50 Hz sine feeding the TRIAC into a load, with a gate pulse train referenced to MT1 firing at
 /// 60 degrees of every half-cycle, so the load sees a full-wave chopped sine.
 struct Dimmer {
@@ -292,4 +339,17 @@ TEST_CASE("A TRIAC dimmer chops both half-cycles on both engines", "[thyristor][
     // The anti-parallel pair of the subcircuit and the bidirectional device of Nodalys agree on the peaks
     CHECK_THAT(LoadVoltageAt(nodalys_transient, 25e-3), WithinAbs(LoadVoltageAt(ngspice_transient, 25e-3), 0.1));
     CHECK_THAT(LoadVoltageAt(nodalys_transient, 35e-3), WithinAbs(LoadVoltageAt(ngspice_transient, 35e-3), 0.1));
+}
+
+TEST_CASE("A TRIAC or a thyristor left idle on the mains blocks both half-cycles on both engines",
+          "[thyristor][simulator]") {
+    // The ngspice subcircuits once fired by themselves here: through the sensors of the TRIAC's gate stage and
+    // through the displacement current of the collector junctions, which the steep mains sine drove into the bases
+    for (const Core::ComponentType type : {Core::ComponentType::TRIAC, Core::ComponentType::THYRISTOR}) {
+        const IdleOnMains idle(type);
+        INFO((type == Core::ComponentType::TRIAC ? "TRIAC" : "thyristor"));
+        CHECK(PeakIdleCurrent(idle.Circuit) < IDLE_CURRENT_LIMIT);
+        const TestSupport::NodalysInUse nodalys;
+        CHECK(PeakIdleCurrent(idle.Circuit) < IDLE_CURRENT_LIMIT);
+    }
 }

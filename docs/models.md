@@ -275,16 +275,15 @@ of a reverse-biased thyristor from finding a path through it to the anode, as th
 `RG` and `RT` are parameters of the instance; the holding current, the trigger current and the on-state threshold
 emerge from the transistors, close to the figures of Nodalys. There is no breakover on ngspice: the pair blocks
 whatever forward voltage the circuit puts on it. Neither the critical `dv/dt` nor the turn-off time reach it: the
-fixed junction capacitances of the pair soften the switching but fire nothing, and it recovers its blocking as soon
-as the current releases.
+emitter junctions of the pair have a fixed capacitance that softens the switching, the collector junctions have
+none, so a fast-rising anode voltage fires nothing, and it recovers its blocking as soon as the current releases.
 
 - **The engines agree on the rectification**: the half-wave controlled rectifier of the example, fired at 60 degrees
   into 100 Ohm, averages the same 2.2 V on both, its anode current matches within 1 %, and the bridge example
   matches to 0.3 %. A circuit with a thyristor runs on the Gear integration, as one with a fuse does: the
-  trapezoidal rule rings for ever on an inductor whose current the release of the latch cuts. The differences that
-  remain are listed and bounded in the cross-validation test: the noise of the blocking state, as the junctions of
-  the pair leak and generate shot noise while the switch model of Nodalys is silent, and the figures that divide
-  by the gain through a blocked thyristor, such as its input-referred noise, which mean nothing on either engine.
+  trapezoidal rule rings for ever on an inductor whose current the release of the latch cuts. The difference that
+  remains is listed and bounded in the cross-validation test: the figures that divide by the gain through a blocked
+  thyristor, such as its input-referred noise, mean nothing on either engine.
 - **The latching current is not modeled separately** from the holding current: the gate sustains conduction whatever
   the anode current, and the latch holds above `IH` once it is gone.
 - **The `dv/dt` firing and the `tq` recovery are Nodalys-only**, as the breakover is. Nodalys reads the rate of rise
@@ -313,13 +312,15 @@ that gap and the device follows the voltage onto the other half of its line. ngs
 `imcsim_scr` kind sit anti-parallel between MT2 and MT1, each with its own vanishing anode diode so it conducts one way
 only, and a gate stage referenced to MT1 routes gate current of either polarity to whichever pair is forward-biased.
 The sensors of that stage sit across the gate resistors to MT1, so they conduct only while the gate draws current and
-the device blocks with the gate open or tied to MT1, whatever MT2 does. `RG` and `RT` are parameters of the instance;
+the device blocks with the gate open or tied to MT1, whatever MT2 does: the sensors and the pair that conducts toward
+MT2 reach it through vanishing diodes, so MT2 of the other sign cannot drive the gate stage, and an idle TRIAC on
+230 V mains blocks both half-cycles. `RG` and `RT` are parameters of the instance;
 the holding and trigger currents and the on-state threshold emerge from the transistors, close to the figures of
 Nodalys, and there is no breakover on ngspice.
 
 - **The engines agree on the dimming**: the light dimmer of the example, fired at 60 degrees into 100 Ohm, chops both
   half-cycles to the same peaks on both engines. A circuit with a TRIAC runs on the Gear integration, as one with a
-  thyristor or a fuse does. The blocking-state noise differs as it does for the SCR, and is bounded in the
+  thyristor or a fuse does. The input-referred noise differs as it does for the SCR, and is bounded in the
   cross-validation test.
 - The same figures as the SCR set it, and the critical `dv/dt` and the turn-off time apply to the magnitudes: a
   fast voltage change of either sign fires a blocking TRIAC, and a voltage of either sign re-applied inside the

@@ -21,7 +21,7 @@ namespace GUI {
  * @param[in] results    Where the results of the runs go; they must outlive the controls.
  */
 AnalysisControls::AnalysisControls(Schematic &schematic, ResultStore &results)
-    : m_Schematic(schematic), m_Results(results) {
+    : m_Schematic(schematic), m_Results(results), m_ReportDocumentVersion(schematic.GetDocumentVersion()) {
 }
 
 /**
@@ -120,8 +120,14 @@ bool AnalysisControls::PressRunKey() {
 /**
  * @brief   Takes in the result of the run that ended, stops a run whose circuit was edited, hands a live run the parts
  *          the user changed and starts the run asked for while a paused live run held the worker. Call it every frame.
+ * @note    Opening another schematic also forgets how the last runs went, since their errors were about a circuit
+ *          that is gone; an edit keeps them, as rerunning on an edit looks at them.
  */
 void AnalysisControls::Update() {
+    if (m_Schematic.GetDocumentVersion() != m_ReportDocumentVersion) {
+        m_ReportDocumentVersion = m_Schematic.GetDocumentVersion();
+        m_Report.Reset();
+    }
     if (!m_RunningAnalysis) {
         return;
     }

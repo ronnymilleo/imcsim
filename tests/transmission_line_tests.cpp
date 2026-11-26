@@ -22,6 +22,7 @@
 #include "schematic/schematic_file.h"
 #include "simulation/analysis_suggestions.h"
 #include "simulation/simulation_backend.h"
+#include "simulation/simulator.h"
 #include "ui_elements/ui_transmission_line.h"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -193,6 +194,30 @@ TEST_CASE("A transmission line symbol exposes four grid terminals and round-trip
     REQUIRE(invalid.has_value());
     CHECK(invalid->Elements.empty());
     CHECK(invalid->Warnings.size() == 1);
+}
+
+TEST_CASE("On ngspice a one-port line is refused for its part, not for its port count",
+          "[transmission_line][simulator]") {
+    Core::SetBackend(nullptr);
+    Core::TransmissionLine line;
+    line.SetName("TL1");
+    line.SetValue(100.0);
+    line.SetParameters({.Delay = 1e-9});
+    Core::Resistor load;
+    load.SetName("RL");
+    load.SetValue(200.0);
+    Core::Ground ground;
+    Core::Circuit circuit;
+    circuit.AddPort({.Number = 1, .Node = 1, .ReferenceOhms = 50.0});
+    circuit.Add(line, {1, 0, 2, 0});
+    circuit.Add(load, {2, 0});
+    circuit.Add(ground, {0});
+
+    // A second port would not help, since ngspice cannot simulate the line at all
+    const Core::SParametersRun run = Core::RunSParameters(circuit, {});
+    REQUIRE_FALSE(run.Result.has_value());
+    CHECK_THAT(run.Result.error(), ContainsSubstring("Transmission lines are simulated natively by Nodalys"));
+    CHECK_THAT(run.Result.error(), !ContainsSubstring("S-parameter ports"));
 }
 
 TEST_CASE("Nodalys simulates lossless and lossy transmission lines while ngspice and pole-zero refuse them cleanly",

@@ -57,6 +57,7 @@ public:
     // Recording
     void Record(Analysis analysis, RunStatus status);
     void Clear(Analysis analysis);
+    void Reset();
 
     // Reading
     const RunStatus &GetStatus(Analysis analysis) const;
