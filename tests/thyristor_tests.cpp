@@ -75,7 +75,9 @@ struct HalfWaveRectifier {
     }
 };
 
-/// The load voltage at the first time point at or after an instant.
+/**
+ * @brief   The load voltage at the first time point at or after an instant.
+ */
 double LoadVoltageAt(const Core::Transient &transient, const double time) {
     const auto point = std::ranges::lower_bound(transient.Times, time);
     REQUIRE(point != transient.Times.end());
@@ -110,7 +112,6 @@ double MeanLoadVoltage(const Core::Transient &transient) {
     return area / (to - from);
 }
 
-/// Runs the rectifier on the backend in use and returns its transient.
 const Core::Transient &RunRectifier(const Core::Circuit &circuit, Core::TransientRun &run) {
     run = Core::RunTransient(circuit, RECTIFIER_SETTINGS);
     REQUIRE(run.Result.has_value());
@@ -152,7 +153,9 @@ struct IdleOnMains {
     }
 };
 
-/// The largest load current over two mains periods on the backend in use.
+/**
+ * @brief   The largest load current over two mains periods on the backend in use.
+ */
 double PeakIdleCurrent(const Core::Circuit &circuit) {
     const Core::TransientRun run =
         Core::RunTransient(circuit, {.StopTime = 2.0 / MAINS_FREQUENCY, .TimeStep = 1.0 / MAINS_FREQUENCY / 200.0});
@@ -230,12 +233,13 @@ struct LatchedOnDC {
     }
 };
 
-/// True when some warning starts with the text, so a test can check one rating at a time.
+/**
+ * @brief   True when some warning starts with the text, so a test can check one rating at a time.
+ */
 bool HasWarning(const std::vector<std::string> &warnings, const std::string_view start) {
     return std::ranges::any_of(warnings, [&](const std::string &warning) { return warning.starts_with(start); });
 }
 
-/// True when some warning says a part exceeds a rating.
 bool HasRatingWarning(const std::vector<std::string> &warnings) {
     return std::ranges::any_of(warnings, [](const std::string &warning) { return warning.contains("exceeds its"); });
 }

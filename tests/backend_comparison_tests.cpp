@@ -43,7 +43,9 @@
 
 namespace {
 
-/// Relative plus absolute closeness, for values that may sit near zero.
+/**
+ * @brief   Relative plus absolute closeness, for values that may sit near zero.
+ */
 bool Close(const double a, const double b, const double relative, const double absolute) {
     return std::fabs(a - b) <= relative * std::max(std::fabs(a), std::fabs(b)) + absolute;
 }
@@ -158,7 +160,9 @@ double Interpolate(const Core::Transient &trace, const std::vector<double> &valu
 
 /**
  * @brief   Runs the transient through both backends and compares every trace at the Nodalys time points.
- * @param[in] skip  Points to skip at the start, while the first-step backward Euler error decays.
+ * @param[in] circuit   Circuit to simulate.
+ * @param[in] settings  Transient span and time step.
+ * @param[in] skip      Points to skip at the start, while the first-step backward Euler error decays.
  */
 void CheckTransientParity(const Core::Circuit &circuit,
                           const Core::TransientSettings &settings,

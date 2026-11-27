@@ -58,7 +58,9 @@ struct Tank {
     }
 };
 
-/// Largest voltage of node 1 between two times, which for the tank is the amplitude of the ringing.
+/**
+ * @brief   Largest voltage of node 1 between two times, which for the tank is the amplitude of the ringing.
+ */
 double PeakBetween(const Core::Transient &transient, const double from, const double to) {
     double peak = 0.0;
     for (std::size_t index = 0; index < transient.Times.size(); ++index) {
@@ -112,7 +114,6 @@ struct Rectifier {
     }
 };
 
-/// Runs a check on ngspice and then on Nodalys.
 template <typename Check>
 void OnBothEngines(Check check) {
     check();
@@ -155,7 +156,9 @@ GUI::LoadedSchematic LoadOrFail(const std::string &text) {
     return std::move(*loaded);
 }
 
-/// Largest distance between the voltage of node 2 and the one a fine run gives at the same time.
+/**
+ * @brief   Largest distance between the voltage of node 2 and the one a fine run gives at the same time.
+ */
 double MaxErrorAgainst(const Core::Transient &run, const Core::Transient &reference) {
     double error = 0.0;
     for (std::size_t index = 0; index < run.Times.size(); ++index) {

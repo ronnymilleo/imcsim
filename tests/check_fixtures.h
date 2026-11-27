@@ -11,7 +11,10 @@
 #include "circuit/components/resistor.h"
 #include "circuit/components/voltage_source.h"
 
-/// A 5 V source across a 1k resistor to ground: node 1 is the source, ground is node 0.
+/**
+ * @struct  SourceAndResistor
+ * @brief   A 5 V source across a 1k resistor to ground: node 1 is the source, ground is node 0.
+ */
 struct SourceAndResistor {
     Core::VoltageSource Source;
     Core::Resistor Load;

@@ -77,14 +77,18 @@ struct Chopper {
     }
 };
 
-/// The load voltage at the first time point at or after an instant.
+/**
+ * @brief   The load voltage at the first time point at or after an instant.
+ */
 double LoadVoltageAt(const Core::Transient &transient, const double time) {
     const auto point = std::ranges::lower_bound(transient.Times, time);
     REQUIRE(point != transient.Times.end());
     return transient.NodeVoltages[LOAD_NODE][static_cast<std::size_t>(point - transient.Times.begin())];
 }
 
-/// The anode current at the first time point at or after an instant.
+/**
+ * @brief   The anode current at the first time point at or after an instant.
+ */
 double AnodeCurrentAt(const Core::Transient &transient, const double time) {
     const auto trace = std::ranges::find(transient.Currents, "GTO1.A", &Core::ComponentTrace::Name);
     REQUIRE(trace != transient.Currents.end());

@@ -12,6 +12,10 @@
 
 namespace {
 
+/**
+ * @struct  Pair
+ * @brief   Two numbers read and written by key in the table-driven JSON tests.
+ */
 struct Pair {
     double First = 1.0;
     double Second = 2.0;

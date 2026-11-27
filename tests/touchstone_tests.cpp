@@ -24,7 +24,9 @@ std::vector<std::string> SplitLines(const std::string &text) {
     return lines;
 }
 
-/// Two frequencies of a two-port whose entries are 0.1 to 0.8, with the real part first.
+/**
+ * @brief   Two frequencies of a two-port whose entries are 0.1 to 0.8, with the real part first.
+ */
 Core::SParameters MakeTwoPort() {
     Core::SParameters result;
     result.Frequencies = {1e9, 2e9};

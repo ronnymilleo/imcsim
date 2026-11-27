@@ -12,7 +12,6 @@
 
 namespace {
 
-/// The alpha of a texel of the falloff texture.
 std::uint8_t GetAlpha(const GUI::GlowTexels &texels, const std::size_t row, const std::size_t column) {
     return texels[(row * GUI::GLOW_TEXTURE_SIZE + column) * GUI::GLOW_TEXEL_BYTES + 3];
 }

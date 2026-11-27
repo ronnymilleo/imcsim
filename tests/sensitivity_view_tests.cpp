@@ -12,7 +12,10 @@
 
 namespace {
 
-/// A resistor, a capacitor four decades under it, a source with no influence and a block, in the order of a result.
+/**
+ * @brief   A resistor, a capacitor four decades under it, a source with no influence and a block, in the order of a
+ *          result.
+ */
 Core::Sensitivity MakeSensitivity() {
     Core::Sensitivity sensitivity;
     sensitivity.OutputNode = 2;

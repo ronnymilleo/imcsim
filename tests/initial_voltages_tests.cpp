@@ -44,7 +44,9 @@ using Catch::Matchers::WithinAbs;
 /// A transient of 5 ms in 5 us steps, which holds five time constants of the 1 ms circuits below.
 constexpr Core::TransientSettings FIVE_MILLISECONDS{.StopTime = 5e-3, .TimeStep = 5e-6};
 
-/// Voltage of a node at the first point at or after a time.
+/**
+ * @brief   Voltage of a node at the first point at or after a time.
+ */
 double VoltageAt(const Core::Transient &transient, const std::size_t node, const double time) {
     const auto point = std::ranges::lower_bound(transient.Times, time);
     REQUIRE(point != transient.Times.end());
@@ -121,7 +123,9 @@ struct Divider {
     }
 };
 
-/// Runs a transient on each engine in turn, ngspice first.
+/**
+ * @brief   Runs a transient on each engine in turn, ngspice first.
+ */
 std::vector<Core::Transient> RunOnBothEngines(const Core::Circuit &circuit, const Core::TransientSettings &settings) {
     std::vector<Core::Transient> results;
     const Core::TransientRun ngspice = Core::RunTransient(circuit, settings);
@@ -165,7 +169,9 @@ MakeTank(const std::string &name, const double volts, const bool is_marker_on_pi
     return definition;
 }
 
-/// An instance of a block with one pin.
+/**
+ * @brief   An instance of a block with one pin ("A").
+ */
 Core::SubcircuitInstance MakeInstance(const std::string &name, const std::string &definition) {
     Core::SubcircuitInstance instance(definition, {"A"});
     instance.SetName(name);
@@ -202,7 +208,9 @@ struct TwoTanks {
     }
 };
 
-/// Both pins of the two instances start at the voltage and discharge with the time constant of 1 ms.
+/**
+ * @brief   Both pins of the two instances start at the voltage and discharge with the time constant of 1 ms.
+ */
 void CheckBothTanksDischarge(const Core::Circuit &circuit, const double volts) {
     for (const Core::Transient &transient : RunOnBothEngines(circuit, FIVE_MILLISECONDS)) {
         for (const std::size_t node : {std::size_t{1}, std::size_t{2}}) {

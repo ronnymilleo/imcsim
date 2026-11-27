@@ -13,7 +13,9 @@
 
 namespace {
 
-/// A two-port at two frequencies, with Z and Y at both or at neither.
+/**
+ * @brief   A two-port at two frequencies, with Z and Y at both or at neither.
+ */
 Core::SParameters MakeTwoPort(const bool has_matrices) {
     Core::SParameters result;
     result.Frequencies = {1e6, 1e7};

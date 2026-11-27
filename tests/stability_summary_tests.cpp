@@ -18,12 +18,18 @@ namespace {
 using Catch::Matchers::ContainsSubstring;
 using Catch::Matchers::EndsWith;
 
+/**
+ * @struct  Point
+ * @brief   Rollett factor K and geometric stability factor mu of one frequency point.
+ */
 struct Point {
     double K = 2.0;
     double Mu = 2.0;
 };
 
-/// A sweep whose points have the given K and mu, one decade of 1 MHz steps from 100 MHz, stable when mu is above 1.
+/**
+ * @brief   A sweep whose points have the given K and mu, stepped by 100 MHz from 100 MHz, stable when mu is above 1.
+ */
 GUI::TwoPortSweep MakeSweep(const std::vector<Point> &points) {
     GUI::TwoPortSweep sweep;
     double frequency = 100e6;

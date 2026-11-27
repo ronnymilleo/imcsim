@@ -21,6 +21,10 @@ constexpr std::size_t POINT_COUNT = 5001;
 constexpr double FREQUENCY = 1e3;
 constexpr double STOP_TIME = 5e-3;
 
+/**
+ * @struct  Waves
+ * @brief   Sampled input and output waveforms over a shared time vector.
+ */
 struct Waves {
     std::vector<double> Times;
     std::vector<double> Input;

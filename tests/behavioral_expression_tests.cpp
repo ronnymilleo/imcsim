@@ -14,7 +14,9 @@ namespace {
 
 using Kind = Core::BehavioralReference::Kind;
 
-/// Nets IN and OUT are nodes 1 and 2, and ground is 0.
+/**
+ * @brief   Nets IN and OUT are nodes 1 and 2, and ground is 0.
+ */
 std::optional<int> FindTestNode(const std::string_view net) {
     if (net == "IN") {
         return 1;
@@ -28,7 +30,9 @@ std::optional<int> FindTestNode(const std::string_view net) {
     return std::nullopt;
 }
 
-/// R1 is read through its probe, and V1 through itself.
+/**
+ * @brief   R1 is read through its probe, and V1 through itself.
+ */
 std::optional<std::string> FindTestSource(const std::string_view current) {
     if (current == "R1") {
         return "Vprobe-R1";

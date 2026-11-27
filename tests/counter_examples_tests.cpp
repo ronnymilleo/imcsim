@@ -56,7 +56,9 @@ LoadedExample LoadCounterExample(const std::string_view file_name) {
     return {.Schematic = std::move(schematic), .Circuit = std::move(circuit), .Settings = settings};
 }
 
-/// The nodes of the nets Q0, Q1... of a circuit, up to the bit count.
+/**
+ * @brief   The nodes of the nets Q0, Q1... of a circuit, up to the bit count.
+ */
 std::vector<std::size_t> FindBitNodes(const Core::Circuit &circuit, const std::size_t bit_count) {
     std::vector<std::size_t> nodes;
     for (std::size_t bit = 0; bit < bit_count; ++bit) {
@@ -67,14 +69,18 @@ std::vector<std::size_t> FindBitNodes(const Core::Circuit &circuit, const std::s
     return nodes;
 }
 
-/// The voltage of a node at an instant, taken from the last point at or before it.
+/**
+ * @brief   The voltage of a node at an instant, taken from the last point at or before it.
+ */
 double VoltageAt(const Core::Transient &transient, const std::size_t node, const double instant) {
     const auto after = std::ranges::upper_bound(transient.Times, instant);
     REQUIRE(after != transient.Times.begin());
     return transient.NodeVoltages[node][static_cast<std::size_t>(after - transient.Times.begin()) - 1];
 }
 
-/// What the counter reads at an instant, a bit at a time, or no value when a bit is neither high nor low.
+/**
+ * @brief   What the counter reads at an instant, a bit at a time, or no value when a bit is neither high nor low.
+ */
 std::optional<int>
 ReadCount(const Core::Transient &transient, const std::vector<std::size_t> &bit_nodes, const double instant) {
     int count = 0;
@@ -91,7 +97,9 @@ ReadCount(const Core::Transient &transient, const std::vector<std::size_t> &bit_
     return count;
 }
 
-/// The count before the first edge, then after each rising edge that fits in the run.
+/**
+ * @brief   The count before the first edge, then after each rising edge that fits in the run.
+ */
 std::vector<std::optional<int>> ReadCountPerEdge(const Core::Transient &transient,
                                                  const std::vector<std::size_t> &bit_nodes,
                                                  const double stop_time_seconds) {
@@ -107,7 +115,9 @@ std::vector<std::optional<int>> ReadCountPerEdge(const Core::Transient &transien
     return counts;
 }
 
-/// The counts a counter that wraps after the largest one shows from the start: 0, 1, 2...
+/**
+ * @brief   The counts a counter that wraps after the largest one shows from the start: 0, 1, 2...
+ */
 std::vector<std::optional<int>> ExpectedCounts(const std::size_t edge_count, const int modulus) {
     std::vector<std::optional<int>> counts;
     for (std::size_t edge = 0; edge <= edge_count; ++edge) {

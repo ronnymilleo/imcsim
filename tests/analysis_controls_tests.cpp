@@ -141,7 +141,9 @@ bool UpdateUntilIdle(GUI::AnalysisControls &controls) {
     return false;
 }
 
-// Calls Update() as the frame loop does until a condition holds
+/**
+ * @brief   Calls Update() as the frame loop does until a condition holds.
+ */
 template <typename Condition>
 bool UpdateUntil(GUI::AnalysisControls &controls, const Condition &condition) {
     const auto deadline = std::chrono::steady_clock::now() + WAIT_LIMIT;

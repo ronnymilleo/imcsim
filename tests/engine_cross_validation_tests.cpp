@@ -313,13 +313,13 @@ constexpr std::array KNOWN_DIFFERENCES{
 
 using Differences = std::vector<std::string>;
 
-/// Two values of one quantity, as the engines gave them.
 bool Agree(const double expected, const double actual, const Tolerance tolerance) {
     return std::fabs(expected - actual)
         <= tolerance.Relative * std::max(std::fabs(expected), std::fabs(actual)) + tolerance.Absolute;
 }
 
 /**
+ * @class   DifferenceLog
  * @brief   Collects the differences of one comparison and counts the ones past the listed few.
  * @details A log made with known differences allows the quantities they cover to differ by their bounds.
  */
@@ -329,19 +329,25 @@ public:
 
     explicit DifferenceLog(std::vector<const KnownDifference *> known) : m_Known(std::move(known)) {}
 
-    /// The tolerance a quantity is held to: the bound of the entry that covers it, or the usual one.
+    /**
+     * @brief   The tolerance a quantity is held to: the bound of the entry that covers it, or the usual one.
+     */
     Tolerance Allowed(const std::string &quantity, const Tolerance usual) const {
         const KnownDifference *covering = FindCovering(quantity);
         return covering != nullptr ? covering->Bound : usual;
     }
 
-    /// How many output steps an edge of a transient quantity may sit from the other engine's.
+    /**
+     * @brief   How many output steps an edge of a transient quantity may sit from the other engine's.
+     */
     double AllowedWindowSteps(const std::string &quantity) const {
         const KnownDifference *covering = FindCovering(quantity);
         return covering != nullptr ? covering->TimeWindowSteps : TRANSIENT_TIME_WINDOW_STEPS;
     }
 
-    /// A quantity that Nodalys does not report, which no bound can cover, unless a known difference names it.
+    /**
+     * @brief   A quantity that Nodalys does not report, which no bound can cover, unless a known difference names it.
+     */
     void AddMissing(const std::string &quantity) {
         if (FindCovering(quantity) == nullptr) {
             Add(quantity, "missing from Nodalys");
@@ -361,7 +367,6 @@ public:
         }
     }
 
-    /// Same length required, then every pair compared.
     void CompareSeries(const std::string &quantity,
                        const std::vector<double> &expected,
                        const std::vector<double> &actual,
@@ -378,7 +383,9 @@ public:
         }
     }
 
-    /// The lines, each with how many more of its quantity were left out.
+    /**
+     * @brief   The lines, each with how many more of its quantity were left out.
+     */
     Differences Take() {
         Differences lines = std::move(m_Lines);
         for (std::string &line : lines) {
@@ -406,7 +413,9 @@ private:
 
 // Waveforms
 
-/// The value of a sampled waveform at an instant, between its two nearest points.
+/**
+ * @brief   The value of a sampled waveform at an instant, between its two nearest points.
+ */
 double ValueAt(const std::vector<double> &times, const std::vector<double> &values, const double instant) {
     const auto after = std::ranges::lower_bound(times, instant);
     if (after == times.begin()) {
@@ -421,7 +430,9 @@ double ValueAt(const std::vector<double> &times, const std::vector<double> &valu
     return values[upper - 1] + fraction * (values[upper] - values[upper - 1]);
 }
 
-/// Smallest and largest value a waveform takes from one instant to another.
+/**
+ * @brief   Smallest and largest value a waveform takes from one instant to another.
+ */
 std::pair<double, double>
 RangeBetween(const std::vector<double> &times, const std::vector<double> &values, const double from, const double to) {
     double low = std::min(ValueAt(times, values, from), ValueAt(times, values, to));
@@ -491,13 +502,14 @@ const Core::ComponentTrace *FindTrace(const std::vector<Core::ComponentTrace> &t
     return found != traces.end() ? &*found : nullptr;
 }
 
-/// The nodes of the circuit itself: an engine may add nodes of its own after them, such as the internal ones of a
-/// logic part or a transformer, which are not results.
+/**
+ * @brief   The nodes of the circuit itself: an engine may add nodes of its own after them, such as the internal ones of
+ *          a logic part or a transformer, which are not results.
+ */
 std::vector<double> CircuitNodes(const std::vector<double> &voltages, const int node_count) {
     return {voltages.begin(), voltages.begin() + std::min<std::ptrdiff_t>(node_count, std::ssize(voltages))};
 }
 
-/// Whether either engine returned fewer nodes than the circuit has.
 bool HasFewerNodes(const std::size_t expected_size, const std::size_t actual_size, const int node_count) {
     return std::min(expected_size, actual_size) < static_cast<std::size_t>(node_count);
 }
@@ -562,7 +574,9 @@ void CompareTransients(DifferenceLog &log,
     }
 }
 
-/// The difference of two phases in degrees, around the circle.
+/**
+ * @brief   The difference of two phases in degrees, around the circle.
+ */
 double PhaseDistance(const double expected, const double actual) {
     const double difference = std::fmod(std::fabs(expected - actual), FULL_TURN_DEGREES);
     return std::min(difference, FULL_TURN_DEGREES - difference);
@@ -676,7 +690,9 @@ void CompareNoise(DifferenceLog &log, const Core::Noise &expected, const Core::N
     log.Compare("input noise total", expected.InputTotal, actual.InputTotal, NOISE_TOTAL);
 }
 
-/// An impedance, where a very large one is an open circuit whatever its value.
+/**
+ * @brief   An impedance, where a very large one is an open circuit whatever its value.
+ */
 void CompareImpedance(DifferenceLog &log, const std::string &quantity, const double expected, const double actual) {
     if (std::fabs(expected) > OPEN_CIRCUIT_OHMS && std::fabs(actual) > OPEN_CIRCUIT_OHMS) {
         return;
@@ -709,7 +725,9 @@ void CompareSensitivities(DifferenceLog &log, const Core::Sensitivity &expected,
     }
 }
 
-/// The roots as sets: each one of ngspice must have one of Nodalys of the same kind near it, used once.
+/**
+ * @brief   The roots as sets: each one of ngspice must have one of Nodalys of the same kind near it, used once.
+ */
 void ComparePoleZeros(DifferenceLog &log, const Core::PoleZero &expected, const Core::PoleZero &actual) {
     std::vector<bool> used(actual.Roots.size(), false);
     for (const Core::PoleZeroRoot &root : expected.Roots) {
@@ -759,8 +777,10 @@ void CompareSParameters(DifferenceLog &log, const Core::SParameters &expected, c
     }
 }
 
-/// Logic states only: the engines draw a gate output with different edges and levels, so the voltage between them is
-/// not the quantity to compare.
+/**
+ * @brief   Logic states only: the engines draw a gate output with different edges and levels, so the voltage between
+ *          them is not the quantity to compare.
+ */
 void CompareTruthTables(DifferenceLog &log, const Core::TruthTable &expected, const Core::TruthTable &actual) {
     if (expected.Rows.size() != actual.Rows.size()) {
         log.Add("rows", std::format("ngspice has {}, Nodalys {}", expected.Rows.size(), actual.Rows.size()));
@@ -796,10 +816,8 @@ void CompareTruthTables(DifferenceLog &log, const Core::TruthTable &expected, co
  * @brief   What comparing one analysis of one example came to.
  */
 struct Outcome {
-    /// Why the comparison could not be made, or empty when it was.
-    std::string SkipReason;
-    /// Differences at the usual tolerances.
-    Differences Found;
+    std::string SkipReason; ///< Why the comparison could not be made, or empty when it was.
+    Differences Found;      ///< Differences at the usual tolerances.
     /// Differences left once the known ones are allowed their bounds; equal to Found when there are none.
     Differences Beyond;
 };
@@ -808,6 +826,7 @@ struct Outcome {
  * @brief   Runs one analysis on ngspice, then on Nodalys, and compares what they return.
  * @param[in] run      Runs the analysis through the backend in use.
  * @param[in] compare  Adds the differences of two results to a log.
+ * @param[in] known    Known differences allowed wider bounds.
  */
 template <typename Run, typename Compare>
 Outcome RunBoth(Run &&run, Compare &&compare, const std::vector<const KnownDifference *> &known) {
@@ -830,7 +849,9 @@ Outcome RunBoth(Run &&run, Compare &&compare, const std::vector<const KnownDiffe
     return {.SkipReason = {}, .Found = usual.Take(), .Beyond = bounded.Take()};
 }
 
-/// Whether a circuit holds a source of noise or random values, whose random draws differ between engines.
+/**
+ * @brief   Whether a circuit holds a source of noise or random values, whose random draws differ between engines.
+ */
 bool HasRandomSource(const Core::Circuit &circuit) {
     return std::ranges::any_of(Core::CollectParts(circuit), [](const Core::Component *part) {
         if (!Core::IsSource(part->GetType())) {
@@ -841,7 +862,6 @@ bool HasRandomSource(const Core::Circuit &circuit) {
     });
 }
 
-/// The entries of KNOWN_DIFFERENCES for one analysis of one example.
 std::vector<const KnownDifference *> FindKnownDifferences(const GUI::Example &example,
                                                           const std::string_view analysis) {
     std::vector<const KnownDifference *> known;

@@ -28,15 +28,19 @@ GUI::TwoPortMatrix MakePotentiallyUnstable() {
     return {.S11 = Polar(0.75, -115.0), .S12 = Polar(0.06, 60.0), .S21 = Polar(3.2, 70.0), .S22 = Polar(0.45, -40.0)};
 }
 
-/// The reflection the other port shows for a termination, which is what makes a termination unstable above 1.
+/**
+ * @brief   The reflection the other port shows for a termination, which is what makes a termination unstable above 1.
+ */
 double ReflectionSeen(const GUI::TwoPortMatrix &matrix, const bool is_load, const Complex termination) {
     const Complex near_side = is_load ? matrix.S11 : matrix.S22;
     const Complex far_side = is_load ? matrix.S22 : matrix.S11;
     return std::abs(near_side + matrix.S12 * matrix.S21 * termination / (1.0 - far_side * termination));
 }
 
-/// Walks a grid of points of the chart, leaves out those that sit on the boundary, and returns the unstable ones by the
-/// direct formula.
+/**
+ * @brief   Walks a grid of points of the chart, leaves out those that sit on the boundary, and returns the ones on the
+ *          requested side by the direct formula.
+ */
 std::vector<Complex> FindGridPoints(const GUI::TwoPortMatrix &matrix, const bool is_load, const bool is_unstable) {
     std::vector<Complex> points;
     constexpr int STEPS = 40;
@@ -58,7 +62,6 @@ std::vector<Complex> FindGridPoints(const GUI::TwoPortMatrix &matrix, const bool
     return points;
 }
 
-/// Whether the boundary says a point is on its unstable side.
 bool IsUnstableByBoundary(const GUI::StabilityBoundary &boundary, const Complex point) {
     switch (boundary.Shape) {
     case GUI::BoundaryShape::CIRCLE:

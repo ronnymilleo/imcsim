@@ -57,7 +57,9 @@ struct LowPass {
     }
 };
 
-/// Figures that are the same decibels and degrees at both of the two frequencies.
+/**
+ * @brief   Figures that are the same decibels and degrees at both of the two frequencies.
+ */
 Core::ACElementFigures MakeFigures(const double value, const double decibels, const double degrees) {
     return {.Value = value,
             .MagnitudeDecibelsPerPercent = {decibels, decibels},

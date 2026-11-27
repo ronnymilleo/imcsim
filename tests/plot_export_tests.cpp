@@ -261,7 +261,9 @@ TEST_CASE("A centered note is drawn over its point, a plain one beside it", "[pl
 
 namespace {
 
-/// Two curves of a Smith chart: S11 spiraling in from the rim, and S22 sitting at the center.
+/**
+ * @brief   Two curves of a Smith chart: S11 spiraling in from the rim, and S22 sitting at the center.
+ */
 GUI::ExportFigure MakeSmithFigure() {
     GUI::ExportSmith smith{.Title = "Smith chart"};
     GUI::ExportSmithTrace reflection{.Name = "S11", .Color = {86, 156, 214}};
