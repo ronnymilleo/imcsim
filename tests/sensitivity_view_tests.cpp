@@ -68,6 +68,7 @@ TEST_CASE("The table gives each part its value, its two sensitivities and its sh
     CHECK(rows[0].Absolute == "-200uV/Ohm");
     // Per 1 %, signed: -1 V for 100 % is -10 mV
     CHECK(rows[0].Normalized == "-10mV");
+    CHECK(rows[0].Tolerance == "-");
     CHECK(rows[0].Share == 1.0);
     // A block names its element, selects the block and has no value of its own to show
     CHECK(rows[1].Part == "X2.R1");
@@ -80,4 +81,31 @@ TEST_CASE("The table gives each part its value, its two sensitivities and its sh
     CHECK(rows[4].Part == "VCC 12V");
     CHECK(rows[4].PartName == "V1");
     CHECK(rows[4].Value == "12V");
+    CHECK_FALSE(GUI::FormatWorstCaseSummary(MakeSensitivity()).has_value());
+}
+
+TEST_CASE("The sensitivity table and summary show worst-case deviations when parts carry tolerances",
+          "[sensitivity_view]") {
+    Core::Sensitivity sensitivity = MakeSensitivity();
+    sensitivity.Parts[0].TolerancePercent = 5.0;
+    sensitivity.Parts[2].TolerancePercent = 10.0;
+
+    const std::vector<GUI::SensitivityRow> rows = GUI::MakeSensitivityRows(sensitivity);
+    REQUIRE(rows.size() == 5);
+    CHECK(rows[0].Tolerance == "±50mV (5%)");
+    CHECK(rows[1].Tolerance == "-");
+    CHECK(rows[2].Tolerance == "±10uV (10%)");
+
+    const std::optional<std::string> summary = GUI::FormatWorstCaseSummary(sensitivity);
+    REQUIRE(summary.has_value());
+    CHECK(summary->contains("2 toleranced parts"));
+    CHECK(summary->contains("±50.01mV (extreme)"));
+    CHECK(summary->contains("±50mV (RSS)"));
+
+    Core::Sensitivity single;
+    single.Parts = {{.Name = "R1", .Unit = "Ohm", .Value = 1e3, .Normalized = -2.5, .TolerancePercent = 5.0}};
+    const std::optional<std::string> single_summary = GUI::FormatWorstCaseSummary(single);
+    REQUIRE(single_summary.has_value());
+    CHECK(single_summary->contains("1 toleranced part:"));
+    CHECK(single_summary->contains("±125mV (extreme)"));
 }

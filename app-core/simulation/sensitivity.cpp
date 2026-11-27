@@ -7,6 +7,7 @@
 
 #include "circuit/components/controlled_source.h"
 #include "circuit/components/source.h"
+#include "simulation/monte_carlo.h"
 #include "spice/spice_text.h"
 #include <algorithm>
 #include <cmath>
@@ -71,7 +72,8 @@ PartSensitivity MakePart(const Component &part, const double absolute, const dou
             .Unit = part.GetUnit(),
             .Value = EffectiveSensitivityValue(part),
             .Absolute = absolute,
-            .Normalized = normalized};
+            .Normalized = normalized,
+            .TolerancePercent = IsVaried(part) ? part.GetTolerance() : std::nullopt};
 }
 
 /**

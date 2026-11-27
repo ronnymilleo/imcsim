@@ -133,14 +133,17 @@ TEST_CASE("The table ranks the parts at the frequency and writes each figure", "
     CHECK(rows[0].Value == "4.7kOhm");
     CHECK(rows[0].Magnitude == "-0.5 dB");
     CHECK(rows[0].Phase == "-0.1 deg");
+    CHECK(rows[0].Tolerance == "-");
     CHECK(rows[0].Share == 1.0);
     CHECK(rows[1].Part == "C1");
     CHECK(rows[1].Magnitude == "+0 dB");
     CHECK(rows[1].Phase == "-2 deg");
+    CHECK(rows[1].Tolerance == "-");
     CHECK(rows[1].Share < 1.0);
     // The source moves nothing, so it ranks last with no share
     CHECK(rows[2].Part == "V1");
     CHECK(rows[2].Share == 0.0);
+    CHECK_FALSE(GUI::FormatACWorstCaseSummary(sensitivity, 0).has_value());
 
     // Where the output was too small a part has no figures and ranks with the rest at zero
     const std::vector<GUI::ACSensitivityRow> corner = GUI::MakeACSensitivityRows(sensitivity, 2);
@@ -177,4 +180,39 @@ TEST_CASE("The texts keep three significant digits and sign the change", "[ac_se
     CHECK(GUI::FormatDecibelsPerPercent(-0.0) == "+0 dB");
     CHECK(GUI::FormatDecibelsPerPercent(std::nullopt) == "-");
     CHECK(GUI::FormatDegreesPerPercent(std::nullopt) == "-");
+}
+
+TEST_CASE("The AC sensitivity table and summary show worst-case gain and phase bounds for toleranced parts",
+          "[ac_sensitivity_view]") {
+    Core::ACSensitivity sensitivity = MakeSensitivity();
+    sensitivity.Parts[1].TolerancePercent = 5.0;
+    sensitivity.Parts[2].TolerancePercent = 10.0;
+
+    const std::vector<GUI::ACSensitivityRow> rows = GUI::MakeACSensitivityRows(sensitivity, 0);
+    REQUIRE(rows.size() == 3);
+    // R1 ranks first at 10 Hz: 10% x |-0.5| dB/% = 5 dB, 10% x |-0.1| deg/% = 1 deg
+    CHECK(rows[0].PartName == "R1");
+    CHECK(rows[0].Tolerance == "±5 dB / ±1 deg (10%)");
+    CHECK(rows[1].PartName == "C1");
+    CHECK(rows[1].Tolerance == "±0 dB / ±10 deg (5%)");
+    CHECK(rows[2].Tolerance == "-");
+
+    // At 1 kHz (index 2), R1 has no figure so its tolerance column reads "-"
+    const std::vector<GUI::ACSensitivityRow> high_freq = GUI::MakeACSensitivityRows(sensitivity, 2);
+    REQUIRE(high_freq.size() == 3);
+    CHECK(high_freq[2].PartName == "R1");
+    CHECK(high_freq[2].Tolerance == "-");
+
+    const std::optional<std::string> summary = GUI::FormatACWorstCaseSummary(sensitivity, 0);
+    REQUIRE(summary.has_value());
+    CHECK(summary->contains("Worst case at 10Hz (2 toleranced parts):"));
+    CHECK(summary->contains("gain ±5 dB (extreme), ±5 dB (RSS)"));
+    CHECK(summary->contains("phase ±11 deg (extreme), ±10 deg (RSS)"));
+
+    // At a frequency where no toleranced part has any valid figure, the summary reports that output is too small
+    sensitivity.Parts[1].MagnitudeDecibelsPerPercent[2] = std::nullopt;
+    sensitivity.Parts[1].PhaseDegreesPerPercent[2] = std::nullopt;
+    const std::optional<std::string> small_summary = GUI::FormatACWorstCaseSummary(sensitivity, 2);
+    REQUIRE(small_summary.has_value());
+    CHECK(small_summary.value() == "Worst case at 1kHz (2 toleranced parts): output too small");
 }

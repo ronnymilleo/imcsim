@@ -8,6 +8,7 @@
 
 #include "results/logarithmic_level.h"
 #include "results/sensitivity_view.h"
+#include "simulation/worst_case.h"
 #include "spice/spice_value.h"
 #include <algorithm>
 #include <cmath>
@@ -53,6 +54,24 @@ std::string FormatFigure(const std::optional<double> &value, const char *unit) {
         return "-";
     }
     return std::format("{:+.{}g} {}", *value == 0.0 ? 0.0 : *value, SIGNIFICANT_DIGITS, unit);
+}
+
+std::string FormatMagnitudeBound(const double value, const char *unit) {
+    return std::format("±{:.{}g} {}", value == 0.0 ? 0.0 : value, SIGNIFICANT_DIGITS, unit);
+}
+
+std::string FormatACPartTolerance(const Core::ACPartSensitivity &part, const std::size_t frequency_index) {
+    if (!part.TolerancePercent || *part.TolerancePercent <= 0.0) {
+        return "-";
+    }
+    const std::optional<double> gain = Core::GetACPartGainWorstCase(part, frequency_index);
+    const std::optional<double> phase = Core::GetACPartPhaseWorstCase(part, frequency_index);
+    if (!gain && !phase) {
+        return "-";
+    }
+    const std::string gain_text = gain ? FormatMagnitudeBound(*gain, "dB") : "-";
+    const std::string phase_text = phase ? FormatMagnitudeBound(*phase, "deg") : "-";
+    return std::format("{} / {} ({}%)", gain_text, phase_text, Core::FormatValue(*part.TolerancePercent));
 }
 
 } // namespace
@@ -205,6 +224,7 @@ std::vector<ACSensitivityRow> MakeACSensitivityRows(const Core::ACSensitivity &s
                         .Value = std::format("{}{}", Core::FormatValue(part->Value), part->Unit),
                         .Magnitude = FormatDecibelsPerPercent(figure(part->MagnitudeDecibelsPerPercent)),
                         .Phase = FormatDegreesPerPercent(figure(part->PhaseDegreesPerPercent)),
+                        .Tolerance = FormatACPartTolerance(*part, frequency_index),
                         .Share = largest > 0.0 ? GetInfluence(*part, frequency_index) / largest : 0.0});
     }
     return rows;
@@ -248,6 +268,50 @@ std::string FormatDecibelsPerPercent(const std::optional<double> &decibels) {
  */
 std::string FormatDegreesPerPercent(const std::optional<double> &degrees) {
     return FormatFigure(degrees, "deg");
+}
+
+/**
+ * @brief   Formats the analytical worst-case summary line at one frequency of an AC sensitivity result.
+ * @param[in] sensitivity      The result.
+ * @param[in] frequency_index  Index of the frequency in the result.
+ * @return  Summary of EVA and RSS gain/phase bounds when at least one part has a tolerance, or none otherwise.
+ */
+std::optional<std::string> FormatACWorstCaseSummary(const Core::ACSensitivity &sensitivity,
+                                                    const std::size_t frequency_index) {
+    if (frequency_index >= sensitivity.Frequencies.size()) {
+        return std::nullopt;
+    }
+    const Core::ACWorstCasePoint point = Core::ComputeACWorstCaseAt(sensitivity, frequency_index);
+    if (point.TolerancedPartCount == 0) {
+        return std::nullopt;
+    }
+    const std::string frequency = std::format("{}Hz", Core::FormatValue(sensitivity.Frequencies[frequency_index]));
+    const char *part_word = point.TolerancedPartCount == 1 ? "part" : "parts";
+    if (!point.ExtremeGainDecibels && !point.ExtremePhaseDegrees) {
+        return std::format("Worst case at {} ({} toleranced {}): output too small",
+                           frequency,
+                           point.TolerancedPartCount,
+                           part_word);
+    }
+    std::string bounds;
+    if (point.ExtremeGainDecibels && point.RssGainDecibels) {
+        bounds += std::format("gain {} (extreme), {} (RSS)",
+                              FormatMagnitudeBound(*point.ExtremeGainDecibels, "dB"),
+                              FormatMagnitudeBound(*point.RssGainDecibels, "dB"));
+    }
+    if (point.ExtremePhaseDegrees && point.RssPhaseDegrees) {
+        if (!bounds.empty()) {
+            bounds += " · ";
+        }
+        bounds += std::format("phase {} (extreme), {} (RSS)",
+                              FormatMagnitudeBound(*point.ExtremePhaseDegrees, "deg"),
+                              FormatMagnitudeBound(*point.RssPhaseDegrees, "deg"));
+    }
+    return std::format("Worst case at {} ({} toleranced {}): {}",
+                       frequency,
+                       point.TolerancedPartCount,
+                       part_word,
+                       bounds);
 }
 
 } // namespace GUI

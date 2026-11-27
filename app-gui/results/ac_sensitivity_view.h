@@ -42,6 +42,8 @@ struct ACSensitivityRow {
     std::string Magnitude;
     /// Change of the phase for a 1 % higher value, such as "-0.286 deg", or "-".
     std::string Phase;
+    /// Worst-case gain and phase change at the part's tolerance, such as "±0.217 dB / ±1.43 deg (5%)", or "-".
+    std::string Tolerance;
     /// How much of the response a 1 % change of the part moves, as a share of the part that moves it most, from 0 to 1.
     double Share = 0.0;
 };
@@ -78,6 +80,8 @@ std::vector<ACSensitivityCurve> MakeACSensitivityCurves(const Core::ACSensitivit
 // Texts
 std::string FormatDecibelsPerPercent(const std::optional<double> &decibels);
 std::string FormatDegreesPerPercent(const std::optional<double> &degrees);
+std::optional<std::string> FormatACWorstCaseSummary(const Core::ACSensitivity &sensitivity,
+                                                    std::size_t frequency_index);
 
 } // namespace GUI
 

@@ -179,16 +179,28 @@ void ACSensitivityTab::DrawTable(const Core::ACSensitivity &sensitivity) {
     DrawFrequencyChoice(sensitivity);
     const std::size_t frequency_index =
         std::min(m_Results.GetACSensitivityFrequency(), sensitivity.Frequencies.size() - 1);
+    ImGui::PushTextWrapPos(0.0f);
+    if (const std::optional<std::string> summary = FormatACWorstCaseSummary(sensitivity, frequency_index)) {
+        ImGui::TextUnformatted(summary->c_str());
+        ImGui::SetItemTooltip("Extreme adds every toleranced part's worst corner together; RSS takes the root sum of "
+                              "squares for independent tolerances");
+    } else {
+        ImGui::TextDisabled(
+            "Set tolerances on resistors, capacitors, inductors or DC voltage sources to bound the worst-case "
+            "gain and phase change here without Monte Carlo sampling");
+    }
+    ImGui::PopTextWrapPos();
     const std::vector<ACSensitivityRow> rows = MakeACSensitivityRows(sensitivity, frequency_index);
     const std::optional<bool> show_all = DrawAllNoneButtons("ac_sensitivity_parts");
     constexpr ImGuiTableFlags TABLE_FLAGS =
         ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp;
-    if (ImGui::BeginTable("ac_sensitivity", 6, TABLE_FLAGS)) {
+    if (ImGui::BeginTable("ac_sensitivity", 7, TABLE_FLAGS)) {
         ImGui::TableSetupColumn("Plot", ImGuiTableColumnFlags_WidthFixed);
         ImGui::TableSetupColumn("Part");
         ImGui::TableSetupColumn("Value");
         ImGui::TableSetupColumn("Gain per 1 %");
         ImGui::TableSetupColumn("Phase per 1 %");
+        ImGui::TableSetupColumn("Worst case");
         ImGui::TableSetupColumn("Share of largest");
         ImGui::TableHeadersRow();
         for (std::size_t position = 0; position < rows.size(); ++position) {
@@ -223,6 +235,8 @@ void ACSensitivityTab::DrawTable(const Core::ACSensitivity &sensitivity) {
             ImGui::TextUnformatted(row.Magnitude.c_str());
             ImGui::TableNextColumn();
             ImGui::TextUnformatted(row.Phase.c_str());
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(row.Tolerance.c_str());
             ImGui::TableNextColumn();
             ImGui::ProgressBar(static_cast<float>(row.Share),
                                {-FLT_MIN, 0.0f},

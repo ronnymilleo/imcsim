@@ -261,6 +261,8 @@ struct PartSensitivity {
     std::optional<double> Value;
     double Absolute = 0.0;
     double Normalized = 0.0;
+    /// Tolerance of the part in percent when the circuit sets one that varies, or none.
+    std::optional<double> TolerancePercent;
 };
 
 /**
@@ -295,6 +297,8 @@ struct ACPartSensitivity {
     std::vector<std::optional<double>> MagnitudeDecibelsPerPercent;
     /// Degrees the phase of the response changes by, at each frequency; none where the output is too small.
     std::vector<std::optional<double>> PhaseDegreesPerPercent;
+    /// Tolerance of the part in percent when the circuit sets one that varies, or none.
+    std::optional<double> TolerancePercent;
 };
 
 /**
