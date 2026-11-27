@@ -46,11 +46,15 @@ void UIOpAmp::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, 
 
 /**
  * @brief   The input signs sit inside the triangle, next to their inputs.
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     color   Line color.
+ * @param[in]     style   Drawing standard (unused; triangle is identical in IEC and ANSI).
  */
 void UIOpAmp::DrawSymbol(SchematicCanvas &canvas,
                          const ViewTransform &view,
                          const ImU32 color,
-                         SymbolStyle /*style*/) const {
+                         [[maybe_unused]] const SymbolStyle style) const {
     const ImVec2 triangle[3] = {LocalToScreen(view, -BODY_HALF_LENGTH, -BODY_HALF_HEIGHT),
                                 LocalToScreen(view, BODY_HALF_LENGTH, 0),
                                 LocalToScreen(view, -BODY_HALF_LENGTH, BODY_HALF_HEIGHT)};
@@ -69,6 +73,9 @@ void UIOpAmp::DrawSymbol(SchematicCanvas &canvas,
 
 /**
  * @brief   The name above the triangle and the model below it, with its gain-bandwidth product while ideal.
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     color   Text color.
  */
 void UIOpAmp::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const auto &op_amp = static_cast<const Core::OpAmp &>(GetComponent());

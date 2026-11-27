@@ -201,7 +201,9 @@ private:
     std::unique_ptr<Nodalys::CircuitBuilder> m_Builder;
     std::vector<std::string> m_Warnings;
 
-    /// Hands the engine the initial voltages and the nodesets of a circuit, at the nodes its node map gives.
+    /**
+     * @brief   Hands the engine the initial voltages and the nodesets of a circuit, at the nodes its node map gives.
+     */
     void AddNodeVoltages(const Circuit &circuit, const std::vector<int> &node_map) {
         for (const CircuitNodeVoltage &initial_voltage : circuit.GetInitialVoltages()) {
             m_Builder->SetInitialVoltage(node_map[static_cast<std::size_t>(initial_voltage.Node)],

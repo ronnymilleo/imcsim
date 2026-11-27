@@ -41,8 +41,7 @@ struct OpAmpParameters {
     OpAmpInputStage InputStage = OpAmpInputStage::NPN;
     double OpenLoopGainDecibels = 106.0;
     double GainBandwidth = 1e6;
-    /// Volts per microsecond, as datasheets give it.
-    double SlewRate = 0.5;
+    double SlewRate = 0.5; ///< Volts per microsecond, as datasheets give it.
     double PhaseMarginDegrees = 60.0;
     double InputBiasCurrent = 80e-9;
     double CommonModeRejectionDecibels = 90.0;

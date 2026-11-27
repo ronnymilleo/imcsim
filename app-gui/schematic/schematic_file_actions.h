@@ -27,8 +27,7 @@ namespace GUI {
 struct FileActionHooks {
     /// Leaves any drag, paste, placement or wire in progress, before the schematic is cleared or replaced.
     std::function<void()> StopEditing;
-    /// Shows the whole schematic that was just opened.
-    std::function<void()> FrameSchematic;
+    std::function<void()> FrameSchematic; ///< Shows the whole schematic that was just opened.
     /// Lets an imported file or an inserted example follow the cursor until a click places it.
     std::function<void(PastedGroup)> PlaceGroup;
     /// Lets the user pick the subcircuits of a SPICE library to import, with the name of its file.
@@ -104,17 +103,14 @@ private:
     std::optional<Example> m_ExampleToOpen;
 
     // Dialogs
-    /// Touched only by the main thread.
-    std::optional<FileAction> m_ActionToConfirm;
+    std::optional<FileAction> m_ActionToConfirm; ///< Touched only by the main thread.
     /// The action of the dialog in progress, touched only by the main thread.
     std::optional<FileAction> m_DialogAction;
     FileDialog m_FileDialog;
     std::string m_MessagesTitle;
     std::vector<std::string> m_Messages;
-    /// Messages from outside the popups' ID stack, opened by the next DrawPopups().
-    bool m_HasQueuedMessages = false;
-    /// Export: dark keeps the colors of the editor, light suits print.
-    bool m_ExportDark = false;
+    bool m_HasQueuedMessages = false; ///< Messages from outside the popups' ID stack, opened by the next DrawPopups().
+    bool m_ExportDark = false;        ///< Export: dark keeps the colors of the editor, light suits print.
 
     void HandleQuitRequest();
     void HandleExampleRequest();

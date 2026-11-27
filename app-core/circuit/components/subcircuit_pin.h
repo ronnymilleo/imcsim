@@ -24,6 +24,10 @@ struct PortSettings {
     int Number = 1;
     double ReferenceOhms = DEFAULT_PORT_REFERENCE_OHMS;
 
+    /**
+     * @brief   Compares two PortSettings values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const PortSettings &) const = default;
 };
 

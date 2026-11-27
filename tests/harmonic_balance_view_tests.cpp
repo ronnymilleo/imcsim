@@ -26,7 +26,10 @@ using Catch::Matchers::ContainsSubstring;
 using Catch::Matchers::WithinAbs;
 using Complex = std::complex<double>;
 
-/// Builds a two-node circuit V1(1-0) -- R1(1-0) and returns the schematic with the measured non-ground node index.
+/**
+ * @brief   Builds a two-node circuit V1(1-0) -- R1(1-0) and returns the schematic with the measured non-ground node
+ *          index.
+ */
 std::pair<GUI::Schematic, int> BuildMeasuredDividerSchematic() {
     GUI::Schematic schematic;
     std::vector<std::unique_ptr<GUI::UIElement>> elements;

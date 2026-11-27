@@ -46,11 +46,18 @@ using DenseMatrix = BasicDenseMatrix<double>;
  *          negative indices (ground) like `MnaSystem::AddA()`.
  */
 struct ComplexStamper {
+    /// Callback receiving a complex matrix entry `(row, col, value)` and opaque `context`.
     using Callback = void (*)(int row, int col, std::complex<double> value, void *context);
 
     Callback Apply = nullptr;
     void *Context = nullptr;
 
+    /**
+     * @brief   Forwards a complex matrix entry to `Apply`, ignoring negative (ground) indices or a null callback.
+     * @param[in] row    Zero-based MNA row index, or negative for ground (ignored).
+     * @param[in] col    Zero-based MNA column index, or negative for ground (ignored).
+     * @param[in] value  Complex admittance or stamp contribution added at `(row, col)`.
+     */
     void Add(const int row, const int col, const std::complex<double> value) const {
         if (row < 0 || col < 0 || Apply == nullptr) {
             return;
@@ -64,11 +71,17 @@ struct ComplexStamper {
  * @brief   Type-erased frequency-dependent matrix delta callback registered on a reactive `MnaSystem`.
  */
 struct FrequencyStamp {
+    /// Callback stamping frequency-dependent matrix entries into `stamper` at angular frequency `omega`.
     using Callback = void (*)(const void *context, const ComplexStamper &stamper, double omega);
 
     Callback Stamp = nullptr;
     const void *Context = nullptr;
 
+    /**
+     * @brief   Invokes the frequency-dependent stamp at angular frequency `omega` when `Stamp` is non-null.
+     * @param[in] stamper  Sink receiving complex MNA matrix entries.
+     * @param[in] omega    Angular frequency \f$\omega = 2\pi f\f$, in radians per second.
+     */
     void Apply(const ComplexStamper &stamper, const double omega) const {
         if (Stamp != nullptr) {
             Stamp(Context, stamper, omega);

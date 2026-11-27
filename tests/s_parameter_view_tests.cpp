@@ -20,7 +20,9 @@ using Catch::Matchers::ContainsSubstring;
 using Catch::Matchers::WithinAbs;
 using Complex = std::complex<double>;
 
-/// A two-port at three frequencies: S11 = 1/3 (a load of 100 ohm on 50), S21 = 0.5, S12 = 0.25, S22 = j / 2.
+/**
+ * @brief   A two-port at three frequencies: S11 = 1/3 (a load of 100 ohm on 50), S21 = 0.5, S12 = 0.25, S22 = j / 2.
+ */
 Core::SParameters MakeResult() {
     Core::SParameters result;
     result.Frequencies = {1e6, 1e7, 1e8};

@@ -103,11 +103,9 @@ ImVec4 GetLEDLight(const Core::LEDColor color) {
 struct ReadoutStyle {
     ImFont *Font = nullptr;
     float FontSize = 0.0f;
-    /// Space around the text, across and up and down.
-    ImVec2 Padding;
+    ImVec2 Padding; ///< Space around the text, across and up and down.
     float DotRadius = 0.0f;
-    /// Space between a wire and its readout.
-    float Gap = 0.0f;
+    float Gap = 0.0f; ///< Space between a wire and its readout.
     float Rounding = 0.0f;
     ImU32 Fill = 0;
     ImU32 Border = 0;

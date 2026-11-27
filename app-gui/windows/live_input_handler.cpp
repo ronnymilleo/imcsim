@@ -83,6 +83,7 @@ bool LiveInputHandler::HandleInput(Schematic &schematic, const std::optional<Liv
 
 /**
  * @brief   The push button the mouse holds down, or none.
+ * @return  Element index of the currently held push button, or none.
  */
 std::optional<std::size_t> LiveInputHandler::GetHeldButton() const {
     return m_HeldButton;

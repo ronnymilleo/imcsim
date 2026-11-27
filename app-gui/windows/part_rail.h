@@ -42,14 +42,12 @@ public:
     RailRequest Draw(const EditorMode &mode, float height);
 
 private:
-    /// The symbol standard of the part icons.
-    const Preferences &m_Preferences;
+    const Preferences &m_Preferences; ///< The symbol standard of the part icons.
     /// Part each group places, the last one picked from its list, indexed like the entries of every section in turn.
     std::vector<Core::ComponentType> m_GroupChoices;
     /// An instance of each ready block, read once, which its button and its row draw as their icon.
     std::vector<std::unique_ptr<UIElement>> m_ReadyBlockIcons;
-    /// The ready block the button places, the last one picked from its list.
-    std::size_t m_ReadyBlockChoice = 0;
+    std::size_t m_ReadyBlockChoice = 0; ///< The ready block the button places, the last one picked from its list.
 
     // Buttons
     std::optional<EditorMode> DrawEntry(const RailEntry &entry, std::size_t index, const EditorMode &mode);

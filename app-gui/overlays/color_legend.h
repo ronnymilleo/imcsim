@@ -22,9 +22,12 @@ namespace GUI {
 struct LegendLabels {
     std::string Low;
     std::string High;
-    /// What the colors measure, drawn above the bar, or empty.
-    std::string Title;
+    std::string Title; ///< What the colors measure, drawn above the bar, or empty.
 
+    /**
+     * @brief   Checks whether two LegendLabels instances hold equal values.
+     * @return  True when every field is equal.
+     */
     bool operator==(const LegendLabels &) const = default;
 };
 

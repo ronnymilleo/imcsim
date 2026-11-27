@@ -28,6 +28,10 @@ struct DiacParameters {
     double OffResistance = 1e9;       ///< Blocking resistance below the breakover, in Ohms.
     double HoldingCurrent = 1e-3;     ///< \f$I_H\f$: current magnitude below which the device releases, in Amperes.
 
+    /**
+     * @brief   Compares two DiacParameters values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const DiacParameters &) const = default;
 };
 

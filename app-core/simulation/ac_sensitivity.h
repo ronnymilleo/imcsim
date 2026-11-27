@@ -22,8 +22,7 @@ namespace Core {
  * @brief   What a solver reports of one element: its value and how the response changes for a 1 % higher value.
  */
 struct ACElementFigures {
-    /// Value of the element: ohms, farads, henries, volts, amperes or the gain.
-    double Value = 0.0;
+    double Value = 0.0; ///< Value of the element: ohms, farads, henries, volts, amperes or the gain.
     std::vector<std::optional<double>> MagnitudeDecibelsPerPercent;
     std::vector<std::optional<double>> PhaseDegreesPerPercent;
 };

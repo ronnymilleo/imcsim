@@ -46,8 +46,7 @@ const GUI::ReadyBlock &FindBlock(const std::string_view title) {
  */
 struct Bench {
     GUI::Schematic Schematic;
-    /// The terminal of each pin of the block, by its name.
-    std::map<std::string, GUI::GridPoint> Pins;
+    std::map<std::string, GUI::GridPoint> Pins; ///< The terminal of each pin of the block, by its name.
     std::size_t DriverCount = 0;
 };
 

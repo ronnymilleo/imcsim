@@ -26,6 +26,10 @@ struct SParameterEntry {
     int Row = 1;
     int Column = 1;
 
+    /**
+     * @brief   Checks whether two SParameterEntry instances hold equal values.
+     * @return  True when every field is equal.
+     */
     bool operator==(const SParameterEntry &) const = default;
 };
 
@@ -46,8 +50,7 @@ public:
 
 private:
     int m_PortCount = 0;
-    /// Row by row, one flag per entry.
-    std::vector<bool> m_Shown;
+    std::vector<bool> m_Shown; ///< Row by row, one flag per entry.
 };
 
 /**
@@ -64,8 +67,7 @@ struct SParameterReading {
     double AngleDegrees = 0.0;
     bool IsReflection = false;
     double ReferenceOhms = 0.0;
-    /// None for an open circuit, whose impedance is infinite.
-    std::optional<std::complex<double>> Impedance;
+    std::optional<std::complex<double>> Impedance; ///< None for an open circuit, whose impedance is infinite.
     /// None when the port reflects everything or nothing is reflected, where the ratio is infinite or the loss too.
     std::optional<double> Vswr;
     std::optional<double> ReturnLossDecibels;

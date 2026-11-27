@@ -29,8 +29,7 @@ namespace GUI {
 struct DefinitionChange {
     /// The definition as it is now, kept by the library; never null, and valid until the library changes again.
     const SavedSubcircuit *Definition = nullptr;
-    /// The names the pins had before, in their old order.
-    std::vector<std::string> OldNames;
+    std::vector<std::string> OldNames; ///< The names the pins had before, in their old order.
     /// For each old pin, the index of the new pin it became, or none when it went away.
     std::vector<std::optional<std::size_t>> Matches;
 };
@@ -42,8 +41,7 @@ struct DefinitionChange {
 struct MergeResult {
     /// The name each one has here, in the order they came: its own, or the free name it was given.
     std::vector<std::string> Names;
-    /// Whether any was added, so the document changed.
-    bool IsAnyAdded = false;
+    bool IsAnyAdded = false; ///< Whether any was added, so the document changed.
 };
 
 /**

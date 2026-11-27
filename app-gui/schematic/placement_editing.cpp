@@ -53,6 +53,8 @@ void SwitchMode(EditorMode &current, EditorMode next, Schematic &schematic, cons
 /**
  * @brief   Before the schematic is cleared or replaced: a drag or paste in progress would point at parts that are gone.
  * @details Probing measures whatever schematic is shown, so it goes on.
+ * @param[in,out] schematic  Schematic about to be cleared or replaced.
+ * @param[in,out] mode       Active editor mode, reset to selecting when holding transient state.
  */
 void StopEditing(Schematic &schematic, EditorMode &mode) {
     EndDrag(schematic, mode);
@@ -131,6 +133,8 @@ std::optional<std::string> PlacePastedGroup(Schematic &root, BlockSession &block
 
 /**
  * @brief   The name of the newest label that has one, or none.
+ * @param[in] schematic  Schematic whose net labels are searched from newest to oldest.
+ * @return  Net name of the most recently added non-empty net label, or empty when none exists.
  */
 std::string FindLastNet(const Schematic &schematic) {
     for (const auto &element : std::views::reverse(schematic.GetElements())) {

@@ -85,7 +85,9 @@ Apply(const DenseMatrix &a, const DenseMatrix &b, const Complex shift, const std
     return result;
 }
 
-/// How far x is from satisfying A x = shift B x, relative to the size of the pencil and of x.
+/**
+ * @brief   How far `x` is from satisfying \f$A x = \mu B x\f$, relative to the norms of the pencil and `x`.
+ */
 double Residual(const DenseMatrix &a,
                 const DenseMatrix &b,
                 const Complex shift,

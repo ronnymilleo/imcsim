@@ -42,8 +42,7 @@ private:
     /// Largest zoom of a framing the next frame does, once the canvas size is known: the default when a schematic is
     /// opened, more for Fit.
     std::optional<float> m_FrameMaxZoom;
-    /// Size of the canvas the last frame, none before the first one.
-    std::optional<ImVec2> m_CanvasSize;
+    std::optional<ImVec2> m_CanvasSize; ///< Size of the canvas the last frame, none before the first one.
 };
 
 // Grid

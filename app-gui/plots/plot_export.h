@@ -52,8 +52,7 @@ struct ExportAxis {
     bool Logarithmic = false;
     /// Empty: round ticks across the range of the samples, or decades on a logarithmic axis.
     std::vector<ExportTick> Ticks;
-    /// Empty: the range of the samples, with some room.
-    std::optional<ExportRange> Range;
+    std::optional<ExportRange> Range; ///< Empty: the range of the samples, with some room.
 };
 
 /**
@@ -61,16 +60,13 @@ struct ExportAxis {
  * @brief   One trace of a panel, sampled at the X values of its figure.
  */
 struct ExportSeries {
-    /// Heads its CSV column, with the unit of its axis.
-    std::string Name;
-    /// Empty: no legend entry, as for the second and later curves of a DC sweep family.
-    std::string LegendLabel;
+    std::string Name;        ///< Heads its CSV column, with the unit of its axis.
+    std::string LegendLabel; ///< Empty: no legend entry, as for the second and later curves of a DC sweep family.
     std::vector<double> Values;
     /// Empty: the CSV lists the values. Otherwise it lists these, for values that only stand for something, such as
     /// the heights of a logic signal in its lane standing for its voltages.
     std::vector<double> Samples;
-    /// Index in the Y axes of the panel.
-    std::size_t Axis = 0;
+    std::size_t Axis = 0; ///< Index in the Y axes of the panel.
     ExportColor Color;
     bool Dashed = false;
     bool Heavy = false;
@@ -89,8 +85,7 @@ struct ExportNote {
     double Y = 0.0;
     std::size_t Axis = 0;
     std::string Text;
-    /// Centered on its point instead of beside it, as the bit labels of a logic lane are.
-    bool Centered = false;
+    bool Centered = false; ///< Centered on its point instead of beside it, as the bit labels of a logic lane are.
 };
 
 /**
@@ -109,8 +104,7 @@ struct ExportPanel {
  * @brief   One curve of a Smith chart: a reflection coefficient at every frequency of a sweep.
  */
 struct ExportSmithTrace {
-    /// Names the curve in the legend and heads its CSV columns, such as "S11".
-    std::string Name;
+    std::string Name; ///< Names the curve in the legend and heads its CSV columns, such as "S11".
     ExportColor Color;
     std::vector<double> Frequencies;
     /// The reflection coefficient at each frequency, as real and imaginary parts.
@@ -133,18 +127,13 @@ struct ExportSmithStroke {
  *          CSV table, saying that the whole chart is stable or unstable.
  */
 struct ExportSmithCircle {
-    /// Names it in the legend and in the CSV table, such as "Source stability circle".
-    std::string Name;
+    std::string Name; ///< Names it in the legend and in the CSV table, such as "Source stability circle".
     ExportColor Color;
     double FrequencyHertz = 0.0;
-    /// "circle", "line" or "none".
-    std::string Shape;
-    /// The center of a circle, or the point of a line nearest to the origin.
-    std::complex<double> Center;
-    /// Not a number for a line and for none.
-    double Radius = 0.0;
-    /// Which terminations are stable, in words, for the CSV table.
-    std::string StableRegion;
+    std::string Shape;           ///< "circle", "line" or "none".
+    std::complex<double> Center; ///< The center of a circle, or the point of a line nearest to the origin.
+    double Radius = 0.0;         ///< Not a number for a line and for none.
+    std::string StableRegion;    ///< Which terminations are stable, in words, for the CSV table.
     /// The part of the boundary inside the chart and a margin: a run of points per piece.
     std::vector<std::vector<std::complex<double>>> Boundary;
     std::vector<ExportSmithStroke> Hatch;
@@ -169,8 +158,7 @@ struct ExportFigure {
     ExportAxis XAxis;
     bool XLogarithmic = false;
     std::vector<double> Xs;
-    /// Empty: the whole X data.
-    std::optional<ExportRange> XRange;
+    std::optional<ExportRange> XRange; ///< Empty: the whole X data.
     std::vector<ExportPanel> Panels;
     /// A Smith chart in place of the panels: when set, only it is drawn, and its CSV lists the real and imaginary
     /// parts, then the stability circles.

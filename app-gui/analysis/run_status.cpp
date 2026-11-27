@@ -18,6 +18,10 @@ namespace GUI {
 
 /**
  * @brief   "Transient running", with the share done when the run reports one.
+ * @param[in] analysis_name  Display name of the running analysis.
+ * @param[in] is_stopping    Whether cancellation has been requested for the run.
+ * @param[in] progress       Fraction completed from 0 to 1, or 0 when unreported.
+ * @return  Status text such as "Transient running, 45%" or "Stopping Transient".
  */
 std::string FormatRunProgress(const std::string_view analysis_name, const bool is_stopping, const double progress) {
     if (is_stopping) {
@@ -41,6 +45,9 @@ std::string FormatLiveTime(const double seconds) {
 /**
  * @brief   "Transient live at 12.50ms", or paused: a live run has no end to count toward, so it tells how far it has
  *          got.
+ * @param[in] is_paused  Whether the live transient is paused.
+ * @param[in] transient  Transient result accumulated so far, or none before the first chunk arrives.
+ * @return  Status text naming the live or paused state and the latest simulated time when points exist.
  */
 std::string FormatLiveProgress(const bool is_paused, const std::optional<Core::Transient> &transient) {
     const char *state = is_paused ? "paused" : "live";
@@ -53,6 +60,10 @@ std::string FormatLiveProgress(const bool is_paused, const std::optional<Core::T
 /**
  * @brief   "2000 time steps in 41ms" for a transient, "41ms" for another analysis: how much the last run made and how
  *          long it took, or empty when the run was live and kept pace with the clock.
+ * @param[in] seconds    Wall time of the run in seconds, or none for a live run.
+ * @param[in] analysis   Analysis that produced the run.
+ * @param[in] transient  Transient result, used to report the number of time steps when analysis is TRANSIENT.
+ * @return  Summary of the run duration (with step count for a transient), or empty when seconds is unset.
  */
 std::string DescribeRunCost(const std::optional<double> seconds,
                             const Analysis analysis,
@@ -88,6 +99,9 @@ std::string GetRunButtonLabel(const RunAction action) {
 /**
  * @brief   What the last run reported, in the tone its outcome asks for; a run in progress takes the place of that
  *          report.
+ * @param[in] controls   Controls holding the active and last-completed run states.
+ * @param[in] transient  Current transient result, used for live time and step counts.
+ * @return  Status-bar line for the active or last run, or an empty line when nothing has run yet.
  */
 RunStatusLine DescribeRunStatus(const AnalysisControls &controls, const std::optional<Core::Transient> &transient) {
     if (controls.IsLive() && !controls.IsStopping()) {

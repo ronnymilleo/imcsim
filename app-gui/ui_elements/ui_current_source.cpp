@@ -33,6 +33,10 @@ UICurrentSource::UICurrentSource(const GridPoint position, const Rotation rotati
 /**
  * @brief   The arrow points from the first terminal to the second, the way a positive current flows through the source.
  * @details ANSI draws it inside the circle; IEC, and any source showing its waveform, draw it outside.
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     color   Line color.
+ * @param[in]     style   Drawing standard selecting ANSI inner arrow or IEC crossbar with outer arrow.
  */
 void UICurrentSource::DrawSymbol(SchematicCanvas &canvas,
                                  const ViewTransform &view,

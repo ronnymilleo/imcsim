@@ -53,10 +53,8 @@ private:
     ValueField m_TimeStep;
     ValueField m_LiveSeconds;
     FrequencyRangeFields m_ACSweepRange;
-    /// Start, stop and step of the swept DC sweep range.
-    std::array<ValueField, 3> m_SweptFields;
-    /// Start, stop and step of the stepped DC sweep range.
-    std::array<ValueField, 3> m_SteppedFields;
+    std::array<ValueField, 3> m_SweptFields;   ///< Start, stop and step of the swept DC sweep range.
+    std::array<ValueField, 3> m_SteppedFields; ///< Start, stop and step of the stepped DC sweep range.
     FrequencyRangeFields m_NoiseRange;
     FrequencyRangeFields m_ACSensitivityRange;
     FrequencyRangeFields m_SParameterRange;

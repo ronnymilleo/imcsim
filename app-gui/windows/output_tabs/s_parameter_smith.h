@@ -33,8 +33,7 @@ private:
     /// Size of the room for the chart when its axes were last fitted, so a resized window fits them again.
     float m_FittedWidth = 0.0f;
     float m_FittedHeight = 0.0f;
-    /// Whether the chart shows the stability circles of a two-port.
-    bool m_AreCirclesShown = false;
+    bool m_AreCirclesShown = false; ///< Whether the chart shows the stability circles of a two-port.
 
     bool TakeResized(ImVec2 room);
     void PlotItems(const Core::SParameters &result,

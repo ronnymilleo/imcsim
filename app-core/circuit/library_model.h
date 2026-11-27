@@ -25,6 +25,10 @@ struct LibraryModel {
     ComponentType Kind = ComponentType::DIODE;
     std::string Text;
 
+    /**
+     * @brief   Compares two LibraryModel values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const LibraryModel &) const = default;
 };
 

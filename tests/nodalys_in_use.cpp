@@ -11,10 +11,16 @@
 
 namespace TestSupport {
 
+/**
+ * @brief   Installs Nodalys as the active simulation backend.
+ */
 NodalysInUse::NodalysInUse() {
     Core::SetBackend(std::make_unique<Core::NodalysBackend>());
 }
 
+/**
+ * @brief   Restores the default ngspice simulation backend.
+ */
 NodalysInUse::~NodalysInUse() {
     Core::SetBackend(nullptr);
 }

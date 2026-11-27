@@ -42,15 +42,13 @@ struct PlotSpan {
  */
 struct SpectrumTrace {
     std::string Label;
-    /// Unit of the trace, such as "V"; the spectrum reads in decibels relative to 1 of it.
-    std::string Unit;
+    std::string Unit; ///< Unit of the trace, such as "V"; the spectrum reads in decibels relative to 1 of it.
     ImAxis Axis = ImAxis_Y1;
     ImU32 Color = 0;
     bool Dashed = false;
     /// No value when the trace is undefined somewhere in the span, as a math channel dividing by zero.
     std::optional<std::vector<double>> Decibels;
-    /// Of the mean and every frequency, so a negligible mean reads as about zero.
-    double LargestAmplitude = 0.0;
+    double LargestAmplitude = 0.0; ///< Of the mean and every frequency, so a negligible mean reads as about zero.
     HarmonicAnalysis Harmonics;
     /// One-sided noise density of each frequency, in the unit of the trace per square root of hertz; empty when the
     /// trace is undefined somewhere in the span.

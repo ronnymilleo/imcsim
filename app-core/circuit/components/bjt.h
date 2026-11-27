@@ -31,8 +31,7 @@ struct BJTParameters {
     double ForwardKneeCurrent = 0.0;
     /// Saturation current of the base-emitter leakage, which lowers the gain at low currents.
     double LeakageSaturationCurrent = 0.0;
-    /// Emission coefficient of the base-emitter leakage.
-    double LeakageEmissionCoefficient = 1.5;
+    double LeakageEmissionCoefficient = 1.5; ///< Emission coefficient of the base-emitter leakage.
     double BaseResistance = 0.0;
     double CollectorResistance = 0.0;
     double EmitterResistance = 0.0;

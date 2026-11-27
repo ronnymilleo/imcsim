@@ -372,6 +372,8 @@ void DrawRandom(Core::Source &source, SourceFields &fields, Schematic &schematic
 
 /**
  * @brief   Loads the texts of the fields of every waveform from the parameters the source holds.
+ * @param[in,out] fields  Waveform parameter fields and PWL import state to populate.
+ * @param[in]     source  Independent voltage or current source being loaded.
  */
 void LoadSourceFields(SourceFields &fields, const Core::Source &source) {
     LoadParameterFields(AC_FIELDS, fields.AC, source.GetAC());
@@ -395,6 +397,13 @@ void LoadSourceFields(SourceFields &fields, const Core::Source &source) {
     fields.PWLImportError.clear();
 }
 
+/**
+ * @brief   Draws the waveform selector and parameter fields for an independent voltage or current source.
+ * @param[in,out] source      Source component being edited.
+ * @param[in,out] fields      Waveform parameter fields and PWL import state.
+ * @param[in,out] main_value  Value field used for the DC voltage or current.
+ * @param[in,out] schematic   Marked modified when the waveform or its parameters change.
+ */
 void DrawSource(Core::Source &source, SourceFields &fields, ValueField &main_value, Schematic &schematic) {
     using SourceType = Core::Source::SourceType;
     DrawSourceTypes(source, schematic);

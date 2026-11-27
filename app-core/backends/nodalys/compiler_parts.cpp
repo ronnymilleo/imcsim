@@ -167,6 +167,12 @@ AddMOSFETPart(Nodalys::CircuitBuilder &builder, const Circuit &top_circuit, cons
 
 } // namespace
 
+/**
+ * @brief   Finds the circuit entry and terminal index reporting a named controlling current.
+ * @param[in] circuit  Circuit whose entries are searched.
+ * @param[in] name     Current trace name (such as `V1` or `Q1.C`).
+ * @return  Probe specification `(Entry, Terminal)`, or an error message when no part reports `name`.
+ */
 std::expected<ProbeSpec, std::string> FindControllingCurrent(const Circuit &circuit, const std::string &name) {
     for (std::size_t entry = 0; entry < circuit.GetEntries().size(); ++entry) {
         const Component &part = *circuit.GetEntries()[entry].Part;
@@ -182,17 +188,32 @@ std::expected<ProbeSpec, std::string> FindControllingCurrent(const Circuit &circ
 }
 
 /**
- * @brief   Names the 0 V source that carries the current of one terminal of a part, inside the block named by prefix.
+ * @brief   Names the 0 V source that carries the current of one terminal of a part, inside the block named by `prefix`.
+ * @param[in] prefix    Dotted subcircuit instance prefix, or empty at the top level.
+ * @param[in] entry     Zero-based entry index in the owning circuit.
+ * @param[in] terminal  Zero-based terminal index on the entry.
+ * @return  Unique internal probe source name.
  */
 std::string ProbeName(const std::string &prefix, const int entry, const int terminal) {
     return prefix.empty() ? std::format("__probe_{}_{}", entry, terminal)
                           : std::format("__probe_{}_{}_{}", prefix, entry, terminal);
 }
 
+/**
+ * @brief   Formats the diagnostic error for a component type that Nodalys does not implement.
+ * @param[in] entry  Resolved component entry.
+ * @return  Human-readable unsupported-device message naming the part and its type.
+ */
 std::string NoDeviceMessage(const EntryContext &entry) {
     return std::format("Nodalys has no device for {} (a {} part) yet", entry.Part.GetName(), GetTypeName(entry.Type));
 }
 
+/**
+ * @brief   Adds a passive component (resistor, capacitor, inductor, mechanical switch, or potentiometer) to `builder`.
+ * @param[in,out] builder  Nodalys circuit builder receiving the device.
+ * @param[in]     entry    Resolved component entry, nodes, and parameter value.
+ * @return  Empty on success, or an error message if the passive part kind is unsupported.
+ */
 std::expected<void, std::string> AddPassivePart(Nodalys::CircuitBuilder &builder, const EntryContext &entry) {
     const Component &part = entry.Part;
     const std::vector<int> &nodes = entry.Nodes;
@@ -223,6 +244,12 @@ std::expected<void, std::string> AddPassivePart(Nodalys::CircuitBuilder &builder
     }
 }
 
+/**
+ * @brief   Adds an independent supply or signal source (`VCC`, voltage/current source, clock, or logic input).
+ * @param[in,out] builder  Nodalys circuit builder receiving the source device.
+ * @param[in]     entry    Resolved component entry, nodes, and value.
+ * @return  Empty on success, or an error message if the source kind is unsupported.
+ */
 std::expected<void, std::string> AddSourcePart(Nodalys::CircuitBuilder &builder, const EntryContext &entry) {
     const Component &part = entry.Part;
     const std::vector<int> &nodes = entry.Nodes;
@@ -250,6 +277,10 @@ std::expected<void, std::string> AddSourcePart(Nodalys::CircuitBuilder &builder,
 /**
  * @brief   Adds a source controlled by a voltage or by a current; the current ones read the probe planned for the
  *          controlling current.
+ * @param[in,out] builder  Nodalys circuit builder receiving the controlled source.
+ * @param[in]     entry    Resolved component entry, nodes, and gain value.
+ * @param[in]     scope    Compilation scope used to resolve the controlling current probe.
+ * @return  Empty on success, or an error message when the controlling current does not exist.
  */
 std::expected<void, std::string>
 AddControlledSource(Nodalys::CircuitBuilder &builder, const EntryContext &entry, const CompileScope &scope) {
@@ -285,6 +316,10 @@ AddControlledSource(Nodalys::CircuitBuilder &builder, const EntryContext &entry,
 /**
  * @brief   Adds a behavioral source, with the nets of its expression turned into nodes and the currents it reads
  *          into the probes planned for them, so the engine gets an expression of plain node numbers and source names.
+ * @param[in,out] builder  Nodalys circuit builder receiving the behavioral source.
+ * @param[in]     entry    Resolved component entry and terminal nodes.
+ * @param[in]     scope    Compilation scope mapping net names to nodes and currents to probe sources.
+ * @return  Empty on success, or an error message if the expression references an unknown net or current.
  */
 std::expected<void, std::string>
 AddBehavioralSource(Nodalys::CircuitBuilder &builder, const EntryContext &entry, const CompileScope &scope) {
@@ -310,6 +345,13 @@ AddBehavioralSource(Nodalys::CircuitBuilder &builder, const EntryContext &entry,
     return {};
 }
 
+/**
+ * @brief   Adds a semiconductor device (diode, Zener, LED, BJT, MOSFET, or IGBT) with resolved model parameters.
+ * @param[in,out] builder      Nodalys circuit builder receiving the semiconductor device.
+ * @param[in]     top_circuit  Top-level circuit holding imported `.model` definitions.
+ * @param[in]     entry        Resolved component entry and terminal nodes.
+ * @return  Empty on success, or an error message when a referenced library model is missing or unsupported.
+ */
 std::expected<void, std::string>
 AddSemiconductor(Nodalys::CircuitBuilder &builder, const Circuit &top_circuit, const EntryContext &entry) {
     const Component &part = entry.Part;
@@ -337,6 +379,12 @@ AddSemiconductor(Nodalys::CircuitBuilder &builder, const Circuit &top_circuit, c
     }
 }
 
+/**
+ * @brief   Adds a self-actuated switching part (voltage-controlled switch, fuse, thyristor/TRIAC/GTO, DIAC, or relay).
+ * @param[in,out] builder  Nodalys circuit builder receiving the switching device.
+ * @param[in]     entry    Resolved component entry and terminal nodes.
+ * @return  Empty on success, or an error message if the switching part kind is unsupported.
+ */
 std::expected<void, std::string> AddSwitchingPart(Nodalys::CircuitBuilder &builder, const EntryContext &entry) {
     const Component &part = entry.Part;
     const std::vector<int> &nodes = entry.Nodes;
@@ -372,6 +420,11 @@ std::expected<void, std::string> AddSwitchingPart(Nodalys::CircuitBuilder &build
     }
 }
 
+/**
+ * @brief   Adds a coupled two-winding transformer to `builder`.
+ * @param[in,out] builder  Nodalys circuit builder receiving the transformer.
+ * @param[in]     entry    Resolved transformer entry and primary/secondary terminal nodes.
+ */
 void AddTransformer(Nodalys::CircuitBuilder &builder, const EntryContext &entry) {
     const auto &transformer = static_cast<const Transformer &>(entry.Part);
     const TransformerParameters &figures = transformer.GetParameters();
@@ -386,6 +439,11 @@ void AddTransformer(Nodalys::CircuitBuilder &builder, const EntryContext &entry)
                            figures.WindingResistance);
 }
 
+/**
+ * @brief   Adds a two-port TEM transmission line (lossless or RLGC lossy) to `builder`.
+ * @param[in,out] builder  Nodalys circuit builder receiving the transmission line.
+ * @param[in]     entry    Resolved transmission line entry and four port terminal nodes.
+ */
 void AddTransmissionLine(Nodalys::CircuitBuilder &builder, const EntryContext &entry) {
     const auto &line = static_cast<const TransmissionLine &>(entry.Part);
     builder.AddTransmissionLine(entry.Name,
@@ -396,6 +454,11 @@ void AddTransmissionLine(Nodalys::CircuitBuilder &builder, const EntryContext &e
                                 ToNodalys(line.GetValue(), line.GetParameters()));
 }
 
+/**
+ * @brief   Adds an operational amplifier (single-pole ideal model or Boyle macromodel) to `builder`.
+ * @param[in,out] builder  Nodalys circuit builder receiving the op-amp model.
+ * @param[in]     entry    Resolved op-amp entry and five terminal nodes (`out`, `+`, `-`, `V+`, `V-`).
+ */
 void AddOpAmp(Nodalys::CircuitBuilder &builder, const EntryContext &entry) {
     const std::vector<int> &nodes = entry.Nodes;
     const auto &op_amp = static_cast<const OpAmp &>(entry.Part);

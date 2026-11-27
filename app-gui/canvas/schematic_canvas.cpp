@@ -154,6 +154,11 @@ void SvgCanvas::AddCircleFilled(const ImVec2 center, const float radius, const I
 /**
  * @brief   ImGui places text by its top left corner; SVG by a point on the baseline.
  * @details The ascent of the ImGui font puts the baseline where the screen has it.
+ * @param[in] font       Font that measures the text.
+ * @param[in] font_size  Font size in pixels.
+ * @param[in] position   Top left corner of the text, in screen pixels.
+ * @param[in] color      Text color.
+ * @param[in] text       Text to write, in UTF-8.
  */
 void SvgCanvas::AddText(ImFont *font,
                         const float font_size,

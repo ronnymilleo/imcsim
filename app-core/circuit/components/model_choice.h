@@ -85,8 +85,7 @@ public:
     const char *GetName() const { return m_Model != nullptr ? m_Model->Name : CUSTOM_MODEL_NAME; }
 
 private:
-    /// Null when the choice is custom parameters.
-    const Model *m_Model;
+    const Model *m_Model; ///< Null when the choice is custom parameters.
     Parameters m_CustomParameters;
 };
 

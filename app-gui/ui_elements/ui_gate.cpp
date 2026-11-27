@@ -151,6 +151,9 @@ void UIGate::DrawSymbol(SchematicCanvas &canvas,
 
 /**
  * @brief   The name above the body.
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     color   Text color.
  */
 void UIGate::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const float top = GetGateCenterY() - GetGateHalfHeight();
@@ -178,6 +181,8 @@ std::vector<GridPoint> UIGate::GetLocalTerminals() const {
 /**
  * @brief   The leads of a gate run along x, whichever input they are, and the default direction would follow the longer
  *          axis.
+ * @param[in] terminal  Index in `GetLocalTerminals()`.
+ * @return  `{1, 0}` for an input on the left, `{-1, 0}` for the output on the right.
  */
 GridPoint UIGate::GetLocalTerminalInward(const std::size_t terminal) const {
     return GetLocalTerminals()[terminal].X < 0 ? GridPoint{1, 0} : GridPoint{-1, 0};

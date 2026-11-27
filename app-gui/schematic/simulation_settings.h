@@ -91,8 +91,7 @@ struct SimulationSettings {
     double LiveSeconds = DEFAULT_LIVE_SECONDS;
     Core::ACSweepSettings ACSweep;
     Core::SweepRange SweptRange;
-    /// Keeps its values while stepping is off.
-    Core::SweepRange SteppedRange{.Start = 0.0, .Stop = 5.0, .Step = 1.0};
+    Core::SweepRange SteppedRange{.Start = 0.0, .Stop = 5.0, .Step = 1.0}; ///< Keeps its values while stepping is off.
     bool StepSource = false;
     Core::ACSweepSettings NoiseRange{.StartFrequency = 10.0, .StopFrequency = 100e3, .PointsPerDecade = 20};
     std::string NoiseSource;
@@ -121,6 +120,10 @@ struct SimulationSettings {
     /// Tolerances, integration method and nominal temperature of every analysis, on both engines.
     Core::SolverOptions Solver;
 
+    /**
+     * @brief   Checks whether two SimulationSettings instances hold equal values.
+     * @return  True when every field is equal.
+     */
     bool operator==(const SimulationSettings &) const = default;
 };
 

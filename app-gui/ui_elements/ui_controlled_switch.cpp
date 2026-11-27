@@ -57,6 +57,9 @@ UIControlledSwitch::UIControlledSwitch(const Core::ComponentType type,
 /**
  * @brief   The contact leads stop at the contacts; the control leads run to the bar or the coil, with their polarity
  *          beside.
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     color   Line color.
  */
 void UIControlledSwitch::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     canvas.AddLine(LocalToScreen(view, 0, -2),
@@ -114,6 +117,9 @@ void UIControlledSwitch::DrawSymbol(SchematicCanvas &canvas,
 
 /**
  * @brief   The threshold of a switch, or the pull-in voltage of a relay, under the name.
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     color   Text color.
  */
 void UIControlledSwitch::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const double voltage =

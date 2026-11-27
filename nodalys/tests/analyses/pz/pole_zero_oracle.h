@@ -33,18 +33,13 @@ struct OracleBand {
 struct PoleZeroReport {
     std::vector<std::complex<double>> Poles;
     std::vector<std::complex<double>> Zeros;
-    /// What Nodalys warned about.
-    std::vector<std::string> Warnings;
-    /// The gain that scales the rebuilt response, read in the middle of the band.
-    double Gain = 0.0;
+    std::vector<std::string> Warnings; ///< What Nodalys warned about.
+    double Gain = 0.0;                 ///< The gain that scales the rebuilt response, read in the middle of the band.
     /// Largest magnitude difference over the band, in decibels, ignoring points far below the peak of the response.
     double MaxMagnitudeErrorDecibels = 0.0;
-    /// Frequency of that largest magnitude difference, in hertz.
-    double WorstFrequencyHertz = 0.0;
-    /// Largest phase difference over the band, in degrees, on the same points.
-    double MaxPhaseErrorDegrees = 0.0;
-    /// Describes the failure when the run or the sweep gave no result; empty otherwise.
-    std::string Error;
+    double WorstFrequencyHertz = 0.0;  ///< Frequency of that largest magnitude difference, in hertz.
+    double MaxPhaseErrorDegrees = 0.0; ///< Largest phase difference over the band, in degrees, on the same points.
+    std::string Error; ///< Describes the failure when the run or the sweep gave no result; empty otherwise.
 };
 
 /// The largest magnitude difference, in decibels, that counts as a match.

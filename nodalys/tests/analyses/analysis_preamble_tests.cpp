@@ -31,7 +31,6 @@ const std::string DIVIDER = "divider\n"
                             "C1 2 0 1u\n"
                             ".end\n";
 
-/// A circuit parsed from a netlist, which the analyses work on.
 Nodalys::Circuit ParseCircuit(const std::string &netlist) {
     auto parsed = Nodalys::ParseNetlist(netlist);
     REQUIRE(parsed.has_value());

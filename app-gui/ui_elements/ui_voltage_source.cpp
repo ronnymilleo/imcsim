@@ -31,6 +31,10 @@ UIVoltageSource::UIVoltageSource(const GridPoint position, const Rotation rotati
 /**
  * @brief   The positive terminal is the first one, at x = -2.
  * @details AC and pulse sources show their waveform instead of signs.
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     color   Line color.
+ * @param[in]     style   Drawing standard selecting IEC through-conductor or ANSI inner polarity signs.
  */
 void UIVoltageSource::DrawSymbol(SchematicCanvas &canvas,
                                  const ViewTransform &view,

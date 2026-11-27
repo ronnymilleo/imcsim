@@ -20,18 +20,9 @@ namespace Core {
 
 class Circuit;
 
-/**
- * @brief   The parameters a diode part simulates with: its own, or its library model parsed for Nodalys.
- * @param[in] circuit  Circuit that carries the library model the part names, when it names one.
- * @param[in] diode    Part to resolve the parameters of.
- * @return  The parameters, or the reason its library model cannot be simulated by Nodalys.
- */
+// Parameter resolution
 [[nodiscard]] std::expected<DiodeParameters, std::string> ResolveParameters(const Circuit &circuit, const Diode &diode);
-
-/// The parameters a BJT part simulates with, like ResolveParameters() for a diode.
 [[nodiscard]] std::expected<BJTParameters, std::string> ResolveParameters(const Circuit &circuit, const BJT &bjt);
-
-/// The parameters a MOSFET part simulates with, like ResolveParameters() for a diode.
 [[nodiscard]] std::expected<MOSFETParameters, std::string> ResolveParameters(const Circuit &circuit,
                                                                              const MOSFET &mosfet);
 

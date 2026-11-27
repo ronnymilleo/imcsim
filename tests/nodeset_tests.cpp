@@ -111,7 +111,9 @@ State ReadState(const std::vector<double> &voltages) {
     return State::OTHER;
 }
 
-/// Starts the operating point near the state in which the first transistor conducts, or the second one.
+/**
+ * @brief   Starts the operating point near the state in which the first transistor conducts, or the second one.
+ */
 void SetNodesets(Core::Circuit &circuit, const State wanted) {
     const bool is_first_on = wanted == State::FIRST_ON;
     circuit.AddNodeset({.Node = 2, .Volts = is_first_on ? 0.2 : 5.0});
@@ -138,7 +140,6 @@ State StartOfTransientState(const Core::Circuit &circuit) {
     return ReadState(start);
 }
 
-/// Runs a check on ngspice and then on Nodalys.
 template <typename Check>
 void OnBothEngines(Check check) {
     check();

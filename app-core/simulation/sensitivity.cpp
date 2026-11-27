@@ -34,8 +34,10 @@ std::optional<double> Find(const SensitivityVectors &vectors, const std::string 
     return found->second;
 }
 
-/// DC level of a part as written in the netlist; for non-DC independent sources this is the waveform start/offset,
-/// not the stored AC/peak magnitude in GetValue().
+/**
+ * @brief   DC level of a part as written in the netlist; for non-DC independent sources this is the waveform
+ *          start/offset, not the stored AC/peak magnitude in `GetValue()`.
+ */
 double EffectiveSensitivityValue(const Component &part) {
     if (!IsSource(part.GetType())) {
         return part.GetValue();

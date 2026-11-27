@@ -40,8 +40,13 @@ void UIGround::DrawSymbol(SchematicCanvas &canvas,
 
 /**
  * @brief   Ground has no name or value to show.
+ * @param[in,out] canvas  Where it would be drawn (unused).
+ * @param[in]     view    Transform of the current frame (unused).
+ * @param[in]     color   Text color (unused).
  */
-void UIGround::DrawLabels(SchematicCanvas & /*canvas*/, const ViewTransform & /*view*/, ImU32 /*color*/) const {
+void UIGround::DrawLabels([[maybe_unused]] SchematicCanvas &canvas,
+                          [[maybe_unused]] const ViewTransform &view,
+                          [[maybe_unused]] const ImU32 color) const {
 }
 
 LocalBounds UIGround::GetLocalBounds() const {
@@ -50,6 +55,7 @@ LocalBounds UIGround::GetLocalBounds() const {
 
 /**
  * @brief   The lead goes down from the terminal to the bars.
+ * @return  Top center of the ground bars in local grid units.
  */
 ImVec2 UIGround::GetLeadEnd() const {
     return {0.0f, LEAD_LENGTH};

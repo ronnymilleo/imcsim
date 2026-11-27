@@ -44,8 +44,7 @@ struct MathInstruction {
     Kind Type = Kind::NUMBER;
     double Number = 0.0;
     int Node = 0;
-    /// A voltage named by a net label, such as OUT, until ResolveNetNames() turns it into a node.
-    std::string Net;
+    std::string Net; ///< A voltage named by a net label, such as OUT, until ResolveNetNames() turns it into a node.
     std::string Current;
 };
 

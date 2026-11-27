@@ -55,8 +55,7 @@ private:
         GridPoint Max;
     };
 
-    /// The points that are not free; every other point is.
-    std::map<GridPoint, Use> m_Uses;
+    std::map<GridPoint, Use> m_Uses; ///< The points that are not free; every other point is.
     std::vector<Area> m_Areas;
 
     bool CanEnter(GridPoint point, std::size_t direction) const;

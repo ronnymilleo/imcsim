@@ -19,10 +19,8 @@ namespace GUI {
  */
 struct ShownTraces {
     std::vector<int> Nodes;
-    /// Names of the currents.
-    std::vector<std::string> Currents;
-    /// Labels and units of the math traces.
-    std::vector<std::string> MathLabels;
+    std::vector<std::string> Currents;   ///< Names of the currents.
+    std::vector<std::string> MathLabels; ///< Labels and units of the math traces.
 };
 
 /**
@@ -36,6 +34,10 @@ struct TraceFits {
     bool HaveCurrentsChanged = false;
     bool HasMathChanged = false;
 
+    /**
+     * @brief   Checks whether two TraceFits instances hold equal values.
+     * @return  True when every field is equal.
+     */
     bool operator==(const TraceFits &) const = default;
 };
 

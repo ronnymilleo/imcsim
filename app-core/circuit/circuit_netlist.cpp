@@ -686,7 +686,9 @@ FormatPart(const Circuit &circuit, const Component &component, const std::vector
     }
 }
 
-/// Whether a part only marks or reads its node, so the netlist has no element for it.
+/**
+ * @brief   Whether a part only marks or reads its node, so the netlist has no element for it.
+ */
 bool WritesNoElement(const ComponentType type) {
     const ComponentFamily family = GetFamily(type);
     return family == ComponentFamily::MARKER || family == ComponentFamily::LOGIC_DISPLAY;

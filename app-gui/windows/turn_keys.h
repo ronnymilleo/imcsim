@@ -16,10 +16,8 @@ namespace GUI {
  * @brief   The state of the keys that turn, in one frame.
  */
 struct TurnKeys {
-    /// Whether R was pressed this frame.
-    bool IsRotatePressed = false;
-    /// Whether M was pressed this frame.
-    bool IsMirrorPressed = false;
+    bool IsRotatePressed = false; ///< Whether R was pressed this frame.
+    bool IsMirrorPressed = false; ///< Whether M was pressed this frame.
     bool IsShiftHeld = false;
 };
 

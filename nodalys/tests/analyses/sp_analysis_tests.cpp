@@ -25,7 +25,9 @@ using Complex = std::complex<double>;
 
 constexpr double TWO_PI = 2.0 * std::numbers::pi;
 
-/// Parses a netlist that holds its own .sp card and runs the analysis on it.
+/**
+ * @brief   Parses a netlist that holds its own .sp card and runs the analysis on it.
+ */
 std::expected<Nodalys::SParameterResult, std::string> RunNetlist(const std::string &body, const std::string &card) {
     const auto parsed = Nodalys::ParseNetlist(std::format("* test\n{}{}\n.end\n", body, card));
     REQUIRE(parsed.has_value());

@@ -34,6 +34,9 @@ UIDependentSource::UIDependentSource(std::unique_ptr<Core::Component> component,
 
 /**
  * @brief   The output leads reach the diamond from both terminals.
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     color   Line color.
  */
 void UIDependentSource::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     canvas.AddLine(LocalToScreen(view, 0, -2), LocalToScreen(view, 0, -DIAMOND_RADIUS), color, LINE_THICKNESS);
@@ -43,11 +46,15 @@ void UIDependentSource::DrawTerminals(SchematicCanvas &canvas, const ViewTransfo
 /**
  * @brief   A source that sets a voltage shows its polarity, + toward terminal 1; one that sets a current shows the way
  *          it pushes it, from terminal 1 to terminal 2 through itself, as SPICE does.
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     color   Line color.
+ * @param[in]     style   Drawing standard (unused; diamond symbol is identical in IEC and ANSI).
  */
 void UIDependentSource::DrawSymbol(SchematicCanvas &canvas,
                                    const ViewTransform &view,
                                    const ImU32 color,
-                                   SymbolStyle /*style*/) const {
+                                   [[maybe_unused]] const SymbolStyle style) const {
     const ImVec2 diamond[4] = {LocalToScreen(view, 0, -DIAMOND_RADIUS),
                                LocalToScreen(view, DIAMOND_RADIUS, 0),
                                LocalToScreen(view, 0, DIAMOND_RADIUS),

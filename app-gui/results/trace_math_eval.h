@@ -30,8 +30,7 @@ struct MathResult {
  * @brief   An expression evaluated over an AC sweep: its magnitude and phase at each frequency, and its unit.
  */
 struct ACMathResult {
-    /// Relative to 1 of the unit, as 20*log10 of the magnitude.
-    std::vector<double> MagnitudesDecibels;
+    std::vector<double> MagnitudesDecibels; ///< Relative to 1 of the unit, as 20*log10 of the magnitude.
     std::vector<double> PhasesDegrees;
     Dimension Unit;
 };

@@ -33,6 +33,10 @@ UIPotentiometer::UIPotentiometer(const GridPoint position, const Rotation rotati
 
 /**
  * @brief   The body of a resistor, and the wiper lead from the third terminal down to an arrow head on it.
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     color   Line color.
+ * @param[in]     style   Drawing standard selecting IEC rectangle or ANSI zig-zag resistor body.
  */
 void UIPotentiometer::DrawSymbol(SchematicCanvas &canvas,
                                  const ViewTransform &view,
@@ -45,6 +49,9 @@ void UIPotentiometer::DrawSymbol(SchematicCanvas &canvas,
 /**
  * @brief   One line with the name, the value and the position of the wiper, such as "RV1 10k 25%", so that the parts of
  *          the label never overlap whichever way the part is turned.
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     color   Text color.
  */
 void UIPotentiometer::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const auto &pot = static_cast<const Core::Potentiometer &>(GetComponent());

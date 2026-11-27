@@ -26,7 +26,9 @@ Complex Polar(const double magnitude, const double degrees) {
     return std::polar(magnitude, degrees * std::numbers::pi / 180.0);
 }
 
-/// Three frequencies of a transistor: unstable at the first two (K below 1) and stable at the last.
+/**
+ * @brief   Three frequencies of a transistor: unstable at the first two (K below 1) and stable at the last.
+ */
 Core::SParameters MakeResult() {
     Core::SParameters result;
     result.Frequencies = {1e8, 2e8, 4e8};

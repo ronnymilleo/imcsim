@@ -45,13 +45,17 @@ Prepared Prepare(const std::string &text) {
     return {.Netlist = std::move(*parsed), .Config = config};
 }
 
-/// Runs the analysis on a netlist and compares the roots with the AC sweep over a band.
+/**
+ * @brief   Runs the analysis on a netlist and compares the roots with the AC sweep over a band.
+ */
 Testing::PoleZeroReport Check(const std::string &text, const Testing::OracleBand &band) {
     const Prepared prepared = Prepare(text);
     return Testing::CheckPoleZero(prepared.Netlist.CircuitInstance, prepared.Config, band);
 }
 
-/// Sorts roots by real part, then imaginary part, so two lists can be compared one to one.
+/**
+ * @brief   Sorts roots by real part, then imaginary part, so two lists can be compared one to one.
+ */
 std::vector<std::complex<double>> Sorted(std::vector<std::complex<double>> roots) {
     std::ranges::sort(roots, [](const auto &lhs, const auto &rhs) {
         return lhs.real() != rhs.real() ? lhs.real() < rhs.real() : lhs.imag() < rhs.imag();
@@ -59,13 +63,17 @@ std::vector<std::complex<double>> Sorted(std::vector<std::complex<double>> roots
     return roots;
 }
 
-/// The roots of a x^2 + b x + c = 0, for the circuits whose denominator is a quadratic.
+/**
+ * @brief   The roots of \f$a x^2 + b x + c = 0\f$, for the circuits whose denominator is a quadratic.
+ */
 std::vector<std::complex<double>> QuadraticRoots(const double a, const double b, const double c) {
     const std::complex<double> root = std::sqrt(std::complex<double>(b * b - 4.0 * a * c, 0.0));
     return {(-b + root) / (2.0 * a), (-b - root) / (2.0 * a)};
 }
 
-/// An RC ladder of the given number of sections, 1 kohm and 1 nF each, driven by a source and open at the end.
+/**
+ * @brief   An RC ladder of the given number of sections, 1 kohm and 1 nF each, driven by a source and open at the end.
+ */
 std::string RcLadder(const int sections) {
     std::string text = "RC ladder\nVin 1 0 0 AC 1\n";
     for (int section = 1; section <= sections; ++section) {

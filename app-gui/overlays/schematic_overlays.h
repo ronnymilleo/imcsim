@@ -53,8 +53,7 @@ public:
 
 private:
     GlowRenderer &m_GlowRenderer;
-    /// How the schematic is colored, and which live effects are on.
-    const Preferences &m_Preferences;
+    const Preferences &m_Preferences; ///< How the schematic is colored, and which live effects are on.
     DisplayedStateResolver m_Resolver;
     /// The results of the frame, from Update(), which the sensitivity coloring reads while drawing; null before the
     /// first Update().

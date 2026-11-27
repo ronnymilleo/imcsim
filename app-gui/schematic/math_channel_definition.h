@@ -49,6 +49,10 @@ struct MathChannel {
     std::string Second;
     std::string Expression;
 
+    /**
+     * @brief   Checks whether two MathChannel instances hold equal values.
+     * @return  True when every field is equal.
+     */
     bool operator==(const MathChannel &) const = default;
 };
 

@@ -36,8 +36,7 @@ private:
      * @brief   Where the dialog callback leaves the chosen path, or no path when the dialog was canceled or failed.
      */
     struct Channel {
-        /// Guards Result, since SDL may call the dialog callback from another thread.
-        std::mutex Mutex;
+        std::mutex Mutex; ///< Guards Result, since SDL may call the dialog callback from another thread.
         std::optional<std::optional<std::filesystem::path>> Result;
     };
 

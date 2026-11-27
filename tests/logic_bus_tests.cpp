@@ -18,7 +18,9 @@
 
 namespace {
 
-/// Resolves the nets Q0 to Q2 to nodes 1 to 3, and nothing else.
+/**
+ * @brief   Resolves the nets Q0 to Q2 to nodes 1 to 3, and nothing else.
+ */
 std::optional<int> FindCounterNet(const std::string_view net) {
     if (net == "Q0") {
         return 1;

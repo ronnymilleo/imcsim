@@ -18,7 +18,6 @@ using Catch::Matchers::WithinAbs;
 
 namespace {
 
-/// Evaluates a noise or random waveform at the given transient time.
 double Eval(const Nodalys::TransientNoiseSource &source, const double dc_value, const double time) {
     return source.Evaluate(dc_value, Nodalys::TimeContext{.IsTransient = true, .Time = time});
 }

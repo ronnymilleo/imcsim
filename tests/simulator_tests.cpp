@@ -193,7 +193,6 @@ std::complex<double> FromDecibels(const double decibels, const double degrees) {
     return std::polar(std::pow(10.0, decibels / 20.0), degrees * std::numbers::pi / 180.0);
 }
 
-// Finds a current by component name, failing the test when it is missing
 template <typename Current>
 const Current &FindCurrent(const std::vector<Current> &currents, const std::string &name) {
     const auto found = std::ranges::find_if(currents, [&name](const Current &current) { return current.Name == name; });

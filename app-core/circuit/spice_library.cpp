@@ -56,7 +56,7 @@ constexpr auto SCALES = std::to_array<Scale>({{"meg", 1e6},
 constexpr auto ENCRYPTION_MARKERS = std::to_array<std::string_view>({"$cdnencstart", "pspice_encrypted"});
 
 /**
- * @brief   ngspice ends a line at ";", and at "$" when it follows a space or a tab.
+ * @brief   ngspice ends a line at `";"`, and at `"$"` when it follows a space or a tab.
  */
 std::string_view StripComment(std::string_view line) {
     if (const std::size_t semicolon = line.find(';'); semicolon != std::string_view::npos) {
@@ -257,8 +257,7 @@ bool IsInclusion(const std::string_view directive) {
 /// statements, and the definitions outside the subcircuits that one may use.
 struct LibraryScan {
     std::vector<std::string> Lines;
-    /// Where each line is, for the warnings.
-    std::vector<std::string> Origins;
+    std::vector<std::string> Origins; ///< Where each line is, for the warnings.
     std::vector<Statement> Statements;
     std::vector<std::pair<std::size_t, std::size_t>> Found;
     std::map<std::string, Definition> Definitions;

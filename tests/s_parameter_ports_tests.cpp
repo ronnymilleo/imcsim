@@ -45,7 +45,9 @@ struct Resistive {
     }
 };
 
-/// A resistor in series between two nodes with ports on both, and nothing else: Z does not exist.
+/**
+ * @brief   A resistor in series between two nodes with ports on both, and nothing else: Z does not exist.
+ */
 Resistive MakeSeries(const double ohms) {
     return Resistive(ohms, 2);
 }
@@ -64,19 +66,19 @@ struct CapacitorToGround {
     }
 };
 
-/// The checks as the Nodalys backend asks for them.
 std::optional<std::string> CheckOnNodalys(const Core::Circuit &circuit, const Core::SParameterSettings &settings) {
     const Core::NodalysBackend nodalys;
     return Core::CheckSParameterSettings(circuit, settings, nodalys.GetCapabilities().SParameters);
 }
 
-/// The checks as ngspice asks for them.
 std::optional<std::string> CheckOnNgspice(const Core::Circuit &circuit, const Core::SParameterSettings &settings) {
     Core::SetBackend(nullptr);
     return Core::CheckSParameterSettings(circuit, settings, Core::GetBackend().GetCapabilities().SParameters);
 }
 
-/// Runs the analysis the way the editor does, through the simulator, on Nodalys, and puts ngspice back after.
+/**
+ * @brief   Runs the analysis the way the editor does, through the simulator, on Nodalys, and puts ngspice back after.
+ */
 Core::SParametersRun RunOnNodalys(const Core::Circuit &circuit, const Core::SParameterSettings &settings) {
     Core::SetBackend(std::make_unique<Core::NodalysBackend>());
     Core::SParametersRun run = Core::RunSParameters(circuit, settings);
@@ -84,7 +86,9 @@ Core::SParametersRun RunOnNodalys(const Core::Circuit &circuit, const Core::SPar
     return run;
 }
 
-/// What the engine itself says about a circuit, past the checks of imcsim.
+/**
+ * @brief   What the engine itself says about a circuit, past the checks of imcsim.
+ */
 std::string EngineError(const Core::Circuit &circuit, const Core::SParameterSettings &settings) {
     Core::NodalysBackend nodalys;
     const Core::SParametersRun run = nodalys.RunSParameters(circuit, settings);

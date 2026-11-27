@@ -78,7 +78,6 @@ Core::SParameterSettings SinglePoint(const double frequency) {
             .LinearPoints = 3};
 }
 
-/// The checks as the default backend, ngspice, asks for them.
 std::optional<std::string> CheckOnNgspice(const Core::Circuit &circuit, const Core::SParameterSettings &settings) {
     Core::SetBackend(nullptr);
     return Core::CheckSParameterSettings(circuit, settings, Core::GetBackend().GetCapabilities().SParameters);
@@ -89,7 +88,9 @@ void RequireClose(const Complex actual, const Complex expected, const double tol
     CHECK_THAT(actual.imag(), WithinAbs(expected.imag(), tolerance));
 }
 
-/// S11 and S21 of the T low-pass from its ABCD matrix, which ngspice must agree with.
+/**
+ * @brief   S11 and S21 of the T low-pass from its ABCD matrix, which ngspice must agree with.
+ */
 std::pair<Complex, Complex> LowPassTClosedForm(const double frequency, const double reference) {
     const Complex series = Complex(0.0, TWO_PI * frequency * 8e-6);
     const Complex shunt = Complex(0.0, TWO_PI * frequency * 3.18e-9);

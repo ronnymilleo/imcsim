@@ -33,8 +33,7 @@ struct Expansion {
  */
 struct Source {
     std::filesystem::path Path;
-    /// Whether it is the file the user picked, whose lines need no file name.
-    bool IsMain = false;
+    bool IsMain = false; ///< Whether it is the file the user picked, whose lines need no file name.
 };
 
 std::string DescribeLine(const Source &source, const std::size_t line) {
@@ -53,7 +52,7 @@ std::string Unquote(const std::string_view name) {
 }
 
 /**
- * @brief   The words of a line before any comment, which ngspice starts with ";", or "$" after a space.
+ * @brief   The words of a line before any comment, which ngspice starts with `";"`, or `"$"` after a space.
  */
 std::vector<std::string> ReadWords(const std::string_view line) {
     std::vector<std::string> words = SplitWords(line);

@@ -15,7 +15,9 @@
 
 namespace {
 
-/// A table of the given runs, each measured by one column, and one varied part whose value is the run number.
+/**
+ * @brief   A table of the given runs, each measured by one column, and one varied part whose value is the run number.
+ */
 GUI::MonteCarloTable MakeTable(const std::vector<std::optional<double>> &measures) {
     GUI::MonteCarloTable table;
     table.Parts = {"R1"};

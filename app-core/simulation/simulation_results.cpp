@@ -101,7 +101,7 @@ bool TruthTableRow::HasOperatingPoint() const {
 /**
  * @brief   Computes total harmonic distortion (THD) from harmonic phasors indexed 0..H.
  * @param[in] phasors  Complex phasors where index 0 is DC and index 1 is the fundamental.
- * @return  Dimensionless THD ratio $\sqrt{\sum_{k=2}^{H} |X_k|^2} / |X_1|$, or 0 when no fundamental is present.
+ * @return  Dimensionless THD ratio \f$\sqrt{\sum_{k=2}^{H} |X_k|^2} / |X_1|\f$, or 0 when no fundamental is present.
  */
 double ComputeHarmonicBalanceThd(const std::span<const std::complex<double>> phasors) {
     if (phasors.size() < 3) {

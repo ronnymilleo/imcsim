@@ -24,8 +24,10 @@ namespace {
 constexpr double LOW_LEVEL_VOLTS = 0.5;
 constexpr double HIGH_LEVEL_VOLTS = 4.0;
 
-/// Two NPN transistors with cross-coupled collectors and bases, which has two stable operating points: node 2 low and
-/// node 3 high, or the other way round. The extra lines say what to compute and where to start.
+/**
+ * @brief   Two NPN transistors with cross-coupled collectors and bases, which has two stable operating points: node 2
+ *          low and node 3 high, or the other way round. The extra lines say what to compute and where to start.
+ */
 std::string BistableNetlist(const std::string_view extra, const std::string_view supply = "5") {
     return std::format("* bistable\n"
                        "V1 1 0 {}\n"

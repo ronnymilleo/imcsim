@@ -19,7 +19,9 @@ using Catch::Matchers::WithinRel;
 
 constexpr double DECIBELS_PER_NEPER = 20.0 / std::numbers::ln10;
 
-/// A part with the same figures at the three frequencies of MakeSensitivity().
+/**
+ * @brief   A part with the same figures at the three frequencies of MakeSensitivity().
+ */
 Core::ACPartSensitivity
 MakePart(const std::string &name, const std::optional<double> &decibels, const std::optional<double> &degrees) {
     return {.Name = name,
@@ -30,8 +32,10 @@ MakePart(const std::string &name, const std::optional<double> &decibels, const s
             .PhaseDegreesPerPercent = {degrees, degrees, degrees}};
 }
 
-/// A low-pass with its corner between the second and third frequency, a resistor that moves the gain, a capacitor
-/// that only moves the phase and a source that moves nothing.
+/**
+ * @brief   A low-pass with its corner between the second and third frequency, a resistor that moves the gain, a
+ *          capacitor that only moves the phase and a source that moves nothing.
+ */
 Core::ACSensitivity MakeSensitivity() {
     Core::ACSensitivity sensitivity;
     sensitivity.OutputNode = 2;

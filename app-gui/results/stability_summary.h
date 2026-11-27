@@ -24,6 +24,10 @@ struct UnstableRegion {
     std::size_t First = 0;
     std::size_t Last = 0;
 
+    /**
+     * @brief   Checks whether two UnstableRegion instances hold equal values.
+     * @return  True when every field is equal.
+     */
     bool operator==(const UnstableRegion &) const = default;
 };
 

@@ -22,7 +22,9 @@ constexpr double GATE_OFF_CONDUCTANCE = 1e-9;
 /// it and the error is that small a share of a period.
 constexpr double MIN_BREAKPOINT_GAP = 1e-12;
 
-/// Sign of a quantity, zero at zero, which mirrors the on-state line and the gate junction of a TRIAC about zero.
+/**
+ * @brief   Sign of a quantity, zero at zero, mirroring the TRIAC on-state line and gate junction about zero.
+ */
 constexpr double SignOf(const double value) {
     return value > 0.0 ? 1.0 : (value < 0.0 ? -1.0 : 0.0);
 }

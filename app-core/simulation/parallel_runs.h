@@ -38,6 +38,12 @@ inline std::size_t GetBatchThreadCount(const std::size_t count, const bool is_co
 
 /**
  * @brief   Runs a batch sequentially on the calling thread, reporting progress before each item starts.
+ * @param[in]     count            Number of items (`0` to `count - 1`).
+ * @param[in,out] control          Optional run control for stop requests and progress reporting, or null.
+ * @param[in]     run_item         Callable `bool(std::size_t index)` executed once per item; returning false stops
+ * early.
+ * @param[in]     progress_offset  Completed items before this batch starts.
+ * @param[in]     total            Denominator for normalized progress reporting.
  */
 template <typename RunItem>
 void RunSerialBatch(const std::size_t count,
@@ -60,6 +66,12 @@ void RunSerialBatch(const std::size_t count,
 
 /**
  * @brief   Runs a batch concurrently across a team of worker threads pulling indices from an atomic counter.
+ * @param[in]     count            Number of items (`0` to `count - 1`).
+ * @param[in]     thread_count     Total threads in the team (including the calling thread), at least 2.
+ * @param[in,out] control          Optional run control for stop requests and progress reporting, or null.
+ * @param[in]     run_item         Callable `bool(std::size_t index)` executed once per scheduled item.
+ * @param[in]     progress_offset  Completed items before this batch starts.
+ * @param[in]     total            Denominator for normalized progress reporting.
  */
 template <typename RunItem>
 void RunConcurrentBatch(const std::size_t count,

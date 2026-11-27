@@ -50,8 +50,7 @@ struct LoadedExample {
     Core::Circuit Circuit;
     Nodalys::PoleZeroConfig Config;
     bool HasLogic = false;
-    /// Whether the example has a Vin or Iin source to drive the analysis.
-    bool HasInput = false;
+    bool HasInput = false; ///< Whether the example has a Vin or Iin source to drive the analysis.
 };
 
 bool IsInputName(const std::string_view name) {
@@ -111,7 +110,9 @@ Testing::PoleZeroReport CheckExample(const LoadedExample &example, const Testing
     return Testing::CheckPoleZero(*compiled, example.Config, band);
 }
 
-/// The roots of a polynomial given from the highest power down, by Durand-Kerner, which shares nothing with QZ.
+/**
+ * @brief   The roots of a polynomial given from the highest power down, by Durand-Kerner, which shares nothing with QZ.
+ */
 std::vector<std::complex<double>> PolynomialRoots(const std::vector<double> &coefficients) {
     const std::size_t degree = coefficients.size() - 1;
     // Working in x = s / scale, with scale the geometric mean of the roots, keeps the iteration near 1

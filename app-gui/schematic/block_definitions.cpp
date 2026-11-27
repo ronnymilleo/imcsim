@@ -35,16 +35,12 @@ struct ReroutedPin {
  * @brief   What happens to the wires on the terminals of the instances of a block that changed.
  */
 struct TerminalMoves {
-    /// Terminals whose wires follow them, before the change.
-    std::vector<GridPoint> OldPoints;
-    /// The same terminals after it, in the same order.
-    std::vector<GridPoint> NewPoints;
-    /// Terminals of pins that went away, whose wires go too.
-    std::vector<GridPoint> Removed;
+    std::vector<GridPoint> OldPoints; ///< Terminals whose wires follow them, before the change.
+    std::vector<GridPoint> NewPoints; ///< The same terminals after it, in the same order.
+    std::vector<GridPoint> Removed;   ///< Terminals of pins that went away, whose wires go too.
     /// Pins that moved to another edge, which get a new wire around the box from where they were.
     std::vector<ReroutedPin> Rerouted;
-    /// The instances, which the new wires go around.
-    RoutingObstacles Blocks;
+    RoutingObstacles Blocks; ///< The instances, which the new wires go around.
 };
 
 /**
@@ -53,10 +49,8 @@ struct TerminalMoves {
  */
 struct InstanceTerminals {
     std::vector<GridPoint> Points;
-    /// The direction from each terminal into the box, which tells the edge it is on.
-    std::vector<GridPoint> Inwards;
-    /// The pin of each terminal, by name, in terminal order.
-    std::vector<std::string> PinNames;
+    std::vector<GridPoint> Inwards; ///< The direction from each terminal into the box, which tells the edge it is on.
+    std::vector<std::string> PinNames; ///< The pin of each terminal, by name, in terminal order.
 };
 
 InstanceTerminals CaptureTerminals(const UIElement &element) {
@@ -361,7 +355,7 @@ std::expected<SavedSubcircuit, std::string> DrawDefinition(const std::vector<std
  * @param[in] definitions  Blocks the parts may place.
  * @return  The copies, in the same order; the reason when the text cannot be read back.
  */
-std::expected<CopiedContent, std::string> CopyContent(const std::span<const UIElement *const> elements,
+std::expected<CopiedContent, std::string> CopyContent(std::span<const UIElement *const> elements,
                                                       const std::vector<UIWire> &wires,
                                                       const std::span<const SavedSubcircuit> definitions) {
     auto loaded = LoadSchematic(SaveParts(elements, wires, definitions));

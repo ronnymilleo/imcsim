@@ -42,6 +42,8 @@ bool HasParametersOnly(const Core::ComponentType type) {
 
 /**
  * @brief   Parts with something to edit: a value, a model, a name, a state or parameters; ground has nothing.
+ * @param[in] component  Component to inspect.
+ * @return  True when the part editor has at least one property field for this component.
  */
 bool HasPropertyFields(const Core::Component &component) {
     const Core::ComponentType type = component.GetType();
@@ -68,6 +70,8 @@ bool HasPropertyFields(const Core::Component &component) {
 
 /**
  * @brief   Whether a model sets the part: diodes, transistors, IGBTs and op-amps.
+ * @param[in] type  Component type to inspect.
+ * @return  True when the part offers ready, library or custom device models.
  */
 bool HasModelChoice(const Core::ComponentType type) {
     return Core::IsDiode(type) || Core::IsBJT(type) || Core::IsMOSFET(type) || Core::IsIGBT(type)
@@ -76,6 +80,8 @@ bool HasModelChoice(const Core::ComponentType type) {
 
 /**
  * @brief   Value fields show for parts with a value, and for parts with a model only while they are custom.
+ * @param[in] component  Component to inspect.
+ * @return  True when numeric parameter or value inputs are shown for the component in its current state.
  */
 bool ShowsValueFields(const Core::Component &component) {
     const Core::ComponentType type = component.GetType();
@@ -101,6 +107,7 @@ bool ShowsValueFields(const Core::Component &component) {
 
 /**
  * @brief   Tells whether a part has a main value that typing can start editing.
+ * @param[in] component  Component to inspect.
  * @return  True for parts with a value (resistors, capacitors, inductors, VCC, controlled sources), DC sources and
  *          ideal op-amps; false for parts set by a model or a waveform.
  */

@@ -257,7 +257,9 @@ NodeVoltageWords DescribeKind(const NodeVoltageKind kind) {
              : NodeVoltageWords{.WithArticle = "a nodeset", .Plural = "nodesets"};
 }
 
-/// The words of a message that starts with the marker, such as "An initial voltage".
+/**
+ * @brief   Capitalizes the first character of a marker phrase so it can start a diagnostic sentence.
+ */
 std::string Capitalized(const std::string_view text) {
     std::string capitalized(text);
     capitalized.front() = static_cast<char>(std::toupper(static_cast<unsigned char>(capitalized.front())));

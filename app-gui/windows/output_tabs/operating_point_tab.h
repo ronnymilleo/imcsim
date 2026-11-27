@@ -36,8 +36,7 @@ private:
     ResultStore &m_Results;
     /// The steps laid out as a sweep of the parameter, for a run stepped through a parameter.
     std::optional<Core::DCSweep> m_StepSweep;
-    /// The result version m_StepSweep was laid out from.
-    std::optional<std::size_t> m_SweptVersion;
+    std::optional<std::size_t> m_SweptVersion; ///< The result version m_StepSweep was laid out from.
     /// Changes whenever the values of m_StepSweep change, which picking another step does not do.
     std::size_t m_StepSweepVersion = 0;
     TraceFitState m_Fit;

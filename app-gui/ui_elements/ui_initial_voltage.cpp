@@ -46,6 +46,9 @@ void UIInitialVoltage::DrawSymbol(SchematicCanvas &canvas,
 
 /**
  * @brief   The role and the voltage, such as "IC 2.5V", stand past the square; the part has no name.
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     color   Text color.
  */
 void UIInitialVoltage::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const std::string label = std::format("IC {}V", Core::FormatValue(GetComponent().GetValue()));
@@ -58,6 +61,7 @@ LocalBounds UIInitialVoltage::GetLocalBounds() const {
 
 /**
  * @brief   The terminal is at the foot of the symbol, and its lead goes up to the square.
+ * @return  Bottom center of the marker square in local grid units.
  */
 ImVec2 UIInitialVoltage::GetLeadEnd() const {
     return {0.0f, -LEAD_LENGTH};

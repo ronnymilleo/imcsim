@@ -50,8 +50,7 @@ private:
     SDL_WindowFlags m_SDLWindowFlags{};
     SDL_Window *m_SDLWindow = nullptr;
     SDL_GPUDevice *m_GPUDevice = nullptr;
-    /// Declared before the editor, which draws with it.
-    GlowRenderer m_GlowRenderer;
+    GlowRenderer m_GlowRenderer; ///< Declared before the editor, which draws with it.
 
     // Application state
     std::vector<std::string> m_Errors;
@@ -63,8 +62,7 @@ private:
     std::string m_SettingsPath;
     /// The user's choices, in a file of their own beside imgui.ini; empty when the data folder is not known.
     std::string m_PreferencesPath;
-    /// What the file holds, so the preferences are written only when they change.
-    Preferences m_SavedPreferences;
+    Preferences m_SavedPreferences; ///< What the file holds, so the preferences are written only when they change.
     /// Last title given to the window, so it is only set again when the file or its state changes.
     std::string m_WindowTitle;
     /// Result versions already shown, one per analysis, so each new result opens the Output window once.
@@ -80,17 +78,13 @@ private:
     std::size_t m_ShownTruthTableVersion = 0;
     std::size_t m_ShownHarmonicBalanceVersion = 0;
     std::size_t m_ShownMonteCarloVersion = 0;
-    /// Finished runs seen, so a new failure opens the tab that tells why once.
-    std::size_t m_ShownRunCount = 0;
-    /// Runs the selected analysis again after edits, when the preference asks for it.
-    AutoRerun m_AutoRerun;
+    std::size_t m_ShownRunCount = 0; ///< Finished runs seen, so a new failure opens the tab that tells why once.
+    AutoRerun m_AutoRerun;           ///< Runs the selected analysis again after edits, when the preference asks for it.
 
-    /// Declared before the windows that refer to it, so it exists when they are built.
-    Schematic m_Schematic;
+    Schematic m_Schematic; ///< Declared before the windows that refer to it, so it exists when they are built.
     /// The results of the analyses of the schematic, which tells it of every change that drops them.
     ResultStore m_Results;
-    /// Declared before the windows that refer to them, so they exist when they are built.
-    Preferences m_Preferences;
+    Preferences m_Preferences; ///< Declared before the windows that refer to them, so they exist when they are built.
     AnalysisControls m_AnalysisControls{m_Schematic, m_Results};
     AnalysisSettingsPanel m_AnalysisSettings{m_Schematic};
     PartEditor m_PartEditor{m_Schematic, m_Preferences};

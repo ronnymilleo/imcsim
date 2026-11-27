@@ -84,6 +84,9 @@ void DrawPortSettings(Core::SubcircuitPinMarker &marker, ValueField &port_refere
 /**
  * @brief   The net name of a label or pin marker, the reference impedance of a port, and one field per parameter of a
  *          block instance.
+ * @param[in,out] fields     Input buffers and value fields populated from the component.
+ * @param[in]     component  Net label, pin marker or subcircuit instance being loaded.
+ * @param[in]     schematic  Schematic holding the subcircuit definitions.
  */
 void LoadBlockFields(BlockFields &fields, const Core::Component &component, const Schematic &schematic) {
     if (Core::IsSubcircuitPin(component.GetType())) {
@@ -101,6 +104,9 @@ void LoadBlockFields(BlockFields &fields, const Core::Component &component, cons
 
 /**
  * @brief   The name applies as soon as it is valid, or empty, which leaves the label or marker unnamed.
+ * @param[in,out] label      Net label or subcircuit pin marker being edited.
+ * @param[in,out] fields     Text buffer and port-impedance field for the label or marker.
+ * @param[in,out] schematic  Marked modified when the name or port settings change.
  */
 void DrawNetLabel(Core::NetLabel &label, BlockFields &fields, Schematic &schematic) {
     const bool is_pin = Core::IsSubcircuitPin(label.GetType());
@@ -130,6 +136,14 @@ void DrawNetLabel(Core::NetLabel &label, BlockFields &fields, Schematic &schemat
     }
 }
 
+/**
+ * @brief   Draws the definition name and parameter override fields of a block instance, with a button to reset
+ *          overrides to definition defaults.
+ * @param[in,out] instance   Subcircuit instance being edited.
+ * @param[in,out] fields     Value fields for the instance parameters.
+ * @param[in,out] schematic  Schematic providing the definition and marked modified on edits.
+ * @return  True when parameter overrides were reset so the caller can reload the fields.
+ */
 bool DrawSubcircuit(Core::SubcircuitInstance &instance, BlockFields &fields, Schematic &schematic) {
     bool is_reset = false;
     const auto definition =

@@ -92,6 +92,10 @@ std::vector<std::byte> BuildWav(const std::uint16_t format_code,
     return wav;
 }
 
+/**
+ * @class   TempFile
+ * @brief   Path in the system temporary folder that removes its file when the scope ends.
+ */
 class TempFile {
 public:
     explicit TempFile(const std::string &filename) : m_Path(std::filesystem::temp_directory_path() / filename) {}

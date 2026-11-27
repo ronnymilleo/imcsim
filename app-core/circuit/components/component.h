@@ -85,34 +85,23 @@ constexpr ComponentType LAST_COMPONENT_TYPE = ComponentType::IGBT;
  * @brief   Groups the kinds of component that the compiler and the netlist writer handle the same way.
  */
 enum class ComponentFamily {
-    /// Ground, net labels, initial voltages, nodesets and pins: they mark a node and add no device.
-    MARKER,
+    MARKER, ///< Ground, net labels, initial voltages, nodesets and pins: they mark a node and add no device.
     /// Resistors, capacitors, inductors, potentiometers and switches: two or three terminals and a plain value.
     PASSIVE,
     /// Supply rails, voltage and current sources, clocks and logic inputs: they drive their node from a setting.
     SOURCE,
     /// VCVS, VCCS, CCCS and CCVS: a source that follows a voltage or a current elsewhere in the circuit.
     CONTROLLED_SOURCE,
-    /// Behavioral voltage and current sources: a source that follows an expression.
-    BEHAVIORAL_SOURCE,
-    /// Diodes, transistors and the like: parts that run on a device model.
-    SEMICONDUCTOR,
-    /// Voltage-controlled switches, relays and fuses: parts that open and close by themselves.
-    SWITCHING,
-    /// The transformer, which couples two windings.
-    TRANSFORMER,
-    /// The two-port TEM transmission line.
-    TRANSMISSION_LINE,
-    /// The op-amp.
-    AMPLIFIER,
-    /// Subcircuit instances: a block with a circuit of its own inside.
-    BLOCK,
-    /// Logic gates and the buffer.
-    LOGIC_GATE,
-    /// D, JK, T and SR flip-flops.
-    FLIP_FLOP,
-    /// Logic outputs and 7-segment displays, which only show the logic levels of their nodes.
-    LOGIC_DISPLAY,
+    BEHAVIORAL_SOURCE, ///< Behavioral voltage and current sources: a source that follows an expression.
+    SEMICONDUCTOR,     ///< Diodes, transistors and the like: parts that run on a device model.
+    SWITCHING,         ///< Voltage-controlled switches, relays and fuses: parts that open and close by themselves.
+    TRANSFORMER,       ///< The transformer, which couples two windings.
+    TRANSMISSION_LINE, ///< The two-port TEM transmission line.
+    AMPLIFIER,         ///< The op-amp.
+    BLOCK,             ///< Subcircuit instances: a block with a circuit of its own inside.
+    LOGIC_GATE,        ///< Logic gates and the buffer.
+    FLIP_FLOP,         ///< D, JK, T and SR flip-flops.
+    LOGIC_DISPLAY,     ///< Logic outputs and 7-segment displays, which only show the logic levels of their nodes.
 };
 
 /// Largest tolerance a part may have, in percent: far beyond any real part, and well short of the 100 % that could take

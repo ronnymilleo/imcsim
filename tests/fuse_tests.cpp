@@ -101,7 +101,9 @@ struct PulsedFuseLoop {
     }
 };
 
-/// ngspice falls back to slower ways of finding an operating point when the first one fails, and says so
+/**
+ * @brief   ngspice falls back to slower ways of finding an operating point when the first one fails, and says so.
+ */
 bool HasConvergenceTrouble(const std::vector<Core::SimulatorMessage> &messages) {
     return std::ranges::any_of(messages, [](const Core::SimulatorMessage &message) {
         return message.Text.contains("failed") || message.Text.contains("singular")
@@ -117,14 +119,18 @@ bool HasBlewWarning(const Core::Transient &transient) {
 /// Heat at which the latch of the model starts to charge, a margin above the 1 that the rated current settles at.
 constexpr double LATCH_HEAT = 1.015;
 
-/// The time the default fuse takes to blow at a current: the heat settles at the current squared over the rated one
-/// squared, with the cooling time constant, and the latch fires when it reaches LATCH_HEAT.
+/**
+ * @brief   The time the default fuse takes to blow at a current: the heat settles at the current squared over the rated
+ *          one squared, with the cooling time constant, and the latch fires when it reaches LATCH_HEAT.
+ */
 double BlowTime(const double current, const Core::FuseParameters &parameters = QUICK_FUSE) {
     const double ratio = LATCH_HEAT * parameters.RatedCurrent * parameters.RatedCurrent / (current * current);
     return -Core::GetCoolingTimeConstant(parameters) * std::log(1.0 - ratio);
 }
 
-/// Four samples of a fuse on nodes 1 and 2 that carries 2 A at 0 s and 0.1 s, blows at 0.2 s and then sees 5 V.
+/**
+ * @brief   Four samples of a fuse on nodes 1 and 2 that carries 2 A at 0 s and 0.1 s, blows at 0.2 s and then sees 5 V.
+ */
 Core::Transient BlowingFuseResult() {
     Core::Transient transient;
     transient.Times = {0.0, 0.1, 0.2, 0.3};

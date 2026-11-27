@@ -51,6 +51,9 @@ void UINodeset::DrawSymbol(SchematicCanvas &canvas,
 
 /**
  * @brief   The role and the voltage, such as "NS 2.5V", stand past the diamond; the part has no name.
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     color   Text color.
  */
 void UINodeset::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const std::string label = std::format("NS {}V", Core::FormatValue(GetComponent().GetValue()));
@@ -63,8 +66,10 @@ std::vector<GridPoint> UINodeset::GetLocalTerminals() const {
 
 /**
  * @brief   The terminal is at the foot of the symbol, and its lead goes up to the diamond.
+ * @param[in] terminal  Index in `GetLocalTerminals()` (always 0).
+ * @return  Unit step `{0, -1}` pointing up along the lead.
  */
-GridPoint UINodeset::GetLocalTerminalInward(std::size_t /*terminal*/) const {
+GridPoint UINodeset::GetLocalTerminalInward([[maybe_unused]] const std::size_t terminal) const {
     return {0, -1};
 }
 

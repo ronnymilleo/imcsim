@@ -214,10 +214,8 @@ struct PanelLayout {
  * @brief   Horizontal room of the Y axes, shared by every panel so their axes line up.
  */
 struct AxisColumns {
-    /// Baseline of the name of the left axis, which reads bottom to top.
-    double LeftNameX = 0.0;
-    /// Width of each right axis, from the plot outwards.
-    std::vector<double> RightWidths;
+    double LeftNameX = 0.0;          ///< Baseline of the name of the left axis, which reads bottom to top.
+    std::vector<double> RightWidths; ///< Width of each right axis, from the plot outwards.
 };
 
 /**

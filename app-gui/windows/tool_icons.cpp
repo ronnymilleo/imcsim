@@ -30,8 +30,7 @@ struct IconPlacement {
     ImVec2 Center;
     float Size;
     ImU32 Color;
-    /// -1 mirrors the icon horizontally, for Redo.
-    float Flip;
+    float Flip; ///< -1 mirrors the icon horizontally, for Redo.
 
     ImVec2 Point(const float x, const float y) const { return Center + ImVec2(x * Flip, y) * Size; }
 };

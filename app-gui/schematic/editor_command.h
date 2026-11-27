@@ -27,8 +27,7 @@ enum class EditorCommand {
     IMPORT_SPICE,
     EXPORT_SCHEMATIC,
     QUIT,
-    /// Runs the selected analysis or continues a stopped live run, as F5 does; it never stops a run.
-    RUN,
+    RUN, ///< Runs the selected analysis or continues a stopped live run, as F5 does; it never stops a run.
     // History
     UNDO,
     REDO,
@@ -68,6 +67,10 @@ struct TurnRequest {
     PointTransform::Kind Kind;
     bool IsKeepingWires;
 
+    /**
+     * @brief   Checks whether two TurnRequest instances hold equal values.
+     * @return  True when every field is equal.
+     */
     bool operator==(const TurnRequest &) const = default;
 };
 

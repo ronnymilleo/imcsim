@@ -28,8 +28,7 @@ struct SubcircuitDefinition;
  */
 struct CircuitEntry {
     const Component *Part = nullptr;
-    /// One node per terminal, in terminal order; node 0 is ground.
-    std::vector<int> Nodes;
+    std::vector<int> Nodes; ///< One node per terminal, in terminal order; node 0 is ground.
 };
 
 /**
@@ -37,8 +36,7 @@ struct CircuitEntry {
  * @brief   A port of the S-parameter analysis: a node that is driven and measured through its reference impedance.
  */
 struct CircuitPort {
-    /// Index in the S matrix, from 1.
-    int Number = 1;
+    int Number = 1; ///< Index in the S matrix, from 1.
     int Node = 0;
     double ReferenceOhms = 50.0;
 };
@@ -58,10 +56,8 @@ struct CircuitNodeVoltage {
  * @brief   What a marker does with the voltage it gives a node.
  */
 enum class NodeVoltageKind {
-    /// The node starts a transient at the voltage (SPICE `.ic`).
-    INITIAL,
-    /// The voltage is the guess the solver starts the operating point from (SPICE `.nodeset`).
-    NODESET
+    INITIAL, ///< The node starts a transient at the voltage (SPICE `.ic`).
+    NODESET  ///< The voltage is the guess the solver starts the operating point from (SPICE `.nodeset`).
 };
 
 /**
@@ -108,8 +104,7 @@ private:
     std::vector<CircuitPort> m_Ports;
     /// One entry per marker, so two markers on one node stay visible to the checks.
     std::vector<CircuitNodeVoltage> m_InitialVoltages;
-    /// One entry per marker, for the same reason.
-    std::vector<CircuitNodeVoltage> m_Nodesets;
+    std::vector<CircuitNodeVoltage> m_Nodesets; ///< One entry per marker, for the same reason.
     SolverOptions m_SolverOptions;
     /// Node of each net a label names, by the name in the form nets are compared in, so a behavioral source can read
     /// V(OUT).

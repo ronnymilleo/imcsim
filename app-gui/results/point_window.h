@@ -29,6 +29,10 @@ struct PointWindow {
     std::size_t First = 0;
     std::size_t Count = 0;
 
+    /**
+     * @brief   Checks whether two PointWindow instances hold equal values.
+     * @return  True when every field is equal.
+     */
     bool operator==(const PointWindow &) const = default;
 };
 

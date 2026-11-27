@@ -63,7 +63,9 @@ struct Switch {
     }
 };
 
-/// The default model, the 600 V 30 A one.
+/**
+ * @brief   The default model, the 600 V 30 A one.
+ */
 const Core::IGBTParameters &DefaultFigures() {
     return Core::GetIGBTModels().front().Parameters;
 }
@@ -82,7 +84,9 @@ const Core::OperatingPoint &RunOperatingPoint(const Core::Circuit &circuit, Core
     return *run.Result;
 }
 
-/// True when some warning starts with the text, so a test can check one rating at a time.
+/**
+ * @brief   True when some warning starts with the text, so a test can check one rating at a time.
+ */
 bool HasWarning(const std::vector<std::string> &warnings, const std::string_view start) {
     return std::ranges::any_of(warnings, [&](const std::string &warning) { return warning.starts_with(start); });
 }

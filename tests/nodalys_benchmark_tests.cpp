@@ -36,7 +36,6 @@ namespace {
 constexpr double VOLTAGE_TOLERANCE_RELATIVE = 1e-3;
 constexpr double VOLTAGE_TOLERANCE_ABSOLUTE = 1e-5;
 
-/// Closeness check with relative and absolute tolerances.
 bool Close(const double a,
            const double b,
            const double relative = VOLTAGE_TOLERANCE_RELATIVE,

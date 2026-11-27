@@ -23,7 +23,9 @@ using Catch::Matchers::ContainsSubstring;
 using Catch::Matchers::WithinAbs;
 using Complex = std::complex<double>;
 
-/// A two-port at three frequencies with Z and Y, absent at the middle one when it is asked to be.
+/**
+ * @brief   A two-port at three frequencies with Z and Y, absent at the middle one when it is asked to be.
+ */
 Core::SParameters MakeResult(const bool is_middle_absent, const bool has_matrices = true) {
     Core::SParameters result;
     result.Frequencies = {1e6, 1e7, 1e8};

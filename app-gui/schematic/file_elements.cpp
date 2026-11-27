@@ -356,7 +356,7 @@ void FixNames(const std::vector<std::unique_ptr<UIElement>> &elements, std::vect
  * @param[in] elements  Parts to write, in the order they are listed.
  * @return  The list, with one object per part.
  */
-nlohmann::json WriteElements(const std::span<const UIElement *const> elements) {
+nlohmann::json WriteElements(std::span<const UIElement *const> elements) {
     nlohmann::json list = nlohmann::json::array();
     for (const UIElement *element : elements) {
         list.push_back(WriteElement(*element));

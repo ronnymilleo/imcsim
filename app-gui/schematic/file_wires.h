@@ -19,10 +19,8 @@ namespace GUI {
  * @brief   How much a warning about a skipped wire says.
  */
 enum class WireWording {
-    /// Names the problem: no integer ends, zero length or diagonal.
-    SPECIFIC,
-    /// Only says the wire is invalid.
-    GENERIC,
+    SPECIFIC, ///< Names the problem: no integer ends, zero length or diagonal.
+    GENERIC,  ///< Only says the wire is invalid.
 };
 
 // Writing

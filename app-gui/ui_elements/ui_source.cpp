@@ -147,6 +147,9 @@ UISource::UISource(std::unique_ptr<Core::Source> source, const GridPoint positio
 
 /**
  * @brief   Every waveform but DC ignores the value of the source, so it is labeled by its main figures instead.
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     color   Text color.
  */
 void UISource::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const std::optional<std::string> waveform = DescribeWaveform(GetSource());

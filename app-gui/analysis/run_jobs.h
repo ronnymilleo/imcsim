@@ -103,6 +103,9 @@ struct SteppedRuns {
 
 /**
  * @brief   Hands a result to the results, or clears the old one so stale values never sit next to an error.
+ * @param[in] result  Simulation result or failure reason.
+ * @param[in] store   Callable taking `std::optional<Result>` to store or clear the result.
+ * @return  The failure message when result holds an error, or none on success.
  */
 template <typename Result, typename Store>
 std::optional<std::string> StoreResult(std::expected<Result, std::string> result, Store store) {
@@ -117,6 +120,12 @@ std::optional<std::string> StoreResult(std::expected<Result, std::string> result
 /**
  * @brief   Runs once per value and stops at the first step that fails or when asked to; the output of each step is
  *          headed by its value, so a warning can be traced to the step that printed it.
+ * @param[in]     step      Parameter step settings naming the varied part or temperature.
+ * @param[in]     unit      Unit of the stepped parameter, such as "Ohm" or "degC".
+ * @param[in]     values    Ordered parameter values to simulate.
+ * @param[in,out] control   Cancellation and progress handle shared with the worker thread.
+ * @param[in]     run_step  Callable running the analysis at one `Core::ParameterValue`.
+ * @return  The step family of results (or why a step stopped or failed) together with all simulator messages.
  */
 template <typename Result, typename RunStep>
 SteppedRuns<Result> RunSteps(const ParameterStepSettings &step,
@@ -204,6 +213,12 @@ void RecordDraw(MonteCarloDraws<Result> &draws,
 
 /**
  * @brief   Runs one Monte Carlo draw and measures its output before dropping traces past MAX_KEPT_TRACES.
+ * @param[in] settings     Monte Carlo seed, distribution and run settings.
+ * @param[in] circuit      Nominal circuit to sample from.
+ * @param[in] run          1-based draw index.
+ * @param[in] run_circuit  Callable simulating the sampled circuit.
+ * @param[in] measure      Callable extracting table measurements from a converged result.
+ * @return  Sampled part values, simulation outcome (emptied past MAX_KEPT_TRACES), measurements and messages.
  */
 template <typename Result, typename RunCircuit, typename Measure>
 MonteCarloDrawOutcome<Result> RunOneMonteCarloDraw(const Core::MonteCarloSettings &settings,
@@ -232,6 +247,12 @@ MonteCarloDrawOutcome<Result> RunOneMonteCarloDraw(const Core::MonteCarloSetting
  * @brief   Runs the nominal circuit and then each draw, and goes on past a run that fails to converge, since a random
  *          draw may land on values the solver cannot handle; the nominal run has to work.
  * @details A stop keeps the runs made. Only the first runs keep their traces; every run keeps its measurements.
+ * @param[in]     settings     Monte Carlo seed, distribution and run count.
+ * @param[in]     circuit      Nominal circuit to simulate and vary.
+ * @param[in,out] control      Cancellation and progress handle shared with the worker thread.
+ * @param[in]     run_circuit  Callable simulating one circuit instance.
+ * @param[in]     measure      Callable extracting table measurements from each converged result.
+ * @return  Kept trace family (or nominal/stop failure), full run table and simulator messages.
  */
 template <typename Result, typename RunCircuit, typename Measure>
 MonteCarloRuns<Result> RunMonteCarlo(const Core::MonteCarloSettings &settings,
@@ -306,6 +327,9 @@ MonteCarloRuns<Result> RunMonteCarlo(const Core::MonteCarloSettings &settings,
 /**
  * @brief   Hands the steps to the results, or reports the step that failed; the old result is cleared before the
  *          steps run.
+ * @param[in] family  Stepped results or failure reason.
+ * @param[in] store   Callable storing the `StepFamily<Result>` on success.
+ * @return  The failure message when family holds an error, or none on success.
  */
 template <typename Result, typename Store>
 std::optional<std::string> StoreSteps(std::expected<StepFamily<Result>, std::string> family, Store store) {
@@ -319,6 +343,11 @@ std::optional<std::string> StoreSteps(std::expected<StepFamily<Result>, std::str
 /**
  * @brief   Hands the traces of the runs to the results as StoreSteps() does, and then their table, or reports why they
  *          did not run.
+ * @param[in]     family   Kept traces of the Monte Carlo runs, or why the run failed.
+ * @param[in]     table    Per-run values and measurements table.
+ * @param[in,out] results  Result store receiving the Monte Carlo table on success.
+ * @param[in]     store    Callable storing the kept trace family on success.
+ * @return  The failure message when family holds an error, or none on success.
  */
 template <typename Result, typename Store>
 std::optional<std::string> StoreMonteCarlo(std::expected<StepFamily<Result>, std::string> family,
@@ -337,6 +366,10 @@ std::optional<std::string> StoreMonteCarlo(std::expected<StepFamily<Result>, std
  *          to the thread that polls, where store puts it away.
  * @details A job that was stopped delivers nothing, unless what it has made is worth keeping, as the points of a
  *          transient.
+ * @param[in] circuit  Circuit snapshot copied before the worker thread starts.
+ * @param[in] work     Callable executing the simulation on the worker thread.
+ * @param[in] store    Callable delivering the finished run on the UI thread.
+ * @return  Worker job ready for `Core::SimulationService`.
  */
 template <typename Run, bool KeepsPartial = false, typename Work, typename Store>
 Core::Job MakeJob(const Core::Circuit &circuit, Work work, Store store) {

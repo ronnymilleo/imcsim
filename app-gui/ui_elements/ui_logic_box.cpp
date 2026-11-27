@@ -59,6 +59,12 @@ UILogicBox::UILogicBox(std::unique_ptr<Core::Component> component, const GridPoi
     : UISingleTerminalElement(std::move(component), position, rotation) {
 }
 
+/**
+ * @brief   Draws the rectangular outline of the box above the lead.
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     color   Line color.
+ */
 void UILogicBox::DrawBox(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const std::array<ImVec2, 4> box = {LocalToScreen(view, -BOX_HALF_WIDTH, BOX_TOP),
                                        LocalToScreen(view, BOX_HALF_WIDTH, BOX_TOP),
@@ -69,6 +75,10 @@ void UILogicBox::DrawBox(SchematicCanvas &canvas, const ViewTransform &view, con
 
 /**
  * @brief   The digit in the middle of the box, sized with the zoom and left out when too small to read.
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     digit   UTF-8 digit or state character to center inside the box.
+ * @param[in]     color   Text color.
  */
 void UILogicBox::DrawDigit(SchematicCanvas &canvas,
                            const ViewTransform &view,
@@ -91,6 +101,7 @@ LocalBounds UILogicBox::GetLocalBounds() const {
 
 /**
  * @brief   The lead goes up from the terminal to the box.
+ * @return  Bottom center of the logic box in local grid units.
  */
 ImVec2 UILogicBox::GetLeadEnd() const {
     return {0.0f, BOX_BOTTOM};

@@ -33,6 +33,11 @@ struct TransmissionLineParameters {
     double ReferenceFrequency = 1e9;
 
     bool IsLossy() const;
+
+    /**
+     * @brief   Compares two TransmissionLineParameters values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const TransmissionLineParameters &) const = default;
 };
 

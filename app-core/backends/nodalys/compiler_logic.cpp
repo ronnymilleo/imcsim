@@ -102,7 +102,9 @@ void ExpandJkFlipFlop(Nodalys::CircuitBuilder &builder, const EntryContext &entr
 
 /**
  * @brief   Adds a logic gate: the inverter and the buffer have one input; every other gate is one device that
- *          AddLogicGate() builds.
+ *          `AddLogicGate()` builds.
+ * @param[in,out] builder  Nodalys circuit builder receiving the gate device.
+ * @param[in]     entry    Resolved component entry and compiled terminal nodes.
  */
 void AddGatePart(Nodalys::CircuitBuilder &builder, const EntryContext &entry) {
     const auto &logic = static_cast<const LogicPart &>(entry.Part);
@@ -120,6 +122,11 @@ void AddGatePart(Nodalys::CircuitBuilder &builder, const EntryContext &entry) {
     }
 }
 
+/**
+ * @brief   Adds a D, SR, T, or JK flip-flop to the builder, expanding SR, T, and JK around a D flip-flop core.
+ * @param[in,out] builder  Nodalys circuit builder receiving the flip-flop macromodel.
+ * @param[in]     entry    Resolved component entry and compiled terminal nodes.
+ */
 void AddFlipFlopPart(Nodalys::CircuitBuilder &builder, const EntryContext &entry) {
     const std::vector<int> &nodes = entry.Nodes;
     switch (entry.Type) {

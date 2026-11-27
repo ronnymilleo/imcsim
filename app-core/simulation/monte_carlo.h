@@ -53,6 +53,10 @@ struct MonteCarloSettings {
     ToleranceDistribution Distribution = ToleranceDistribution::GAUSSIAN;
     unsigned int Seed = 0;
 
+    /**
+     * @brief   Compares two MonteCarloSettings values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const MonteCarloSettings &) const = default;
 };
 
@@ -64,8 +68,7 @@ struct MonteCarloSettings {
 struct MonteCarloCircuit {
     std::vector<std::unique_ptr<Component>> Parts;
     Circuit Simulated;
-    /// Value of each varied part, in the order FindVariedParts() lists them.
-    std::vector<double> Values;
+    std::vector<double> Values; ///< Value of each varied part, in the order FindVariedParts() lists them.
 };
 
 // Random numbers

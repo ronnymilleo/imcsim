@@ -192,7 +192,7 @@ std::optional<std::string> FindBlockTolerance(const Circuit &circuit) {
  * @return  How many parts were set, which are those of that kind.
  */
 std::size_t
-SetTolerances(const std::span<Component *const> parts, const ComponentType type, const std::optional<double> percent) {
+SetTolerances(std::span<Component *const> parts, const ComponentType type, const std::optional<double> percent) {
     std::size_t changed = 0;
     for (Component *part : parts) {
         if (part->GetType() != type || !part->SupportsTolerance()) {

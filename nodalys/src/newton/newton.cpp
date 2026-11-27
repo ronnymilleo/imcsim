@@ -249,6 +249,11 @@ NewtonOutcome SolveWithStrategies(CompiledCircuit &compiled,
 
 } // namespace
 
+/**
+ * @brief   Stamps stiff Norton voltage clamps to ground for `.ic` or `.nodeset` node directives.
+ * @param[in,out] sys     System to stamp into.
+ * @param[in]     clamps  Node unknown indices and target voltages to clamp.
+ */
 void StampNodeClamps(MnaSystem &sys, const std::span<const NodeVoltageDirective> clamps) {
     for (const NodeVoltageDirective &clamp : clamps) {
         StampConductance(sys, clamp.Node, -1, NODE_CLAMP_CONDUCTANCE);
@@ -256,6 +261,17 @@ void StampNodeClamps(MnaSystem &sys, const std::span<const NodeVoltageDirective>
     }
 }
 
+/**
+ * @brief   Finds the DC or transient-step solution of a compiled circuit with Newton-Raphson.
+ * @details A solve that finds an operating point and has nodesets runs twice, as SPICE does: first with every nodeset
+ *          pulling its node to its voltage, then released, from the point the first pass found. If the pulled pass
+ *          finds nothing the solve goes on without the nodesets.
+ * @param[in,out] compiled  The compiled circuit holding the MNA system, devices, and node directives.
+ * @param[in,out] x         Initial guess in, converged solution out.
+ * @param[in]     time      TimeContext indicating DC or transient operating conditions.
+ * @param[in]     options   Convergence tolerances and limits.
+ * @return  Outcome with iteration count, fallback strategy, fault reason, and whether it converged.
+ */
 NewtonOutcome SolveNewton(CompiledCircuit &compiled,
                           std::vector<double> &x,
                           const TimeContext &time,
@@ -277,6 +293,16 @@ NewtonOutcome SolveNewton(CompiledCircuit &compiled,
     return outcome;
 }
 
+/**
+ * @brief   Runs a solve of an operating point through the passes of the nodesets.
+ * @details The one place that knows the order: the pulled pass, then the released one from its point, and a plain
+ *          solve from the start when either finds nothing. `SolveNewton` and the DC bias of the harmonic balance both
+ *          go through it, so a nodeset means the same in both.
+ * @param[in,out] x      Initial guess in, solution out; restored to the initial guess when the passes fail before the
+ *                       plain solve runs.
+ * @param[in]     solve  Runs one pass on `x` and returns whether it converged.
+ * @return  What the last pass that ran returned.
+ */
 bool SolveInNodesetPasses(std::vector<double> &x,
                           const std::function<bool(std::vector<double> &, NodesetPass)> &solve) {
     const std::vector<double> start = x;
@@ -287,6 +313,12 @@ bool SolveInNodesetPasses(std::vector<double> &x,
     return solve(x, NodesetPass::PLAIN);
 }
 
+/**
+ * @brief   Adds to the message of a solve that failed the fault of a device, when one was seen.
+ * @param[in] message  What the analysis says when the solve does not converge.
+ * @param[in] outcome  The outcome of the solve.
+ * @return  The message, followed by the fault when there is one.
+ */
 std::string DescribeFailure(std::string message, const NewtonOutcome &outcome) {
     if (!outcome.Fault.empty()) {
         message += std::format("; {}", outcome.Fault);

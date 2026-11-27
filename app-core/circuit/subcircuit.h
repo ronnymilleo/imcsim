@@ -22,6 +22,10 @@ struct SubcircuitPin {
     std::string Name;
     int Node = 0;
 
+    /**
+     * @brief   Compares two SubcircuitPin values for equality.
+     * @return  True when both name and node match.
+     */
     bool operator==(const SubcircuitPin &) const = default;
 };
 
@@ -33,6 +37,10 @@ struct SubcircuitParameter {
     std::string Name;
     double DefaultValue = 0.0;
 
+    /**
+     * @brief   Compares two SubcircuitParameter values for equality.
+     * @return  True when both name and default value match.
+     */
     bool operator==(const SubcircuitParameter &) const = default;
 };
 
@@ -46,6 +54,10 @@ struct SubcircuitText {
     std::vector<std::string> Ports;
     std::string Text;
 
+    /**
+     * @brief   Compares two SubcircuitText values for equality.
+     * @return  True when both ports and body text match.
+     */
     bool operator==(const SubcircuitText &) const = default;
 };
 

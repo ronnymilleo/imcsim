@@ -35,10 +35,8 @@ struct CurrentVector {
  * @brief   The node voltages and component currents a run leaves, a value per point.
  */
 struct NodeAndCurrentVectors {
-    /// Indexed by node number; node 0 is ground and always 0 V.
-    std::vector<std::vector<double>> NodeVoltages;
-    /// One per current, in circuit order.
-    std::vector<ComponentTrace> Currents;
+    std::vector<std::vector<double>> NodeVoltages; ///< Indexed by node number; node 0 is ground and always 0 V.
+    std::vector<ComponentTrace> Currents;          ///< One per current, in circuit order.
 };
 
 // Plots

@@ -58,6 +58,8 @@ void MoveDraggedElements(Schematic &schematic, const GroupDrag &drag, const Grid
 
 /**
  * @brief   A drag keeps the positions of the items it moves, so deleting, cutting or undoing waits until it ends.
+ * @param[in] mode  Editor mode to check.
+ * @return  True when the mode is selecting with an active drag gesture.
  */
 bool IsDragging(const EditorMode &mode) {
     const auto *selecting = std::get_if<SelectingMode>(&mode);
@@ -68,6 +70,10 @@ bool IsDragging(const EditorMode &mode) {
  * @brief   Captures what a drag of the current selection needs, so every frame can be computed from the start.
  * @details A click on one item of a group only keeps the group while the mouse moves: without a move it leaves just
  *          that item selected.
+ * @param[in] schematic    Schematic whose current selection is starting to move.
+ * @param[in] cursor       Grid position where the drag started.
+ * @param[in] collapse_to  Selection to fall back to when the mouse is released without moving, or none.
+ * @return  Initial drag state for the current selection.
  */
 GroupDrag MakeDrag(const Schematic &schematic, const GridPoint cursor, std::optional<Selection> collapse_to) {
     GroupDrag drag;
@@ -91,6 +97,9 @@ GroupDrag MakeDrag(const Schematic &schematic, const GridPoint cursor, std::opti
 /**
  * @brief   Moves the selection by how far the cursor went from where the drag started, rebuilding the wires from the
  *          wires the drag started with so moving back and forth does not pile up bends.
+ * @param[in,out] schematic  Schematic whose selected elements and attached wires are moved.
+ * @param[in,out] mode       Editor mode holding the active drag state.
+ * @param[in]     cursor     Current snapped grid position of the cursor.
  * @note    It does nothing unless the mode is selecting with a drag in progress.
  */
 void UpdateDrag(Schematic &schematic, EditorMode &mode, const GridPoint cursor) {
@@ -128,6 +137,8 @@ void UpdateDrag(Schematic &schematic, EditorMode &mode, const GridPoint cursor) 
  * @brief   What the drag left selected: just the clicked item when the mouse never moved over a group.
  * @details The cleanup of the wires is done by every frame of the drag already, so it only matters when the drag
  *          changed nothing.
+ * @param[in,out] schematic  Schematic whose selection and wires are finalized.
+ * @param[in,out] mode       Editor mode whose active drag is cleared.
  */
 void EndDrag(Schematic &schematic, EditorMode &mode) {
     auto *selecting = std::get_if<SelectingMode>(&mode);
@@ -144,6 +155,9 @@ void EndDrag(Schematic &schematic, EditorMode &mode) {
 
 /**
  * @brief   Replaces the selection; a drag belongs to the items it was started with, so it ends.
+ * @param[in,out] schematic  Schematic whose selection is replaced.
+ * @param[in,out] mode       Editor mode whose active drag is ended first.
+ * @param[in]     selection  New selection to set.
  */
 void ApplySelection(Schematic &schematic, EditorMode &mode, const Selection &selection) {
     EndDrag(schematic, mode);
@@ -154,6 +168,8 @@ void ApplySelection(Schematic &schematic, EditorMode &mode, const Selection &sel
  * @brief   Deselects everything, as Esc does, and ends what was being done with the selection: a drag belongs to the
  *          selection, so it ends with it, and so does a selection box.
  * @details Schematic::ClearSelection() only deselects; this is the one the editor calls.
+ * @param[in,out] schematic  Schematic whose selection is cleared.
+ * @param[in,out] mode       Editor mode whose active drag and selection box are cleared.
  */
 void CancelSelection(Schematic &schematic, EditorMode &mode) {
     EndDrag(schematic, mode);
@@ -165,6 +181,8 @@ void CancelSelection(Schematic &schematic, EditorMode &mode) {
 
 /**
  * @brief   Selects every part and wire, while the editor is selecting.
+ * @param[in,out] schematic  Schematic whose parts and wires are selected.
+ * @param[in,out] mode       Editor mode; must be selecting for the call to take effect.
  */
 void SelectAll(Schematic &schematic, EditorMode &mode) {
     if (!IsSelecting(mode)) {
@@ -177,6 +195,10 @@ void SelectAll(Schematic &schematic, EditorMode &mode) {
  * @brief   Turns or mirrors every selected part about the center of the selection, and the selected wires with them.
  * @details The wires that meet them follow, unless keep_wires: then the parts turn alone and every wire stays where it
  *          was. A turn during a drag ends that move and goes on dragging from the new position.
+ * @param[in,out] schematic   Schematic whose selected parts and wires are transformed.
+ * @param[in,out] mode        Editor mode; an active drag is restarted from the transformed positions.
+ * @param[in]     kind        Quarter turn or mirror transform to apply.
+ * @param[in]     keep_wires  True to leave all wires untouched while turning only the selected parts.
  */
 void TransformSelection(Schematic &schematic,
                         EditorMode &mode,

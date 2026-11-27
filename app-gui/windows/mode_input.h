@@ -27,10 +27,8 @@ namespace GUI {
  *          is, and the parts of the editor a mode starts or asks something of.
  */
 struct ModeInput {
-    /// The document, which holds the blocks a part may place.
-    Schematic &Root;
-    /// The open blocks, whose shown schematic is where parts and groups land.
-    BlockSession &Blocks;
+    Schematic &Root;      ///< The document, which holds the blocks a part may place.
+    BlockSession &Blocks; ///< The open blocks, whose shown schematic is where parts and groups land.
     SchematicOverlays &Overlays;
     PartEditor &Part;
     PartPopover &Popover;
@@ -38,8 +36,7 @@ struct ModeInput {
     const Preferences &UserPreferences;
     SchematicCanvas &Canvas;
     CanvasPointer Pointer;
-    /// Whether wires go up or down before they turn, kept from one wire to the next.
-    bool &IsWireVerticalFirst;
+    bool &IsWireVerticalFirst; ///< Whether wires go up or down before they turn, kept from one wire to the next.
 };
 
 // Input of each mode, after the schematic is drawn; each returns the mode to switch to, or none

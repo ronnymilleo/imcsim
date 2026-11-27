@@ -130,6 +130,9 @@ IgbtDevice::IgbtDevice(const int collector, const int gate, const int emitter, I
  * @brief   Stamps the collector current linearized at the iterate, and the gate leakage.
  * @details In a transient step the tail decays from the stored current of the last accepted point over the step;
  *          every other solve has no tail.
+ * @param[in,out] sys   MNA system to stamp into.
+ * @param[in]     x     Current Newton iterate.
+ * @param[in]     time  Analysis time context.
  */
 void IgbtDevice::Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) {
     m_StepStart = m_StoredCurrent;
@@ -152,6 +155,9 @@ void IgbtDevice::Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeC
 /**
  * @brief   The current entering a terminal: the collector current into the collector, the gate leakage into the
  *          gate, and both out of the emitter.
+ * @param[in] terminal  Terminal index (`0 = Collector`, `1 = Gate`, `2 = Emitter`).
+ * @param[in] x         Evaluated MNA solution vector.
+ * @return  Current entering the terminal, in Amperes.
  */
 double IgbtDevice::TerminalCurrent(const int terminal, const std::vector<double> &x) const {
     const double collector = Evaluate(x).Current;
@@ -170,11 +176,16 @@ double IgbtDevice::TerminalCurrent(const int terminal, const std::vector<double>
 /**
  * @brief   The small-signal current entering a terminal, from the slopes of the collector current at the operating
  *          point.
+ * @param[in] terminal  Terminal index (`0 = Collector`, `1 = Gate`, `2 = Emitter`).
+ * @param[in] x_dc      DC operating-point solution vector.
+ * @param[in] x_ac      Complex AC solution phasor vector.
+ * @param[in] omega     Angular frequency \f$\omega\f$, in radians per second (unused; capacitances are external).
+ * @return  Complex small-signal current phasor entering the terminal, in Amperes.
  */
 std::complex<double> IgbtDevice::AcTerminalCurrent(const int terminal,
                                                    const std::vector<double> &x_dc,
                                                    const std::vector<std::complex<double>> &x_ac,
-                                                   const double /*omega*/) const {
+                                                   [[maybe_unused]] const double omega) const {
     const Conduction conduction = Evaluate(x_dc);
     const std::complex<double> vce = AcBranchVoltage(x_ac, m_Collector, m_Emitter);
     const std::complex<double> vge = AcBranchVoltage(x_ac, m_Gate, m_Emitter);
@@ -221,6 +232,7 @@ bool IgbtDevice::Limit(std::vector<double> &x_new, const std::vector<double> &x_
 /**
  * @brief   Moves the stored current to the accepted point: up with the conduction at once, down toward it with the
  *          tail decay of the step.
+ * @param[in] x  Converged solution vector of the accepted point.
  */
 void IgbtDevice::AcceptStep(const std::vector<double> &x) {
     const double conduction =

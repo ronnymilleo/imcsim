@@ -33,14 +33,10 @@ public:
     void Draw(PartEditor &part_editor, Schematic &schematic);
 
 private:
-    /// The point the middle of the top edge of the popover opens on.
-    ImVec2 m_Anchor = {0.0f, 0.0f};
-    /// The middle of the canvas on screen, as drawn last.
-    ImVec2 m_CanvasCenter = {0.0f, 0.0f};
-    /// The top edge of the canvas on screen, as drawn last.
-    float m_CanvasTop = 0.0f;
-    /// Whether a menu or a key asked to open the popover.
-    bool m_IsRequested = false;
+    ImVec2 m_Anchor = {0.0f, 0.0f};       ///< The point the middle of the top edge of the popover opens on.
+    ImVec2 m_CanvasCenter = {0.0f, 0.0f}; ///< The middle of the canvas on screen, as drawn last.
+    float m_CanvasTop = 0.0f;             ///< The top edge of the canvas on screen, as drawn last.
+    bool m_IsRequested = false;           ///< Whether a menu or a key asked to open the popover.
 };
 
 } // namespace GUI

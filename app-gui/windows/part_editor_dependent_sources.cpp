@@ -56,6 +56,9 @@ void DrawControllingCurrent(Core::ControlledSource &source, Schematic &schematic
 
 /**
  * @brief   The gain is the ratio of output to control, so the line below spells out what it multiplies.
+ * @param[in,out] source      Controlled source (VCVS, VCCS, CCCS or CCVS) being edited.
+ * @param[in,out] main_value  Value field editing the source gain.
+ * @param[in,out] schematic   Schematic providing candidate controlling currents and marked modified on edits.
  */
 void DrawControlledSource(Core::ControlledSource &source, ValueField &main_value, Schematic &schematic) {
     if (const std::optional<double> value = main_value.Draw("Gain", source.GetUnit(), AnyValue)) {
@@ -81,6 +84,9 @@ void DrawControlledSource(Core::ControlledSource &source, ValueField &main_value
 /**
  * @brief   The expression applies as soon as it parses, so a half-typed one keeps the last that did; below it, what is
  *          wrong with it in the circuit as it is now, or what it may use.
+ * @param[in,out] source           Behavioral voltage or current source being edited.
+ * @param[in,out] expression_text  Text buffer holding the expression currently typed.
+ * @param[in,out] schematic        Schematic used to validate net/current references and marked modified on edits.
  */
 void DrawBehavioralSource(Core::BehavioralSource &source, std::string &expression_text, Schematic &schematic) {
     const bool is_voltage = source.GetType() == Core::ComponentType::BEHAVIORAL_VOLTAGE;

@@ -36,6 +36,9 @@ UIDiac::UIDiac(const GridPoint position, const Rotation rotation)
 
 /**
  * @brief   The MT2 and MT1 leads run along the axis to the bars.
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     color   Line color.
  */
 void UIDiac::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     canvas.AddLine(LocalToScreen(view, -2, 0), LocalToScreen(view, -1, 0), color, LINE_THICKNESS);

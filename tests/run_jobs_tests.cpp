@@ -30,7 +30,9 @@
 
 namespace {
 
-/// A run of these tests makes a number, which it measures as the mean of node 1.
+/**
+ * @brief   A run of these tests makes a number, which it measures as the mean of node 1.
+ */
 GUI::Measurement MeasureNumber(const double number) {
     return {.Columns = {{.Node = 1, .Kind = GUI::MeasureKind::MEAN, .Current = ""}}, .Values = {number}};
 }

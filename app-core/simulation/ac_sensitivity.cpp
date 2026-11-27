@@ -18,7 +18,9 @@ namespace Core {
 
 namespace {
 
-/// The larger the better: how far an element moves the response anywhere in the sweep, in decibels per percent.
+/**
+ * @brief   Largest magnitude sensitivity of an element anywhere in the sweep, in decibels per percent.
+ */
 double GetPeakEffect(const ACElementFigures &figures) {
     double peak = 0.0;
     for (const std::optional<double> &decibels : figures.MagnitudeDecibelsPerPercent) {

@@ -32,6 +32,8 @@ constexpr std::size_t MAX_SPICE_BLOCK_CHECK_ENTRIES = 256;
  */
 class SpiceBlockCheck {
 public:
+    /// Callback checking a SPICE subcircuit block with resolved parameters, returning a failure message or
+    /// `std::nullopt`.
     using Checker = std::function<std::optional<std::string>(const Nodalys::SubcircuitText &text,
                                                              const std::map<std::string, double> &parameters)>;
 

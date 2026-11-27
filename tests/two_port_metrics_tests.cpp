@@ -22,12 +22,16 @@ Complex Polar(const double magnitude, const double degrees) {
     return std::polar(magnitude, degrees * std::numbers::pi / 180.0);
 }
 
-/// A transistor of K a little below 1: potentially unstable, MSG 17.27 dB.
+/**
+ * @brief   A transistor of K a little below 1: potentially unstable, MSG 17.27 dB.
+ */
 GUI::TwoPortMatrix MakePotentiallyUnstable() {
     return {.S11 = Polar(0.75, -115.0), .S12 = Polar(0.06, 60.0), .S21 = Polar(3.2, 70.0), .S22 = Polar(0.45, -40.0)};
 }
 
-/// A stable amplifier: K 2.4 and MAG 7.58 dB.
+/**
+ * @brief   A stable amplifier: K 2.4 and MAG 7.58 dB.
+ */
 GUI::TwoPortMatrix MakeUnconditionallyStable() {
     return {.S11 = Polar(0.3, -70.0), .S12 = Polar(0.08, 60.0), .S21 = Polar(2.1, 80.0), .S22 = Polar(0.4, -40.0)};
 }

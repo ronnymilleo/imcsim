@@ -127,7 +127,9 @@ void DrawSmithTraces(SvgWriter &svg,
     }
 }
 
-/// The boundary of a stability circle is dashed, which tells it from the solid traces.
+/**
+ * @brief   The boundary of a stability circle is dashed, which tells it from the solid traces.
+ */
 std::string CircleDash(const double scale) {
     return std::format("{} {}", FormatCoordinate(DASH_LENGTH * scale), FormatCoordinate(DASH_GAP * scale));
 }
@@ -160,7 +162,9 @@ void DrawSmithCircles(SvgWriter &svg,
     }
 }
 
-/// The circles that are drawn, which are the ones with a boundary; the others are only in the table.
+/**
+ * @brief   The circles that are drawn, which are the ones with a boundary; the others are only in the table.
+ */
 bool IsCircleDrawn(const ExportSmithCircle &circle) {
     return !circle.Boundary.empty();
 }
@@ -221,6 +225,9 @@ void DrawSmithLegend(SvgWriter &svg,
 /**
  * @brief   Draws the chart in the largest square the image leaves under its header, with room around it for the labels
  *          of the reactance arcs.
+ * @param[in] smith  Reflection traces, stability circles and title to plot.
+ * @param[in] style  Image dimensions and dark or print theme.
+ * @return  The complete SVG document, or an error message when the image is too small for the chart.
  */
 std::expected<std::string, std::string> RenderSmith(const ExportSmith &smith, const ExportStyle &style) {
     const auto width = static_cast<double>(style.Width);

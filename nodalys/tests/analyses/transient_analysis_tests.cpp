@@ -60,7 +60,9 @@ double FindPeakAfter(const std::vector<double> &times, const std::vector<double>
     return peak;
 }
 
-/// RC discharge: 1 V on the capacitor, v(t) = exp(-t / tau) with tau = 1 ms.
+/**
+ * @brief   RC discharge: 1 V on the capacitor, \f$v(t) = \exp(-t / \tau)\f$ with \f$\tau = 1\f$ ms.
+ */
 double MeasureRcDischargeError(const Nodalys::IntegrationMethod method, const double time_step) {
     constexpr double RESISTANCE = 1e3;
     constexpr double CAPACITANCE = 1e-6;
@@ -74,7 +76,9 @@ double MeasureRcDischargeError(const Nodalys::IntegrationMethod method, const do
     return std::fabs(result.NodeVoltages[1].back() - std::exp(-result.Times.back() / (RESISTANCE * CAPACITANCE)));
 }
 
-/// RL decay: 1 A in the inductor, i(t) = exp(-t R / L) with L / R = 1 ms.
+/**
+ * @brief   RL decay: 1 A in the inductor, \f$i(t) = \exp(-t R / L)\f$ with \f$L / R = 1\f$ ms.
+ */
 double MeasureRlDecayError(const Nodalys::IntegrationMethod method, const double time_step) {
     constexpr double RESISTANCE = 10.0;
     constexpr double INDUCTANCE = 10e-3;

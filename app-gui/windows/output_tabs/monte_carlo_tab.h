@@ -36,12 +36,10 @@ public:
 private:
     Schematic &m_Schematic;
     ResultStore &m_Results;
-    /// Node whose quantity is shown; the first measured one while the user has not picked.
-    std::optional<int> m_Node;
+    std::optional<int> m_Node; ///< Node whose quantity is shown; the first measured one while the user has not picked.
     /// Current whose quantity is shown, in place of a node, when the user picked one.
     std::optional<std::string> m_Current;
-    /// Quantity shown; the first the node offers while the user has not picked.
-    std::optional<MeasureKind> m_Kind;
+    std::optional<MeasureKind> m_Kind; ///< Quantity shown; the first the node offers while the user has not picked.
     RunSort m_Sort;
 
     std::optional<std::size_t> ResolveColumn(const MonteCarloTable &table);

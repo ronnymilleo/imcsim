@@ -28,8 +28,7 @@ public:
 
 private:
     TouchstoneOptions m_Options;
-    /// Why the last Touchstone export could not be written, or empty.
-    std::string m_ExportError;
+    std::string m_ExportError; ///< Why the last Touchstone export could not be written, or empty.
 
     void DrawOptions();
     void Save(const Core::SParameters &result,

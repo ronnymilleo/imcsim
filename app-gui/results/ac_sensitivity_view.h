@@ -4,7 +4,7 @@
  *          that matter most, the heat level of each part, the curves and the rows and texts of the table.
  * @details Pure functions with no ImGui, so the tests run them; the drawing is in the overlays and the tab. The
  *          influence of a part at a frequency is the relative change of the complex response for a relative change of
- *          its value, $|d \ln H / d \ln p|$, which puts the magnitude and the phase in one number: a part that only
+ *          its value, \f$|d \ln H / d \ln p|\f$, which puts the magnitude and the phase in one number: a part that only
  *          moves the phase still counts.
  */
 
@@ -34,14 +34,11 @@ inline constexpr double AC_SENSITIVITY_DECADES = 3.0;
 struct ACSensitivityRow {
     /// The part as the schematic names it, such as "R1", "VCC 12V", or "X2.R1" for the element inside a block.
     std::string Part;
-    /// The name of the part in the circuit, which a click on the row selects.
-    std::string PartName;
-    /// Such as "4.7kOhm".
-    std::string Value;
+    std::string PartName; ///< The name of the part in the circuit, which a click on the row selects.
+    std::string Value;    ///< Such as "4.7kOhm".
     /// Change of the gain for a 1 % higher value, such as "-0.0434 dB", or "-" where the output is too small.
     std::string Magnitude;
-    /// Change of the phase for a 1 % higher value, such as "-0.286 deg", or "-".
-    std::string Phase;
+    std::string Phase; ///< Change of the phase for a 1 % higher value, such as "-0.286 deg", or "-".
     /// Worst-case gain and phase change at the part's tolerance, such as "±0.217 dB / ±1.43 deg (5%)", or "-".
     std::string Tolerance;
     /// How much of the response a 1 % change of the part moves, as a share of the part that moves it most, from 0 to 1.
@@ -53,10 +50,8 @@ struct ACSensitivityRow {
  * @brief   The two figures of one part at every frequency, with a gap where the output was too small to have one.
  */
 struct ACSensitivityCurve {
-    /// Decibels per 1 %, not a number where there is none.
-    std::vector<double> Magnitude;
-    /// Degrees per 1 %, not a number where there is none.
-    std::vector<double> Phase;
+    std::vector<double> Magnitude; ///< Decibels per 1 %, not a number where there is none.
+    std::vector<double> Phase;     ///< Degrees per 1 %, not a number where there is none.
 };
 
 // Frequency

@@ -34,8 +34,7 @@ struct MeasuredTrace {
  */
 struct StatisticsCell {
     std::string Text;
-    /// The exact value of a reading written "~0", or empty.
-    std::string Tooltip;
+    std::string Tooltip; ///< The exact value of a reading written "~0", or empty.
 };
 
 /**

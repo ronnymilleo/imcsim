@@ -29,7 +29,10 @@ struct GridPoint {
     int X = 0;
     int Y = 0;
 
-    /// Ordering lets grid points be keys of std::map.
+    /**
+     * @brief   Orders grid points lexicographically by X and then Y so they can serve as ordered container keys.
+     * @return  Strong ordering between this point and another.
+     */
     auto operator<=>(const GridPoint &) const = default;
 };
 

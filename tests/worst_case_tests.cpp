@@ -25,6 +25,10 @@ namespace {
 using Catch::Matchers::WithinAbs;
 using Catch::Matchers::WithinRel;
 
+/**
+ * @struct  TolerancedDivider
+ * @brief   A 10 V resistive divider of two 10 kOhm, 5% resistors to ground.
+ */
 struct TolerancedDivider {
     Core::VoltageSource Source;
     Core::Resistor Top;
@@ -48,6 +52,11 @@ struct TolerancedDivider {
     }
 };
 
+/**
+ * @struct  TolerancedLowPass
+ * @brief   An RC low-pass filter with 1 kHz corner, 10% resistor, 5% capacitor, and an AC source whose tolerance is
+ *          ignored.
+ */
 struct TolerancedLowPass {
     Core::VoltageSource Source;
     Core::Resistor Series;

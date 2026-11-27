@@ -50,14 +50,11 @@ enum class AnalysisKind {
  *          that run before the backend name no engine. The defaults are no limit at all.
  */
 struct SParameterLimits {
-    /// Fewest ports the backend runs with.
-    std::size_t MinPorts = 1;
+    std::size_t MinPorts = 1; ///< Fewest ports the backend runs with.
     /// Why it needs that many, as a sentence without a period, such as "ngspice needs at least two S-parameter ports".
     std::string MinPortsReason;
-    /// Fewest points of a linear sweep the backend gives all of.
-    int MinLinearPoints = 2;
-    /// Why it needs that many, as a sentence without a period.
-    std::string MinLinearPointsReason;
+    int MinLinearPoints = 2;           ///< Fewest points of a linear sweep the backend gives all of.
+    std::string MinLinearPointsReason; ///< Why it needs that many, as a sentence without a period.
 };
 
 /**
@@ -76,8 +73,7 @@ struct BackendCapabilities {
     std::map<AnalysisKind, std::string> UnsupportedWithNodesets;
     /// Why the backend cannot simulate at a temperature other than the default one, or none when it can.
     std::optional<std::string> TemperatureUnsupported;
-    /// What the backend asks of the ports and of the sweep of an S-parameter analysis.
-    SParameterLimits SParameters;
+    SParameterLimits SParameters; ///< What the backend asks of the ports and of the sweep of an S-parameter analysis.
     /// Finds why the backend cannot simulate one part in one analysis when that depends on what the part holds, such
     /// as the expression of a behavioral source, which names functions the backend may not have, or the text of a
     /// block kept as SPICE text, which the circuit holds the definition of; empty when the backend has no such limit.

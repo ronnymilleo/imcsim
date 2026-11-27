@@ -61,8 +61,8 @@ private:
         double GcBc; ///< \f$\partial I_C / \partial v_{bc}\f$.
         double GbBe; ///< \f$\partial I_B / \partial v_{be}\f$.
         double GbBc; ///< \f$\partial I_B / \partial v_{bc}\f$.
-        /// \f$I_{\text{fwd}} / q_b\f$ for Gummel-Poon forward transit-time charge \f$Q_{DE} = \tau_F I_{\text{fwd}} /
-        /// q_b\f$.
+        /// Forward current over base charge \f$I_{\text{fwd}} / q_b\f$, for Gummel-Poon transit-time charge
+        /// \f$Q_{DE} = \tau_F I_{\text{fwd}} / q_b\f$.
         double IfwdQb;
         /// \f$\partial (I_{\text{fwd}} / q_b) / \partial v_{be}\f$ for Gummel-Poon diffusion capacitance.
         double DIfwdQbDvbe;

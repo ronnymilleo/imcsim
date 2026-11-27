@@ -70,6 +70,11 @@ double DefaultGain(const ComponentType type) {
     case ComponentType::SUBCIRCUIT:
     case ComponentType::CLOCK:
     case ComponentType::LOGIC_INPUT:
+    case ComponentType::THYRISTOR:
+    case ComponentType::TRIAC:
+    case ComponentType::DIAC:
+    case ComponentType::GTO:
+    case ComponentType::IGBT:
         break;
     }
     return 1.0;

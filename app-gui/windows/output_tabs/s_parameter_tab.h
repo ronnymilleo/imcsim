@@ -60,8 +60,7 @@ private:
     // Fit
     /// The visible frequency range of the magnitude and phase plots, shared by both.
     PlotSpan m_View{.From = 1.0, .To = 1e9};
-    /// The result the selection and the axes were set for.
-    std::size_t m_FittedVersion = 0;
+    std::size_t m_FittedVersion = 0; ///< The result the selection and the axes were set for.
     /// Whether the next frame fits the axes to the curves, after a new result or another choice of entries.
     bool m_IsFitting = true;
 

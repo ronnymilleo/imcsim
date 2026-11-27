@@ -96,27 +96,20 @@ private:
 
     // Run in progress
     Core::SimulationService m_Service;
-    /// Analysis of the run in progress, if any.
-    std::optional<Analysis> m_RunningAnalysis;
-    /// Version of the circuit the run in progress started from.
-    std::size_t m_RunCircuitVersion = 0;
-    /// When the run in progress started, for the time it took.
-    std::chrono::steady_clock::time_point m_RunStart;
+    std::optional<Analysis> m_RunningAnalysis;        ///< Analysis of the run in progress, if any.
+    std::size_t m_RunCircuitVersion = 0;              ///< Version of the circuit the run in progress started from.
+    std::chrono::steady_clock::time_point m_RunStart; ///< When the run in progress started, for the time it took.
     /// Run asked for while a paused live run held the worker, which starts once that run has ended.
     bool m_IsRunPending = false;
 
     // Live runs
-    /// Whether the next transient runs live.
-    bool m_IsLiveModeOn = false;
-    /// Whether the run in progress is a live one.
-    bool m_IsLiveRun = false;
-    /// Whether the transient on display came from a live run.
-    bool m_IsLiveResult = false;
+    bool m_IsLiveModeOn = false; ///< Whether the next transient runs live.
+    bool m_IsLiveRun = false;    ///< Whether the run in progress is a live one.
+    bool m_IsLiveResult = false; ///< Whether the transient on display came from a live run.
 
     // Last runs
     RunReport m_Report;
-    /// Version of the document the last runs were about.
-    std::size_t m_ReportDocumentVersion = 0;
+    std::size_t m_ReportDocumentVersion = 0; ///< Version of the document the last runs were about.
 
     // Runs of one analysis
     void StartRun(Analysis analysis, Core::Job job);

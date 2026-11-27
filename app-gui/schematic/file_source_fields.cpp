@@ -86,14 +86,12 @@ constexpr auto RANDOM_KEYS = std::to_array<ParameterKey<Core::RandomParameters>>
  */
 template <typename Parameters, std::size_t Count>
 struct WaveformCodec {
-    /// Key of the object that holds the waveform, so the sine keys in the element object stay apart.
-    const char *Key;
+    const char *Key; ///< Key of the object that holds the waveform, so the sine keys in the element object stay apart.
     const std::array<ParameterKey<Parameters>, Count> &Keys;
     const Parameters &(Core::Source::*Get)() const;
     void (Core::Source::*Set)(const Parameters &);
     bool (Core::Source::*IsValid)(const Parameters &) const;
-    /// Continues "Element 3 ..." when the source rejects the numbers.
-    const char *Message;
+    const char *Message; ///< Continues "Element 3 ..." when the source rejects the numbers.
 };
 
 constexpr WaveformCodec PULSE_WAVEFORM{"pulse",

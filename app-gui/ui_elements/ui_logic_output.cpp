@@ -49,6 +49,9 @@ void UILogicOutput::DrawReading(SchematicCanvas &canvas,
 
 /**
  * @brief   The lead goes up from the terminal to the box, with an arrow that points into it.
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     color   Line and arrow color.
  */
 void UILogicOutput::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     UILogicBox::DrawTerminals(canvas, view, color);
@@ -60,11 +63,15 @@ void UILogicOutput::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &
 
 /**
  * @brief   The empty box; the reading goes in it through DrawReading().
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     color   Line color.
+ * @param[in]     style   Drawing standard (unused; box is identical in IEC and ANSI).
  */
 void UILogicOutput::DrawSymbol(SchematicCanvas &canvas,
                                const ViewTransform &view,
                                const ImU32 color,
-                               const SymbolStyle /*style*/) const {
+                               [[maybe_unused]] const SymbolStyle style) const {
     DrawBox(canvas, view, color);
 }
 

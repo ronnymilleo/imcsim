@@ -15,12 +15,9 @@ namespace GUI {
  * @brief   How a trace is drawn on the plots, which its swatch copies.
  */
 enum class TraceStyle {
-    /// A voltage.
-    SOLID,
-    /// A current.
-    DASHED,
-    /// A math channel, heavier than the traces it comes from.
-    HEAVY,
+    SOLID,  ///< A voltage.
+    DASHED, ///< A current.
+    HEAVY,  ///< A math channel, heavier than the traces it comes from.
 };
 
 bool DrawTraceCheckbox(const char *label, bool *is_shown, ImU32 color, TraceStyle style);

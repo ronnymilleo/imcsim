@@ -22,10 +22,8 @@ namespace Core {
  */
 struct DCWorstCase {
     std::size_t TolerancedPartCount = 0;
-    /// Extreme Value Analysis deviation bound in volts.
-    double ExtremeVolts = 0.0;
-    /// Root Sum of Squares deviation bound in volts.
-    double RssVolts = 0.0;
+    double ExtremeVolts = 0.0; ///< Extreme Value Analysis deviation bound in volts.
+    double RssVolts = 0.0;     ///< Root Sum of Squares deviation bound in volts.
 };
 
 /**

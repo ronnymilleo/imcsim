@@ -39,12 +39,10 @@ struct GroupDrag {
     TerminalMove StartTerminals;
     std::vector<UIWire> StartWires;
     std::optional<bool> SlidesVertically;
-    /// Moved the mouse far enough to change something.
-    bool Moved = false;
+    bool Moved = false; ///< Moved the mouse far enough to change something.
     GridPoint LastCursor;
     GridPoint LastDelta;
-    /// What a click without a move leaves selected.
-    std::optional<Selection> CollapseTo;
+    std::optional<Selection> CollapseTo; ///< What a click without a move leaves selected.
 };
 
 /**

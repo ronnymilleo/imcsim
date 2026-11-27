@@ -24,6 +24,10 @@ public:
 
     void Draw(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const;
 
+    /**
+     * @brief   Checks whether two wire segments connect the same start and end points.
+     * @return  True when both endpoints match.
+     */
     bool operator==(const UIWire &) const = default;
 
     GridPoint GetStart() const;

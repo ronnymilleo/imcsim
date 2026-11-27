@@ -42,10 +42,8 @@ enum class LiveEffect {
     CURRENT_FLOW,
     LED_GLOW,
     HEAT_GLOW,
-    /// Lights the box of a logic input that is high and of a logic output that reads 1.
-    LOGIC_LIGHTS,
-    /// A short burst of rays at the instant a fuse blows.
-    FUSE,
+    LOGIC_LIGHTS, ///< Lights the box of a logic input that is high and of a logic output that reads 1.
+    FUSE,         ///< A short burst of rays at the instant a fuse blows.
     COUNT
 };
 
@@ -92,24 +90,19 @@ enum class HarmonicAmplitudeUnit {
  */
 struct Preferences {
     // Appearance
-    /// By name, so the choice survives themes being added or reordered.
-    std::string Theme = GetThemes().front().Name;
+    std::string Theme = GetThemes().front().Name; ///< By name, so the choice survives themes being added or reordered.
     SymbolStyle Symbols = SymbolStyle::IEC;
-    /// Numbers each terminal; terminal 1 is where a positive current enters.
-    bool ShowTerminalNumbers = false;
+    bool ShowTerminalNumbers = false; ///< Numbers each terminal; terminal 1 is where a positive current enters.
 
-    /// Schematic while showing results.
-    WireColoring WireColors = WireColoring::PLAIN;
+    WireColoring WireColors = WireColoring::PLAIN; ///< Schematic while showing results.
     /// By enum value, each on its own; all off until asked for but the fuse flash.
     std::array<bool, NUMBER_OF_LIVE_EFFECTS> LiveEffects = DEFAULT_LIVE_EFFECTS;
 
     /// Parts: resistors, capacitors and inductors take the nearest value of the series.
     Core::ValueSeries ValueSeries = Core::ValueSeries::FREE;
 
-    /// Results: a new result brings the Output window to the front, or only marks it.
-    bool BringOutputToFront = true;
-    /// Which engine solves the circuits.
-    SimulationEngine Engine = SimulationEngine::NODALYS;
+    bool BringOutputToFront = true; ///< Results: a new result brings the Output window to the front, or only marks it.
+    SimulationEngine Engine = SimulationEngine::NODALYS; ///< Which engine solves the circuits.
     /// The selected analysis runs again by itself once an edit of the circuit settles, if it was already run.
     bool RerunOnEdit = false;
     /// Quiet time after the last edit before it runs, from MIN_RERUN_DELAY_SECONDS to MAX_RERUN_DELAY_SECONDS.
@@ -120,6 +113,10 @@ struct Preferences {
     bool IsEffectOn(LiveEffect effect) const;
     void SetEffectOn(LiveEffect effect, bool on);
 
+    /**
+     * @brief   Checks whether two Preferences instances hold equal values.
+     * @return  True when every field is equal.
+     */
     bool operator==(const Preferences &) const = default;
 };
 

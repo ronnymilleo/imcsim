@@ -20,7 +20,9 @@ constexpr double NOTCH_FLOOR_DECIBELS = 60.0;
 constexpr double DEGREES_PER_RADIAN = 180.0 / std::numbers::pi;
 constexpr double DECIBELS_PER_NEPER = 20.0 / std::numbers::ln10;
 
-/// The log of prod(s - zero) / prod(s - pole), which a product of 60 poles would overflow.
+/**
+ * @brief   The log of prod(s - zero) / prod(s - pole), which a product of 60 poles would overflow.
+ */
 std::complex<double> LogShape(const std::complex<double> s,
                               const std::vector<std::complex<double>> &poles,
                               const std::vector<std::complex<double>> &zeros) {
@@ -34,14 +36,18 @@ std::complex<double> LogShape(const std::complex<double> s,
     return total;
 }
 
-/// One complex response of the AC sweep at a node, rebuilt from its decibels and degrees.
+/**
+ * @brief   One complex response of the AC sweep at a node, rebuilt from its decibels and degrees.
+ */
 std::complex<double> SweepValue(const Nodalys::AcSweepResult &sweep, const int node, const std::size_t index) {
     const double magnitude = std::pow(10.0, sweep.NodeMagnitudesDecibels[static_cast<std::size_t>(node)][index] / 20.0);
     const double phase = sweep.NodePhasesDegrees[static_cast<std::size_t>(node)][index] / DEGREES_PER_RADIAN;
     return std::polar(magnitude, phase);
 }
 
-/// How far the AC response is from the roots at one frequency, relative to the gain: log magnitude and angle.
+/**
+ * @brief   How far the AC response is from the roots at one frequency, relative to the gain: log magnitude and angle.
+ */
 std::complex<double>
 LogGainAt(const Nodalys::AcSweepResult &sweep, const PoleZeroReport &report, const int node, const std::size_t index) {
     const std::complex<double> s{0.0, TWO_PI * sweep.Frequencies[index]};

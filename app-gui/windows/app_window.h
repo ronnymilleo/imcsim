@@ -50,8 +50,7 @@ private:
     bool m_FocusRequested = false;
     /// Opened by OpenBehind(): appears without taking the focus, and behind the selected tab when docked.
     bool m_AppearBehind = false;
-    /// A dot beside the title or tab, for something new the user has not seen yet.
-    bool m_NewContentMarker = false;
+    bool m_NewContentMarker = false; ///< A dot beside the title or tab, for something new the user has not seen yet.
     /// In font sizes; only used the first time the window appears, before imgui.ini remembers it.
     std::optional<ImVec2> m_InitialSize;
 };

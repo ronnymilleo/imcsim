@@ -34,6 +34,10 @@ struct LiveChange {
     LiveQuantity Quantity = LiveQuantity::RESISTANCE;
     double Value = 0.0;
 
+    /**
+     * @brief   Compares two LiveChange values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const LiveChange &) const = default;
 };
 

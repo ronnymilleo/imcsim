@@ -137,6 +137,12 @@ std::expected<void, std::string> CheckMosfetLevel(const LibraryModel &model,
 
 } // namespace
 
+/**
+ * @brief   Resolves the parameters a diode part simulates with: its own, or its library `.model` parsed for Nodalys.
+ * @param[in] circuit  Circuit that carries the library model the part names, when it names one.
+ * @param[in] diode    Diode, Zener diode, or LED part to resolve the parameters of.
+ * @return  The resolved parameters, or the reason its library model cannot be simulated by Nodalys.
+ */
 std::expected<DiodeParameters, std::string> ResolveParameters(const Circuit &circuit, const Diode &diode) {
     if (!diode.HasLibraryModel()) {
         return diode.GetParameters();
@@ -177,6 +183,12 @@ std::expected<DiodeParameters, std::string> ResolveParameters(const Circuit &cir
     return parameters;
 }
 
+/**
+ * @brief   Resolves the parameters a BJT part simulates with: its own, or its library `.model` parsed for Nodalys.
+ * @param[in] circuit  Circuit that carries the library model the part names, when it names one.
+ * @param[in] bjt      NPN or PNP transistor part to resolve the parameters of.
+ * @return  The resolved Gummel-Poon parameters, or the reason its library model cannot be simulated by Nodalys.
+ */
 std::expected<BJTParameters, std::string> ResolveParameters(const Circuit &circuit, const BJT &bjt) {
     if (!bjt.HasLibraryModel()) {
         return bjt.GetParameters();
@@ -212,6 +224,13 @@ std::expected<BJTParameters, std::string> ResolveParameters(const Circuit &circu
     return parameters;
 }
 
+/**
+ * @brief   Resolves the parameters a MOSFET part simulates with: its own, or its level-1 library `.model` parsed for
+ *          Nodalys.
+ * @param[in] circuit  Circuit that carries the library model the part names, when it names one.
+ * @param[in] mosfet   NMOS or PMOS transistor part to resolve the parameters of.
+ * @return  The resolved level-1 parameters, or an error when the model is missing, malformed, or not level 1.
+ */
 std::expected<MOSFETParameters, std::string> ResolveParameters(const Circuit &circuit, const MOSFET &mosfet) {
     if (!mosfet.HasLibraryModel()) {
         return mosfet.GetParameters();

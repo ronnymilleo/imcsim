@@ -28,7 +28,9 @@ constexpr int GATE = 3;
 /// Node of the gate source behind its gate resistor.
 constexpr int DRIVE = 4;
 
-/// A supply feeding the collector through a load, the emitter grounded and the gate held by a DC source.
+/**
+ * @brief   A supply feeding the collector through a load, the emitter grounded and the gate held by a DC source.
+ */
 Nodalys::Circuit BuildSwitch(const Nodalys::IgbtParameters &params,
                              const double supply_volts,
                              const double load_ohms,
@@ -43,7 +45,9 @@ Nodalys::Circuit BuildSwitch(const Nodalys::IgbtParameters &params,
     return std::move(*circuit);
 }
 
-/// The same switch with its gate driven by a pulse through a gate resistor.
+/**
+ * @brief   The same switch with its gate driven by a pulse through a gate resistor.
+ */
 Nodalys::Circuit BuildPulsedSwitch(const Nodalys::IgbtParameters &params,
                                    const double supply_volts,
                                    const double load_ohms,
@@ -89,7 +93,10 @@ const std::vector<double> &TransientCurrent(const Nodalys::TransientResult &resu
     return current->Values;
 }
 
-/// The charge a current carries from an instant to the end of the run, by the trapezoid over the points reported.
+/**
+ * @brief   The charge a current carries from an instant to the end of the run, by the trapezoid over the points
+ *          reported.
+ */
 double ChargeAfter(const Nodalys::TransientResult &result, const std::vector<double> &current, const double from) {
     double charge = 0.0;
     for (std::size_t i = 1; i < result.Times.size(); ++i) {

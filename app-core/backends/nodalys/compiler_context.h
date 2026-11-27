@@ -15,7 +15,9 @@
 
 namespace Core {
 
+/// Parameter name-to-value map passed down when instantiating a subcircuit.
 using Parameters = std::map<std::string, double>;
+/// Maps `entry_index -> terminal_index -> probe_node` for instrumented terminal currents.
 using ProbeNodes = std::map<int, std::map<int, int>>;
 
 /**

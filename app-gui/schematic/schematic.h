@@ -62,6 +62,9 @@ public:
 
     Schematic();
     Schematic(const Schematic &) = delete;
+    /**
+     * @brief   Moves a schematic into a new one without transferring its circuit listener.
+     */
     Schematic(Schematic &&) = default;
     Schematic &operator=(const Schematic &) = delete;
     Schematic &operator=(Schematic &&) = delete;
@@ -204,8 +207,7 @@ private:
      *          was set on, and the new one is not that one.
      */
     struct ListenerSlot {
-        /// Told when a change drops the results, or null; never owned.
-        CircuitListener *Target = nullptr;
+        CircuitListener *Target = nullptr; ///< Told when a change drops the results, or null; never owned.
 
         ListenerSlot() = default;
         ListenerSlot(const ListenerSlot &) = delete;
@@ -219,10 +221,8 @@ private:
     ListenerSlot m_Listener;
 
     // Live runs
-    /// Whether a live run is going on.
-    bool m_IsLiveRun = false;
-    /// Changes of the parts of the live run that it has not taken yet.
-    std::vector<Core::LiveChange> m_LiveChanges;
+    bool m_IsLiveRun = false;                    ///< Whether a live run is going on.
+    std::vector<Core::LiveChange> m_LiveChanges; ///< Changes of the parts of the live run that it has not taken yet.
 
     // History
     UndoHistory m_History;

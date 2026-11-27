@@ -60,6 +60,10 @@ struct ScaleKey {
     std::size_t DataVersion = 0;
     PointWindow Window;
 
+    /**
+     * @brief   Checks whether two ScaleKey instances hold equal values.
+     * @return  True when every field is equal.
+     */
     bool operator==(const ScaleKey &) const = default;
 };
 
@@ -68,10 +72,8 @@ struct ScaleKey {
  * @brief   The heat scale of a transient, kept with what it was worked out for and when.
  */
 struct TransientScaleCache {
-    /// What the scale was worked out for; none before the first one.
-    std::optional<ScaleKey> Key;
-    /// When the scale was last worked out, on the screen clock, in seconds.
-    double LastTime = 0.0;
+    std::optional<ScaleKey> Key; ///< What the scale was worked out for; none before the first one.
+    double LastTime = 0.0;       ///< When the scale was last worked out, on the screen clock, in seconds.
     HeatScale Scale;
 };
 
@@ -101,8 +103,7 @@ public:
 private:
     /// The instant of the transient shown, and the window of points the scale goes over.
     const TransientPlayback &m_Playback;
-    /// What the schematic shows, resolved at the start of each frame.
-    std::optional<DisplayedState> m_Displayed;
+    std::optional<DisplayedState> m_Displayed; ///< What the schematic shows, resolved at the start of each frame.
     TransientScaleCache m_TransientScale;
     FuseBlowTracker m_Fuses;
     /// What each fuse shows this frame, by element; none for the other parts.

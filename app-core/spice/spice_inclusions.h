@@ -26,8 +26,7 @@ struct LibraryLines {
     std::vector<std::string> Lines;
     /// Where each line is, such as "Line 12" or "Line 3 of models.lib", for the warnings.
     std::vector<std::string> Origins;
-    /// What could not be included, and why.
-    std::vector<std::string> Warnings;
+    std::vector<std::string> Warnings; ///< What could not be included, and why.
 };
 
 // Reading

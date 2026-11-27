@@ -30,7 +30,9 @@ constexpr int SUPPLY = 1;
 constexpr int LOAD = 2;
 constexpr int INDUCTOR_END = 3;
 
-/// A supply on node 1 feeding the quick fuse to node 2, where a load goes to ground.
+/**
+ * @brief   A supply on node 1 feeding the quick fuse to node 2, where a load goes to ground.
+ */
 Nodalys::Circuit BuildFuseLoop(const double supply_volts, const double load_ohms) {
     Nodalys::CircuitBuilder builder;
     builder.AddVdc("V1", SUPPLY, 0, supply_volts, 1.0);
@@ -51,7 +53,10 @@ Nodalys::TransientResult RunTransient(const Nodalys::Circuit &circuit, const dou
     return std::move(*result);
 }
 
-/// Time of the first point where the load has lost all but a thousandth of its voltage, or none when it never does.
+/**
+ * @brief   Time of the first point where the load has lost all but a thousandth of its voltage, or none when it never
+ *          does.
+ */
 std::optional<double> FindOpenTime(const Nodalys::TransientResult &result) {
     const std::vector<double> &load = result.NodeVoltages[LOAD];
     const double open_level = 1e-3 * load.front();
@@ -62,7 +67,10 @@ std::optional<double> FindOpenTime(const Nodalys::TransientResult &result) {
     return result.Times[static_cast<std::size_t>(open - load.begin())];
 }
 
-/// Time a fuse takes to blow at a constant current, from the closed form of the heat equation that starts at zero.
+/**
+ * @brief   Time a fuse takes to blow at a constant current, from the closed form of the heat equation that starts at
+ *          zero.
+ */
 double ExpectedBlowTime(const double current) {
     const double settled_heat = current * current / (QUICK_FUSE.RatedCurrent * QUICK_FUSE.RatedCurrent);
     return QUICK_TIME_CONSTANT * std::log(settled_heat / (settled_heat - BLOW_HEAT));

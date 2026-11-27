@@ -71,8 +71,7 @@ struct PointClasses {
     std::vector<GridPoint> SupplyPoints;
     /// Points of the named labels, by the name they are compared with.
     std::map<std::string, std::vector<GridPoint>> LabeledPoints;
-    /// The name of a label as typed, on each of its points.
-    std::map<GridPoint, std::string> LabelText;
+    std::map<GridPoint, std::string> LabelText; ///< The name of a label as typed, on each of its points.
 };
 
 void ClassifyElement(const UIElement &element, PointClasses &classes) {

@@ -49,7 +49,9 @@ constexpr int GATE = 3;
 /// Node between the two sources of the TRIAC that reads a fast voltage fall.
 constexpr int BIAS = 4;
 
-/// A supply on node 1 feeding the thyristor to node 2, where a load goes to ground, and a gate drive on node 3.
+/**
+ * @brief   A supply on node 1 feeding the thyristor to node 2, where a load goes to ground, and a gate drive on node 3.
+ */
 Nodalys::Circuit BuildScrLoop(const Nodalys::ThyristorParameters &params,
                               const double supply_volts,
                               const double load_ohms,
@@ -64,7 +66,9 @@ Nodalys::Circuit BuildScrLoop(const Nodalys::ThyristorParameters &params,
     return std::move(*circuit);
 }
 
-/// The same loop, with the gate driven by a pulse instead of a steady voltage.
+/**
+ * @brief   The same loop, with the gate driven by a pulse instead of a steady voltage.
+ */
 Nodalys::Circuit BuildPulsedScrLoop(const Nodalys::ThyristorParameters &params,
                                     const double supply_volts,
                                     const double load_ohms,
@@ -79,8 +83,10 @@ Nodalys::Circuit BuildPulsedScrLoop(const Nodalys::ThyristorParameters &params,
     return std::move(*circuit);
 }
 
-/// The same loop with a pulsed supply, which the dv/dt firing and the turn-off recovery read; a gate pulse of
-/// High = 0 leaves the gate silent.
+/**
+ * @brief   The same loop with a pulsed supply, which the dv/dt firing and the turn-off recovery read; a gate pulse of
+ *          High = 0 leaves the gate silent.
+ */
 Nodalys::Circuit BuildCommutatedLoop(const Nodalys::ThyristorParameters &params,
                                      const Nodalys::PulseParameters &supply_pulse,
                                      const double load_ohms,
@@ -113,21 +119,24 @@ Nodalys::OperatingPointResult RunOperatingPoint(const Nodalys::Circuit &circuit)
     return std::move(*result);
 }
 
-/// The load voltage at the first time point at or after an instant.
+/**
+ * @brief   The load voltage at the first time point at or after an instant.
+ */
 double LoadVoltageAt(const Nodalys::TransientResult &result, const double time) {
     const auto point = std::ranges::lower_bound(result.Times, time);
     REQUIRE(point != result.Times.end());
     return result.NodeVoltages[LOAD][static_cast<std::size_t>(point - result.Times.begin())];
 }
 
-/// The values of one named current trace of a transient.
 const std::vector<double> &CurrentTrace(const Nodalys::TransientResult &result, const std::string_view name) {
     const auto trace = std::ranges::find(result.Currents, name, &Nodalys::ComponentTrace::Name);
     REQUIRE(trace != result.Currents.end());
     return trace->Values;
 }
 
-/// The mean of the load voltage over one period of the steady state, from the second period on.
+/**
+ * @brief   The mean of the load voltage over one period of the steady state, from the second period on.
+ */
 double MeanLoadVoltageOverPeriod(const Nodalys::TransientResult &result, const double period) {
     double sum = 0.0;
     int count = 0;
@@ -141,7 +150,10 @@ double MeanLoadVoltageOverPeriod(const Nodalys::TransientResult &result, const d
     return sum / static_cast<double>(count);
 }
 
-/// A DC supply feeding a thyristor into a load, with the gate driven by a piecewise linear source from the cathode.
+/**
+ * @brief   A DC supply feeding a thyristor into a load, with the gate driven by a piecewise linear source from the
+ *          cathode.
+ */
 Nodalys::Circuit BuildGateDrivenLoop(const Nodalys::ThyristorParameters &params,
                                      const double supply_volts,
                                      const double load_ohms,
@@ -156,7 +168,10 @@ Nodalys::Circuit BuildGateDrivenLoop(const Nodalys::ThyristorParameters &params,
     return std::move(*circuit);
 }
 
-/// A gate that fires at 1 ms with a short positive pulse and, when a turn-off level is given, pulls it from 2 ms.
+/**
+ * @brief   A gate that fires at 1 ms with a short positive pulse and, when a turn-off level is given, pulls it from
+ *          2 ms.
+ */
 Nodalys::PwlParameters FireThenTurnOffDrive(const double turn_off_volts) {
     return {.Points = {{0.0, 0.0},
                        {1e-3, 0.0},
