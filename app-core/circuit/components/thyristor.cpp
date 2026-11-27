@@ -82,6 +82,10 @@ bool IsThyristor(const ComponentType type) {
     return type == ComponentType::THYRISTOR || type == ComponentType::TRIAC || type == ComponentType::GTO;
 }
 
+/**
+ * @brief   Returns the SPICE subcircuit name used for an SCR in ngspice netlists.
+ * @return  Null-terminated subcircuit name `"imcsim_scr"`.
+ */
 const char *GetThyristorSubcircuitName() {
     return "imcsim_scr";
 }
@@ -122,10 +126,18 @@ std::string FormatThyristorSubcircuit() {
            ".ends imcsim_scr\n";
 }
 
+/**
+ * @brief   Returns the SPICE subcircuit name written for a TRIAC in exported netlists.
+ * @return  Null-terminated subcircuit name `"imcsim_triac"`.
+ */
 const char *GetTriacSubcircuitName() {
     return "imcsim_triac";
 }
 
+/**
+ * @brief   Returns the SPICE subcircuit name written for a GTO in exported netlists.
+ * @return  Null-terminated subcircuit name `"imcsim_gto"`.
+ */
 const char *GetGtoSubcircuitName() {
     return "imcsim_gto";
 }

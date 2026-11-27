@@ -42,6 +42,10 @@ struct SolverOptions {
     /// The temperature the model parameters are given at; a run at another temperature scales them from it.
     double NominalTemperatureCelsius = DEFAULT_NOMINAL_TEMPERATURE_CELSIUS;
 
+    /**
+     * @brief   Compares two SolverOptions values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const SolverOptions &) const = default;
 };
 

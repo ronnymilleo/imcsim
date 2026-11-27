@@ -54,6 +54,10 @@ bool Diac::IsValidParameters(const DiacParameters &parameters) {
         && release_voltage < parameters.BreakoverVoltage;
 }
 
+/**
+ * @brief   Returns the SPICE subcircuit name written for a DIAC in exported netlists.
+ * @return  Null-terminated subcircuit name `"imcsim_diac"`.
+ */
 const char *GetDiacSubcircuitName() {
     return "imcsim_diac";
 }

@@ -22,13 +22,15 @@ namespace Core {
  *          I squared t. The time constant is worked out from the two, see GetCoolingTimeConstant().
  */
 struct FuseParameters {
-    /// Largest current the fuse carries for ever, in amperes.
-    double RatedCurrent = 1.0;
-    /// Current squared times time that melts the element in a short overload, in A^2 s.
-    double MeltingI2t = 1.045;
+    double RatedCurrent = 1.0; ///< Largest current the fuse carries for ever, in amperes.
+    double MeltingI2t = 1.045; ///< Current squared times time that melts the element in a short overload, in A^2 s.
     double ColdResistance = 0.0964;
     double BlownResistance = 1e9;
 
+    /**
+     * @brief   Compares two FuseParameters values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const FuseParameters &) const = default;
 };
 

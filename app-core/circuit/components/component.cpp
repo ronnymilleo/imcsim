@@ -24,14 +24,10 @@ namespace {
  * @brief   Which values a kind of component accepts.
  */
 enum class ValueRule {
-    /// The component has no value, so no value is valid.
-    NONE,
-    /// Any number, negative and not-a-number included.
-    ANY,
-    /// Strictly above zero, as for a resistance, a capacitance or an inductance.
-    POSITIVE,
-    /// Any finite number.
-    FINITE,
+    NONE,     ///< The component has no value, so no value is valid.
+    ANY,      ///< Any number, negative and not-a-number included.
+    POSITIVE, ///< Strictly above zero, as for a resistance, a capacitance or an inductance.
+    FINITE,   ///< Any finite number.
 };
 
 /**
@@ -44,14 +40,10 @@ struct ComponentTraits {
     /// Text written to files, read back by ParseComponentType(). All traits strings are literals, so they end in a
     /// null character and can be returned as C strings.
     std::string_view TypeName;
-    /// SPICE letter that starts the instance name; empty when the kind is not named.
-    std::string_view NamePrefix;
-    /// Unit of the value, or of the gain for a controlled source; empty when there is none.
-    std::string_view Unit;
-    /// Rule for the value; a component has a value exactly when the rule is not NONE.
-    ValueRule AcceptedValues;
-    /// Group of the kinds the compiler and the netlist writer treat alike.
-    ComponentFamily Family;
+    std::string_view NamePrefix; ///< SPICE letter starting the instance name; empty when unnamed.
+    std::string_view Unit;       ///< Unit of the value (or controlled-source gain); empty when none.
+    ValueRule AcceptedValues;    ///< Value domain; a part has a value when the rule is not NONE.
+    ComponentFamily Family;      ///< Group of kinds the compiler and netlist writer treat alike.
 };
 
 constexpr auto COMPONENT_TRAITS = std::to_array<ComponentTraits>({

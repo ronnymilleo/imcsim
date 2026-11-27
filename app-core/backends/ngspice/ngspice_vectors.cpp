@@ -47,7 +47,9 @@ std::optional<std::string> FindPlotStartingWith(const std::string_view prefix) {
 }
 
 /**
- * @brief   ngspice keeps no reference to the name after the call.
+ * @brief   Looks up a vector by name in the current ngspice plot.
+ * @param[in] name  Name of the vector; ngspice keeps no reference to it after the call.
+ * @return  Pointer to the static `vector_info` record when present and non-empty, or `nullptr` when missing.
  */
 pvector_info FindVector(std::string name) {
     const pvector_info vector = ngGet_Vec_Info(name.data());
@@ -58,7 +60,11 @@ pvector_info FindVector(std::string name) {
 }
 
 /**
- * @brief   Analyses with complex results, such as .ac, also store their scale (the frequency) as complex numbers.
+ * @brief   Copies the real part of an ngspice vector starting from `first_point`.
+ * @details Analyses with complex results, such as `.ac`, also store their scale (the frequency) as complex numbers.
+ * @param[in] vector       ngspice vector descriptor to copy from.
+ * @param[in] first_point  Zero-based index of the first sample to copy.
+ * @return  Real samples from `first_point` to the end, or empty when `first_point` is at or past the vector length.
  */
 std::vector<double> RealPart(const vector_info &vector, const std::size_t first_point) {
     const std::size_t length = static_cast<std::size_t>(vector.v_length);
@@ -70,6 +76,11 @@ std::vector<double> RealPart(const vector_info &vector, const std::size_t first_
     return values;
 }
 
+/**
+ * @brief   Copies all samples of an ngspice vector as complex numbers.
+ * @param[in] vector  ngspice vector descriptor to copy from (real-only vectors get a zero imaginary part).
+ * @return  Complex samples across the full length of `vector`.
+ */
 std::vector<std::complex<double>> ComplexValues(const vector_info &vector) {
     std::vector<std::complex<double>> values(static_cast<std::size_t>(vector.v_length));
     for (std::size_t index = 0; index < values.size(); ++index) {
@@ -81,7 +92,10 @@ std::vector<std::complex<double>> ComplexValues(const vector_info &vector) {
 }
 
 /**
- * @brief   ngspice saves the vector names of a plot in lower case; the plot name itself is kept as listed.
+ * @brief   Lists the vector names stored in a named ngspice plot.
+ * @details ngspice saves the vector names of a plot in lower case; the plot name itself is kept as listed.
+ * @param[in] plot  Plot identifier as returned by `ngSpice_AllPlots()`.
+ * @return  Vector names in the plot, or empty when the plot does not exist.
  */
 std::vector<std::string> ListVectors(std::string plot) {
     std::vector<std::string> names;
@@ -109,7 +123,7 @@ std::optional<std::vector<double>> ReadRealVector(std::string name) {
 /**
  * @brief   Reads the first value of a vector that holds real numbers, as the analyses with a single point leave.
  * @param[in] name  Name of the vector.
- * @param[in] what  What the vector holds, for the error: "ngspice returned no <what>".
+ * @param[in] what  What the vector holds, for the error: `"ngspice returned no <what>"`.
  * @return  The value, or the error when the vector is missing or holds complex numbers.
  */
 std::expected<double, std::string> ReadScalar(std::string name, const std::string_view what) {
@@ -124,9 +138,9 @@ std::expected<double, std::string> ReadScalar(std::string name, const std::strin
  * @brief   Reads a real vector that must have as many points as the scale of the run.
  * @param[in] name         Name of the vector.
  * @param[in] length       Number of points the vector must have.
- * @param[in] what         What the vector holds, for the error: "ngspice returned no <what>".
+ * @param[in] what         What the vector holds, for the error: `"ngspice returned no <what>"`.
  * @param[in] first_point  Index of the first point to keep; the ones before it are dropped.
- * @return  The values from first_point on, or the error when the vector is missing or has another length.
+ * @return  The values from `first_point` on, or the error when the vector is missing or has another length.
  */
 std::expected<std::vector<double>, std::string> ReadRealVectorOfLength(std::string name,
                                                                        const std::size_t length,
@@ -143,7 +157,7 @@ std::expected<std::vector<double>, std::string> ReadRealVectorOfLength(std::stri
  * @brief   Reads a vector as complex numbers, which must have as many points as the scale of the run.
  * @param[in] name    Name of the vector.
  * @param[in] length  Number of points the vector must have.
- * @param[in] what    What the vector holds, for the error: "ngspice returned no <what>".
+ * @param[in] what    What the vector holds, for the error: `"ngspice returned no <what>"`.
  * @return  The values, or the error when the vector is missing or has another length.
  */
 std::expected<std::vector<std::complex<double>>, std::string>
@@ -193,16 +207,21 @@ ReadNodeAndCurrentVectors(const Circuit &circuit, const std::size_t length, cons
 }
 
 /**
- * @brief   The branch current of a voltage source, an inductor or a current probe.
+ * @brief   Returns the ngspice branch-current vector name (`<element>#branch`) for a voltage source, inductor, or
+ * probe.
+ * @param[in] element_name  SPICE element name in any case.
+ * @return  Lower-case branch vector name `<element>#branch`.
  */
 std::string BranchVectorName(const std::string &element_name) {
     return std::format("{}#branch", ToLower(element_name));
 }
 
 /**
- * @brief   Where ngspice saves the currents of a component, with .options savecurrents and the current probes.
+ * @brief   Lists where ngspice saves the currents of a component, with `.options savecurrents` and the current probes.
  * @details Two-terminal parts report one current, positive from their first terminal to their second; probed parts one
  *          per probed terminal, positive into it.
+ * @param[in] component  Circuit component whose current trace and ngspice vector names are queried.
+ * @return  Trace and ngspice vector name pairs for the component, or empty when the part reports no current.
  */
 std::vector<CurrentVector> CurrentVectors(const Component &component) {
     const std::vector<CurrentProbe> probes = GetCurrentProbes(component);

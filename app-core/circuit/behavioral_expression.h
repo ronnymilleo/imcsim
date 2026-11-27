@@ -21,6 +21,10 @@ namespace Core {
  * @brief   A voltage or current an expression reads, and where it is written in the text.
  */
 struct BehavioralReference {
+    /**
+     * @enum    Kind
+     * @brief   Whether a behavioral reference reads a node voltage or a branch current.
+     */
     enum class Kind {
         VOLTAGE,
         CURRENT
@@ -29,11 +33,13 @@ struct BehavioralReference {
     Kind Type = Kind::VOLTAGE;
     /// One or two nets for a voltage, V(OUT) or V(IN, OUT); the name of the current, R1 or Q1.C, for a current.
     std::vector<std::string> Names;
-    /// First character of the reference, the V or the I.
-    std::size_t Start = 0;
-    /// Characters from Start to the closing parenthesis, included.
-    std::size_t Length = 0;
+    std::size_t Start = 0;  ///< First character of the reference, the V or the I.
+    std::size_t Length = 0; ///< Characters from Start to the closing parenthesis, included.
 
+    /**
+     * @brief   Compares two BehavioralReference values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const BehavioralReference &) const = default;
 };
 

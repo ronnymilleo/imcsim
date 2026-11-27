@@ -25,8 +25,7 @@ struct DiodeParameters {
     double SaturationCurrent = 1e-14;
     double EmissionCoefficient = 1.0;
     double SeriesResistance = 0.0;
-    /// For a Zener, the voltage it regulates at.
-    double BreakdownVoltage = 100.0;
+    double BreakdownVoltage = 100.0; ///< For a Zener, the voltage it regulates at.
     double BreakdownCurrent = 1e-3;
     double JunctionCapacitance = 0.0;
     double JunctionPotential = 1.0;

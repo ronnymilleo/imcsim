@@ -26,7 +26,16 @@ public:
 
     CircuitCopy(const CircuitCopy &) = delete;
     CircuitCopy &operator=(const CircuitCopy &) = delete;
+
+    /**
+     * @brief   Moves ownership of the cloned parts and wired circuit from another copy.
+     */
     CircuitCopy(CircuitCopy &&) noexcept = default;
+
+    /**
+     * @brief   Moves ownership of the cloned parts and wired circuit from another copy.
+     * @return  Reference to `*this`.
+     */
     CircuitCopy &operator=(CircuitCopy &&) noexcept = default;
     ~CircuitCopy() = default;
 

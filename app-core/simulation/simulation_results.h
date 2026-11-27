@@ -53,10 +53,8 @@ struct ComponentTrace {
  *          second. A voltage source that delivers power therefore shows a negative current.
  */
 struct OperatingPoint {
-    /// Indexed by node number; node 0 is ground and always 0 V.
-    std::vector<double> NodeVoltages;
-    /// One per named component, in circuit order; ground carries none.
-    std::vector<ComponentCurrent> Currents;
+    std::vector<double> NodeVoltages;       ///< Indexed by node number; node 0 is ground and always 0 V.
+    std::vector<ComponentCurrent> Currents; ///< One per named component, in circuit order; ground carries none.
     /// Problems in the results that ngspice does not report, such as a diode in reverse breakdown.
     std::vector<std::string> Warnings;
 };
@@ -69,8 +67,7 @@ struct Transient {
     std::vector<double> Times;
     /// Indexed by node number, then by time point; node 0 is ground and always 0 V.
     std::vector<std::vector<double>> NodeVoltages;
-    /// One per named component, in circuit order, with a value per time point.
-    std::vector<ComponentTrace> Currents;
+    std::vector<ComponentTrace> Currents; ///< One per named component, in circuit order, with a value per time point.
     /// Problems in the results that ngspice does not report, such as a diode in reverse breakdown.
     std::vector<std::string> Warnings;
     /// False while the run still goes on and after a stop, when the points end before the stop time.
@@ -87,12 +84,10 @@ struct ACSweep {
     std::vector<double> Frequencies;
     /// Indexed by node number, then by frequency point; node 0 is ground and stays empty.
     std::vector<std::vector<double>> NodeMagnitudesDecibels;
-    /// Indexed as NodeMagnitudesDecibels.
-    std::vector<std::vector<double>> NodePhasesDegrees;
+    std::vector<std::vector<double>> NodePhasesDegrees; ///< Indexed as NodeMagnitudesDecibels.
     /// One per named component, in circuit order, with a value per frequency point.
     std::vector<ComponentTrace> CurrentMagnitudesDecibels;
-    /// Indexed as CurrentMagnitudesDecibels.
-    std::vector<ComponentTrace> CurrentPhasesDegrees;
+    std::vector<ComponentTrace> CurrentPhasesDegrees; ///< Indexed as CurrentMagnitudesDecibels.
 };
 
 /**
@@ -100,12 +95,10 @@ struct ACSweep {
  * @brief   Node voltages and component currents along a DC sweep, for one value of the stepped source.
  */
 struct DCSweepCurve {
-    /// Value of the stepped source for this curve; 0 when there is no stepped source.
-    double StepValue = 0.0;
+    double StepValue = 0.0; ///< Value of the stepped source for this curve; 0 when there is no stepped source.
     /// Indexed by node number, then by swept value; node 0 is ground and always 0 V.
     std::vector<std::vector<double>> NodeVoltages;
-    /// One per current, as in Transient, with a value per swept value.
-    std::vector<ComponentTrace> Currents;
+    std::vector<ComponentTrace> Currents; ///< One per current, as in Transient, with a value per swept value.
 };
 
 /**
@@ -116,14 +109,10 @@ struct DCSweepCurve {
 struct DCSweep {
     std::string SweptSource;
     std::string SweptUnit;
-    /// The X axis of every curve.
-    std::vector<double> SweptValues;
-    /// Empty when no source is stepped.
-    std::string SteppedSource;
-    /// Empty when no source is stepped.
-    std::string SteppedUnit;
-    /// One per value of the stepped source, or a single curve.
-    std::vector<DCSweepCurve> Curves;
+    std::vector<double> SweptValues;  ///< The X axis of every curve.
+    std::string SteppedSource;        ///< Empty when no source is stepped.
+    std::string SteppedUnit;          ///< Empty when no source is stepped.
+    std::vector<DCSweepCurve> Curves; ///< One per value of the stepped source, or a single curve.
 };
 
 /**
@@ -152,8 +141,7 @@ struct Noise {
     std::vector<double> InputDensities;
     double OutputTotal = 0.0;
     double InputTotal = 0.0;
-    /// Every part that adds noise, the largest total first.
-    std::vector<NoiseContribution> Contributions;
+    std::vector<NoiseContribution> Contributions; ///< Every part that adds noise, the largest total first.
 };
 
 /**
@@ -166,8 +154,7 @@ struct Noise {
 struct TransferFunction {
     int OutputNode = 0;
     std::string InputSource;
-    /// Unit of the input source, "V" or "A", which sets the unit of the gain.
-    std::string InputUnit;
+    std::string InputUnit; ///< Unit of the input source, "V" or "A", which sets the unit of the gain.
     double Gain = 0.0;
     double InputImpedance = 0.0;
     double OutputImpedance = 0.0;
@@ -187,8 +174,7 @@ struct PoleZeroRoot {
     double NaturalFrequencyHertz = 0.0;
     std::optional<double> QualityFactor;
     std::optional<double> DampingRatio;
-    /// A pole there makes the circuit unstable, or the solver failed to find it right.
-    bool IsRightHalfPlane = false;
+    bool IsRightHalfPlane = false; ///< A pole there makes the circuit unstable, or the solver failed to find it right.
 };
 
 /**
@@ -223,8 +209,7 @@ struct PoleZero {
  */
 struct SParameters {
     std::vector<double> Frequencies;
-    /// One reference impedance in ohms per port, in the order of the port numbers.
-    std::vector<double> ReferenceOhms;
+    std::vector<double> ReferenceOhms; ///< One reference impedance in ohms per port, in the order of the port numbers.
     std::vector<std::complex<double>> Values;
     /// Impedance matrix Z in ohms at each frequency, or none where the circuit has no finite one; empty for a backend
     /// that does not give it.
@@ -251,14 +236,11 @@ struct SParameters {
  */
 struct PartSensitivity {
     std::string Name;
-    /// Kind of the part, which tells how the schematic labels it.
-    ComponentType Type = ComponentType::RESISTOR;
+    ComponentType Type = ComponentType::RESISTOR; ///< Kind of the part, which tells how the schematic labels it.
     /// The element inside the block that has the largest normalized sensitivity, such as "R1"; empty for other parts.
     std::string Element;
-    /// Unit of the value of the part, as Component::GetUnit() gives it; empty for a gain.
-    std::string Unit;
-    /// None for an element inside a block, whose value the results do not carry.
-    std::optional<double> Value;
+    std::string Unit;            ///< Unit of the part's value, from Component::GetUnit(); empty for a gain.
+    std::optional<double> Value; ///< None for an element inside a block, whose value the results do not carry.
     double Absolute = 0.0;
     double Normalized = 0.0;
     /// Tolerance of the part in percent when the circuit sets one that varies, or none.
@@ -285,12 +267,10 @@ struct Sensitivity {
  */
 struct ACPartSensitivity {
     std::string Name;
-    /// Kind of the part, which tells how the schematic labels it.
-    ComponentType Type = ComponentType::RESISTOR;
+    ComponentType Type = ComponentType::RESISTOR; ///< Kind of the part, which tells how the schematic labels it.
     /// The element inside the block that has the largest effect, such as "R1"; empty for other parts.
     std::string Element;
-    /// Unit of the value of the part, as Component::GetUnit() gives it; empty for a gain.
-    std::string Unit;
+    std::string Unit; ///< Unit of the value of the part, as Component::GetUnit() gives it; empty for a gain.
     double Value = 0.0;
     /// Decibels the magnitude of the response changes by, at each frequency; none where the output is too small for a
     /// relative change to mean anything.
@@ -325,10 +305,8 @@ struct ACSensitivity {
  *          outputs depend on its history has none.
  */
 struct TruthTableRow {
-    /// Whether each input is high, in the order of TruthTable::InputNames.
-    std::vector<bool> InputsHigh;
-    /// One voltage per output node, in the order of TruthTable::OutputNodes.
-    std::vector<double> OutputVoltages;
+    std::vector<bool> InputsHigh;       ///< Whether each input is high, in the order of TruthTable::InputNames.
+    std::vector<double> OutputVoltages; ///< One voltage per output node, in the order of TruthTable::OutputNodes.
 
     bool HasOperatingPoint() const;
 };
@@ -359,21 +337,18 @@ struct ComponentPhasors {
  * @struct  HarmonicBalance
  * @brief   Periodic steady-state spectra and one-cycle waveforms solved in the frequency domain.
  * @details Phasors store peak complex amplitudes indexed from DC (0) to the highest harmonic, matching the
- *          real signal $x(t) = X_0 + \sum_{k=1}^{H} \operatorname{Re}(X_k e^{j k \omega_0 t})$.
+ *          real signal \f$x(t) = X_0 + \sum_{k=1}^{H} \mathrm{Re}(X_k e^{j k \omega_0 t})\f$.
  */
 struct HarmonicBalance {
     double FundamentalFrequency = 0.0;
     std::vector<double> Frequencies;
     /// Indexed by node number, then by harmonic index; node 0 is ground and stays zero.
     std::vector<std::vector<std::complex<double>>> NodePhasors;
-    /// One per named component, in circuit order.
-    std::vector<ComponentPhasors> CurrentPhasors;
-    /// Sample instants across one fundamental period $[0, T_0)$.
-    std::vector<double> Times;
+    std::vector<ComponentPhasors> CurrentPhasors; ///< One per named component, in circuit order.
+    std::vector<double> Times;                    ///< Sample instants across one fundamental period \f$[0, T_0)\f$.
     /// Reconstructed periodic voltage waveforms indexed by node number, then by time sample.
     std::vector<std::vector<double>> NodeWaveforms;
-    /// Reconstructed periodic current waveforms per component.
-    std::vector<ComponentTrace> CurrentWaveforms;
+    std::vector<ComponentTrace> CurrentWaveforms; ///< Reconstructed periodic current waveforms per component.
     std::vector<std::string> Warnings;
     int Iterations = 0;
     /// Solver strategy that converged: "linear", "direct", "source stepping", or "gmin stepping".
@@ -392,17 +367,29 @@ struct SimulationRun {
     std::vector<SimulatorMessage> Messages;
 };
 
+/// Outcome of a DC operating-point run.
 using OperatingPointRun = SimulationRun<OperatingPoint>;
+/// Outcome of a time-domain transient run.
 using TransientRun = SimulationRun<Transient>;
+/// Outcome of a small-signal AC frequency sweep run.
 using ACSweepRun = SimulationRun<ACSweep>;
+/// Outcome of a DC source sweep run.
 using DCSweepRun = SimulationRun<DCSweep>;
+/// Outcome of a small-signal noise analysis run.
 using NoiseRun = SimulationRun<Noise>;
+/// Outcome of a DC operating-point sensitivity run.
 using SensitivityRun = SimulationRun<Sensitivity>;
+/// Outcome of a small-signal AC sensitivity sweep run.
 using ACSensitivityRun = SimulationRun<ACSensitivity>;
+/// Outcome of a small-signal pole-zero analysis run.
 using PoleZeroRun = SimulationRun<PoleZero>;
+/// Outcome of an S-parameter sweep run.
 using SParametersRun = SimulationRun<SParameters>;
+/// Outcome of a small-signal DC transfer-function run.
 using TransferFunctionRun = SimulationRun<TransferFunction>;
+/// Outcome of a digital truth-table run.
 using TruthTableRun = SimulationRun<TruthTable>;
+/// Outcome of a periodic steady-state Harmonic Balance run.
 using HarmonicBalanceRun = SimulationRun<HarmonicBalance>;
 
 } // namespace Core

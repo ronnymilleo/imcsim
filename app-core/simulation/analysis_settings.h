@@ -26,6 +26,10 @@ struct TransientSettings {
     /// ngspice does not seed them.
     unsigned int Seed = 0;
 
+    /**
+     * @brief   Compares two TransientSettings values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const TransientSettings &) const = default;
 };
 
@@ -38,6 +42,10 @@ struct ACSweepSettings {
     double StopFrequency = 1e6;
     int PointsPerDecade = 20;
 
+    /**
+     * @brief   Compares two ACSweepSettings values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const ACSweepSettings &) const = default;
 };
 
@@ -53,6 +61,10 @@ struct SweepRange {
     double Stop = 5.0;
     double Step = 0.1;
 
+    /**
+     * @brief   Compares two SweepRange values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const SweepRange &) const = default;
 };
 
@@ -91,6 +103,10 @@ struct NoiseSettings {
     double StopFrequency = 100e3;
     int PointsPerDecade = 20;
 
+    /**
+     * @brief   Compares two NoiseSettings values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const NoiseSettings &) const = default;
 };
 
@@ -104,6 +120,10 @@ struct TransferFunctionSettings {
     int OutputNode = 0;
     std::string InputSource;
 
+    /**
+     * @brief   Compares two TransferFunctionSettings values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const TransferFunctionSettings &) const = default;
 };
 
@@ -118,6 +138,10 @@ struct PoleZeroSettings {
     int OutputNode = 0;
     std::string InputSource;
 
+    /**
+     * @brief   Compares two PoleZeroSettings values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const PoleZeroSettings &) const = default;
 };
 
@@ -139,6 +163,10 @@ struct SParameterSettings {
     int PointsPerDecade = 100;
     int LinearPoints = 101;
 
+    /**
+     * @brief   Compares two SParameterSettings values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const SParameterSettings &) const = default;
 };
 
@@ -150,6 +178,10 @@ struct SParameterSettings {
 struct SensitivitySettings {
     int OutputNode = 0;
 
+    /**
+     * @brief   Compares two SensitivitySettings values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const SensitivitySettings &) const = default;
 };
 
@@ -167,6 +199,10 @@ struct ACSensitivitySettings {
     double StopFrequency = 100e3;
     int PointsPerDecade = 20;
 
+    /**
+     * @brief   Compares two ACSensitivitySettings values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const ACSensitivitySettings &) const = default;
 };
 
@@ -179,6 +215,10 @@ struct TruthTableSettings {
     std::vector<std::string> Inputs;
     std::vector<int> OutputNodes;
 
+    /**
+     * @brief   Compares two TruthTableSettings values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const TruthTableSettings &) const = default;
 };
 
@@ -189,9 +229,12 @@ struct TruthTableSettings {
 struct HarmonicBalanceSettings {
     double FundamentalFrequency = 1e3;
     int Harmonics = 8;
-    /// Samples per fundamental period for AFT; 0 chooses an automatic power of two from Harmonics.
-    int Samples = 0;
+    int Samples = 0; ///< Samples per fundamental period for AFT; 0 chooses an automatic power of two from Harmonics.
 
+    /**
+     * @brief   Compares two HarmonicBalanceSettings values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const HarmonicBalanceSettings &) const = default;
 };
 

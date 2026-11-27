@@ -32,10 +32,8 @@ struct CrossSectionFigures {
     double EffectivePermittivity = 1.0;
     /// Share of the dielectric loss the wave sees: below 1 when part of the field runs in air, as on a microstrip.
     double FillingFactor = 1.0;
-    /// Conductor area the direct current flows through, in square meters.
-    double DcArea = 0.0;
-    /// The skin resistance per meter is the surface resistance times this, in 1/m.
-    double SkinFactor = 0.0;
+    double DcArea = 0.0;     ///< Conductor area the direct current flows through, in square meters.
+    double SkinFactor = 0.0; ///< The skin resistance per meter is the surface resistance times this, in 1/m.
 };
 
 using FiguresOrError = std::expected<CrossSectionFigures, std::string>;

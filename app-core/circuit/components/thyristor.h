@@ -57,6 +57,10 @@ struct ThyristorParameters {
     /// True for a TRIAC, which conducts both ways; the part sets it from its type and the editor leaves it alone.
     bool IsBidirectional = false;
 
+    /**
+     * @brief   Compares two ThyristorParameters values for equality.
+     * @return  True when all fields match.
+     */
     bool operator==(const ThyristorParameters &) const = default;
 };
 

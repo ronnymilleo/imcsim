@@ -132,6 +132,10 @@ double GetChannelGain(const IGBTParameters &parameters) {
     return parameters.Transconductance * parameters.Transconductance / (2.0 * parameters.TransconductanceCurrent);
 }
 
+/**
+ * @brief   Returns the SPICE subcircuit name written for an IGBT in exported netlists.
+ * @return  Null-terminated subcircuit name `"imcsim_igbt"`.
+ */
 const char *GetIGBTSubcircuitName() {
     return "imcsim_igbt";
 }
