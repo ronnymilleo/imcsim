@@ -43,8 +43,7 @@ struct ActiveMatrixTraces {
  * @brief   Everything the steps of a harmonic balance share, so a Newton iteration allocates nothing.
  */
 struct HbWorkspace {
-    /// Asked before each Newton iteration, or empty.
-    std::function<bool()> ShouldStop;
+    std::function<bool()> ShouldStop; ///< Asked before each Newton iteration, or empty.
     bool IsStopped = false; ///< Set once ShouldStop() asked for a stop, so the continuation strategies end too.
     /// True when the last evaluation of the residual met a device that has no value at the state, such as a behavioral
     /// source whose expression is out of range; the state it gave cannot be a solution.

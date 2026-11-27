@@ -29,6 +29,10 @@ using Complex = std::complex<double>;
 constexpr double TWO_PI = 2.0 * std::numbers::pi;
 constexpr double BOLTZMANN_CONSTANT = 1.380649e-23;
 
+/**
+ * @struct  TwoPortScattering
+ * @brief   Input reflection and forward transmission parameters of a symmetric two-port network.
+ */
 struct TwoPortScattering {
     Complex S11;
     Complex S21;
@@ -39,7 +43,10 @@ void RequireClose(const Complex actual, const Complex expected, const double tol
     CHECK_THAT(actual.imag(), WithinAbs(expected.imag(), tolerance));
 }
 
-/// Closed-form telegrapher scattering parameters of a uniform transmission line between port1_ohms and port2_ohms.
+/**
+ * @brief   Closed-form telegrapher scattering parameters of a uniform transmission line between port1_ohms and
+ *          port2_ohms.
+ */
 TwoPortScattering AnalyticalScattering(const Nodalys::TransmissionLineParameters &parameters,
                                        const double frequency,
                                        const double port1_ohms,

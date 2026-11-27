@@ -31,7 +31,9 @@ constexpr double DEGREES_PER_RADIAN = 180.0 / std::numbers::pi;
 using Values = std::map<std::string, double>;
 using CircuitMaker = std::function<Nodalys::Circuit(const Values &)>;
 
-/// Options that leave the operating point converged far below the size of the finite-difference steps.
+/**
+ * @brief   Options that leave the operating point converged far below the size of the finite-difference steps.
+ */
 Nodalys::ConvergenceOptions TightOptions() {
     return {.RelTol = 1e-12, .VoltageAbsTol = 1e-13, .CurrentAbsTol = 1e-18, .MaxIterations = 500};
 }
@@ -42,7 +44,9 @@ Nodalys::Circuit Finish(Nodalys::CircuitBuilder &builder) {
     return std::move(*circuit);
 }
 
-/// A single frequency, which is how a sweep of one point is asked.
+/**
+ * @brief   A single frequency, which is how a sweep of one point is asked.
+ */
 Nodalys::AcSensitivityConfig SingleFrequency(const int output, const std::string &source, const double frequency) {
     return {.OutputPositiveNode = output,
             .OutputNegativeNode = 0,
@@ -59,7 +63,9 @@ const Nodalys::AcElementSensitivity &FindElement(const Nodalys::AcSensitivityRes
     return *found;
 }
 
-/// The response of a node to the circuit's only AC source: magnitude in decibels and phase in degrees.
+/**
+ * @brief   The response of a node to the circuit's only AC source: magnitude in decibels and phase in degrees.
+ */
 Complex ReadResponse(const Nodalys::Circuit &circuit, const int node, const double frequency) {
     const Nodalys::AcSweepConfig config{.StartFrequency = frequency, .StopFrequency = frequency, .PointsPerDecade = 1};
     const auto sweep = Nodalys::ComputeACSweep(circuit, config, TightOptions());

@@ -35,7 +35,9 @@ std::string RcNetlist(const std::string &directive) {
     return "RC low-pass\n" + RC_PARTS + directive + "\n.end\n";
 }
 
-/// Runs the command line on a netlist given as its standard input; the exit code goes to `code`.
+/**
+ * @brief   Runs the command line on a netlist given as its standard input; the exit code goes to `code`.
+ */
 std::string RunCommandLine(const std::vector<std::string> &arguments, const std::string &netlist, int &code) {
     std::vector<const char *> argv{"nodalys"};
     for (const std::string &argument : arguments) {
@@ -55,14 +57,15 @@ const Nodalys::AcSensitivityConfig &GetAcConfig(const Nodalys::ParsedNetlist &pa
     return std::get<Nodalys::AcSensitivityConfig>(parsed.Analyses[index].Config);
 }
 
-/// What ParseNetlist says when it refuses the netlist.
 std::string FindRefusal(const std::string &netlist) {
     const auto parsed = Nodalys::ParseNetlist(netlist);
     REQUIRE_FALSE(parsed.has_value());
     return parsed.error();
 }
 
-/// The result of the engine for the RC of the tests, built without the parser.
+/**
+ * @brief   Runs ComputeAcSensitivity directly on the RC circuit of the tests, bypassing the CLI and exporters.
+ */
 Nodalys::AcSensitivityResult ComputeDirectly(const std::string &directive) {
     auto parsed = Nodalys::ParseNetlist(RcNetlist(directive));
     REQUIRE(parsed.has_value());
@@ -71,7 +74,9 @@ Nodalys::AcSensitivityResult ComputeDirectly(const std::string &directive) {
     return *result;
 }
 
-/// The cells of the CSV row that starts with a frequency, split at the commas.
+/**
+ * @brief   The cells of the CSV row that starts with a frequency, split at the commas.
+ */
 std::vector<std::string> FindCsvRow(const std::string &csv, const std::string &frequency) {
     std::istringstream lines(csv);
     std::string line;
