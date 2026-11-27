@@ -1,6 +1,6 @@
 /**
  * @file    nodalys_backend.cpp
- * @brief   The Nodalys simulation backend, which solves circuits with the autonomous Nodalys engine.
+ * @brief   The Nodalys simulation backend, which solves circuits with the clean-room Nodalys solver of imcsim.
  */
 
 #include "backends/nodalys/nodalys_backend.h"

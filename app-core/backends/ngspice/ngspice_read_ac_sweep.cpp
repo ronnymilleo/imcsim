@@ -51,7 +51,9 @@ void AddACCurrent(std::string name, const std::vector<std::complex<double>> &cur
     result.CurrentPhasesDegrees.push_back(std::move(phases));
 }
 
-// Voltage across the part times its admittance: 1/R for a resistor, j*2*pi*f*C for a capacitor
+/**
+ * @brief   Voltage across the part times its admittance: \f$1/R\f$ for a resistor, \f$j 2\pi f C\f$ for a capacitor.
+ */
 std::vector<std::complex<double>>
 PassiveACCurrent(const CircuitEntry &entry,
                  const std::vector<double> &frequencies,
@@ -88,9 +90,11 @@ bool HasACBranchCurrent(const ComponentType type) {
     return std::ranges::contains(BRANCH_CURRENT_TYPES, type);
 }
 
-// ngspice computes no device currents in .ac, so resistors, capacitors and current sources are worked out from
-// their node voltages and values; inductors and voltage sources have their branch current in the results. Probed
-// parts are read from their probes instead
+/**
+ * @brief   ngspice computes no device currents in `.ac`, so resistors, capacitors and current sources are worked out
+ *          from their node voltages and values; inductors and voltage sources have their branch current in the results.
+ *          Probed parts are read from their probes instead.
+ */
 std::expected<std::vector<std::complex<double>>, std::string>
 ACCurrent(const CircuitEntry &entry,
           const std::vector<double> &frequencies,

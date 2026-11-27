@@ -1,6 +1,6 @@
 /**
  * @file    exporters.cpp
- * @brief   Unified simulation result dispatchers and file writer helpers.
+ * @brief   Exports simulation results in Nutmeg SPICE rawfile, CSV, and JSON formats.
  */
 
 #include "nodalys/exporters.h"

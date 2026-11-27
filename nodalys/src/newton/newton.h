@@ -1,6 +1,7 @@
 /**
  * @file    newton.h
- * @brief   Newton-Raphson nonlinear solver iteration loop and convergence outcomes.
+ * @brief   Newton-Raphson driver of Nodalys: the iteration loop, its convergence test, and the homotopy
+ *          fallback strategies (`gmin stepping` and `source stepping`).
  */
 
 #ifndef NODALYS_NEWTON_H

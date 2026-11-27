@@ -1,6 +1,7 @@
 /**
  * @file    circuit_builder.cpp
- * @brief   Fluent programmatic C++ API to collect a CircuitDescription and compile it into a Nodalys Circuit.
+ * @brief   Fluent programmatic C++ API to construct a Nodalys circuit.
+ * @details Collects a CircuitDescription and compiles it into an immutable Nodalys Circuit.
  */
 
 #include "nodalys/circuit_builder.h"

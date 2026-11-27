@@ -1,6 +1,6 @@
 /**
  * @file    netlist_elements.cpp
- * @brief   Dispatches element lines of a SPICE netlist to passive, source, and device readers.
+ * @brief   Reads the element lines of a netlist, such as R1 or Q2, into the circuit being built.
  */
 
 #include "parser/netlist/netlist_elements.h"

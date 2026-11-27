@@ -1,6 +1,6 @@
 /**
  * @file    component.cpp
- * @brief   Circuit component model implementation.
+ * @brief   Circuit component model shared by the simulator core and the GUI.
  */
 
 #include "circuit/components/component.h"

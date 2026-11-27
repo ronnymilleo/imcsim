@@ -1,6 +1,6 @@
 /**
  * @file    wire_editing.cpp
- * @brief   Keeps wires attached to terminals that move and cleans up the segments left behind.
+ * @brief   Keeps wires attached to terminals that move, moves selected wires, and cleans up the segments left behind.
  */
 
 #include "schematic/wire_editing.h"
