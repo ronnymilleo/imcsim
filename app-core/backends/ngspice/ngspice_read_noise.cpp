@@ -86,8 +86,10 @@ bool IsDeviceOf(const std::string_view device, const std::vector<std::string> &e
     });
 }
 
-// Each part adds up the power of its devices, at every frequency and in total; parts whose noise does not reach the
-// output are left out
+/**
+ * @brief   Each part adds up the power of its devices, at every frequency and in total; parts whose noise does not
+ *          reach the output are left out.
+ */
 std::expected<std::vector<NoiseContribution>, std::string>
 ReadNoiseContributions(const Circuit &circuit, const NoisePlots &plots, const std::size_t point_count) {
     SendCommand(std::format("setplot {}", plots.Totals));

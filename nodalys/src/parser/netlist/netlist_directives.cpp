@@ -1,7 +1,6 @@
 /**
  * @file    netlist_directives.cpp
- * @brief   Reads the analysis directives of a netlist (.op, .tran, .dc, .ac, .tf, .noise, .sp, .pz, .sens, .hb) and
- *          dispatches settings directives.
+ * @brief   Reads the directives of a netlist, such as .tran and .options, into the analyses and settings it asks for.
  */
 
 #include "parser/netlist/netlist_directives.h"

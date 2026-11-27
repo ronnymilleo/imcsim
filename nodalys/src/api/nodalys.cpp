@@ -1,6 +1,7 @@
 /**
  * @file    nodalys.cpp
- * @brief   Public entry point forwarding simulation requests to internal solvers.
+ * @brief   Single-include umbrella header for the Nodalys simulation engine.
+ * @details Implements the top-level simulation entry points forwarding requests to the internal solvers.
  */
 
 #include "nodalys/nodalys.h"

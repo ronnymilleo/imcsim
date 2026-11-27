@@ -1,6 +1,7 @@
 /**
  * @file    circuit_compiler.cpp
- * @brief   Lowers a CircuitDescription into a CompiledCircuit with allocated MNA unknowns and late branch bindings.
+ * @brief   Compiles a collected CircuitDescription into an MNA CompiledCircuit with allocated unknowns and bound
+ *          control branches.
  */
 
 #include "compiler/circuit_compiler.h"
