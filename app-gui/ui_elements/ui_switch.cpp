@@ -65,6 +65,9 @@ void UISwitch::DrawSymbol(SchematicCanvas &canvas,
 
 /**
  * @brief   The name sits above whatever is drawn highest, and the state under the contacts.
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     color   Text color.
  */
 void UISwitch::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const float top = IsPushButton() ? RAISED_BAR_Y - STEM_LENGTH : OPEN_LEVER_TIP.y;

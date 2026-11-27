@@ -37,12 +37,9 @@ public:
 private:
     Schematic &m_Schematic;
     const ResultStore &m_Results;
-    /// The noise result the axes of its plot were fitted to.
-    TraceFitState m_Fit;
-    /// Visible range of the noise plot.
-    PlotSpan m_View;
-    /// The parts whose share the noise plot shows.
-    std::set<std::string> m_ShownContributions;
+    TraceFitState m_Fit;                        ///< The noise result the axes of its plot were fitted to.
+    PlotSpan m_View;                            ///< Visible range of the noise plot.
+    std::set<std::string> m_ShownContributions; ///< The parts whose share the noise plot shows.
     /// The shares the plot drew last frame, so its axes fit when they change.
     std::vector<std::string> m_PlottedContributions;
 

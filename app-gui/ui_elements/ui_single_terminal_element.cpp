@@ -54,9 +54,10 @@ std::vector<GridPoint> UISingleTerminalElement::GetLocalTerminals() const {
 
 /**
  * @brief   The way into the part runs along the lead.
+ * @param[in] terminal  Index in `GetLocalTerminals()` (always 0).
  * @return  A unit step from the terminal toward the end of the lead.
  */
-GridPoint UISingleTerminalElement::GetLocalTerminalInward(std::size_t /*terminal*/) const {
+GridPoint UISingleTerminalElement::GetLocalTerminalInward([[maybe_unused]] const std::size_t terminal) const {
     const ImVec2 lead_end = GetLeadEnd();
     return {GetStep(lead_end.x), GetStep(lead_end.y)};
 }

@@ -64,11 +64,9 @@ private:
     ExportStyle m_Style;
     FileDialog m_Dialog;
     std::optional<ExportFigure> m_PendingFigure;
-    /// A table written as it is, in place of a figure.
-    std::optional<std::string> m_PendingText;
+    std::optional<std::string> m_PendingText; ///< A table written as it is, in place of a figure.
     ExportFormat m_PendingFormat = ExportFormat::SVG;
-    /// Extension the file takes when the dialog leaves it out.
-    std::string m_PendingExtension;
+    std::string m_PendingExtension; ///< Extension the file takes when the dialog leaves it out.
     std::string m_Error;
 };
 

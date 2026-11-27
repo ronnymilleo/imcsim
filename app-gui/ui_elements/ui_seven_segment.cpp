@@ -120,6 +120,9 @@ void UISevenSegment::DrawReading(SchematicCanvas &canvas,
 
 /**
  * @brief   One lead per input, from its terminal to the left edge of the box.
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     color   Line color.
  */
 void UISevenSegment::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     for (const GridPoint terminal : GetLocalTerminals()) {
@@ -133,11 +136,15 @@ void UISevenSegment::DrawTerminals(SchematicCanvas &canvas, const ViewTransform 
 
 /**
  * @brief   The box and the outline of every segment; the result fills them through DrawReading().
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     color   Line color.
+ * @param[in]     style   Drawing standard (unused; display box is identical in IEC and ANSI).
  */
 void UISevenSegment::DrawSymbol(SchematicCanvas &canvas,
                                 const ViewTransform &view,
                                 const ImU32 color,
-                                const SymbolStyle /*style*/) const {
+                                [[maybe_unused]] const SymbolStyle style) const {
     const std::array<ImVec2, 4> box = {LocalToScreen(view, BOX_LEFT, BOX_TOP),
                                        LocalToScreen(view, BOX_RIGHT, BOX_TOP),
                                        LocalToScreen(view, BOX_RIGHT, BOX_BOTTOM),
@@ -150,6 +157,9 @@ void UISevenSegment::DrawSymbol(SchematicCanvas &canvas,
 
 /**
  * @brief   The name of each input inside the box, next to its lead; the display has no name or value to show.
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     color   Text color.
  */
 void UISevenSegment::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const std::vector<GridPoint> terminals = GetLocalTerminals();
@@ -165,6 +175,7 @@ void UISevenSegment::DrawLabels(SchematicCanvas &canvas, const ViewTransform &vi
 
 /**
  * @brief   One input per segment down the left of the box, a at the top and g at the bottom.
+ * @return  Seven input terminals in `Core::SEGMENT_NAMES` order, in local grid units.
  */
 std::vector<GridPoint> UISevenSegment::GetLocalTerminals() const {
     std::vector<GridPoint> terminals;
@@ -176,8 +187,10 @@ std::vector<GridPoint> UISevenSegment::GetLocalTerminals() const {
 
 /**
  * @brief   Every lead goes right, into the box, even the inputs at its top and bottom.
+ * @param[in] terminal  Index in `GetLocalTerminals()`.
+ * @return  Unit step `{1, 0}` pointing right into the display box.
  */
-GridPoint UISevenSegment::GetLocalTerminalInward(std::size_t /*terminal*/) const {
+GridPoint UISevenSegment::GetLocalTerminalInward([[maybe_unused]] const std::size_t terminal) const {
     return {1, 0};
 }
 

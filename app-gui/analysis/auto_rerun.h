@@ -16,20 +16,13 @@ namespace GUI {
  * @brief   What the program is doing this frame, as far as running again by itself is concerned.
  */
 struct AutoRerunFrame {
-    /// The user's preference to run again after edits.
-    bool IsEnabled = false;
-    /// How long an edit must settle before the analysis runs again.
-    double SettleSeconds = 0.0;
-    /// Seconds on any clock that only goes forward.
-    double Time = 0.0;
-    /// Changes with each edit that drops the results.
-    std::size_t CircuitVersion = 0;
-    /// Changes with each schematic opened or created.
-    std::size_t DocumentVersion = 0;
-    /// The selected analysis has a result or an error to follow, or is running.
-    bool HasRunToFollow = false;
-    /// A field is being typed in or something is being dragged, so the edit is not over yet.
-    bool IsEditing = false;
+    bool IsEnabled = false;          ///< The user's preference to run again after edits.
+    double SettleSeconds = 0.0;      ///< How long an edit must settle before the analysis runs again.
+    double Time = 0.0;               ///< Seconds on any clock that only goes forward.
+    std::size_t CircuitVersion = 0;  ///< Changes with each edit that drops the results.
+    std::size_t DocumentVersion = 0; ///< Changes with each schematic opened or created.
+    bool HasRunToFollow = false;     ///< The selected analysis has a result or an error to follow, or is running.
+    bool IsEditing = false; ///< A field is being typed in or something is being dragged, so the edit is not over yet.
     /// The next run would be a Monte Carlo analysis, which can take up to a thousand runs, so it is never started by an
     /// edit; the user starts it with Run.
     bool IsMonteCarlo = false;
@@ -54,8 +47,7 @@ private:
     std::optional<std::size_t> m_SeenCircuitVersion;
     std::optional<std::size_t> m_SeenDocumentVersion;
     bool m_IsFollowing = false;
-    /// Time of the last edit while a run is due.
-    std::optional<double> m_DueSince;
+    std::optional<double> m_DueSince; ///< Time of the last edit while a run is due.
 };
 
 } // namespace GUI

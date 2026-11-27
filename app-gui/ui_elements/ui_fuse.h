@@ -29,10 +29,8 @@ protected:
     void DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const override;
 
 private:
-    /// Whether the result on display shows the fuse open.
-    bool m_IsBlown = false;
-    /// Strength of the flash of the blow, from 0 (none) to 1 (the instant it blew).
-    float m_FlashLevel = 0.0f;
+    bool m_IsBlown = false;    ///< Whether the result on display shows the fuse open.
+    float m_FlashLevel = 0.0f; ///< Strength of the flash of the blow, from 0 (none) to 1 (the instant it blew).
 
     void DrawFlash(SchematicCanvas &canvas, const ViewTransform &view) const;
 };

@@ -50,10 +50,8 @@ struct WorldBounds {
  * @brief   The size of the head of an arrow drawn on a symbol, in local grid units.
  */
 struct ArrowHead {
-    /// From the tip back to the base, along the arrow.
-    float Length = 0.0f;
-    /// From the axis of the arrow to each corner of the base.
-    float HalfWidth = 0.0f;
+    float Length = 0.0f;    ///< From the tip back to the base, along the arrow.
+    float HalfWidth = 0.0f; ///< From the axis of the arrow to each corner of the base.
 };
 
 /**
@@ -61,12 +59,9 @@ struct ArrowHead {
  * @brief   A row of half-circle turns, as on an inductor or a transformer, in local grid units.
  */
 struct CoilTurns {
-    /// Where the first turn starts, on the axis of the coil.
-    ImVec2 Start;
-    /// Unit vector along the coil, from the first turn to the last.
-    ImVec2 Axis;
-    /// Unit vector toward the side the turns bulge to.
-    ImVec2 Bulge;
+    ImVec2 Start; ///< Where the first turn starts, on the axis of the coil.
+    ImVec2 Axis;  ///< Unit vector along the coil, from the first turn to the last.
+    ImVec2 Bulge; ///< Unit vector toward the side the turns bulge to.
     int TurnCount = 0;
     float TurnRadius = 0.0f;
 };

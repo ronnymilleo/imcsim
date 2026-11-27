@@ -30,12 +30,9 @@ public:
 private:
     Schematic &m_Schematic;
     const ResultStore &m_Results;
-    /// Whether the axes are linear instead of symmetric logarithmic.
-    bool m_IsLinear = false;
-    /// The result the axes of the plot were fitted to.
-    std::size_t m_FittedVersion = 0;
-    /// The scale the limits of the plot were last set for.
-    bool m_FittedLinear = false;
+    bool m_IsLinear = false;         ///< Whether the axes are linear instead of symmetric logarithmic.
+    std::size_t m_FittedVersion = 0; ///< The result the axes of the plot were fitted to.
+    bool m_FittedLinear = false;     ///< The scale the limits of the plot were last set for.
 
     void DrawSummary(const Core::PoleZero &result);
     void DrawPlane(const Core::PoleZero &result);

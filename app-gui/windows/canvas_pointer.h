@@ -17,10 +17,8 @@ namespace GUI {
  */
 struct CanvasPointer {
     const ViewTransform &View;
-    /// Pixels per grid unit.
-    float Zoom;
-    /// Whether the cursor is over the canvas, and no live part took the mouse where that matters.
-    bool IsHovered;
+    float Zoom;     ///< Pixels per grid unit.
+    bool IsHovered; ///< Whether the cursor is over the canvas, and no live part took the mouse where that matters.
 
     ImVec2 GetWorldPosition() const;
     float GetPickTolerance() const;

@@ -34,9 +34,12 @@ struct ShownTransient {
  */
 struct FuseDisplay {
     bool IsBlown = false;
-    /// Strength of the flash that marks the blow, from 0 to 1.
-    float FlashLevel = 0.0f;
+    float FlashLevel = 0.0f; ///< Strength of the flash that marks the blow, from 0 to 1.
 
+    /**
+     * @brief   Checks whether two FuseDisplay instances hold equal values.
+     * @return  True when every field is equal.
+     */
     bool operator==(const FuseDisplay &) const = default;
 };
 
@@ -62,8 +65,7 @@ private:
     std::optional<std::size_t> m_BlowTimesVersion;
     /// Whether each element was a fuse shown open in the last frame; empty when that frame showed no transient.
     std::vector<bool> m_WasBlown;
-    /// When the screen clock last saw each fuse blow, by element.
-    std::vector<double> m_BlownSince;
+    std::vector<double> m_BlownSince; ///< When the screen clock last saw each fuse blow, by element.
 
     void ReadBlowTimes(const std::vector<std::unique_ptr<UIElement>> &elements,
                        const Connectivity &connectivity,

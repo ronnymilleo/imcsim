@@ -59,14 +59,10 @@ enum class ChartCoverage {
  */
 struct StabilityBoundary {
     BoundaryShape Shape = BoundaryShape::NONE;
-    /// The center of a circle, or the point of a line nearest to the origin.
-    std::complex<double> Center;
-    /// The radius of a circle.
-    double Radius = 0.0;
-    /// For a line, the unit vector from it toward the stable side.
-    std::complex<double> StableNormal;
-    /// For a circle, whether the stable terminations are inside it, as against outside.
-    bool IsStableInside = false;
+    std::complex<double> Center;       ///< The center of a circle, or the point of a line nearest to the origin.
+    double Radius = 0.0;               ///< The radius of a circle.
+    std::complex<double> StableNormal; ///< For a line, the unit vector from it toward the stable side.
+    bool IsStableInside = false; ///< For a circle, whether the stable terminations are inside it, as against outside.
     ChartCoverage Coverage = ChartCoverage::ENTIRELY_STABLE;
 };
 
@@ -75,10 +71,8 @@ struct StabilityBoundary {
  * @brief   The two boundaries of a two-port at one frequency.
  */
 struct StabilityCircles {
-    /// On the plane of the reflection coefficient of the source.
-    StabilityBoundary Source;
-    /// On the plane of the reflection coefficient of the load.
-    StabilityBoundary Load;
+    StabilityBoundary Source; ///< On the plane of the reflection coefficient of the source.
+    StabilityBoundary Load;   ///< On the plane of the reflection coefficient of the load.
 };
 
 /**

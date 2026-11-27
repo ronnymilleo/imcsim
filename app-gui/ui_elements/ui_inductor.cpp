@@ -30,11 +30,15 @@ UIInductor::UIInductor(const GridPoint position, const Rotation rotation)
 
 /**
  * @brief   Four turns from one lead to the other, bulging toward -Y.
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     color   Line color.
+ * @param[in]     style   Drawing standard (unused; coil turns are identical in IEC and ANSI).
  */
 void UIInductor::DrawSymbol(SchematicCanvas &canvas,
                             const ViewTransform &view,
                             const ImU32 color,
-                            SymbolStyle /*style*/) const {
+                            [[maybe_unused]] const SymbolStyle style) const {
     DrawCoilTurns(canvas,
                   view,
                   {.Start = {SYMBOL_START, 0.0f},

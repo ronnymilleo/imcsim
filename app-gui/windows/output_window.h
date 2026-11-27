@@ -85,8 +85,7 @@ private:
 
     // Math channels
     MathChannels m_MathChannels;
-    /// The panel of the logic buses, which the transient plot draws as lanes of numbers.
-    LogicBuses m_Buses;
+    LogicBuses m_Buses; ///< The panel of the logic buses, which the transient plot draws as lanes of numbers.
     /// Over the whole run, or none while it grows; the plot of a run in progress evaluates the window instead.
     std::optional<FullMath> m_FullMath;
 
@@ -102,14 +101,11 @@ private:
     SParameterTab m_SParameterTab;
     HarmonicBalanceTab m_HarmonicBalanceTab;
     MonteCarloTab m_MonteCarloTab;
-    /// The tab shown this frame, which Export saves.
-    PlotTab m_ShownTab = PlotTab::TRANSIENT;
-    /// Tab to bring to the front on the next frame, after a new result.
-    std::optional<PlotTab> m_TabToShow;
+    PlotTab m_ShownTab = PlotTab::TRANSIENT; ///< The tab shown this frame, which Export saves.
+    std::optional<PlotTab> m_TabToShow;      ///< Tab to bring to the front on the next frame, after a new result.
     /// The tab the user is on, which the bar keeps while its result is gone; none before the first result.
     std::optional<PlotTab> m_KeptTab;
-    /// The tabs without a result, which More lists.
-    std::vector<PlotTab> m_OtherTabs;
+    std::vector<PlotTab> m_OtherTabs; ///< The tabs without a result, which More lists.
 
     PlotExporter m_Exporter;
 

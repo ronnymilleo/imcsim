@@ -46,8 +46,7 @@ public:
     Draw(const ContextMenuServices &services, Analysis selected_analysis, bool is_editing_block);
 
 private:
-    /// What the right click was on, for the measure item of the menu.
-    std::optional<MeasurementTarget> m_Target;
+    std::optional<MeasurementTarget> m_Target; ///< What the right click was on, for the measure item of the menu.
 };
 
 } // namespace GUI

@@ -24,6 +24,10 @@ namespace GUI {
  *          a piecewise linear source are one text of "time value" pairs.
  */
 struct SourceFields {
+    /**
+     * @enum    ImportKind
+     * @brief   File format being chosen in the PWL waveform import dialog.
+     */
     enum class ImportKind {
         CSV,
         WAV
@@ -36,10 +40,8 @@ struct SourceFields {
     std::array<ValueField, 5> AM;
     std::array<ValueField, 8> Noise;
     std::array<ValueField, 4> Random;
-    /// The "time value" points of a PWL source being typed, as long as the user wants them.
-    std::string PWLText;
-    /// Full-scale amplitude used when importing a normalized WAV recording into PWL points.
-    ValueField WavPeak;
+    std::string PWLText; ///< The "time value" points of a PWL source being typed, as long as the user wants them.
+    ValueField WavPeak;  ///< Full-scale amplitude used when importing a normalized WAV recording into PWL points.
     double WavPeakValue = 1.0;
     FileDialog PWLImportDialog;
     ImportKind PendingImportKind = ImportKind::CSV;

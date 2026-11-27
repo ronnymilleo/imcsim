@@ -40,6 +40,9 @@ UITransmissionLine::UITransmissionLine(const GridPoint position, const Rotation 
 /**
  * @brief   Draws the port 1 and port 2 leads: + terminals bend to the center conductor axis, - terminals tap the bottom
  *          of the outer shield.
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     color   Line color.
  */
 void UITransmissionLine::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const std::array<ImVec2, 3> left_signal = {LocalToScreen(view, -2.0f, -1.0f),
@@ -120,6 +123,9 @@ void UITransmissionLine::DrawSymbol(SchematicCanvas &canvas,
 
 /**
  * @brief   The name above, and the characteristic impedance with propagation delay (such as "50 Ohm 1ns") below.
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     color   Text color.
  */
 void UITransmissionLine::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const auto &line = static_cast<const Core::TransmissionLine &>(GetComponent());

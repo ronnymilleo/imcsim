@@ -41,11 +41,9 @@ struct FrameResults {
     std::vector<std::string> TransientErrors;
     /// The math channels over the whole transient, or null while a run grows; owned by the window.
     const FullMath *WholeRunMath = nullptr;
-    /// One list of channels per curve of the DC sweep.
-    std::vector<std::vector<MathTrace>> DCSweepMath;
+    std::vector<std::vector<MathTrace>> DCSweepMath; ///< One list of channels per curve of the DC sweep.
     std::vector<std::string> DCSweepErrors;
-    /// The math channels over the AC sweep shown, on the complex values of its traces.
-    ACMathTraces ACSweepMath;
+    ACMathTraces ACSweepMath; ///< The math channels over the AC sweep shown, on the complex values of its traces.
     std::vector<std::string> ACSweepErrors;
     bool AnythingMeasured = false;
 };

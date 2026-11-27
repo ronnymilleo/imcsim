@@ -37,11 +37,9 @@ protected:
 private:
     /// Where the body of an ANSI gate is, in local grid units.
     struct GateBody {
-        /// The x where the body ends and the output lead starts.
-        float Tip = 0.0f;
+        float Tip = 0.0f; ///< The x where the body ends and the output lead starts.
         float HalfHeight = 0.0f;
-        /// The y of the middle of the body, where the output is.
-        float Center = 0.0f;
+        float Center = 0.0f; ///< The y of the middle of the body, where the output is.
     };
 
     // Layout

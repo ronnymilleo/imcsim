@@ -21,8 +21,7 @@ namespace GUI {
 struct RailEntry {
     std::string_view Name;
     std::span<const Core::ComponentType> Parts;
-    /// The ready logic blocks, which come from their own list rather than Parts.
-    bool IsReadyBlocks = false;
+    bool IsReadyBlocks = false; ///< The ready logic blocks, which come from their own list rather than Parts.
 
     bool IsGroup() const;
 };

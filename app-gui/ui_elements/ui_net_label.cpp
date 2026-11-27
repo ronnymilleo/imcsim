@@ -41,6 +41,9 @@ void UINetLabel::DrawSymbol(SchematicCanvas &canvas,
 
 /**
  * @brief   The name of the net stands where parts show their name; a label with none shows a question mark.
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     color   Text color.
  */
 void UINetLabel::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const std::string &net = static_cast<const Core::NetLabel &>(GetComponent()).GetNet();
@@ -53,6 +56,7 @@ LocalBounds UINetLabel::GetLocalBounds() const {
 
 /**
  * @brief   The terminal is at the foot of the symbol, and its lead goes up to the circle.
+ * @return  Bottom of the net-label circle in local grid units.
  */
 ImVec2 UINetLabel::GetLeadEnd() const {
     return {0.0f, -LEAD_LENGTH};

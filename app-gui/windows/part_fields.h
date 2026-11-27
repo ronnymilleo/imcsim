@@ -29,6 +29,9 @@ struct ParameterField {
 
 /**
  * @brief   Loads the text of every field from the members of the parameters.
+ * @param[in]     fields        Descriptors mapping each UI field to a struct member and display scale.
+ * @param[in,out] value_fields  Value input widgets to populate.
+ * @param[in]     parameters    Current parameter values of the component.
  */
 template <typename Parameters, std::size_t Count>
 void LoadParameterFields(const std::array<ParameterField<Parameters>, Count> &fields,
@@ -42,7 +45,12 @@ void LoadParameterFields(const std::array<ParameterField<Parameters>, Count> &fi
 /**
  * @brief   Draws one field per member and applies a valid edit to the parameters; each value is checked by trying it in
  *          a copy of the whole set, since some limits depend on several members.
- * @details Returns whether a value changed.
+ * @param[in]     fields        Descriptors mapping each UI field to a struct member, unit and display scale.
+ * @param[in,out] value_fields  Value input widgets holding the edited texts.
+ * @param[in]     source_unit   Fallback unit used for fields whose own unit is null.
+ * @param[in]     is_valid      Whole-struct predicate validating a candidate parameter set.
+ * @param[in,out] parameters    Parameter struct updated in place when any field produces a valid edit.
+ * @return  True when at least one parameter member changed this frame.
  */
 template <typename Parameters, std::size_t Count>
 bool DrawParameterFields(const std::array<ParameterField<Parameters>, Count> &fields,

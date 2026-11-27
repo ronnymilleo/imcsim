@@ -133,6 +133,9 @@ CursorReading ReadCursorDecades(const PlotCursors &cursors) {
 
 /**
  * @brief   Writes a measured value with four significant digits, a SPICE suffix and its unit, such as "4.700kOhm".
+ * @param[in] value  Numeric quantity to format.
+ * @param[in] unit   Unit suffix appended after the SPICE scale prefix.
+ * @return  Formatted measurement string with unit.
  */
 std::string FormatQuantity(const double value, const char *unit) {
     return std::format("{}{}", Core::FormatMeasurement(value), unit);
@@ -141,6 +144,9 @@ std::string FormatQuantity(const double value, const char *unit) {
 /**
  * @brief   Writes a value with two decimals and its unit: decibels and degrees read better with fixed decimals than
  *          with SPICE suffixes, which would show 500m dB.
+ * @param[in] value  Numeric value to format.
+ * @param[in] unit   Unit suffix appended directly after the two-decimal number.
+ * @return  Fixed two-decimal string with unit.
  */
 std::string FormatFixed(const double value, const char *unit) {
     return Core::FormatFixed(value, 2) + unit;
@@ -148,6 +154,9 @@ std::string FormatFixed(const double value, const char *unit) {
 
 /**
  * @brief   Writes a value with its suffix and unit, or "-" for no value.
+ * @param[in] value  Optional numeric quantity to format.
+ * @param[in] unit   Unit suffix appended when value is present.
+ * @return  Formatted measurement string, or "-" when value is empty.
  */
 std::string FormatOptionalQuantity(const std::optional<double> value, const char *unit) {
     return value ? FormatQuantity(*value, unit) : "-";
@@ -155,6 +164,8 @@ std::string FormatOptionalQuantity(const std::optional<double> value, const char
 
 /**
  * @brief   Draws a two-column row of a statistics table: what is measured and its value.
+ * @param[in] name   Label shown muted in the first column.
+ * @param[in] value  Formatted value text shown in the second column.
  */
 void DrawStatistic(const char *name, const std::string &value) {
     ImGui::TableNextRow();

@@ -53,8 +53,7 @@ struct Harmonic {
  */
 struct HarmonicAnalysis {
     double Mean = 0.0;
-    /// The fundamental first; empty when the trace holds no tone.
-    std::vector<Harmonic> Harmonics;
+    std::vector<Harmonic> Harmonics; ///< The fundamental first; empty when the trace holds no tone.
     /// Root sum of squares of the harmonics over the fundamental; no value without a fundamental and a second harmonic.
     std::optional<double> TotalDistortion;
     /// Periods of the fundamental the span must hold, when it holds fewer: the peaks of the mean, the fundamental and
@@ -74,8 +73,7 @@ struct NoiseBand {
     /// the middle median of the slices of the band within 3 dB of the highest, so that a part of the band past the
     /// noise does not pull it down.
     double Density = 0.0;
-    /// Root of the noise power in the band, in the unit of the trace.
-    double TotalRms = 0.0;
+    double TotalRms = 0.0; ///< Root of the noise power in the band, in the unit of the trace.
 };
 
 std::size_t ChooseSpectrumSampleCount(std::span<const double> xs, double from, double to);

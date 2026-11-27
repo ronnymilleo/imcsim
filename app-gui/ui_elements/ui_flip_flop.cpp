@@ -78,11 +78,15 @@ void UIFlipFlop::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &vie
 
 /**
  * @brief   The box, with the small triangle that marks the clock input.
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     color   Line color.
+ * @param[in]     style   Drawing standard (unused; flip-flop box is identical in IEC and ANSI).
  */
 void UIFlipFlop::DrawSymbol(SchematicCanvas &canvas,
                             const ViewTransform &view,
                             const ImU32 color,
-                            SymbolStyle /*style*/) const {
+                            [[maybe_unused]] const SymbolStyle style) const {
     const float half_height = GetHalfHeight();
     const ImVec2 box[4] = {LocalToScreen(view, -FLIP_FLOP_HALF_WIDTH, -half_height),
                            LocalToScreen(view, FLIP_FLOP_HALF_WIDTH, -half_height),
@@ -102,6 +106,9 @@ void UIFlipFlop::DrawSymbol(SchematicCanvas &canvas,
 /**
  * @brief   The name above the end of the SET lead, which is a unit over the box, and the names of the pins inside the
  *          box; the clock input shows its marker instead of a name.
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     color   Text color.
  */
 void UIFlipFlop::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const float half_height = GetHalfHeight();

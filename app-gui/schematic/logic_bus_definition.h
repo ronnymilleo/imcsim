@@ -39,6 +39,10 @@ struct LogicBus {
     BusFormat Format = BusFormat::HEXADECIMAL;
     bool Shown = true;
 
+    /**
+     * @brief   Checks whether two LogicBus instances hold equal values.
+     * @return  True when every field is equal.
+     */
     bool operator==(const LogicBus &) const = default;
 };
 

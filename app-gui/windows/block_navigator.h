@@ -26,8 +26,7 @@ namespace GUI {
  * @brief   The parts of the editor that follow the schematic on show, which start over when it changes.
  */
 struct ShownSchematicFollowers {
-    /// The mode of the editor; a drag or a part on its way belongs to the schematic it started on.
-    EditorMode &Mode;
+    EditorMode &Mode; ///< The mode of the editor; a drag or a part on its way belongs to the schematic it started on.
     PartEditor &Part;
     SchematicOverlays &Overlays;
     CanvasView &View;
@@ -68,8 +67,7 @@ public:
 
 private:
     BlockSession m_Session;
-    /// Changes the pins and parameter defaults of a block kept as SPICE text.
-    SpiceSettingsDialog m_SpiceSettings;
+    SpiceSettingsDialog m_SpiceSettings; ///< Changes the pins and parameter defaults of a block kept as SPICE text.
     ShownSchematicFollowers m_Followers;
 
     void EndDragOfShown();

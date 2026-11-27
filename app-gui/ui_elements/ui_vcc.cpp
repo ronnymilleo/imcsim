@@ -43,6 +43,9 @@ void UIVCC::DrawSymbol(SchematicCanvas &canvas,
 
 /**
  * @brief   The rail is labeled by its role and voltage past the bar; the SPICE name (V1) only matters in the netlist.
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     color   Text color.
  */
 void UIVCC::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const std::string label = std::format("VCC {}V", Core::FormatValue(GetComponent().GetValue()));
@@ -55,6 +58,7 @@ LocalBounds UIVCC::GetLocalBounds() const {
 
 /**
  * @brief   The terminal is at the middle of the symbol, and its lead goes up to the bar.
+ * @return  Center of the supply rail bar in local grid units.
  */
 ImVec2 UIVCC::GetLeadEnd() const {
     return {0.0f, -LEAD_LENGTH};

@@ -23,12 +23,9 @@ namespace GUI {
  *          same point.
  */
 struct ReadoutAnchor {
-    /// The point whose node the readout shows.
-    GridPoint Point;
-    /// One end of what the readout sits beside, in world units.
-    ImVec2 Start;
-    /// The other end, in world units.
-    ImVec2 End;
+    GridPoint Point; ///< The point whose node the readout shows.
+    ImVec2 Start;    ///< One end of what the readout sits beside, in world units.
+    ImVec2 End;      ///< The other end, in world units.
 };
 
 /**
@@ -36,8 +33,7 @@ struct ReadoutAnchor {
  * @brief   The readout of one node and where it sits.
  */
 struct NodeReadout {
-    /// The node, above ground and with a voltage in the result.
-    std::size_t Node = 0;
+    std::size_t Node = 0; ///< The node, above ground and with a voltage in the result.
     ReadoutAnchor Anchor;
 };
 

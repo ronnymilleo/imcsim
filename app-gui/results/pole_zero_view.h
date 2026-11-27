@@ -20,14 +20,11 @@ namespace GUI {
  * @brief   One row of the table: a pole or a zero, with a conjugate pair on one row.
  */
 struct PoleZeroRow {
-    /// "pole" or "zero".
-    std::string Kind;
+    std::string Kind; ///< "pole" or "zero".
     std::string Real;
-    /// The imaginary part of a pair, with "+/-" in front; "0" for a real root.
-    std::string Imaginary;
+    std::string Imaginary; ///< The imaginary part of a pair, with "+/-" in front; "0" for a real root.
     std::string Frequency;
-    /// "-" for a real root and "inf" for a pair on the imaginary axis.
-    std::string Quality;
+    std::string Quality; ///< "-" for a real root and "inf" for a pair on the imaginary axis.
     std::string Damping;
     bool IsRightHalfPlane = false;
 };

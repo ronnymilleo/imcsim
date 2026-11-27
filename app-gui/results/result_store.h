@@ -120,14 +120,10 @@ private:
     std::optional<Core::OperatingPoint> m_OperatingPoint;
     /// Every step of the last stepped operating point; m_OperatingPoint holds the selected one.
     std::optional<StepFamily<Core::OperatingPoint>> m_OperatingPointSteps;
-    /// The transient the views read; for a stepped run, its selected step.
-    std::optional<Core::Transient> m_Transient;
-    /// Every step of a stepped transient, or none.
-    std::optional<StepFamily<Core::Transient>> m_TransientSteps;
-    /// The AC sweep the views read; for a stepped run, its selected step.
-    std::optional<Core::ACSweep> m_ACSweep;
-    /// Every step of a stepped AC sweep, or none.
-    std::optional<StepFamily<Core::ACSweep>> m_ACSweepSteps;
+    std::optional<Core::Transient> m_Transient; ///< The transient the views read; for a stepped run, its selected step.
+    std::optional<StepFamily<Core::Transient>> m_TransientSteps; ///< Every step of a stepped transient, or none.
+    std::optional<Core::ACSweep> m_ACSweep; ///< The AC sweep the views read; for a stepped run, its selected step.
+    std::optional<StepFamily<Core::ACSweep>> m_ACSweepSteps; ///< Every step of a stepped AC sweep, or none.
     std::optional<Core::DCSweep> m_DCSweep;
     /// What every run of the last Monte Carlo analysis drew and measured, or none.
     std::optional<MonteCarloTable> m_MonteCarlo;
@@ -145,8 +141,7 @@ private:
     // Result versions, which change with every new result, so windows can tell a rerun from one they showed
     std::size_t m_OperatingPointVersion = 0;
     std::size_t m_TransientVersion = 0;
-    /// Also counts the chunks added to a transient that is still being made.
-    std::size_t m_TransientDataVersion = 0;
+    std::size_t m_TransientDataVersion = 0; ///< Also counts the chunks added to a transient that is still being made.
     std::size_t m_ACSweepVersion = 0;
     std::size_t m_DCSweepVersion = 0;
     std::size_t m_MonteCarloVersion = 0;

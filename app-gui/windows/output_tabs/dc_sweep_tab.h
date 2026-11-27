@@ -39,8 +39,7 @@ private:
     /// What the plot showed last frame, so its axes fit for a new result and when its traces change.
     TraceFitState m_Fit;
     PlotCursors m_Cursors;
-    /// The visible range of the swept source, which the statistics measure.
-    PlotSpan m_View;
+    PlotSpan m_View; ///< The visible range of the swept source, which the statistics measure.
 
     void DrawPlot(const Core::DCSweep &sweep, const std::vector<std::vector<MathTrace>> &math);
     void DrawStatistics(const Core::DCSweep &sweep, const std::vector<std::vector<MathTrace>> &math);

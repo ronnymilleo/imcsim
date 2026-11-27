@@ -22,6 +22,10 @@ struct Dimension {
     int Seconds = 0;
     bool Known = true;
 
+    /**
+     * @brief   Checks whether two Dimension instances hold equal values.
+     * @return  True when every field is equal.
+     */
     bool operator==(const Dimension &) const = default;
 };
 

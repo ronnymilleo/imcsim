@@ -34,6 +34,9 @@ UIBehavioralSource::UIBehavioralSource(const Core::ComponentType type,
 
 /**
  * @brief   The name above, the expression below, both to the right of the diamond.
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     color   Text color.
  */
 void UIBehavioralSource::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     DrawNameAndValue(canvas, view, FormatBehavioralLabel(GetSource()), color);
@@ -49,6 +52,7 @@ LocalBounds UIBehavioralSource::GetLocalBounds() const {
 
 /**
  * @brief   A behavioral voltage source sets a voltage, and a behavioral current source a current.
+ * @return  True for `BEHAVIORAL_VOLTAGE`, false for `BEHAVIORAL_CURRENT`.
  */
 bool UIBehavioralSource::SetsVoltage() const {
     return GetComponent().GetType() == Core::ComponentType::BEHAVIORAL_VOLTAGE;

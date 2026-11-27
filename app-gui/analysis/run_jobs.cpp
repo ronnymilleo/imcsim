@@ -10,6 +10,9 @@ namespace GUI {
 
 /**
  * @brief   The table of a Monte Carlo analysis, with the varied parts of the circuit and no runs yet.
+ * @param[in] circuit   Circuit whose toleranced parts populate the table columns.
+ * @param[in] settings  Monte Carlo settings specifying the requested number of draws.
+ * @return  An empty Monte Carlo table initialized with the varied part names, units and requested run count.
  */
 MonteCarloTable MakeMonteCarloTable(const Core::Circuit &circuit, const Core::MonteCarloSettings &settings) {
     MonteCarloTable table{.RequestedRuns = static_cast<std::size_t>(settings.Runs)};

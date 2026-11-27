@@ -30,10 +30,8 @@ struct WireLink {
  * @brief   What new wires go around besides the parts and wires: the blocks they go to, with their names.
  */
 struct RoutingObstacles {
-    /// Boxes no wire may cross, such as the bodies of the blocks the wires go to.
-    std::vector<WorldBounds> Boxes;
-    /// Single points no wire may cross, such as those under the names of the blocks.
-    std::vector<GridPoint> Points;
+    std::vector<WorldBounds> Boxes; ///< Boxes no wire may cross, such as the bodies of the blocks the wires go to.
+    std::vector<GridPoint> Points;  ///< Single points no wire may cross, such as those under the names of the blocks.
 };
 
 // Placement

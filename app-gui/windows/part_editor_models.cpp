@@ -202,6 +202,9 @@ void DrawOpAmpInputStage(Core::OpAmp &op_amp, Schematic &schematic) {
 
 /**
  * @brief   The custom parameters of diodes, transistors, IGBTs and op-amps, and the bandwidth of the ideal op-amp.
+ * @param[in,out] fields      Value field arrays populated from the semiconductor or op-amp parameters.
+ * @param[in]     component   Diode, BJT, MOSFET, IGBT or op-amp being loaded.
+ * @param[in,out] main_value  Main value field loaded with the ideal op-amp gain-bandwidth product when applicable.
  */
 void LoadModelFields(ModelFields &fields, const Core::Component &component, ValueField &main_value) {
     const Core::ComponentType type = component.GetType();
@@ -220,6 +223,12 @@ void LoadModelFields(ModelFields &fields, const Core::Component &component, Valu
     }
 }
 
+/**
+ * @brief   Draws the model selector and custom SPICE parameter fields for a diode, Zener or LED.
+ * @param[in,out] diode      Diode component being edited.
+ * @param[in,out] fields     Custom parameter fields for the diode.
+ * @param[in,out] schematic  Schematic providing library models and marked modified on edits.
+ */
 void DrawDiode(Core::Diode &diode, ModelFields &fields, Schematic &schematic) {
     if (DrawModelChoice(diode,
                         Core::GetDiodeModels(diode.GetType()),
@@ -237,6 +246,12 @@ void DrawDiode(Core::Diode &diode, ModelFields &fields, Schematic &schematic) {
     }
 }
 
+/**
+ * @brief   Draws the model selector and custom Gummel-Poon parameter fields for a BJT.
+ * @param[in,out] bjt        BJT component being edited.
+ * @param[in,out] fields     Custom parameter fields for the BJT.
+ * @param[in,out] schematic  Schematic providing library models and marked modified on edits.
+ */
 void DrawBJT(Core::BJT &bjt, ModelFields &fields, Schematic &schematic) {
     if (DrawModelChoice(bjt,
                         Core::GetBJTModels(bjt.GetType()),
@@ -252,6 +267,12 @@ void DrawBJT(Core::BJT &bjt, ModelFields &fields, Schematic &schematic) {
     }
 }
 
+/**
+ * @brief   Draws the model selector and custom Level 1 parameter fields for a MOSFET.
+ * @param[in,out] mosfet     MOSFET component being edited.
+ * @param[in,out] fields     Custom parameter fields for the MOSFET.
+ * @param[in,out] schematic  Schematic providing library models and marked modified on edits.
+ */
 void DrawMOSFET(Core::MOSFET &mosfet, ModelFields &fields, Schematic &schematic) {
     if (DrawModelChoice(mosfet,
                         Core::GetMOSFETModels(mosfet.GetType()),
@@ -269,6 +290,9 @@ void DrawMOSFET(Core::MOSFET &mosfet, ModelFields &fields, Schematic &schematic)
 
 /**
  * @brief   An IGBT runs on Nodalys only; when custom, the fields are the figures of its datasheet.
+ * @param[in,out] igbt       IGBT component being edited.
+ * @param[in,out] fields     Custom parameter fields for the IGBT.
+ * @param[in,out] schematic  Marked modified when model or parameters change.
  */
 void DrawIGBT(Core::IGBT &igbt, ModelFields &fields, Schematic &schematic) {
     if (DrawModelChoice(igbt, Core::GetIGBTModels(), Core::CUSTOM_IGBT_MODEL_NAME, IGBT_FIELDS, fields.IGBT)) {
@@ -286,6 +310,10 @@ void DrawIGBT(Core::IGBT &igbt, ModelFields &fields, Schematic &schematic) {
 /**
  * @brief   The ideal op-amp has only its gain-bandwidth product to set; a macromodel shows its specifications when
  *          custom.
+ * @param[in,out] op_amp      Op-amp component being edited.
+ * @param[in,out] fields      Custom macromodel specification fields for the op-amp.
+ * @param[in,out] main_value  Value field editing the ideal gain-bandwidth product.
+ * @param[in,out] schematic   Marked modified when model or parameters change.
  */
 void DrawOpAmp(Core::OpAmp &op_amp, ModelFields &fields, ValueField &main_value, Schematic &schematic) {
     if (DrawModelChoice(op_amp,

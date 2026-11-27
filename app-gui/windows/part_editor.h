@@ -56,22 +56,18 @@ private:
     /// The standard series that resistors, capacitors and inductors take their values from.
     const Preferences &m_Preferences;
     // Texts being edited
-    /// Selection the texts were loaded from.
-    std::optional<std::size_t> m_LoadedSelection;
+    std::optional<std::size_t> m_LoadedSelection; ///< Selection the texts were loaded from.
     /// The main value of the part, which the sources, the models and the controlled sources use too.
     ValueField m_Value;
-    /// The name being typed for the part, applied when the field is left.
-    std::array<char, 40> m_Name{};
-    /// Why the name typed last cannot be used, or empty.
-    std::string m_NameError;
+    std::array<char, 40> m_Name{}; ///< The name being typed for the part, applied when the field is left.
+    std::string m_NameError;       ///< Why the name typed last cannot be used, or empty.
     PassiveFields m_Passives;
     SourceFields m_Sources;
     ModelFields m_Models;
     ElectromechanicalFields m_Electromechanical;
     LogicFields m_Logic;
     BlockFields m_Blocks;
-    /// The expression of a behavioral source being typed, kept while it does not parse.
-    std::string m_ExpressionText;
+    std::string m_ExpressionText; ///< The expression of a behavioral source being typed, kept while it does not parse.
     /// Parameters of the block being edited, which a resistor, capacitor or inductor can take its value from.
     std::vector<std::string> m_BlockParameters;
 

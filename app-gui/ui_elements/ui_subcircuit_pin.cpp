@@ -61,6 +61,9 @@ void UISubcircuitPin::DrawSymbol(SchematicCanvas &canvas,
 /**
  * @brief   The name sits beyond the square, outside the circuit, where the block's edge is; a port reads its number
  *          first, such as "P1" or "P2 (OUT)".
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     color   Text color.
  */
 void UISubcircuitPin::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const auto &marker = static_cast<const Core::SubcircuitPinMarker &>(GetComponent());
@@ -78,6 +81,7 @@ LocalBounds UISubcircuitPin::GetLocalBounds() const {
 
 /**
  * @brief   The lead goes left from the terminal to the square.
+ * @return  Right edge of the marker square in local grid units.
  */
 ImVec2 UISubcircuitPin::GetLeadEnd() const {
     return {SQUARE_NEAR, 0.0f};

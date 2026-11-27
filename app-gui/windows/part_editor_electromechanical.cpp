@@ -85,6 +85,8 @@ constexpr auto TRANSMISSION_LINE_FIELDS = std::to_array<ParameterField<Core::Tra
 
 /**
  * @brief   The parameters of the switches that follow a voltage, relays, fuses and transformers.
+ * @param[in,out] fields     Value field arrays populated from the component parameters.
+ * @param[in]     component  Electromechanical, power-semiconductor or transmission-line component to load.
  */
 void LoadElectromechanicalFields(ElectromechanicalFields &fields, const Core::Component &component) {
     const Core::ComponentType type = component.GetType();
@@ -115,6 +117,8 @@ void LoadElectromechanicalFields(ElectromechanicalFields &fields, const Core::Co
 
 /**
  * @brief   A closed switch conducts; a push button is pressed when closed.
+ * @param[in,out] contact    Switch or push button being edited.
+ * @param[in,out] schematic  Notified of live or static state changes.
  */
 void DrawSwitch(Core::Switch &contact, Schematic &schematic) {
     bool closed = contact.IsClosed();
@@ -128,6 +132,9 @@ void DrawSwitch(Core::Switch &contact, Schematic &schematic) {
 
 /**
  * @brief   The switch closes above the threshold plus the hysteresis, and opens below the threshold minus it.
+ * @param[in,out] controlled  Voltage-controlled switch being edited.
+ * @param[in,out] fields      Parameter value fields for the switch.
+ * @param[in,out] schematic   Marked modified when parameters change.
  */
 void DrawControlledSwitch(Core::VoltageControlledSwitch &controlled,
                           ElectromechanicalFields &fields,
@@ -146,6 +153,9 @@ void DrawControlledSwitch(Core::VoltageControlledSwitch &controlled,
 /**
  * @brief   The contact closes when the coil voltage reaches the pull-in value and opens when it falls to the drop-out
  *          one.
+ * @param[in,out] relay      Relay being edited.
+ * @param[in,out] fields     Parameter value fields for the relay.
+ * @param[in,out] schematic  Marked modified when parameters change.
  */
 void DrawRelay(Core::Relay &relay, ElectromechanicalFields &fields, Schematic &schematic) {
     Core::RelayParameters parameters = relay.GetParameters();
@@ -162,6 +172,9 @@ void DrawRelay(Core::Relay &relay, ElectromechanicalFields &fields, Schematic &s
 /**
  * @brief   A combo of ready fuses fills the figures, which stay editable, and the cooling time constant that they
  *          imply is shown read-only.
+ * @param[in,out] fuse       Fuse being edited.
+ * @param[in,out] fields     Parameter value fields for the fuse.
+ * @param[in,out] schematic  Marked modified when parameters change.
  */
 void DrawFuse(Core::Fuse &fuse, ElectromechanicalFields &fields, Schematic &schematic) {
     Core::FuseParameters parameters = fuse.GetParameters();
@@ -197,6 +210,9 @@ void DrawFuse(Core::Fuse &fuse, ElectromechanicalFields &fields, Schematic &sche
  * @brief   The thyristor fires at the gate trigger current, latches on, and releases below the holding current; a
  *          TRIAC does so both ways, firing in all four gate quadrants, and a GTO also turns off on a negative gate
  *          current of IGQ.
+ * @param[in,out] thyristor  SCR, TRIAC or GTO being edited.
+ * @param[in,out] fields     Parameter value fields for the thyristor and GTO turn-off current.
+ * @param[in,out] schematic  Marked modified when parameters change.
  */
 void DrawThyristor(Core::Thyristor &thyristor, ElectromechanicalFields &fields, Schematic &schematic) {
     Core::ThyristorParameters parameters = thyristor.GetParameters();
@@ -232,6 +248,9 @@ void DrawThyristor(Core::Thyristor &thyristor, ElectromechanicalFields &fields, 
 
 /**
  * @brief   The DIAC breaks over at VBO either way, snaps back to the on-state line from V0 and releases below IH.
+ * @param[in,out] diac       DIAC being edited.
+ * @param[in,out] fields     Parameter value fields for the DIAC.
+ * @param[in,out] schematic  Marked modified when parameters change.
  */
 void DrawDiac(Core::Diac &diac, ElectromechanicalFields &fields, Schematic &schematic) {
     Core::DiacParameters parameters = diac.GetParameters();
@@ -249,6 +268,9 @@ void DrawDiac(Core::Diac &diac, ElectromechanicalFields &fields, Schematic &sche
 
 /**
  * @brief   The value is the primary inductance; the secondary's follows from the turns ratio.
+ * @param[in,out] transformer  Transformer being edited.
+ * @param[in,out] fields       Parameter value fields for the transformer.
+ * @param[in,out] schematic    Marked modified when parameters change.
  */
 void DrawTransformer(Core::Transformer &transformer, ElectromechanicalFields &fields, Schematic &schematic) {
     Core::TransformerParameters parameters = transformer.GetParameters();

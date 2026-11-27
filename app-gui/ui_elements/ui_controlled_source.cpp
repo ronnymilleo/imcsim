@@ -36,6 +36,9 @@ UIControlledSource::UIControlledSource(const Core::ComponentType type,
 
 /**
  * @brief   The output leads reach the diamond; the control leads end short of it, with their polarity beside them.
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     color   Line color.
  */
 void UIControlledSource::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     UIDependentSource::DrawTerminals(canvas, view, color);
@@ -51,6 +54,9 @@ void UIControlledSource::DrawTerminals(SchematicCanvas &canvas, const ViewTransf
 /**
  * @brief   The gain reads with its unit, such as "10V/V"; a current-controlled source adds the current it follows, as
  *          "10A/A·I(R1)", or "I(?)" until one is picked.
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     color   Text color.
  */
 void UIControlledSource::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const Core::ControlledSource &source = GetSource();
@@ -86,6 +92,7 @@ LocalBounds UIControlledSource::GetLocalBounds() const {
 
 /**
  * @brief   A VCVS and a CCVS set a voltage, a VCCS and a CCCS a current.
+ * @return  True for `VCVS` or `CCVS`, false for `VCCS` or `CCCS`.
  */
 bool UIControlledSource::SetsVoltage() const {
     const Core::ComponentType type = GetComponent().GetType();

@@ -67,24 +67,19 @@ enum class GainKind {
 struct TwoPortMetrics {
     /// False when an entry of the matrix is not a finite number; every other field is then meaningless.
     bool IsValid = true;
-    /// Rollett's factor; infinite when the two-port is unilateral.
-    double K = 0.0;
-    /// |S11 S22 - S12 S21|.
-    double DeltaMagnitude = 0.0;
+    double K = 0.0;              ///< Rollett's factor; infinite when the two-port is unilateral.
+    double DeltaMagnitude = 0.0; ///< |S11 S22 - S12 S21|.
     /// Edwards-Sinsky factor of the load side, the distance from the load circle to the edge of the chart; above 1 is
     /// unconditionally stable. Infinite when nothing in the denominator is left.
     double Mu = 0.0;
-    /// The same measured from the source side; it is above 1 exactly when Mu is.
-    double MuPrime = 0.0;
-    /// Whether |S12 S21| is at or below UNILATERAL_PRODUCT_FLOOR.
-    bool IsUnilateral = false;
+    double MuPrime = 0.0;      ///< The same measured from the source side; it is above 1 exactly when Mu is.
+    bool IsUnilateral = false; ///< Whether |S12 S21| is at or below UNILATERAL_PRODUCT_FLOOR.
     /// Whether S21 is more than zero; without it nothing is transmitted and there is no gain to bound.
     bool HasForwardTransmission = false;
     /// Whether no passive source and load can make it unstable: mu above 1, within STABILITY_TOLERANCE.
     bool IsUnconditionallyStable = false;
     GainKind Gain = GainKind::NONE;
-    /// The gain bound named by Gain in decibels of power; none for GainKind::NONE.
-    std::optional<double> GainDecibels;
+    std::optional<double> GainDecibels; ///< The gain bound named by Gain in decibels of power; none for GainKind::NONE.
     /// |S21 / S12| as a power ratio in decibels, whatever the stability; none when it is unilateral or nothing is
     /// transmitted.
     std::optional<double> MaximumStableGainDecibels;

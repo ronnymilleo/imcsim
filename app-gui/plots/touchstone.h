@@ -44,6 +44,10 @@ struct TouchstoneOptions {
     TouchstoneFrequencyUnit Unit = TouchstoneFrequencyUnit::GHZ;
     TouchstoneFormat Format = TouchstoneFormat::MAGNITUDE_ANGLE;
 
+    /**
+     * @brief   Checks whether two TouchstoneOptions instances hold equal values.
+     * @return  True when every field is equal.
+     */
     bool operator==(const TouchstoneOptions &) const = default;
 };
 

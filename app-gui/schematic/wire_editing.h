@@ -34,10 +34,8 @@ struct PointTransform {
     };
 
     Kind Type = Kind::TRANSLATE;
-    /// How far a translation moves points.
-    GridPoint Delta;
-    /// The point the other kinds turn or mirror about.
-    GridPoint Pivot;
+    GridPoint Delta; ///< How far a translation moves points.
+    GridPoint Pivot; ///< The point the other kinds turn or mirror about.
 
     GridPoint Apply(GridPoint point) const;
 };
@@ -57,12 +55,9 @@ struct MovedWires {
  *          parts that stay.
  */
 struct TerminalMove {
-    /// Terminals of the parts that move, before the move.
-    std::vector<GridPoint> Old;
-    /// The same terminals after the move, in the same order.
-    std::vector<GridPoint> New;
-    /// Terminals of the parts that stay.
-    std::vector<GridPoint> Fixed;
+    std::vector<GridPoint> Old;   ///< Terminals of the parts that move, before the move.
+    std::vector<GridPoint> New;   ///< The same terminals after the move, in the same order.
+    std::vector<GridPoint> Fixed; ///< Terminals of the parts that stay.
 };
 
 std::vector<UIWire> FollowTerminals(const std::vector<UIWire> &wires,

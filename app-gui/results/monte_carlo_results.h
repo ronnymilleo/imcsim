@@ -51,6 +51,10 @@ struct MeasureColumn {
     /// The current measured, as the results name it, such as "R1" or "Q1.C"; empty for a quantity of a node.
     std::string Current;
 
+    /**
+     * @brief   Checks whether two MeasureColumn instances hold equal values.
+     * @return  True when every field is equal.
+     */
     bool operator==(const MeasureColumn &) const = default;
 };
 
@@ -69,13 +73,10 @@ struct Measurement {
  * @brief   One run: the value each varied part took and what the run measured.
  */
 struct MonteCarloRun {
-    /// One per varied part, as MonteCarloTable::Parts lists them.
-    std::vector<double> Values;
-    /// One per column of the table; empty for a run that failed.
-    std::vector<std::optional<double>> Measures;
+    std::vector<double> Values;                  ///< One per varied part, as MonteCarloTable::Parts lists them.
+    std::vector<std::optional<double>> Measures; ///< One per column of the table; empty for a run that failed.
     bool IsFailed = false;
-    /// Why the run failed.
-    std::string Error;
+    std::string Error; ///< Why the run failed.
 };
 
 /**
@@ -85,14 +86,11 @@ struct MonteCarloRun {
  *          A run that was stopped before it started is missing, so the table can hold fewer runs than were asked for.
  */
 struct MonteCarloTable {
-    /// Names of the varied parts, as the schematic shows them.
-    std::vector<std::string> Parts;
-    /// Unit of the value of each part, such as "Ohm".
-    std::vector<std::string> Units;
+    std::vector<std::string> Parts; ///< Names of the varied parts, as the schematic shows them.
+    std::vector<std::string> Units; ///< Unit of the value of each part, such as "Ohm".
     std::vector<MeasureColumn> Columns;
     std::vector<MonteCarloRun> Runs;
-    /// Runs asked for, without the nominal one.
-    std::size_t RequestedRuns = 0;
+    std::size_t RequestedRuns = 0; ///< Runs asked for, without the nominal one.
 };
 
 /**
@@ -104,8 +102,7 @@ struct SampleStatistics {
     double Minimum = 0.0;
     double Maximum = 0.0;
     double Mean = 0.0;
-    /// Sample standard deviation, with n - 1 in the divisor; zero for a single sample.
-    double StandardDeviation = 0.0;
+    double StandardDeviation = 0.0; ///< Sample standard deviation, with n - 1 in the divisor; zero for a single sample.
     double Percentile1 = 0.0;
     double Percentile99 = 0.0;
 };
@@ -125,6 +122,10 @@ struct Histogram {
  * @brief   How the table of runs is ordered: by run number, by the value of a part or by a measured column.
  */
 struct RunSort {
+    /**
+     * @enum    Key
+     * @brief   Which kind of column orders the Monte Carlo runs table.
+     */
     enum class Key {
         RUN,
         PART,
@@ -132,8 +133,7 @@ struct RunSort {
     };
 
     Key By = Key::RUN;
-    /// Part or column to sort by.
-    std::size_t Index = 0;
+    std::size_t Index = 0; ///< Part or column to sort by.
     bool IsAscending = true;
 };
 

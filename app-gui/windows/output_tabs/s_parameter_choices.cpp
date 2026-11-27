@@ -49,6 +49,12 @@ SParameterSelection &SParameterSelections::Get(const SParameterQuantity quantity
     return m_Selections[GetSlot(quantity, view)];
 }
 
+/**
+ * @brief   The entries checked for a quantity and a view.
+ * @param[in] quantity  S, Z or Y.
+ * @param[in] view      The view drawn; only S tells the Smith chart apart.
+ * @return  Read-only selection for that quantity and view.
+ */
 const SParameterSelection &SParameterSelections::Get(const SParameterQuantity quantity,
                                                      const SParameterView view) const {
     return m_Selections[GetSlot(quantity, view)];

@@ -19,8 +19,7 @@ namespace GUI {
  * @brief   A part under the cursor that the user sets by hand during a live run, and what the mouse does to it.
  */
 struct LivePart {
-    /// Index of the part among the elements of the schematic on show.
-    std::size_t Index = 0;
+    std::size_t Index = 0; ///< Index of the part among the elements of the schematic on show.
     LiveAction Action = LiveAction::NONE;
 };
 
@@ -41,8 +40,7 @@ public:
     std::optional<std::size_t> GetHeldButton() const;
 
 private:
-    /// The push button the mouse holds down.
-    std::optional<std::size_t> m_HeldButton;
+    std::optional<std::size_t> m_HeldButton; ///< The push button the mouse holds down.
 
     void ReleaseHeldButton(Schematic &schematic);
 };

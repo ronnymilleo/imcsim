@@ -24,16 +24,11 @@ namespace GUI {
  * @details One field per member of each set of parameters.
  */
 struct LogicFields {
-    /// One per member of Core::LogicParameters.
-    std::array<ValueField, 2> Logic;
-    /// One per member of Core::ClockParameters.
-    std::array<ValueField, 4> Clock;
-    /// One per member of Core::LogicInputParameters.
-    std::array<ValueField, 1> Input;
-    /// One per member of Core::LogicOutputParameters.
-    std::array<ValueField, 1> Output;
-    /// One per member of Core::SevenSegmentParameters.
-    std::array<ValueField, 1> SevenSegment;
+    std::array<ValueField, 2> Logic;        ///< One per member of Core::LogicParameters.
+    std::array<ValueField, 4> Clock;        ///< One per member of Core::ClockParameters.
+    std::array<ValueField, 1> Input;        ///< One per member of Core::LogicInputParameters.
+    std::array<ValueField, 1> Output;       ///< One per member of Core::LogicOutputParameters.
+    std::array<ValueField, 1> SevenSegment; ///< One per member of Core::SevenSegmentParameters.
 };
 
 // Loading

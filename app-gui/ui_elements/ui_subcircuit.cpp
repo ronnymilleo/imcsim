@@ -146,6 +146,9 @@ void UISubcircuit::DrawSymbol(SchematicCanvas &canvas,
 
 /**
  * @brief   The instance name above, the definition below, and each pin name inside the box next to its lead.
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     color   Text color.
  */
 void UISubcircuit::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const auto &instance = Instance(GetComponent());
@@ -171,6 +174,7 @@ void UISubcircuit::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view
 /**
  * @brief   One terminal per pin, in pin order, on the edge its marker gave it; the pins of each edge are centered on it
  *          in the order they come.
+ * @return  Terminal positions in local grid units, ordered as `Core::SubcircuitInstance::GetPins()`.
  */
 std::vector<GridPoint> UISubcircuit::GetLocalTerminals() const {
     const auto &instance = Instance(GetComponent());

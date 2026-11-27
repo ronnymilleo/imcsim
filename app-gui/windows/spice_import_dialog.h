@@ -19,10 +19,8 @@ namespace GUI {
  * @brief   What the user picked to import from a SPICE library, for the editor to add to the schematic.
  */
 struct SpiceImportResult {
-    /// The picked subcircuits, as blocks with the pins the user set up.
-    std::vector<SavedSubcircuit> Blocks;
-    /// The picked device models.
-    std::vector<Core::LibraryModel> Models;
+    std::vector<SavedSubcircuit> Blocks;    ///< The picked subcircuits, as blocks with the pins the user set up.
+    std::vector<Core::LibraryModel> Models; ///< The picked device models.
 };
 
 /**

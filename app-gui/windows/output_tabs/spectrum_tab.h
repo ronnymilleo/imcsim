@@ -39,20 +39,14 @@ public:
 private:
     Schematic &m_Schematic;
     const ResultStore &m_Results;
-    /// Window the transform of the spectrum applies.
-    SpectrumWindow m_Window = SpectrumWindow::HANN;
-    /// Whether the frequency scale of the spectrum is logarithmic.
-    bool m_IsLogarithmic = false;
-    /// Whether the plot shows noise densities on logarithmic axes instead of decibels.
-    bool m_IsDensity = false;
+    SpectrumWindow m_Window = SpectrumWindow::HANN; ///< Window the transform of the spectrum applies.
+    bool m_IsLogarithmic = false;                   ///< Whether the frequency scale of the spectrum is logarithmic.
+    bool m_IsDensity = false; ///< Whether the plot shows noise densities on logarithmic axes instead of decibels.
     /// Whether every trace of the last spectra was broadband, so the density view opens by itself when they become so.
     bool m_WereAllBroadband = false;
-    /// Visible range of the spectrum plot.
-    PlotSpan m_View;
-    /// The last spectra computed.
-    std::optional<TransientSpectra> m_Spectra;
-    /// Whether the spectra changed since the plot last fitted its axes to them.
-    bool m_HasChanged = false;
+    PlotSpan m_View;                           ///< Visible range of the spectrum plot.
+    std::optional<TransientSpectra> m_Spectra; ///< The last spectra computed.
+    bool m_HasChanged = false; ///< Whether the spectra changed since the plot last fitted its axes to them.
 
     void Update(const Core::Transient &transient, const std::vector<MathTrace> &math, PlotSpan span);
     void DrawPlot();

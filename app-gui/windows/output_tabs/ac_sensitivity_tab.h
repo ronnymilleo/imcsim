@@ -46,12 +46,9 @@ private:
     ResultStore &m_Results;
     /// The wire coloring that the checkbox at the top sets to Sensitivity, or back to Plain.
     Preferences &m_Preferences;
-    /// The result version the checked parts and the curves were made for.
-    std::optional<std::size_t> m_LoadedVersion;
-    /// Visible range of the plots, which both plots share.
-    PlotSpan m_View;
-    /// The parts whose curves the plots show.
-    std::set<std::string> m_ShownParts;
+    std::optional<std::size_t> m_LoadedVersion; ///< The result version the checked parts and the curves were made for.
+    PlotSpan m_View;                            ///< Visible range of the plots, which both plots share.
+    std::set<std::string> m_ShownParts;         ///< The parts whose curves the plots show.
     /// The figures of every part as curves, in the order of the parts of the result.
     std::vector<ACSensitivityCurve> m_Curves;
 

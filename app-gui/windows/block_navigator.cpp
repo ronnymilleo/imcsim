@@ -25,6 +25,7 @@ BlockNavigator::BlockNavigator(Schematic &root, const ShownSchematicFollowers &f
 
 /**
  * @brief   Tells whether a block is open, so the editor shows it instead of the document.
+ * @return  True while editing inside an open block.
  */
 bool BlockNavigator::IsEditingBlock() const {
     return m_Session.IsOpen();
@@ -32,6 +33,7 @@ bool BlockNavigator::IsEditingBlock() const {
 
 /**
  * @brief   The schematic on show: the innermost open block, or the document.
+ * @return  Mutable schematic currently displayed in the editor.
  */
 Schematic &BlockNavigator::GetShown() {
     return m_Session.GetShown();
@@ -39,6 +41,7 @@ Schematic &BlockNavigator::GetShown() {
 
 /**
  * @brief   The schematic on show: the innermost open block, or the document.
+ * @return  Read-only schematic currently displayed in the editor.
  */
 const Schematic &BlockNavigator::GetShown() const {
     return m_Session.GetShown();
@@ -46,6 +49,7 @@ const Schematic &BlockNavigator::GetShown() const {
 
 /**
  * @brief   The open blocks and the settings of their dialog, for the parts of the editor that place or make blocks.
+ * @return  Mutable block session of the navigator.
  */
 BlockSession &BlockNavigator::GetSession() {
     return m_Session;
@@ -53,6 +57,7 @@ BlockSession &BlockNavigator::GetSession() {
 
 /**
  * @brief   The open blocks and the settings of their dialog.
+ * @return  Read-only block session of the navigator.
  */
 const BlockSession &BlockNavigator::GetSession() const {
     return m_Session;

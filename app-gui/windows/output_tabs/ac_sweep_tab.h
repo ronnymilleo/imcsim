@@ -46,8 +46,7 @@ private:
         const char *VoltageAxis;
         const char *CurrentAxis;
         std::string ThirdAxis;
-        /// Unit of the cursor readout, such as " dB".
-        const char *Unit;
+        const char *Unit; ///< Unit of the cursor readout, such as " dB".
         std::vector<std::vector<double>> Core::ACSweep::*Nodes;
         std::vector<Core::ComponentTrace> Core::ACSweep::*Currents;
         const std::vector<MathTrace> *Math;
@@ -71,10 +70,8 @@ private:
     ResultStore &m_Results;
     /// What the plots showed last frame, so their axes fit for a new result and when their traces change.
     TraceFitState m_Fit;
-    /// Shared by both plots.
-    PlotCursors m_Cursors;
-    /// The visible frequency range, shared by both plots.
-    PlotSpan m_View{.From = 1.0, .To = 1e6};
+    PlotCursors m_Cursors;                   ///< Shared by both plots.
+    PlotSpan m_View{.From = 1.0, .To = 1e6}; ///< The visible frequency range, shared by both plots.
     /// Whether the plots mark the poles and zeros of the last pole-zero analysis, when there is one.
     bool m_ShowPoleZero = false;
 

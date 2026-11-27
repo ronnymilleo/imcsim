@@ -38,6 +38,9 @@ UITransformer::UITransformer(const GridPoint position, const Rotation rotation)
 
 /**
  * @brief   The leads run to the ends of the coils, one unit apart from the core on each side.
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     color   Line color.
  */
 void UITransformer::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     for (const float y : {-1.0f, 1.0f}) {
@@ -62,6 +65,9 @@ void UITransformer::DrawSymbol(SchematicCanvas &canvas,
 
 /**
  * @brief   The primary inductance and the turns ratio, such as "100m 2:1".
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     color   Text color.
  */
 void UITransformer::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const auto &transformer = static_cast<const Core::Transformer &>(GetComponent());

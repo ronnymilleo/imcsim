@@ -222,6 +222,8 @@ void DrawTruthTable(const Core::TruthTable &table, Schematic &schematic) {
 
 /**
  * @brief   Selects the part with this name in the editor, which a click on its row asks for.
+ * @param[in,out] schematic  Schematic whose matching element is selected when found.
+ * @param[in]     name       Component name to match.
  */
 void SelectPart(Schematic &schematic, const std::string &name) {
     const auto &elements = schematic.GetElements();

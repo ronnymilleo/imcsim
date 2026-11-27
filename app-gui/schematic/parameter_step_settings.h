@@ -29,6 +29,10 @@ struct ParameterStepSettings {
     double Step = 25.0;
     std::string List;
 
+    /**
+     * @brief   Checks whether two ParameterStepSettings instances hold equal values.
+     * @return  True when every field is equal.
+     */
     bool operator==(const ParameterStepSettings &) const = default;
 };
 

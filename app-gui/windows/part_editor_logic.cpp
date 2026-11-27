@@ -41,6 +41,8 @@ constexpr auto SEVEN_SEGMENT_FIELDS = std::to_array<ParameterField<Core::SevenSe
 
 /**
  * @brief   The parameters of the digital parts, the clock, and the logic inputs, outputs and displays.
+ * @param[in,out] fields     Value field arrays populated from the digital component parameters.
+ * @param[in]     component  Logic gate, flip-flop, clock, logic input, logic output or 7-segment display to load.
  */
 void LoadLogicFields(LogicFields &fields, const Core::Component &component) {
     const Core::ComponentType type = component.GetType();
@@ -67,6 +69,9 @@ void LoadLogicFields(LogicFields &fields, const Core::Component &component) {
 
 /**
  * @brief   The levels the part swaps at follow from the logic level: it reads 1 above 70% of it and 0 below 30%.
+ * @param[in,out] part       Logic gate or flip-flop being edited.
+ * @param[in,out] fields     Parameter value fields for logic level and propagation delay.
+ * @param[in,out] schematic  Marked modified when parameters or input count change.
  */
 void DrawLogicPart(Core::LogicPart &part, LogicFields &fields, Schematic &schematic) {
     Core::LogicParameters parameters = part.GetParameters();
@@ -98,6 +103,9 @@ void DrawLogicPart(Core::LogicPart &part, LogicFields &fields, Schematic &schema
 /**
  * @brief   The clock picks its own rise and fall times; the frequency sets the period and the duty the share that is
  *          high.
+ * @param[in,out] clock      Digital clock being edited.
+ * @param[in,out] fields     Parameter value fields for frequency, duty cycle, logic level and start delay.
+ * @param[in,out] schematic  Marked modified when parameters change.
  */
 void DrawClock(Core::Clock &clock, LogicFields &fields, Schematic &schematic) {
     Core::ClockParameters parameters = clock.GetParameters();
@@ -115,6 +123,9 @@ void DrawClock(Core::Clock &clock, LogicFields &fields, Schematic &schematic) {
 /**
  * @brief   A constant source from the part to ground: high drives the logic level and low 0 V, so a latch has a defined
  *          start.
+ * @param[in,out] input      Logic input source being edited.
+ * @param[in,out] fields     Parameter value fields for its logic level.
+ * @param[in,out] schematic  Notified of live state toggles and parameter edits.
  */
 void DrawLogicInput(Core::LogicInput &input, LogicFields &fields, Schematic &schematic) {
     bool high = input.IsHigh();
@@ -135,6 +146,9 @@ void DrawLogicInput(Core::LogicInput &input, LogicFields &fields, Schematic &sch
 
 /**
  * @brief   The logic level the output reads its node against; it changes no result, only the reading.
+ * @param[in,out] output     Logic output indicator being edited.
+ * @param[in,out] fields     Parameter value fields for its threshold logic level.
+ * @param[in,out] schematic  Marked modified when parameters change.
  */
 void DrawLogicOutput(Core::LogicOutput &output, LogicFields &fields, Schematic &schematic) {
     Core::LogicOutputParameters parameters = output.GetParameters();
@@ -151,6 +165,9 @@ void DrawLogicOutput(Core::LogicOutput &output, LogicFields &fields, Schematic &
 
 /**
  * @brief   The logic level the display reads its inputs against; it changes no result, only which segments light.
+ * @param[in,out] display    7-segment display being edited.
+ * @param[in,out] fields     Parameter value fields for its threshold logic level.
+ * @param[in,out] schematic  Marked modified when parameters change.
  */
 void DrawSevenSegment(Core::SevenSegmentDisplay &display, LogicFields &fields, Schematic &schematic) {
     Core::SevenSegmentParameters parameters = display.GetParameters();

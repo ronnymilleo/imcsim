@@ -23,8 +23,7 @@ public:
     std::optional<EditorCommand> GetPicked() const;
 
 private:
-    /// The command of the item clicked this frame, or none.
-    std::optional<EditorCommand> m_Picked;
+    std::optional<EditorCommand> m_Picked; ///< The command of the item clicked this frame, or none.
 };
 
 // Items, which return the command picked, or none

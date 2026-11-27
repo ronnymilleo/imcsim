@@ -29,18 +29,13 @@ inline constexpr double SENSITIVITY_DECADES = 4.0;
 struct SensitivityRow {
     /// The part as the schematic names it, such as "R1", "VCC 12V", or "X2.R1" for the element inside a block.
     std::string Part;
-    /// The name of the part in the circuit, which a click on the row selects.
-    std::string PartName;
-    /// Such as "4.7kOhm", or empty when the results do not carry it.
-    std::string Value;
-    /// Volts per unit of the value, such as "-1.1mV/Ohm".
-    std::string Absolute;
-    /// Volts for a 1 % change of the value, signed.
-    std::string Normalized;
+    std::string PartName;   ///< The name of the part in the circuit, which a click on the row selects.
+    std::string Value;      ///< Such as "4.7kOhm", or empty when the results do not carry it.
+    std::string Absolute;   ///< Volts per unit of the value, such as "-1.1mV/Ohm".
+    std::string Normalized; ///< Volts for a 1 % change of the value, signed.
     /// Worst-case output change at the part's tolerance, such as "±125mV (5%)", or "-" when untoleranced.
     std::string Tolerance;
-    /// The size of the normalized sensitivity as a share of the largest, from 0 to 1.
-    double Share = 0.0;
+    double Share = 0.0; ///< The size of the normalized sensitivity as a share of the largest, from 0 to 1.
 };
 
 // Labels

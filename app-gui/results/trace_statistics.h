@@ -26,8 +26,7 @@ struct TraceStatistics {
     double PeakToPeak = 0.0;
     double Mean = 0.0;
     double RMS = 0.0;
-    /// No value when the trace does not repeat at least once within the span.
-    std::optional<double> Frequency;
+    std::optional<double> Frequency; ///< No value when the trace does not repeat at least once within the span.
 };
 
 /**
@@ -53,10 +52,8 @@ struct BodeStatistics {
     std::optional<double> LowerCutoff;
     /// Where the gain falls 3 dB below the peak, above it; no value when it does not within the span.
     std::optional<double> UpperCutoff;
-    /// Where the gain first falls through 0 dB.
-    std::optional<double> UnityGainFrequency;
-    /// 180 degrees plus the phase at the unity-gain frequency, as for a loop gain.
-    std::optional<double> PhaseMargin;
+    std::optional<double> UnityGainFrequency; ///< Where the gain first falls through 0 dB.
+    std::optional<double> PhaseMargin; ///< 180 degrees plus the phase at the unity-gain frequency, as for a loop gain.
 };
 
 bool IsNegligible(double value, double scale);

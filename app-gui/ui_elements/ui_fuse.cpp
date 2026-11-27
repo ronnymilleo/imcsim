@@ -80,6 +80,9 @@ void UIFuse::DrawSymbol(SchematicCanvas &canvas,
 
 /**
  * @brief   The name above and the rated current under the part, which says "blown" in its place once it is open.
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     color   Text color when the fuse is intact.
  */
 void UIFuse::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     DrawLabel(canvas, view, {0.0f, -RATING_OFFSET_Y}, {0.0f, -1.0f}, GetComponent().GetName(), color);

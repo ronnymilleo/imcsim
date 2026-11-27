@@ -68,6 +68,7 @@ BlockSession::BlockSession(Schematic &root) : m_Root(root) {
 
 /**
  * @brief   Whether a block is open, so the editor shows its contents instead of the document.
+ * @return  True while at least one block is open on the session stack.
  */
 bool BlockSession::IsOpen() const {
     return !m_OpenBlocks.empty();
@@ -75,6 +76,7 @@ bool BlockSession::IsOpen() const {
 
 /**
  * @brief   The blocks open, from the outermost to the one shown.
+ * @return  Stack of open blocks, empty when the root document is shown.
  */
 const std::vector<OpenBlock> &BlockSession::GetOpenBlocks() const {
     return m_OpenBlocks;
@@ -82,11 +84,16 @@ const std::vector<OpenBlock> &BlockSession::GetOpenBlocks() const {
 
 /**
  * @brief   The schematic on show: the contents of the innermost open block, or the document.
+ * @return  Mutable schematic currently displayed in the editor.
  */
 Schematic &BlockSession::GetShown() {
     return IsOpen() ? *m_OpenBlocks.back().Content : m_Root;
 }
 
+/**
+ * @brief   The schematic on show: the contents of the innermost open block, or the document.
+ * @return  Read-only schematic currently displayed in the editor.
+ */
 const Schematic &BlockSession::GetShown() const {
     return IsOpen() ? *m_OpenBlocks.back().Content : m_Root;
 }
@@ -94,6 +101,8 @@ const Schematic &BlockSession::GetShown() const {
 /**
  * @brief   Whether a block can be placed where the editor is: never inside itself, nor inside a block it contains, at
  *          any depth.
+ * @param[in] name  Definition name of the candidate block to place.
+ * @return  True when placing the block at the current level creates no nesting cycle.
  */
 bool BlockSession::CanPlaceBlock(const std::string_view name) const {
     return std::ranges::none_of(m_OpenBlocks, [&](const OpenBlock &block) {
@@ -103,6 +112,7 @@ bool BlockSession::CanPlaceBlock(const std::string_view name) const {
 
 /**
  * @brief   The blocks of the document the part picker offers where the editor is, which CanPlaceBlock() allows.
+ * @return  Definitions in document order that can be placed without cycles.
  */
 std::vector<const SavedSubcircuit *> BlockSession::ListPlaceableBlocks() const {
     std::vector<const SavedSubcircuit *> blocks;
@@ -137,6 +147,7 @@ std::optional<std::string> BlockSession::FindBlockName(const UIElement *element)
 
 /**
  * @brief   The definition of a block in the document.
+ * @param[in] name  Name of the block definition to look up.
  * @return  The definition, or null when the document has none by that name.
  */
 const SavedSubcircuit *BlockSession::FindDefinition(const std::string &name) const {
@@ -214,6 +225,9 @@ std::expected<void, std::string> BlockSession::DiscardAndClose() {
 
 /**
  * @brief   Changes the settings of a block kept as SPICE text, in the document and in the open blocks that hold a copy.
+ * @param[in] name        Name of the SPICE subcircuit definition to update.
+ * @param[in] pins        Updated pin names and box sides in subcircuit order.
+ * @param[in] parameters  Updated subcircuit parameters and defaults.
  * @return  Nothing, or why the settings were refused; the document is left as it was then.
  */
 std::expected<void, std::string>
@@ -301,18 +315,34 @@ void BlockSession::RestoreSettings() {
     settings.Parameters = definition->Parameters;
 }
 
+/**
+ * @brief   Returns the editable name of the block shown in the settings dialog.
+ * @return  Mutable block name for the innermost open block or pending new block.
+ */
 std::string &BlockSession::GetName() {
     return GetShownSettings().Name;
 }
 
+/**
+ * @brief   Returns the editable pin list of the block shown in the settings dialog.
+ * @return  Mutable pin list for the innermost open block or pending new block.
+ */
 std::vector<SavedSubcircuitPin> &BlockSession::GetPins() {
     return GetShownSettings().Pins;
 }
 
+/**
+ * @brief   Returns the editable parameter list of the block shown in the settings dialog.
+ * @return  Mutable parameter list for the innermost open block or pending new block.
+ */
 std::vector<Core::SubcircuitParameter> &BlockSession::GetParameters() {
     return GetShownSettings().Parameters;
 }
 
+/**
+ * @brief   Returns the error message currently displayed in the block settings dialog.
+ * @return  Validation or apply error text, or empty when there is no error.
+ */
 const std::string &BlockSession::GetError() const {
     return m_Error;
 }
@@ -350,6 +380,7 @@ void BlockSession::RequestDialog() {
 
 /**
  * @brief   Whether the dialog was asked for since the last call, which forgets the request.
+ * @return  True when a dialog open request was pending.
  */
 bool BlockSession::TakeDialogRequest() {
     return std::exchange(m_IsDialogRequested, false);

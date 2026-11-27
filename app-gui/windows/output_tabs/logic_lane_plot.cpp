@@ -162,6 +162,7 @@ void DrawBusLane(const Core::Transient &transient,
 
 /**
  * @brief   The number of lanes, buses and signals together.
+ * @return  Total count of bus lanes and single-bit signal lanes.
  */
 std::size_t LaneLayout::GetCount() const {
     return Buses.size() + Signals.size();
@@ -193,6 +194,9 @@ LaneLayout FindLaneLayout(Schematic &schematic, const std::size_t node_count, co
  * @brief   Splits the room left in the window between the analog plot and the plot of logic lanes.
  * @details The lanes take a row each, up to a share of the room, and the analog plot takes the rest; a plot alone takes
  *          all of it.
+ * @param[in] lane_count       Number of logic lanes to display.
+ * @param[in] has_analog_plot  Whether the analog plot is also shown above the lanes.
+ * @return  Pixel heights of the analog plot and the logic-lane plot.
  */
 PlotHeights GetPlotHeights(const std::size_t lane_count, const bool has_analog_plot) {
     if (lane_count == 0 || !has_analog_plot) {
@@ -212,6 +216,9 @@ PlotHeights GetPlotHeights(const std::size_t lane_count, const bool has_analog_p
 
 /**
  * @brief   The names of the lanes, in order from the top: each bus by its name, each signal by its net.
+ * @param[in] layout        Resolved bus and signal lanes.
+ * @param[in] connectivity  Schematic connectivity providing net labels for signal nodes.
+ * @return  Display labels for every lane from top to bottom.
  */
 std::vector<std::string> ListLaneNames(const LaneLayout &layout, const Connectivity &connectivity) {
     std::vector<std::string> names;
@@ -252,6 +259,8 @@ void SetupLaneAxes(const std::vector<std::string> &names, PlotSpan &view) {
 
 /**
  * @brief   Draws the buses in the top lanes.
+ * @param[in] transient  Transient waveform data to decode into bus values.
+ * @param[in] layout     Resolved bus and signal lanes.
  */
 void DrawBusLanes(const Core::Transient &transient, const LaneLayout &layout) {
     for (std::size_t bus = 0; bus < layout.Buses.size(); ++bus) {
@@ -265,6 +274,9 @@ void DrawBusLanes(const Core::Transient &transient, const LaneLayout &layout) {
 /**
  * @brief   Plots each signal as a trace between its low and high levels, in the lanes under the buses.
  * @details A lane the circuit drives to a voltage between the thresholds is drawn halfway between low and high.
+ * @param[in] transient  Transient waveform data containing node voltages.
+ * @param[in] layout     Resolved bus and signal lanes.
+ * @param[in] names      Display labels of all lanes from top to bottom.
  * @return  The traces drawn, for the readout, which reads a logic state.
  */
 std::vector<PlottedTrace>
@@ -291,6 +303,8 @@ PlotSignalLanes(const Core::Transient &transient, const LaneLayout &layout, cons
 
 /**
  * @brief   Labels every cell of the signal lanes with 0, 1 or X, within what the plot shows.
+ * @param[in] transient  Transient waveform data containing node voltages.
+ * @param[in] layout     Resolved bus and signal lanes.
  */
 void DrawBitValueLabels(const Core::Transient &transient, const LaneLayout &layout) {
     std::vector<LogicSignal> signals;

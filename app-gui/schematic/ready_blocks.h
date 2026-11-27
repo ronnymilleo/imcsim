@@ -24,8 +24,7 @@ namespace GUI {
  */
 struct ReadyBlock {
     std::string_view Title;
-    /// The name of its definition, which the search finds too, so "mux" finds the multiplexer.
-    std::string_view Name;
+    std::string_view Name; ///< The name of its definition, which the search finds too, so "mux" finds the multiplexer.
     std::string_view Description;
     std::string_view FileName;
 };

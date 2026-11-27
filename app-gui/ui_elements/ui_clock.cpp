@@ -67,6 +67,9 @@ void UIClock::DrawSymbol(SchematicCanvas &canvas,
 
 /**
  * @brief   The name above the box and the frequency with the duty cycle beside it.
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     color   Text color.
  */
 void UIClock::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const Core::ClockParameters &figures = static_cast<const Core::Clock &>(GetComponent()).GetParameters();
@@ -82,6 +85,7 @@ LocalBounds UIClock::GetLocalBounds() const {
 
 /**
  * @brief   The lead goes up from the terminal to the box.
+ * @return  Bottom center of the clock box in local grid units.
  */
 ImVec2 UIClock::GetLeadEnd() const {
     return {0.0f, BOX_BOTTOM};

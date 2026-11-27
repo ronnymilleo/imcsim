@@ -57,8 +57,7 @@ struct HarmonicTraceSummary {
     std::string Label;
     std::string Unit;
     bool IsCurrent = false;
-    /// Signed DC component X_0.
-    double DcValue = 0.0;
+    double DcValue = 0.0; ///< Signed DC component X_0.
     /// Total harmonic distortion in percent across harmonics >= 2 relative to the fundamental.
     double ThdPercent = 0.0;
     std::vector<HarmonicTableRow> Rows;

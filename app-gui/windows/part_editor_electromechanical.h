@@ -29,24 +29,15 @@ namespace GUI {
  * @details One field per member of each set of parameters.
  */
 struct ElectromechanicalFields {
-    /// One per member of Core::SwitchParameters.
-    std::array<ValueField, 4> VoltageSwitch;
-    /// One per member of Core::RelayParameters.
-    std::array<ValueField, 5> Relay;
-    /// One per member of Core::FuseParameters.
-    std::array<ValueField, 4> Fuse;
-    /// One per member of Core::ThyristorParameters.
-    std::array<ValueField, 14> Thyristor;
-    /// One per member of Core::ThyristorParameters that only a GTO has.
-    std::array<ValueField, 1> GateTurnOff;
-    /// One per member of Core::DiacParameters.
-    std::array<ValueField, 5> Diac;
-    /// One per member of Core::TransformerParameters.
-    std::array<ValueField, 3> Transformer;
-    /// One per member of Core::TransmissionLineParameters.
-    std::array<ValueField, 6> TransmissionLine;
-    /// The geometry the figures of a line can be worked out from.
-    LineGeometryCalculator LineGeometry;
+    std::array<ValueField, 4> VoltageSwitch;    ///< One per member of Core::SwitchParameters.
+    std::array<ValueField, 5> Relay;            ///< One per member of Core::RelayParameters.
+    std::array<ValueField, 4> Fuse;             ///< One per member of Core::FuseParameters.
+    std::array<ValueField, 14> Thyristor;       ///< One per member of Core::ThyristorParameters.
+    std::array<ValueField, 1> GateTurnOff;      ///< One per member of Core::ThyristorParameters that only a GTO has.
+    std::array<ValueField, 5> Diac;             ///< One per member of Core::DiacParameters.
+    std::array<ValueField, 3> Transformer;      ///< One per member of Core::TransformerParameters.
+    std::array<ValueField, 6> TransmissionLine; ///< One per member of Core::TransmissionLineParameters.
+    LineGeometryCalculator LineGeometry;        ///< The geometry the figures of a line can be worked out from.
 };
 
 // Loading

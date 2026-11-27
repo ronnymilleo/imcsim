@@ -45,14 +45,11 @@ struct StabilityCurves {
     std::vector<double> Frequencies;
     std::vector<double> K;
     std::vector<double> Mu;
-    /// MAG, or the unilateral gain where S12 is 0, in decibels.
-    std::vector<double> MaximumAvailableGainDecibels;
-    /// MSG in decibels.
-    std::vector<double> MaximumStableGainDecibels;
+    std::vector<double> MaximumAvailableGainDecibels; ///< MAG, or the unilateral gain where S12 is 0, in decibels.
+    std::vector<double> MaximumStableGainDecibels;    ///< MSG in decibels.
     std::string MaximumAvailableGainLabel;
     std::string MaximumStableGainLabel;
-    /// The range of the Y axis of the factors.
-    ExportRange FactorRange;
+    ExportRange FactorRange; ///< The range of the Y axis of the factors.
 };
 
 // Curves

@@ -76,6 +76,9 @@ void DrawWirePreview(const WiringMode &mode, const ModeInput &input, const GridP
 /**
  * @brief   Selecting handles its clicks before the schematic is drawn (HandleSelectionInput()), so a dragged
  *          part is drawn where the cursor is; here, hovering a wire or a part shows its value on display.
+ * @param[in,out] mode   Current selecting mode state.
+ * @param[in]     input  Canvas pointer, schematic, overlays and editor context for this frame.
+ * @return  Always none, since selecting stays active here.
  */
 std::optional<EditorMode> HandleMode(SelectingMode &mode, const ModeInput &input) {
     if (!input.Pointer.IsHovered || mode.Drag || !input.Overlays.GetDisplayed()) {
@@ -91,6 +94,9 @@ std::optional<EditorMode> HandleMode(SelectingMode &mode, const ModeInput &input
  * @brief   Placement mode: R rotates, M mirrors left to right and Shift+M top to bottom, Esc or right click cancels,
  *          left click places and keeps the mode active so several components can be placed in a row.
  * @details A label or a pin marker needs a name next, so placing one ends the mode and opens its popover on the name.
+ * @param[in,out] mode   Current placement mode state, updated when turning keys are pressed.
+ * @param[in]     input  Canvas pointer, schematic, overlays and editor context for this frame.
+ * @return  `SelectingMode` when placement is cancelled or finishes on a label or pin marker; none otherwise.
  */
 std::optional<EditorMode> HandleMode(PlacingMode &mode, const ModeInput &input) {
     if (WantsToLeaveMode(input)) {
@@ -130,6 +136,9 @@ std::optional<EditorMode> HandleMode(PlacingMode &mode, const ModeInput &input) 
  * @brief   Wire mode: the first click starts a wire, each following click adds an L-shaped bend up to the cursor and
  *          continues from there. F flips the bend, and the wire ends on a terminal, on a second click at the same
  *          point, or with Esc or right click. Esc or right click with no wire in progress leaves the mode.
+ * @param[in,out] mode   Current wiring mode state holding the in-progress start point.
+ * @param[in]     input  Canvas pointer, schematic, bend preference and editor context for this frame.
+ * @return  `SelectingMode` when Esc or right click leaves wire mode with no wire in progress; none otherwise.
  */
 std::optional<EditorMode> HandleMode(WiringMode &mode, const ModeInput &input) {
     if (ImGui::IsWindowFocused()) {
@@ -162,8 +171,11 @@ std::optional<EditorMode> HandleMode(WiringMode &mode, const ModeInput &input) {
 /**
  * @brief   Probe mode: the item under the cursor is outlined with what it measures, a node voltage on a wire or a
  *          current on a part, and a left click adds it to the plots or removes it. Esc or right click leaves the mode.
+ * @param[in,out] mode   Current probing mode tag.
+ * @param[in]     input  Canvas pointer, schematic, overlays and editor context for this frame.
+ * @return  `SelectingMode` when Esc or right click leaves probe mode; none otherwise.
  */
-std::optional<EditorMode> HandleMode(ProbingMode & /*mode*/, const ModeInput &input) {
+std::optional<EditorMode> HandleMode([[maybe_unused]] ProbingMode &mode, const ModeInput &input) {
     if (WantsToLeaveMode(input)) {
         return SelectingMode{};
     }
@@ -206,6 +218,9 @@ std::optional<EditorMode> HandleMode(ProbingMode & /*mode*/, const ModeInput &in
  * @brief   Paste mode: the pasted group follows the cursor, half see-through, R rotates it, M mirrors it left to right
  *          and Shift+M top to bottom, Esc or right click cancels, and a left click places it and selects what was
  *          placed. Parts get the next free names of the schematic.
+ * @param[in,out] mode   Current pasting mode holding the clipboard group being positioned.
+ * @param[in]     input  Canvas pointer, root and shown schematics, file actions and editor context for this frame.
+ * @return  `SelectingMode` once the paste is placed or cancelled; none while positioning continues.
  */
 std::optional<EditorMode> HandleMode(PastingMode &mode, const ModeInput &input) {
     if (WantsToLeaveMode(input)) {

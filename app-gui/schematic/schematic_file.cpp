@@ -85,7 +85,7 @@ std::string SaveSchematic(const std::vector<std::unique_ptr<UIElement>> &element
  * @return  The same JSON a file holds, with the default settings and no measurements, so it loads back with
  *          LoadSchematic().
  */
-std::string SaveParts(const std::span<const UIElement *const> elements,
+std::string SaveParts(std::span<const UIElement *const> elements,
                       const std::vector<UIWire> &wires,
                       const std::span<const SavedSubcircuit> subcircuits,
                       const std::span<const Core::LibraryModel> models) {

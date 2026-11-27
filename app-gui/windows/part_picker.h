@@ -47,20 +47,14 @@ private:
         std::optional<EditorMode> Get(std::size_t index) const;
     };
 
-    /// The symbol standard of the part icons.
-    const Preferences &m_Preferences;
-    /// The query typed in the picker.
-    std::string m_Query;
-    /// The highlighted match.
-    std::size_t m_Highlighted = 0;
-    /// Whether a menu, the rail or Space asked to focus the field on the next frame.
-    bool m_IsOpenRequested = false;
+    const Preferences &m_Preferences; ///< The symbol standard of the part icons.
+    std::string m_Query;              ///< The query typed in the picker.
+    std::size_t m_Highlighted = 0;    ///< The highlighted match.
+    bool m_IsOpenRequested = false;   ///< Whether a menu, the rail or Space asked to focus the field on the next frame.
     /// Whether the list of matches shows: while the field is active, and while the mouse is on the list it clicks.
     bool m_IsListShown = false;
-    /// Whether the mouse was on the list the last time it showed.
-    bool m_IsListHovered = false;
-    /// Whether a part was picked, so the editor takes the focus back.
-    bool m_IsEditorFocusRequested = false;
+    bool m_IsListHovered = false;          ///< Whether the mouse was on the list the last time it showed.
+    bool m_IsEditorFocusRequested = false; ///< Whether a part was picked, so the editor takes the focus back.
 
     static PartMatches FindMatches(const std::string &query, const std::vector<const SavedSubcircuit *> &blocks);
     std::optional<EditorMode> DrawList(const PartMatches &matches, ImVec2 position, bool moved);

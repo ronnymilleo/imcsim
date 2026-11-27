@@ -101,12 +101,9 @@ double GetSingleCurrentAt(const Core::Component &component, const double current
  * @brief   What the terminals of the parts ask of the wires.
  */
 struct TerminalLoads {
-    /// Current each point hands to the parts there.
-    std::map<GridPoint, double> DrawnAt;
-    /// The points ground holds.
-    std::set<GridPoint> Grounded;
-    /// Every terminal, where the wires are split.
-    std::vector<GridPoint> Points;
+    std::map<GridPoint, double> DrawnAt; ///< Current each point hands to the parts there.
+    std::set<GridPoint> Grounded;        ///< The points ground holds.
+    std::vector<GridPoint> Points;       ///< Every terminal, where the wires are split.
 };
 
 /**
@@ -134,10 +131,8 @@ struct WireGraph {
  * @brief   The points of a group of joined wires, each reached through one piece from the root.
  */
 struct SpanningTree {
-    /// Points by distance from the root, which comes first.
-    std::vector<GridPoint> Order;
-    /// For every point but the root, the piece that reached it.
-    std::map<GridPoint, std::size_t> ParentPiece;
+    std::vector<GridPoint> Order;                 ///< Points by distance from the root, which comes first.
+    std::map<GridPoint, std::size_t> ParentPiece; ///< For every point but the root, the piece that reached it.
 };
 
 /**

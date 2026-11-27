@@ -38,6 +38,10 @@ struct SavedMeasurements {
     std::vector<MathChannel> MathChannels;
     std::vector<LogicBus> Buses;
 
+    /**
+     * @brief   Checks whether two SavedMeasurements instances hold equal values.
+     * @return  True when every field is equal.
+     */
     bool operator==(const SavedMeasurements &) const = default;
 };
 
@@ -52,6 +56,10 @@ struct SavedSubcircuitPin {
     GridPoint Point;
     Core::PinSide Side = Core::PinSide::LEFT;
 
+    /**
+     * @brief   Checks whether two SavedSubcircuitPin instances hold equal values.
+     * @return  True when every field is equal.
+     */
     bool operator==(const SavedSubcircuitPin &) const = default;
 };
 

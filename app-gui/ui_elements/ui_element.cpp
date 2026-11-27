@@ -332,6 +332,12 @@ LocalBounds UIElement::GetLocalBounds() const {
 /**
  * @brief   ImGui text cannot rotate, so the text stays upright and is pushed from the anchor along the rotated
  *          direction until it no longer overlaps the anchor, whatever the element rotation.
+ * @param[in,out] canvas           Where it is drawn: the editor window or an exported image.
+ * @param[in]     view             Transform of the current frame.
+ * @param[in]     local_anchor     Point in local grid units from which the label is offset.
+ * @param[in]     local_direction  Unit vector in local grid units giving the outward offset direction.
+ * @param[in]     text             UTF-8 label text; nothing is drawn when empty.
+ * @param[in]     color            Text color.
  */
 void UIElement::DrawLabel(SchematicCanvas &canvas,
                           const ViewTransform &view,

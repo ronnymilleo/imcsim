@@ -30,10 +30,8 @@ enum class SParameterView {
  * @brief   What the body of the tab draws under its controls.
  */
 enum class SParameterBody {
-    /// Z or Y exist at no frequency of the sweep, so the body says why instead.
-    NO_FREQUENCY,
-    /// No entry of the matrix is checked, so there is nothing to plot.
-    NOTHING_CHECKED,
+    NO_FREQUENCY,    ///< Z or Y exist at no frequency of the sweep, so the body says why instead.
+    NOTHING_CHECKED, ///< No entry of the matrix is checked, so there is nothing to plot.
     STABILITY,
     SMITH,
     MAGNITUDE_PHASE

@@ -24,8 +24,7 @@ namespace GUI {
 struct PassiveFields {
     /// Voltage a capacitor or current an inductor starts a transient from; empty when none is set.
     ValueField InitialCondition;
-    /// Percent the value may be off in a Monte Carlo run; empty when the part keeps its value.
-    ValueField Tolerance;
+    ValueField Tolerance; ///< Percent the value may be off in a Monte Carlo run; empty when the part keeps its value.
 };
 
 // Loading

@@ -33,9 +33,12 @@ namespace GUI {
 struct WindowAvailability {
     /// Whether a scroll bar moves the window along the run, which is longer than the window.
     bool HasScrollbar = false;
-    /// Whether the user picks how many points the window holds.
-    bool HasSize = false;
+    bool HasSize = false; ///< Whether the user picks how many points the window holds.
 
+    /**
+     * @brief   Checks whether two WindowAvailability instances hold equal values.
+     * @return  True when every field is equal.
+     */
     bool operator==(const WindowAvailability &) const = default;
 };
 
@@ -44,16 +47,18 @@ struct WindowAvailability {
  * @brief   What the analog plot of a transient shows in a frame, worked out once from the traces and the lanes.
  */
 struct AnalogPlan {
-    /// Nodes drawn as logic lanes, which the analog plot leaves out.
-    std::vector<int> LaneNodes;
+    std::vector<int> LaneNodes; ///< Nodes drawn as logic lanes, which the analog plot leaves out.
     bool ShowsCurrents = false;
     /// Whether a voltage is shown, measured or as a math channel, so the voltage axis keeps its label and ticks.
     bool HasVoltages = false;
-    /// Whether the plot of logic lanes under it shares its time axis.
-    bool HasLanes = false;
+    bool HasLanes = false; ///< Whether the plot of logic lanes under it shares its time axis.
     /// Left out when it would be empty, so a circuit measured only at logic nodes shows the lanes alone.
     bool IsShown = false;
 
+    /**
+     * @brief   Checks whether two AnalogPlan instances hold equal values.
+     * @return  True when every field is equal.
+     */
     bool operator==(const AnalogPlan &) const = default;
 };
 
@@ -86,8 +91,7 @@ private:
     /// What the plot showed last frame, so its axes fit for a new result and when its traces change.
     TraceFitState m_Fit;
     PlotCursors m_Cursors;
-    /// The visible time range, which the logic lanes share and the statistics measure.
-    PlotSpan m_View;
+    PlotSpan m_View; ///< The visible time range, which the logic lanes share and the statistics measure.
     /// The data version of the transient drawn last frame, to fit the axes as a run that is still going on grows.
     std::size_t m_DrawnDataVersion = 0;
     /// The window the plot drew last frame, so a window that moved or changed size fits the axes.
@@ -96,8 +100,7 @@ private:
     // Logic lanes
     /// Whether the signals of logic parts get a lane each, in a plot of their own under the analog one.
     bool m_ShowLogicLanes = true;
-    /// Whether each steady stretch of a lane is labeled 0, 1 or X.
-    bool m_ShowBitValues = false;
+    bool m_ShowBitValues = false; ///< Whether each steady stretch of a lane is labeled 0, 1 or X.
 
     // Notes and window
     void DrawRunControls(const Core::Transient &transient);

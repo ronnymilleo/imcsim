@@ -67,8 +67,7 @@ public:
     std::size_t GetFinishedRunCount() const;
 
 private:
-    /// Last run of each analysis, in the order of the Analysis enum.
-    std::array<RunStatus, ANALYSIS_COUNT> m_Statuses;
+    std::array<RunStatus, ANALYSIS_COUNT> m_Statuses; ///< Last run of each analysis, in the order of the Analysis enum.
     std::optional<Analysis> m_LastRun;
     /// Runs finished so far, which tells a new outcome from the same one seen again.
     std::size_t m_FinishedRunCount = 0;

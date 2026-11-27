@@ -19,7 +19,9 @@ std::string FormatHertz(const double frequency) {
     return std::format("{}Hz", Core::FormatValue(frequency));
 }
 
-/// Quality factors and damping ratios are plain numbers, so no scale suffix: 0.74, not 740m.
+/**
+ * @brief   Quality factors and damping ratios are plain numbers, so no scale suffix: 0.74, not 740m.
+ */
 std::string FormatPlain(const double value) {
     return std::format("{:.3g}", value);
 }

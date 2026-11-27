@@ -21,13 +21,10 @@ namespace GUI {
  * @brief   What the input of the selecting mode reads and changes, which the editor owns.
  */
 struct SelectionInput {
-    /// The schematic on show, whose items a click picks.
-    Schematic &Shown;
-    /// The mode of the editor, which holds the box and the drag while it is selecting.
-    EditorMode &Mode;
+    Schematic &Shown; ///< The schematic on show, whose items a click picks.
+    EditorMode &Mode; ///< The mode of the editor, which holds the box and the drag while it is selecting.
     PartPopover &Popover;
-    /// Where the mouse is; it is not hovering when a live part took the mouse.
-    CanvasPointer Pointer;
+    CanvasPointer Pointer; ///< Where the mouse is; it is not hovering when a live part took the mouse.
     /// ImGui closes a popup on Esc before the frame starts, so an Esc that closed one leaves the selection alone.
     bool WasPopupOpenLastFrame;
 };

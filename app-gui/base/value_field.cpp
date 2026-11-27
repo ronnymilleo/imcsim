@@ -284,13 +284,17 @@ void DrawFieldLabel(const char *label) {
 
 /**
  * @brief   The validity check of a value that has no limit.
+ * @param[in] value  Candidate value, accepted unconditionally.
+ * @return  Always true.
  */
-bool AnyValue(double /*value*/) {
+bool AnyValue([[maybe_unused]] const double value) {
     return true;
 }
 
 /**
  * @brief   The validity check of a value that must not be zero, such as the step of a range.
+ * @param[in] value  Candidate value to test.
+ * @return  True when value is non-zero.
  */
 bool IsNonZero(const double value) {
     return value != 0.0;

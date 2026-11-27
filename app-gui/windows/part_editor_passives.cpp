@@ -59,12 +59,23 @@ bool DrawParameterChoice(Core::Component &component,
 
 /**
  * @brief   The initial condition and the tolerance of the part, or empty fields when it has none.
+ * @param[in,out] fields     Initial-condition and tolerance value fields to populate.
+ * @param[in]     component  Component whose optional initial condition and tolerance are loaded.
  */
 void LoadPassiveFields(PassiveFields &fields, const Core::Component &component) {
     fields.InitialCondition.LoadOptional(component.GetInitialCondition());
     fields.Tolerance.LoadOptional(component.GetTolerance());
 }
 
+/**
+ * @brief   Draws the main value field (or block-parameter binding inside a block), snapping passive values to the
+ *          user's preferred E-series when enabled.
+ * @param[in,out] component         Component whose main value or parameter expression is edited.
+ * @param[in,out] main_value        Value input widget for the component's main value.
+ * @param[in]     block_parameters  Parameter names of the enclosing block when editing inside a block, or empty.
+ * @param[in]     preferences       User preferences supplying the standard E-series for passive parts.
+ * @param[in,out] schematic         Marked modified when the value or parameter binding changes.
+ */
 void DrawValue(Core::Component &component,
                ValueField &main_value,
                const std::vector<std::string> &block_parameters,
@@ -94,6 +105,9 @@ void DrawValue(Core::Component &component,
  * @brief   A capacitor's initial condition is a voltage and an inductor's a current; leaving the field empty means no
  *          initial condition, but once any part has one the whole transient runs with uic and an empty part starts at
  *          zero.
+ * @param[in,out] component  Capacitor or inductor whose initial condition is edited.
+ * @param[in,out] fields     Passive value fields holding the initial-condition input.
+ * @param[in,out] schematic  Marked modified when the initial condition changes.
  */
 void DrawInitialCondition(Core::Component &component, PassiveFields &fields, Schematic &schematic) {
     const bool is_capacitor = component.GetType() == Core::ComponentType::CAPACITOR;
@@ -114,6 +128,10 @@ void DrawInitialCondition(Core::Component &component, PassiveFields &fields, Sch
  * @brief   The percent the value may be off in a Monte Carlo run; an empty field means the part keeps its value. A
  *          voltage source only varies while it is a DC one, and the series of standard values of the preferences
  *          offers its own tolerance for a resistor, capacitor or inductor.
+ * @param[in,out] component    Component whose percentage tolerance is edited.
+ * @param[in,out] fields       Passive value fields holding the tolerance input.
+ * @param[in]     preferences  User preferences providing the E-series tolerance shortcut.
+ * @param[in,out] schematic    Marked modified when the tolerance changes.
  */
 void DrawTolerance(Core::Component &component,
                    PassiveFields &fields,
@@ -147,6 +165,8 @@ void DrawTolerance(Core::Component &component,
 
 /**
  * @brief   The wiper as a share of the track, counted from terminal 1.
+ * @param[in,out] pot        Potentiometer whose wiper position is edited.
+ * @param[in,out] schematic  Notified of live or static wiper changes.
  */
 void DrawWiper(Core::Potentiometer &pot, Schematic &schematic) {
     DrawFieldLabel("Wiper");

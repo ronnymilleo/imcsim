@@ -19,8 +19,7 @@ namespace GUI {
  * @brief   The new settings of a block kept as SPICE text, for the editor to apply to every instance of it.
  */
 struct SpiceSettingsResult {
-    /// The name of the block, which does not change.
-    std::string Name;
+    std::string Name; ///< The name of the block, which does not change.
     std::vector<SavedSubcircuitPin> Pins;
     std::vector<Core::SubcircuitParameter> Parameters;
 };

@@ -37,7 +37,9 @@ struct Interval {
     double To = 0.0;
 };
 
-/// The scalar product of two points taken as vectors of the plane.
+/**
+ * @brief   The scalar product of two points taken as vectors of the plane.
+ */
 double Dot(const Complex first, const Complex second) {
     return std::real(std::conj(first) * second);
 }
@@ -105,7 +107,9 @@ FindBoundary(const Complex near_side, const Complex far_side, const Complex delt
     return boundary;
 }
 
-/// The part of the unit chart on one hatch line that lies on the unstable side of a circle.
+/**
+ * @brief   The part of the unit chart on one hatch line that lies on the unstable side of a circle.
+ */
 std::vector<Interval> CutByCircle(const StabilityBoundary &boundary, const double across, const Interval chart) {
     const double circle_across = Dot(HATCH_ACROSS, boundary.Center);
     const double circle_along = Dot(HATCH_ALONG, boundary.Center);
@@ -134,7 +138,9 @@ std::vector<Interval> CutByCircle(const StabilityBoundary &boundary, const doubl
     return shared.To > shared.From ? std::vector<Interval>{shared} : std::vector<Interval>{};
 }
 
-/// The part of the unit chart on one hatch line that lies on the unstable side of a line.
+/**
+ * @brief   The part of the unit chart on one hatch line that lies on the unstable side of a line.
+ */
 std::vector<Interval> CutByLine(const StabilityBoundary &boundary, const double across, const Interval chart) {
     const double normal_across = Dot(HATCH_ACROSS, boundary.StableNormal);
     const double normal_along = Dot(HATCH_ALONG, boundary.StableNormal);

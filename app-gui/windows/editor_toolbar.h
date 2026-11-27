@@ -54,12 +54,9 @@ public:
 private:
     AnalysisControls &m_Controls;
     AnalysisSettingsPanel &m_SettingsPanel;
-    /// The document, whose simulation settings name the analysis Run starts.
-    const Schematic &m_RootSchematic;
-    /// Results of the document, read for the live run time readout.
-    const ResultStore &m_Results;
-    /// Shared playback speed kept in sync with the live simulation controls.
-    TransientPlayback &m_Playback;
+    const Schematic &m_RootSchematic; ///< The document, whose simulation settings name the analysis Run starts.
+    const ResultStore &m_Results;     ///< Results of the document, read for the live run time readout.
+    TransientPlayback &m_Playback;    ///< Shared playback speed kept in sync with the live simulation controls.
 
     // Simulation
     void DrawRunControls(float run_left, float row_top, bool is_editing_block);

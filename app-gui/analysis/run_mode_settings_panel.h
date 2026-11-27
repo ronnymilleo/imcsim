@@ -39,8 +39,7 @@ private:
     Schematic &m_Schematic;
 
     // Fields
-    /// Start, stop and step of the stepped parameter.
-    std::array<ValueField, 3> m_ParameterFields;
+    std::array<ValueField, 3> m_ParameterFields; ///< Start, stop and step of the stepped parameter.
     /// The tolerance in percent that the buttons of Monte Carlo give every part of a kind.
     ValueField m_ToleranceAllField;
     double m_ToleranceAllPercent = 5.0;

@@ -52,13 +52,10 @@ public:
     void Restore(const SavedMeasurements &measurements, const Connectivity &connectivity);
 
 private:
-    /// Probes on nodes.
-    std::vector<VoltageProbe> m_VoltageProbes;
-    /// Current names such as "R1" or "Q1.C".
-    std::set<std::string> m_MeasuredCurrents;
+    std::vector<VoltageProbe> m_VoltageProbes; ///< Probes on nodes.
+    std::set<std::string> m_MeasuredCurrents;  ///< Current names such as "R1" or "Q1.C".
     std::vector<MathChannel> m_MathChannels;
-    /// Logic signals the transient plot reads together as numbers.
-    std::vector<LogicBus> m_Buses;
+    std::vector<LogicBus> m_Buses; ///< Logic signals the transient plot reads together as numbers.
 };
 
 } // namespace GUI

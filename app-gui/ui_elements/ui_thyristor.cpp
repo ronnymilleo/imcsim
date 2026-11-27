@@ -68,6 +68,9 @@ UIThyristor::UIThyristor(const Core::ComponentType type, const GridPoint positio
 /**
  * @brief   The anode (MT2) and cathode (MT1) leads run along the axis; the gate lead runs from the cathode bar down to
  *          its terminal.
+ * @param[in,out] canvas  Where it is drawn: the editor window or an exported image.
+ * @param[in]     view    Transform of the current frame.
+ * @param[in]     color   Line color.
  */
 void UIThyristor::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     canvas.AddLine(LocalToScreen(view, -2, 0), LocalToScreen(view, -1, 0), color, LINE_THICKNESS);

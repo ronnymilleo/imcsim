@@ -112,30 +112,24 @@ private:
      * @brief   Where the canvas is this frame and what the cursor is over, which each step of the frame reads.
      */
     struct CanvasFrame {
-        /// Top left corner of the canvas on the screen.
-        ImVec2 Origin;
+        ImVec2 Origin; ///< Top left corner of the canvas on the screen.
         ImVec2 Size;
-        /// Pan and zoom, once the wheel and the middle button of this frame moved them.
-        ViewTransform View;
-        /// Whether the cursor is over the canvas.
-        bool IsHovered = false;
+        ViewTransform View;     ///< Pan and zoom, once the wheel and the middle button of this frame moved them.
+        bool IsHovered = false; ///< Whether the cursor is over the canvas.
         /// The part under the cursor that a live run lets the user set by hand, or none.
         std::optional<LivePart> HoveredLivePart;
     };
 
     Schematic &m_RootSchematic;
-    /// The results of the root schematic, the only one an analysis runs on.
-    const ResultStore &m_RootResults;
+    const ResultStore &m_RootResults; ///< The results of the root schematic, the only one an analysis runs on.
     /// What the editor shows of the results while a block is open: none, since a block has no run of its own.
     const ResultStore m_NoResults{};
-    /// Imports SPICE libraries and sets up the pins of the blocks they become.
-    SpiceImportDialog m_SpiceImport;
+    SpiceImportDialog m_SpiceImport; ///< Imports SPICE libraries and sets up the pins of the blocks they become.
     AnalysisControls &m_Controls;
     AnalysisSettingsPanel &m_SettingsPanel;
     PartEditor &m_PartEditor;
     TransientPlayback &m_Playback;
-    /// How the schematic is drawn and exported.
-    const Preferences &m_Preferences;
+    const Preferences &m_Preferences; ///< How the schematic is drawn and exported.
 
     // Parts of the editor, in the order they are built
     CanvasView m_View;
@@ -145,24 +139,18 @@ private:
     PartRail m_PartRail;
     SchematicOverlays m_Overlays;
 
-    /// What clicks and keys on the canvas do now.
-    EditorMode m_Mode;
+    EditorMode m_Mode; ///< What clicks and keys on the canvas do now.
     /// The level on show, the document or an open block, which the mode, the overlays and the view follow.
     BlockNavigator m_Navigator;
-    /// Whether wires go up or down before they turn, kept from one wire to the next.
-    bool m_WireVerticalFirst = false;
-    /// Live runs: what the mouse does to the parts set by hand, and the push button it holds.
-    LiveInputHandler m_Live;
-    /// Properties of the selected part, over the canvas.
-    PartPopover m_Popover;
-    /// What a right click opens.
-    EditorContextMenu m_ContextMenu;
+    bool m_WireVerticalFirst = false; ///< Whether wires go up or down before they turn, kept from one wire to the next.
+    LiveInputHandler m_Live; ///< Live runs: what the mouse does to the parts set by hand, and the push button it holds.
+    PartPopover m_Popover;   ///< Properties of the selected part, over the canvas.
+    EditorContextMenu m_ContextMenu; ///< What a right click opens.
     /// ImGui closes a popup on Esc before the frame starts, so the editor checks the last frame to leave that
     /// Esc alone.
     bool m_PopupOpenLastFrame = false;
 
-    /// Menu command waiting for the next Update().
-    std::optional<EditorCommand> m_RequestedCommand;
+    std::optional<EditorCommand> m_RequestedCommand; ///< Menu command waiting for the next Update().
 
     // Frame
     void Draw() override;

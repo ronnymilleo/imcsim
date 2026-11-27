@@ -29,6 +29,10 @@ struct Selection {
     std::set<std::size_t> Wires;
 
     bool Empty() const;
+    /**
+     * @brief   Checks whether two Selection instances hold equal values.
+     * @return  True when every field is equal.
+     */
     bool operator==(const Selection &) const = default;
 };
 
@@ -46,8 +50,7 @@ struct IndexRange {
  * @brief   The parts and wires a selection picks, in index order, for copying them out of the schematic.
  */
 struct SelectedItems {
-    /// Parts of the schematic, which stay owned by it.
-    std::vector<const UIElement *> Elements;
+    std::vector<const UIElement *> Elements; ///< Parts of the schematic, which stay owned by it.
     std::vector<UIWire> Wires;
 };
 
