@@ -5,6 +5,7 @@
 
 #include "simulation/ac_sensitivity.h"
 
+#include "simulation/monte_carlo.h"
 #include "simulation/sensitivity.h"
 #include "spice/spice_text.h"
 #include <algorithm>
@@ -33,7 +34,8 @@ ACPartSensitivity MakePart(const Component &part, const ACElementFigures &figure
             .Unit = part.GetUnit(),
             .Value = figures.Value,
             .MagnitudeDecibelsPerPercent = figures.MagnitudeDecibelsPerPercent,
-            .PhaseDegreesPerPercent = figures.PhaseDegreesPerPercent};
+            .PhaseDegreesPerPercent = figures.PhaseDegreesPerPercent,
+            .TolerancePercent = IsVaried(part) ? part.GetTolerance() : std::nullopt};
 }
 
 /**

@@ -7,6 +7,7 @@
 #include "results/sensitivity_view.h"
 
 #include "results/logarithmic_level.h"
+#include "simulation/worst_case.h"
 #include "spice/spice_value.h"
 #include <algorithm>
 #include <cmath>
@@ -18,6 +19,14 @@ namespace {
 
 std::string FormatUnit(const std::string &unit, const std::string &prefix) {
     return unit.empty() ? prefix : std::format("{}/{}", prefix, unit);
+}
+
+std::string FormatPartTolerance(const Core::PartSensitivity &part) {
+    const std::optional<double> delta = Core::GetPartWorstCaseChange(part);
+    if (!delta || !part.TolerancePercent) {
+        return "-";
+    }
+    return std::format("±{}V ({}%)", Core::FormatValue(*delta), Core::FormatValue(*part.TolerancePercent));
 }
 
 } // namespace
@@ -90,10 +99,29 @@ std::vector<SensitivityRow> MakeSensitivityRows(const Core::Sensitivity &sensiti
         }
         row.Absolute = std::format("{}{}", Core::FormatValue(part.Absolute), FormatUnit(part.Unit, "V"));
         row.Normalized = std::format("{}V", Core::FormatValue(part.Normalized / SENSITIVITY_PERCENT));
+        row.Tolerance = FormatPartTolerance(part);
         row.Share = largest > 0.0 ? std::abs(part.Normalized) / largest : 0.0;
         rows.push_back(std::move(row));
     }
     return rows;
+}
+
+/**
+ * @brief   Formats the analytical worst-case summary line above the DC sensitivity table.
+ * @param[in] sensitivity  The result.
+ * @return  Summary of EVA and RSS bounds when at least one part has a tolerance, or none otherwise.
+ */
+std::optional<std::string> FormatWorstCaseSummary(const Core::Sensitivity &sensitivity) {
+    const Core::DCWorstCase worst_case = Core::ComputeWorstCase(sensitivity);
+    if (worst_case.TolerancedPartCount == 0) {
+        return std::nullopt;
+    }
+    const char *part_word = worst_case.TolerancedPartCount == 1 ? "part" : "parts";
+    return std::format("Worst case from {} toleranced {}: ±{}V (extreme) · ±{}V (RSS)",
+                       worst_case.TolerancedPartCount,
+                       part_word,
+                       Core::FormatValue(worst_case.ExtremeVolts),
+                       Core::FormatValue(worst_case.RssVolts));
 }
 
 } // namespace GUI

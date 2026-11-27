@@ -97,6 +97,15 @@ void DrawSensitivity(const Core::Sensitivity &sensitivity, Schematic &schematic)
     ImGui::PushTextWrapPos(0.0f);
     ImGui::TextDisabled("How the DC voltage of %s changes with the value of each part, around the operating point",
                         GetVoltageLabel(schematic.GetConnectivity(), sensitivity.OutputNode).c_str());
+    if (const std::optional<std::string> summary = FormatWorstCaseSummary(sensitivity)) {
+        ImGui::TextUnformatted(summary->c_str());
+        ImGui::SetItemTooltip("Extreme adds every toleranced part's worst corner together; RSS takes the root sum of "
+                              "squares for independent tolerances");
+    } else {
+        ImGui::TextDisabled(
+            "Set tolerances on resistors, capacitors, inductors or DC voltage sources to bound the worst-case "
+            "output change here without Monte Carlo sampling");
+    }
     ImGui::PopTextWrapPos();
     constexpr ImGuiTableFlags TABLE_FLAGS =
         ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_ScrollY;
@@ -104,12 +113,13 @@ void DrawSensitivity(const Core::Sensitivity &sensitivity, Schematic &schematic)
     const ImVec2 table_size = {0.0f,
                                std::max(ImGui::GetContentRegionAvail().y - ImGui::GetFrameHeightWithSpacing() * 2.0f,
                                         ImGui::GetFontSize() * 6.0f)};
-    if (ImGui::BeginTable("sensitivity", 5, TABLE_FLAGS, table_size)) {
+    if (ImGui::BeginTable("sensitivity", 6, TABLE_FLAGS, table_size)) {
         ImGui::TableSetupScrollFreeze(0, 1);
         ImGui::TableSetupColumn("Part");
         ImGui::TableSetupColumn("Value");
         ImGui::TableSetupColumn("Absolute");
         ImGui::TableSetupColumn("Per 1 %");
+        ImGui::TableSetupColumn("Worst case");
         ImGui::TableSetupColumn("Share of largest");
         ImGui::TableHeadersRow();
         for (const SensitivityRow &row : MakeSensitivityRows(sensitivity)) {
@@ -124,6 +134,8 @@ void DrawSensitivity(const Core::Sensitivity &sensitivity, Schematic &schematic)
             ImGui::TextUnformatted(row.Absolute.c_str());
             ImGui::TableNextColumn();
             ImGui::TextUnformatted(row.Normalized.c_str());
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(row.Tolerance.c_str());
             ImGui::TableNextColumn();
             ImGui::ProgressBar(static_cast<float>(row.Share),
                                {-FLT_MIN, 0.0f},

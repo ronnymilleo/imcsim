@@ -37,6 +37,8 @@ struct SensitivityRow {
     std::string Absolute;
     /// Volts for a 1 % change of the value, signed.
     std::string Normalized;
+    /// Worst-case output change at the part's tolerance, such as "±125mV (5%)", or "-" when untoleranced.
+    std::string Tolerance;
     /// The size of the normalized sensitivity as a share of the largest, from 0 to 1.
     double Share = 0.0;
 };
@@ -53,6 +55,7 @@ std::optional<float> FindSensitivityLevel(const Core::Sensitivity &sensitivity, 
 
 // Table
 std::vector<SensitivityRow> MakeSensitivityRows(const Core::Sensitivity &sensitivity);
+std::optional<std::string> FormatWorstCaseSummary(const Core::Sensitivity &sensitivity);
 
 } // namespace GUI
 

@@ -104,6 +104,7 @@ add_library(imcsim-core-lib
             simulation/simulation_service.cpp
             simulation/simulator.cpp
             simulation/stepped_circuit.cpp
+            simulation/worst_case.cpp
             spice/spice_inclusions.cpp
             spice/spice_text.cpp
             spice/spice_value.cpp

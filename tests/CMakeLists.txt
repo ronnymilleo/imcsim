@@ -175,6 +175,7 @@ add_executable(imcsim-tests
             voltage_probes_tests.cpp
             wire_editing_tests.cpp
             wire_routing_tests.cpp
+            worst_case_tests.cpp
 )
 
 # The oracle that rebuilds a response from its poles and zeros is shared with the Nodalys tests
