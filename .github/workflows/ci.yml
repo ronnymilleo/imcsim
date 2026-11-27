@@ -99,7 +99,7 @@ jobs:
     container: archlinux:base-20261122.0.629543
     steps:
       - name: Install dependencies
-        run: pacman -Syu --noconfirm --needed git python
+        run: pacman -Syu --noconfirm --needed git python doxygen
 
       - name: Check out the repository
         uses: actions/checkout@v7
@@ -119,6 +119,9 @@ jobs:
 
       - name: Check the Nodalys declaration ordering
         run: python tools/file_order_check.py nodalys
+
+      - name: Check Doxygen warnings and documentation rules
+        run: python tools/doxygen_check.py
 
   # clang-tidy takes longer than the build and the tests together, so it runs beside them; it needs a build for the
   # compile database and the generated headers, which the compiler cache of its own makes quick
