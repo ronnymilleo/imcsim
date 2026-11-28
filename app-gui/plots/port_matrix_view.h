@@ -49,6 +49,8 @@ bool AreAllFrequenciesAbsent(const Core::SParameters &result, SParameterQuantity
 std::string DescribeAbsentFrequencies(const Core::SParameters &result, SParameterQuantity quantity);
 
 // Curves
+std::vector<std::complex<double>>
+ListMatrixValues(const Core::SParameters &result, const SParameterEntry &entry, SParameterQuantity quantity);
 std::vector<double>
 ListMatrixMagnitudes(const Core::SParameters &result, const SParameterEntry &entry, SParameterQuantity quantity);
 std::vector<double>
@@ -72,6 +74,9 @@ ExportFigure BuildMatrixMagnitudePhaseFigure(const Core::SParameters &result,
                                              const std::vector<SParameterEntry> &entries,
                                              const std::optional<ExportRange> &view,
                                              SParameterQuantity quantity);
+ExportFigure BuildMatrixPolarFigure(const Core::SParameters &result,
+                                    const std::vector<SParameterEntry> &entries,
+                                    SParameterQuantity quantity);
 ExportFigure BuildMatrixTableFigure(const Core::SParameters &result,
                                     const std::vector<SParameterEntry> &entries,
                                     SParameterQuantity quantity);

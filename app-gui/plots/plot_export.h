@@ -9,6 +9,7 @@
 #define IMCSIM_PLOT_EXPORT_H
 
 #include "base/svg_writer.h"
+#include "plots/complex_plane.h"
 #include <complex>
 #include <cstddef>
 #include <expected>
@@ -151,6 +152,33 @@ struct ExportSmith {
 };
 
 /**
+ * @struct  ExportComplexTrace
+ * @brief   One complex-valued frequency locus on a Polar or Nyquist plot.
+ */
+struct ExportComplexTrace {
+    std::string Name;        ///< Heads its CSV real/imaginary columns.
+    std::string LegendLabel; ///< Empty: omitted from the legend, as for non-selected parameter steps.
+    std::string Unit;        ///< Unit appended to CSV column headers when non-empty.
+    ExportColor Color;
+    bool Dashed = false;
+    bool Faint = false; ///< Drawn lighter in the background, as for stepped parameter runs.
+    std::vector<double> Frequencies;
+    std::vector<std::complex<double>> Values;
+};
+
+/**
+ * @struct  ExportComplexPlane
+ * @brief   A Polar or Nyquist diagram in the complex plane, with equal real and imaginary scales.
+ */
+struct ExportComplexPlane {
+    std::string Title;
+    ComplexPlaneKind Kind = ComplexPlaneKind::POLAR;
+    bool MirrorNegativeFrequencies = false; ///< Draws the conjugate negative-frequency locus on Nyquist plots.
+    std::optional<std::complex<double>> CriticalPoint; ///< Marked on Nyquist plots (typically `-1 + j0`).
+    std::vector<ExportComplexTrace> Traces;
+};
+
+/**
  * @struct  ExportFigure
  * @brief   Panels stacked top to bottom that share one X axis and its samples.
  */
@@ -163,6 +191,9 @@ struct ExportFigure {
     /// A Smith chart in place of the panels: when set, only it is drawn, and its CSV lists the real and imaginary
     /// parts, then the stability circles.
     std::optional<ExportSmith> Smith;
+    /// A Polar or Nyquist plot in place of the panels: when set, renders on equal complex-plane axes and exports
+    /// real and imaginary columns to CSV.
+    std::optional<ExportComplexPlane> ComplexPlane;
 };
 
 /**

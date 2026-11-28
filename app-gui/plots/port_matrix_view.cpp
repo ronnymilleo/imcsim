@@ -195,6 +195,27 @@ std::string DescribeAbsentFrequencies(const Core::SParameters &result, const SPa
 }
 
 /**
+ * @brief   Lists the complex value of a matrix entry at every frequency.
+ * @param[in] result    Result of the sweep.
+ * @param[in] entry     Entry to list; it must lie inside the matrix.
+ * @param[in] quantity  Scattering, impedance or admittance.
+ * @return  Complex entry per frequency, with NaN real and imaginary parts where Z or Y is missing.
+ */
+std::vector<std::complex<double>>
+ListMatrixValues(const Core::SParameters &result, const SParameterEntry &entry, const SParameterQuantity quantity) {
+    if (quantity == SParameterQuantity::S) {
+        return ListValues(result, entry);
+    }
+    std::vector<std::complex<double>> values;
+    values.reserve(result.Frequencies.size());
+    for (std::size_t frequency = 0; frequency < result.Frequencies.size(); ++frequency) {
+        const std::optional<std::complex<double>> value = ReadMatrixValue(result, frequency, entry, quantity);
+        values.push_back(value.value_or(std::complex<double>{MISSING, MISSING}));
+    }
+    return values;
+}
+
+/**
  * @brief   Lists the magnitude of an entry at every frequency.
  * @param[in] result    Result of the sweep.
  * @param[in] entry     Entry to list; it must lie inside the matrix.
@@ -374,6 +395,34 @@ ExportFigure BuildMatrixMagnitudePhaseFigure(const Core::SParameters &result,
     }
     figure.Panels.push_back(std::move(magnitude));
     figure.Panels.push_back(std::move(phase));
+    return figure;
+}
+
+/**
+ * @brief   Builds an `ExportFigure` of the Polar view of checked S, Z or Y matrix entries.
+ * @param[in] result    Result of the sweep.
+ * @param[in] entries   Entries to draw, which must lie inside the matrix.
+ * @param[in] quantity  Scattering, impedance or admittance.
+ * @return  Export figure carrying `ComplexPlane` with `POLAR` kind.
+ */
+ExportFigure BuildMatrixPolarFigure(const Core::SParameters &result,
+                                    const std::vector<SParameterEntry> &entries,
+                                    const SParameterQuantity quantity) {
+    const std::string unit = GetQuantityUnit(quantity);
+    ExportComplexPlane plane;
+    plane.Title = std::format("{}-parameters polar plot", GetQuantityLetter(quantity));
+    plane.Kind = ComplexPlaneKind::POLAR;
+    for (std::size_t index = 0; index < entries.size(); ++index) {
+        const std::string name = GetMatrixEntryName(entries[index], quantity);
+        plane.Traces.push_back({.Name = name,
+                                .LegendLabel = name,
+                                .Unit = unit,
+                                .Color = GetEntryColor(index),
+                                .Frequencies = result.Frequencies,
+                                .Values = ListMatrixValues(result, entries[index], quantity)});
+    }
+    ExportFigure figure;
+    figure.ComplexPlane = std::move(plane);
     return figure;
 }
 

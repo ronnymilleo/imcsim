@@ -86,6 +86,29 @@ std::string RenderCirclesCsv(const ExportSmith &smith) {
     return text;
 }
 
+/**
+ * @brief   The table of a Polar or Nyquist plot: a row per frequency, with the real and imaginary parts of each trace.
+ */
+std::string RenderComplexPlaneCsv(const ExportComplexPlane &plane) {
+    std::string text = CsvHeader("Frequency", "Hz");
+    for (const ExportComplexTrace &trace : plane.Traces) {
+        text +=
+            "," + CsvHeader(trace.Name + " real", trace.Unit) + "," + CsvHeader(trace.Name + " imaginary", trace.Unit);
+    }
+    text += "\n";
+    const std::size_t rows = plane.Traces.empty() ? 0 : plane.Traces.front().Frequencies.size();
+    for (std::size_t row = 0; row < rows; ++row) {
+        text += FormatCsvValue(plane.Traces.front().Frequencies[row]);
+        for (const ExportComplexTrace &trace : plane.Traces) {
+            const bool has_value = row < trace.Values.size();
+            text += "," + (has_value ? FormatCsvValue(trace.Values[row].real()) : "") + ","
+                  + (has_value ? FormatCsvValue(trace.Values[row].imag()) : "");
+        }
+        text += "\n";
+    }
+    return text;
+}
+
 } // namespace
 
 /**
@@ -100,6 +123,9 @@ std::string RenderCirclesCsv(const ExportSmith &smith) {
 std::string RenderCsv(const ExportFigure &figure) {
     if (figure.Smith) {
         return RenderSmithCsv(*figure.Smith) + RenderCirclesCsv(*figure.Smith);
+    }
+    if (figure.ComplexPlane) {
+        return RenderComplexPlaneCsv(*figure.ComplexPlane);
     }
     std::vector<const ExportSeries *> columns;
     std::string text = CsvHeader(figure.XAxis.Name, figure.XAxis.Unit);

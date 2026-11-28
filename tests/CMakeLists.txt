@@ -33,6 +33,7 @@ add_executable(imcsim-tests
             clipboard_tests.cpp
             code_models.cpp
             color_legend_tests.cpp
+            complex_plane_tests.cpp
             component_tests.cpp
             connectivity_tests.cpp
             controlled_sources_tests.cpp
