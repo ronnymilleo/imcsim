@@ -7,6 +7,7 @@
 
 #include "plots/plot_export.h"
 
+#include "plots/plot_export_complex.h"
 #include "plots/plot_export_smith.h"
 #include "plots/plot_export_style.h"
 #include "plots/plot_ticks.h"
@@ -586,6 +587,12 @@ std::expected<std::string, std::string> RenderSvg(const ExportFigure &figure, co
             return std::unexpected("There is nothing to export");
         }
         return RenderSmith(*figure.Smith, style);
+    }
+    if (figure.ComplexPlane) {
+        if (figure.ComplexPlane->Traces.empty()) {
+            return std::unexpected("There is nothing to export");
+        }
+        return RenderComplexPlane(*figure.ComplexPlane, style);
     }
     if (figure.Panels.empty() || figure.Xs.empty()) {
         return std::unexpected("There is nothing to export");

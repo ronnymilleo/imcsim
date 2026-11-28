@@ -72,8 +72,6 @@ private:
     const Core::ACSweep &m_Sweep;
 
     Value GetJOmega(std::size_t index) const;
-    static std::vector<Value> ToPhasors(const std::vector<double> &magnitudes_decibels,
-                                        const std::vector<double> &phases_degrees);
 };
 
 /**
@@ -86,6 +84,8 @@ struct PhasorFigures {
 };
 
 // Phasors
+std::vector<std::complex<double>> ToPhasors(const std::vector<double> &magnitudes_decibels,
+                                            const std::vector<double> &phases_degrees);
 PhasorFigures ToDecibelsAndDegrees(std::complex<double> phasor);
 
 } // namespace GUI

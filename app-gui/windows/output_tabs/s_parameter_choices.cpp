@@ -12,8 +12,9 @@ namespace {
 
 constexpr std::size_t S_MAGNITUDE_PHASE_SLOT = 0;
 constexpr std::size_t S_SMITH_SLOT = 1;
-constexpr std::size_t Z_SLOT = 2;
-constexpr std::size_t Y_SLOT = 3;
+constexpr std::size_t S_POLAR_SLOT = 2;
+constexpr std::size_t Z_SLOT = 3;
+constexpr std::size_t Y_SLOT = 4;
 
 } // namespace
 
@@ -68,7 +69,10 @@ std::size_t SParameterSelections::GetSlot(const SParameterQuantity quantity, con
         return Y_SLOT;
     case SParameterQuantity::S:
     default:
-        return view == SParameterView::SMITH ? S_SMITH_SLOT : S_MAGNITUDE_PHASE_SLOT;
+        if (view == SParameterView::SMITH) {
+            return S_SMITH_SLOT;
+        }
+        return view == SParameterView::POLAR ? S_POLAR_SLOT : S_MAGNITUDE_PHASE_SLOT;
     }
 }
 
@@ -94,7 +98,10 @@ SParameterBody ChooseBody(const Core::SParameters &result,
     if (!has_checked) {
         return SParameterBody::NOTHING_CHECKED;
     }
-    return view == SParameterView::SMITH ? SParameterBody::SMITH : SParameterBody::MAGNITUDE_PHASE;
+    if (view == SParameterView::SMITH) {
+        return SParameterBody::SMITH;
+    }
+    return view == SParameterView::POLAR ? SParameterBody::POLAR : SParameterBody::MAGNITUDE_PHASE;
 }
 
 } // namespace GUI

@@ -208,11 +208,18 @@ PhasorSamples::Value PhasorSamples::GetJOmega(const std::size_t index) const {
     return {0.0, 2.0 * std::numbers::pi * m_Sweep.Frequencies[index]};
 }
 
-std::vector<PhasorSamples::Value> PhasorSamples::ToPhasors(const std::vector<double> &magnitudes_decibels,
-                                                           const std::vector<double> &phases_degrees) {
-    std::vector<Value> phasors;
-    phasors.reserve(magnitudes_decibels.size());
-    for (std::size_t index = 0; index < magnitudes_decibels.size(); ++index) {
+/**
+ * @brief   Rebuilds complex phasors from their magnitudes in decibels (20*log10) and phases in degrees.
+ * @param[in] magnitudes_decibels  Magnitudes in dB, one per frequency.
+ * @param[in] phases_degrees       Phases in degrees, one per frequency.
+ * @return  One complex phasor per paired sample.
+ */
+std::vector<std::complex<double>> ToPhasors(const std::vector<double> &magnitudes_decibels,
+                                            const std::vector<double> &phases_degrees) {
+    const std::size_t count = std::min(magnitudes_decibels.size(), phases_degrees.size());
+    std::vector<std::complex<double>> phasors;
+    phasors.reserve(count);
+    for (std::size_t index = 0; index < count; ++index) {
         phasors.push_back(std::polar(std::pow(10.0, magnitudes_decibels[index] / DECIBELS_PER_DECADE),
                                      phases_degrees[index] * std::numbers::pi / HALF_TURN_DEGREES));
     }

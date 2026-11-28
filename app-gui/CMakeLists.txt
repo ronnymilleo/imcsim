@@ -51,10 +51,13 @@ add_library(imcsim-gui-lib
             overlays/part_heat.cpp
             overlays/readout_placement.cpp
             overlays/schematic_overlays.cpp
+            plots/ac_complex_view.cpp
+            plots/complex_plane.cpp
             plots/harmonic_balance_view.cpp
             plots/logic_buses.cpp
             plots/math_channels.cpp
             plots/plot_export.cpp
+            plots/plot_export_complex.cpp
             plots/plot_export_csv.cpp
             plots/plot_export_smith.cpp
             plots/plot_export_style.cpp
@@ -206,6 +209,7 @@ add_library(imcsim-gui-lib
             windows/netlist_window.cpp
             windows/output_tabs/ac_sensitivity_tab.cpp
             windows/output_tabs/ac_sweep_tab.cpp
+            windows/output_tabs/complex_plane_plot.cpp
             windows/output_tabs/cursor_widgets.cpp
             windows/output_tabs/dc_sweep_tab.cpp
             windows/output_tabs/harmonic_balance_tab.cpp
