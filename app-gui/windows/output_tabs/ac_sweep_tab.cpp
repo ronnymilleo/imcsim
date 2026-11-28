@@ -47,13 +47,23 @@ void ACSweepTab::Draw(const FrameResults &frame) {
                                 frame.AnythingMeasured || !frame.ACSweepMath.Magnitudes.empty()
                                     ? "Relative to the AC magnitude of the sources: a magnitude of 1 reads as gain"
                                     : NOTHING_MEASURED);
-            DrawCursorToggle(m_Cursors, right_edge);
+            if (m_ViewMode == ACSweepView::BODE) {
+                DrawCursorToggle(m_Cursors, right_edge);
+            }
             DrawMathErrors(frame.ACSweepErrors);
-            if (const auto &pole_zero = m_Results.GetPoleZero()) {
+            DrawViewChoices();
+            if (m_ViewMode == ACSweepView::BODE && m_Results.GetPoleZero()) {
+                ImGui::SameLine();
                 ImGui::Checkbox("Show poles and zeros", &m_ShowPoleZero);
                 ImGui::SetItemTooltip(
                     "Mark the natural frequency of each pole (p) and zero (z) of the last Poles and zeros "
                     "analysis with a dashed line; the colors are those of its s-plane");
+            }
+            if (m_ViewMode == ACSweepView::NYQUIST) {
+                ImGui::SameLine();
+                ImGui::Checkbox("Mirror negative frequencies", &m_MirrorNegativeFrequencies);
+                ImGui::SetItemTooltip("Draw the conjugate branch H(-jw) = conj(H(jw)) dashed to complete the Nyquist "
+                                      "contour");
             }
             if (const auto &steps = m_Results.GetACSweepSteps()) {
                 if (const std::optional<std::size_t> picked =
@@ -61,7 +71,11 @@ void ACSweepTab::Draw(const FrameResults &frame) {
                     m_Results.SelectACSweepStep(*picked);
                 }
             }
-            DrawPlots(*sweep, frame.ACSweepMath);
+            if (m_ViewMode == ACSweepView::BODE) {
+                DrawPlots(*sweep, frame.ACSweepMath);
+            } else {
+                DrawComplexView(*sweep, frame.ACSweepMath);
+            }
         },
         [&] { DrawStatistics(*sweep, frame.ACSweepMath); });
 }
@@ -76,15 +90,66 @@ bool ACSweepTab::CanExport(const FrameResults &frame) const {
 }
 
 /**
- * @brief   The figure of both Bode plots for the export, over the visible frequency range.
+ * @brief   The figure of the active AC sweep view (Bode, Nyquist or Polar) for the export.
  * @param[in] frame  The math channels over the sweep.
  * @return  The figure, or an empty one without an AC sweep.
  */
 ExportFigure ACSweepTab::BuildFigure(const FrameResults &frame) const {
     if (const std::optional<Core::ACSweep> &sweep = m_Results.GetACSweep()) {
-        return BuildACSweepFigure(*sweep, frame.ACSweepMath, m_Results, m_Schematic, m_View);
+        if (m_ViewMode == ACSweepView::BODE) {
+            return BuildACSweepFigure(*sweep, frame.ACSweepMath, m_Results, m_Schematic, m_View);
+        }
+        const ComplexPlaneKind kind =
+            m_ViewMode == ACSweepView::NYQUIST ? ComplexPlaneKind::NYQUIST : ComplexPlaneKind::POLAR;
+        return BuildACSweepComplexFigure(*sweep,
+                                         frame.ACSweepMath,
+                                         m_Results,
+                                         m_Schematic,
+                                         kind,
+                                         m_MirrorNegativeFrequencies);
     }
     return {};
+}
+
+void ACSweepTab::DrawViewChoices() {
+    if (ImGui::RadioButton("Bode", m_ViewMode == ACSweepView::BODE)) {
+        m_ViewMode = ACSweepView::BODE;
+    }
+    ImGui::SameLine();
+    if (ImGui::RadioButton("Nyquist", m_ViewMode == ACSweepView::NYQUIST)) {
+        m_ViewMode = ACSweepView::NYQUIST;
+        m_IsComplexFitting = true;
+    }
+    ImGui::SetItemTooltip("Complex-plane locus Re vs Im with the unit circle and critical point (-1, 0)");
+    ImGui::SameLine();
+    if (ImGui::RadioButton("Polar", m_ViewMode == ACSweepView::POLAR)) {
+        m_ViewMode = ACSweepView::POLAR;
+        m_IsComplexFitting = true;
+    }
+    ImGui::SetItemTooltip("Magnitude and phase on concentric circles and 30-degree angle spokes");
+}
+
+void ACSweepTab::DrawComplexView(const Core::ACSweep &sweep, const ACMathTraces &math) {
+    ShownTraces shown{.Nodes = ListMeasuredNodes(sweep.NodeMagnitudesDecibels.size(), m_Schematic),
+                      .Currents = ListMeasuredCurrents(sweep.CurrentMagnitudesDecibels, m_Schematic),
+                      .MathLabels = ListMathLabels(math.Magnitudes)};
+    const TraceFits fits = m_Fit.TakeFits(m_Results.GetACSweepVersion(), std::move(shown));
+    if (fits.IsNewResult || fits.HaveVoltagesChanged || fits.HaveCurrentsChanged || fits.HasMathChanged) {
+        m_IsComplexFitting = true;
+    }
+    const std::vector<ComplexLocus> loci = BuildACSweepComplexLoci(sweep, math, m_Results, m_Schematic);
+    const ComplexPlaneKind kind =
+        m_ViewMode == ACSweepView::NYQUIST ? ComplexPlaneKind::NYQUIST : ComplexPlaneKind::POLAR;
+    m_ComplexPlot.Draw(
+        kind == ComplexPlaneKind::NYQUIST ? "##ac_nyquist" : "##ac_polar",
+        kind,
+        loci,
+        m_MirrorNegativeFrequencies,
+        false,
+        m_IsComplexFitting,
+        [&](const std::size_t locus_index, const std::size_t sample_index) {
+            return DescribeACSweepComplexReading(sweep.Frequencies[sample_index], loci[locus_index], sample_index);
+        });
 }
 
 /**
@@ -193,8 +258,10 @@ void ACSweepTab::DrawRoots(const bool has_labels) {
  *          that the -3 dB points refer to; the cursors only read the gain and phase at two frequencies.
  */
 void ACSweepTab::DrawStatistics(const Core::ACSweep &sweep, const ACMathTraces &math) {
+    const bool use_cursors = m_ViewMode == ACSweepView::BODE;
     const PlotCursors &cursors = m_Cursors;
-    const CursorReadings cursor_readings = ReadCursors(cursors, "Hz", {ReadCursorDecades(cursors)});
+    const CursorReadings cursor_readings =
+        use_cursors ? ReadCursors(cursors, "Hz", {ReadCursorDecades(cursors)}) : CursorReadings{};
     DrawStatisticsHeader("Response over the whole sweep");
     std::vector<PlottedTrace> magnitudes =
         ListTraces(sweep.NodeMagnitudesDecibels, sweep.CurrentMagnitudesDecibels, m_Schematic, " dB", " dB");
@@ -213,7 +280,8 @@ void ACSweepTab::DrawStatistics(const Core::ACSweep &sweep, const ACMathTraces &
     for (std::size_t index = 0; index < magnitudes.size(); ++index) {
         traces.push_back({.MagnitudesDecibels = *magnitudes[index].Values, .PhasesDegrees = *phases[index].Values});
     }
-    const std::vector<StatisticsRow> rows = BuildBodeStatistics(sweep.Frequencies, traces, GetShownCursors(cursors));
+    const std::vector<StatisticsRow> rows =
+        BuildBodeStatistics(sweep.Frequencies, traces, use_cursors ? GetShownCursors(cursors) : std::nullopt);
     DrawTraceTable("bode_statistics", magnitudes, rows, cursor_readings);
 }
 

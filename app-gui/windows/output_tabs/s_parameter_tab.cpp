@@ -81,6 +81,9 @@ void SParameterTab::Draw(PlotExporter &exporter) {
     case SParameterBody::SMITH:
         m_Smith.Draw(*result, m_Selections.Get(m_Quantity, view).ListShown(), m_Stability, m_IsFitting);
         break;
+    case SParameterBody::POLAR:
+        DrawPolar(*result, view);
+        break;
     case SParameterBody::MAGNITUDE_PHASE:
     default:
         DrawMagnitudePhase(*result, view);
@@ -121,6 +124,9 @@ ExportFigure SParameterTab::BuildFigure(const bool is_table) const {
                         : BuildStabilityFigure(sweep, ExportRange{.From = m_View.From, .To = m_View.To});
     }
     const std::vector<SParameterEntry> entries = m_Selections.Get(m_Quantity, view).ListShown();
+    if (view == SParameterView::POLAR && !is_table) {
+        return BuildMatrixPolarFigure(*result, entries, m_Quantity);
+    }
     if (m_Quantity != SParameterQuantity::S) {
         return is_table ? BuildMatrixTableFigure(*result, entries, m_Quantity)
                         : BuildMatrixMagnitudePhaseFigure(*result,
@@ -161,7 +167,7 @@ void SParameterTab::StartResult(const Core::SParameters &result) {
  */
 SParameterView SParameterTab::GetDisplayedView(const Core::SParameters &result) const {
     if (m_Quantity != SParameterQuantity::S) {
-        return SParameterView::MAGNITUDE_PHASE;
+        return m_MatrixDisplay;
     }
     if (m_Display == SParameterView::STABILITY && !IsTwoPort(result)) {
         return SParameterView::SMITH;
@@ -187,7 +193,8 @@ void SParameterTab::DrawControls(const Core::SParameters &result, PlotExporter &
     if (view == SParameterView::SMITH) {
         m_Smith.DrawCircleControls(result, m_Stability);
     }
-    if (view == SParameterView::MAGNITUDE_PHASE && m_Quantity != SParameterQuantity::S) {
+    if ((view == SParameterView::MAGNITUDE_PHASE || view == SParameterView::POLAR)
+        && m_Quantity != SParameterQuantity::S) {
         const std::string absent = DescribeAbsentFrequencies(result, m_Quantity);
         if (!absent.empty() && !AreAllFrequenciesAbsent(result, m_Quantity)) {
             ShowWrapped(absent);
@@ -258,8 +265,24 @@ void SParameterTab::DrawViewChoice(const Core::SParameters &result, const SParam
         m_IsFitting = true;
     }
     ImGui::SameLine();
-    if (DrawChoice("Magnitude and phase", view == SParameterView::MAGNITUDE_PHASE, true, "") && is_s) {
-        m_Display = SParameterView::MAGNITUDE_PHASE;
+    if (DrawChoice("Polar",
+                   view == SParameterView::POLAR,
+                   true,
+                   "Magnitude and phase on concentric circles and 30-degree angle spokes")) {
+        if (is_s) {
+            m_Display = SParameterView::POLAR;
+        } else {
+            m_MatrixDisplay = SParameterView::POLAR;
+        }
+        m_IsFitting = true;
+    }
+    ImGui::SameLine();
+    if (DrawChoice("Magnitude and phase", view == SParameterView::MAGNITUDE_PHASE, true, "")) {
+        if (is_s) {
+            m_Display = SParameterView::MAGNITUDE_PHASE;
+        } else {
+            m_MatrixDisplay = SParameterView::MAGNITUDE_PHASE;
+        }
         m_IsFitting = true;
     }
     ImGui::SameLine();
@@ -301,6 +324,32 @@ void SParameterTab::DrawSelection(const Core::SParameters &result, const SParame
             }
         }
     }
+}
+
+void SParameterTab::DrawPolar(const Core::SParameters &result, const SParameterView view) {
+    const std::vector<SParameterEntry> entries = m_Selections.Get(m_Quantity, view).ListShown();
+    const std::string unit = GetQuantityUnit(m_Quantity);
+    std::vector<ComplexLocus> loci;
+    loci.reserve(entries.size());
+    for (std::size_t index = 0; index < entries.size(); ++index) {
+        const std::string name = GetMatrixEntryName(entries[index], m_Quantity);
+        loci.push_back({.Name = name,
+                        .LegendLabel = name,
+                        .Unit = unit,
+                        .Color = ImGui::GetColorU32(ToImVec4(GetEntryColor(index))),
+                        .IsDashed = false,
+                        .IsFaint = false,
+                        .Values = ListMatrixValues(result, entries[index], m_Quantity)});
+    }
+    m_Polar.Draw("##sp_polar",
+                 ComplexPlaneKind::POLAR,
+                 loci,
+                 false,
+                 true,
+                 m_IsFitting,
+                 [&](const std::size_t locus_index, const std::size_t sample_index) {
+                     return DescribeMatrixReadings(result, sample_index, {entries[locus_index]}, m_Quantity);
+                 });
 }
 
 /**

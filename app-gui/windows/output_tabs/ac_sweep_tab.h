@@ -6,12 +6,14 @@
 #ifndef IMCSIM_AC_SWEEP_TAB_H
 #define IMCSIM_AC_SWEEP_TAB_H
 
+#include "plots/ac_complex_view.h"
 #include "plots/plot_export.h"
 #include "plots/plot_types.h"
 #include "plots/trace_fit_state.h"
 #include "results/result_store.h"
 #include "schematic/schematic.h"
 #include "simulation/simulation_results.h"
+#include "windows/output_tabs/complex_plane_plot.h"
 #include "windows/output_tabs/frame_results.h"
 #include <string>
 #include <vector>
@@ -74,7 +76,13 @@ private:
     PlotSpan m_View{.From = 1.0, .To = 1e6}; ///< The visible frequency range, shared by both plots.
     /// Whether the plots mark the poles and zeros of the last pole-zero analysis, when there is one.
     bool m_ShowPoleZero = false;
+    ACSweepView m_ViewMode = ACSweepView::BODE;
+    bool m_MirrorNegativeFrequencies = false; ///< Draws the conjugate negative-frequency locus on Nyquist plots.
+    bool m_IsComplexFitting = true;
+    ComplexPlanePlot m_ComplexPlot;
 
+    void DrawViewChoices();
+    void DrawComplexView(const Core::ACSweep &sweep, const ACMathTraces &math);
     void DrawPlots(const Core::ACSweep &sweep, const ACMathTraces &math);
     void DrawPlot(const Core::ACSweep &sweep, const BodePlot &plot, const PlotFits &fits);
     void DrawRoots(bool has_labels);

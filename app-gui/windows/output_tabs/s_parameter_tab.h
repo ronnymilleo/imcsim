@@ -15,6 +15,7 @@
 #include "results/result_store.h"
 #include "schematic/schematic.h"
 #include "simulation/simulation_results.h"
+#include "windows/output_tabs/complex_plane_plot.h"
 #include "windows/output_tabs/s_parameter_choices.h"
 #include "windows/output_tabs/s_parameter_smith.h"
 #include "windows/output_tabs/s_parameter_stability.h"
@@ -56,6 +57,8 @@ private:
     SParameterQuantity m_Quantity = SParameterQuantity::S;
     /// The view the user chose for S, which Z and Y leave alone and S gets back.
     SParameterView m_Display = SParameterView::SMITH;
+    /// The view chosen for Z and Y (`POLAR` or `MAGNITUDE_PHASE`).
+    SParameterView m_MatrixDisplay = SParameterView::MAGNITUDE_PHASE;
 
     // Fit
     /// The visible frequency range of the magnitude and phase plots, shared by both.
@@ -67,6 +70,7 @@ private:
     // Views
     TouchstoneExportControl m_Touchstone;
     SParameterSmithChart m_Smith;
+    ComplexPlanePlot m_Polar;
     SParameterStability m_Stability;
 
     // Result
@@ -81,7 +85,8 @@ private:
     void DrawViewChoice(const Core::SParameters &result, SParameterView view, PlotExporter &exporter);
     void DrawSelection(const Core::SParameters &result, SParameterView view);
 
-    // Magnitude and phase
+    // Magnitude, phase and polar
+    void DrawPolar(const Core::SParameters &result, SParameterView view);
     void DrawMagnitudePhase(const Core::SParameters &result, SParameterView view);
     void DrawBodePlot(const Core::SParameters &result,
                       const std::vector<SParameterEntry> &entries,

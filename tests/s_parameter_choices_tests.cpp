@@ -36,11 +36,16 @@ TEST_CASE("Each view of S, and Z and Y, keep their own checked entries", "[s_par
     GUI::SParameterSelections selections;
     selections.Reset(2);
     CHECK(selections.GetPortCount() == 2);
-    // The Smith chart starts from the reflections, the magnitude and phase from S11 and S21
+    // The Smith chart starts from the reflections, the Polar and magnitude/phase views from S11 and S21
     CHECK(selections.Get(GUI::SParameterQuantity::S, GUI::SParameterView::SMITH).IsShown(2, 2));
+    CHECK_FALSE(selections.Get(GUI::SParameterQuantity::S, GUI::SParameterView::POLAR).IsShown(2, 2));
+    CHECK_FALSE(selections.Get(GUI::SParameterQuantity::S, GUI::SParameterView::MAGNITUDE_PHASE).IsShown(2, 2));
+
+    selections.Get(GUI::SParameterQuantity::S, GUI::SParameterView::POLAR).SetShown(2, 2, true);
     CHECK_FALSE(selections.Get(GUI::SParameterQuantity::S, GUI::SParameterView::MAGNITUDE_PHASE).IsShown(2, 2));
 
     selections.Get(GUI::SParameterQuantity::Z, GUI::SParameterView::MAGNITUDE_PHASE).SetShown(1, 2, true);
+    CHECK(selections.Get(GUI::SParameterQuantity::Z, GUI::SParameterView::POLAR).IsShown(1, 2));
     CHECK(selections.Get(GUI::SParameterQuantity::Z, GUI::SParameterView::SMITH).IsShown(1, 2));
     CHECK_FALSE(selections.Get(GUI::SParameterQuantity::Y, GUI::SParameterView::MAGNITUDE_PHASE).IsShown(1, 2));
     CHECK_FALSE(selections.Get(GUI::SParameterQuantity::S, GUI::SParameterView::MAGNITUDE_PHASE).IsShown(1, 2));
@@ -52,11 +57,16 @@ TEST_CASE("The body says why it draws nothing, or draws the view", "[s_parameter
     using Body = GUI::SParameterBody;
     CHECK(GUI::ChooseBody(without, GUI::SParameterQuantity::Z, GUI::SParameterView::MAGNITUDE_PHASE, true)
           == Body::NO_FREQUENCY);
+    CHECK(GUI::ChooseBody(without, GUI::SParameterQuantity::Z, GUI::SParameterView::POLAR, true) == Body::NO_FREQUENCY);
     CHECK(GUI::ChooseBody(with, GUI::SParameterQuantity::S, GUI::SParameterView::SMITH, false)
+          == Body::NOTHING_CHECKED);
+    CHECK(GUI::ChooseBody(with, GUI::SParameterQuantity::S, GUI::SParameterView::POLAR, false)
           == Body::NOTHING_CHECKED);
     // The stability needs no entry checked
     CHECK(GUI::ChooseBody(with, GUI::SParameterQuantity::S, GUI::SParameterView::STABILITY, false) == Body::STABILITY);
     CHECK(GUI::ChooseBody(with, GUI::SParameterQuantity::S, GUI::SParameterView::SMITH, true) == Body::SMITH);
+    CHECK(GUI::ChooseBody(with, GUI::SParameterQuantity::S, GUI::SParameterView::POLAR, true) == Body::POLAR);
+    CHECK(GUI::ChooseBody(with, GUI::SParameterQuantity::Z, GUI::SParameterView::POLAR, true) == Body::POLAR);
     CHECK(GUI::ChooseBody(with, GUI::SParameterQuantity::Y, GUI::SParameterView::MAGNITUDE_PHASE, true)
           == Body::MAGNITUDE_PHASE);
 }

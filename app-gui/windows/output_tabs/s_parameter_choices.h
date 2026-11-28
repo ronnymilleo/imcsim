@@ -17,10 +17,12 @@ namespace GUI {
 
 /**
  * @enum    SParameterView
- * @brief   What the tab draws: the Smith chart, the magnitude and phase plots or the stability of a two-port.
+ * @brief   What the tab draws: the Smith chart, the Polar plot, the magnitude and phase plots or the stability of a
+ *          two-port.
  */
 enum class SParameterView {
     SMITH,
+    POLAR,
     MAGNITUDE_PHASE,
     STABILITY
 };
@@ -34,6 +36,7 @@ enum class SParameterBody {
     NOTHING_CHECKED, ///< No entry of the matrix is checked, so there is nothing to plot.
     STABILITY,
     SMITH,
+    POLAR,
     MAGNITUDE_PHASE
 };
 
@@ -50,8 +53,8 @@ public:
     const SParameterSelection &Get(SParameterQuantity quantity, SParameterView view) const;
 
 private:
-    /// The magnitude and phase of S, the Smith chart of S, Z and Y, in that order.
-    static constexpr std::size_t SELECTION_COUNT = 4;
+    /// Magnitude/phase of S, Smith chart of S, Polar of S, Z, and Y, in that order.
+    static constexpr std::size_t SELECTION_COUNT = 5;
 
     std::array<SParameterSelection, SELECTION_COUNT> m_Selections;
 
